@@ -1,0 +1,42 @@
+{
+  "name": "Panduga",
+  "description": "Assistant for the panduga.ch multi-family event: agenda, menu, rooms, shopping; organizers can make changes with confirmation.",
+  "model": "claude-sonnet-5-5",
+  "triggers": ["!panduga", "@panduga"],
+  "dm": "members",
+  "mcpServers": {
+    "panduga": {
+      "url": "${PANDUGA_MCP_URL}",
+      "tokens": {
+        "organizer": "${PANDUGA_TOKEN_ORGANIZER}",
+        "participant": "${PANDUGA_TOKEN_MEMBER}"
+      }
+    }
+  },
+  "tools": {
+    "participant": [
+      "panduga:whoami", "panduga:list_events",
+      "panduga:agenda_list", "panduga:agenda_get", "panduga:agenda_overlaps",
+      "panduga:menu_list", "panduga:rooms_list", "panduga:shopping_list",
+      "panduga:site_read", "panduga:table_list", "panduga:nominations_list"
+    ],
+    "organizer": ["panduga:*"],
+    "deny": []
+  },
+  "confirm": {
+    "preview": "panduga:*_preview",
+    "tool": "panduga:confirm",
+    "idField": "confirm_id",
+    "ttlMinutes": 9
+  },
+  "schedules": [
+    {
+      "id": "morning-agenda",
+      "at": "08:00",
+      "days": "daily",
+      "chats": "all",
+      "enabled": false,
+      "prompt": "Post a short, friendly good-morning summary of today's agenda for the event. Only if there are activities today."
+    }
+  ]
+}

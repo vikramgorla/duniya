@@ -1,0 +1,16 @@
+#cloud-config
+# Bootstraps whatsapp-agent-duniya: writes bootstrap values, clones the repo, runs deploy/install.sh.
+write_files:
+  - path: /etc/duniya/bootstrap.env
+    permissions: "0600"
+    owner: root:root
+    encoding: b64
+    content: ${bootstrap_env_b64}
+  - path: /usr/local/sbin/duniya-bootstrap
+    permissions: "0700"
+    owner: root:root
+    encoding: b64
+    content: ${bootstrap_sh_b64}
+
+runcmd:
+  - [/usr/local/sbin/duniya-bootstrap]

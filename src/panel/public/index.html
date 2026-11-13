@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duniya · agent admin</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #f6f5f1; --card: #fff; --ink: #1d1d1b; --muted: #6b6a64; --line: #e4e2da;
+    --accent: #0f6e56; --accent-soft: #e1f5ee; --warn: #854f0b; --warn-soft: #faeeda;
+    --bad: #a32d2d; --bad-soft: #fcebeb; --info: #185fa5; --info-soft: #e6f1fb; --radius: 10px;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --card: #201f1d; --ink: #ecebe6; --muted: #a09e96; --line: #34332f;
+      --accent: #5dcaa5; --accent-soft: #0d3a2e; --warn: #ef9f27; --warn-soft: #3a2a10;
+      --bad: #f09595; --bad-soft: #3d1a1a; --info: #85b7eb; --info-soft: #102a45; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.5; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; max-width: 1100px; margin: 0 auto; }
+  .brand { font-weight: 600; letter-spacing: .2px; }
+  .brand small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); display: inline-block; }
+  .dot.ok { background: #1d9e75; } .dot.warn { background: #ba7517; } .dot.bad { background: #e24b4a; }
+  nav { display: flex; gap: 2px; overflow-x: auto; padding: 0 12px; max-width: 1100px; margin: 0 auto; scrollbar-width: none; }
+  nav button { background: none; border: 0; padding: 10px 12px; color: var(--muted); font: inherit; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+  nav button.on { color: var(--ink); border-bottom-color: var(--accent); }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; font-weight: 600; }
+  .muted { color: var(--muted); } .small { font-size: 13px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .spread { justify-content: space-between; }
+  button.btn, .btn { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.danger { color: var(--bad); border-color: var(--bad); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  input, select, textarea { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; width: 100%; }
+  textarea { min-height: 80px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  .pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--line); color: var(--ink); white-space: nowrap; }
+  .pill.ok { background: var(--accent-soft); color: var(--accent); } .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.bad { background: var(--bad-soft); color: var(--bad); } .pill.info { background: var(--info-soft); color: var(--info); }
+  .feed { list-style: none; margin: 0; padding: 0; }
+  .feed li { border-bottom: 1px solid var(--line); padding: 8px 2px; cursor: pointer; }
+  .feed li:last-child { border-bottom: 0; }
+  .feed .meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .feed .sum { white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-word; max-height: 360px; }
+  table { width: 100%; border-collapse: collapse; } td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; } th { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .toggle { position: relative; width: 40px; height: 22px; flex: none; } .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle span { position: absolute; inset: 0; background: var(--line); border-radius: 999px; transition: .15s; cursor: pointer; }
+  .toggle span::after { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .15s; }
+  .toggle input:checked + span { background: var(--accent); } .toggle input:checked + span::after { transform: translateX(18px); }
+  .qr { background: #fff; padding: 8px; border-radius: 8px; width: 220px; max-width: 100%; }
+  .center { min-height: 80vh; display: grid; place-items: center; }
+  .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 14px; z-index: 20; max-width: 90vw; }
+  .chatlog { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow: auto; margin: 10px 0; }
+  .bubble { padding: 8px 10px; border-radius: 10px; max-width: 85%; white-space: pre-wrap; word-break: break-word; }
+  .bubble.me { align-self: flex-end; background: var(--accent-soft); } .bubble.bot { align-self: flex-start; background: var(--bg); border: 1px solid var(--line); }
+  .hide { display: none !important; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+'use strict';
+// ---------- tiny DOM helper: all user/WhatsApp text goes through textContent ----------
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className = v;
+    else if (k === 'value') el.value = v;
+    else if (k === 'checked') el.checked = !!v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+const $ = (s) => document.querySelector(s);
+function toast(msg) { const t = h('div', { class: 'toast' }, msg); document.body.append(t); setTimeout(() => t.remove(), 3000); }
+async function api(method, path, body) {
+  const res = await fetch(path, { method, headers: body !== undefined || method !== 'GET' ? { 'content-type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : (method !== 'GET' ? '{}' : undefined) });
+  if (res.status === 401 && path !== '/api/login') { renderLogin(); throw new Error('Login required'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+const ago = (ts) => { const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s / 60)}m` : s < 86400 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`; };
+const time = (ts) => new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const TYPE_CLASS = { 'message.in': 'info', 'message.out': 'ok', 'tool.call': '', 'tool.error': 'bad', error: 'bad', 'confirm.created': 'warn', 'confirm.applied': 'ok', 'confirm.cancelled': 'warn', 'channel.status': 'info', 'schedule.run': 'info', 'bot.updated': '', system: '' };
+function toggle(checked, onchange) { return h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked, onchange: (e) => onchange(e.target.checked) }), h('span')); }
+
+// ---------- state ----------
+const S = { tab: 'overview', status: null, bots: [], feed: [], feedBot: '', es: null };
+const TABS = [['overview', 'Overview'], ['activity', 'Activity'], ['bots', 'Bots'], ['chats', 'Chats'], ['pending', 'Pending'], ['secrets', 'Secrets'], ['settings', 'Settings']];
+
+// ---------- login ----------
+async function renderLogin() {
+  S.es?.close(); S.es = null;
+  const app = $('#app'); app.replaceChildren();
+  let info = {}; try { info = await (await fetch('/api/session')).json(); } catch {}
+  if (info.authed) return boot();
+  const pw = h('input', { type: 'password', placeholder: 'Admin password', autocomplete: 'current-password' });
+  const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:20px' });
+  const go = async (e) => {
+    e.preventDefault();
+    try { await api('POST', '/api/login', { password: pw.value }); boot(); } catch (x) { err.textContent = x.message; }
+  };
+  app.append(h('div', { class: 'center' }, h('form', { class: 'card', style: 'width:min(360px,92vw)', onsubmit: go },
+    h('h2', {}, 'Duniya agent admin'),
+    info.passwordConfigured ? null : h('p', { class: 'small', style: 'color:var(--warn)' }, 'No admin password configured on the server (ADMIN_PASSWORD).'),
+    pw, err, h('button', { class: 'btn primary', style: 'width:100%' }, 'Sign in'))));
+  pw.focus();
+}
+
+// ---------- shell ----------
+async function boot() {
+  const app = $('#app'); app.replaceChildren();
+  const dot = h('span', { class: 'dot', id: 'wa-dot' });
+  const nav = h('nav', {}, TABS.map(([id, label]) => h('button', { 'data-tab': id, onclick: () => show(id) }, label)));
+  app.append(
+    h('header', {}, h('div', { class: 'bar' }, dot, h('div', { class: 'brand' }, 'Duniya', h('small', { id: 'brand-sub' }, 'agents')),
+      h('div', { style: 'flex:1' }), h('button', { class: 'btn small', onclick: async () => { await api('POST', '/api/logout'); renderLogin(); } }, 'Sign out')), nav),
+    h('main', { id: 'main' }));
+  connectEvents();
+  await refreshStatus();
+  setInterval(refreshStatus, 5000);
+  show(location.hash.slice(1) || 'overview');
+}
+async function refreshStatus() {
+  try { S.status = await api('GET', '/api/status'); } catch { return; }
+  const st = S.status.channel.status;
+  const dot = $('#wa-dot'); if (dot) dot.className = `dot ${st === 'open' ? 'ok' : st === 'qr' || st === 'reconnecting' || st === 'starting' ? 'warn' : 'bad'}`;
+  const sub = $('#brand-sub'); if (sub) sub.textContent = S.status.settings.paused ? 'paused' : `${S.status.bots.filter((b) => b.enabled).length} bots live`;
+  if (S.tab === 'overview') renderOverview(true);
+}
+function show(tab) {
+  S.tab = tab; location.hash = tab;
+  document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+  ({ overview: renderOverview, activity: renderActivity, bots: renderBots, chats: renderChats, pending: renderPending, secrets: renderSecrets, settings: renderSettings })[tab]?.();
+}
+function connectEvents() {
+  S.es?.close();
+  S.es = new EventSource('/api/events');
+  S.es.onmessage = (e) => {
+    const a = JSON.parse(e.data);
+    S.feed.unshift(a); S.feed.length = Math.min(S.feed.length, 500);
+    if (S.tab === 'activity' && (!S.feedBot || a.bot === S.feedBot)) $('#feed')?.prepend(feedItem(a));
+    if (S.tab === 'overview') { const r = $('#recent'); if (r) { r.prepend(feedItem(a)); while (r.children.length > 8) r.lastChild.remove(); } }
+    if (a.type === 'channel.status') refreshStatus();
+  };
+}
+
+// ---------- overview ----------
+let overviewBusy = false;
+function renderOverview(soft) {
+  const st = S.status; if (!st) return;
+  if (soft && overviewBusy) return; // don't clobber an open input
+  const m = $('#main'); const c = st.channel;
+  const statusPill = h('span', { class: `pill ${c.status === 'open' ? 'ok' : c.status === 'qr' ? 'warn' : 'bad'}` }, c.status);
+  const phone = h('input', { placeholder: 'Bot number, e.g. 41791234567', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
+  const wa = h('div', { class: 'card' },
+    h('div', { class: 'row spread' }, h('h2', {}, 'WhatsApp'), statusPill),
+    c.status === 'open' ? h('p', {}, 'Connected as ', h('b', {}, (c.me || '').split(':')[0].split('@')[0]), h('span', { class: 'muted small' }, ` · since ${time(c.since)}`)) : null,
+    c.qrDataUrl ? h('div', {}, h('p', { class: 'small muted' }, 'WhatsApp → Settings → Linked devices → Link a device, then scan:'), h('img', { class: 'qr', src: c.qrDataUrl, alt: 'WhatsApp QR code' })) : null,
+    c.status !== 'open' ? h('div', {}, h('label', {}, 'Or link with a pairing code'), h('div', { class: 'row' }, phone,
+      h('button', { class: 'btn', onclick: async () => { try { const r = await api('POST', '/api/whatsapp/pair', { phone: phone.value }); toast(`Pairing code: ${r.code}`); overviewBusy = false; refreshStatus(); } catch (e) { toast(e.message); } } }, 'Get code'))) : null,
+    c.pairingCode ? h('p', {}, 'Pairing code: ', h('b', { style: 'font-size:20px;letter-spacing:2px' }, c.pairingCode)) : null,
+    c.lastError ? h('p', { class: 'small', style: 'color:var(--bad)' }, c.lastError) : null,
+    h('div', { class: 'row', style: 'margin-top:10px' },
+      h('button', { class: 'btn', onclick: async () => { await api('POST', '/api/whatsapp/restart'); toast('Reconnecting…'); } }, 'Reconnect'),
+      h('button', { class: 'btn danger', onclick: async () => { if (confirm('Unlink this WhatsApp number? You will need to scan a new QR.')) { await api('POST', '/api/whatsapp/logout'); toast('Logged out'); } } }, 'Unlink')));
+
+  const control = h('div', { class: 'card' },
+    h('h2', {}, 'Control'),
+    h('div', { class: 'row spread' }, h('div', {}, h('b', {}, 'Pause all bots'), h('div', { class: 'small muted' }, 'Kill switch: stops all replies and schedules')),
+      toggle(st.settings.paused, async (v) => { await api('POST', '/api/settings', { paused: v }); toast(v ? 'Paused' : 'Resumed'); refreshStatus(); })),
+    h('table', { style: 'margin-top:10px' }, h('tbody', {}, st.bots.map((b) => h('tr', {},
+      h('td', {}, h('b', {}, b.name), h('div', { class: 'small muted' }, `${b.chats} chat(s)`)),
+      h('td', { style: 'text-align:right' }, toggle(b.enabled, async (v) => { await api('PUT', `/api/bots/${b.id}`, { enabled: v }); toast(`${b.name} ${v ? 'enabled' : 'disabled'}`); refreshStatus(); })))))),
+    st.pending ? h('p', {}, h('span', { class: 'pill warn' }, `${st.pending} pending confirmation(s)`)) : null);
+
+  const updLog = h('pre', { class: 'hide' });
+  const sys = h('div', { class: 'card' },
+    h('h2', {}, 'Server'),
+    h('table', {}, h('tbody', {},
+      [['Version', st.version], ['Uptime', ago(Date.now() - st.uptimeSec * 1000)], ['Memory', `${st.memoryMb} MB`], ['Node', st.node]]
+        .map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v))))),
+    h('div', { class: 'row', style: 'margin-top:10px' },
+      h('button', { class: 'btn primary', onclick: async (e) => {
+        if (!confirm('Pull the latest code from GitHub and restart?')) return;
+        e.target.disabled = true; e.target.textContent = 'Updating…';
+        try { const r = await api('POST', '/api/system/update'); updLog.textContent = r.log; updLog.classList.remove('hide'); toast(r.code === 0 ? 'Updated, restarting…' : 'Update failed'); if (r.code === 0) setTimeout(() => location.reload(), 8000); }
+        catch (x) { toast(x.message); } finally { e.target.disabled = false; e.target.textContent = 'Update from GitHub'; }
+      } }, 'Update from GitHub'),
+      h('button', { class: 'btn', onclick: async () => { if (confirm('Restart the service?')) { await api('POST', '/api/system/restart').catch(() => {}); toast('Restarting…'); setTimeout(() => location.reload(), 6000); } } }, 'Restart')),
+    updLog);
+
+  const recent = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('div', { class: 'row spread' }, h('h2', {}, 'Recent activity'), h('button', { class: 'btn small', onclick: () => show('activity') }, 'All activity')),
+    h('ul', { class: 'feed', id: 'recent' }, S.feed.slice(0, 8).map(feedItem)));
+  m.replaceChildren(h('div', { class: 'grid' }, wa, control, sys, recent));
+  if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; const r = $('#recent'); if (r) r.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
+}
+
+// ---------- activity ----------
+function feedItem(a) {
+  const detail = h('pre', { class: 'hide' }, a.detail ? JSON.stringify(a.detail, null, 2) : '(no details)');
+  return h('li', { onclick: () => detail.classList.toggle('hide') },
+    h('div', { class: 'meta' }, h('span', { class: `pill ${TYPE_CLASS[a.type] ?? ''}` }, a.type), a.bot ? h('span', {}, a.bot) : null,
+      a.chat ? h('span', { title: a.chat }, a.chat.split('@')[0].slice(-8)) : null, h('span', { style: 'margin-left:auto' }, time(a.ts))),
+    h('div', { class: 'sum' }, a.summary), detail);
+}
+async function renderActivity() {
+  const m = $('#main');
+  const sel = h('select', { onchange: async (e) => { S.feedBot = e.target.value; await load(); }, style: 'max-width:220px' },
+    h('option', { value: '' }, 'All bots'), (S.status?.bots || []).map((b) => h('option', { value: b.id, selected: S.feedBot === b.id }, b.name)));
+  const list = h('ul', { class: 'feed', id: 'feed' });
+  const more = h('button', { class: 'btn', onclick: async () => { const last = list.lastChild?.dataset?.id; const rows = await api('GET', `/api/activity?limit=200&bot=${encodeURIComponent(S.feedBot)}&before=${last || 0}`); rows.forEach((r) => { const li = feedItem(r); li.dataset.id = r.id; list.append(li); }); } }, 'Load older');
+  m.replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'Live activity'), sel), h('p', { class: 'small muted' }, 'Messages, tool calls, confirmations and errors, newest first. Tap an entry for details.'), list, h('div', { style: 'margin-top:10px' }, more)));
+  async function load() {
+    const rows = await api('GET', `/api/activity?limit=200&bot=${encodeURIComponent(S.feedBot)}`);
+    list.replaceChildren(...rows.map((r) => { const li = feedItem(r); li.dataset.id = r.id; return li; }));
+  }
+  await load();
+}
+
+// ---------- bots ----------
+async function renderBots() {
+  const m = $('#main');
+  S.bots = await api('GET', '/api/bots');
+  m.replaceChildren(h('div', { class: 'row spread', style: 'margin-bottom:12px' }, h('div', { class: 'muted small' }, 'Bots live in the repo under bots/<id>/. Settings below are stored on the server and survive updates.'),
+    h('button', { class: 'btn', onclick: async () => { await api('POST', '/api/bots/reload'); toast('Reloaded from disk'); renderBots(); } }, 'Reload bots')),
+  h('div', { class: 'grid' }, S.bots.map(botCard)));
+}
+function botCard(b) {
+  const f = {};
+  const field = (key, label, el) => { f[key] = el; return h('div', {}, h('label', {}, label), el); };
+  const lines = (arr) => (arr || []).join('\n');
+  const form = h('div', {},
+    field('model', 'Model', h('input', { value: b.model })),
+    field('triggers', 'Triggers (comma separated, e.g. !panduga)', h('input', { value: (b.triggers || []).join(', ') })),
+    field('dm', 'Direct messages', h('select', {}, ['members', 'organizers', 'anyone', 'none'].map((v) => h('option', { value: v, selected: b.dm === v }, { members: 'Members of its groups + listed participants', organizers: 'Organizers only', anyone: 'Anyone', none: 'Nobody' }[v])))),
+    field('organizers', 'Organizer phone numbers (one per line, with country code)', h('textarea', { value: lines(b.organizers), style: 'min-height:60px' })),
+    field('participants', 'Extra participants allowed to DM (one per line)', h('textarea', { value: lines(b.participants), style: 'min-height:50px' })),
+    field('extraPrompt', 'Extra instructions (added to the bot prompt)', h('textarea', { value: b.extraPrompt || '' })),
+    field('schedules', 'Schedules (JSON: [{"id":"digest","at":"08:00","days":"daily","prompt":"…","chats":"all"}])', h('textarea', { value: JSON.stringify(b.schedules || [], null, 2) })),
+    h('div', { class: 'row' }, field('historySize', 'History (msgs)', h('input', { type: 'number', value: b.historySize, style: 'width:110px' })), field('maxTokens', 'Max tokens', h('input', { type: 'number', value: b.maxTokens, style: 'width:110px' }))),
+    h('div', { class: 'row', style: 'margin-top:10px' }, h('span', { class: 'small' }, 'Reply when @mentioned'), toggle(b.respondToMentions, (v) => (f.respondToMentions = v))),
+    h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn primary', onclick: save }, 'Save')));
+  async function save() {
+    try {
+      const patch = {
+        model: f.model.value.trim(), triggers: f.triggers.value.split(',').map((s) => s.trim()).filter(Boolean), dm: f.dm.value,
+        organizers: f.organizers.value.split('\n'), participants: f.participants.value.split('\n'), extraPrompt: f.extraPrompt.value,
+        schedules: JSON.parse(f.schedules.value || '[]'), historySize: Number(f.historySize.value), maxTokens: Number(f.maxTokens.value),
+      };
+      if (typeof f.respondToMentions === 'boolean') patch.respondToMentions = f.respondToMentions;
+      await api('PUT', `/api/bots/${b.id}`, patch); toast('Saved');
+    } catch (e) { toast(e.message); }
+  }
+  const scheds = (b.schedules || []).map((s) => h('div', { class: 'row spread small', style: 'margin:4px 0' }, h('span', {}, `${s.id} · ${s.at} ${s.days}`),
+    h('button', { class: 'btn small', onclick: async () => { const r = await api('POST', `/api/bots/${b.id}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${r.length} chat(s)` : 'No chats bound'); } }, 'Run now')));
+
+  // test console
+  const log = h('div', { class: 'chatlog' });
+  const role = h('select', { style: 'max-width:150px' }, h('option', { value: 'participant' }, 'as participant'), h('option', { value: 'organizer' }, 'as organizer'));
+  const input = h('input', { placeholder: 'Ask the bot something…' });
+  const testForm = h('form', { class: 'row', onsubmit: async (e) => {
+    e.preventDefault(); const text = input.value.trim(); if (!text) return;
+    log.append(h('div', { class: 'bubble me' }, text)); input.value = '';
+    const wait = h('div', { class: 'bubble bot muted' }, '…'); log.append(wait); log.scrollTop = 1e9;
+    try { const r = await api('POST', `/api/bots/${b.id}/test`, { text, role: role.value }); wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); }
+    catch (x) { wait.textContent = `Error: ${x.message}`; }
+    log.scrollTop = 1e9;
+  } }, role, input, h('button', { class: 'btn' }, 'Send'));
+
+  const details = h('div', { class: 'hide' }, form);
+  return h('div', { class: 'card' },
+    h('div', { class: 'row spread', style: 'flex-wrap:nowrap;align-items:flex-start' }, h('div', { style: 'flex:1;min-width:0' }, h('h2', { style: 'margin:0' }, b.name), h('div', { class: 'small muted' }, b.description || b.id)),
+      toggle(b.enabled, async (v) => { await api('PUT', `/api/bots/${b.id}`, { enabled: v }); toast(`${b.name} ${v ? 'enabled' : 'disabled'}`); })),
+    h('div', { class: 'row small', style: 'margin:10px 0' },
+      h('span', { class: 'pill' }, `${b.chats.length} chat(s)`), h('span', { class: 'pill' }, `${b.organizers.length} organizer(s)`),
+      Object.keys(b.mcpServers || {}).map((k) => h('span', { class: 'pill info' }, `MCP: ${k}`)),
+      (b.localTools || []).map((t) => h('span', { class: 'pill ok' }, `tool: ${t}`)),
+      b.confirm ? h('span', { class: 'pill warn' }, 'changes need confirm') : null),
+    scheds.length ? h('div', {}, h('label', {}, 'Schedules'), scheds) : null,
+    h('label', {}, 'Test console (real tools, does not post to WhatsApp)'), log, testForm,
+    h('div', { style: 'margin-top:12px' }, h('button', { class: 'btn', onclick: (e) => { details.classList.toggle('hide'); e.target.textContent = details.classList.contains('hide') ? 'Edit settings' : 'Hide settings'; } }, 'Edit settings')),
+    details);
+}
+
+// ---------- chats ----------
+async function renderChats() {
+  const m = $('#main');
+  m.replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading groups…')));
+  const [chats, bots] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/bots')]);
+  const rows = chats.map((c) => h('tr', {},
+    h('td', {}, h('b', {}, c.name), h('div', { class: 'small muted' }, `${c.size} members · ${c.id}`)),
+    h('td', { style: 'width:200px' }, h('select', { onchange: async (e) => { await api('POST', '/api/chats/bind', { chat: c.id, bot: e.target.value || null }); toast(e.target.value ? `Bound to ${e.target.value}` : 'Unbound'); } },
+      h('option', { value: '' }, '— no bot —'), bots.map((b) => h('option', { value: b.id, selected: c.bot === b.id }, b.name))))));
+  m.replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'WhatsApp groups'),
+    h('p', { class: 'small muted' }, 'Add the bot number to a group in WhatsApp, then pick which bot answers there. Each group has at most one bot.'),
+    chats.length ? h('table', {}, h('tbody', {}, rows)) : h('p', { class: 'muted' }, 'No groups yet (or WhatsApp is not connected).')));
+}
+
+// ---------- pending ----------
+async function renderPending() {
+  const rows = await api('GET', '/api/pending');
+  $('#main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Pending confirmations'),
+    h('p', { class: 'small muted' }, 'Changes an organizer asked for that are waiting for "confirm CODE". You can also apply or cancel them here.'),
+    rows.length ? h('table', {}, h('tbody', {}, rows.map((p) => h('tr', {},
+      h('td', {}, h('b', {}, p.code), h('div', { class: 'small muted' }, `${p.bot} · ${p.tool} · expires in ${Math.max(0, Math.round((p.expires - Date.now()) / 60000))} min`), h('pre', {}, p.summary)),
+      h('td', { style: 'white-space:nowrap' },
+        h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('POST', `/api/pending/${p.code}/apply`); toast(r.result); } catch (e) { toast(e.message); } renderPending(); } }, 'Apply'), ' ',
+        h('button', { class: 'btn', onclick: async () => { await api('DELETE', `/api/pending/${p.code}`); renderPending(); } }, 'Cancel')))))) : h('p', { class: 'muted' }, 'Nothing pending.')));
+}
+
+// ---------- secrets ----------
+async function renderSecrets() {
+  const rows = await api('GET', '/api/secrets');
+  const name = h('input', { placeholder: 'NAME_LIKE_THIS' }); const val = h('input', { type: 'password', placeholder: 'value' });
+  const setRow = (n) => { const v = h('input', { type: 'password', placeholder: 'new value' });
+    return h('tr', {}, h('td', {}, h('code', {}, n.name), n.usedByBots ? h('div', { class: 'small muted' }, 'used by a bot') : null),
+      h('td', {}, h('span', { class: `pill ${n.set ? 'ok' : 'bad'}` }, n.set ? 'set' : 'missing')),
+      h('td', {}, h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); await api('PUT', '/api/secrets', { name: n.name, value: v.value }); toast(v.value ? 'Saved' : 'Removed'); renderSecrets(); } }, v, h('button', { class: 'btn' }, 'Save')))); };
+  $('#main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Secrets'),
+    h('p', { class: 'small muted' }, 'API keys and tokens, stored on the server only (never shown again). Bots reference them as ${NAME} in bot.json. Save an empty value to remove.'),
+    h('table', {}, h('tbody', {}, rows.map(setRow))),
+    h('label', {}, 'Add a secret'), h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); try { await api('PUT', '/api/secrets', { name: name.value.trim(), value: val.value }); toast('Saved'); renderSecrets(); } catch (x) { toast(x.message); } } }, name, val, h('button', { class: 'btn primary' }, 'Add'))));
+}
+
+// ---------- settings ----------
+async function renderSettings() {
+  const st = S.status; const bots = await api('GET', '/api/bots');
+  const cur = h('input', { type: 'password', placeholder: 'current', autocomplete: 'current-password' });
+  const next = h('input', { type: 'password', placeholder: 'new (12+ chars)', autocomplete: 'new-password' });
+  $('#main').replaceChildren(h('div', { class: 'grid' },
+    h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default bot for DMs without a trigger'),
+      h('select', { onchange: async (e) => { await api('POST', '/api/settings', { defaultDmBot: e.target.value }); toast('Saved'); } },
+        h('option', { value: '' }, '— first bot that accepts the sender —'), bots.map((b) => h('option', { value: b.id, selected: st.settings.defaultDmBot === b.id }, b.name)))),
+    h('div', { class: 'card' }, h('h2', {}, 'Admin password'), cur, h('div', { style: 'height:8px' }), next,
+      h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: async () => { try { await api('POST', '/api/password', { current: cur.value, next: next.value }); toast('Changed — sign in again'); renderLogin(); } catch (e) { toast(e.message); } } }, 'Change password')),
+    h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'As an organizer of any bot you can send:'),
+      h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups')))));
+}
+
+renderLogin();
+</script>
+</body>
+</html>

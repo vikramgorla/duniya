@@ -1,0 +1,20 @@
+{
+  "name": "whatsapp-agent-duniya",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted WhatsApp agent platform: many Claude-powered bots on one number, MCP tools, admin panel.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/index.js",
+    "test": "node --test --test-concurrency=1 --disable-warning=ExperimentalWarning test/*.test.js"
+  },
+  "engines": { "node": ">=22.13" },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "baileys": "7.0.0-rc14",
+    "pino": "^10.4.0",
+    "qrcode": "^1.5.4"
+  }
+}

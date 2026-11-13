@@ -1,0 +1,8 @@
+node_modules/
+data/
+backups/
+.env
+infra/terraform/.terraform/
+infra/terraform/*.tfstate*
+infra/terraform/*.tfvars
+!infra/terraform/example.tfvars

@@ -1,0 +1,134 @@
+name: Infrastructure (OCI)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to do"
+        type: choice
+        options: [plan, apply, destroy]
+        default: plan
+  push:
+    branches: [main]
+    paths: ["infra/terraform/**", ".github/workflows/infra.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infra
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    env:
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+      ACTION: ${{ github.event_name == 'workflow_dispatch' && inputs.action || 'plan' }}
+      STATE_BUCKET: ${{ vars.STATE_BUCKET || 'whatsapp-agent-duniya-tfstate' }}
+      OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING: "True"
+      TF_VAR_tenancy_ocid: ${{ secrets.OCI_TENANCY_OCID }}
+      TF_VAR_region: ${{ secrets.OCI_REGION }}
+      TF_VAR_compartment_ocid: ${{ secrets.OCI_COMPARTMENT_OCID }}
+      TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
+      TF_VAR_cf_tunnel_token: ${{ secrets.CF_TUNNEL_TOKEN }}
+      TF_VAR_git_token: ${{ secrets.GIT_CLONE_TOKEN }}
+      TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+      TF_VAR_ssh_ingress_cidr: ${{ vars.SSH_INGRESS_CIDR }}
+      TF_VAR_shape: ${{ vars.SHAPE || 'VM.Standard.E2.1.Micro' }}
+      TF_VAR_repo_url: https://github.com/${{ github.repository }}.git
+      TF_VAR_branch: ${{ github.event.repository.default_branch }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secrets
+        run: |
+          missing=""
+          for s in OCI_TENANCY_OCID OCI_USER_OCID OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_REGION ADMIN_PASSWORD; do
+            [ -n "${!s}" ] || missing="$missing $s"
+          done
+          if [ -n "$missing" ]; then echo "::error::Missing repository secrets:$missing"; exit 1; fi
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+
+      - name: Write OCI API key config
+        run: |
+          mkdir -p ~/.oci && chmod 700 ~/.oci
+          printf '%s\n' "$OCI_PRIVATE_KEY" > ~/.oci/key.pem && chmod 600 ~/.oci/key.pem
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=$OCI_USER_OCID
+          fingerprint=$OCI_FINGERPRINT
+          tenancy=$OCI_TENANCY_OCID
+          region=$OCI_REGION
+          key_file=$HOME/.oci/key.pem
+          EOF
+          chmod 600 ~/.oci/config
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+
+      - name: Install OCI CLI
+        run: pipx install oci-cli >/dev/null && oci --version
+
+      - name: Ensure state bucket exists
+        id: state
+        run: |
+          NS=$(oci os ns get --query data --raw-output)
+          COMP="${TF_VAR_compartment_ocid:-$TF_VAR_tenancy_ocid}"
+          if ! oci os bucket get --namespace "$NS" --bucket-name "$STATE_BUCKET" >/dev/null 2>&1; then
+            echo "Creating private bucket $STATE_BUCKET (versioned)"
+            oci os bucket create --namespace "$NS" --compartment-id "$COMP" --name "$STATE_BUCKET" \
+              --public-access-type NoPublicAccess --versioning Enabled >/dev/null
+          fi
+          echo "namespace=$NS" >> "$GITHUB_OUTPUT"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.17.2"
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: |
+          terraform init \
+            -backend-config="bucket=$STATE_BUCKET" \
+            -backend-config="namespace=${{ steps.state.outputs.namespace }}" \
+            -backend-config="region=$TF_VAR_region"
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: terraform plan
+        if: env.ACTION != 'destroy'
+        run: terraform plan -out=tfplan
+
+      - name: terraform apply
+        if: env.ACTION == 'apply'
+        run: |
+          terraform apply tfplan
+          {
+            echo "## Deployed"
+            echo '```'
+            terraform output -raw next_steps
+            echo
+            echo "public_ip: $(terraform output -raw public_ip)"
+            echo "image: $(terraform output -raw image)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: terraform destroy
+        if: env.ACTION == 'destroy'
+        run: terraform destroy -auto-approve
