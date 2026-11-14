@@ -17,6 +17,7 @@ const DEFAULTS = {
   github: { enabled: false, repo: '', branch: '', path: 'backups' },
   s3: { enabled: false, endpoint: '', region: 'auto', bucket: '', prefix: 'duniya/' },
   githubClientId: '',
+  githubApp: null, // 019: { id, slug, name, owner, htmlUrl, clientId, createdAt, installationId?, account? }
 };
 
 export function getBackupSettings() {
@@ -54,7 +55,25 @@ export function setPassphrase(p) {
 }
 
 export const githubClientId = () => getBackupSettings().githubClientId || process.env.GITHUB_OAUTH_CLIENT_ID || '';
-const ghToken = () => getSecret('GITHUB_BACKUP_TOKEN');
+export const APP_KEY_SECRET = 'GITHUB_APP_PRIVATE_KEY';
+let instToken = null; // { installationId, token, expiresAt }
+/** An installation token for the backup GitHub App, refreshed 5 minutes before it expires. */
+export async function appInstallationToken() {
+  const app = getBackupSettings().githubApp;
+  const pem = getSecret(APP_KEY_SECRET);
+  if (!app?.installationId || !pem) throw Object.assign(new Error('The GitHub app is not installed yet'), { status: 400 });
+  if (instToken && instToken.installationId === app.installationId && instToken.expiresAt - Date.now() > 300000) return instToken.token;
+  const t = await gh.installationToken(gh.appJwt(app.id, pem), app.installationId);
+  instToken = { installationId: app.installationId, ...t };
+  return t.token;
+}
+export const resetAppToken = () => { instToken = null; };
+/** How backups reach GitHub: the installed GitHub App when there is one, else the saved token (or null). */
+export function githubAuth() {
+  if (getBackupSettings().githubApp?.installationId && getSecret(APP_KEY_SECRET)) return appInstallationToken;
+  return getSecret('GITHUB_BACKUP_TOKEN') || null;
+}
+const ghToken = githubAuth;
 const s3For = (s) => s3Client({ ...s.s3, accessKeyId: getSecret('S3_ACCESS_KEY_ID'), secretAccessKey: getSecret('S3_SECRET_ACCESS_KEY') });
 
 function stampName(d = new Date()) {
@@ -141,7 +160,10 @@ export async function fetchBackup(source, file) {
 
 /** Decrypt and stage; caller restarts the process. */
 export async function restoreBackup({ source, file, passphrase }) {
-  const buf = await fetchBackup(source, file);
+  return restoreBuffer(await fetchBackup(source, file), passphrase, { source, file });
+}
+/** Decrypt an encrypted backup already in memory (e.g. an uploaded file) and stage it. */
+export function restoreBuffer(buf, passphrase, { source = 'upload', file = 'uploaded file' } = {}) {
   const bundle = decryptBundle(buf, passphrase);
   const names = stageRestore(bundle, `${source}:${file}`);
   activity('backup.restore', { summary: `Restore of ${file} from ${source} staged (${names.length} files); restarting` });

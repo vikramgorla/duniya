@@ -24,6 +24,15 @@ db.exec(`
     tenant_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT, PRIMARY KEY (tenant_id, key)
   );
 `);
+// 019: Google sign-in. google_sub is Google's stable account id; invites let an email sign in with Google once.
+if (!db.prepare("SELECT 1 FROM pragma_table_info('users') WHERE name = 'google_sub'").get()) db.exec('ALTER TABLE users ADD COLUMN google_sub TEXT');
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users (tenant_id, google_sub) WHERE google_sub IS NOT NULL;
+  CREATE TABLE IF NOT EXISTS invites (
+    id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL, email TEXT NOT NULL, role TEXT NOT NULL, invited_by TEXT,
+    created_at INTEGER, renewed_at INTEGER, expires_at INTEGER, UNIQUE(tenant_id, email)
+  );
+`);
 db.prepare('INSERT OR IGNORE INTO tenants (id, name, created_at) VALUES (?, ?, ?)').run(TENANT, 'Default', Date.now());
 
 // ---------- secrets ----------
@@ -85,7 +94,10 @@ export const getSetting = (key, fallback) => getSettings()[key] ?? fallback;
 
 // ---------- users ----------
 export const ROLES = ['owner', 'admin', 'viewer'];
-const userView = (u) => u && ({ id: u.id, username: u.username, email: u.email || '', role: u.role, disabled: !!u.disabled, createdAt: u.created_at });
+const userView = (u) => u && ({
+  id: u.id, username: u.username, email: u.email || '', role: u.role, disabled: !!u.disabled, createdAt: u.created_at,
+  google: !!u.google_sub, hasPassword: !!u.pw_hash,
+});
 
 export const countUsers = () => db.prepare('SELECT COUNT(*) AS n FROM users WHERE tenant_id = ?').get(TENANT).n;
 export const listUsers = () => db.prepare('SELECT * FROM users WHERE tenant_id = ? ORDER BY id').all(TENANT).map(userView);
@@ -108,6 +120,90 @@ export function createUser({ username, email = '', role = 'admin', password }) {
     .run(TENANT, name, String(email || ''), role, salt, hash, Date.now());
   return getUser(Number(r.lastInsertRowid));
 }
+const normEmail = (e) => String(e || '').trim().toLowerCase();
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const err = (status, message, field) => Object.assign(new Error(message), { status, field });
+
+export function findUserByGoogleSub(sub) {
+  return userView(db.prepare('SELECT * FROM users WHERE tenant_id = ? AND google_sub = ?').get(TENANT, String(sub)));
+}
+/** Users whose email matches (case-insensitive). */
+export function findUsersByEmail(email) {
+  return db.prepare('SELECT * FROM users WHERE tenant_id = ? AND lower(trim(email)) = ?').all(TENANT, normEmail(email)).map(userView);
+}
+export function linkGoogle(userId, sub) {
+  const other = findUserByGoogleSub(sub);
+  if (other && other.id !== Number(userId)) throw err(409, `This Google account is already linked to ${other.username}`);
+  db.prepare('UPDATE users SET google_sub = ? WHERE id = ? AND tenant_id = ?').run(String(sub), Number(userId), TENANT);
+  return getUser(userId);
+}
+export function unlinkGoogle(userId) {
+  const u = getUser(userId);
+  if (!u) throw err(404, 'User not found');
+  if (!u.hasPassword) throw err(400, 'Set a password first, otherwise this account could not sign in any more');
+  db.prepare('UPDATE users SET google_sub = NULL WHERE id = ?').run(u.id);
+  return getUser(u.id);
+}
+/** A username from an email address: anu.rao@gmail.com → anu.rao (then anu.rao-2, …). */
+export function usernameFromEmail(email) {
+  let base = normEmail(email).split('@')[0].replace(/\+.*$/, '').replace(/[^a-z0-9._-]+/g, '.').replace(/^[._-]+|[._-]+$/g, '').slice(0, 34);
+  if (base.length < 2) base = `user${base}`;
+  const taken = (n) => !!db.prepare('SELECT 1 FROM users WHERE tenant_id = ? AND username = ?').get(TENANT, n);
+  if (!taken(base)) return base;
+  for (let i = 2; i < 1000; i++) if (!taken(`${base}-${i}`)) return `${base}-${i}`;
+  return `${base}-${Date.now().toString(36)}`;
+}
+/** Account created by an accepted invite: signs in with Google only (no password until they set one). */
+export function createGoogleUser({ email, role, sub }) {
+  if (!ROLES.includes(role)) throw err(400, 'Invalid role');
+  const name = usernameFromEmail(email);
+  const r = db.prepare('INSERT INTO users (tenant_id, username, email, role, google_sub, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(TENANT, name, normEmail(email), role, String(sub), Date.now());
+  return getUser(Number(r.lastInsertRowid));
+}
+
+// ---------- invites (019) ----------
+const INVITE_MS = 14 * 24 * 3600 * 1000;
+const inviteView = (i) => i && ({ id: i.id, email: i.email, role: i.role, invitedBy: i.invited_by || '', createdAt: i.created_at, renewedAt: i.renewed_at, expiresAt: i.expires_at, expired: i.expires_at < Date.now() });
+export const listInvites = () => db.prepare('SELECT * FROM invites WHERE tenant_id = ? ORDER BY id').all(TENANT).map(inviteView);
+export function createInvite({ email, role = 'admin', by = '' }) {
+  const e = normEmail(email);
+  if (!EMAIL_RE.test(e)) throw err(400, 'Enter a valid email address', 'email');
+  if (!ROLES.includes(role)) throw err(400, 'Role must be owner, admin or viewer', 'role');
+  if (findUsersByEmail(e).length) throw err(409, `${e} already has an account — they can sign in with Google directly`, 'email');
+  const now = Date.now();
+  db.prepare(`INSERT INTO invites (tenant_id, email, role, invited_by, created_at, renewed_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(tenant_id, email) DO UPDATE SET role = excluded.role, invited_by = excluded.invited_by, renewed_at = excluded.renewed_at, expires_at = excluded.expires_at`)
+    .run(TENANT, e, role, by, now, now, now + INVITE_MS);
+  return inviteView(db.prepare('SELECT * FROM invites WHERE tenant_id = ? AND email = ?').get(TENANT, e));
+}
+export function renewInvite(id) {
+  const now = Date.now();
+  const n = db.prepare('UPDATE invites SET renewed_at = ?, expires_at = ? WHERE id = ? AND tenant_id = ?').run(now, now + INVITE_MS, Number(id), TENANT).changes;
+  if (!n) throw err(404, 'Invite not found');
+  return inviteView(db.prepare('SELECT * FROM invites WHERE id = ?').get(Number(id)));
+}
+export function revokeInvite(id) {
+  const i = db.prepare('SELECT * FROM invites WHERE id = ? AND tenant_id = ?').get(Number(id), TENANT);
+  if (!i) throw err(404, 'Invite not found');
+  db.prepare('DELETE FROM invites WHERE id = ?').run(i.id);
+  return inviteView(i);
+}
+/** The open (unexpired) invite for this email, if any. */
+export const openInvite = (email) => inviteView(db.prepare('SELECT * FROM invites WHERE tenant_id = ? AND email = ? AND expires_at > ?').get(TENANT, normEmail(email), Date.now()));
+/** Accept: create the account and delete the invite, atomically. */
+export function acceptInvite(email, sub) {
+  const inv = openInvite(email);
+  if (!inv) return null;
+  db.exec('BEGIN');
+  try {
+    const u = createGoogleUser({ email, role: inv.role, sub });
+    db.prepare('DELETE FROM invites WHERE id = ?').run(inv.id);
+    db.exec('COMMIT');
+    return { user: u, invite: inv };
+  } catch (e) { db.exec('ROLLBACK'); throw e; }
+}
+
 export function updateUser(id, { role, password, disabled, email }) {
   const u = db.prepare('SELECT * FROM users WHERE id = ? AND tenant_id = ?').get(Number(id), TENANT);
   if (!u) throw Object.assign(new Error('User not found'), { status: 404 });
