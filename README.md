@@ -104,8 +104,9 @@ Built with [GitHub Spec Kit](https://github.com/github/spec-kit): the constituti
 [007 backups](specs/007-backups/spec.md) · [008 install & updates](specs/008-install-and-exposure/spec.md).
 New work: `/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-implement` → `/speckit-converge`.
 
-Releases: bump `package.json`, tag `vX.Y.Z`, push the tag. The release workflow attaches the OCI stack zip and
-publishes the Docker image to `ghcr.io/vikramgorla/whatsapp-agent-duniya`.
+Releases: bump the version in `package.json` and merge to `main` (or push a `vX.Y.Z` tag, or run the workflow by hand).
+The release workflow creates the tag and GitHub release, attaches the OCI stack zip and publishes the Docker image to
+`ghcr.io/vikramgorla/whatsapp-agent-duniya`.
 
 ## Notes
 

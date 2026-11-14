@@ -50,12 +50,16 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Check required secrets
+        id: check
         run: |
           missing=""
           for s in OCI_TENANCY_OCID OCI_USER_OCID OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_REGION; do
             [ -n "${!s}" ] || missing="$missing $s"
           done
-          if [ -n "$missing" ]; then echo "::error::Missing repository secrets:$missing"; exit 1; fi
+          if [ -z "$missing" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then echo "::notice::OCI secrets not set; skipping (this workflow is an optional example)"; exit 0; fi
+          echo "::error::Missing repository secrets:$missing"; exit 1
         env:
           OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
@@ -64,6 +68,7 @@ jobs:
           OCI_REGION: ${{ secrets.OCI_REGION }}
 
       - name: Write OCI API key config
+        if: steps.check.outputs.ok == 'true'
         run: |
           mkdir -p ~/.oci && chmod 700 ~/.oci
           printf '%s\n' "$OCI_PRIVATE_KEY" > ~/.oci/key.pem && chmod 600 ~/.oci/key.pem
@@ -84,9 +89,11 @@ jobs:
           OCI_REGION: ${{ secrets.OCI_REGION }}
 
       - name: Install OCI CLI
+        if: steps.check.outputs.ok == 'true'
         run: pipx install oci-cli >/dev/null && oci --version
 
       - name: Ensure state bucket exists
+        if: steps.check.outputs.ok == 'true'
         id: state
         run: |
           NS=$(oci os ns get --query data --raw-output)
@@ -99,11 +106,13 @@ jobs:
           echo "namespace=$NS" >> "$GITHUB_OUTPUT"
 
       - uses: hashicorp/setup-terraform@v3
+        if: steps.check.outputs.ok == 'true'
         with:
           terraform_version: "1.17.2"
           terraform_wrapper: false
 
       - name: terraform init (remote state in OCI Object Storage)
+        if: steps.check.outputs.ok == 'true'
         run: |
           printf 'terraform {\n  backend "oci" {\n    key = "whatsapp-agent-duniya/terraform.tfstate"\n  }\n}\n' > backend.tf
           terraform init \
@@ -112,14 +121,15 @@ jobs:
             -backend-config="region=$TF_VAR_region"
 
       - name: terraform validate
+        if: steps.check.outputs.ok == 'true'
         run: terraform validate
 
       - name: terraform plan
-        if: env.ACTION != 'destroy'
+        if: steps.check.outputs.ok == 'true' && env.ACTION != 'destroy'
         run: terraform plan -out=tfplan
 
       - name: terraform apply
-        if: env.ACTION == 'apply'
+        if: steps.check.outputs.ok == 'true' && env.ACTION == 'apply'
         run: |
           terraform apply tfplan
           {
@@ -132,5 +142,5 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: terraform destroy
-        if: env.ACTION == 'destroy'
+        if: steps.check.outputs.ok == 'true' && env.ACTION == 'destroy'
         run: terraform destroy -auto-approve
