@@ -21,7 +21,7 @@ const trim = (v, n = 4000) => {
 // ---------- what gets logged (011) ----------
 export const LOG_CATEGORIES = {
   messages: 'Messages in and out', tools: 'Tool calls', models: 'Model usage (tokens)', memory: 'Memory (summaries, notes)',
-  schedules: 'Scheduled posts', backups: 'Backups', system: 'System (start, updates, maintenance)',
+  schedules: 'Scheduled posts', backups: 'Backups', system: 'System (start, updates, maintenance)', mcp: 'AI assistants (MCP)',
 };
 // Always recorded, whatever the settings: errors, confirmations of changes, configuration changes, channel status.
 const ALWAYS = new Set(['errors', 'confirmations', 'config', 'channel']);
@@ -38,6 +38,7 @@ export function categoryOf(type) {
   if (type === 'channel.status') return 'channel';
   if (type.startsWith('bot.') || type === 'config' || type === 'backup.settings') return 'config';
   if (type.startsWith('backup.')) return 'backups';
+  if (type.startsWith('mcp.')) return 'mcp';
   return 'system';
 }
 

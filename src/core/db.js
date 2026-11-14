@@ -104,11 +104,12 @@ export function pruneActivity({ days = 30, max = 5000 } = {}) {
   db.prepare('DELETE FROM activity WHERE id <= (SELECT id FROM activity ORDER BY id DESC LIMIT 1 OFFSET ?)').run(Math.max(100, max));
   db.prepare('DELETE FROM activity WHERE ts < ?').run(Date.now() - Math.max(1, days) * 86400000);
 }
-export function listActivity({ limit = 200, bot = '', before = 0 } = {}) {
+export function listActivity({ limit = 200, bot = '', chat = '', before = 0 } = {}) {
   const lim = Math.min(Number(limit) || 200, 1000);
-  const rows = bot
-    ? db.prepare('SELECT * FROM activity WHERE bot = ? AND (? = 0 OR id < ?) ORDER BY id DESC LIMIT ?').all(bot, before, before, lim)
-    : db.prepare('SELECT * FROM activity WHERE (? = 0 OR id < ?) ORDER BY id DESC LIMIT ?').all(before, before, lim);
+  const where = ['(? = 0 OR id < ?)']; const args = [before, before];
+  if (bot) { where.push('bot = ?'); args.push(bot); }
+  if (chat) { where.push('chat = ?'); args.push(chat); }
+  const rows = db.prepare(`SELECT * FROM activity WHERE ${where.join(' AND ')} ORDER BY id DESC LIMIT ?`).all(...args, lim);
   return rows.map((r) => ({ ...r, detail: r.detail ? JSON.parse(r.detail) : null }));
 }
 

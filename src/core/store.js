@@ -136,7 +136,10 @@ export function deleteUser(id) {
   if (u.role === 'owner' && ownersCount() <= 1) throw Object.assign(new Error('At least one owner must remain'), { status: 400 });
   deleteSessionsFor(u.id);
   db.prepare('DELETE FROM users WHERE id = ?').run(u.id);
+  for (const fn of userDeletedListeners) fn(u.id); // e.g. AI assistant grants (017): ids can be reused by SQLite
 }
+const userDeletedListeners = new Set();
+export const onUserDeleted = (fn) => userDeletedListeners.add(fn);
 export function authenticate(username, password) {
   const u = db.prepare('SELECT * FROM users WHERE tenant_id = ? AND username = ? AND disabled = 0')
     .get(TENANT, String(username || 'admin').trim().toLowerCase());
