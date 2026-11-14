@@ -561,6 +561,38 @@ async function renderOverview(soft) {
   if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
 }
+/**
+ * Follow an update to the end, whatever happens to this page: checks every 3 s; notices when the service goes away
+ * (restart) and when it answers again, then reloads the page on the new version. Never stops on a failed request;
+ * gives up waiting after 5 minutes and reloads anyway. Only one watcher runs.
+ */
+function watchUpdate(from, onTick) {
+  if (S.updateWatch) return;
+  const started = Date.now(); let wentDown = false; let bootUptime = null;
+  S.updateFrom = from;
+  const done = (msg) => { clearInterval(S.updateWatch); S.updateWatch = null; S.updateFrom = null; toast(msg); setTimeout(() => location.reload(), 900); };
+  S.updateWatch = setInterval(async () => {
+    let v = null; let stv = null;
+    try {
+      const r = await fetch('/api/updates', { cache: 'no-store' });
+      if (r.ok) v = await r.json(); else wentDown = wentDown || r.status >= 500;
+      const rs = await fetch('/api/status', { cache: 'no-store' });
+      if (rs.ok) stv = await rs.json();
+    } catch { wentDown = true; }
+    if (stv) {
+      if (bootUptime !== null && stv.uptimeSec < bootUptime) wentDown = true; // the process restarted between two checks
+      bootUptime = stv.uptimeSec;
+    }
+    if (v && !v.running) {
+      if (v.status?.lastResult && !v.status.lastResult.ok && v.status.lastResult.at > started - 60000 && !wentDown) {
+        clearInterval(S.updateWatch); S.updateWatch = null; S.updateFrom = null; toast('The update failed; the previous version is still running.'); onTick?.(); return;
+      }
+      if (wentDown || (v.status?.current && v.status.current !== from)) return done(`Updated to ${v.status?.current || 'the new version'} — reloading`);
+    }
+    if (Date.now() - started > 5 * 60000) return done('Reloading to check the update…');
+    onTick?.();
+  }, 3000);
+}
 async function renderUpdates(box, note = '') {
   const u = await api('GET', '/api/updates').catch(() => null); if (!u || !box) return;
   const st = u.status || {};
@@ -585,16 +617,7 @@ async function renderUpdates(box, note = '') {
   // While an update runs (state kept on the server, so a reload or redraw can't lose it): show progress and poll.
   const running = u.running ? h('div', { class: 'note' }, h('span', { class: 'spinner' }), h('b', {}, ` Installing ${u.running.target || 'the update'}…`),
     ` started ${ago(u.running.startedAt)} ago. The service restarts when it is done; this page reloads by itself.`) : null;
-  clearTimeout(S.updatePoll);
-  if (u.running && !S.updateFrom) S.updateFrom = st.current;
-  if (u.running || S.updateFrom) {
-    S.updatePoll = setTimeout(async () => {
-      const v = await api('GET', '/api/updates').catch(() => null); // fails while the service restarts
-      if (v && !v.running && S.updateFrom && v.status?.current !== S.updateFrom) { const to = v.status.current; S.updateFrom = null; toast(`Updated to ${to}`); setTimeout(() => location.reload(), 800); return; }
-      if (v && !v.running && v.status?.lastResult && !v.status.lastResult.ok) { S.updateFrom = null; renderUpdates(box, 'The update failed; the previous version is still running.'); return; }
-      if (document.body.contains(box)) renderUpdates(box);
-    }, 3000);
-  }
+  if (u.running || S.updateFrom) watchUpdate(S.updateFrom || st.current, () => document.body.contains(box) && renderUpdates(box));
   box.replaceChildren(h('h3', {}, 'Updates'),
     u.install === 'docker' ? h('div', { class: 'note' }, 'Docker install: update with  docker compose pull && docker compose up -d') : null,
     note ? h('div', { class: 'note warn' }, note) : null,
