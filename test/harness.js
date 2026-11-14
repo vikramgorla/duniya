@@ -1,6 +1,6 @@
 // Shared e2e harness: fake MCP server, scripted fake Claude API, fake WhatsApp channel, real core + panel.
 import http from 'node:http';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -94,7 +94,7 @@ export async function setup({ bindings = {}, env = {}, legacy = null, extend = n
     t.store.setSecret('PANDUGA_MCP_URL', `http://127.0.0.1:${t.mcpHttp.address().port}/mcp`);
     t.store.setSecret('PANDUGA_TOKEN_ORGANIZER', 'org');
     await t.bots.createBot({ id: 'panduga', config: {
-      ...t.bots.templateConfig('event-assistant-panduga'), name: 'Panduga', model: 'claude-sonnet-5-5',
+      ...JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures/panduga-bot.json'), 'utf8')), name: 'Panduga', model: 'claude-sonnet-5-5',
       // token-based service (OAuth sign-in has its own test, mcp-oauth.test.js)
       mcpServers: { panduga: { url: '${PANDUGA_MCP_URL}', tokens: { organizer: '${PANDUGA_TOKEN_ORGANIZER}', participant: '${PANDUGA_TOKEN_MEMBER}' } } },
       chats: ['g1@g.us'], organizers: ['+41 79 000 00 01'], ...(bindings.panduga || {}),

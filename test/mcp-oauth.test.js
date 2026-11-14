@@ -183,5 +183,4 @@ test('schema: auth must be oauth, token or none; oauth drops token references', 
   const ok = await t.api(cookie, 'PUT', '/api/bots/panduga', { mcpServers: { panduga: { url: 'https://x.example/mcp', auth: 'oauth', tokens: { organizer: '${PANDUGA_TOKEN_ORGANIZER}' } } } });
   assert.equal(ok.status, 200);
   assert.deepEqual(ok.body.config.mcpServers.panduga.tokens, { organizer: '', participant: '' });
-  assert.equal(t.bots.templateConfig('event-assistant-panduga').mcpServers.panduga.auth, 'oauth');
 });

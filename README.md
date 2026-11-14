@@ -127,7 +127,8 @@ Admin panel (localhost:8080 behind Caddy / Cloudflare Tunnel / SSH) · SQLite ·
   group is a participant. The model never sees or calls the confirm tool.
 - **Panel users**: owner (everything), admin (bots, chats, models, memory), viewer (read-only).
 - **Plugins** (`plugins/<name>/index.js`) add local tools or commands for advanced cases; see `plugins/example-dice`.
-- **Bot templates** live in `templates/`; bots themselves are data in the app (export/import as JSON).
+- **Bot templates** (`templates/`): New bot, School friends, Family, Car pooling, Office colleagues, Event planning,
+  Neighbours. Bots themselves are data in the app (export/import as JSON).
 
 ## Development
 

@@ -11,7 +11,8 @@ after(() => t.close());
 
 test('US1: create a bot from a template, edit it, validation errors save nothing', async () => {
   const templates = (await t.api(owner, 'GET', '/api/templates')).body;
-  assert.deepEqual(templates.map((x) => x.id), ['blank', 'event-assistant-panduga']);
+  assert.deepEqual(templates.map((x) => x.id).sort(), ['blank', 'carpool', 'event-planning', 'family', 'neighbours', 'office-colleagues', 'school-friends']);
+  assert.equal(templates[0].id, 'blank', 'blank first');
   const created = await t.api(owner, 'POST', '/api/bots', { template: 'blank', config: { name: 'Carpool Helper' } });
   assert.equal(created.status, 201);
   assert.equal(created.body.id, 'carpool-helper');
@@ -132,4 +133,13 @@ test('US5: secrets are encrypted at rest and never returned', async () => {
   assert.ok(list.find((s) => s.name === 'SUPER_SECRET_VALUE_TEST').set);
   assert.ok(!JSON.stringify(list).includes('needle'));
   assert.equal(t.store.getSecret('SUPER_SECRET_VALUE_TEST'), 'plaintext-needle-42');
+});
+
+test('every shipped template is a valid bot and creates one', async () => {
+  const { validateBotConfig } = await import('../src/core/schema.js');
+  for (const tpl of t.bots.listTemplates()) {
+    const { config } = validateBotConfig(t.bots.templateConfig(tpl.id));
+    assert.ok(config.name && config.prompt.length > 40, tpl.id);
+    assert.ok(!JSON.stringify(config).toLowerCase().includes('panduga'), `${tpl.id} is generic`);
+  }
 });
