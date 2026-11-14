@@ -28,8 +28,11 @@ export function createBundle({ includeWhatsApp = true, appVersion = '' } = {}) {
   if (existsSync(keyFile)) files['master.key'] = readFileSync(keyFile).toString('base64');
   else if (process.env.MASTER_KEY) files['master.key'] = Buffer.from(process.env.MASTER_KEY).toString('base64');
   if (includeWhatsApp) {
-    const auth = resolve(DATA_DIR, 'whatsapp-auth');
-    for (const rel of walk(auth)) files[`whatsapp-auth/${rel}`] = readFileSync(resolve(auth, rel)).toString('base64');
+    // every linked number: whatsapp-auth (main) and whatsapp-auth-<id> (more numbers)
+    for (const dir of readdirSync(DATA_DIR).filter((n) => n === 'whatsapp-auth' || n.startsWith('whatsapp-auth-'))) {
+      const auth = resolve(DATA_DIR, dir);
+      for (const rel of walk(auth)) files[`${dir}/${rel}`] = readFileSync(resolve(auth, rel)).toString('base64');
+    }
   }
   return { format: 'duniya-backup', version: 1, createdAt: new Date().toISOString(), app: { version: appVersion }, files };
 }

@@ -73,8 +73,19 @@ export async function checkForUpdate({ root = ROOT, channel = getUpdateSettings(
   return status;
 }
 
-/** Run deploy/update.sh <target>. Returns { code, log }. */
+// One update at a time. The running state is kept server-side so the panel can show it after a reload.
+let inflight = null;
+export const updateRunning = () => (inflight ? { target: inflight.target, startedAt: inflight.startedAt } : null);
+
+/** Run deploy/update.sh <target>. Returns { code, log }. A second call while one runs gets the same result. */
 export function applyUpdate({ root = ROOT, target } = {}) {
+  if (inflight && root === ROOT) return inflight.promise;
+  const promise = runUpdate({ root, target }).finally(() => { if (root === ROOT) inflight = null; });
+  if (root === ROOT) inflight = { target, startedAt: Date.now(), promise };
+  return promise;
+}
+
+function runUpdate({ root, target }) {
   return new Promise((r) => {
     const p = spawn('bash', [resolve(root, 'deploy/update.sh'), ...(target ? [target] : [])], { cwd: root });
     let log = ''; p.stdout.on('data', (d) => (log += d)); p.stderr.on('data', (d) => (log += d));

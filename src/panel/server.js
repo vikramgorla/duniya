@@ -21,6 +21,7 @@ import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
 import { humanCode } from '../core/crypto.js';
 import { organizerConnection, oauthClientOf } from '../core/tools.js';
 import { installPackage, installedInfo } from '../core/mcp-local.js';
+import { snapshot as sysSnapshot, metricsHistory, osUpdates, logs as sysLogs, opsStatus, requestOp } from '../core/system.js';
 
 // Local tool services run third-party code on this server: only owners may add or change them.
 const localSig = (cfg) => JSON.stringify(Object.entries(cfg?.mcpServers || {}).filter(([, v]) => v?.type === 'local')
@@ -370,6 +371,14 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     activity('system', { summary: `Secret ${body.value ? 'set' : 'removed'}: ${body.name} (by ${user.username})` });
     return { ok: true };
   });
+
+  // ---------- server metrics & maintenance (011) ----------
+  route('GET', '/api/system', async () => sysSnapshot());
+  route('GET', '/api/system/history', async () => metricsHistory());
+  route('GET', '/api/system/os-updates', async (req, res, body, q) => osUpdates({ refresh: q.get('refresh') === '1' }), { role: 'admin' });
+  route('GET', '/api/system/logs', async (req, res, body, q) => sysLogs(q.get('unit') || 'whatsapp-agent-duniya', q.get('lines')), { role: 'admin' });
+  route('GET', '/api/system/ops', async () => opsStatus(), { role: 'owner' });
+  route('POST', '/api/system/ops', async (req, res, body, q, p, user) => requestOp(String(body.action || ''), user.username), { role: 'owner' });
 
   // ---------- channel control ----------
   route('POST', '/api/whatsapp/pair', async (req, res, body) => ({ code: await channel.pair(body.phone) }));

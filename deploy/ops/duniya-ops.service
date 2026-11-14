@@ -1,0 +1,7 @@
+[Unit]
+Description=whatsapp-agent-duniya maintenance helper (OS updates, restarts)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/duniya-ops
+TimeoutStartSec=3600

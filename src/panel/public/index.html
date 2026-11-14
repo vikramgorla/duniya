@@ -53,6 +53,8 @@
   .pill.bad { background: var(--bad-soft); color: var(--bad); } .pill.info { background: var(--info-soft); color: var(--info); }
   .note { background: var(--info-soft); color: var(--info); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin: 8px 0; }
   .note.warn { background: var(--warn-soft); color: var(--warn); }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -1px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .note.ok { background: var(--accent-soft); color: var(--accent); }
   .feed { list-style: none; margin: 0; padding: 0; }
   .feed li { border-bottom: 1px solid var(--line); padding: 8px 2px; cursor: pointer; }
@@ -266,26 +268,29 @@ async function renderUpdates(box, note = '') {
       ? h('div', { class: 'note warn' }, h('b', {}, `Update available: ${st.latest}`), ` · running ${st.current}`)
       : h('div', { class: 'note ok' }, h('b', {}, `✓ Up to date: ${st.current}`), h('span', { class: 'muted' }, ` · checked ${ago(st.checkedAt)} ago`));
   const last = lr ? h('p', { class: 'small muted' }, lr.ok ? `Last update: ${lr.from ? `${lr.from} → ` : ''}${lr.target} on ${time(lr.at)}` : `Last update failed on ${time(lr.at)}; the previous version kept running.`) : null;
-  const updateBtn = st.available && u.install !== 'docker' ? h('button', { class: 'btn primary', onclick: async (e) => {
+  const updateBtn = st.available && !u.running && u.install !== 'docker' ? h('button', { class: 'btn primary', onclick: async (e) => {
     if (!confirm(`Install ${st.latest} and restart? The bots pause for about a minute.`)) return;
-    const from = st.current;
-    box.querySelectorAll('button').forEach((b) => (b.disabled = true));
-    e.target.textContent = `Installing ${st.latest}…`;
+    e.target.disabled = true;
     const r = await tryApi(() => api('POST', '/api/updates/apply'));
-    if (!r || r.code !== 0) { if (r) { log.textContent = r.log; log.classList.remove('hide'); } renderUpdates(box, 'The update failed; the previous version is still running.'); return; }
-    e.target.textContent = 'Restarting…';
-    // wait for the new version to answer, then show the result
-    for (let i = 0; i < 60; i++) {
-      await new Promise((ok) => setTimeout(ok, 3000));
-      const v = await api('GET', '/api/updates').catch(() => null);
-      if (v?.status?.current && v.status.current !== from) { toast(`Updated to ${v.status.current}`); location.reload(); return; }
-    }
-    renderUpdates(box, 'The service has not come back yet. Refresh this page in a minute.');
+    if (r) { S.updateFrom = st.current; renderUpdates(box); }
   } }, `Update to ${st.latest}`) : null;
+  // While an update runs (state kept on the server, so a reload or redraw can't lose it): show progress and poll.
+  const running = u.running ? h('div', { class: 'note' }, h('span', { class: 'spinner' }), h('b', {}, ` Installing ${u.running.target || 'the update'}…`),
+    ` started ${ago(u.running.startedAt)} ago. The service restarts when it is done; this page reloads by itself.`) : null;
+  clearTimeout(S.updatePoll);
+  if (u.running && !S.updateFrom) S.updateFrom = st.current;
+  if (u.running || S.updateFrom) {
+    S.updatePoll = setTimeout(async () => {
+      const v = await api('GET', '/api/updates').catch(() => null); // fails while the service restarts
+      if (v && !v.running && S.updateFrom && v.status?.current !== S.updateFrom) { const to = v.status.current; S.updateFrom = null; toast(`Updated to ${to}`); setTimeout(() => location.reload(), 800); return; }
+      if (v && !v.running && v.status?.lastResult && !v.status.lastResult.ok) { S.updateFrom = null; renderUpdates(box, 'The update failed; the previous version is still running.'); return; }
+      if (document.body.contains(box)) renderUpdates(box);
+    }, 3000);
+  }
   box.replaceChildren(h('h3', {}, 'Updates'),
     u.install === 'docker' ? h('div', { class: 'note' }, 'Docker install: update with  docker compose pull && docker compose up -d') : null,
     note ? h('div', { class: 'note warn' }, note) : null,
-    state, last,
+    running || state, running ? null : last,
     h('div', { class: 'row', style: 'margin-top:8px' }, updateBtn,
       h('button', { class: 'btn', onclick: (e) => tryApi(async () => { e.target.disabled = true; e.target.textContent = 'Checking…'; await api('POST', '/api/updates/check'); renderUpdates(box); }) }, 'Check now')),
     h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted' }, 'Update settings'),

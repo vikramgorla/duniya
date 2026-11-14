@@ -10,7 +10,8 @@ export function applyPendingRestore(dataDir) {
   const keep = resolve(dataDir, `pre-restore-${Date.now()}`);
   mkdirSync(keep, { recursive: true });
   // Move current state aside
-  for (const name of ['duniya.sqlite', 'duniya.sqlite-wal', 'duniya.sqlite-shm', 'master.key', 'whatsapp-auth']) {
+  const authDirs = readdirSync(dataDir).filter((n) => n === 'whatsapp-auth' || n.startsWith('whatsapp-auth-'));
+  for (const name of ['duniya.sqlite', 'duniya.sqlite-wal', 'duniya.sqlite-shm', 'master.key', ...authDirs]) {
     const p = resolve(dataDir, name);
     if (existsSync(p)) renameSync(p, resolve(keep, name));
   }

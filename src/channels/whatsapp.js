@@ -17,13 +17,15 @@ const AUTH_DIR = resolve(DATA_DIR, 'whatsapp-auth');
  * Channel interface used by the router/panel:
  *   start(onMessage), send(chat, text, opts), listChats(), status(), pair(phone), logout(), restart()
  */
-export function createWhatsAppChannel() {
+export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir = AUTH_DIR } = {}) {
+  const AUTH = authDir;
   let sock = null;
   let onMessage = () => {};
   let onHistory = () => {};
   let state = { status: 'starting', qr: null, pairingCode: null, me: null, since: Date.now(), lastError: null };
   let retries = 0;
   let stopping = false;
+  let removed = false;
   const groupCache = new Map();
 
   const setState = (patch) => {
@@ -31,13 +33,13 @@ export function createWhatsAppChannel() {
     state = { ...state, ...patch };
     if (patch.status && patch.status !== before) {
       state.since = Date.now();
-      activity('channel.status', { summary: `WhatsApp: ${patch.status}`, detail: { me: state.me, error: state.lastError } });
+      activity('channel.status', { summary: `WhatsApp${number === 'main' ? '' : ` (${label})`}: ${patch.status}`, detail: { number, me: state.me, error: state.lastError } });
     }
   };
 
   async function connect() {
     stopping = false;
-    const { state: auth, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    const { state: auth, saveCreds } = await useMultiFileAuthState(AUTH);
     const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: undefined }));
     sock = makeWASocket({
       auth, version, logger,
@@ -61,11 +63,12 @@ export function createWhatsAppChannel() {
         const msg = lastDisconnect?.error?.message || String(code || '');
         if (stopping) return;
         if (code === DisconnectReason.loggedOut) {
-          rmSync(AUTH_DIR, { recursive: true, force: true });
+          rmSync(AUTH, { recursive: true, force: true });
           setState({ status: 'logged_out', qr: null, me: null, lastError: 'Logged out — scan a new QR' });
           setTimeout(connect, 2000);
           return;
         }
+        if (removed) return;
         const delay = Math.min(60000, 2000 * 2 ** retries++);
         setState({ status: 'reconnecting', lastError: msg });
         setTimeout(() => { if (mySock === sock) connect(); }, delay);
@@ -144,7 +147,7 @@ export function createWhatsAppChannel() {
   }
 
   return {
-    id: 'whatsapp',
+    id: 'whatsapp', number, label,
     async start(handler, { onHistory: historyHandler } = {}) {
       onMessage = handler;
       if (historyHandler) onHistory = historyHandler;
@@ -192,9 +195,16 @@ export function createWhatsAppChannel() {
     async logout() {
       stopping = true;
       try { await sock?.logout(); } catch { /* ignore */ }
-      rmSync(AUTH_DIR, { recursive: true, force: true });
+      rmSync(AUTH, { recursive: true, force: true });
       setState({ status: 'logged_out', me: null, qr: null, pairingCode: null });
       setTimeout(connect, 1000);
+    },
+    /** Unlink and stop for good (number removed). */
+    async remove() {
+      removed = true; stopping = true;
+      try { await sock?.logout(); } catch { /* ignore */ }
+      try { sock?.end(undefined); } catch { /* ignore */ }
+      rmSync(AUTH, { recursive: true, force: true });
     },
     async restart() {
       stopping = true;

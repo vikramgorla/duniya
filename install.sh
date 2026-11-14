@@ -240,8 +240,17 @@ EOF
 EOF
   systemctl restart rsyslog 2>/dev/null || true
 fi
+# Server maintenance from the panel (OS updates, reboot): a root helper started by a path unit when the app writes
+# an action word to its request file. The app itself never gets root. Logs: the app may read the journal.
+install -m 0755 -o root -g root "$APP_DIR/deploy/ops/duniya-ops" /usr/local/sbin/duniya-ops
+install -m 0644 "$APP_DIR/deploy/ops/duniya-ops.service" /etc/systemd/system/duniya-ops.service
+install -m 0644 "$APP_DIR/deploy/ops/duniya-ops.path" /etc/systemd/system/duniya-ops.path
+install -d -m 0750 -o "$APP_USER" -g "$APP_USER" /var/lib/duniya/ops-request
+install -d -m 0755 -o root -g root /var/lib/duniya-ops
+getent group systemd-journal >/dev/null && usermod -a -G systemd-journal "$APP_USER"
 systemctl daemon-reload
 systemctl enable -q whatsapp-agent-duniya
+systemctl enable -q --now duniya-ops.path
 systemctl restart whatsapp-agent-duniya
 
 # ---------- exposure ----------

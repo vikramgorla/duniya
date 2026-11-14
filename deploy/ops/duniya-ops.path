@@ -1,0 +1,9 @@
+[Unit]
+Description=whatsapp-agent-duniya maintenance requests
+
+[Path]
+PathChanged=/var/lib/duniya/ops-request/request
+Unit=duniya-ops.service
+
+[Install]
+WantedBy=multi-user.target

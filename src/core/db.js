@@ -95,11 +95,14 @@ export function eraseChat(chat) {
 
 // ---- activity log (what the panel shows) ----
 const insAct = db.prepare('INSERT INTO activity (ts, type, bot, chat, summary, detail) VALUES (?, ?, ?, ?, ?, ?)');
-const pruneAct = db.prepare('DELETE FROM activity WHERE id <= (SELECT id FROM activity ORDER BY id DESC LIMIT 1 OFFSET 5000)');
 export function insertActivity(a) {
   const r = insAct.run(a.ts, a.type, a.bot || '', a.chat || '', a.summary || '', a.detail ? JSON.stringify(a.detail) : '');
-  if (Math.random() < 0.02) pruneAct.run();
   return Number(r.lastInsertRowid);
+}
+/** Keep at most `max` entries and nothing older than `days`. */
+export function pruneActivity({ days = 30, max = 5000 } = {}) {
+  db.prepare('DELETE FROM activity WHERE id <= (SELECT id FROM activity ORDER BY id DESC LIMIT 1 OFFSET ?)').run(Math.max(100, max));
+  db.prepare('DELETE FROM activity WHERE ts < ?').run(Date.now() - Math.max(1, days) * 86400000);
 }
 export function listActivity({ limit = 200, bot = '', before = 0 } = {}) {
   const lim = Math.min(Number(limit) || 200, 1000);

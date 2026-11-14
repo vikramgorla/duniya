@@ -9,6 +9,7 @@ import { startBackupScheduler } from './core/backup/index.js';
 import { updateRoutes } from './panel/routes/updates.js';
 import { startUpdateScheduler } from './core/updates.js';
 import { activity } from './core/events.js';
+import { startMetrics } from './core/system.js';
 
 await loadBots();
 console.log(`Bots: ${listBots().map((b) => `${b.id}${b.enabled ? '' : ' (disabled)'}`).join(', ') || 'none'}`);
@@ -19,6 +20,7 @@ await whatsapp.start(createRouter(whatsapp), { onHistory: createHistoryHandler()
 startScheduler(whatsapp);
 startBackupScheduler();
 startUpdateScheduler();
+startMetrics();
 activity('system', { summary: 'Started' });
 
 process.on('unhandledRejection', (e) => activity('error', { summary: `Unhandled: ${e?.message || e}` }));
