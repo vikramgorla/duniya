@@ -263,10 +263,48 @@ if [ "$EXPOSURE" = "domain" ] || [ "$EXPOSURE" = "ip" ]; then
   systemctl stop duniya-status-page duniya-status-render 2>/dev/null || true  # first-boot progress page (OCI bootstrap)
   if ! command -v caddy >/dev/null; then
     say "Installing Caddy (automatic HTTPS)"
-    curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-    curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt > /etc/apt/sources.list.d/caddy-stable.list
-    apt-get update -qq && apt-get install -y -qq caddy >/dev/null
+    # Use the distro's signed package (Ubuntu 24.04 / Debian 12 ship Caddy 2.6+). Caddy's own apt repo has had signing-key
+    # mismatches, so we don't depend on it; fall back to the official release binary from GitHub.
+    rm -f /etc/apt/sources.list.d/caddy-stable.list
+    if ! { apt-get install -y -qq caddy >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq caddy >/dev/null 2>&1; }; }; then
+      say "Distro package not available; installing the Caddy release binary"
+      case "$(uname -m)" in x86_64) CARCH=amd64 ;; aarch64|arm64) CARCH=arm64 ;; *) die "Unsupported CPU $(uname -m) for Caddy" ;; esac
+      CVER="$(curl -fsSL https://api.github.com/repos/caddyserver/caddy/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' | head -1)"
+      [ -n "$CVER" ] || die "Could not find the latest Caddy release"
+      CTMP="$(mktemp -d)"
+      CBASE="https://github.com/caddyserver/caddy/releases/download/v$CVER"
+      curl -fsSL -o "$CTMP/caddy.tgz" "$CBASE/caddy_${CVER}_linux_${CARCH}.tar.gz"
+      curl -fsSL -o "$CTMP/sums" "$CBASE/caddy_${CVER}_checksums.txt"
+      (cd "$CTMP" && grep " caddy_${CVER}_linux_${CARCH}.tar.gz\$" sums | sed "s# caddy_.*# caddy.tgz#" | sha512sum -c --quiet) || die "Caddy download checksum mismatch"
+      tar -xzf "$CTMP/caddy.tgz" -C "$CTMP" caddy && install -m 0755 "$CTMP/caddy" /usr/bin/caddy && rm -rf "$CTMP"
+      getent group caddy >/dev/null || groupadd --system caddy
+      id caddy >/dev/null 2>&1 || useradd --system --gid caddy --create-home --home-dir /var/lib/caddy --shell /usr/sbin/nologin caddy
+      install -d -m 0755 /etc/caddy
+      cat > /etc/systemd/system/caddy.service <<'EOF'
+[Unit]
+Description=Caddy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=caddy
+Group=caddy
+ExecStart=/usr/bin/caddy run --environ --config /etc/caddy/Caddyfile
+ExecReload=/usr/bin/caddy reload --config /etc/caddy/Caddyfile --force
+TimeoutStopSec=5s
+LimitNOFILE=1048576
+PrivateTmp=true
+ProtectSystem=full
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
+EOF
+      systemctl daemon-reload
+    fi
   fi
+  install -d -m 0755 /etc/caddy
   cat > /etc/caddy/Caddyfile <<EOF
 $HOSTNAME_PUBLIC {
 	encode gzip
