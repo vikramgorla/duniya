@@ -1,6 +1,10 @@
 import { env } from './config.js';
 import { addPending, takePending, peekPending, dropPending } from './db.js';
 import { chat as modelChat } from './providers/index.js';
+import { getChatPrefs } from './chat-prefs.js';
+
+/** The model for a chat: the chat's own choice (auto, provider:auto or provider:model) or the bot's. */
+export const chatModel = (bot, chat) => { const m = getChatPrefs(chat).model; return m && m !== 'inherit' ? m : bot.model; };
 import { buildContext } from './memory.js';
 import { activity } from './events.js';
 import { toolsFor, matchesAny, organizerConnection } from './tools.js';
@@ -75,7 +79,7 @@ export async function runAgent(ctx) {
     let res;
     try {
       res = await modelChat({
-        model: bot.model, purpose: 'bot', maxTokens: bot.maxTokens,
+        model: chatModel(bot, chat), purpose: 'bot', maxTokens: bot.maxTokens,
         system: systemPrompt({ bot, role, isGroup, chatName: ctx.chatName }), tools: defs, messages,
       });
     } catch (e) {

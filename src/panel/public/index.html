@@ -4,80 +4,114 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Duniya · WhatsApp agents</title>
-<link rel="icon" href="data:,">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2710%27 fill=%27%230b7a75%27/%3E%3Cellipse cx=%2716%27 cy=%2716%27 rx=%2715%27 ry=%275.5%27 fill=%27none%27 stroke=%27%23e39b2d%27 stroke-width=%272.2%27 transform=%27rotate(-22 16 16)%27/%3E%3C/svg%3E">
+<meta name="theme-color" content="#f7f3ec">
 <style>
+  /* Duniya design language — see DESIGN.md. Warm paper, ink, peacock teal, marigold. */
   :root {
-    --bg: #f6f5f1; --card: #fff; --ink: #1d1d1b; --muted: #6b6a64; --line: #e4e2da;
-    --accent: #0f6e56; --accent-soft: #e1f5ee; --warn: #854f0b; --warn-soft: #faeeda;
-    --bad: #a32d2d; --bad-soft: #fcebeb; --info: #185fa5; --info-soft: #e6f1fb; --radius: 10px;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --bg: #f7f3ec; --bg-2: #efe9df; --card: #fffdf9; --ink: #1c2030; --muted: #6d6a73; --line: #e6dfd3; --line-2: #d9d0c1;
+    --accent: #0b7a75; --accent-ink: #ffffff; --accent-soft: #dff1ee; --marigold: #e39b2d; --marigold-soft: #fbefd9;
+    --warn: #8a5300; --warn-soft: #fbefd9; --bad: #b53a4e; --bad-soft: #fbe6e9; --info: #2f5fb3; --info-soft: #e7eefb;
+    --radius: 18px; --radius-s: 12px; --shadow: 0 1px 2px rgba(28,32,48,.05), 0 6px 24px -8px rgba(28,32,48,.10);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", Inter, Roboto, system-ui, sans-serif;
+    --font-display: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI Variable Display", var(--font);
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-family: var(--font); color-scheme: light dark;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #161615; --card: #201f1d; --ink: #ecebe6; --muted: #a09e96; --line: #34332f;
-      --accent: #5dcaa5; --accent-soft: #0d3a2e; --warn: #ef9f27; --warn-soft: #3a2a10;
-      --bad: #f09595; --bad-soft: #3d1a1a; --info: #85b7eb; --info-soft: #102a45; }
+    :root { --bg: #11131c; --bg-2: #171a26; --card: #1a1d2a; --ink: #ece9e2; --muted: #9a98a3; --line: #2a2e3e; --line-2: #363b4e;
+      --accent: #3cc4b7; --accent-ink: #0b1a19; --accent-soft: #0f3431; --marigold: #f2b553; --marigold-soft: #3a2c14;
+      --warn: #f2b553; --warn-soft: #3a2c14; --bad: #f08a9b; --bad-soft: #3d1d25; --info: #8db3f5; --info-soft: #18264a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px -10px rgba(0,0,0,.5); }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.5; }
-  header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
-  .bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; max-width: 1100px; margin: 0 auto; }
-  .brand { font-weight: 600; } .brand small { color: var(--muted); font-weight: 400; margin-left: 6px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); display: inline-block; flex: none; }
-  .dot.ok { background: #1d9e75; } .dot.warn { background: #ba7517; } .dot.bad { background: #e24b4a; }
-  nav { display: flex; gap: 2px; overflow-x: auto; padding: 0 12px; max-width: 1100px; margin: 0 auto; scrollbar-width: none; }
-  nav button { background: none; border: 0; padding: 10px 12px; color: var(--muted); font: inherit; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
-  nav button.on { color: var(--ink); border-bottom-color: var(--accent); }
-  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
-  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
-  .card h2 { font-size: 15px; margin: 0 0 10px; font-weight: 600; }
-  .card h3 { font-size: 14px; margin: 16px 0 6px; font-weight: 600; }
-  fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin: 0 0 14px; min-width: 0; }
-  legend { font-weight: 600; padding: 0 6px; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: radial-gradient(1200px 500px at 85% -120px, var(--marigold-soft), transparent 70%), radial-gradient(900px 500px at -10% -160px, var(--accent-soft), transparent 70%), var(--bg); background-attachment: fixed; color: var(--ink); font-size: 15px; line-height: 1.5; }
+  h1, h2, h3, .brand, .display { font-family: var(--font-display); letter-spacing: -0.01em; }
+  header { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 12px 20px 6px; max-width: 1160px; margin: 0 auto; }
+  .brand { font-weight: 700; font-size: 19px; display: inline-flex; align-items: center; gap: 10px; }
+  .brand small { color: var(--muted); font-weight: 500; font-size: 13px; font-family: var(--font); letter-spacing: 0; }
+  .logo { width: 30px; height: 30px; flex: none; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); display: inline-block; flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 0%, transparent); }
+  .dot.ok { background: #19a37f; box-shadow: 0 0 0 3px color-mix(in srgb, #19a37f 22%, transparent); } .dot.warn { background: var(--marigold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--marigold) 25%, transparent); } .dot.bad { background: #e0485f; box-shadow: 0 0 0 3px color-mix(in srgb, #e0485f 22%, transparent); }
+  nav { display: flex; gap: 4px; overflow-x: auto; padding: 6px 16px 10px; max-width: 1160px; margin: 0 auto; scrollbar-width: none; }
+  nav::-webkit-scrollbar { display: none; }
+  nav button { background: none; border: 0; padding: 7px 14px; color: var(--muted); font: inherit; font-weight: 500; cursor: pointer; border-radius: 999px; white-space: nowrap; transition: background .15s, color .15s; }
+  nav button:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  nav button.on { color: var(--accent-ink); background: var(--accent); }
+  main { max-width: 1160px; margin: 0 auto; padding: 18px 20px 48px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; min-width: 0; box-shadow: var(--shadow); }
+  .card h2 { font-size: 17px; margin: 0 0 12px; font-weight: 700; }
+  .card h3 { font-size: 15px; margin: 18px 0 8px; font-weight: 700; }
+  .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+  .stat { font-family: var(--font-display); font-size: 30px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat small { font-size: 14px; color: var(--muted); font-weight: 500; margin-left: 4px; }
+  .num { font-variant-numeric: tabular-nums; }
+  fieldset { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 14px 16px; margin: 0 0 16px; min-width: 0; background: color-mix(in srgb, var(--bg) 40%, transparent); }
+  legend { font-weight: 700; padding: 0 6px; font-family: var(--font-display); }
   .muted { color: var(--muted); } .small { font-size: 13px; }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .row > input, .row > select, .row > div { flex: 1; min-width: 120px; }
   .spread { justify-content: space-between; } .nowrap { flex-wrap: nowrap; }
-  button.btn, .btn { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; text-decoration: none; display: inline-block; }
-  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .btn.danger { color: var(--bad); border-color: var(--bad); }
-  .btn.small { padding: 4px 9px; font-size: 13px; }
-  .btn:disabled { opacity: .5; cursor: default; }
-  input, select, textarea { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; width: 100%; }
-  input[type=checkbox] { width: auto; }
-  textarea { min-height: 80px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+  button.btn, .btn { font: inherit; font-weight: 500; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--card); color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: transform .08s, background .15s, border-color .15s; }
+  .btn:hover { border-color: var(--ink); } .btn:active { transform: scale(.97); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+  .btn.small { padding: 4px 11px; font-size: 13px; }
+  .btn:disabled { opacity: .5; cursor: default; transform: none; }
+  input, select, textarea { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line-2); border-radius: var(--radius-s); padding: 9px 12px; width: 100%; transition: border-color .15s, box-shadow .15s; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+  input[type=checkbox] { width: auto; accent-color: var(--accent); }
+  textarea { min-height: 80px; font-family: var(--mono); font-size: 13px; }
   textarea.prose { font-family: inherit; font-size: 14px; min-height: 140px; }
-  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
-  label.inline { display: inline-flex; gap: 6px; align-items: center; margin: 4px 12px 4px 0; color: var(--ink); font-size: 14px; }
-  .pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--line); color: var(--ink); white-space: nowrap; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 5px; font-weight: 500; }
+  label.inline { display: inline-flex; gap: 6px; align-items: center; margin: 4px 14px 4px 0; color: var(--ink); font-size: 14px; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--bg-2); color: var(--ink); white-space: nowrap; }
   .pill.ok { background: var(--accent-soft); color: var(--accent); } .pill.warn { background: var(--warn-soft); color: var(--warn); }
   .pill.bad { background: var(--bad-soft); color: var(--bad); } .pill.info { background: var(--info-soft); color: var(--info); }
-  .note { background: var(--info-soft); color: var(--info); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin: 8px 0; }
+  .note { background: var(--info-soft); color: var(--info); border-radius: var(--radius-s); padding: 10px 12px; font-size: 13px; margin: 8px 0; }
   .note.warn { background: var(--warn-soft); color: var(--warn); }
+  .note.ok { background: var(--accent-soft); color: var(--accent); }
+  .note.bad { background: var(--bad-soft); color: var(--bad); }
   .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -1px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .note.ok { background: var(--accent-soft); color: var(--accent); }
   .feed { list-style: none; margin: 0; padding: 0; }
-  .feed li { border-bottom: 1px solid var(--line); padding: 8px 2px; cursor: pointer; }
+  .feed li { border-bottom: 1px dashed var(--line); padding: 10px 2px; cursor: pointer; }
   .feed li:last-child { border-bottom: 0; }
   .feed .meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
-  .feed .sum { white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
-  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-word; max-height: 360px; }
-  table { width: 100%; border-collapse: collapse; } td, th { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; } th { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .feed .sum { white-space: pre-wrap; word-break: break-word; margin-top: 3px; }
+  pre { background: #0f1220; color: #d7dbe8; border: 0; border-radius: var(--radius-s); padding: 12px 14px; overflow: auto; font: 12px/1.55 var(--mono); white-space: pre-wrap; word-break: break-word; max-height: 380px; }
+  table { width: 100%; border-collapse: collapse; } td, th { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; } th { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  tr:last-child td { border-bottom: 0; }
   td.c, th.c { text-align: center; }
-  .toggle { position: relative; width: 40px; height: 22px; flex: none; display: inline-block; margin: 0; } .toggle input { opacity: 0; width: 0; height: 0; }
-  .toggle span { position: absolute; inset: 0; background: var(--line); border-radius: 999px; transition: .15s; cursor: pointer; }
-  .toggle span::after { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .15s; }
+  .toggle { position: relative; width: 42px; height: 24px; flex: none; display: inline-block; margin: 0; } .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle span { position: absolute; inset: 0; background: var(--line-2); border-radius: 999px; transition: .15s; cursor: pointer; }
+  .toggle span::after { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
   .toggle input:checked + span { background: var(--accent); } .toggle input:checked + span::after { transform: translateX(18px); }
   .toggle input:disabled + span { opacity: .5; cursor: default; }
-  .qr { background: #fff; padding: 8px; border-radius: 8px; width: 220px; max-width: 100%; }
+  .qr { background: #fff; padding: 10px; border-radius: var(--radius-s); width: 220px; max-width: 100%; }
   .center { min-height: 80vh; display: grid; place-items: center; }
-  .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 14px; z-index: 20; max-width: 90vw; }
-  .chatlog { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow: auto; margin: 10px 0; }
-  .bubble { padding: 8px 10px; border-radius: 10px; max-width: 85%; white-space: pre-wrap; word-break: break-word; }
-  .bubble.me { align-self: flex-end; background: var(--accent-soft); } .bubble.bot { align-self: flex-start; background: var(--bg); border: 1px solid var(--line); }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; z-index: 20; max-width: 90vw; box-shadow: var(--shadow); }
+  .chatlog { display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow: auto; margin: 10px 0; }
+  .bubble { padding: 9px 12px; border-radius: 16px; max-width: 85%; white-space: pre-wrap; word-break: break-word; }
+  .bubble.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; } .bubble.bot { align-self: flex-start; background: var(--bg-2); border-bottom-left-radius: 4px; }
   .hide { display: none !important; }
-  .code { font-family: ui-monospace, Menlo, monospace; font-size: 22px; letter-spacing: 3px; font-weight: 600; }
+  .code { font-family: var(--mono); font-size: 22px; letter-spacing: 3px; font-weight: 600; }
   .readonly .mut { display: none !important; }
+  .meter { height: 8px; border-radius: 999px; background: var(--bg-2); overflow: hidden; margin: 8px 0 4px; }
+  .meter > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--marigold))); }
+  .meter.hot > i { background: linear-gradient(90deg, var(--marigold), var(--bad)); }
+  .spark { width: 100%; height: 44px; display: block; margin-top: 6px; }
+  .spark path.l { fill: none; stroke: var(--accent); stroke-width: 1.6; } .spark path.a { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: none; }
+  .tiles { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+  .row > .seg { flex: 0 0 auto; min-width: 0; }
+  .seg { display: inline-flex; background: var(--bg-2); border-radius: 999px; padding: 3px; gap: 2px; }
+  .seg button { border: 0; background: none; font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; color: var(--muted); cursor: pointer; }
+  .seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .number-card { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 12px 14px; margin: 10px 0; background: color-mix(in srgb, var(--bg) 40%, transparent); }
+  @media (max-width: 640px) { main { padding: 14px 12px 40px; } .card { padding: 16px; border-radius: 16px; } .bar { padding: 10px 14px 4px; } }
 </style>
 </head>
 <body>
@@ -102,6 +136,14 @@ function h(tag, attrs, ...kids) {
   return el;
 }
 const $ = (s) => document.querySelector(s);
+/** Brand mark: a world (teal) with an orbit (marigold) — Duniya means "world". */
+function logo() {
+  const ns = 'http://www.w3.org/2000/svg'; const el = (t, a) => { const e = document.createElementNS(ns, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); return e; };
+  const svg = el('svg', { viewBox: '0 0 32 32', class: 'logo', 'aria-hidden': 'true' });
+  svg.append(el('circle', { cx: 16, cy: 16, r: 10, fill: 'var(--accent)' }), el('path', { d: 'M9 13c3 2 9 2 14-1M8.5 19c4 1.6 10 1.6 15-1.5', stroke: 'color-mix(in srgb, var(--accent-ink) 55%, transparent)', 'stroke-width': 1.2, fill: 'none' }),
+    el('ellipse', { cx: 16, cy: 16, rx: 15, ry: 5.5, fill: 'none', stroke: 'var(--marigold)', 'stroke-width': 2.2, transform: 'rotate(-22 16 16)' }));
+  return svg;
+}
 function toast(msg) { const t = h('div', { class: 'toast' }, msg); document.body.append(t); setTimeout(() => t.remove(), 3500); }
 async function api(method, path, body) {
   const opts = { method, headers: {} };
@@ -132,7 +174,7 @@ const S = { tab: 'overview', user: null, status: null, feed: [], feedBot: '', es
 const RANK = { viewer: 1, admin: 2, owner: 3 };
 const can = (role) => S.user && RANK[S.user.role] >= RANK[role];
 const TABS = () => [['overview', 'Overview'], ['activity', 'Activity'], ['bots', 'Bots'], ['chats', 'Chats'], ['models', 'Models'],
-  can('owner') && ['backups', 'Backups'], ['pending', 'Pending'], ['secrets', 'Secrets'], ['settings', 'Settings']].filter(Boolean);
+  ['server', 'Server'], can('owner') && ['backups', 'Backups'], ['pending', 'Pending'], ['secrets', 'Secrets'], ['settings', 'Settings']].filter(Boolean);
 
 // ---------- login & first-run setup ----------
 async function renderLogin() {
@@ -159,8 +201,10 @@ async function renderLogin() {
   app.append(h('div', { class: 'center' }, h('form', { class: 'card', style: 'width:min(360px,92vw)', onsubmit: async (e) => {
     e.preventDefault();
     try { const r = await api('POST', '/api/login', { username: user.value, password: pw.value }); S.user = r.user; boot(); } catch (x) { err.textContent = x.message; }
-  } }, h('h2', {}, 'Duniya · WhatsApp agents'), field('Username', user), field('Password', pw), err,
-    h('button', { class: 'btn primary', style: 'width:100%;margin-top:8px' }, 'Sign in'))));
+  } }, h('div', { style: 'display:flex;justify-content:center;margin:4px 0 6px' }, Object.assign(logo(), { style: 'width:52px;height:52px' })),
+    h('h2', { style: 'text-align:center;font-size:24px;margin-bottom:2px' }, 'Duniya'), h('p', { class: 'small muted', style: 'text-align:center;margin:0 0 6px' }, 'Your WhatsApp agents'),
+    field('Username', user), field('Password', pw), err,
+    h('button', { class: 'btn primary', style: 'width:100%;margin-top:10px;justify-content:center' }, 'Sign in'))));
   pw.focus();
 }
 
@@ -171,7 +215,7 @@ async function boot() {
   document.body.classList.toggle('readonly', !can('admin'));
   const nav = h('nav', {}, TABS().map(([id, label]) => h('button', { 'data-tab': id, onclick: () => (location.hash === `#${id}` ? show(id) : (location.hash = id)) }, label)));
   app.append(
-    h('header', {}, h('div', { class: 'bar' }, h('span', { class: 'dot', id: 'wa-dot' }), h('div', { class: 'brand' }, 'Duniya', h('small', { id: 'brand-sub' }, 'agents')),
+    h('header', {}, h('div', { class: 'bar' }, h('div', { class: 'brand' }, logo(), 'Duniya', h('span', { class: 'dot', id: 'wa-dot', title: 'WhatsApp' }), h('small', { id: 'brand-sub' }, 'agents')),
       h('div', { style: 'flex:1' }), h('span', { class: 'small muted' }, `${S.user.username} · ${S.user.role}`),
       h('button', { class: 'btn small', onclick: async () => { await api('POST', '/api/logout').catch(() => {}); S.user = null; renderLogin(); } }, 'Sign out')), nav),
     h('main', { id: 'main' }));
@@ -192,7 +236,7 @@ function show(tab) {
   S.tab = tab;
   if (location.hash.slice(1).split('/')[0] !== tab) history.replaceState(null, '', `#${tab}`);
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-  const r = { overview: renderOverview, activity: renderActivity, bots: renderBots, chats: renderChats, models: renderModels, backups: renderBackups, pending: renderPending, secrets: renderSecrets, settings: renderSettings }[tab];
+  const r = { overview: renderOverview, server: renderServer, activity: renderActivity, bots: renderBots, chats: renderChats, models: renderModels, backups: renderBackups, pending: renderPending, secrets: renderSecrets, settings: renderSettings }[tab];
   Promise.resolve(r?.()).catch((e) => toast(e.message));
 }
 function connectEvents() {
@@ -223,18 +267,34 @@ async function renderOverview(soft) {
   if (soft && (overviewBusy || $('#main')?.contains(document.activeElement))) return;
   overviewSig = sig;
   const c = st.channel;
-  const phone = h('input', { placeholder: 'Bot number, e.g. 41791234567', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
+  const numbers = c.numbers || [{ id: 'main', label: 'Main', ...c }];
+  const pillFor = (x) => h('span', { class: `pill ${x.status === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(x.status) ? 'warn' : 'bad'}` }, x.status === 'open' ? 'connected' : x.status === 'qr' ? 'waiting for scan' : x.status.replace('_', ' '));
+  const numberBlock = (n) => {
+    const body = { number: n.id };
+    const phone = h('input', { placeholder: 'This number, e.g. 41791234567', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
+    const dmSel = h('select', { disabled: !can('admin'), style: 'max-width:260px', onchange: (e) => tryApi(() => api('PUT', `/api/whatsapp/numbers/${n.id}`, { dmBot: e.target.value }), 'Saved') },
+      h('option', { value: '' }, 'Default (Settings)'), st.bots.map((b) => h('option', { value: b.id, selected: n.dmBot === b.id }, b.name)));
+    return h('div', { class: 'number-card' },
+      h('div', { class: 'row spread' }, h('div', {}, h('b', {}, n.label), n.status === 'open' ? h('span', { class: 'muted small num' }, `  +${(n.me || '').split(':')[0].split('@')[0]}`) : null), pillFor(n)),
+      n.status === 'open' ? h('div', { class: 'small muted' }, `Connected since ${time(n.since)}`) : null,
+      n.qrDataUrl && can('admin') ? h('div', {}, h('p', { class: 'small muted' }, 'On this phone: WhatsApp → Settings → Linked devices → Link a device, then scan:'), h('img', { class: 'qr', src: n.qrDataUrl, alt: 'WhatsApp QR code' })) : null,
+      n.status !== 'open' && can('admin') ? h('div', {}, h('label', {}, 'Or link with a pairing code'), h('div', { class: 'row' }, phone,
+        h('button', { class: 'btn', onclick: () => tryApi(async () => { const r = await api('POST', '/api/whatsapp/pair', { ...body, phone: phone.value }); overviewBusy = false; toast(`Pairing code: ${r.code}`); refreshStatus(); }) }, 'Get code'))) : null,
+      n.pairingCode ? h('p', {}, 'Pairing code: ', h('span', { class: 'code' }, n.pairingCode)) : null,
+      n.lastError && n.status !== 'open' ? h('p', { class: 'small', style: 'color:var(--bad)' }, n.lastError) : null,
+      h('label', {}, 'Direct messages to this number go to'), dmSel,
+      h('div', { class: 'row mut', style: 'margin-top:10px' },
+        h('button', { class: 'btn small', onclick: () => tryApi(() => api('POST', '/api/whatsapp/restart', body), 'Reconnecting…') }, 'Reconnect'),
+        h('button', { class: 'btn small danger', onclick: () => confirm(`Unlink ${n.label}? You will need to scan a new QR.`) && tryApi(() => api('POST', '/api/whatsapp/logout', body), 'Unlinked') }, 'Unlink'),
+        n.id !== 'main' && can('owner') ? h('button', { class: 'btn small danger', onclick: () => confirm(`Remove the number “${n.label}”? Its chats keep their memory; bots bound to them stop answering there.`) && tryApi(async () => { await api('DELETE', `/api/whatsapp/numbers/${n.id}`); refreshStatus(); }, 'Removed') }, 'Remove') : null));
+  };
+  const newLabel = h('input', { placeholder: 'Name, e.g. Shop', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
   const wa = h('div', { class: 'card' },
-    h('div', { class: 'row spread' }, h('h2', {}, 'WhatsApp'), h('span', { class: `pill ${c.status === 'open' ? 'ok' : c.status === 'qr' ? 'warn' : 'bad'}` }, c.status)),
-    c.status === 'open' ? h('p', {}, 'Connected as ', h('b', {}, (c.me || '').split(':')[0].split('@')[0]), h('span', { class: 'muted small' }, ` · since ${time(c.since)}`)) : null,
-    c.qrDataUrl && can('admin') ? h('div', {}, h('p', { class: 'small muted' }, 'On the bot phone: WhatsApp → Settings → Linked devices → Link a device, then scan:'), h('img', { class: 'qr', src: c.qrDataUrl, alt: 'WhatsApp QR code' })) : null,
-    c.status !== 'open' && can('admin') ? h('div', {}, h('label', {}, 'Or link with a pairing code'), h('div', { class: 'row' }, phone,
-      h('button', { class: 'btn', onclick: () => tryApi(async () => { const r = await api('POST', '/api/whatsapp/pair', { phone: phone.value }); overviewBusy = false; toast(`Pairing code: ${r.code}`); refreshStatus(); }) }, 'Get code'))) : null,
-    c.pairingCode ? h('p', {}, 'Pairing code: ', h('span', { class: 'code' }, c.pairingCode)) : null,
-    c.lastError ? h('p', { class: 'small', style: 'color:var(--bad)' }, c.lastError) : null,
-    h('div', { class: 'row mut', style: 'margin-top:10px' },
-      h('button', { class: 'btn', onclick: () => tryApi(() => api('POST', '/api/whatsapp/restart'), 'Reconnecting…') }, 'Reconnect'),
-      h('button', { class: 'btn danger', onclick: () => confirm('Unlink this WhatsApp number? You will need to scan a new QR.') && tryApi(() => api('POST', '/api/whatsapp/logout'), 'Logged out') }, 'Unlink')));
+    h('div', { class: 'row spread' }, h('h2', {}, 'WhatsApp numbers'), h('span', { class: 'pill' }, `${numbers.filter((n) => n.status === 'open').length}/${numbers.length} connected`)),
+    numbers.map(numberBlock),
+    can('owner') ? h('details', { class: 'mut' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, '+ Add another number'),
+      h('p', { class: 'small muted' }, 'Each number is linked as its own device. Use a dedicated number for bots.'),
+      h('div', { class: 'row' }, newLabel, h('button', { class: 'btn primary', onclick: () => tryApi(async () => { await api('POST', '/api/whatsapp/numbers', { label: newLabel.value }); overviewBusy = false; await refreshStatus(); renderOverview(); }, 'Added — scan its QR') }, 'Add number'))) : null);
   const control = h('div', { class: 'card' }, h('h2', {}, 'Control'),
     h('div', { class: 'row spread nowrap' }, h('div', {}, h('b', {}, 'Pause all bots'), h('div', { class: 'small muted' }, 'Stops all replies and scheduled posts')),
       toggle(st.settings.paused, (v) => tryApi(async () => { await api('POST', '/api/settings', { paused: v }); refreshStatus(); }, v ? 'Paused' : 'Resumed'))),
@@ -299,6 +359,83 @@ async function renderUpdates(box, note = '') {
     log);
 }
 
+// ---------- server (011) ----------
+const bytes = (n) => { if (n == null) return '–'; const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; } return `${n >= 10 || i === 0 ? Math.round(n) : n.toFixed(1)} ${u[i]}`; };
+const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+function spark(values, max) {
+  const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 100 30'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('class', 'spark');
+  const v = values.slice(-120); if (v.length < 2) return svg;
+  const top = max ?? Math.max(1, ...v);
+  const pts = v.map((y, i) => [(i / (v.length - 1)) * 100, 29 - (Math.min(y, top) / top) * 27]);
+  const line = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(2)},${y.toFixed(2)}`).join('');
+  for (const [cls, d] of [['a', `${line}L100,30L0,30Z`], ['l', line]]) { const pa = document.createElementNS(ns, 'path'); pa.setAttribute('class', cls); pa.setAttribute('d', d); pa.setAttribute('vector-effect', 'non-scaling-stroke'); svg.append(pa); }
+  return svg;
+}
+const meter = (p) => h('div', { class: `meter ${p >= 85 ? 'hot' : ''}` }, h('i', { style: `width:${Math.min(100, p)}%` }));
+let serverTimer = null; let opsTimer = null; let logUnit = 'whatsapp-agent-duniya';
+async function renderServer() {
+  clearInterval(serverTimer); clearTimeout(opsTimer);
+  const tilesBox = h('div', { class: 'tiles' }); const infoBox = h('div', { class: 'card' }); const opsBox = h('div', { class: 'card' }); const logBox = h('div', { class: 'card', style: 'margin-top:16px' });
+  opsBox.append(h('h2', {}, 'OS updates & maintenance'), h('p', { class: 'muted small' }, h('span', { class: 'spinner' }), ' Checking for OS updates…'));
+  $('#main').replaceChildren(tilesBox, h('div', { class: 'grid', style: 'margin-top:16px' }, infoBox, opsBox), can('admin') ? logBox : null);
+  async function tiles() {
+    if (S.tab !== 'server') return clearInterval(serverTimer);
+    const [x, hist] = await Promise.all([api('GET', '/api/system'), api('GET', '/api/system/history')]).catch(() => [null, []]);
+    if (!x) return;
+    const m = x.memory; const d = x.disks[0];
+    const tile = (eyebrow, stat, sub, extra) => h('div', { class: 'card' }, h('div', { class: 'eyebrow' }, eyebrow), stat, sub ? h('div', { class: 'small muted' }, sub) : null, extra);
+    tilesBox.replaceChildren(
+      tile('CPU', h('div', { class: 'stat' }, x.cpu == null ? '…' : `${Math.round(x.cpu)}`, h('small', {}, '%')), `${x.cpus} core${x.cpus > 1 ? 's' : ''} · load ${x.load.join(' / ')}`, spark(hist.map((p) => p.cpu), 100)),
+      tile('Memory', h('div', { class: 'stat' }, `${pct(m.used, m.total)}`, h('small', {}, '%')), `${bytes(m.used)} of ${bytes(m.total)} · app ${bytes(x.app.rss)}`, [meter(pct(m.used, m.total)), spark(hist.map((p) => p.mem), 100)]),
+      tile('Disk', h('div', { class: 'stat' }, d ? `${pct(d.used, d.total)}` : '–', h('small', {}, '%')), d ? `${bytes(d.free)} free of ${bytes(d.total)}` : '', d ? meter(pct(d.used, d.total)) : null),
+      tile('Swap', h('div', { class: 'stat' }, m.swapTotal ? `${pct(m.swapUsed, m.swapTotal)}` : '–', h('small', {}, m.swapTotal ? '%' : '')), m.swapTotal ? `${bytes(m.swapUsed)} of ${bytes(m.swapTotal)}` : 'No swap', m.swapTotal ? meter(pct(m.swapUsed, m.swapTotal)) : null),
+      tile('Network', h('div', { class: 'stat' }, bytes(x.network?.rxRate || 0), h('small', {}, '/s in')), `${bytes(x.network?.txRate || 0)}/s out · total ${bytes(x.network?.rx)} in`, spark(hist.map((p) => p.rx + p.tx))),
+      tile('Uptime', h('div', { class: 'stat', style: 'font-size:24px' }, ago(Date.now() - x.uptimeSec * 1000)), `since ${time(Date.now() - x.uptimeSec * 1000)}`,
+        x.rebootRequired ? h('div', { class: 'note warn' }, 'Restart required to finish updates') : null));
+    infoBox.replaceChildren(h('h2', {}, 'This server'),
+      h('table', {}, h('tbody', {}, [['Host', x.host], ['System', x.os], ['Kernel', `${x.kernel} (${x.arch})`], ['App', `pid ${x.app.pid} · Node ${x.app.node}`]].map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v))))),
+      Object.keys(x.services).length ? h('div', {}, h('h3', {}, 'Services'), h('div', { class: 'row' }, Object.entries(x.services).filter(([, v]) => v !== 'inactive' && v !== 'unknown' || true).map(([k, v]) => h('span', { class: `pill ${v === 'active' ? 'ok' : v === 'inactive' ? '' : 'bad'}` }, `${k}: ${v}`)))) : h('p', { class: 'small muted' }, 'Service status is available on installs that use systemd.'));
+  }
+  async function opsCard() {
+    if (S.tab !== 'server') return;
+    if (!can('admin')) { opsBox.replaceChildren(h('h2', {}, 'Maintenance'), h('p', { class: 'small muted' }, 'Admins can see OS updates; owners can run maintenance.')); return; }
+    const [upd, ops] = await Promise.all([api('GET', '/api/system/os-updates').catch(() => null), can('owner') ? api('GET', '/api/system/ops').catch(() => null) : null]);
+    const run = ops?.status?.state === 'running' ? ops.status : null;
+    const act = (action, label, cls = '', ask = '') => h('button', { class: `btn ${cls}`, disabled: !!run || !ops?.available, onclick: () => (!ask || confirm(ask)) && tryApi(async () => { await api('POST', '/api/system/ops', { action }); setTimeout(opsCard, 1500); }, 'Started') }, label);
+    opsBox.replaceChildren(h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'OS updates & maintenance'),
+      h('button', { class: 'btn small', onclick: async (e) => { e.target.disabled = true; await api('GET', '/api/system/os-updates?refresh=1').catch(() => {}); opsCard(); } }, 'Check')),
+      !upd ? null : !upd.supported ? h('p', { class: 'small muted' }, 'OS update checks are available on Debian/Ubuntu servers.')
+        : h('div', { style: 'margin:10px 0' }, upd.packages.length
+          ? h('div', { class: `note ${upd.security ? 'warn' : ''}` }, h('b', {}, `${upd.packages.length} package update${upd.packages.length > 1 ? 's' : ''}`), upd.security ? ` · ${upd.security} security` : '', ` · checked ${ago(upd.at)} ago`)
+          : h('div', { class: 'note ok' }, h('b', {}, '✓ System packages are up to date'), ` · checked ${ago(upd.at)} ago`),
+        upd.packages.length ? h('details', {}, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Show packages'), h('div', { class: 'small', style: 'margin-top:6px' }, upd.packages.slice(0, 200).map((p) => h('div', {}, h('b', {}, p.name), ` ${p.from || ''} → ${p.to}`, p.security ? h('span', { class: 'pill warn', style: 'margin-left:6px' }, 'security') : null)))) : null),
+      can('owner') ? (ops?.available ? h('div', {},
+        run ? h('div', { class: 'note' }, h('span', { class: 'spinner' }), h('b', {}, ` ${ops.actions[run.action] || run.action}…`), ` started ${ago(run.startedAt)} ago`) : null,
+        h('div', { class: 'row', style: 'margin-top:8px' },
+          act('os-update', 'Install OS updates', 'primary', 'Install all OS package updates now? The server stays online; a restart may be needed afterwards.'),
+          act('reboot', 'Restart server', 'danger', 'Restart the whole server now? Bots are offline for 1–2 minutes.')),
+        h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'More'),
+          h('div', { class: 'row', style: 'margin-top:8px' }, act('os-cleanup', 'Remove unused packages'), act('restart-web', 'Restart web server'), act('restart-tunnel', 'Restart tunnel'))),
+        ops.status && !run ? h('p', { class: 'small muted' }, `Last: ${ops.actions[ops.status.action] || ops.status.action} — ${ops.status.state === 'done' ? 'done' : 'failed'} ${time(ops.status.endedAt)}`) : null,
+        ops.log ? h('details', { open: !!run }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Output'), h('pre', {}, ops.log)) : null)
+        : h('div', { class: 'note' }, 'Maintenance actions need a one-time setup on this server: re-run the installer, or redeploy. Metrics and update checks work without it.'))
+        : h('p', { class: 'small muted' }, 'Only the owner can run maintenance.'));
+    if (run) opsTimer = setTimeout(opsCard, 4000);
+  }
+  async function logsCard() {
+    if (!can('admin')) return;
+    const r = await api('GET', `/api/system/logs?unit=${encodeURIComponent(logUnit)}&lines=200`).catch((e) => ({ lines: [], note: e.message }));
+    const seg = h('div', { class: 'seg' }, [['whatsapp-agent-duniya', 'App'], ['caddy', 'Web server'], ['cloudflared', 'Tunnel'], ['duniya-ops', 'Maintenance']].map(([u, l]) => h('button', { class: logUnit === u ? 'on' : '', onclick: () => { logUnit = u; logsCard(); } }, l)));
+    const pre = h('pre', { style: 'max-height:460px' }, r.lines.length ? r.lines.join('\n') : (r.note || 'No log lines.'));
+    logBox.replaceChildren(h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Logs'), h('button', { class: 'btn small', onclick: logsCard }, 'Refresh')),
+      h('div', { style: 'margin:10px 0;overflow-x:auto' }, seg), pre);
+    pre.scrollTop = pre.scrollHeight;
+  }
+  await tiles(); opsCard(); logsCard();
+  serverTimer = setInterval(tiles, 10000);
+}
+
 // ---------- activity ----------
 function feedItem(a) {
   const detail = h('pre', { class: 'hide' }, a.detail ? JSON.stringify(a.detail, null, 2) : '(no details)');
@@ -324,6 +461,20 @@ async function renderActivity() {
 // ---------- bots ----------
 let modelsCache = null;
 const loadModels = async (refresh) => (modelsCache = !refresh && modelsCache ? modelsCache : await api('GET', `/api/models${refresh ? '?refresh=1' : ''}`));
+/** Model picker: Auto (any provider), "<provider> · Auto", or a specific model, grouped by provider.
+ *  withInherit adds "Same as the bot" (per chat). */
+function modelSelect(models, value, { withInherit = false, autoLabel = 'Auto (best connected model)', ...attrs } = {}) {
+  const groups = new Map();
+  for (const m of models.models) { if (!groups.has(m.provider)) groups.set(m.provider, []); groups.get(m.provider).push(m); }
+  const known = new Set(['inherit', 'auto', ...models.models.map((m) => m.ref), ...[...groups.keys()].map((p) => `${p}:auto`)]);
+  return h('select', attrs,
+    withInherit ? h('option', { value: 'inherit', selected: value === 'inherit' }, 'Same as the bot') : null,
+    h('option', { value: 'auto', selected: value === 'auto' }, autoLabel),
+    [...groups].map(([prov, list]) => h('optgroup', { label: list[0].label.split(' · ')[0] },
+      h('option', { value: `${prov}:auto`, selected: value === `${prov}:auto` }, `${list[0].label.split(' · ')[0]} · Auto`),
+      list.map((m) => h('option', { value: m.ref, selected: value === m.ref }, m.label.split(' · ').slice(1).join(' · ') || m.ref)))),
+    value && !known.has(value) ? h('option', { value, selected: true }, `${value} (not available)`) : null);
+}
 async function renderBots() {
   const route = location.hash.split('/');
   if (route[1]) return renderBotEditor(decodeURIComponent(route[1]));
@@ -365,9 +516,7 @@ async function renderBotEditor(id) {
   const F = {};
   const inp = (key, attrs = {}) => (F[key] = h('input', { value: c[key] ?? '', ...attrs }));
   // General
-  const modelSel = (F.model = h('select', {}, h('option', { value: 'auto' }, `Auto${models.resolvedDefault ? ` (${models.resolvedDefault})` : ''}`),
-    models.models.map((m) => h('option', { value: m.ref, selected: c.model === m.ref }, m.label)),
-    c.model !== 'auto' && !models.models.some((m) => m.ref === c.model) ? h('option', { value: c.model, selected: true }, `${c.model} (not available)`) : null));
+  const modelSel = (F.model = modelSelect(models, c.model, { autoLabel: `Auto${models.resolvedDefault ? ` (now ${models.resolvedDefault})` : ''}` }));
   F.dm = h('select', {}, [['members', 'Members of its groups + listed participants'], ['organizers', 'Organizers only'], ['anyone', 'Anyone'], ['none', 'Nobody']].map(([v, l]) => h('option', { value: v, selected: c.dm === v }, l)));
   F.enabled = h('input', { type: 'checkbox', checked: c.enabled }); F.respondToMentions = h('input', { type: 'checkbox', checked: c.respondToMentions });
   F.memory = h('input', { type: 'checkbox', checked: c.memory?.enabled !== false });
@@ -589,18 +738,32 @@ async function renderBotEditor(id) {
 }
 
 // ---------- chats + memory ----------
+let chatsFilter = 'all';
 async function renderChats() {
-  $('#main').replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading groups…')));
-  const [chats, bots] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/bots')]);
+  $('#main').replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading chats…')));
+  const [chats, bots, models] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/bots'), loadModels().catch(() => ({ models: [] }))]);
   const memBox = h('div', {});
-  const rows = chats.map((c) => h('tr', {},
-    h('td', {}, h('b', {}, c.name), h('div', { class: 'small muted' }, `${c.size} members · ${c.id}`),
-      h('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => renderMemory(c, memBox) }, 'Memory')),
-    h('td', { style: 'width:200px' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/chats/bind', { chat: c.id, bot: e.target.value || null }), e.target.value ? 'Bound' : 'Unbound') },
-      h('option', { value: '' }, '— no bot —'), bots.map((b) => h('option', { value: b.id, selected: c.bot === b.id }, b.name))))));
-  $('#main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'WhatsApp groups'),
-    h('p', { class: 'small muted' }, 'Add the bot number to a group in WhatsApp, then choose which bot answers there. Each group has at most one bot. Messages in all groups are remembered so a bot added later has context.'),
-    chats.length ? h('table', {}, h('tbody', {}, rows)) : h('p', { class: 'muted' }, 'No groups yet (or WhatsApp is not connected).')), memBox);
+  const multi = new Set(chats.map((c) => c.number)).size > 1;
+  const savePrefs = (c, patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, patch)); }, 'Saved');
+  const list = h('div', {});
+  const draw = () => {
+    const shown = chats.filter((c) => chatsFilter === 'all' || (chatsFilter === 'groups' ? c.isGroup : !c.isGroup));
+    list.replaceChildren(shown.length ? h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Chat'), h('th', {}, 'Bot'), h('th', {}, 'Model'), h('th', {}, 'Activity log'))),
+      h('tbody', {}, shown.map((c) => h('tr', {},
+        h('td', {}, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, c.name || c.id), h('span', { class: `pill ${c.isGroup ? 'info' : ''}` }, c.isGroup ? 'group' : 'person'), multi ? h('span', { class: 'pill' }, c.numberLabel) : null),
+          h('div', { class: 'small muted' }, c.isGroup ? `${c.size || 0} members` : c.phone ? `+${c.phone}` : '', c.lastAt ? ` · last message ${ago(c.lastAt)} ago` : ''),
+          h('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => renderMemory(c, memBox) }, 'Memory')),
+        h('td', { style: 'min-width:170px' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, bot: e.target.value || null }); c.bot = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
+          h('option', { value: '' }, c.isGroup ? '— no bot —' : '— default for direct messages —'), bots.map((b) => h('option', { value: b.id, selected: c.bot === b.id }, b.name)))),
+        h('td', { style: 'min-width:200px' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) })),
+        h('td', { style: 'min-width:130px' }, h('select', { disabled: !can('admin'), onchange: (e) => savePrefs(c, { logging: e.target.value }) },
+          [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message a bot number.' : 'No chats yet (or WhatsApp is not connected).'));
+  };
+  const seg = h('div', { class: 'seg' }, [['all', 'All'], ['groups', 'Groups'], ['people', 'People']].map(([v, l]) => h('button', { class: chatsFilter === v ? 'on' : '', onclick: (e) => { chatsFilter = v; seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === e.target)); draw(); } }, l)));
+  draw();
+  $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Chats'), seg),
+    h('p', { class: 'small muted' }, 'Choose which bot answers in each group or with each person, and optionally a different model or logging level for that chat. A person assigned to a bot is always answered by it; unassigned direct messages go to the default bot of the number. Messages in groups are remembered so a bot added later has context.'),
+    list), memBox);
 }
 async function renderMemory(c, box) {
   const enc = encodeURIComponent(c.id);
@@ -625,8 +788,7 @@ async function renderModels() {
   const secretForm = (name, placeholder) => { const v = h('input', { type: 'password', placeholder }); return h('form', { class: 'row mut', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name, value: v.value }), v.value ? 'Saved' : 'Removed')) renderModels(); } }, v, h('button', { class: 'btn' }, 'Save')); };
   const statusPill = (p) => h('span', { class: `pill ${p.connected ? 'ok' : p.error ? 'bad' : ''}` }, p.connected ? `${p.models} models` : p.error ? 'error' : 'not connected');
   const by = Object.fromEntries(provs.map((p) => [p.id, p]));
-  const opts = (sel, resolved) => [h('option', { value: 'auto' }, `Auto${resolved ? ` (${resolved})` : ''}`), models.models.map((m) => h('option', { value: m.ref, selected: sel === m.ref }, m.label))];
-  const def = h('select', {}, opts(models.defaultModel, models.resolvedDefault)); const bg = h('select', {}, opts(models.backgroundModel, models.resolvedBackground));
+  const def = modelSelect(models, models.defaultModel, { autoLabel: `Auto${models.resolvedDefault ? ` (now ${models.resolvedDefault})` : ''}` }); const bg = modelSelect(models, models.backgroundModel, { autoLabel: `Auto${models.resolvedBackground ? ` (now ${models.resolvedBackground})` : ''}` });
   // ChatGPT
   const cg = by.chatgpt; const paste = h('input', { placeholder: 'http://127.0.0.1:1455/auth/callback?code=…' });
   const cgFlow = h('div', {});
@@ -778,7 +940,7 @@ async function renderSecrets() {
 
 // ---------- settings ----------
 async function renderSettings() {
-  const bots = await api('GET', '/api/bots');
+  const [bots, lg] = await Promise.all([api('GET', '/api/bots'), api('GET', '/api/logging').catch(() => null)]);
   const cur = h('input', { type: 'password', placeholder: 'current', autocomplete: 'current-password' });
   const next = h('input', { type: 'password', placeholder: 'new (12+ characters)', autocomplete: 'new-password' });
   const cards = [
@@ -787,6 +949,7 @@ async function renderSettings() {
     h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default bot for DMs without a trigger'),
       h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmBot: e.target.value }), 'Saved') },
         h('option', { value: '' }, '— first bot that accepts the sender —'), bots.map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmBot === b.id }, b.name)))),
+    lg ? loggingCard(lg) : null,
     h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any bot can send:'),
       h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups'))),
   ];
@@ -805,6 +968,23 @@ async function renderSettings() {
         un, ue, ur, up, h('button', { class: 'btn primary' }, 'Add user'))));
   }
   $('#main').replaceChildren(h('div', { class: 'grid' }, cards));
+}
+
+function loggingCard({ settings, categories }) {
+  const cfg = structuredClone(settings);
+  const levelSeg = h('div', { class: 'seg' }, [['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('button', { class: cfg.level === v ? 'on' : '', disabled: !can('admin'),
+    onclick: (e) => { cfg.level = v; levelSeg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.target)); hint.textContent = HINTS[v]; cats.classList.toggle('hide', v === 'minimal'); } }, l)));
+  const HINTS = { minimal: 'Only errors, confirmations, configuration changes and connection status.', normal: 'The categories ticked below, with short details.', verbose: 'The categories ticked below, with full details (bigger log).' };
+  const hint = h('div', { class: 'small muted', style: 'margin-top:6px' }, HINTS[cfg.level]);
+  const cats = h('div', { class: cfg.level === 'minimal' ? 'hide' : '', style: 'margin-top:8px' }, Object.entries(categories).map(([k, label]) => h('label', { class: 'inline' },
+    h('input', { type: 'checkbox', checked: cfg.categories[k] !== false, disabled: !can('admin'), onchange: (e) => (cfg.categories[k] = e.target.checked) }), label)));
+  const days = h('input', { type: 'number', value: cfg.retentionDays, min: 1, max: 365, style: 'max-width:100px' });
+  const max = h('input', { type: 'number', value: cfg.maxEntries, min: 500, step: 500, style: 'max-width:120px' });
+  return h('div', { class: 'card' }, h('h2', {}, 'Activity log'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Choose what is recorded, to keep the log useful and small. Errors, confirmations and configuration changes are always kept. Each chat can override this on the Chats page.'),
+    levelSeg, hint, cats,
+    h('div', { class: 'row', style: 'margin-top:10px' }, h('div', {}, h('label', {}, 'Keep for (days)'), days), h('div', {}, h('label', {}, 'At most (entries)'), max)),
+    can('admin') ? h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: () => tryApi(() => api('PUT', '/api/logging', { ...cfg, retentionDays: Number(days.value), maxEntries: Number(max.value) }), 'Saved') }, 'Save') : null);
 }
 
 window.addEventListener('hashchange', () => { if (S.user) show(location.hash.slice(1).split('/')[0] || 'overview'); });

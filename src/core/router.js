@@ -27,11 +27,15 @@ function stripTriggers(bot, text) {
 
 /** Pick the bot for a direct message, or null. */
 async function botForDm(msg, channel) {
+  // A 1:1 chat an admin assigned to a bot (Chats page) always goes to that bot.
+  const assigned = botForChat(msg.chat);
+  if (assigned) return assigned.enabled ? assigned : null;
   const lower = msg.text.trim().toLowerCase();
   const enabled = listBots().filter((b) => b.enabled);
   const byTrigger = enabled.find((b) => startsWithTrigger(b, lower));
+  const numberDefault = (getSettings().whatsappNumbers || []).find((n) => n.id === (msg.number || 'main'))?.dmBot;
   const candidates = byTrigger ? [byTrigger]
-    : [getBot(getSettings().defaultDmBot), ...enabled].filter((b) => b?.enabled);
+    : [getBot(numberDefault), getBot(getSettings().defaultDmBot), ...enabled].filter((b) => b?.enabled);
   for (const bot of candidates) {
     if (bot.dm === 'none') continue;
     const role = roleIn(bot, msg.phone);

@@ -86,6 +86,7 @@ export async function setup({ bindings = {}, env = {}, legacy = null, extend = n
   t.config = await import('../src/core/config.js');
   t.memory = await import('../src/core/memory.js');
   t.db = await import('../src/core/db.js');
+  t.events = await import('../src/core/events.js');
   await t.bots.loadBots();
   if (!legacy) {
     t.store.setSecret('ANTHROPIC_API_KEY', 'test');

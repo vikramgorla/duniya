@@ -107,6 +107,13 @@ export async function warmModels() {
 
 export function resolveModel(ref, purpose = 'bot') {
   const parsed = parseRef(ref);
+  if (parsed && parsed.model === 'auto') { // "provider:auto": that provider's best model
+    const p = providerById(parsed.provider);
+    if (!p?.configured) throw Object.assign(new Error(`Provider "${parsed.provider}" is not connected`), { code: 'no_model' });
+    const pick = parsed.provider === 'anthropic' ? anthropic.RECOMMENDED[purpose === 'background' ? 'background' : 'bot'] : autoPick(modelCache.get(p.id)?.models || [], purpose);
+    if (!pick) throw Object.assign(new Error(`No usable model listed by ${p.name}`), { code: 'no_model' });
+    return parseRef(`${parsed.provider}:${pick}`);
+  }
   if (parsed) return parsed;
   const setting = purpose === 'background'
     ? getSetting('backgroundModel', process.env.SUMMARY_MODEL || 'auto')
@@ -133,7 +140,7 @@ export function resolveModel(ref, purpose = 'bot') {
  * Returns { content, stop_reason, usage, model: 'provider:model' }.
  */
 export async function chat({ model = 'auto', purpose = 'bot', system, messages, tools = [], maxTokens = 1024 }) {
-  if (!parseRef(model)) await warmModels();
+  if (!parseRef(model) || parseRef(model).model === 'auto') await warmModels();
   const r = resolveModel(model, purpose);
   const p = providerById(r.provider);
   if (!p) throw Object.assign(new Error(`Unknown model provider "${r.provider}"`), { code: 'no_model' });

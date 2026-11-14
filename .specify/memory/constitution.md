@@ -52,6 +52,9 @@ confirmation, schedule run, configuration change and error MUST be recorded in t
 streamed to the admin panel. Operators MUST be able to pause all bots, enable or disable each bot,
 and see channel health from the panel without shell access.
 
+Operators MAY reduce what is recorded (global level, categories, per chat) to keep the log small, but errors,
+confirmations, configuration changes and channel status MUST always be recorded.
+
 *Rationale*: the owners need to see and control what the bots do.
 
 ### VI. Free-Tier, Everything as Code
@@ -76,6 +79,18 @@ accounts in CI). CI MUST pass before merging to `main`.
 
 *Rationale*: specs keep a small project understandable; fakes make the critical paths (roles,
 confirmation, routing) verifiable on every push.
+
+### VIII. Experience First
+
+The people running this are often not technical. Every feature MUST be usable from the admin panel without a shell,
+in plain language, with the next step obvious: links that go straight to where a key or setting is created, exactly
+what to copy, visual status that is never contradictory or stale, progress for long actions that survives reloads,
+and confirmations that state the consequence. One-click flows are preferred whenever the other side allows them.
+UI work MUST follow `DESIGN.md` and its checklist; a feature is not done until its screens pass that checklist in
+light and dark mode on a phone and an iPad.
+
+*Rationale*: the owners judge the product by how it feels to set up and run; capability that can't be found or
+understood does not exist for them.
 
 ## Security & Privacy Constraints
 
@@ -124,4 +139,4 @@ principle removed or redefined; MINOR: principle or section added or materially 
 clarification), and reviewed in a pull request. Reviewers verify constitution compliance for every
 change.
 
-**Version**: 1.2.0 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-14
+**Version**: 1.3.0 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-14

@@ -12,6 +12,9 @@ Run AI assistants in your WhatsApp groups, on your own server, managed from a we
   on request and can search older messages.
 - **Your choice of models**: Anthropic API key, OpenAI API key, any OpenAI-compatible endpoint (OpenRouter, Ollama,
   …), or your **ChatGPT Plus/Pro plan** via Sign in with ChatGPT. Pick per bot, or *Auto*.
+- **Several WhatsApp numbers**, groups and 1:1 chats: choose the bot, the model (or Auto) and the logging level per
+  chat.
+- **Server page**: CPU, memory, disk, network, logs, OS updates and restart — no SSH needed.
 - **Admin panel**: live activity (every message, tool call, model and token count), pause switch, users with
   roles, encrypted secrets, WhatsApp QR / pairing code, in-place updates.
 - **Encrypted backups** on a schedule to this server, a **private GitHub repo** the app creates for you, or any
@@ -124,3 +127,6 @@ The release workflow creates the tag and GitHub release, attaches the OCI stack 
 - Claude **subscriptions** (Pro/Max) can't be used by third-party apps under Anthropic's terms, so Claude needs an
   API key. ChatGPT plan usage uses OpenAI's official open-source flow (preview).
 - GitHub *device login* for backups needs a GitHub OAuth App client id (Device Flow enabled); pasting a token always works.
+
+
+Design language: [DESIGN.md](DESIGN.md).

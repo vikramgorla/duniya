@@ -1,5 +1,5 @@
 import { loadBots, listBots } from './core/bots.js';
-import { createWhatsAppChannel } from './channels/whatsapp.js';
+import { createChannelRegistry } from './channels/registry.js';
 import { createRouter, createHistoryHandler } from './core/router.js';
 import { startScheduler } from './core/scheduler.js';
 import { startPanel } from './panel/server.js';
@@ -14,7 +14,7 @@ import { startMetrics } from './core/system.js';
 await loadBots();
 console.log(`Bots: ${listBots().map((b) => `${b.id}${b.enabled ? '' : ' (disabled)'}`).join(', ') || 'none'}`);
 
-const whatsapp = createWhatsAppChannel();
+const whatsapp = createChannelRegistry();
 startPanel({ channel: whatsapp, extend: [providerRoutes, backupRoutes, updateRoutes] });
 await whatsapp.start(createRouter(whatsapp), { onHistory: createHistoryHandler() });
 startScheduler(whatsapp);

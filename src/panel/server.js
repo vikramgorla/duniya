@@ -13,7 +13,8 @@ import {
 } from '../core/bots.js';
 import { referencedSecrets } from '../core/schema.js';
 import { listActivity, listPending, dropPending, takePending, deleteNote, getNote } from '../core/db.js';
-import { bus, activity } from '../core/events.js';
+import { bus, activity, loggingSettings, resetLoggingCache, LOG_CATEGORIES } from '../core/events.js';
+import { allChatPrefs, setChatPrefs, seenChats } from '../core/chat-prefs.js';
 import { runAgent, handleConfirmCommand, applyPending } from '../core/agent.js';
 import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool, mcpConnection } from '../core/mcp.js';
@@ -82,7 +83,8 @@ async function readBody(req) {
   const raw = Buffer.concat(chunks).toString('utf8');
   return raw ? JSON.parse(raw) : {};
 }
-const gitVersion = () => new Promise((r) => execFile('git', ['log', '-1', '--format=%h %cs %s'], { cwd: ROOT }, (e, out) => r(e ? 'unknown' : out.trim())));
+const PKG_VERSION = (() => { try { return `v${JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')).version}`; } catch { return ''; } })();
+const gitVersion = () => new Promise((r) => execFile('git', ['log', '-1', '--format=%h'], { cwd: ROOT }, (e, out) => r([PKG_VERSION, e ? '' : out.trim()].filter(Boolean).join(' · ') || 'unknown')));
 function rateLimitLogin(ip) {
   const recent = (loginAttempts.get(ip) || []).filter((t) => Date.now() - t < 60000);
   recent.push(Date.now()); loginAttempts.set(ip, recent);
@@ -324,11 +326,40 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
 
   // ---------- chats + memory ----------
   route('GET', '/api/chats', async () => {
-    const chats = await channel.listChats();
+    const groups = (await channel.listChats()).map((c) => ({ ...c, isGroup: true }));
     const owner = new Map(listBots().flatMap((b) => b.chats.map((c) => [c, b.id])));
-    const known = new Set(chats.map((c) => c.id));
-    const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: '(not a member / offline)', size: 0 }));
-    return [...chats, ...missing].map((c) => ({ ...c, bot: owner.get(c.id) || '' }));
+    const prefs = allChatPrefs();
+    const numbers = new Map(((await channel.status()).numbers || []).map((n) => [n.id, n.label]));
+    const known = new Set(groups.map((c) => c.id));
+    // 1:1 chats the numbers have seen (name and number only) and any bound chat we can't see right now
+    const people = seenChats({ groups: false }).filter((c) => !known.has(c.id)).map((c) => ({ id: c.id, name: c.name || `+${c.phone}`, phone: c.phone, number: c.number, isGroup: false, lastAt: c.lastAt }));
+    for (const c of people) known.add(c.id);
+    const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: '(not a member / offline)', size: 0, isGroup: !/@(s\.whatsapp\.net|lid)$/.test(id) }));
+    return [...groups, ...people, ...missing].map((c) => {
+      const number = c.number || (c.id.includes('#') ? c.id.split('#')[0] : 'main');
+      return { ...c, number, numberLabel: numbers.get(number) || number, bot: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit' };
+    });
+  });
+  route('PUT', '/api/chats/:chat/prefs', async (req, res, body, q, p, user) => {
+    const chat = decodeURIComponent(p.chat);
+    const out = setChatPrefs(chat, { model: body.model, logging: body.logging });
+    activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging} (${user.username})` });
+    return out;
+  });
+  // ---------- activity logging settings (011) ----------
+  route('GET', '/api/logging', async () => ({ settings: loggingSettings(), categories: LOG_CATEGORIES }));
+  route('PUT', '/api/logging', async (req, res, body, q, p, user) => {
+    const cur = loggingSettings();
+    const next = {
+      level: ['minimal', 'normal', 'verbose'].includes(body.level) ? body.level : cur.level,
+      categories: Object.fromEntries(Object.keys(LOG_CATEGORIES).map((k) => [k, body.categories?.[k] ?? cur.categories[k]]).map(([k, v]) => [k, !!v])),
+      retentionDays: Math.max(1, Math.min(365, Number(body.retentionDays) || cur.retentionDays)),
+      maxEntries: Math.max(500, Math.min(100000, Number(body.maxEntries) || cur.maxEntries)),
+    };
+    updateSettings({ logging: next });
+    resetLoggingCache();
+    activity('config', { summary: `Activity logging: ${next.level}, keep ${next.retentionDays} days / ${next.maxEntries} entries (${user.username})` });
+    return next;
   });
   route('POST', '/api/chats/bind', async (req, res, body, q, p, user) => { await bindChat(String(body.chat), body.bot || null, user.username); return { ok: true }; });
   route('GET', '/api/chats/:chat/memory', async (req, res, body, q, p) => memoryView(decodeURIComponent(p.chat)));
@@ -381,9 +412,23 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
   route('POST', '/api/system/ops', async (req, res, body, q, p, user) => requestOp(String(body.action || ''), user.username), { role: 'owner' });
 
   // ---------- channel control ----------
-  route('POST', '/api/whatsapp/pair', async (req, res, body) => ({ code: await channel.pair(body.phone) }));
-  route('POST', '/api/whatsapp/logout', async () => { await channel.logout(); return { ok: true }; });
-  route('POST', '/api/whatsapp/restart', async () => { await channel.restart(); return { ok: true }; });
+  route('POST', '/api/whatsapp/pair', async (req, res, body) => ({ code: await channel.pair(body.phone, body.number) }));
+  route('POST', '/api/whatsapp/logout', async (req, res, body) => { await channel.logout(body.number); return { ok: true }; });
+  route('POST', '/api/whatsapp/restart', async (req, res, body) => { await channel.restart(body.number); return { ok: true }; });
+  // more numbers (012)
+  route('POST', '/api/whatsapp/numbers', async (req, res, body) => {
+    if (!channel.addNumber) return [400, { error: 'Not supported' }];
+    return [201, await channel.addNumber({ id: body.id, label: body.label })];
+  }, { role: 'owner' });
+  route('PUT', '/api/whatsapp/numbers/:id', async (req, res, body, q, p) => {
+    if (body.dmBot !== undefined) {
+      const list = (getSettings().whatsappNumbers || [{ id: 'main', label: 'Main' }]).map((n) => (n.id === p.id ? { ...n, dmBot: String(body.dmBot || '') } : n));
+      updateSettings({ whatsappNumbers: list });
+    }
+    if (body.label) await channel.renameNumber?.(p.id, body.label);
+    return { ok: true };
+  });
+  route('DELETE', '/api/whatsapp/numbers/:id', async (req, res, body, q, p) => channel.removeNumber(p.id), { role: 'owner' });
 
   // ---------- system ----------
   route('POST', '/api/system/restart', async () => { setTimeout(() => process.exit(0), 300); return { ok: true }; }, { role: 'owner' });
