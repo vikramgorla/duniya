@@ -37,6 +37,8 @@ export function friendlyModelError(e) {
     return 'I have reached the ChatGPT plan usage limit for now. Please try again later.';
   }
   if (code === 'subscription_sharing_user_not_eligible') return 'The connected ChatGPT account is not eligible for plan usage (Plus or Pro needed).';
+  if (code === 'copilot_limit') return 'I have reached the GitHub Copilot usage limit for now. Please try again later.';
+  if (code === 'free_only') return 'My model isn’t available right now (this server only allows free models). An admin can choose another model.';
   if (code === 'no_model') return 'No AI model is configured yet. An admin needs to connect a model provider.';
   return null;
 }

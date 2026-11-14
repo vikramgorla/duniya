@@ -2,9 +2,10 @@
 import { getSecret, getSetting, updateSettings, setSecret } from '../store.js';
 import * as anthropic from './anthropic.js';
 import * as chatgpt from './chatgpt.js';
+import * as copilot from './copilot.js';
 import { chatCompletionsProvider } from './openai-chat.js';
 
-const RESERVED = new Set(['anthropic', 'openai', 'chatgpt', 'auto', 'local', 'memory']);
+const RESERVED = new Set(['anthropic', 'openai', 'chatgpt', 'copilot', 'auto', 'local', 'memory']);
 export const COMPAT_ID_RE = /^[a-z][a-z0-9-]{1,30}$/;
 const keySecretFor = (id) => `PROVIDER_${id.toUpperCase().replace(/-/g, '_')}_KEY`;
 const OPENAI_BASE = () => (process.env.OPENAI_API_BASE || 'https://api.openai.com/v1');
@@ -13,17 +14,50 @@ const openai = chatCompletionsProvider({ baseUrl: OPENAI_BASE(), key: () => getS
 
 export const compatibleList = () => getSetting('providers', []) || [];
 
+// ---------- OpenRouter preset (018) ----------
+export const OPENROUTER_ID = 'openrouter';
+const OPENROUTER_BASE = () => (process.env.OPENROUTER_API_BASE || 'https://openrouter.ai/api/v1');
+export const isFreeModel = (id) => /:free$/.test(String(id || ''));
+
+/** Wrap an adapter so only free models (ids ending ":free") are listed and used. */
+function freeOnlyAdapter(adapter, name) {
+  return {
+    async listModels() { return (await adapter.listModels()).filter((m) => isFreeModel(m.id)); },
+    async chat(args) {
+      if (!isFreeModel(args.model)) throw Object.assign(new Error(`“Free models only” is on for ${name}: choose a model ending in :free, or turn the switch off (Models)`), { code: 'free_only' });
+      return adapter.chat(args);
+    },
+  };
+}
+
+/** One-tap OpenRouter: an OpenAI-compatible endpoint with id "openrouter"; key optional when only toggling. */
+export function addOpenRouter({ key, freeOnly } = {}) {
+  const existing = compatibleList().find((p) => p.id === OPENROUTER_ID);
+  if (!existing && !String(key || '').trim()) throw Object.assign(new Error('Paste your OpenRouter key (it starts with sk-or-)'), { status: 400, field: 'key' });
+  const prov = addCompatible({ id: OPENROUTER_ID, name: 'OpenRouter', baseUrl: OPENROUTER_BASE(), ...(String(key || '').trim() ? { key: String(key).trim() } : {}) });
+  return setFreeOnly(OPENROUTER_ID, freeOnly === undefined ? (existing ? !!existing.freeOnly : true) : !!freeOnly) || prov;
+}
+export function setFreeOnly(id, on) {
+  const list = compatibleList().map((p) => (p.id === id ? { ...p, freeOnly: !!on } : p));
+  updateSettings({ providers: list });
+  modelCache.delete(id);
+  return list.find((p) => p.id === id);
+}
+
 /** All providers with their adapter and whether they're configured. */
 export function providers() {
   const list = [
     { id: 'anthropic', type: 'anthropic', name: 'Anthropic (Claude)', configured: anthropic.configured(), adapter: anthropic },
     { id: 'openai', type: 'openai', name: 'OpenAI (API key)', configured: !!getSecret('OPENAI_API_KEY'), adapter: openai },
     { id: 'chatgpt', type: 'chatgpt', name: 'ChatGPT plan (Sign in with ChatGPT)', configured: chatgpt.configured(), adapter: chatgpt, account: chatgpt.credentials()?.email || '' },
+    { id: 'copilot', type: 'copilot', name: 'GitHub Copilot', configured: copilot.configured(), adapter: copilot },
   ];
   for (const p of compatibleList()) {
+    const name = p.name || p.id;
+    const base = chatCompletionsProvider({ baseUrl: p.baseUrl, key: () => getSecret(keySecretFor(p.id)) });
     list.push({
-      id: p.id, type: 'compatible', name: p.name || p.id, baseUrl: p.baseUrl, configured: true,
-      adapter: chatCompletionsProvider({ baseUrl: p.baseUrl, key: () => getSecret(keySecretFor(p.id)) }),
+      id: p.id, type: 'compatible', name, baseUrl: p.baseUrl, configured: true, freeOnly: !!p.freeOnly,
+      adapter: p.freeOnly ? freeOnlyAdapter(base, name) : base,
     });
   }
   return list;
@@ -33,8 +67,9 @@ const providerById = (id) => providers().find((p) => p.id === id);
 export function addCompatible({ id, name, baseUrl, key }) {
   if (!COMPAT_ID_RE.test(id || '') || RESERVED.has(id)) throw Object.assign(new Error('id: 2–31 lowercase letters/digits/-, not a reserved name'), { status: 400, field: 'id' });
   try { const u = new URL(baseUrl); if (!/^https?:$/.test(u.protocol)) throw new Error(); } catch { throw Object.assign(new Error('baseUrl must be an http(s) URL'), { status: 400, field: 'baseUrl' }); }
+  const before = compatibleList().find((p) => p.id === id);
   const list = compatibleList().filter((p) => p.id !== id);
-  list.push({ id, name: String(name || id).slice(0, 60), baseUrl: baseUrl.replace(/\/+$/, '') });
+  list.push({ id, name: String(name || id).slice(0, 60), baseUrl: baseUrl.replace(/\/+$/, ''), ...(before?.freeOnly ? { freeOnly: true } : {}) });
   updateSettings({ providers: list });
   if (key !== undefined) setSecret(keySecretFor(id), String(key || ''));
   modelCache.delete(id);
@@ -61,15 +96,25 @@ export const clearModelCache = (id) => (id ? modelCache.delete(id) : modelCache.
 export async function status({ refresh = false } = {}) {
   const out = [];
   for (const p of providers()) {
-    const row = { id: p.id, type: p.type, name: p.name, connected: false, models: 0, ...(p.baseUrl ? { baseUrl: p.baseUrl } : {}), ...(p.account ? { account: p.account } : {}) };
+    const row = { id: p.id, type: p.type, name: p.name, connected: false, models: 0, ...(p.baseUrl ? { baseUrl: p.baseUrl } : {}), ...(p.account ? { account: p.account } : {}), ...(p.type === 'compatible' ? { freeOnly: p.freeOnly } : {}) };
     if (p.configured) {
       const m = await providerModels(p, { refresh });
       row.connected = !m.error; row.models = m.models.length; if (m.error) row.error = m.error;
+      if (row.connected && p.id === 'copilot') Object.assign(row, await copilotExtras({ refresh }));
     }
     out.push(row);
   }
   return out;
 }
+
+const extrasCache = { at: 0, value: null };
+async function copilotExtras({ refresh }) {
+  if (!refresh && extrasCache.value && Date.now() - extrasCache.at < 5 * 60000) return extrasCache.value;
+  const [account, quota] = await Promise.all([copilot.account(), copilot.quota().catch(() => null)]);
+  extrasCache.at = Date.now(); extrasCache.value = { ...(account ? { account } : {}), ...(quota ? { quota } : {}) };
+  return extrasCache.value;
+}
+export function clearCopilotExtras() { extrasCache.value = null; }
 
 export async function allModels({ refresh = false } = {}) {
   const out = [];
@@ -147,4 +192,21 @@ export async function chat({ model = 'auto', purpose = 'bot', system, messages, 
   if (!p.configured) throw Object.assign(new Error(`Provider "${p.name}" is not connected`), { code: 'no_model' });
   const res = await p.adapter.chat({ model: r.model, system, messages, tools, maxTokens });
   return { ...res, model: r.ref };
+}
+
+/** Connection test (018): send "Say hi" to a provider (its Auto model unless one is given); reply + latency. */
+export async function testProvider(id, model) {
+  const p = providerById(id);
+  if (!p) throw Object.assign(new Error(`Unknown model provider "${id}"`), { status: 404 });
+  if (!p.configured) throw Object.assign(new Error(`${p.name} is not connected yet`), { status: 400 });
+  const started = Date.now();
+  try {
+    if (!model) await providerModels(p);
+    const res = await chat({ model: model ? `${id}:${model}` : `${id}:auto`, purpose: 'background', maxTokens: 60,
+      system: 'You are checking a connection. Answer in one short friendly sentence.', messages: [{ role: 'user', content: 'Say hi' }] });
+    const reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+    return { ok: true, model: res.model, reply: reply.slice(0, 500) || '(empty reply)', ms: Date.now() - started };
+  } catch (e) {
+    return { ok: false, error: e.message, ms: Date.now() - started };
+  }
 }

@@ -111,6 +111,43 @@
   .seg button { border: 0; background: none; font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; color: var(--muted); cursor: pointer; }
   .seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
   .number-card { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 12px 14px; margin: 10px 0; background: color-mix(in srgb, var(--bg) 40%, transparent); }
+  .pgrid { margin-top: 16px; align-items: start; }
+  .phead { display: flex; gap: 10px 12px; align-items: center; flex-wrap: wrap; }
+  .phead h2 { margin: 0; flex: 1; min-width: 0; }
+  .pcost { margin-top: 8px; }
+  .pcard a:not(.btn), .card details a { color: var(--accent); font-weight: 500; }
+  .pmark { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; font: 700 17px var(--font-display); color: #fff; flex: none; }
+  .m-or { background: #5b6bd6; } .m-an { background: #c4693f; } .m-oa { background: #10a37f; } .m-cg { background: #1f8a70; } .m-gh { background: #24292f; }
+  @media (prefers-color-scheme: dark) { .m-gh { background: #6e7681; } }
+  .pcard.on { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+  .ptags { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .steps { list-style: none; counter-reset: st; padding: 0; margin: 8px 0 4px; }
+  .steps > li { counter-increment: st; position: relative; padding: 0 0 14px 38px; }
+  .steps > li::before { content: counter(st); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font: 700 13px var(--font-display); display: grid; place-items: center; }
+  .steps > li:not(:last-child)::after { content: ""; position: absolute; left: 12.5px; top: 30px; bottom: 4px; width: 1px; background: var(--line); }
+  .steps code, .ptags code { font-family: var(--mono); font-size: 12.5px; background: var(--bg-2); padding: 1px 5px; border-radius: 6px; }
+  .cue { margin-top: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow: hidden; font-size: 12px; max-width: 360px; }
+  .cue-top { display: flex; align-items: center; gap: 4px; padding: 5px 8px; background: var(--bg-2); color: var(--muted); }
+  .cue-top i { width: 7px; height: 7px; border-radius: 50%; background: var(--line-2); }
+  .cue-top span { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+  .cue-addr { padding: 6px 8px; background: var(--bg-2); font-family: var(--mono); font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .cue-body { padding: 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .cue-btn { display: inline-block; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--card); font-weight: 600; }
+  .cue-btn.dark { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .cue-field { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); background: var(--card); border: 1px solid var(--line-2); border-radius: 8px; padding: 3px 4px 3px 8px; }
+  .cue-copy { font-family: var(--font); font-size: 11px; padding: 1px 7px; border-radius: 6px; background: var(--bg-2); }
+  .cue-hl { display: inline-block; border-radius: 10px; outline: 2px dashed var(--marigold); outline-offset: 3px; }
+  .cue-perm { display: flex; gap: 10px; align-items: center; justify-content: space-between; width: 100%; }
+  .cue-select { display: inline-block; border: 1px solid var(--line-2); border-radius: 8px; padding: 2px 8px; background: var(--card); }
+  .pasteform { margin-top: 4px; } .pasteform .row > input { min-width: 0; }
+  .testout:empty { display: none; } .testout .note { margin-top: 10px; }
+  .card details { margin-top: 4px; } .card summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 6px 0; }
+  .start h2 { margin-top: 4px; }
+  .choices { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-top: 12px; }
+  .choice { text-align: left; font: inherit; color: var(--ink); background: color-mix(in srgb, var(--bg) 50%, var(--card)); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; min-height: 44px; transition: border-color .15s, transform .08s; }
+  .choice:hover { border-color: var(--accent); } .choice:active { transform: scale(.98); }
+  .choice span { font-size: 13px; color: var(--muted); }
+  .row.nowrap > input { flex: 1; }
   @media (max-width: 640px) { main { padding: 14px 12px 40px; } .card { padding: 16px; border-radius: 16px; } .bar { padding: 10px 14px 4px; } }
 </style>
 </head>
@@ -858,54 +895,219 @@ async function renderMemory(c, box) {
 }
 
 // ---------- models ----------
+const LINKS = {
+  anthropicKeys: 'https://platform.claude.com/settings/keys',
+  openaiKeys: 'https://platform.openai.com/api-keys',
+  openrouterKeys: 'https://openrouter.ai/settings/keys',
+  openrouterFree: 'https://openrouter.ai/models?max_price=0',
+  githubSignup: 'https://github.com/signup',
+  copilotToken: 'https://github.com/settings/personal-access-tokens/new?name=duniya&description=Copilot+for+duniya&expires_in=90&copilot_requests=write',
+};
+const ext = (href, text) => h('a', { href, target: '_blank', rel: 'noopener' }, text, ' ↗');
+// Small drawings of what to look for on the other site (no images from the web).
+const cue = {
+  win: (site, ...kids) => h('div', { class: 'cue', 'aria-hidden': 'true' }, h('div', { class: 'cue-top' }, h('i'), h('i'), h('i'), h('span', {}, site)), h('div', { class: 'cue-body' }, kids)),
+  btn: (text, dark) => h('span', { class: `cue-btn${dark ? ' dark' : ''}` }, text),
+  field: (text) => h('span', { class: 'cue-field' }, text, h('span', { class: 'cue-copy' }, 'Copy')),
+  hl: (el) => h('span', { class: 'cue-hl' }, el),
+};
+const stepList = (steps) => h('ol', { class: 'steps' }, steps.map(([text, drawing]) => h('li', {}, h('div', {}, text), drawing || null)));
+const secs = (ms) => (ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`);
+
+function testBox(id) {
+  const out = h('div', { class: 'testout' });
+  const btn = h('button', { class: 'btn small mut', onclick: async () => {
+    btn.disabled = true; out.replaceChildren(h('div', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Sending “Say hi”…'));
+    const r = await tryApi(() => api('POST', `/api/providers/${encodeURIComponent(id)}/test`, {}));
+    btn.disabled = false;
+    if (!r) return out.replaceChildren();
+    out.replaceChildren(r.ok
+      ? h('div', { class: 'note ok' }, h('b', {}, `“${r.reply}”`), h('div', { class: 'small' }, `${r.model} · answered in ${secs(r.ms)}`))
+      : h('div', { class: 'note bad' }, `Test failed after ${secs(r.ms)}: ${r.error}`));
+  } }, 'Test');
+  return { btn, out };
+}
+
+/** One provider card: what it is + cost, then either the steps to connect or the connected state. */
+function providerCard({ id, mark, title, cost, tag, p, steps, form, connected, extra, ownerOnly }) {
+  const isOn = p?.connected;
+  const pill = isOn ? h('span', { class: 'pill ok' }, `✓ Connected · ${p.models} model${p.models === 1 ? '' : 's'}`)
+    : p?.error ? h('span', { class: 'pill bad' }, 'Needs attention') : h('span', { class: 'pill' }, 'Not connected');
+  const t = isOn ? testBox(id) : null;
+  return h('div', { class: `card pcard${isOn ? ' on' : ''}`, id: `prov-${id}` },
+    h('div', { class: 'phead' }, h('span', { class: `pmark ${mark}` }, title[0]), h('h2', {}, title), pill),
+    h('div', { class: 'small muted pcost' }, cost),
+    tag ? h('div', { class: 'ptags' }, tag) : null,
+    p?.error ? h('div', { class: 'note bad' }, p.error) : null,
+    isOn ? h('div', {}, connected, h('div', { class: 'row', style: 'margin-top:10px' }, t.btn, extra), t.out)
+      : ownerOnly && !can('owner') ? h('p', { class: 'small muted' }, 'Ask an owner to connect this account.')
+        : h('div', {}, h('div', { class: 'eyebrow', style: 'margin-top:14px' }, 'How to connect'), stepList(steps), form));
+}
+
+function keyForm({ placeholder, button = 'Connect', submit, busy = 'Checking…' }) {
+  const v = h('input', { type: 'password', placeholder, autocomplete: 'off', spellcheck: 'false' });
+  const err = h('div', { class: 'small', style: 'color:var(--bad)' });
+  const btn = h('button', { class: 'btn primary' }, button);
+  return h('form', { class: 'mut pasteform', onsubmit: async (e) => {
+    e.preventDefault(); err.textContent = '';
+    if (!v.value.trim()) { err.textContent = 'Paste the key first.'; return; }
+    btn.disabled = true; btn.replaceChildren(h('span', { class: 'spinner' }), ` ${busy}`);
+    try { await submit(v.value.trim()); toast('Connected'); renderModels(); } catch (x) { err.textContent = x.message; btn.disabled = false; btn.replaceChildren(button); }
+  } }, h('label', {}, 'Paste it here'), h('div', { class: 'row nowrap' }, v, btn), err);
+}
+const saveSecretKey = (name) => async (value) => { await api('PUT', '/api/secrets', { name, value }); await api('GET', '/api/providers?refresh=1'); modelsCache = null; };
+const replaceKey = (form) => h('details', { class: 'small mut' }, h('summary', {}, 'Replace key'), form);
+
 async function renderModels() {
-  const [provs, models, secrets] = await Promise.all([api('GET', '/api/providers'), loadModels(true), api('GET', '/api/secrets')]);
-  const isSet = (n) => secrets.find((s) => s.name === n)?.set;
-  const secretForm = (name, placeholder) => { const v = h('input', { type: 'password', placeholder }); return h('form', { class: 'row mut', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name, value: v.value }), v.value ? 'Saved' : 'Removed')) renderModels(); } }, v, h('button', { class: 'btn' }, 'Save')); };
-  const statusPill = (p) => h('span', { class: `pill ${p.connected ? 'ok' : p.error ? 'bad' : ''}` }, p.connected ? `${p.models} models` : p.error ? 'error' : 'not connected');
+  const [provs, models] = await Promise.all([api('GET', '/api/providers'), loadModels(true)]);
   const by = Object.fromEntries(provs.map((p) => [p.id, p]));
-  const def = modelSelect(models, models.defaultModel, { autoLabel: `Auto${models.resolvedDefault ? ` (now ${models.resolvedDefault})` : ''}` }); const bg = modelSelect(models, models.backgroundModel, { autoLabel: `Auto${models.resolvedBackground ? ` (now ${models.resolvedBackground})` : ''}` });
-  // ChatGPT
-  const cg = by.chatgpt; const paste = h('input', { placeholder: 'http://127.0.0.1:1455/auth/callback?code=…' });
-  const cgFlow = h('div', {});
-  const cgCard = h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'ChatGPT plan (Sign in with ChatGPT)'), statusPill(cg)),
-    h('p', { class: 'small muted' }, 'Use a ChatGPT Plus/Pro plan’s included usage. Official OpenAI flow for open-source apps.'),
-    cg.connected ? h('p', {}, `Connected as ${cg.account || 'account'}`) : null, cg.error ? h('div', { class: 'note warn' }, cg.error) : null,
-    can('owner') ? h('div', { class: 'row' },
-      h('button', { class: 'btn primary', onclick: async () => {
-        const r = await tryApi(() => api('POST', '/api/providers/chatgpt/start')); if (!r) return;
-        cgFlow.replaceChildren(h('ol', { class: 'small' },
-          h('li', {}, h('a', { href: r.authorizeUrl, target: '_blank', rel: 'noopener' }, 'Open the ChatGPT sign-in'), ' and allow plan usage.'),
-          h('li', {}, 'Your browser then shows a page that can’t be reached (address starting with http://127.0.0.1:1455). That’s expected.'),
-          h('li', {}, 'Copy that page’s full address and paste it here:')),
-          h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); const d = await tryApi(() => api('POST', '/api/providers/chatgpt/complete', { callbackUrl: paste.value })); if (d) { toast(`Connected ${d.email} · ${d.models} models`); renderModels(); } } }, paste, h('button', { class: 'btn primary' }, 'Finish')));
-      } }, cg.connected ? 'Sign in again' : 'Sign in with ChatGPT'),
-      cg.connected ? h('button', { class: 'btn danger', onclick: () => confirm('Disconnect ChatGPT?') && tryApi(async () => { await api('DELETE', '/api/providers/chatgpt'); renderModels(); }, 'Disconnected') }, 'Disconnect') : null) : h('p', { class: 'small muted' }, 'Only owners can connect accounts.'),
-    cgFlow);
-  // Compatible
-  const cid = h('input', { placeholder: 'id, e.g. openrouter' }); const cname = h('input', { placeholder: 'Name' });
-  const curl = h('input', { placeholder: 'https://openrouter.ai/api/v1' }); const ckey = h('input', { type: 'password', placeholder: 'API key (optional)' });
-  const compat = provs.filter((p) => p.type === 'compatible');
-  $('#main').replaceChildren(
-    models.problem ? h('div', { class: 'note warn', style: 'margin-bottom:12px' }, models.problem) : null,
-    h('div', { class: 'grid' },
-      h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'Anthropic (Claude)'), statusPill(by.anthropic)),
-        h('p', { class: 'small muted' }, 'Paste an API key from console.anthropic.com. (Claude Pro/Max subscriptions can’t be used by third-party apps under Anthropic’s terms.)'),
-        by.anthropic.error ? h('div', { class: 'note warn' }, by.anthropic.error) : null, secretForm('ANTHROPIC_API_KEY', isSet('ANTHROPIC_API_KEY') ? '•••• saved — paste to replace' : 'sk-ant-…')),
-      h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'OpenAI (API key)'), statusPill(by.openai)),
-        by.openai.error ? h('div', { class: 'note warn' }, by.openai.error) : null, secretForm('OPENAI_API_KEY', isSet('OPENAI_API_KEY') ? '•••• saved — paste to replace' : 'sk-…')),
-      cgCard,
-      h('div', { class: 'card' }, h('h2', {}, 'OpenAI-compatible endpoints'),
-        h('p', { class: 'small muted' }, 'OpenRouter, Ollama, LM Studio, vLLM, Groq, Mistral… anything with an OpenAI-style /chat/completions.'),
-        compat.length ? h('table', {}, h('tbody', {}, compat.map((p) => h('tr', {}, h('td', {}, h('b', {}, p.name), h('div', { class: 'small muted' }, `${p.id} · ${p.baseUrl}`), p.error ? h('div', { class: 'small', style: 'color:var(--bad)' }, p.error) : null),
-          h('td', {}, statusPill(p)), h('td', {}, h('button', { class: 'btn small danger mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/providers/compatible/${p.id}`); renderModels(); }, 'Removed') }, 'Remove')))))) : null,
-        h('form', { class: 'mut', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('POST', '/api/providers/compatible', { id: cid.value.trim(), name: cname.value.trim(), baseUrl: curl.value.trim(), key: ckey.value }), 'Saved')) renderModels(); } },
-          h('div', { class: 'row' }, cid, cname), h('div', { class: 'row', style: 'margin-top:6px' }, curl, ckey), h('button', { class: 'btn', style: 'margin-top:6px' }, 'Add endpoint'))),
-      h('div', { class: 'card' }, h('h2', {}, 'Default models'),
-        field('Default model (bots on Auto)', def, models.resolvedDefault ? `Auto currently means ${models.resolvedDefault}` : ''),
-        field('Background model (memory summaries)', bg, models.resolvedBackground ? `Auto currently means ${models.resolvedBackground}` : ''),
-        h('button', { class: 'btn primary mut', style: 'margin-top:10px', onclick: () => tryApi(async () => { await api('POST', '/api/models/defaults', { defaultModel: def.value, backgroundModel: bg.value }); modelsCache = null; renderModels(); }, 'Saved') }, 'Save'),
-        h('button', { class: 'btn', style: 'margin:10px 0 0 8px', onclick: async () => { modelsCache = null; await api('GET', '/api/providers?refresh=1'); renderModels(); } }, 'Refresh model lists'))));
+  const anyOn = provs.some((p) => p.connected);
+  const go = (id) => () => document.getElementById(`prov-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const disconnect = (what, path, consequence) => h('button', { class: 'btn small danger mut', onclick: () => confirm(`Disconnect ${what}? ${consequence}`) && tryApi(async () => { await api('DELETE', path); modelsCache = null; renderModels(); }, 'Disconnected') }, 'Disconnect');
+
+  // Start here
+  const start = anyOn
+    ? h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Models'), h('span', { class: 'pill ok' }, `${provs.filter((p) => p.connected).length} connected`)),
+      h('p', { class: 'small muted', style: 'margin:6px 0 0' }, models.resolvedDefault ? `Bots on Auto use ${models.resolvedDefault} right now. You can connect more providers below and pick per bot.` : models.problem || ''))
+    : h('div', { class: 'card start' }, h('div', { class: 'eyebrow' }, 'Start here'), h('h2', {}, 'Connect a model so your bots can answer'),
+      h('p', { class: 'small muted', style: 'margin-top:-6px' }, 'Pick one to begin. You can add more later and choose per bot.'),
+      h('div', { class: 'choices' },
+        h('button', { class: 'choice', onclick: go('openrouter') }, h('b', {}, 'Free to start'), h('span', {}, 'OpenRouter free models. No card needed, about 50 messages a day.')),
+        h('button', { class: 'choice', onclick: go('anthropic') }, h('b', {}, 'Best answers'), h('span', {}, 'Anthropic (Claude) or OpenAI API key. Pay per use.')),
+        h('button', { class: 'choice', onclick: go('chatgpt') }, h('b', {}, 'I pay for ChatGPT'), h('span', {}, 'Use your ChatGPT Plus or Pro plan.')),
+        h('button', { class: 'choice', onclick: go('copilot') }, h('b', {}, 'I have GitHub Copilot'), h('span', {}, 'Use your Copilot allowance.'))));
+
+  // OpenRouter
+  const or = by.openrouter;
+  const freeToggle = or ? h('label', { class: 'inline' }, toggle(or.freeOnly, (on) => tryApi(async () => { await api('POST', '/api/providers/openrouter', { freeOnly: on }); modelsCache = null; renderModels(); }, on ? 'Free models only' : 'All models allowed')), 'Free models only') : null;
+  const orCard = providerCard({
+    id: 'openrouter', mark: 'm-or', title: 'OpenRouter', p: or,
+    cost: 'Free models: 50 requests a day (1,000 a day after buying $10 of credit), 20 a minute. Paid models cost per use.',
+    tag: h('span', { class: 'pill info' }, 'Zero-cost start'),
+    steps: [
+      [h('span', {}, 'Open ', ext(LINKS.openrouterKeys, 'OpenRouter keys'), ' and sign in (Google, GitHub or email).')],
+      [h('span', {}, 'Click ', h('b', {}, 'Create API Key'), ', name it “duniya” and create it.'), cue.win('openrouter.ai/settings/keys', h('span', { class: 'muted' }, 'API Keys'), cue.hl(cue.btn('Create API Key', true)))],
+      [h('span', {}, 'Copy the key. It starts with ', h('code', {}, 'sk-or-'), ' and is shown only once.'), cue.win('openrouter.ai', cue.hl(cue.field('sk-or-v1-8f2c…')))],
+    ],
+    form: keyForm({ placeholder: 'sk-or-v1-…', button: 'Add OpenRouter', submit: (key) => api('POST', '/api/providers/openrouter', { key, freeOnly: true }) }),
+    connected: h('div', {}, h('div', { class: 'row spread' }, freeToggle, ext(LINKS.openrouterFree, 'See free models')),
+      h('p', { class: 'small muted', style: 'margin:4px 0 0' }, or?.freeOnly ? 'Only models ending in “:free” are listed and used, so nothing is charged. Auto picks one of them.' : 'All OpenRouter models are listed. Paid models use your OpenRouter credit.')),
+    extra: [replaceKey(keyForm({ placeholder: 'sk-or-v1-…', button: 'Save', submit: (key) => api('POST', '/api/providers/openrouter', { key }) })),
+      h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove OpenRouter? Bots using OpenRouter models switch to Auto.') && tryApi(async () => { await api('DELETE', '/api/providers/compatible/openrouter'); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')],
+  });
+
+  // Anthropic
+  const anCard = providerCard({
+    id: 'anthropic', mark: 'm-an', title: 'Anthropic (Claude)', p: by.anthropic,
+    cost: 'Pay per use with prepaid credit in the Claude Console. Very good with tools.',
+    steps: [
+      [h('span', {}, 'Open ', ext(LINKS.anthropicKeys, 'Claude Console → API keys'), '. Sign in, and add credit under Billing if asked.')],
+      [h('span', {}, 'Click ', h('b', {}, 'Create Key'), ', name it “duniya”.'), cue.win('platform.claude.com/settings/keys', h('span', { class: 'muted' }, 'API keys'), cue.hl(cue.btn('+ Create Key', true)))],
+      [h('span', {}, 'Copy the key (starts with ', h('code', {}, 'sk-ant-'), '). It is shown only once.'), cue.win('platform.claude.com', cue.hl(cue.field('sk-ant-api03-Xk…')))],
+    ],
+    form: keyForm({ placeholder: 'sk-ant-…', submit: saveSecretKey('ANTHROPIC_API_KEY') }),
+    connected: h('p', { class: 'small muted', style: 'margin:0' }, 'Claude Pro/Max subscriptions can’t be used here; this uses your API key.'),
+    extra: [replaceKey(keyForm({ placeholder: 'sk-ant-…', button: 'Save', submit: saveSecretKey('ANTHROPIC_API_KEY') })),
+      h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove the Anthropic key? Bots using Claude stop answering until another model is chosen.') && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'ANTHROPIC_API_KEY', value: '' }); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')],
+  });
+
+  // OpenAI
+  const oaCard = providerCard({
+    id: 'openai', mark: 'm-oa', title: 'OpenAI (API key)', p: by.openai,
+    cost: 'Pay per use with prepaid credit on the OpenAI platform (separate from ChatGPT plans).',
+    steps: [
+      [h('span', {}, 'Open ', ext(LINKS.openaiKeys, 'OpenAI → API keys'), ' and sign in. Add credit under Billing if asked.')],
+      [h('span', {}, 'Click ', h('b', {}, 'Create new secret key'), ', name it “duniya”.'), cue.win('platform.openai.com/api-keys', cue.hl(cue.btn('+ Create new secret key', true)))],
+      [h('span', {}, 'Copy the key (starts with ', h('code', {}, 'sk-'), '). It is shown only once.'), cue.win('platform.openai.com', cue.hl(cue.field('sk-proj-4Tq…')))],
+    ],
+    form: keyForm({ placeholder: 'sk-…', submit: saveSecretKey('OPENAI_API_KEY') }),
+    extra: [replaceKey(keyForm({ placeholder: 'sk-…', button: 'Save', submit: saveSecretKey('OPENAI_API_KEY') })),
+      h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove the OpenAI key? Bots using OpenAI models stop answering until another model is chosen.') && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'OPENAI_API_KEY', value: '' }); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')],
+  });
+
+  // ChatGPT plan (sign-in logic unchanged; clearer steps)
+  const cg = by.chatgpt;
+  const paste = h('input', { placeholder: 'http://127.0.0.1:1455/auth/callback?code=…', autocomplete: 'off', spellcheck: 'false' });
+  const cgErr = h('div', { class: 'small', style: 'color:var(--bad)' });
+  const cgOpen = h('div', { class: 'row' });
+  const startBtn = h('button', { class: 'btn primary', onclick: async () => {
+    startBtn.disabled = true;
+    const r = await tryApi(() => api('POST', '/api/providers/chatgpt/start'));
+    startBtn.disabled = false; if (!r) return;
+    cgOpen.replaceChildren(h('a', { class: 'btn primary', href: r.authorizeUrl, target: '_blank', rel: 'noopener' }, 'Open ChatGPT sign-in ↗'), h('span', { class: 'small muted' }, 'Link valid for 15 minutes'));
+    startBtn.classList.add('hide');
+  } }, 'Sign in with ChatGPT');
+  const cgForm = h('form', { class: 'mut pasteform', onsubmit: async (e) => {
+    e.preventDefault(); cgErr.textContent = '';
+    const d = await api('POST', '/api/providers/chatgpt/complete', { callbackUrl: paste.value }).catch((x) => { cgErr.textContent = x.message; });
+    if (d) { toast(`Connected ${d.email} · ${d.models} models`); modelsCache = null; renderModels(); }
+  } }, h('label', {}, 'Paste the whole address here'), h('div', { class: 'row nowrap' }, paste, h('button', { class: 'btn primary' }, 'Finish')), cgErr);
+  const cgCard = providerCard({
+    id: 'chatgpt', mark: 'm-cg', title: 'ChatGPT plan', p: cg, ownerOnly: true,
+    cost: 'Uses the usage included in your ChatGPT Plus or Pro plan. No extra cost; plan limits apply.',
+    steps: [
+      [h('span', {}, 'Click the button and open the sign-in.'), h('div', { style: 'margin-top:8px' }, startBtn, cgOpen)],
+      [h('span', {}, 'Sign in with your ChatGPT account and allow access.'), cue.win('auth.openai.com', h('span', { class: 'muted' }, 'Allow duniya to use your plan?'), cue.hl(cue.btn('Allow', true)))],
+      [h('span', {}, 'Your browser then shows “This site can’t be reached”. ', h('b', {}, 'That’s expected'), ', the sign-in worked.'),
+        h('div', { class: 'cue', 'aria-hidden': 'true' }, h('div', { class: 'cue-addr' }, cue.hl(h('span', {}, '127.0.0.1:1455/auth/callback?code=ac_…&state=…'))), h('div', { class: 'cue-body' }, h('b', {}, 'This site can’t be reached'), h('span', { class: 'muted' }, '127.0.0.1 refused to connect.')))],
+      [h('span', {}, 'Click the address bar, copy the ', h('b', {}, 'whole address'), ' and paste it below.')],
+    ],
+    form: cgForm,
+    connected: h('p', { style: 'margin:0' }, `Signed in as ${cg.account || 'your ChatGPT account'}.`),
+    extra: can('owner') ? disconnect('ChatGPT', '/api/providers/chatgpt', 'Bots using ChatGPT models stop answering until another model is chosen.') : null,
+  });
+
+  // GitHub Copilot (official SDK)
+  const co = by.copilot;
+  const q = co?.quota;
+  const quotaView = q ? (q.unlimited ? h('div', { class: 'small' }, 'Premium requests: unlimited on this plan')
+    : h('div', {}, h('div', { class: 'row spread small' }, h('span', {}, 'Premium requests left'), h('b', { class: 'num' }, q.total != null && q.used != null ? `${Math.max(0, q.total - q.used)} of ${q.total}` : `${q.remainingPercent}%`)),
+      meter(100 - (q.remainingPercent ?? 0)), q.resetDate ? h('div', { class: 'small muted' }, `Resets ${new Date(q.resetDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}`) : null)) : null;
+  const coCard = providerCard({
+    id: 'copilot', mark: 'm-gh', title: 'GitHub Copilot', p: co, ownerOnly: true,
+    cost: 'Uses your Copilot allowance (Free, Pro or Business). Copilot Free is meant for personal use.',
+    tag: h('span', { class: 'pill' }, 'Uses your Copilot allowance'),
+    steps: [
+      [h('span', {}, 'You need a GitHub account with Copilot turned on. No account yet? ', ext(LINKS.githubSignup, 'Sign up'), '.')],
+      [h('span', {}, 'Open ', ext(LINKS.copilotToken, 'this pre-filled token page'), '. Check that ', h('b', {}, 'Copilot requests'), ' is set, then click ', h('b', {}, 'Generate token'), '.'),
+        cue.win('github.com/settings/personal-access-tokens/new', h('div', { class: 'cue-perm' }, h('span', {}, 'Copilot requests'), cue.hl(h('span', { class: 'cue-select' }, 'Read and write ▾'))), cue.btn('Generate token', true))],
+      [h('span', {}, 'Copy the token (starts with ', h('code', {}, 'github_pat_'), '). It is shown only once. Classic tokens (', h('code', {}, 'ghp_'), ') don’t work.'), cue.win('github.com', cue.hl(cue.field('github_pat_11AB…')))],
+    ],
+    form: h('div', {}, keyForm({ placeholder: 'github_pat_…', busy: 'Connecting… the first time this downloads Copilot support (about 400 MB, a few minutes)', submit: (token) => api('POST', '/api/providers/copilot', { token }) }),
+      h('p', { class: 'small muted' }, 'If GitHub refuses the token, open it on GitHub and switch “Copilot requests” to the other access level (Read-only ↔ Read and write), then try again. The first connection downloads GitHub’s official Copilot helper to this server (about 400 MB of disk, about 60 MB of memory while in use); nothing is downloaded if you never connect Copilot.')),
+    connected: h('div', {}, h('p', { style: 'margin:0 0 6px' }, `Signed in as ${co?.account || 'your GitHub account'}.`), quotaView),
+    extra: can('owner') ? [replaceKey(keyForm({ placeholder: 'github_pat_…', button: 'Save', submit: (token) => api('POST', '/api/providers/copilot', { token }) })),
+      disconnect('GitHub Copilot', '/api/providers/copilot', 'Bots using Copilot models stop answering until another model is chosen.')] : null,
+  });
+
+  // Other OpenAI-compatible endpoints (advanced)
+  const cid = h('input', { placeholder: 'id, e.g. ollama' }); const cname = h('input', { placeholder: 'Name' });
+  const curl = h('input', { placeholder: 'http://localhost:11434/v1' }); const ckey = h('input', { type: 'password', placeholder: 'API key (optional)' });
+  const compat = provs.filter((p) => p.type === 'compatible' && p.id !== 'openrouter');
+  const otherCard = h('div', { class: 'card' }, h('h2', {}, 'Other endpoints'),
+    h('p', { class: 'small muted' }, 'Ollama, LM Studio, vLLM, Groq, Mistral… anything with an OpenAI-style /chat/completions.'),
+    compat.map((p) => { const t = p.connected ? testBox(p.id) : null; return h('div', { class: 'number-card' },
+      h('div', { class: 'row spread' }, h('div', {}, h('b', {}, p.name), h('div', { class: 'small muted' }, p.baseUrl)), h('span', { class: `pill ${p.connected ? 'ok' : 'bad'}` }, p.connected ? `✓ ${p.models} models` : 'Needs attention')),
+      p.error ? h('div', { class: 'note bad' }, p.error) : null,
+      h('div', { class: 'row', style: 'margin-top:8px' }, t?.btn, h('button', { class: 'btn small danger mut', onclick: () => confirm(`Remove ${p.name}? Bots using its models switch to Auto.`) && tryApi(async () => { await api('DELETE', `/api/providers/compatible/${p.id}`); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')), t?.out); }),
+    h('details', { class: 'mut' }, h('summary', {}, 'Add an endpoint'),
+      h('form', { onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('POST', '/api/providers/compatible', { id: cid.value.trim(), name: cname.value.trim(), baseUrl: curl.value.trim(), key: ckey.value }), 'Saved')) { modelsCache = null; renderModels(); } } },
+        h('div', { class: 'row', style: 'margin-top:8px' }, cid, cname), h('div', { class: 'row', style: 'margin-top:6px' }, curl, ckey), h('button', { class: 'btn', style: 'margin-top:8px' }, 'Add endpoint'))));
+
+  // Defaults
+  const def = modelSelect(models, models.defaultModel, { autoLabel: `Auto${models.resolvedDefault ? ` (now ${models.resolvedDefault})` : ''}` });
+  const bg = modelSelect(models, models.backgroundModel, { autoLabel: `Auto${models.resolvedBackground ? ` (now ${models.resolvedBackground})` : ''}` });
+  const defaults = h('div', { class: 'card' }, h('h2', {}, 'Default models'),
+    anyOn ? null : h('p', { class: 'small muted' }, 'Connect a provider above first.'),
+    field('Default model (bots on Auto)', def, models.resolvedDefault ? `Auto currently means ${models.resolvedDefault}` : ''),
+    field('Background model (memory summaries)', bg, models.resolvedBackground ? `Auto currently means ${models.resolvedBackground}` : ''),
+    h('div', { class: 'row', style: 'margin-top:12px' },
+      h('button', { class: 'btn primary mut', onclick: () => tryApi(async () => { await api('POST', '/api/models/defaults', { defaultModel: def.value, backgroundModel: bg.value }); modelsCache = null; renderModels(); }, 'Saved') }, 'Save'),
+      h('button', { class: 'btn', onclick: async () => { modelsCache = null; await api('GET', '/api/providers?refresh=1'); renderModels(); } }, 'Refresh model lists')));
+
+  const cards = [orCard, anCard, oaCard, cgCard, coCard];
+  if (anyOn) cards.sort((a, b) => b.classList.contains('on') - a.classList.contains('on')); // connected first
+  $('#main').replaceChildren(start, h('div', { class: 'grid pgrid' }, cards, otherCard, defaults));
 }
 
 // ---------- backups (owner) ----------
