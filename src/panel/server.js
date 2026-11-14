@@ -12,7 +12,7 @@ import {
   listTemplates, templateConfig, exportBot, importBot, listPlugins,
 } from '../core/bots.js';
 import { referencedSecrets } from '../core/schema.js';
-import { listActivity, listPending, dropPending, takePending, deleteNote, getNote } from '../core/db.js';
+import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat } from '../core/db.js';
 import { bus, activity, loggingSettings, resetLoggingCache, LOG_CATEGORIES } from '../core/events.js';
 import { allChatPrefs, setChatPrefs, seenChats } from '../core/chat-prefs.js';
 import { runAgent, handleConfirmCommand, applyPending } from '../core/agent.js';
@@ -21,6 +21,7 @@ import { resetMcpPool, mcpConnection } from '../core/mcp.js';
 import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
 import { humanCode } from '../core/crypto.js';
 import { organizerConnection, oauthClientOf } from '../core/tools.js';
+import { draftBot } from '../core/ai-builder.js';
 import { installPackage, installedInfo } from '../core/mcp-local.js';
 import { snapshot as sysSnapshot, metricsHistory, osUpdates, logs as sysLogs, opsStatus, requestOp } from '../core/system.js';
 
@@ -224,6 +225,44 @@ export function startPanel({ channel, extend = [] }) {
     send(res, 200, JSON.stringify(doc, null, 2), { 'content-type': 'application/json', 'content-disposition': `attachment; filename="${p.id}.bot.json"` });
     return null;
   });
+  // ---------- people & roles (015) ----------
+  // Members of the bot's groups with their role. When no organizers are set yet, WhatsApp group admins are suggested.
+  route('GET', '/api/bots/:id/people', async (req, res, body, q, p) => {
+    const bot = getBot(p.id);
+    if (!bot) return [404, { error: 'Not found' }];
+    return peopleOf(bot);
+  });
+  // ---------- AI helper (016) ----------
+  route('POST', '/api/ai/bot-draft', async (req, res, body, q, p, user) => {
+    const bot = body.botId ? getBot(String(body.botId)) : null;
+    if (body.botId && !bot) return [404, { error: 'Bot not found' }];
+    const people = bot ? (await peopleOf(bot)).groups.flatMap((g) => g.members.filter((m) => m.phone).map((m) => ({ group: g.name, name: m.name, phone: m.phone, groupAdmin: m.admin }))) : [];
+    try {
+      const r = await draftBot({ bot, request: body.request, model: String(body.model || 'auto'), people, by: user.username });
+      return { ...r, names: Object.fromEntries(people.filter((x) => x.name).map((x) => [x.phone, x.name])) };
+    } catch (e) {
+      throw Object.assign(new Error(e.code === 'no_model' ? 'Connect a model provider first (Models).' : e.message), { status: e.status || 400 });
+    }
+  });
+  async function peopleOf(bot) {
+    const suggest = bot.organizers.length === 0;
+    const groups = [];
+    for (const chat of bot.chats.filter((c) => !/@(s\.whatsapp\.net|lid)$/.test(c))) {
+      let members = []; let error = '';
+      try { members = await channel.groupMembers?.(chat) || []; } catch (e) { error = e.message; }
+      const names = namesInChat(chat);
+      groups.push({
+        chat, name: (await channel.chatName?.(chat).catch(() => '')) || chat, error,
+        members: members.map((m) => ({
+          phone: m.phone, admin: m.admin, name: names[m.phone] || '',
+          role: m.phone && bot.organizers.includes(m.phone) ? 'organizer' : suggest && m.admin && m.phone ? 'organizer' : 'participant',
+          suggested: suggest && m.admin && !!m.phone,
+        })).sort((a, b) => (b.admin - a.admin) || (a.name || a.phone).localeCompare(b.name || b.phone)),
+      });
+    }
+    return { suggested: suggest, organizers: bot.organizers, participants: bot.participants, groups };
+  }
+
   // ---------- tool service sign-in (009) ----------
   route('POST', '/api/bots/:id/probe', async (req, res, body) => {
     const url = interpolate(String(body.url || '')).trim();

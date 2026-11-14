@@ -141,3 +141,11 @@ const getKv = db.prepare('SELECT v FROM kv WHERE k = ?');
 const setKvStmt = db.prepare('INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)');
 export const kvGet = (k) => getKv.get(k)?.v;
 export const kvSet = (k, v) => setKvStmt.run(k, String(v));
+
+/** Latest display name per sender phone seen in a chat (for member lists). */
+export function namesInChat(chat) {
+  const rows = db.prepare("SELECT sender, name FROM messages WHERE chat = ? AND sender != '' AND sender != 'bot' ORDER BY id DESC LIMIT 2000").all(chat);
+  const out = {};
+  for (const r of rows) if (!out[r.sender] && r.name) out[r.sender] = r.name;
+  return out;
+}

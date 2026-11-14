@@ -61,6 +61,7 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
     async send(chat, text, opts) { const { ch, jid } = route(chat); return ch.send(jid, text, opts); },
     async typing(chat) { try { const { ch, jid } = route(chat); await ch.typing?.(jid); } catch { /* ignore */ } },
     async chatName(chat) { try { const { ch, jid } = route(chat); return await ch.chatName?.(jid); } catch { return ''; } },
+    async groupMembers(chat) { const { ch, jid } = route(chat); return ch.groupMembers ? ch.groupMembers(jid) : []; },
     async isMember(chat, phone, senderJid) { try { const { ch, jid } = route(chat); return await ch.isMember(jid, phone, senderJid); } catch { return false; } },
     async listChats() {
       const out = [];

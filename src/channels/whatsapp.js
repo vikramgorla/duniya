@@ -169,6 +169,21 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
       const all = await sock.groupFetchAllParticipating();
       return Object.values(all).map((g) => ({ id: g.id, name: g.subject, size: g.participants?.length || 0 }));
     },
+    /** Group members: [{ phone, jid, admin }] (phone digits when WhatsApp shares it). */
+    async groupMembers(groupJid) {
+      const meta = await groupMeta(groupJid);
+      const out = [];
+      for (const p of meta.participants || []) {
+        let phone = '';
+        for (const j of [p.phoneNumber, p.id]) if (!phone && j && isPnUser(j)) phone = digits(jidNormalizedUser(j).split('@')[0]);
+        if (!phone && isLidUser(p.id)) {
+          const pn = await sock.signalRepository?.lidMapping?.getPNForLID(p.id).catch(() => null);
+          if (pn) phone = digits(jidNormalizedUser(pn).split('@')[0]);
+        }
+        out.push({ phone, jid: p.id, admin: p.admin === 'admin' || p.admin === 'superadmin' });
+      }
+      return out;
+    },
     /** Is this sender (phone digits or jid) a member of the group? */
     async isMember(groupJid, phone, jid) {
       try {

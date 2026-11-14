@@ -506,7 +506,10 @@ async function renderBots() {
     b.needs.length ? h('div', { class: 'note warn' }, `Needs secrets: ${b.needs.join(', ')}`) : null,
     b.missingPlugins.length ? h('div', { class: 'note warn' }, `Missing plugins: ${b.missingPlugins.join(', ')}`) : null,
     h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => openBot(b.id) }, can('admin') ? 'Edit & test' : 'View & test'))));
-  $('#main').replaceChildren(create, bots.length ? h('div', { class: 'grid' }, cards) : h('p', { class: 'muted' }, 'No bots yet.'));
+  const aiCreate = can('admin') ? await aiHelper({ title: '✨ Create a bot with AI', applyLabel: 'Create this bot',
+    placeholder: 'Describe the bot in your own words, e.g. “An assistant for our family festival group: answers agenda and menu questions from panduga, replies in English or Telugu, posts tomorrow’s agenda every evening at 8.”',
+    onApply: async (r) => { const res = await tryApi(() => api('POST', '/api/bots', { config: r.proposed }), 'Bot created'); if (res) openBot(res.id); } }) : null;
+  $('#main').replaceChildren(aiCreate, create, bots.length ? h('div', { class: 'grid' }, cards) : h('p', { class: 'muted' }, 'No bots yet.'));
 }
 function openBot(id) { location.hash = `bots/${encodeURIComponent(id)}`; }
 
@@ -524,6 +527,38 @@ async function renderBotEditor(id) {
   F.triggers = h('input', { value: (c.triggers || []).join(', ') });
   F.organizers = h('textarea', { value: lines(c.organizers), style: 'min-height:60px' });
   F.participants = h('textarea', { value: lines(c.participants), style: 'min-height:50px' });
+  // People & roles (015): members of the bot's groups, tap a role. Organizers not in these groups stay in the text box.
+  const orgSet = new Set(c.organizers || []);
+  const peopleBox = h('div', {}, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading group members…'));
+  const groupPhones = new Set();
+  const syncOthers = () => { F.organizers.value = [...orgSet].filter((p) => !groupPhones.has(p)).join('\n'); };
+  F.organizers.addEventListener('input', () => {
+    for (const p of [...orgSet]) if (!groupPhones.has(p)) orgSet.delete(p);
+    for (const l of splitLines(F.organizers.value)) { const d = l.replace(/\D/g, ''); if (d) orgSet.add(d); }
+  });
+  api('GET', `/api/bots/${encodeURIComponent(id)}/people`).then((pp) => {
+    if (pp.suggested) for (const g of pp.groups) for (const m of g.members) if (m.suggested) orgSet.add(m.phone);
+    for (const g of pp.groups) for (const m of g.members) if (m.phone) groupPhones.add(m.phone);
+    syncOthers();
+    const roleSeg = (m) => {
+      if (!m.phone) return h('span', { class: 'small muted' }, 'number hidden by WhatsApp');
+      const seg = h('div', { class: 'seg' }, [['participant', 'Participant'], ['organizer', 'Organizer']].map(([v, l]) => h('button', {
+        class: (orgSet.has(m.phone) ? 'organizer' : 'participant') === v ? 'on' : '', disabled: !can('admin'),
+        onclick: (e) => { if (v === 'organizer') orgSet.add(m.phone); else orgSet.delete(m.phone); seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.target)); syncOthers(); dirty.classList.remove('hide'); } }, l)));
+      return seg;
+    };
+    const dirty = h('div', { class: 'note warn hide' }, 'Roles changed — click Save at the bottom to apply.');
+    peopleBox.replaceChildren(
+      pp.suggested && pp.groups.some((g) => g.members.some((m) => m.suggested)) ? h('div', { class: 'note' }, 'Group admins are pre-selected as organizers. Change anyone you like, then Save.') : null,
+      dirty,
+      pp.groups.length ? pp.groups.map((g) => h('div', { class: 'number-card' },
+        h('div', { class: 'row spread' }, h('b', {}, g.name), h('span', { class: 'pill' }, `${g.members.length} members`)),
+        g.error ? h('div', { class: 'small', style: 'color:var(--bad)' }, g.error) : null,
+        h('table', {}, h('tbody', {}, g.members.map((m) => h('tr', {},
+          h('td', {}, h('b', {}, m.name || (m.phone ? `+${m.phone}` : 'Unknown member')), m.admin ? h('span', { class: 'pill info', style: 'margin-left:6px' }, 'group admin') : null,
+            h('div', { class: 'small muted' }, m.phone && m.name ? `+${m.phone}` : '')),
+          h('td', { style: 'text-align:right' }, roleSeg(m)))))))) : h('p', { class: 'small muted' }, 'Bind this bot to a group on the Chats page to pick people from its members.'));
+  }).catch((e) => peopleBox.replaceChildren(h('p', { class: 'small muted' }, `Could not load members: ${e.message}`)));
   // Tool services
   const kvLines = (o, sep) => Object.entries(o || {}).map(([k, v]) => `${k}${sep}${v}`).join('\n');
   const parseKv = (text, sep) => Object.fromEntries(splitLines(text).map((l) => { const i = l.indexOf(sep); return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : [l.trim(), '']; }));
@@ -668,7 +703,7 @@ async function renderBotEditor(id) {
     const config = {
       name: F.name.value, description: F.description.value, enabled: F.enabled.checked, model: F.model.value, prompt: F.prompt.value,
       triggers: splitLines(F.triggers.value), respondToMentions: F.respondToMentions.checked, dm: F.dm.value,
-      organizers: splitLines(F.organizers.value), participants: splitLines(F.participants.value), timezone: F.timezone.value.trim(),
+      organizers: [...orgSet], participants: splitLines(F.participants.value), timezone: F.timezone.value.trim(),
       historySize: Number(F.historySize.value), maxTokens: Number(F.maxTokens.value), memory: { enabled: F.memory.checked },
       mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, s.type === 'local'
         ? { type: 'local', package: s.pkg, args: splitLines(s.args), env: parseKv(s.env, '='), allowScripts: s.allowScripts }
@@ -706,6 +741,9 @@ async function renderBotEditor(id) {
         h('button', { class: 'btn mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openBot(r.id); } }, 'Duplicate'),
         h('button', { class: 'btn danger mut', onclick: async () => { if (confirm(`Delete “${c.name}”? Its group bindings are removed; chat memory stays until erased.`) && await tryApi(() => api('DELETE', `/api/bots/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'bots'; } } }, 'Delete'),
         h('button', { class: 'btn primary mut', onclick: save }, 'Save'))),
+    can('admin') ? await aiHelper({ botId: id, title: '✨ Change this bot with AI', applyLabel: 'Apply & save',
+      placeholder: 'What should change? e.g. “Make the replies shorter and friendlier”, “Let participants also see the shopping list”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',
+      onApply: async (r) => { const patch = Object.fromEntries(r.changes.map((ch) => [ch.field, ch.after])); if (await tryApi(() => api('PUT', `/api/bots/${encodeURIComponent(id)}`, patch), 'Saved')) renderBotEditor(id); } }) : null,
     h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(340px,1fr));align-items:start' },
       h('div', { class: 'card' },
         b.needs.length ? h('div', { class: 'note warn' }, `Set these under Secrets: ${b.needs.join(', ')}`) : null,
@@ -716,9 +754,12 @@ async function renderBotEditor(id) {
           field('Triggers', F.triggers, 'Group messages starting with one of these wake the bot, e.g. !panduga'),
           field('Who may message it directly', F.dm)),
         h('fieldset', {}, h('legend', {}, 'Instructions'), F.prompt),
-        h('fieldset', {}, h('legend', {}, 'People'),
-          field('Organizers (phone numbers with country code, one per line)', F.organizers, 'Organizers can use organizer tools and confirm changes.'),
-          field('Extra participants allowed to DM', F.participants)),
+        h('fieldset', {}, h('legend', {}, 'People & roles'),
+          h('p', { class: 'small muted', style: 'margin-top:0' }, 'Organizers can use organizer tools and confirm changes. Everyone else in the bot’s groups is a participant.'),
+          peopleBox,
+          h('details', { style: 'margin-top:8px' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'People outside these groups'),
+            field('More organizers (phone numbers with country code, one per line)', F.organizers),
+            field('Extra participants allowed to message the bot directly', F.participants))),
         h('fieldset', {}, h('legend', {}, 'Tool services (MCP)'),
           h('p', { class: 'small muted', style: 'margin-top:0' }, 'Enter the service URL and click Check: services that support sign-in (OAuth) get a Connect button; others use a token stored under Secrets, like ${MY_TOKEN}. Then discover tools and tick what each role may use.'),
           srvList, h('button', { class: 'btn small mut', onclick: () => { servers.push({ key: '', url: '', auth: 'oauth', org: '', part: '' }); drawServers(); } }, '+ Add tool service'),
@@ -738,6 +779,41 @@ async function renderBotEditor(id) {
 }
 
 // ---------- chats + memory ----------
+// ---------- AI helper (016) ----------
+const FIELD_LABEL = { name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', dm: 'Who may message it directly',
+  organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', tools: 'Tool rules', confirm: 'Confirmation', schedules: 'Scheduled posts', memory: 'Group memory',
+  model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', plugins: 'Plugins', enabled: 'Enabled' };
+const showVal = (v) => (v == null || (Array.isArray(v) && !v.length) ? '—' : typeof v === 'string' ? v : Array.isArray(v) && v.every((x) => typeof x === 'string') ? v.join('\n') : JSON.stringify(v, null, 2));
+const withNames = (field, v, names = {}) => (['organizers', 'participants'].includes(field) && Array.isArray(v) ? v.map((p) => (names[p] ? `${names[p]} (+${p})` : `+${p}`)) : v);
+/** "Describe it → AI drafts → review the changes → apply". onApply(result) does the saving. */
+async function aiHelper({ botId = '', title, placeholder, applyLabel, onApply }) {
+  const models = await loadModels().catch(() => ({ models: [] }));
+  const ask = h('textarea', { class: 'prose', style: 'min-height:90px', placeholder });
+  const model = modelSelect(models, 'auto', { autoLabel: `Default model${models.resolvedDefault ? ` (${models.resolvedDefault})` : ''}` });
+  const out = h('div', {});
+  const go = h('button', { class: 'btn primary', onclick: async () => {
+    go.disabled = true; out.replaceChildren(h('p', { class: 'muted small' }, h('span', { class: 'spinner' }), ' Thinking… this can take up to a minute.'));
+    try {
+      const r = await api('POST', '/api/ai/bot-draft', { botId, request: ask.value, model: model.value });
+      out.replaceChildren(
+        h('div', { class: 'note ok' }, h('b', {}, '✨ Draft ready · '), r.summary || `${r.changes.length} change(s)`),
+        r.questions?.length ? h('div', { class: 'note' }, h('b', {}, 'The AI asks: '), r.questions.join(' ')) : null,
+        r.changes.length ? r.changes.map((ch) => h('details', { open: ch.field === 'prompt' || r.changes.length <= 3, style: 'margin:8px 0' },
+          h('summary', { style: 'cursor:pointer' }, h('b', {}, FIELD_LABEL[ch.field] || ch.field), h('span', { class: 'small muted' }, ' — changed')),
+          h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:6px' },
+            h('div', {}, h('div', { class: 'eyebrow' }, 'Before'), h('pre', { style: 'background:var(--bg-2);color:var(--ink)' }, showVal(withNames(ch.field, ch.before, r.names)))),
+            h('div', {}, h('div', { class: 'eyebrow', style: 'color:var(--accent)' }, 'After'), h('pre', { style: 'background:var(--accent-soft);color:var(--ink)' }, showVal(withNames(ch.field, ch.after, r.names)))))))
+          : h('p', { class: 'muted small' }, 'No changes were needed.'),
+        h('p', { class: 'small muted' }, `Drafted with ${r.model}. Nothing is saved until you apply.`),
+        h('div', { class: 'row' }, r.changes.length ? h('button', { class: 'btn primary', onclick: () => onApply(r) }, applyLabel) : null,
+          h('button', { class: 'btn', onclick: () => out.replaceChildren() }, 'Discard')));
+    } catch (e) { out.replaceChildren(h('div', { class: 'note bad' }, e.message)); }
+    go.disabled = false;
+  } }, '✨ Draft');
+  return h('div', { class: 'card', style: 'margin-bottom:16px' }, h('h2', {}, title), ask,
+    h('div', { class: 'row', style: 'margin-top:8px' }, h('div', { style: 'flex:2' }, model), go), out);
+}
+
 let chatsFilter = 'all';
 async function renderChats() {
   $('#main').replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading chats…')));

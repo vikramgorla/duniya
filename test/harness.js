@@ -64,6 +64,7 @@ export async function setup({ bindings = {}, env = {}, legacy = null, extend = n
     chatName: async (chat) => (chat === 'g1@g.us' ? 'Panduga families' : ''),
     listChats: async () => [{ id: 'g1@g.us', name: 'Panduga families', size: 12 }, { id: 'g2@g.us', name: 'Carpool', size: 6 }],
     isMember: async (chat, phone) => chat === 'g1@g.us' && phone === '41790000002',
+    groupMembers: async (chat) => (chat === 'g1@g.us' ? [{ phone: '41790000001', jid: 'a', admin: true }, { phone: '41790000002', jid: 'b', admin: false }, { phone: '41790000003', jid: 'c', admin: true }, { phone: '', jid: 'x@lid', admin: false }] : []),
     status: async () => ({ status: 'open', me: '41790000099:1@s.whatsapp.net', since: Date.now() }),
   };
   t.msg = (o) => ({

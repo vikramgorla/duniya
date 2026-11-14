@@ -12,6 +12,9 @@ Run AI assistants in your WhatsApp groups, on your own server, managed from a we
   on request and can search older messages.
 - **Your choice of models**: Anthropic API key, OpenAI API key, any OpenAI-compatible endpoint (OpenRouter, Ollama,
   …), or your **ChatGPT Plus/Pro plan** via Sign in with ChatGPT. Pick per bot, or *Auto*.
+- **People & roles**: pick organizers from a group's member list (group admins pre-selected).
+- **AI helper**: describe a new bot or a change ("shorter replies", "make Ravi an organizer") and review the draft
+  before saving.
 - **Several WhatsApp numbers**, groups and 1:1 chats: choose the bot, the model (or Auto) and the logging level per
   chat.
 - **Server page**: CPU, memory, disk, network, logs, OS updates and restart — no SSH needed.
