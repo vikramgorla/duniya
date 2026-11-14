@@ -15,30 +15,76 @@ export DEBIAN_FRONTEND=noninteractive
 STATUS_DIR=/run/duniya-status
 status_page() { # $1 = state shown in the banner
   install -d -m 755 "$STATUS_DIR"
-  cat > /usr/local/sbin/duniya-status-render <<'EOF'
+  cat > /usr/local/sbin/duniya-status-render <<'RENDER'
 #!/bin/bash
-# Renders the install log tail as a small auto-refreshing page. Redacts anything that looks like a secret.
+# Renders a small auto-refreshing progress page from the install log. Secrets are redacted, ANSI colors stripped.
 STATE="${1:-Installing}"
+LOGF=/var/log/duniya-install.log
+STEPS=("Adding|Preparing the server" "Installing packages|Installing system packages" "Installing Node|Installing Node.js"
+       "Downloading code|Downloading the app" "Installing Caddy|Setting up HTTPS" "Waiting for the service|Starting the panel")
+esc() { sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
+clean() { sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g; s/\[[0-9;]*m//g; s#(x-access-token:)[^@]+@#\1***@#g; s#((token|password|secret|passphrase|apikey|api_key|setup code)[^:=]*[:=] *)[^ ]+#\1***#Ig'; }
 while true; do
+  LOGTXT="$(tail -n 400 "$LOGF" 2>/dev/null | clean)"
+  MIN=$(( $(cut -d. -f1 /proc/uptime) / 60 ))  # minutes since the VM booted
+  # which step are we on? the last step whose marker appears in the log
+  CUR=-1; for i in "${!STEPS[@]}"; do grep -q -- "${STEPS[$i]%%|*}" <<<"$LOGTXT" && CUR=$i; done
+  ITEMS=""
+  for i in "${!STEPS[@]}"; do
+    label="${STEPS[$i]#*|}"
+    if [ "$i" -lt "$CUR" ]; then cls=done; icon="✓"
+    elif [ "$i" -eq "$CUR" ]; then if [ "$STATE" = "Install failed" ]; then cls=fail; icon="!"; else cls=now; icon=""; fi
+    else cls=todo; icon=""; fi
+    ITEMS+="<li class=$cls><span class=dot>$icon</span>$label</li>"
+  done
+  if [ "$STATE" = "Install failed" ]; then
+    TITLE="Install stopped"; SUB="Something went wrong. The details are at the end of the log below. Fix the cause, or redeploy: on the stack click <b>Destroy</b>, then <b>Apply</b>."; BADGE="<span class='badge bad'>Failed</span>"
+  else
+    TITLE="Setting up your server"; SUB="This takes about 10–15 minutes on the free VM. You can leave this page open: it refreshes itself and turns into the admin panel when it's ready."; BADGE="<span class='badge'>Running · ${MIN} min</span>"
+  fi
   {
-    printf '<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">'
-    printf '<meta http-equiv=refresh content=5><title>whatsapp-agent-duniya: %s</title>' "$STATE"
-    printf '<body style="font:15px system-ui;margin:24px;max-width:960px">'
-    printf '<h2>whatsapp-agent-duniya: %s</h2>' "$STATE"
-    if [ "$STATE" = "Install failed" ]; then
-      printf '<p>The install stopped with an error (see the end of the log). Fix it, or redeploy: Destroy then Apply on the stack.</p>'
-    else
-      printf '<p>First boot takes about 10–15 minutes on the free VM. This page refreshes itself; the admin panel replaces it when ready.</p>'
-    fi
-    printf '<pre style="background:#111;color:#ddd;padding:12px;border-radius:8px;white-space:pre-wrap;font-size:12px">'
-    tail -n 80 /var/log/duniya-install.log 2>/dev/null \
-      | sed -E 's#(x-access-token:)[^@]+@#\1***@#g; s#((token|password|secret|passphrase|apikey|api_key|setup code)[^:=]*[:=] *)[^ ]+#\1***#Ig' \
-      | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
-    printf '</pre>'
+    cat <<HTML
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<meta http-equiv=refresh content=5><title>$TITLE · whatsapp-agent-duniya</title>
+<style>
+:root{--bg:#f4f6f5;--card:#fff;--ink:#14201b;--mute:#5b6a63;--line:#e3e8e5;--ok:#1f9d57;--now:#25a36b;--bad:#d14343}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1311;--card:#161d1a;--ink:#e8efeb;--mute:#93a39b;--line:#25302b}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif}
+main{max-width:860px;margin:0 auto;padding:40px 20px}
+.brand{display:flex;align-items:center;gap:10px;color:var(--mute);font-weight:600;font-size:14px;letter-spacing:.02em}
+.logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#25d366,#128c7e);display:grid;place-items:center;color:#fff;font-size:15px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:28px;margin-top:18px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 30px rgba(0,0,0,.04)}
+h1{font-size:26px;line-height:1.2;margin:0 0 8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+p{margin:0;color:var(--mute)}
+.badge{font-size:13px;font-weight:600;padding:4px 10px;border-radius:99px;background:rgba(37,163,107,.12);color:var(--now)}
+.badge.bad{background:rgba(209,67,67,.12);color:var(--bad)}
+ol{list-style:none;padding:0;margin:24px 0 0;display:grid;gap:12px}
+li{display:flex;align-items:center;gap:12px;color:var(--mute)}
+.dot{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:13px;font-weight:700;flex:none}
+li.done{color:var(--ink)}li.done .dot{background:var(--ok);border-color:var(--ok);color:#fff}
+li.now{color:var(--ink);font-weight:600}li.now .dot{border-color:var(--now);border-top-color:transparent;animation:spin 1s linear infinite}
+li.fail{color:var(--bad);font-weight:600}li.fail .dot{background:var(--bad);border-color:var(--bad);color:#fff}
+@keyframes spin{to{transform:rotate(360deg)}}
+details{margin-top:24px}summary{cursor:pointer;color:var(--mute);font-size:14px;font-weight:600}
+pre{margin:12px 0 0;background:#0b0f0d;color:#cfd8d3;padding:16px;border-radius:12px;white-space:pre-wrap;word-break:break-word;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;max-height:55vh;overflow:auto}
+footer{margin-top:16px;color:var(--mute);font-size:13px;text-align:center}
+</style></head><body><main>
+<div class=brand><div class=logo>✦</div>whatsapp-agent-duniya</div>
+<div class=card>
+<h1>$TITLE $BADGE</h1><p>$SUB</p>
+<ol>$ITEMS</ol>
+<details open><summary>Log</summary><pre>
+HTML
+    tail -n 80 <<<"$LOGTXT" | esc
+    cat <<HTML
+</pre></details></div>
+<footer>Secrets are hidden in this log. This page is only shown during setup.</footer>
+</main></body></html>
+HTML
   } > /run/duniya-status/index.html.tmp && mv /run/duniya-status/index.html.tmp /run/duniya-status/index.html
   sleep 3
 done
-EOF
+RENDER
   chmod 755 /usr/local/sbin/duniya-status-render
   systemctl stop duniya-status-page duniya-status-render 2>/dev/null || true
   systemd-run -q --unit=duniya-status-render /usr/local/sbin/duniya-status-render "$1" || true

@@ -1,7 +1,7 @@
 title: "WhatsApp agents (whatsapp-agent-duniya)"
 description: "Self-hosted WhatsApp agents with an admin panel, on an Always Free VM."
 schemaVersion: 1.1.0
-version: "1.0.5"
+version: "1.0.6"
 locale: "en"
 
 variableGroups:
@@ -93,3 +93,45 @@ variables:
     type: oci:identity:region:name
   compartment_ocid:
     type: oci:identity:compartment:id
+
+# Resource Manager shows these as clickable links; the primary one becomes a button on the job page.
+primaryOutputButton: panel_url
+
+outputGroups:
+  - title: "Open"
+    outputs: [panel_url, install_progress_url, panel_access]
+  - title: "Details"
+    outputs: [public_ip, instance_id, manage_stack_url, logs_url]
+
+outputs:
+  panel_url:
+    type: link
+    title: "Admin panel"
+    displayText: "Open the admin panel"
+    visible: true
+  install_progress_url:
+    type: link
+    title: "Install progress"
+    displayText: "Watch the install"
+    visible: true
+  panel_access:
+    type: string
+    title: "How to get in"
+    visible: true
+  public_ip:
+    type: copyableString
+    title: "Public IP"
+    visible: true
+  instance_id:
+    type: ocid
+    title: "VM"
+    visible: true
+  manage_stack_url:
+    type: link
+    title: "Manage stack"
+    displayText: "Update or remove this deployment"
+    visible: true
+  logs_url:
+    type: string
+    title: "OCI Logging"
+    visible: true
