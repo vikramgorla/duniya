@@ -33,16 +33,17 @@ function guardLocal(user, before, after) {
     throw Object.assign(new Error('Only the owner can add or change local tool services (they run code on this server)'), { status: 403 });
   }
 }
-import { clientIp, isHttps, cookie } from './http-util.js';
+import {
+  CSP, clientIp, isHttps, cookie, send, setSessionCookie, limiter, resultPage, uploadAllowed, setSetupCode, checkSetupCode,
+} from './http.js';
+import { googleRoutes, googleReady } from './routes/google.js';
 import { createAdminMcp } from './admin-mcp.js';
 import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES } from '../core/mcp-oauth.js';
 
 const PUBLIC = resolve(import.meta.dirname, 'public');
-const loginAttempts = new Map(); // ip -> [ts]
 const startedAt = Date.now();
 const ROLE_RANK = { viewer: 1, admin: 2, owner: 3 };
 const SETUP_FILE = resolve(DATA_DIR, 'setup-code.txt');
-let setupCode = null;
 
 // ---------- first owner ----------
 export function bootstrapAuth() {
@@ -56,20 +57,13 @@ export function bootstrapAuth() {
       console.error(`ADMIN_PASSWORD not usable (${e.message}); falling back to a setup code`);
     }
   }
-  setupCode = existsSync(SETUP_FILE) ? readFileSync(SETUP_FILE, 'utf8').trim() : humanCode(10);
+  const setupCode = existsSync(SETUP_FILE) ? readFileSync(SETUP_FILE, 'utf8').trim() : humanCode(10);
+  setSetupCode(setupCode);
   writeFileSync(SETUP_FILE, setupCode, { mode: 0o600 });
   console.log(`\n  First-run setup code: ${setupCode}\n  Open the admin panel and enter it to create the owner account.\n`);
 }
 
 // ---------- helpers ----------
-function send(res, status, body, headers = {}) {
-  const isObj = typeof body !== 'string' && !Buffer.isBuffer(body);
-  res.writeHead(status, {
-    'content-type': isObj ? 'application/json' : 'text/plain; charset=utf-8',
-    'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', ...headers,
-  });
-  res.end(isObj ? JSON.stringify(body) : body);
-}
 async function readBody(req) {
   let size = 0; const chunks = [];
   for await (const c of req) { size += c.length; if (size > 2e6) throw new Error('Body too large'); chunks.push(c); }
@@ -78,24 +72,16 @@ async function readBody(req) {
 }
 const PKG_VERSION = (() => { try { return `v${JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')).version}`; } catch { return ''; } })();
 const gitVersion = () => new Promise((r) => execFile('git', ['log', '-1', '--format=%h'], { cwd: ROOT }, (e, out) => r([PKG_VERSION, e ? '' : out.trim()].filter(Boolean).join(' · ') || 'unknown')));
-function rateLimitLogin(ip) {
-  const recent = (loginAttempts.get(ip) || []).filter((t) => Date.now() - t < 60000);
-  recent.push(Date.now()); loginAttempts.set(ip, recent);
-  return recent.length > 5;
-}
-function setSessionCookie(req, res, userId) {
-  const { token, maxAge } = createSession(userId, clientIp(req));
-  res.setHeader('set-cookie', `duniya_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${isHttps(req) ? '; Secure' : ''}`);
-}
-
-const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+const loginLimit = limiter(5);
+const rateLimitLogin = (ip) => loginLimit(ip);
 
 export function startPanel({ channel, extend = [] }) {
   bootstrapAuth();
   const routes = [];
   /** opts.role: minimum role (default: viewer for GET, admin otherwise). opts.public: no auth. */
+  /** opts.raw: the handler reads the (binary) request body itself; see uploadAllowed() for the CSRF guard. */
   const route = (method, pattern, handler, opts = {}) => routes.push({
-    method, handler, public: !!opts.public,
+    method, handler, public: !!opts.public, raw: !!opts.raw,
     role: opts.role || (method === 'GET' ? 'viewer' : 'admin'),
     re: new RegExp(`^${pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)')}$`),
   });
@@ -103,14 +89,14 @@ export function startPanel({ channel, extend = [] }) {
   // ---------- session / setup ----------
   route('GET', '/api/session', async (req) => {
     const user = sessionUser(cookie(req, 'duniya_session'));
-    return { authed: !!user, user, needsSetup: countUsers() === 0 };
+    return { authed: !!user, user, needsSetup: countUsers() === 0, google: googleReady() };
   }, { public: true });
   route('POST', '/api/setup', async (req, res, body) => {
     if (countUsers() > 0) return [409, { error: 'Already set up' }];
     if (rateLimitLogin(clientIp(req))) return [429, { error: 'Too many attempts, wait a minute' }];
-    if (!setupCode || String(body.code || '').trim().toUpperCase() !== setupCode) return [403, { error: 'Wrong setup code (see the server log or installer output)' }];
+    if (!checkSetupCode(body.code)) return [403, { error: 'Wrong setup code (see the server log or installer output)' }];
     const user = createUser({ username: body.username || 'admin', email: body.email, role: 'owner', password: body.password });
-    rmSync(SETUP_FILE, { force: true }); setupCode = null;
+    rmSync(SETUP_FILE, { force: true }); setSetupCode(null);
     activity('system', { summary: `Owner "${user.username}" created via setup` });
     setSessionCookie(req, res, user.id);
     return { ok: true, user };
@@ -130,11 +116,15 @@ export function startPanel({ channel, extend = [] }) {
     return { ok: true };
   }, { role: 'viewer' });
   route('POST', '/api/password', async (req, res, body, q, p, user) => {
-    if (!authenticate(user.username, String(body.current || ''))) return [400, { error: 'Current password is wrong' }];
+    // Accounts created from a Google invite have no password yet: they may set one (a fallback if Google is off).
+    if (user.hasPassword && !authenticate(user.username, String(body.current || ''))) return [400, { error: 'Current password is wrong' }];
     updateUser(user.id, { password: String(body.next || '') });
     activity('system', { summary: `Password changed: ${user.username}` });
     return { ok: true };
   }, { role: 'viewer' });
+
+  // ---------- Sign in with Google, invites (019) ----------
+  googleRoutes(route);
 
   // ---------- users (owner) ----------
   route('GET', '/api/users', async () => listUsers(), { role: 'owner' });
@@ -520,10 +510,12 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
           return send(res, 403, { error: user.role === 'viewer' ? 'Read-only account' : `Requires ${r.role} role` });
         }
       }
-      if (req.method !== 'GET' && !String(req.headers['content-type'] || '').startsWith('application/json')) {
+      if (req.method !== 'GET' && r.raw) {
+        if (!uploadAllowed(req)) return send(res, 415, { error: 'Uploads must come from the panel' });
+      } else if (req.method !== 'GET' && !String(req.headers['content-type'] || '').startsWith('application/json')) {
         return send(res, 415, { error: 'JSON required' }); // CSRF guard (with SameSite=Strict)
       }
-      const body = req.method === 'GET' ? {} : await readBody(req);
+      const body = req.method === 'GET' || r.raw ? {} : await readBody(req);
       const out = await r.handler(req, res, body, url.searchParams, url.pathname.match(r.re).groups || {}, user);
       if (out === null) return;
       if (Array.isArray(out) && typeof out[0] === 'number' && out.length === 2) return send(res, out[0], out[1]);

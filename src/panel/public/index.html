@@ -92,7 +92,7 @@
   .toggle input:checked + span { background: var(--accent); } .toggle input:checked + span::after { transform: translateX(18px); }
   .toggle input:disabled + span { opacity: .5; cursor: default; }
   .qr { background: #fff; padding: 10px; border-radius: var(--radius-s); width: 220px; max-width: 100%; }
-  .center { min-height: 80vh; display: grid; place-items: center; }
+  .center { min-height: 80vh; display: grid; place-items: center; padding: 24px 0; }
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; z-index: 20; max-width: 90vw; box-shadow: var(--shadow); }
   .chatlog { display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow: auto; margin: 10px 0; }
   .bubble { padding: 9px 12px; border-radius: 16px; max-width: 85%; white-space: pre-wrap; word-break: break-word; }
@@ -111,6 +111,25 @@
   .seg button { border: 0; background: none; font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; color: var(--muted); cursor: pointer; }
   .seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
   .number-card { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 12px 14px; margin: 10px 0; background: color-mix(in srgb, var(--bg) 40%, transparent); }
+  .steps { list-style: none; margin: 8px 0 0; padding: 0; counter-reset: step; }
+  .steps > li { position: relative; padding: 2px 0 14px 40px; counter-increment: step; }
+  .steps > li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 700 14px var(--font-display); background: var(--bg-2); color: var(--muted); }
+  .steps > li.done::before { content: "✓"; background: var(--accent-soft); color: var(--accent); }
+  .steps > li.now::before { background: var(--accent); color: var(--accent-ink); }
+  .steps > li:not(:last-child)::after { content: ""; position: absolute; left: 13.5px; top: 32px; bottom: 4px; width: 1px; background: var(--line); }
+  .steps b.t { display: block; font-family: var(--font-display); font-size: 15px; margin-bottom: 2px; }
+  .copyrow { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+  .copyrow code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; background: var(--bg-2); border-radius: 10px; padding: 7px 10px; font: 13px var(--mono); scrollbar-width: thin; }
+  .btn.google { background: var(--card); color: var(--ink); border-color: var(--line-2); font-weight: 600; }
+  .btn.google svg { width: 18px; height: 18px; }
+  .pill svg { width: 12px; height: 12px; }
+  a:not(.btn) { color: var(--accent); }
+  .or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; margin: 14px 0 2px; }
+  .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .filepick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border: 1px dashed var(--line-2); border-radius: var(--radius-s); padding: 12px; background: color-mix(in srgb, var(--bg) 40%, transparent); }
+  .filepick input[type=file] { border: 0; padding: 0; background: none; flex: 1; min-width: 180px; }
+  .list-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .list-row:last-child { border-bottom: 0; } .list-row > .grow { flex: 1; min-width: 160px; }
   .pgrid { margin-top: 16px; align-items: start; }
   .phead { display: flex; gap: 10px 12px; align-items: center; flex-wrap: wrap; }
   .phead h2 { margin: 0; flex: 1; min-width: 0; }
@@ -121,10 +140,6 @@
   @media (prefers-color-scheme: dark) { .m-gh { background: #6e7681; } }
   .pcard.on { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
   .ptags { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
-  .steps { list-style: none; counter-reset: st; padding: 0; margin: 8px 0 4px; }
-  .steps > li { counter-increment: st; position: relative; padding: 0 0 14px 38px; }
-  .steps > li::before { content: counter(st); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font: 700 13px var(--font-display); display: grid; place-items: center; }
-  .steps > li:not(:last-child)::after { content: ""; position: absolute; left: 12.5px; top: 30px; bottom: 4px; width: 1px; background: var(--line); }
   .steps code, .ptags code { font-family: var(--mono); font-size: 12.5px; background: var(--bg-2); padding: 1px 5px; border-radius: 6px; }
   .cue { margin-top: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow: hidden; font-size: 12px; max-width: 360px; }
   .cue-top { display: flex; align-items: center; gap: 4px; padding: 5px 8px; background: var(--bg-2); color: var(--muted); }
@@ -205,6 +220,53 @@ for (const fn of ['replaceChildren', 'append']) {
 const field = (label, el, hint) => h('div', {}, h('label', {}, label), el, hint ? h('div', { class: 'small muted', style: 'margin-top:3px' }, hint) : null);
 const lines = (arr) => (arr || []).join('\n');
 const splitLines = (s) => String(s || '').split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); } catch {
+    const ta = h('textarea', { style: 'position:fixed;opacity:0' }); ta.value = text; document.body.append(ta); ta.select();
+    try { document.execCommand('copy'); } catch {} ta.remove();
+  }
+}
+const copyBtn = (text, label = 'Copy') => h('button', { class: 'btn small', type: 'button', onclick: async (e) => { await copyText(typeof text === 'function' ? text() : text); const b = e.currentTarget; b.textContent = 'Copied ✓'; setTimeout(() => (b.textContent = label), 1600); } }, label);
+const copyRow = (value) => h('div', { class: 'copyrow' }, h('code', {}, value), copyBtn(value));
+const extLink = (href, label, cls = 'btn small') => h('a', { class: cls, href, target: '_blank', rel: 'noopener' }, label, ' ↗');
+/** Google "G" mark for the Sign in with Google button. */
+function gLogo() {
+  const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', '0 0 48 48'); svg.setAttribute('aria-hidden', 'true');
+  for (const [fill, d] of [['#EA4335', 'M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z'],
+    ['#4285F4', 'M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z'],
+    ['#FBBC05', 'M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z'],
+    ['#34A853', 'M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z']]) {
+    const p = document.createElementNS(ns, 'path'); p.setAttribute('fill', fill); p.setAttribute('d', d); svg.append(p);
+  }
+  return svg;
+}
+/** Upload a file as a raw stream (the panel's upload routes), with progress. Resolves with the JSON answer. */
+function uploadFile(url, file, headers, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', url);
+    x.setRequestHeader('content-type', 'application/octet-stream');
+    x.setRequestHeader('x-duniya-upload', '1');
+    x.setRequestHeader('x-file-name', file.name.replace(/[^\w.@ -]/g, ''));
+    for (const [k, v] of Object.entries(headers || {})) x.setRequestHeader(k, v);
+    x.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded / e.total);
+    x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch {} x.status < 300 ? resolve(j) : reject(new Error(j.error || `Upload failed (${x.status})`)); };
+    x.onerror = () => reject(new Error('Upload failed — check the connection and try again'));
+    x.send(file);
+  });
+}
+/** After a restore: wait for the server to come back, then reload. */
+async function waitForRestart(statusEl) {
+  const t0 = Date.now();
+  await new Promise((r) => setTimeout(r, 3000));
+  while (Date.now() - t0 < 180000) {
+    try { const r = await fetch('/api/session', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (!j.needsSetup) { location.hash = ''; location.reload(); return; } } } catch {}
+    if (statusEl) statusEl.textContent = ` Restoring and restarting… ${Math.round((Date.now() - t0) / 1000)} s`;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  if (statusEl) statusEl.textContent = ' The server has not come back after 3 minutes. Check the Server page or the server log.';
+}
+const meterEl = () => { const i = h('i', { style: 'width:0%' }); const m = h('div', { class: 'meter' }, i); m.set = (f) => (i.style.width = `${Math.round(f * 100)}%`); return m; };
 
 // ---------- state ----------
 const S = { tab: 'overview', user: null, status: null, feed: [], feedBot: '', es: null, editing: null };
@@ -218,31 +280,74 @@ async function renderLogin() {
   S.es?.close(); S.es = null;
   const app = $('#app'); app.replaceChildren();
   let info = {}; try { info = await (await fetch('/api/session')).json(); } catch {}
+  S.google = !!info.google;
   if (info.authed) { S.user = info.user; return boot(); }
   const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:20px;margin-top:6px' });
-  if (info.needsSetup) {
-    const code = h('input', { placeholder: 'Setup code', autocomplete: 'one-time-code', style: 'text-transform:uppercase' });
-    const user = h('input', { placeholder: 'Username', value: 'admin', autocomplete: 'username' });
-    const pw = h('input', { type: 'password', placeholder: 'Password (12+ characters)', autocomplete: 'new-password' });
-    app.append(h('div', { class: 'center' }, h('form', { class: 'card', style: 'width:min(400px,92vw)', onsubmit: async (e) => {
-      e.preventDefault();
-      try { const r = await api('POST', '/api/setup', { code: code.value, username: user.value, password: pw.value }); S.user = r.user; boot(); } catch (x) { err.textContent = x.message; }
-    } }, h('h2', {}, 'Welcome — create the owner account'),
-      h('p', { class: 'small muted' }, 'Enter the one-time setup code shown by the installer (or in the server log: journalctl -u whatsapp-agent-duniya).'),
-      field('Setup code', code), field('Username', user), field('Password', pw), err,
-      h('button', { class: 'btn primary', style: 'width:100%;margin-top:8px' }, 'Create account'))));
-    return code.focus();
-  }
+  const brand = () => [h('div', { style: 'display:flex;justify-content:center;margin:4px 0 6px' }, Object.assign(logo(), { style: 'width:52px;height:52px' })),
+    h('h2', { style: 'text-align:center;font-size:24px;margin-bottom:2px' }, 'Duniya')];
+  if (info.needsSetup) return renderSetup(app, brand);
   const user = h('input', { placeholder: 'Username', value: 'admin', autocomplete: 'username' });
   const pw = h('input', { type: 'password', placeholder: 'Password', autocomplete: 'current-password' });
   app.append(h('div', { class: 'center' }, h('form', { class: 'card', style: 'width:min(360px,92vw)', onsubmit: async (e) => {
     e.preventDefault();
     try { const r = await api('POST', '/api/login', { username: user.value, password: pw.value }); S.user = r.user; boot(); } catch (x) { err.textContent = x.message; }
-  } }, h('div', { style: 'display:flex;justify-content:center;margin:4px 0 6px' }, Object.assign(logo(), { style: 'width:52px;height:52px' })),
-    h('h2', { style: 'text-align:center;font-size:24px;margin-bottom:2px' }, 'Duniya'), h('p', { class: 'small muted', style: 'text-align:center;margin:0 0 6px' }, 'Your WhatsApp agents'),
+  } }, brand(), h('p', { class: 'small muted', style: 'text-align:center;margin:0 0 6px' }, 'Your WhatsApp agents'),
+    info.google ? [h('a', { class: 'btn google', href: '/auth/google/start', style: 'width:100%;justify-content:center;margin-top:10px' }, gLogo(), 'Sign in with Google'), h('div', { class: 'or' }, 'or with your password')] : null,
     field('Username', user), field('Password', pw), err,
-    h('button', { class: 'btn primary', style: 'width:100%;margin-top:10px;justify-content:center' }, 'Sign in'))));
-  pw.focus();
+    h('button', { class: `btn ${info.google ? '' : 'primary'}`, style: 'width:100%;margin-top:10px;justify-content:center' }, 'Sign in'))));
+  if (!info.google) pw.focus();
+}
+
+/** First run: create the owner, or move in from another server by restoring a backup file. */
+function renderSetup(app, brand) {
+  const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:20px;margin-top:6px' });
+  const code = h('input', { placeholder: 'Setup code', autocomplete: 'one-time-code', style: 'text-transform:uppercase' });
+  const box = h('div', {});
+  let mode = 'create';
+  const seg = h('div', { class: 'seg', style: 'width:100%;display:flex;margin:6px 0 4px' }, [['create', 'New setup'], ['restore', 'Restore a backup']].map(([v, l]) => h('button', { type: 'button', class: v === mode ? 'on' : '', style: 'flex:1',
+    onclick: (e) => { mode = v; seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); err.textContent = ''; draw(); } }, l)));
+  function draw() {
+    if (mode === 'create') {
+      const user = h('input', { placeholder: 'Username', value: 'admin', autocomplete: 'username' });
+      const pw = h('input', { type: 'password', placeholder: 'Password (12+ characters)', autocomplete: 'new-password' });
+      box.replaceChildren(h('p', { class: 'small muted' }, 'Create the owner account. You can add other people later (with Google or a password).'),
+        field('Username', user), field('Password', pw),
+        h('button', { class: 'btn primary', style: 'width:100%;margin-top:12px;justify-content:center', onclick: async (e) => {
+          e.preventDefault();
+          try { const r = await api('POST', '/api/setup', { code: code.value, username: user.value, password: pw.value }); S.user = r.user; boot(); } catch (x) { err.textContent = x.message; }
+        } }, 'Create account'));
+    } else {
+      const file = h('input', { type: 'file', accept: '.dbk,application/octet-stream' });
+      const pass = h('input', { type: 'password', placeholder: 'Backup passphrase', autocomplete: 'off' });
+      const meter = meterEl(); const status = h('span', { class: 'small' });
+      const prog = h('div', { class: 'hide', style: 'margin-top:10px' }, meter, h('div', { class: 'small muted' }, h('span', { class: 'spinner' }), status));
+      const go = h('button', { class: 'btn primary', style: 'width:100%;margin-top:12px;justify-content:center', onclick: async (e) => {
+        e.preventDefault(); err.textContent = '';
+        const f = file.files[0];
+        if (!code.value.trim()) return (err.textContent = 'Enter the setup code first');
+        if (!f) return (err.textContent = 'Choose the backup file (.dbk) you downloaded from the old server');
+        if (!pass.value) return (err.textContent = 'Enter the backup passphrase');
+        go.disabled = true; prog.classList.remove('hide'); status.textContent = ' Uploading…';
+        try {
+          const up = await uploadFile('/api/setup/upload', f, { 'x-setup-code': code.value.trim() }, (x) => { meter.set(x); status.textContent = ` Uploading… ${Math.round(x * 100)} %`; });
+          status.textContent = ' Checking the passphrase…';
+          await api('POST', '/api/setup/restore', { code: code.value, upload: up.upload, passphrase: pass.value, name: f.name });
+          meter.set(1); waitForRestart(status);
+        } catch (x) { err.textContent = x.message; go.disabled = false; prog.classList.add('hide'); }
+      } }, 'Upload and restore');
+      box.replaceChildren(
+        h('p', { class: 'small muted' }, 'Bring everything over from your old server: bots, users, settings, secrets, chat memory and the WhatsApp link.'),
+        h('ol', { class: 'small', style: 'padding-left:18px;margin:6px 0' }, h('li', {}, 'On the old server: Backups → “Back up now & download”.'), h('li', {}, 'Here: choose that file and type the backup passphrase.'), h('li', {}, 'This server restarts; sign in with your usual account.')),
+        h('div', { class: 'filepick', style: 'margin-top:10px' }, file), field('Backup passphrase', pass, 'The passphrase you set under Backups on the old server. Without it the file cannot be opened.'),
+        go, prog,
+        h('div', { class: 'note warn', style: 'margin-top:10px' }, 'Turn the old server off (or log WhatsApp out there) once this one runs: the same WhatsApp link should not run in two places.'));
+    }
+  }
+  draw();
+  app.append(h('div', { class: 'center' }, h('form', { class: 'card', style: 'width:min(440px,94vw)', onsubmit: (e) => e.preventDefault() }, brand(),
+    h('p', { class: 'small muted', style: 'text-align:center;margin:0 0 10px' }, 'Welcome! Let’s set up this server.'),
+    field('Setup code', code, 'Shown by the installer, or in the server log: journalctl -u whatsapp-agent-duniya'), seg, box, err)));
+  code.focus();
 }
 
 // ---------- shell ----------
@@ -1111,7 +1216,12 @@ async function renderModels() {
 }
 
 // ---------- backups (owner) ----------
+const backupTime = (f) => { const m = f.match(/(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)/); return m ? time(Date.UTC(m[1], m[2] - 1, m[3], m[4], m[5], m[6])) : f; };
+function downloadFile(href, name) { const a = h('a', { href, download: name, class: 'hide' }); document.body.append(a); a.click(); a.remove(); }
+let ghPollTimer = null; let ghAutoChecked = 0;
+
 async function renderBackups() {
+  clearTimeout(ghPollTimer); ghPollTimer = null;
   const b = await api('GET', '/api/backups'); const s = b.settings;
   const pass = h('input', { type: 'password', placeholder: b.passphraseSet ? '•••• set — enter a new one to change' : 'At least 12 characters — keep it safe!' });
   const sched = h('select', {}, [['hourly', 'Every hour'], ['6h', 'Every 6 hours'], ['daily', 'Daily'], ['weekly', 'Weekly']].map(([v, l]) => h('option', { value: v, selected: s.schedule === v }, l)));
@@ -1120,76 +1230,186 @@ async function renderBackups() {
   const en = h('input', { type: 'checkbox', checked: s.enabled }); const wa = h('input', { type: 'checkbox', checked: s.includeWhatsApp });
   const saveSettings = (patch) => tryApi(async () => { await api('PUT', '/api/backups/settings', patch); renderBackups(); }, 'Saved');
   const last = b.last;
-  // GitHub
-  const ghToken = h('input', { type: 'password', placeholder: 'GitHub token (fine-grained: repo contents read/write)' });
-  const ghRepo = h('input', { value: s.github.repo, placeholder: 'owner/duniya-backups' });
-  const clientId = h('input', { value: s.githubClientId, placeholder: 'GitHub OAuth app client id (Device Flow enabled)' });
-  const ghFlow = h('div', {});
-  const pollLoop = async (interval) => {
-    for (let i = 0; i < 120; i++) {
-      await new Promise((r) => setTimeout(r, interval * 1000));
-      const r = await api('POST', '/api/backups/github/poll').catch((e) => ({ status: 'error', error: e.message }));
-      if (r.status === 'connected') { toast(`Connected as ${r.login}`); return renderBackups(); }
-      if (r.status !== 'pending') { ghFlow.replaceChildren(h('div', { class: 'note warn' }, `GitHub: ${r.status}${r.error ? ` (${r.error})` : ''}`)); return; }
-    }
-  };
+  const busyBtn = (label, cls, fn) => h('button', { class: `btn ${cls}`, disabled: !b.passphraseSet, title: b.passphraseSet ? '' : 'Set a passphrase first', onclick: async (e) => {
+    const btn = e.currentTarget; btn.disabled = true; btn.replaceChildren(h('span', { class: 'spinner' }), ' Backing up…');
+    const r = await tryApi(() => api('POST', '/api/backups/run')); btn.disabled = false; btn.textContent = label;
+    if (r) { await fn(r); renderBackups(); }
+  } }, label);
+  const runNow = busyBtn('Back up now', '', async (r) => toast(`Backup ${r.file}: ${Object.entries(r.results).map(([k, v]) => `${k} ${v}`).join(', ')}`));
+  const runDl = busyBtn('Back up now & download', '', async (r) => { if (r.results.local === 'ok') downloadFile(`/api/backups/download/${r.file}`, r.file); });
+
+  const scheduleCard = h('div', { class: 'card' }, h('h2', {}, 'Schedule'),
+    h('p', { class: 'small muted' }, 'Backups include bots, users, settings, secrets, chat memory and (optionally) the WhatsApp link. They are encrypted with your passphrase before leaving the server — without it they cannot be restored, so write it down somewhere safe (not on this server).'),
+    field('Passphrase', h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/backups/passphrase', { passphrase: pass.value }), 'Passphrase saved')) renderBackups(); } }, pass, h('button', { class: 'btn' }, 'Save'))),
+    h('div', { class: 'row', style: 'margin-top:10px' }, h('label', { class: 'inline' }, en, 'Scheduled backups'), h('label', { class: 'inline' }, wa, 'Include WhatsApp link')),
+    h('div', { class: 'row' }, sched, at, wd, h('span', { class: 'small muted' }, 'keep'), keep),
+    h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn primary', onclick: () => saveSettings({ enabled: en.checked, includeWhatsApp: wa.checked, schedule: sched.value, at: at.value, weekday: wd.value, keep: Number(keep.value) }) }, 'Save'), runNow),
+    last ? h('p', { class: 'small' }, `Last: ${time(last.at)} · ${kb(last.size)} · `, Object.entries(last.results).map(([k, v]) => h('span', { class: `pill ${v.startsWith('ok') ? 'ok' : 'bad'}`, style: 'margin-right:4px' }, `${k}: ${v}`))) : null);
+
+  const localCard = h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'On this server'), h('span', { class: 'pill' }, `${b.local.length} ${b.local.length === 1 ? 'backup' : 'backups'}`)),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, `The newest ${s.keep} backups stay here. Download one to keep a copy on your computer or to move to a new server — the file is already encrypted with your backup passphrase.`),
+    b.local.length ? h('div', {}, b.local.slice(0, 6).map((f) => h('div', { class: 'list-row' }, h('div', { class: 'grow' }, h('b', {}, backupTime(f.file)), h('div', { class: 'small muted' }, `${f.file} · ${kb(f.size)}`)),
+      h('a', { class: 'btn small', href: `/api/backups/download/${encodeURIComponent(f.file)}`, download: f.file }, 'Download'))),
+      b.local.length > 6 ? h('details', {}, h('summary', { class: 'small muted' }, `${b.local.length - 6} older`), b.local.slice(6).map((f) => h('div', { class: 'list-row' }, h('div', { class: 'grow small' }, `${backupTime(f.file)} · ${kb(f.size)}`), h('a', { class: 'btn small', href: `/api/backups/download/${encodeURIComponent(f.file)}`, download: f.file }, 'Download')))) : null)
+      : h('p', { class: 'muted small' }, b.passphraseSet ? 'No backups yet.' : 'Set a passphrase, then make your first backup.'),
+    h('div', { class: 'row', style: 'margin-top:8px' }, runDl),
+    h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted' }, 'Moving to a new server?'),
+      h('ol', { class: 'small', style: 'padding-left:18px' },
+        h('li', {}, 'Click “Back up now & download” and keep the file.'),
+        h('li', {}, 'Install Duniya on the new server (installer or the OCI stack).'),
+        h('li', {}, 'On its first screen choose “Restore a backup”, upload the file and type the backup passphrase. You need the passphrase there — the new server cannot open the file without it.'),
+        h('li', {}, 'Once the new server shows your bots, turn the old one off.'))));
+
   // S3
   const se = h('input', { value: s.s3.endpoint, placeholder: 'https://<account>.r2.cloudflarestorage.com' });
   const sr = h('input', { value: s.s3.region, placeholder: 'auto / us-east-1 / eu-zurich-1' });
   const sb = h('input', { value: s.s3.bucket, placeholder: 'bucket' }); const sp = h('input', { value: s.s3.prefix, placeholder: 'duniya/' });
   const ak = h('input', { placeholder: b.s3.keysSet ? '•••• saved' : 'Access key id' }); const sk = h('input', { type: 'password', placeholder: b.s3.keysSet ? '•••• saved' : 'Secret access key' });
-  // Restore
-  const src = h('select', {}, h('option', { value: 'local' }, 'This server'), s.github.enabled ? h('option', { value: 'github' }, 'GitHub') : null, s.s3.enabled ? h('option', { value: 's3' }, 'S3') : null);
-  const files = h('select', {}); const rpass = h('input', { type: 'password', placeholder: 'Backup passphrase' });
-  const loadFiles = async () => { const l = await tryApi(() => api('GET', `/api/backups/list?source=${src.value}`)) || []; files.replaceChildren(...l.map((f) => h('option', { value: f.file }, `${f.file} · ${kb(f.size)}`))); };
-  src.onchange = loadFiles;
+  const s3Card = h('div', { class: 'card' }, h('h2', {}, 'S3-compatible storage'),
+    h('p', { class: 'small muted' }, 'Cloudflare R2, OCI Object Storage (S3 API), AWS S3, MinIO…'),
+    field('Endpoint', se), h('div', { class: 'row' }, field('Region', sr), field('Bucket', sb), field('Prefix', sp)),
+    h('div', { class: 'row', style: 'margin-top:8px' }, ak, sk, h('button', { class: 'btn', onclick: () => tryApi(() => api('PUT', '/api/backups/s3/keys', { accessKeyId: ak.value, secretAccessKey: sk.value }), 'Keys saved') }, 'Save keys')),
+    h('div', { class: 'row', style: 'margin-top:8px' },
+      h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.s3.enabled, id: 's3on' }), 'Back up to S3'),
+      h('button', { class: 'btn primary', onclick: () => saveSettings({ s3: { enabled: $('#s3on').checked, endpoint: se.value.trim(), region: sr.value.trim() || 'auto', bucket: sb.value.trim(), prefix: sp.value.trim() } }) }, 'Save'),
+      h('button', { class: 'btn', onclick: async () => { const r = await api('POST', '/api/backups/test/s3'); toast(r.ok ? 'S3 OK' : r.error); } }, 'Test')));
 
-  $('#main').replaceChildren(h('div', { class: 'grid' },
-    h('div', { class: 'card' }, h('h2', {}, 'Schedule'),
-      h('p', { class: 'small muted' }, 'Backups include bots, users, settings, secrets, chat memory and (optionally) the WhatsApp link. They are encrypted with your passphrase before leaving the server — without it they cannot be restored.'),
-      field('Passphrase', h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/backups/passphrase', { passphrase: pass.value }), 'Passphrase saved')) renderBackups(); } }, pass, h('button', { class: 'btn' }, 'Save'))),
-      h('div', { class: 'row', style: 'margin-top:10px' }, h('label', { class: 'inline' }, en, 'Scheduled backups'), h('label', { class: 'inline' }, wa, 'Include WhatsApp link')),
-      h('div', { class: 'row' }, sched, at, wd, h('span', { class: 'small muted' }, 'keep'), keep),
-      h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn primary', onclick: () => saveSettings({ enabled: en.checked, includeWhatsApp: wa.checked, schedule: sched.value, at: at.value, weekday: wd.value, keep: Number(keep.value) }) }, 'Save'),
-        h('button', { class: 'btn', onclick: async (e) => { e.target.disabled = true; const r = await tryApi(() => api('POST', '/api/backups/run')); e.target.disabled = false; if (r) { toast(`Backup ${r.file}: ${Object.entries(r.results).map(([k, v]) => `${k} ${v}`).join(', ')}`); renderBackups(); } } }, 'Back up now')),
-      last ? h('p', { class: 'small' }, `Last: ${time(last.at)} · ${kb(last.size)} · `, Object.entries(last.results).map(([k, v]) => h('span', { class: `pill ${v.startsWith('ok') ? 'ok' : 'bad'}`, style: 'margin-right:4px' }, `${k}: ${v}`))) : null,
-      b.local.length ? h('details', {}, h('summary', { class: 'small muted' }, `${b.local.length} on this server`), h('ul', { class: 'small' }, b.local.map((f) => h('li', {}, h('a', { href: `/api/backups/download/${f.file}` }, f.file), ` · ${kb(f.size)}`)))) : null),
-    h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'GitHub (private repository)'), h('span', { class: `pill ${b.github.connected ? 'ok' : ''}` }, b.github.connected ? `as ${b.github.login || '?'}` : 'not connected')),
-      !b.github.connected ? h('p', { class: 'small muted' }, 'No GitHub account? ', h('a', { href: b.github.signupUrl, target: '_blank', rel: 'noopener' }, 'Create one'), ' (free), then come back.') : null,
-      !b.github.connected && b.github.clientIdSet ? h('button', { class: 'btn primary', onclick: async () => {
+  $('#main').replaceChildren(h('div', { class: 'grid' }, scheduleCard, localCard, githubCard(b, s, saveSettings), s3Card, restoreCard(b, s)));
+  if (b.github.app.app && !b.github.app.installed && Date.now() - ghAutoChecked > 15000) { ghAutoChecked = Date.now(); checkGithubApp(true); }
+}
+
+/** Ask the server whether the GitHub app is installed yet; redraw when something changed. */
+async function checkGithubApp(quiet) {
+  const r = await api('POST', '/api/backups/github-app/check').catch((e) => { if (!quiet) toast(e.message); return null; });
+  if (r?.installed) { if (S.tab === 'backups') renderBackups(); if (!quiet) toast(r.repo ? `Installed — backing up to ${r.repo}` : 'Installed'); }
+  else if (r && !quiet) toast('Not installed yet');
+  return r;
+}
+function pollGithubApp(statusEl, n = 0) {
+  clearTimeout(ghPollTimer);
+  if (S.tab !== 'backups' || n > 60) { statusEl.replaceChildren(); return; }
+  statusEl.replaceChildren(h('div', { class: 'note' }, h('span', { class: 'spinner' }), ' Waiting for the installation on GitHub… this page checks every 5 seconds.'));
+  ghPollTimer = setTimeout(async () => { const r = await checkGithubApp(true); if (!r?.installed) pollGithubApp(statusEl, n + 1); }, 5000);
+}
+
+function githubCard(b, s, saveSettings) {
+  const G = b.github; const A = G.app;
+  const pill = G.connected ? h('span', { class: 'pill ok' }, G.via === 'app' ? `app · ${G.login || '?'}` : `token · ${G.login || '?'}`)
+    : A.app ? h('span', { class: 'pill warn' }, 'almost there') : h('span', { class: 'pill' }, 'not connected');
+  const testBtn = h('button', { class: 'btn small', onclick: async () => { const r = await api('POST', '/api/backups/test/github'); toast(r.ok ? 'GitHub OK' : r.error); } }, 'Test');
+  const onOff = h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.github.enabled, onchange: (e) => saveSettings({ github: { enabled: e.target.checked } }) }), 'Back up to GitHub');
+  let body;
+  if (A.app && G.via === 'app' && s.github.repo) {
+    const repoSel = A.repos.length > 1 ? h('select', { onchange: (e) => tryApi(async () => { await api('PUT', '/api/backups/github-app/repo', { repo: e.target.value }); renderBackups(); }, 'Repository changed') }, A.repos.map((r) => h('option', { value: r, selected: r === s.github.repo }, r))) : null;
+    body = [h('div', { class: 'note ok' }, '✓ Backups go to ', h('b', {}, s.github.repo), ' through your GitHub app “', A.app.name, '”.'),
+      repoSel ? field('Repository', repoSel) : null,
+      h('div', { class: 'row', style: 'margin-top:8px' }, onOff, testBtn, extLink(`${A.app.htmlUrl || A.app.settingsUrl}`, 'App on GitHub'),
+        h('button', { class: 'btn small danger', onclick: () => confirm('Disconnect the GitHub app? Backups stop going to GitHub; the backups already there stay. You can delete the app on GitHub afterwards.') && tryApi(async () => { const r = await api('DELETE', '/api/backups/github-app'); if (r.deleteUrl) window.open(r.deleteUrl, '_blank', 'noopener'); renderBackups(); }, 'Disconnected') }, 'Disconnect'))];
+  } else if (A.app) {
+    const statusEl = h('div', {});
+    const chooseSel = h('select', {}, A.repos.map((r) => h('option', { value: r }, r)));
+    body = [h('ol', { class: 'steps' },
+      h('li', { class: 'done' }, h('b', { class: 't' }, 'GitHub app created'), h('span', { class: 'small muted' }, `“${A.app.name}”${A.app.owner ? ` owned by ${A.app.owner}` : ''}`)),
+      h('li', { class: A.installed ? 'done' : 'now' }, h('b', { class: 't' }, 'Create a private repository'),
+        h('p', { class: 'small muted', style: 'margin:0 0 6px' }, 'GitHub opens with the name “duniya-backup” and Private already chosen: click Create repository. Already have a private repository for this? Skip to the next step.'),
+        extLink(A.newRepoUrl, 'Create private repository')),
+      h('li', { class: A.installed ? 'done' : '' }, h('b', { class: 't' }, 'Install the app on that repository'),
+        h('p', { class: 'small muted', style: 'margin:0 0 6px' }, 'Choose “Only select repositories”, pick the backup repository and click Install. The app can then write only there.'),
+        h('div', { class: 'row', style: 'flex-wrap:wrap' }, h('a', { class: 'btn small primary', href: A.installUrl, target: '_blank', rel: 'noopener', onclick: () => pollGithubApp(statusEl) }, 'Install the app ↗'),
+          h('button', { class: 'btn small', onclick: () => checkGithubApp(false) }, 'Check now')), statusEl),
+      h('li', { class: A.installed ? 'now' : '' }, h('b', { class: 't' }, 'Choose the repository'),
+        !A.installed ? h('span', { class: 'small muted' }, 'Done automatically when the app can see one repository.')
+          : !A.repos.length ? h('div', { class: 'note warn' }, 'The app is installed but cannot see any repository. On GitHub, open the app’s installation and add the backup repository, then click Check now.')
+            : h('div', { class: 'row' }, chooseSel, h('button', { class: 'btn primary', onclick: () => tryApi(async () => { await api('PUT', '/api/backups/github-app/repo', { repo: chooseSel.value }); renderBackups(); }, 'Backing up to GitHub') }, 'Use')))),
+    h('button', { class: 'btn small danger', onclick: () => confirm('Start over? This forgets the GitHub app here; you can delete it on GitHub afterwards.') && tryApi(async () => { const r = await api('DELETE', '/api/backups/github-app'); if (r.deleteUrl) window.open(r.deleteUrl, '_blank', 'noopener'); renderBackups(); }) }, 'Start over')];
+  } else if (G.via === 'token') {
+    const ghRepo = h('input', { value: s.github.repo, placeholder: 'owner/duniya-backups' });
+    body = [field('Repository', h('div', { class: 'row' }, ghRepo, h('button', { class: 'btn', onclick: () => saveSettings({ github: { enabled: true, repo: ghRepo.value.trim() } }) }, 'Use'))),
+      !s.github.repo ? h('button', { class: 'btn primary', style: 'margin-top:8px', onclick: () => tryApi(async () => { await api('POST', '/api/backups/github/create-repo', {}); renderBackups(); }, 'Private repo created') }, 'Create private repo “duniya-backups”') : null,
+      h('div', { class: 'row', style: 'margin-top:8px' }, onOff, testBtn,
+        h('button', { class: 'btn small danger', onclick: () => confirm('Disconnect GitHub? Backups stop going there; the backups already there stay.') && tryApi(async () => { await api('DELETE', '/api/backups/github'); renderBackups(); }) }, 'Disconnect'))];
+  } else {
+    const org = h('input', { placeholder: 'organization name' });
+    body = [h('p', { class: 'small muted', style: 'margin-top:0' }, 'Keep encrypted copies in a private GitHub repository. One click creates a small GitHub app owned by you that can only write to the repository you choose — no keys to copy.'),
+      h('a', { class: 'btn primary', href: '/backups/github-app/new' }, 'Create GitHub app'),
+      h('p', { class: 'small muted' }, 'No GitHub account? ', h('a', { href: G.signupUrl, target: '_blank', rel: 'noopener' }, 'Create one'), ' (free), then come back.'),
+      h('details', {}, h('summary', { class: 'small muted' }, 'Create it for an organization instead'),
+        h('div', { class: 'row', style: 'margin-top:8px' }, org, h('button', { class: 'btn', onclick: () => { if (org.value.trim()) location.href = `/backups/github-app/new?org=${encodeURIComponent(org.value.trim())}`; } }, 'Create for organization')))];
+  }
+  // the older ways: a personal access token, or device login with your own OAuth app
+  let tokenWays = null;
+  if (G.via !== 'token' && !(A.app && G.via === 'app')) {
+    const ghToken = h('input', { type: 'password', placeholder: 'GitHub token (fine-grained: repo contents read/write)' });
+    const clientId = h('input', { value: s.githubClientId, placeholder: 'GitHub OAuth app client id (Device Flow enabled)' });
+    const ghFlow = h('div', {});
+    const pollLoop = async (interval) => {
+      for (let i = 0; i < 120; i++) {
+        await new Promise((r) => setTimeout(r, interval * 1000));
+        const r = await api('POST', '/api/backups/github/poll').catch((e) => ({ status: 'error', error: e.message }));
+        if (r.status === 'connected') { toast(`Connected as ${r.login}`); return renderBackups(); }
+        if (r.status !== 'pending') { ghFlow.replaceChildren(h('div', { class: 'note warn' }, `GitHub: ${r.status}${r.error ? ` (${r.error})` : ''}`)); return; }
+      }
+    };
+    tokenWays = h('details', { style: 'margin-top:12px' }, h('summary', { class: 'small muted' }, 'Use a personal access token instead'),
+      h('form', { class: 'row', style: 'margin-top:8px', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/backups/github/token', { token: ghToken.value }), 'Token saved')) renderBackups(); } }, ghToken, h('button', { class: 'btn' }, 'Use token')),
+      G.clientIdSet ? h('button', { class: 'btn small', style: 'margin-top:8px', onclick: async () => {
         const r = await tryApi(() => api('POST', '/api/backups/github/device')); if (!r) return;
         ghFlow.replaceChildren(h('p', {}, 'Open ', h('a', { href: r.verificationUri, target: '_blank', rel: 'noopener' }, r.verificationUri), ' and enter:'), h('p', { class: 'code' }, r.userCode), h('p', { class: 'small muted' }, 'Waiting for approval…'));
         pollLoop(r.interval || 5);
-      } }, 'Connect GitHub') : null,
-      ghFlow,
-      !b.github.connected ? h('form', { class: 'row', style: 'margin-top:8px', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/backups/github/token', { token: ghToken.value }), 'Token saved')) renderBackups(); } }, ghToken, h('button', { class: 'btn' }, 'Use token')) : null,
-      b.github.connected ? h('div', {},
-        field('Repository', h('div', { class: 'row' }, ghRepo, h('button', { class: 'btn', onclick: () => saveSettings({ github: { enabled: true, repo: ghRepo.value.trim() } }) }, 'Use'))),
-        !s.github.repo ? h('button', { class: 'btn primary', style: 'margin-top:8px', onclick: () => tryApi(async () => { await api('POST', '/api/backups/github/create-repo', {}); renderBackups(); }, 'Private repo created') }, 'Create private repo “duniya-backups”') : null,
-        h('div', { class: 'row', style: 'margin-top:8px' }, h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.github.enabled, onchange: (e) => saveSettings({ github: { enabled: e.target.checked } }) }), 'Back up to GitHub'),
-          h('button', { class: 'btn small', onclick: async () => { const r = await api('POST', '/api/backups/test/github'); toast(r.ok ? 'GitHub OK' : r.error); } }, 'Test'),
-          h('button', { class: 'btn small danger', onclick: () => confirm('Disconnect GitHub?') && tryApi(async () => { await api('DELETE', '/api/backups/github'); renderBackups(); }) }, 'Disconnect'))) : null,
-      h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted' }, 'GitHub app for device login'),
-        h('p', { class: 'small muted' }, 'Device login needs a GitHub OAuth app with “Enable Device Flow” (github.com → Settings → Developer settings → OAuth Apps). Paste its client id:'),
-        h('div', { class: 'row' }, clientId, h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('PUT', '/api/backups/github/client-id', { clientId: clientId.value }); renderBackups(); }, 'Saved') }, 'Save')))),
-    h('div', { class: 'card' }, h('h2', {}, 'S3-compatible storage'),
-      h('p', { class: 'small muted' }, 'Cloudflare R2, OCI Object Storage (S3 API), AWS S3, MinIO…'),
-      field('Endpoint', se), h('div', { class: 'row' }, field('Region', sr), field('Bucket', sb), field('Prefix', sp)),
-      h('div', { class: 'row', style: 'margin-top:8px' }, ak, sk, h('button', { class: 'btn', onclick: () => tryApi(() => api('PUT', '/api/backups/s3/keys', { accessKeyId: ak.value, secretAccessKey: sk.value }), 'Keys saved') }, 'Save keys')),
-      h('div', { class: 'row', style: 'margin-top:8px' },
-        h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.s3.enabled, id: 's3on' }), 'Back up to S3'),
-        h('button', { class: 'btn primary', onclick: () => saveSettings({ s3: { enabled: $('#s3on').checked, endpoint: se.value.trim(), region: sr.value.trim() || 'auto', bucket: sb.value.trim(), prefix: sp.value.trim() } }) }, 'Save'),
-        h('button', { class: 'btn', onclick: async () => { const r = await api('POST', '/api/backups/test/s3'); toast(r.ok ? 'S3 OK' : r.error); } }, 'Test'))),
-    h('div', { class: 'card' }, h('h2', {}, 'Restore'),
-      h('div', { class: 'note warn' }, 'Restoring replaces bots, users, settings, secrets, memory and the WhatsApp link with the backup, then restarts. The current data is kept aside on the server.'),
-      h('div', { class: 'row' }, src, h('button', { class: 'btn', onclick: loadFiles }, 'List')), h('div', { style: 'margin-top:6px' }, files), h('div', { style: 'margin-top:6px' }, rpass),
-      h('button', { class: 'btn danger', style: 'margin-top:8px', onclick: async () => {
-        if (!files.value) return toast('Pick a backup');
-        if (!confirm(`Restore ${files.value}? The server restarts and you sign in with the accounts from the backup.`)) return;
-        const r = await tryApi(() => api('POST', '/api/backups/restore', { source: src.value, file: files.value, passphrase: rpass.value }));
-        if (r) { toast('Restoring… the page reloads shortly'); setTimeout(() => location.reload(), 10000); }
-      } }, 'Restore'))));
-  loadFiles();
+      } }, 'Device login') : null, ghFlow,
+      h('p', { class: 'small muted' }, 'Device login needs your own GitHub OAuth app with “Enable Device Flow”. Client id:'),
+      h('div', { class: 'row' }, clientId, h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('PUT', '/api/backups/github/client-id', { clientId: clientId.value }); renderBackups(); }, 'Saved') }, 'Save')));
+  }
+  return h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'GitHub (private repository)'), pill), body, tokenWays);
+}
+
+let restoreMode = 'local';
+function restoreCard(b, s) {
+  const box = h('div', {});
+  const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:18px;margin-top:6px' });
+  const modes = [['local', 'This server'], s.github.enabled && ['github', 'GitHub'], s.s3.enabled && ['s3', 'S3'], ['upload', 'A file']].filter(Boolean);
+  if (!modes.some(([v]) => v === restoreMode)) restoreMode = 'local';
+  const seg = h('div', { class: 'seg', style: 'margin-bottom:8px;flex-wrap:wrap' }, modes.map(([v, l]) => h('button', { class: v === restoreMode ? 'on' : '', onclick: (e) => { restoreMode = v; seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); err.textContent = ''; draw(); } }, l)));
+  const rpass = h('input', { type: 'password', placeholder: 'Backup passphrase', autocomplete: 'off' });
+  const confirmText = (what) => `Restore ${what}? Bots, users, settings, secrets, memory and the WhatsApp link are replaced by the backup and the server restarts (1–2 minutes). The current data is kept aside on the server.`;
+  function draw() {
+    if (restoreMode === 'upload') {
+      const file = h('input', { type: 'file', accept: '.dbk,application/octet-stream' });
+      const meter = meterEl(); const status = h('span', { class: 'small' });
+      const prog = h('div', { class: 'hide', style: 'margin-top:10px' }, meter, h('div', { class: 'small muted' }, h('span', { class: 'spinner' }), status));
+      const go = h('button', { class: 'btn danger', style: 'margin-top:8px', onclick: async () => {
+        err.textContent = ''; const f = file.files[0];
+        if (!f) return (err.textContent = 'Choose a backup file (.dbk) first');
+        if (!rpass.value) return (err.textContent = 'Enter the passphrase the backup was made with');
+        if (!confirm(confirmText(f.name))) return;
+        go.disabled = true; prog.classList.remove('hide');
+        try {
+          const up = await uploadFile('/api/backups/upload', f, {}, (x) => { meter.set(x); status.textContent = ` Uploading… ${Math.round(x * 100)} %`; });
+          status.textContent = ' Checking the passphrase…';
+          await api('POST', '/api/backups/restore', { source: 'upload', upload: up.upload, passphrase: rpass.value, name: f.name });
+          meter.set(1); waitForRestart(status);
+        } catch (x) { err.textContent = x.message; go.disabled = false; prog.classList.add('hide'); }
+      } }, 'Upload and restore');
+      box.replaceChildren(h('p', { class: 'small muted', style: 'margin-top:0' }, `A .dbk file you downloaded earlier, from this or another server (up to ${b.uploadMaxMb} MB). You need the passphrase that server used.`),
+        h('div', { class: 'filepick' }, file), h('div', { style: 'margin-top:8px' }, rpass), go, prog);
+    } else {
+      const files = h('select', {}, h('option', {}, 'Loading…'));
+      const go = h('button', { class: 'btn danger', style: 'margin-top:8px', onclick: async () => {
+        err.textContent = '';
+        if (!files.value) return (err.textContent = 'Pick a backup');
+        if (!confirm(confirmText(files.value))) return;
+        const status = h('span', { class: 'small' }); go.disabled = true;
+        try { await api('POST', '/api/backups/restore', { source: restoreMode, file: files.value, passphrase: rpass.value }); go.after(h('div', { class: 'note' }, h('span', { class: 'spinner' }), status)); waitForRestart(status); } catch (x) { err.textContent = x.message; go.disabled = false; }
+      } }, 'Restore');
+      box.replaceChildren(files, h('div', { style: 'margin-top:6px' }, rpass), go);
+      api('GET', `/api/backups/list?source=${restoreMode}`).then((l) => files.replaceChildren(...(l.length ? l.map((f) => h('option', { value: f.file }, `${backupTime(f.file)} · ${kb(f.size)}`)) : [h('option', { value: '' }, 'No backups here yet')])))
+        .catch((e) => { files.replaceChildren(h('option', { value: '' }, 'Could not list backups')); err.textContent = e.message; });
+    }
+  }
+  draw();
+  return h('div', { class: 'card' }, h('h2', {}, 'Restore'),
+    h('div', { class: 'note warn' }, 'Restoring replaces bots, users, settings, secrets, memory and the WhatsApp link with the backup, then restarts. The current data is kept aside on the server.'),
+    seg, box, err);
 }
 
 // ---------- pending ----------
@@ -1218,12 +1438,16 @@ async function renderSecrets() {
 
 // ---------- settings ----------
 async function renderSettings() {
-  const [bots, lg, ai] = await Promise.all([api('GET', '/api/bots'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null)]);
+  const [bots, lg, ai, sess] = await Promise.all([api('GET', '/api/bots'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null)]);
+  if (sess?.user) { S.user = sess.user; S.google = !!sess.google; }
+  const me = S.user;
   const cur = h('input', { type: 'password', placeholder: 'current', autocomplete: 'current-password' });
   const next = h('input', { type: 'password', placeholder: 'new (12+ characters)', autocomplete: 'new-password' });
   const cards = [
-    h('div', { class: 'card' }, h('h2', {}, 'Your password'), cur, h('div', { style: 'height:8px' }), next,
-      h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => tryApi(async () => { await api('POST', '/api/password', { current: cur.value, next: next.value }); cur.value = next.value = ''; }, 'Password changed') }, 'Change password')),
+    h('div', { class: 'card' }, h('h2', {}, me.hasPassword ? 'Your password' : 'Add a password'),
+      me.hasPassword ? [cur, h('div', { style: 'height:8px' })] : h('p', { class: 'small muted', style: 'margin-top:0' }, 'You sign in with Google. A password is a fallback for when Google sign-in is off.'), next,
+      h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => tryApi(async () => { await api('POST', '/api/password', { current: cur.value, next: next.value }); cur.value = next.value = ''; renderSettings(); }, me.hasPassword ? 'Password changed' : 'Password added') }, me.hasPassword ? 'Change password' : 'Add password')),
+    S.google || me.google ? myGoogleCard(me) : null,
     h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default bot for DMs without a trigger'),
       h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmBot: e.target.value }), 'Saved') },
         h('option', { value: '' }, '— first bot that accepts the sender —'), bots.map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmBot === b.id }, b.name)))),
@@ -1233,18 +1457,8 @@ async function renderSettings() {
       h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups'))),
   ];
   if (can('owner')) {
-    const users = await api('GET', '/api/users');
-    const un = h('input', { placeholder: 'username' }); const ue = h('input', { placeholder: 'email (optional)' });
-    const ur = h('select', {}, h('option', { value: 'admin' }, 'Admin'), h('option', { value: 'viewer' }, 'Viewer (read-only)'), h('option', { value: 'owner' }, 'Owner'));
-    const up = h('input', { type: 'password', placeholder: 'initial password (12+)' });
-    cards.unshift(h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Users'),
-      h('p', { class: 'small muted' }, 'Owners manage everything incl. users, backups and updates. Admins manage bots, chats, models and memory. Viewers can only look.'),
-      h('table', {}, h('tbody', {}, users.map((u) => h('tr', {}, h('td', {}, h('b', {}, u.username), h('div', { class: 'small muted' }, u.email || '')),
-        h('td', {}, h('select', { onchange: (e) => tryApi(() => api('PUT', `/api/users/${u.id}`, { role: e.target.value }), 'Role changed').then((r) => r || renderSettings()) },
-          ['owner', 'admin', 'viewer'].map((r) => h('option', { value: r, selected: u.role === r }, r)))),
-        h('td', {}, u.id === S.user.id ? h('span', { class: 'small muted' }, 'you') : h('button', { class: 'btn small danger', onclick: () => confirm(`Remove ${u.username}?`) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}`); renderSettings(); }, 'Removed') }, 'Remove')))))),
-      h('form', { class: 'row', style: 'margin-top:10px', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('POST', '/api/users', { username: un.value, email: ue.value, role: ur.value, password: up.value }), 'User added')) renderSettings(); } },
-        un, ue, ur, up, h('button', { class: 'btn primary' }, 'Add user'))));
+    const [users, inv, gcfg] = await Promise.all([api('GET', '/api/users'), api('GET', '/api/invites'), api('GET', '/api/auth/google')]);
+    cards.unshift(usersCard(users, inv), googleSetupCard(gcfg));
   }
   $('#main').replaceChildren(h('div', { class: 'grid' }, cards));
 }
@@ -1276,6 +1490,103 @@ function assistantsCard(a) {
       h('td', { class: 'small muted' }, `connected ${ago(g.connectedAt)} ago`, h('br'), g.lastUsedAt ? `last used ${ago(g.lastUsedAt)} ago` : 'not used yet'),
       h('td', { style: 'text-align:right' }, h('button', { class: 'btn small danger', onclick: () => revoke(g) }, 'Disconnect'))))))
       : h('p', { class: 'small muted' }, 'No AI assistants connected yet. Follow the steps above; it takes about a minute.'));
+}
+
+function myGoogleCard(me) {
+  return h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'Your Google account'), h('span', { class: `pill ${me.google ? 'ok' : ''}` }, me.google ? 'linked' : 'not linked')),
+    me.google
+      ? [h('p', { class: 'small muted', style: 'margin-top:0' }, 'You can use “Sign in with Google” on the sign-in page.'),
+        me.hasPassword ? h('button', { class: 'btn small danger', onclick: () => confirm('Unlink your Google account? You then sign in with your password only.') && tryApi(async () => { await api('DELETE', '/api/me/google'); renderSettings(); }, 'Unlinked') }, 'Unlink')
+          : h('p', { class: 'small muted' }, 'To unlink Google, add a password first.')]
+      : [h('p', { class: 'small muted', style: 'margin-top:0' }, 'Link your Google account to sign in with one click instead of your password.'),
+        h('a', { class: 'btn google', href: '/auth/google/start?mode=link' }, gLogo(), 'Link my Google account')]);
+}
+
+function inviteMessage(i, panelUrl) {
+  const until = new Date(i.expiresAt).toLocaleDateString([], { day: 'numeric', month: 'long' });
+  return `Hi! You're invited to the Duniya admin panel as ${i.role}.\n\nOpen ${panelUrl} and choose “Sign in with Google” with ${i.email}.\nThe invite is valid until ${until}.`;
+}
+
+function usersCard(users, inv) {
+  const un = h('input', { placeholder: 'username' }); const ue = h('input', { placeholder: 'email (optional, lets them use Google)' });
+  const roleSel = (val) => h('select', {}, h('option', { value: 'admin', selected: val === 'admin' }, 'Admin'), h('option', { value: 'viewer', selected: val === 'viewer' }, 'Viewer (read-only)'), h('option', { value: 'owner', selected: val === 'owner' }, 'Owner'));
+  const ur = roleSel('admin'); const up = h('input', { type: 'password', placeholder: 'initial password (12+)' });
+  const ie = h('input', { type: 'email', placeholder: 'their.name@gmail.com', autocomplete: 'off' }); const ir = roleSel('admin');
+  const mail = (i) => `mailto:${encodeURIComponent(i.email)}?subject=${encodeURIComponent('Your invite to the Duniya admin panel')}&body=${encodeURIComponent(inviteMessage(i, inv.panelUrl))}`;
+  const days = (ts) => Math.max(0, Math.ceil((ts - Date.now()) / 86400000));
+  return h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Users'),
+    h('p', { class: 'small muted' }, 'Owners manage everything incl. users, backups and updates. Admins manage bots, chats, models and memory. Viewers can only look.'),
+    h('div', { style: 'overflow-x:auto' }, h('table', {}, h('tbody', {}, users.map((u) => h('tr', {},
+      h('td', {}, h('b', {}, u.username), ' ', u.google ? h('span', { class: 'pill info', title: 'Signs in with Google' }, gLogo(), 'Google') : null,
+        h('div', { class: 'small muted' }, [u.email, !u.hasPassword ? 'no password' : ''].filter(Boolean).join(' · '))),
+      h('td', {}, h('select', { style: 'min-width:110px', onchange: (e) => tryApi(() => api('PUT', `/api/users/${u.id}`, { role: e.target.value }), 'Role changed').then((r) => r || renderSettings()) },
+        ['owner', 'admin', 'viewer'].map((r) => h('option', { value: r, selected: u.role === r }, r)))),
+      h('td', { style: 'white-space:nowrap;text-align:right' }, u.id === S.user.id ? h('span', { class: 'small muted' }, 'you') : [
+        u.google && u.hasPassword ? h('button', { class: 'btn small', onclick: () => confirm(`Unlink Google from ${u.username}? They then sign in with their password.`) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}/google`); renderSettings(); }, 'Unlinked') }, 'Unlink Google') : null, ' ',
+        h('button', { class: 'btn small danger', onclick: () => confirm(`Remove ${u.username}? They can no longer sign in.`) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}`); renderSettings(); }, 'Removed') }, 'Remove')])))))),
+    h('h3', {}, 'Invite someone with Google'),
+    inv.googleReady
+      ? h('p', { class: 'small muted', style: 'margin-top:0' }, 'They sign in with their Google account the first time — no password to share. Send them the invite by email or copy it into WhatsApp.')
+      : h('div', { class: 'note' }, 'Set up “Sign in with Google” (the card below) first. Invites only work once Google sign-in is ready.'),
+    h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); const i = await tryApi(() => api('POST', '/api/invites', { email: ie.value, role: ir.value }), 'Invite created — now send it'); if (i) renderSettings(); } },
+      ie, ir, h('button', { class: 'btn primary', disabled: !inv.googleReady }, 'Invite')),
+    inv.invites.length ? h('div', { style: 'margin-top:6px' }, inv.invites.map((i) => h('div', { class: 'list-row' },
+      h('div', { class: 'grow' }, h('b', {}, i.email), h('div', { class: 'small muted' }, `${i.role} · invited by ${i.invitedBy || '?'}`)),
+      h('span', { class: `pill ${i.expired ? 'bad' : 'warn'}` }, i.expired ? 'invite expired' : `invite pending · ${days(i.expiresAt)} days left`),
+      h('div', { class: 'row', style: 'flex:0 0 auto' },
+        h('a', { class: 'btn small', href: mail(i), onclick: () => api('POST', `/api/invites/${i.id}/renew`).then(() => setTimeout(renderSettings, 500)).catch(() => {}) }, i.expired ? 'Renew & email' : 'Email'),
+        copyBtn(() => inviteMessage(i, inv.panelUrl), 'Copy message'),
+        h('button', { class: 'btn small', title: 'Give them 14 more days', onclick: () => tryApi(async () => { await api('POST', `/api/invites/${i.id}/renew`); renderSettings(); }, 'Invite renewed for 14 days') }, 'Resend'),
+        h('button', { class: 'btn small danger', onclick: () => confirm(`Revoke the invite for ${i.email}? They can no longer sign in with it.`) && tryApi(async () => { await api('DELETE', `/api/invites/${i.id}`); renderSettings(); }, 'Invite revoked') }, 'Revoke'))))) : null,
+    h('details', { style: 'margin-top:12px' }, h('summary', { class: 'small muted' }, 'Add a user with a password instead'),
+      h('form', { class: 'row', style: 'margin-top:10px', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('POST', '/api/users', { username: un.value, email: ue.value, role: ur.value, password: up.value }), 'User added')) renderSettings(); } },
+        un, ue, ur, up, h('button', { class: 'btn primary' }, 'Add user'))));
+}
+
+function googleSetupCard(g) {
+  const cid = h('input', { value: g.clientId, placeholder: '1234567890-abc….apps.googleusercontent.com', autocomplete: 'off', spellcheck: 'false' });
+  const sec = h('input', { type: 'password', placeholder: g.secretSet ? '•••• saved — paste a new one to replace' : 'GOCSPX-…', autocomplete: 'off' });
+  const result = h('div', {});
+  const showTest = (r) => result.replaceChildren(!r ? null : h('div', { class: `note ${r.ok ? 'ok' : 'bad'}` },
+    h('b', {}, r.ok ? '✓ Google accepted the setup. ' : 'Not working yet. '), r.ok ? (S.user.google ? 'Your own account is linked.' : 'Try it: “Link my Google account” under Your Google account.') : null,
+    h('ul', { style: 'margin:6px 0 0;padding-left:4px;list-style:none' }, r.checks.map((c) => h('li', {}, `${c.ok ? '✓' : '✗'} ${c.name}${c.detail ? ` — ${c.detail}` : ''}`)))));
+  showTest(g.lastTest);
+  const runTest = async (btn) => { btn.disabled = true; btn.replaceChildren(h('span', { class: 'spinner' }), ' Testing…'); const r = await tryApi(() => api('POST', '/api/auth/google/test')); btn.disabled = false; btn.textContent = 'Test'; if (r) showTest(r); };
+  const step = (cls, title, ...body) => h('li', { class: cls }, h('b', { class: 't' }, title), ...body);
+  const saved = g.clientId && g.secretSet;
+  const steps = h('ol', { class: 'steps' },
+    step(saved ? 'done' : 'now', 'Create a Google Cloud project',
+      h('p', { class: 'small muted', style: 'margin:0 0 6px' }, 'Sign in with the Google account that should own this setup. Name the project e.g. “Duniya” and click Create. Already have a project? Select it at the top of the page instead.'),
+      extLink('https://console.cloud.google.com/projectcreate', 'Open Google Cloud')),
+    step(saved ? 'done' : '', 'Describe your app',
+      h('p', { class: 'small muted', style: 'margin:0 0 6px' }, 'Branding: app name “Duniya”, your email as support and contact email → Save. Audience: choose External. “Testing” is fine — signing in with name and email needs no review by Google.'),
+      h('div', { class: 'row', style: 'flex-wrap:wrap' }, extLink('https://console.cloud.google.com/auth/branding', 'Open Branding'), extLink('https://console.cloud.google.com/auth/audience', 'Open Audience'))),
+    step(saved ? 'done' : '', 'Create the sign-in client',
+      h('p', { class: 'small muted', style: 'margin:0 0 6px' }, 'Application type: Web application. Name: “Duniya panel”. Add these two addresses exactly, then click Create:'),
+      g.warnings.map((w) => h('div', { class: 'note warn' }, w.text)),
+      h('div', { class: 'small' }, 'Authorized JavaScript origins'), copyRow(g.origin),
+      h('div', { class: 'small' }, 'Authorized redirect URIs'), copyRow(g.redirectUri),
+      extLink('https://console.cloud.google.com/auth/clients/create', 'Open Create client')),
+    step(saved ? 'done' : '', 'Paste the Client ID and secret',
+      h('p', { class: 'small muted', style: 'margin:0 0 6px' }, 'Google shows the client secret only once, right after you click Create — copy it now (or download the JSON).'),
+      field('Client ID', cid), field('Client secret', sec),
+      h('div', { class: 'row', style: 'margin-top:10px' },
+        h('button', { class: 'btn primary', onclick: async (e) => {
+          const r = await tryApi(() => api('PUT', '/api/auth/google', { clientId: cid.value.trim(), ...(sec.value ? { clientSecret: sec.value.trim() } : {}) }), 'Saved');
+          if (r?.ready) { const t = await tryApi(() => api('POST', '/api/auth/google/test')); if (t) g.lastTest = t; renderSettings(); }
+        } }, 'Save and test'))));
+  return h('div', { class: 'card', style: 'grid-column:1/-1' },
+    h('div', { class: 'row spread' }, h('h2', {}, 'Sign in with Google'),
+      h('span', { class: `pill ${g.ready ? (g.lastTest?.ok === false ? 'bad' : 'ok') : g.clientId && g.secretSet && !g.enabled ? 'warn' : ''}` }, g.ready ? (g.lastTest?.ok === false ? 'test failed' : 'on') : saved && !g.enabled ? 'off' : 'not set up')),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Let people sign in with their Google account, and invite new people by email. Passwords keep working. Google does not let apps create this for you, so it takes four short steps in Google Cloud (about 5 minutes, free).'),
+    saved ? [
+      h('div', { class: 'row', style: 'margin-bottom:6px' },
+        h('button', { class: 'btn', onclick: (e) => runTest(e.currentTarget) }, 'Test'),
+        h('label', { class: 'inline', style: 'margin-left:auto' }, toggle(g.enabled, (v) => tryApi(async () => { await api('PUT', '/api/auth/google', { enabled: v }); renderSettings(); }, v ? 'Google sign-in on' : 'Google sign-in off')), 'Show on the sign-in page')),
+      result,
+      h('details', {}, h('summary', { class: 'small muted' }, 'Setup steps and addresses'), steps,
+        h('button', { class: 'btn small danger', onclick: () => confirm('Remove Google sign-in? People who only use Google cannot sign in until you set it up again (accounts and links are kept).') && tryApi(async () => { await api('DELETE', '/api/auth/google'); renderSettings(); }, 'Removed') }, 'Remove Google sign-in'))]
+      : [steps, result]);
 }
 
 function loggingCard({ settings, categories }) {

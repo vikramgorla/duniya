@@ -17,6 +17,9 @@ Run AI assistants in your WhatsApp groups, on your own server, managed from a we
 - **People & roles**: pick organizers from a group's member list (group admins pre-selected).
 - **AI helper**: describe a new bot or a change ("shorter replies", "make Ravi an organizer") and review the draft
   before saving.
+- **Sign in with Google** (guided 4-step setup) and invites by email; password sign-in stays.
+- **Backups made easy**: one-click GitHub App, or download a backup and restore it by upload (also on a fresh
+  server's welcome screen).
 - **Several WhatsApp numbers**, groups and 1:1 chats: choose the bot, the model (or Auto) and the logging level per
   chat.
 - **Server page**: CPU, memory, disk, network, logs, OS updates and restart — no SSH needed.
@@ -156,3 +159,10 @@ The release workflow creates the tag and GitHub release, attaches the OCI stack 
 
 
 Design language: [DESIGN.md](DESIGN.md).
+
+### Optional settings (environment)
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PUBLIC_URL` | from the request | Public address of the panel (set by the installer); used for sign-in redirects and the MCP address |
+| `BACKUP_UPLOAD_MAX_MB` | 200 | Largest backup file accepted by "Restore from a file" |
