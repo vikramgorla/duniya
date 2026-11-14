@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Duniya · WhatsApp agents</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2710%27 fill=%27%235a4ff3%27/%3E%3Cellipse cx=%2716%27 cy=%2716%27 rx=%2715%27 ry=%275.5%27 fill=%27none%27 stroke=%27%23ff7a59%27 stroke-width=%272.2%27 transform=%27rotate(-22 16 16)%27/%3E%3C/svg%3E">
-<meta name="theme-color" content="#f5f6fb">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2716%27%20r%3D%273.1%27%20fill%3D%27%23101216%27/%3E%3Ccircle%20cx%3D%2716.00%27%20cy%3D%273.80%27%20r%3D%272.5%27%20fill%3D%27%23ff7a3d%27/%3E%3Cg%20transform%3D%27translate%2816.00%209.40%29%20rotate%280%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%23ff7a3d%27/%3E%3C/g%3E%3Ccircle%20cx%3D%2727.60%27%20cy%3D%2712.23%27%20r%3D%272.5%27%20fill%3D%27%23f2477e%27/%3E%3Cg%20transform%3D%27translate%2822.28%2013.96%29%20rotate%2872%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%23f2477e%27/%3E%3C/g%3E%3Ccircle%20cx%3D%2723.17%27%20cy%3D%2725.87%27%20r%3D%272.5%27%20fill%3D%27%235363ff%27/%3E%3Cg%20transform%3D%27translate%2819.88%2021.34%29%20rotate%28144%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%235363ff%27/%3E%3C/g%3E%3Ccircle%20cx%3D%278.83%27%20cy%3D%2725.87%27%20r%3D%272.5%27%20fill%3D%27%2313b3a1%27/%3E%3Cg%20transform%3D%27translate%2812.12%2021.34%29%20rotate%28216%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%2313b3a1%27/%3E%3C/g%3E%3Ccircle%20cx%3D%274.40%27%20cy%3D%2712.23%27%20r%3D%272.5%27%20fill%3D%27%239bd400%27/%3E%3Cg%20transform%3D%27translate%289.72%2013.96%29%20rotate%28288%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%239bd400%27/%3E%3C/g%3E%3C/svg%3E">
+<meta name="theme-color" content="#f2f1ec">
 <style>
   /* Duniya design language — see DESIGN.md. Base tokens; the Aurora layer at the end overrides them. */
   :root {
@@ -164,80 +164,87 @@
   .choice span { font-size: 13px; color: var(--muted); }
   .row.nowrap > input { flex: 1; }
   @media (max-width: 640px) { main { padding: 14px 12px 40px; } .card { padding: 16px; border-radius: 16px; } .bar { padding: 10px 14px 4px; } }
-  /* ---- Aurora layer (v1.6): vivid gradients, frosted glass, friendly icons. See DESIGN.md. ---- */
+  /* ---- Constellation layer (v1.7): porcelain + ink, one electric signal colour, instrument-panel details. ---- */
   :root {
-    --bg: #f5f6fb; --bg-2: #eceef7; --card: rgba(255,255,255,.74); --card-solid: #ffffff; --ink: #151729; --muted: #5d6178;
-    --line: rgba(21,23,41,.08); --line-2: rgba(21,23,41,.15);
-    --accent: #5a4ff3; --accent-2: #2b86ff; --accent-3: #12b5a6; --accent-4: #ff7a59; --accent-ink: #ffffff; --accent-soft: #eceaff;
-    --grad: linear-gradient(120deg, #7c5cff 0%, #4a6cff 45%, #1fb6c9 100%);
-    --grad-warm: linear-gradient(120deg, #ff8a4c 0%, #ff5e8a 100%);
-    --marigold: #ff7a59; --marigold-soft: #fff0ea;
-    --warn: #a14d00; --warn-soft: #fff1df; --bad: #d2364f; --bad-soft: #ffe8ec; --info: #2160d8; --info-soft: #e7f0ff;
-    --ok: #0f8f7f; --ok-soft: #dcf6f1;
-    --radius: 22px; --radius-s: 14px;
-    --shadow: 0 1px 1px rgba(21,23,41,.04), 0 12px 32px -14px rgba(74,60,200,.22);
-    --glow: 0 8px 22px -8px rgba(90,79,243,.55);
-    --font-display: "Segoe UI Variable Display", "Segoe UI Variable", -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
+    --bg: #f2f1ec; --bg-2: #e8e6df; --card: #ffffff; --card-solid: #ffffff; --ink: #101216; --muted: #5f636c;
+    --line: #e2e0d8; --line-2: #cfccc2;
+    --signal: #c6f432; --signal-ink: #101216; --signal-deep: #4d6b00; --signal-soft: #eef9cc;
+    --accent: #101216; --accent-ink: #ffffff; --accent-soft: #eceae4;
+    --people-1: #ff7a3d; --people-2: #f2477e; --people-3: #13b3a1; --people-4: #5363ff; --people-5: #9bd400;
+    --ok: #3f6b00; --ok-soft: #e9f7c4; --warn: #9a4b00; --warn-soft: #ffeedd; --bad: #c42443; --bad-soft: #ffe6ea; --info: #2c4fd6; --info-soft: #e8edff;
+    --marigold: #ff7a3d; --marigold-soft: #ffeedd;
+    --radius: 16px; --radius-s: 10px;
+    --shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 1px 2px rgba(16,18,22,.04), 0 10px 30px -18px rgba(16,18,22,.25);
+    --glow: 0 0 0 1px rgba(16,18,22,.9), 0 8px 20px -10px rgba(16,18,22,.5);
+    --grid: radial-gradient(rgba(16,18,22,.075) 1px, transparent 1.2px);
+    --font-display: "Segoe UI Variable Display", -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
+    --mono: "SF Mono", ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #0c0e1a; --bg-2: #161a2c; --card: rgba(26,30,50,.72); --card-solid: #1a1e32; --ink: #eef0fb; --muted: #a2a7c2;
-      --line: rgba(255,255,255,.08); --line-2: rgba(255,255,255,.16);
-      --accent: #8f86ff; --accent-ink: #ffffff; --accent-soft: rgba(143,134,255,.16);
-      --marigold: #ff9a76; --marigold-soft: rgba(255,154,118,.14);
-      --warn: #ffc27a; --warn-soft: rgba(255,170,90,.14); --bad: #ff8fa3; --bad-soft: rgba(255,95,130,.15); --info: #8fb8ff; --info-soft: rgba(80,140,255,.15);
-      --ok: #5be0cc; --ok-soft: rgba(40,200,180,.14);
-      --shadow: 0 1px 1px rgba(0,0,0,.3), 0 14px 36px -14px rgba(0,0,0,.6); --glow: 0 8px 24px -8px rgba(124,92,255,.65); }
+    :root { --bg: #0b0c0f; --bg-2: #15171c; --card: #121419; --card-solid: #121419; --ink: #eceef2; --muted: #9196a1;
+      --line: #23262e; --line-2: #343844;
+      --accent: #c6f432; --accent-ink: #101216; --accent-soft: rgba(198,244,50,.12);
+      --ok: #c6f432; --ok-soft: rgba(198,244,50,.12); --warn: #ffb36b; --warn-soft: rgba(255,150,70,.13); --bad: #ff7d93; --bad-soft: rgba(255,80,110,.13); --info: #9fb2ff; --info-soft: rgba(110,140,255,.14);
+      --shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 12px 32px -18px rgba(0,0,0,.8); --glow: 0 0 0 1px rgba(198,244,50,.6), 0 0 22px -6px rgba(198,244,50,.45);
+      --grid: radial-gradient(rgba(255,255,255,.07) 1px, transparent 1.2px); }
   }
-  body {
-    background:
-      radial-gradient(900px 600px at 0% 0%, rgba(124,92,255,.20), transparent 60%),
-      radial-gradient(800px 520px at 100% 0%, rgba(43,134,255,.16), transparent 60%),
-      radial-gradient(900px 700px at 80% 100%, rgba(31,182,201,.14), transparent 60%),
-      radial-gradient(700px 520px at 10% 100%, rgba(255,122,89,.12), transparent 60%),
-      var(--bg);
-    background-attachment: fixed;
-  }
-  h1, h2, h3, .brand, .display, .stat { font-family: var(--font-display); letter-spacing: -0.015em; }
-  .card h2 { font-weight: 650; }
-  header { background: color-mix(in srgb, var(--bg) 62%, transparent); border-bottom: 1px solid var(--line); }
-  .brand { font-weight: 700; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .brand small, .brand .dot { -webkit-text-fill-color: initial; }
-  .brand small { color: var(--muted); }
-  nav { gap: 6px; }
-  nav button { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; }
-  nav button svg { width: 17px; height: 17px; flex: none; opacity: .85; }
-  nav button.on { background: var(--grad); color: #fff; box-shadow: var(--glow); }
+  body { background: var(--grid) 0 0 / 22px 22px fixed, var(--bg); }
+  h1, h2, h3, .brand, .display { font-family: var(--font-display); letter-spacing: -0.02em; }
+  .card h2 { font-weight: 650; font-size: 17px; }
+  header { background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+  .brand { color: var(--ink); background: none; font-weight: 700; letter-spacing: -0.03em; }
+  .brand small { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; }
+  .logo { width: 32px; height: 32px; color: var(--ink); }
+  nav button { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border-radius: 10px; font-size: 14px; }
+  nav button svg { width: 16px; height: 16px; flex: none; opacity: .75; }
+  nav button.on { background: var(--accent); color: var(--accent-ink); box-shadow: none; }
   nav button.on svg { opacity: 1; }
-  .card { background: var(--card); border: 1px solid color-mix(in srgb, #fff 55%, var(--line)); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); }
-  @media (prefers-color-scheme: dark) { .card { border-color: var(--line); } }
-  fieldset { background: color-mix(in srgb, var(--card-solid) 55%, transparent); border-color: var(--line); }
-  .btn.primary, button.btn.primary { background: var(--grad); border: 0; color: #fff; box-shadow: var(--glow); padding: 9px 16px; }
-  .btn.primary:hover { filter: brightness(1.07) saturate(1.1); }
-  .btn { background: color-mix(in srgb, var(--card-solid) 85%, transparent); border-color: var(--line-2); }
-  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  nav button.on::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--signal); margin-left: 2px; box-shadow: 0 0 8px var(--signal); }
+  @media (prefers-color-scheme: dark) { nav button.on::after { background: var(--accent-ink); box-shadow: none; } }
+  .card { background: var(--card); border: 1px solid var(--line); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: var(--shadow); }
+  fieldset { background: color-mix(in srgb, var(--bg) 45%, var(--card)); border-color: var(--line); border-radius: var(--radius-s); }
+  legend { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); font-weight: 600; }
+  .btn, button.btn { border-radius: 10px; background: var(--card); border-color: var(--line-2); font-weight: 550; }
+  .btn:hover { border-color: var(--ink); color: var(--ink); }
+  .btn.primary, button.btn.primary { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); box-shadow: none; padding: 8px 15px; }
+  .btn.primary:hover { box-shadow: var(--glow); filter: none; color: var(--accent-ink); }
   .btn.danger:hover { border-color: var(--bad); color: var(--bad); }
-  input, select, textarea { background: var(--card-solid); border-color: var(--line-2); border-radius: var(--radius-s); }
-  input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
-  .pill.ok { background: var(--ok-soft); color: var(--ok); } .note.ok { background: var(--ok-soft); color: var(--ok); }
-  .pill.info { background: var(--info-soft); color: var(--info); }
-  .note { border: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
-  .dot.ok { background: #16c2a5; box-shadow: 0 0 0 3px rgba(22,194,165,.22); }
-  .stat { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700; }
-  .stat small { -webkit-text-fill-color: var(--muted); }
-  .eyebrow { color: var(--accent); }
-  .meter > i { background: var(--grad); } .meter.hot > i { background: var(--grad-warm); }
-  .spark path.l { stroke: var(--accent); } .spark path.a { fill: color-mix(in srgb, var(--accent) 16%, transparent); }
-  .toggle input:checked + span { background: var(--grad); }
-  .seg { background: color-mix(in srgb, var(--bg-2) 85%, transparent); }
-  .seg button.on { background: var(--card-solid); color: var(--accent); font-weight: 600; box-shadow: 0 1px 3px rgba(21,23,41,.12); }
-  .bubble.me { background: var(--grad); color: #fff; }
-  .number-card { background: color-mix(in srgb, var(--card-solid) 60%, transparent); border-color: var(--line); }
-  .feed li { border-bottom-style: solid; border-bottom-color: var(--line); }
-  .toast { background: #151729; color: #fff; }
-  .hero { position: relative; overflow: hidden; border: 0; color: #fff; background: var(--grad); box-shadow: var(--glow); }
-  .hero::after { content: ""; position: absolute; inset: auto -60px -80px auto; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.35), transparent 65%); }
-  .hero h2, .hero p, .hero .muted { color: #fff; }
-  .hero .muted { opacity: .85; }
+  input, select, textarea { background: var(--card); border-color: var(--line-2); border-radius: var(--radius-s); }
+  input:focus, select:focus, textarea:focus { border-color: var(--ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 55%, transparent); }
+  @media (prefers-color-scheme: dark) { input:focus, select:focus, textarea:focus { border-color: var(--signal); box-shadow: 0 0 0 3px rgba(198,244,50,.18); } }
+  .pill { border-radius: 6px; font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); } .pill.info { background: var(--info-soft); color: var(--info); }
+  .note { border: 0; border-left: 3px solid currentColor; border-radius: 8px; }
+  .note.ok { background: var(--ok-soft); color: var(--ok); }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--muted); }
+  .stat { background: none; color: var(--ink); -webkit-text-fill-color: currentColor; font-family: var(--mono); font-weight: 600; letter-spacing: -0.04em; font-size: 32px; }
+  .stat small { -webkit-text-fill-color: var(--muted); font-family: var(--mono); }
+  th { font-family: var(--mono); letter-spacing: .12em; }
+  .dot { width: 8px; height: 8px; }
+  .dot.ok { background: var(--signal); box-shadow: 0 0 0 3px rgba(198,244,50,.25), 0 0 10px rgba(198,244,50,.8); }
+  @media (prefers-color-scheme: light) { .dot.ok { background: #7fc400; box-shadow: 0 0 0 3px rgba(127,196,0,.2), 0 0 8px rgba(127,196,0,.6); } }
+  .meter { height: 6px; background: var(--bg-2); border-radius: 3px; }
+  .meter > i { background: var(--ink); border-radius: 3px; } .meter.hot > i { background: var(--bad); }
+  @media (prefers-color-scheme: dark) { .meter > i { background: var(--signal); } }
+  .spark path.l { stroke: var(--ink); stroke-width: 1.4; } .spark path.a { fill: color-mix(in srgb, var(--signal) 45%, transparent); }
+  @media (prefers-color-scheme: dark) { .spark path.l { stroke: var(--signal); } .spark path.a { fill: rgba(198,244,50,.12); } }
+  .toggle span { background: var(--line-2); } .toggle input:checked + span { background: var(--ink); }
+  .toggle input:checked + span::after { background: var(--signal); }
+  @media (prefers-color-scheme: dark) { .toggle input:checked + span { background: var(--signal); } .toggle input:checked + span::after { background: #101216; } }
+  .seg { background: var(--bg-2); border-radius: 10px; } .seg button { border-radius: 8px; }
+  .seg button.on { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(16,18,22,.12); }
+  .bubble.me { background: var(--accent); color: var(--accent-ink); }
+  .number-card { background: color-mix(in srgb, var(--bg) 40%, var(--card)); border-color: var(--line); border-radius: var(--radius-s); }
+  pre { background: #0d0f13; color: #d6dae3; }
+  .toast { background: var(--ink); color: var(--bg); border-radius: 10px; font-family: var(--mono); font-size: 13px; }
+  /* status console on Overview */
+  .console { display: grid; grid-template-columns: 1fr auto; gap: 14px 24px; align-items: center; margin-bottom: 16px; }
+  .console h2 { font-size: 26px; margin: 2px 0 0; }
+  .leds { display: flex; gap: 18px; flex-wrap: wrap; justify-content: flex-end; }
+  .led { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .led b { color: var(--ink); font-weight: 600; letter-spacing: .02em; }
+  @media (max-width: 720px) { .console { grid-template-columns: 1fr; } .leds { justify-content: flex-start; } }
+  .ai-chip { display: inline-flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .08em; background: var(--signal); color: var(--signal-ink); border-radius: 5px; padding: 2px 6px; margin-right: 8px; vertical-align: 2px; }
 </style>
 </head>
 <body>
@@ -282,16 +289,17 @@ function icon(name) {
   p.setAttribute('stroke-width', '1.7'); p.setAttribute('stroke-linecap', 'round'); p.setAttribute('stroke-linejoin', 'round');
   svg.append(p); return svg;
 }
-/** Brand mark: a world (teal) with an orbit (marigold) — Duniya means "world". */
+/** Brand mark: five people in a circle, each a different colour, around the world (ink dot). Duniya: a world of people. */
 function logo() {
   const ns = 'http://www.w3.org/2000/svg'; const el = (t, a) => { const e = document.createElementNS(ns, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); return e; };
   const svg = el('svg', { viewBox: '0 0 32 32', class: 'logo', 'aria-hidden': 'true' });
-  const gid = `lg${Math.random().toString(36).slice(2, 8)}`;
-  const defs = el('defs', {}); const lg = el('linearGradient', { id: gid, x1: 0, y1: 0, x2: 1, y2: 1 });
-  lg.append(el('stop', { offset: '0', 'stop-color': '#7c5cff' }), el('stop', { offset: '.55', 'stop-color': '#4a6cff' }), el('stop', { offset: '1', 'stop-color': '#1fb6c9' }));
-  defs.append(lg);
-  svg.append(defs, el('circle', { cx: 16, cy: 16, r: 10, fill: `url(#${gid})` }), el('path', { d: 'M9 13c3 2 9 2 14-1M8.5 19c4 1.6 10 1.6 15-1.5', stroke: 'rgba(255,255,255,.55)', 'stroke-width': 1.2, fill: 'none' }),
-    el('ellipse', { cx: 16, cy: 16, rx: 15, ry: 5.5, fill: 'none', stroke: '#ff7a59', 'stroke-width': 2.2, transform: 'rotate(-22 16 16)' }));
+  svg.append(el('circle', { cx: 16, cy: 16, r: 3.1, fill: 'currentColor' }));
+  ['var(--people-1)', 'var(--people-2)', 'var(--people-4)', 'var(--people-3)', 'var(--people-5)'].forEach((c, i) => {
+    const th = -90 + i * 72; const t = (th * Math.PI) / 180;
+    svg.append(el('circle', { cx: 16 + 12.2 * Math.cos(t), cy: 16 + 12.2 * Math.sin(t), r: 2.5, fill: c }));
+    const g = el('g', { transform: `translate(${16 + 6.6 * Math.cos(t)} ${16 + 6.6 * Math.sin(t)}) rotate(${th + 90})` });
+    g.append(el('path', { d: 'M-3.7 2.2a3.7 3.7 0 0 1 7.4 0z', fill: c })); svg.append(g);
+  });
   return svg;
 }
 function toast(msg) { const t = h('div', { class: 'toast' }, msg); document.body.append(t); setTimeout(() => t.remove(), 3500); }
@@ -381,7 +389,7 @@ async function renderLogin() {
   S.google = !!info.google;
   if (info.authed) { S.user = info.user; return boot(); }
   const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:20px;margin-top:6px' });
-  const brand = () => [h('div', { style: 'display:flex;justify-content:center;margin:4px 0 6px' }, Object.assign(logo(), { style: 'width:52px;height:52px' })),
+  const brand = () => [h('div', { style: 'display:flex;justify-content:center;margin:4px 0 6px' }, Object.assign(logo(), { style: 'width:76px;height:76px' })),
     h('h2', { style: 'text-align:center;font-size:24px;margin-bottom:2px' }, 'Duniya')];
   if (info.needsSetup) return renderSetup(app, brand);
   const user = h('input', { placeholder: 'Username', value: 'admin', autocomplete: 'username' });
@@ -553,10 +561,14 @@ async function renderOverview(soft) {
   const hello = hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
   const live = st.bots.filter((b) => b.enabled).length; const open = numbers.filter((n) => n.status === 'open').length;
   const allGood = !st.settings.paused && open === numbers.length && live > 0;
-  const hero = h('div', { class: 'card hero', style: 'margin-bottom:16px' },
-    h('h2', { style: 'font-size:24px;margin:0 0 4px' }, `${hello}, ${S.user.username}`),
-    h('p', { style: 'margin:0;font-size:15px' }, st.settings.paused ? 'All bots are paused. Turn them back on under Control when you are ready.'
-      : `${live} bot${live === 1 ? '' : 's'} live · WhatsApp ${open}/${numbers.length} connected${st.pending ? ` · ${st.pending} change${st.pending > 1 ? 's' : ''} waiting for confirmation` : ''}${allGood ? ' · everything is running ✨' : ''}`));
+  const led = (label, ok, value) => h('div', { class: 'led' }, h('span', { class: `dot ${ok === true ? 'ok' : ok === false ? 'bad' : 'warn'}` }), label, h('b', {}, value));
+  const hero = h('div', { class: 'card console' },
+    h('div', {}, h('div', { class: 'eyebrow' }, `${hello} · ${S.user.username}`),
+      h('h2', {}, st.settings.paused ? 'All bots are paused' : allGood ? 'Everything is running' : open < numbers.length ? 'A WhatsApp number needs attention' : live ? 'Running, with something to check' : 'No bot is switched on yet')),
+    h('div', { class: 'leds' },
+      led('WhatsApp', open === numbers.length ? true : open ? null : false, `${open}/${numbers.length}`),
+      led('Bots', st.settings.paused ? false : live ? true : null, st.settings.paused ? 'paused' : `${live} live`),
+      led('Waiting', st.pending ? null : true, String(st.pending || 0))));
   $('#main').replaceChildren(hero, h('div', { class: 'grid' }, wa, control, server, recent));
   if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
@@ -777,7 +789,7 @@ async function renderBots() {
     b.needs.length ? h('div', { class: 'note warn' }, `Needs secrets: ${b.needs.join(', ')}`) : null,
     b.missingPlugins.length ? h('div', { class: 'note warn' }, `Missing plugins: ${b.missingPlugins.join(', ')}`) : null,
     h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => openBot(b.id) }, can('admin') ? 'Edit & test' : 'View & test'))));
-  const aiCreate = can('admin') ? await aiHelper({ title: '✨ Create a bot with AI', applyLabel: 'Create this bot',
+  const aiCreate = can('admin') ? await aiHelper({ title: [h('span', { class: 'ai-chip' }, 'AI'), 'Create a bot with AI'], applyLabel: 'Create this bot',
     placeholder: 'Describe the bot in your own words, e.g. “An assistant for our family festival group: answers agenda and menu questions from panduga, replies in English or Telugu, posts tomorrow’s agenda every evening at 8.”',
     onApply: async (r) => { const res = await tryApi(() => api('POST', '/api/bots', { config: r.proposed }), 'Bot created'); if (res) openBot(res.id); } }) : null;
   $('#main').replaceChildren(aiCreate, create, bots.length ? h('div', { class: 'grid' }, cards) : h('p', { class: 'muted' }, 'No bots yet.'));
@@ -820,7 +832,7 @@ async function renderBotEditor(id) {
     };
     const dirty = h('div', { class: 'note warn hide' }, 'Roles changed — click Save at the bottom to apply.');
     peopleBox.replaceChildren(
-      pp.suggested && pp.groups.some((g) => g.members.some((m) => m.suggested)) ? h('div', { class: 'note' }, 'Group admins are pre-selected as organizers. Change anyone you like, then Save.') : null,
+      pp.suggested && pp.groups.some((g) => g.members.some((m) => m.suggested)) ? h('div', { class: 'note' }, 'No roles saved yet, so the group admins (ticked) are this bot’s organizers. Change anyone you like and Save to set roles yourself.') : null,
       dirty,
       pp.groups.length ? pp.groups.map((g) => h('div', { class: 'number-card' },
         h('div', { class: 'row spread' }, h('b', {}, g.name), h('span', { class: 'pill' }, `${g.members.length} members`)),
@@ -1012,7 +1024,7 @@ async function renderBotEditor(id) {
         h('button', { class: 'btn mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openBot(r.id); } }, 'Duplicate'),
         h('button', { class: 'btn danger mut', onclick: async () => { if (confirm(`Delete “${c.name}”? Its group bindings are removed; chat memory stays until erased.`) && await tryApi(() => api('DELETE', `/api/bots/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'bots'; } } }, 'Delete'),
         h('button', { class: 'btn primary mut', onclick: save }, 'Save'))),
-    can('admin') ? await aiHelper({ botId: id, title: '✨ Change this bot with AI', applyLabel: 'Apply & save',
+    can('admin') ? await aiHelper({ botId: id, title: [h('span', { class: 'ai-chip' }, 'AI'), 'Change this bot with AI'], applyLabel: 'Apply & save',
       placeholder: 'What should change? e.g. “Make the replies shorter and friendlier”, “Let participants also see the shopping list”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',
       onApply: async (r) => { const patch = Object.fromEntries(r.changes.map((ch) => [ch.field, ch.after])); if (await tryApi(() => api('PUT', `/api/bots/${encodeURIComponent(id)}`, patch), 'Saved')) renderBotEditor(id); } }) : null,
     h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(340px,1fr));align-items:start' },
@@ -1067,7 +1079,7 @@ async function aiHelper({ botId = '', title, placeholder, applyLabel, onApply })
     try {
       const r = await api('POST', '/api/ai/bot-draft', { botId, request: ask.value, model: model.value });
       out.replaceChildren(
-        h('div', { class: 'note ok' }, h('b', {}, '✨ Draft ready · '), r.summary || `${r.changes.length} change(s)`),
+        h('div', { class: 'note ok' }, h('b', {}, 'Draft ready · '), r.summary || `${r.changes.length} change(s)`),
         r.questions?.length ? h('div', { class: 'note' }, h('b', {}, 'The AI asks: '), r.questions.join(' ')) : null,
         r.changes.length ? r.changes.map((ch) => h('details', { open: ch.field === 'prompt' || r.changes.length <= 3, style: 'margin:8px 0' },
           h('summary', { style: 'cursor:pointer' }, h('b', {}, FIELD_LABEL[ch.field] || ch.field), h('span', { class: 'small muted' }, ' — changed')),
@@ -1080,7 +1092,7 @@ async function aiHelper({ botId = '', title, placeholder, applyLabel, onApply })
           h('button', { class: 'btn', onclick: () => out.replaceChildren() }, 'Discard')));
     } catch (e) { out.replaceChildren(h('div', { class: 'note bad' }, e.message)); }
     go.disabled = false;
-  } }, '✨ Draft');
+  } }, 'Draft');
   return h('div', { class: 'card', style: 'margin-bottom:16px' }, h('h2', {}, title), ask,
     h('div', { class: 'row', style: 'margin-top:8px' }, h('div', { style: 'flex:2' }, model), go), out);
 }

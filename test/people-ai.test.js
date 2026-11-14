@@ -68,3 +68,18 @@ test('016: the helper cannot add local tool services; a model without tool use c
   assert.deepEqual(r.body.proposed.triggers, ['!pd']);
   assert.equal((await t.api(owner, 'POST', '/api/ai/bot-draft', { botId: 'panduga', request: '' })).status, 400);
 });
+
+test('015: while no organizers are saved, group admins ARE organizers (not just pre-ticked)', async () => {
+  await t.api(owner, 'PUT', '/api/bots/panduga', { organizers: [] });
+  t.script.push([{ type: 'text', text: 'hi admin' }], [{ type: 'text', text: 'hi member' }]);
+  await t.route(t.msg({ text: '!panduga hello', phone: '41790000003', senderName: 'Ravi' }));
+  await t.route(t.msg({ text: '!panduga hello', phone: '41790000002', senderName: 'Anu' }));
+  const ins = t.db.listActivity({ limit: 50 }).filter((a) => a.type === 'message.in').slice(0, 2).map((a) => a.summary);
+  assert.ok(ins.some((x) => /^Ravi \(organizer\)/.test(x)), ins.join(' | '));
+  assert.ok(ins.some((x) => /^Anu \(participant\)/.test(x)), ins.join(' | '));
+  // once roles are saved, the saved list decides
+  await t.api(owner, 'PUT', '/api/bots/panduga', { organizers: ['41790000001'] });
+  t.script.push([{ type: 'text', text: 'ok' }]);
+  await t.route(t.msg({ text: '!panduga again', phone: '41790000003', senderName: 'Ravi' }));
+  assert.match(t.db.listActivity({ limit: 5 }).find((a) => a.type === 'message.in').summary, /^Ravi \(participant\)/);
+});

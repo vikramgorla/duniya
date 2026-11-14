@@ -1,6 +1,6 @@
 # Duniya design language
 
-*Duniya* means "the world". The panel should feel bright, friendly and personal: a tool a family-event organiser opens on
+*Duniya* means "the world". The panel should feel futuristic, human and personal: a tool a family-event organiser opens on
 an iPad between two errands, not an enterprise console. This document is the reference for every screen. When you
 add or change UI, check it against the principles and the checklist at the end.
 
@@ -23,33 +23,29 @@ add or change UI, check it against the principles and the checklist at the end.
 7. **Works on a phone and an iPad.** Touch targets ≥ 36 px, horizontal scrolling only inside tab bars and tables,
    no hover-only affordances.
 
-## Visual language — "Aurora" (since v1.6)
+## Visual language — "Constellation" (since v1.7)
 
-Inspired by the friendly, colourful feel of modern AI assistants (e.g. Microsoft Copilot) — **inspiration only**:
-no copied logos, icons, illustrations or brand colours. Our own mark (a world with an orbit) stays.
+Futuristic but human. Inspired by the friendliness of modern AI assistants, **not** a copy of any of them, and
+deliberately not the generic "AI app" look (no purple-blue gradients everywhere, no glass on every surface, no ✨).
 
-| Token | Light | Dark | Use |
-| --- | --- | --- | --- |
-| `--bg` | `#f5f6fb` | `#0c0e1a` | page, under a soft mesh of violet, azure, teal and coral glows |
-| `--card` | white 74 % + blur | `#1a1e32` 72 % + blur | frosted-glass cards |
-| `--ink` / `--muted` | `#151729` / `#5d6178` | `#eef0fb` / `#a2a7c2` | text |
-| `--grad` | violet `#7c5cff` → blue `#4a6cff` → teal `#1fb6c9` | same | primary buttons, active tab, hero, big numbers, meters, toggles |
-| `--grad-warm` | coral `#ff8a4c` → pink `#ff5e8a` | same | "hot" meters, attention |
-| `--accent` | `#5a4ff3` | `#8f86ff` | links, focus rings, selected segments |
-| `--ok` / `--warn` / `--bad` / `--info` | teal / amber / rose / blue (soft backgrounds) | lighter variants | states |
-
-- **Surfaces:** frosted glass cards (backdrop blur, translucent white, hairline light border), 22 px radius, soft
-  violet-tinted shadow; inputs solid, 14 px radius; buttons, tabs, pills fully rounded.
-- **Colour use:** gradients are for the *one* most important thing on screen (primary action, active tab, hero,
-  key number). Everything else stays calm and neutral.
-- **Type:** Segoe UI Variable (Windows) / SF Pro (Apple) / Inter; display weight 600–700 with slight negative
-  tracking; tabular numbers. Big numbers use gradient text.
-- **Icons:** simple 24 px line icons (1.7 px stroke, round caps) next to tab names, drawn by us.
-- **Hero:** Overview opens with a gradient greeting card ("Good afternoon, Vik") that says in one line whether
-  everything is running.
-- **Brand mark:** gradient world (violet→teal) with a coral orbit (`logo()`), also the favicon.
-- **Status:** `pill` / `note` with soft tinted backgrounds; live dots with a halo.
-- **Motion:** 150 ms colour transitions, a small press scale, a spinner for work in progress; nothing else moves.
+- **Mark:** five people in a circle, each a different colour, around the world (an ink dot) — Duniya, a world of
+  people (`logo()`, favicon). The five "people" colours are only used in the mark and in illustrations:
+  `--people-1` saffron `#ff7a3d`, `--people-2` rose `#f2477e`, `--people-3` teal `#13b3a1`, `--people-4` indigo
+  `#5363ff`, `--people-5` lime `#9bd400`.
+- **Ground:** porcelain `#f2f1ec` with a faint 22 px dot grid (dark: near-black `#0b0c0f`); solid white cards
+  (dark `#121419`), hairline borders, a soft shadow; 16 px card radius, 10 px controls.
+- **Ink + one signal:** primary actions and the active tab are **ink** (`#101216`); the single signal colour is
+  electric lime `--signal #c6f432`, used for "live" — the active-tab dot, LED status lights, the knob of an "on"
+  toggle, focus rings, the `AI` chip. In dark mode lime becomes the primary colour.
+- **Instrument details:** labels, pills, table headers and numbers in monospace (uppercase, wide tracking for
+  labels); stats in large mono figures; LED dots with a glow for live state.
+- **Status console:** Overview opens with one sentence about the state ("Everything is running", "A WhatsApp
+  number needs attention") and LEDs for WhatsApp, Bots and Waiting changes.
+- **States:** ok = deep lime, warn = amber, bad = crimson, info = indigo — soft tinted backgrounds with a left rule
+  for notes.
+- **Type:** Segoe UI Variable / SF Pro / Inter for text and headings (tight tracking); SF Mono / Cascadia /
+  JetBrains Mono for labels and numbers.
+- **Motion:** colour transitions, a press scale, a spinner. Nothing else moves.
 
 ## Components (in `src/panel/public/index.html`)
 

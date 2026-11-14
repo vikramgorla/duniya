@@ -25,6 +25,23 @@ function stripTriggers(bot, text) {
   return t.trim();
 }
 
+/**
+ * Role of a sender for a bot. Saved organizers decide; while a bot has none saved, WhatsApp admins of the bot's
+ * groups are its organizers (015: "group admins as the default").
+ */
+export async function resolveRole(bot, msg, channel) {
+  const saved = roleIn(bot, msg.phone);
+  if (saved === 'organizer' || bot.organizers.length || !msg.phone) return saved;
+  const groups = msg.isGroup ? [msg.chat] : bot.chats.filter((c) => !/@(s\.whatsapp\.net|lid)$/.test(c));
+  for (const g of groups) {
+    try {
+      const members = await channel.groupMembers?.(g);
+      if (members?.some((m) => m.admin && m.phone === msg.phone)) return 'organizer';
+    } catch { /* not a member / offline */ }
+  }
+  return 'participant';
+}
+
 /** Pick the bot for a direct message, or null. */
 async function botForDm(msg, channel) {
   // A 1:1 chat an admin assigned to a bot (Chats page) always goes to that bot.
@@ -38,7 +55,7 @@ async function botForDm(msg, channel) {
     : [getBot(numberDefault), getBot(getSettings().defaultDmBot), ...enabled].filter((b) => b?.enabled);
   for (const bot of candidates) {
     if (bot.dm === 'none') continue;
-    const role = roleIn(bot, msg.phone);
+    const role = await resolveRole(bot, msg, channel);
     if (bot.dm === 'anyone' || role === 'organizer') return bot;
     if (bot.dm === 'organizers') continue;
     if (bot.participants.includes(msg.phone)) return bot;
@@ -109,7 +126,7 @@ export function createRouter(channel) {
       });
     }
 
-    const role = bot.hooks.role ? (await bot.hooks.role(msg, bot)) || roleIn(bot, msg.phone) : roleIn(bot, msg.phone);
+    const role = bot.hooks.role ? (await bot.hooks.role(msg, bot)) || await resolveRole(bot, msg, channel) : await resolveRole(bot, msg, channel);
     const isConfirm = /^(confirm|cancel)\s+[a-z0-9]{4}$/i.test(lower);
     const addressed = !msg.isGroup
       || (bot.respondToMentions && (msg.mentioned || msg.replyToBot))
