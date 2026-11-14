@@ -60,6 +60,7 @@ See [docs/deploy/docker.md](docs/deploy/docker.md).
 **Manage an existing deployment:** [open your stacks](https://cloud.oracle.com/resourcemanager/stacks), then pick the stack.
 - *Update the app:* nothing to do in Oracle. The panel updates itself (Settings → Updates).
 - *Update the infrastructure:* **Edit stack**, upload the [latest stack zip](https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip), then **Apply**.
+- *See what the server is doing:* **Observability & Management → Logging → Log groups → whatsapp-agent-duniya-logs** shows the install and app logs. No SSH needed; the first lines appear a few minutes after the VM starts.
 - *Remove everything:* run **Destroy**, then **Delete stack**. Take a backup first if you want to keep your bots.
 
 

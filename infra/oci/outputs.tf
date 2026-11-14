@@ -25,3 +25,8 @@ output "manage_stack_url" {
   description = "Open Resource Manager to update (Edit → new zip → Apply) or remove (Destroy, then Delete) this stack"
   value       = "https://cloud.oracle.com/resourcemanager/stacks?region=${var.region}"
 }
+
+output "logs_url" {
+  description = "Install and app logs in the OCI console (first lines appear a few minutes after the VM starts)"
+  value       = var.enable_logs ? "https://cloud.oracle.com/logging/search?region=${var.region}" : "disabled"
+}

@@ -87,8 +87,8 @@ variable "ssh_public_key" {
 
 variable "ssh_ingress_cidr" {
   type        = string
-  default     = "0.0.0.0/0"
-  description = "CIDR allowed to SSH (key-only login). Narrow it to your IP/32, or empty = no SSH from the internet."
+  default     = ""
+  description = "Optional CIDR allowed to SSH (key-only login), e.g. your IP/32. Empty (default) = SSH closed; use the panel and OCI Logging instead."
 }
 
 variable "repo_url" {
@@ -106,4 +106,10 @@ variable "git_token" {
   default     = ""
   sensitive   = true
   description = "Read-only token, only for a private fork"
+}
+
+variable "enable_logs" {
+  type        = bool
+  default     = true
+  description = "Ship install and app logs to OCI Logging (Observability & Management > Logging > Log groups). Creates a dynamic group and policy."
 }

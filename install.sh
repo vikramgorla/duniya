@@ -212,6 +212,7 @@ EnvironmentFile=$CONF_DIR/app.env
 ExecStart=/usr/bin/node --max-old-space-size=384 --disable-warning=ExperimentalWarning src/index.js
 Restart=always
 RestartSec=5
+SyslogIdentifier=whatsapp-agent-duniya
 MemoryMax=700M
 NoNewPrivileges=true
 ProtectSystem=full
@@ -221,6 +222,24 @@ PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
 EOF
+# Also write app + web server logs to a plain file, so log shippers (e.g. OCI Logging) can tail it. journalctl still works.
+command -v rsyslogd >/dev/null || apt-get install -y -qq rsyslog >/dev/null || true
+if command -v rsyslogd >/dev/null; then
+  cat > /etc/rsyslog.d/30-whatsapp-agent-duniya.conf <<'EOF'
+if $programname == 'whatsapp-agent-duniya' or $programname == 'caddy' or $programname == 'cloudflared' then /var/log/whatsapp-agent-duniya.log
+EOF
+  cat > /etc/logrotate.d/whatsapp-agent-duniya <<'EOF'
+/var/log/whatsapp-agent-duniya.log /var/log/duniya-install.log {
+  weekly
+  rotate 4
+  compress
+  missingok
+  notifempty
+  copytruncate
+}
+EOF
+  systemctl restart rsyslog 2>/dev/null || true
+fi
 systemctl daemon-reload
 systemctl enable -q whatsapp-agent-duniya
 systemctl restart whatsapp-agent-duniya

@@ -162,6 +162,16 @@ resource "oci_core_instance" "app" {
     boot_volume_size_in_gbs = var.boot_volume_gb
   }
 
+  # Oracle Cloud Agent: the "Custom Logs Monitoring" plugin ships the install/app logs to OCI Logging (logging.tf)
+  agent_config {
+    is_monitoring_disabled = false
+    is_management_disabled = false
+    plugins_config {
+      name          = "Custom Logs Monitoring"
+      desired_state = var.enable_logs ? "ENABLED" : "DISABLED"
+    }
+  }
+
   create_vnic_details {
     subnet_id        = oci_core_subnet.public.id
     assign_public_ip = true

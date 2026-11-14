@@ -1,14 +1,14 @@
 title: "WhatsApp agents (whatsapp-agent-duniya)"
 description: "Self-hosted WhatsApp agents with an admin panel, on an Always Free VM."
 schemaVersion: 1.1.0
-version: "1.0.2"
+version: "1.0.3"
 locale: "en"
 
 variableGroups:
   - title: "Admin panel"
     variables: [exposure, domain, cf_tunnel_token, admin_password, update_mode]
   - title: "Virtual machine"
-    variables: [shape, a1_ocpus, a1_memory_gb, boot_volume_gb, ssh_public_key, ssh_ingress_cidr]
+    variables: [shape, a1_ocpus, a1_memory_gb, boot_volume_gb, ssh_public_key, ssh_ingress_cidr, enable_logs]
   - title: "Source"
     visible: false
     variables: [repo_url, branch, git_token, name]
@@ -78,10 +78,14 @@ variables:
     required: false
   ssh_ingress_cidr:
     type: string
-    title: "Allow SSH from (CIDR; key-only login)"
-    description: "Default allows SSH from anywhere with your key. Narrow to your IP, e.g. 203.0.113.4/32, or clear to block SSH."
-    default: "0.0.0.0/0"
+    title: "Allow SSH from (optional)"
+    description: "Leave empty to keep SSH closed (recommended; see logs under Observability & Management > Logging). To open it, enter your IP, e.g. 203.0.113.4/32 (key-only login)."
     required: false
+  enable_logs:
+    type: boolean
+    title: "Send logs to OCI Logging"
+    description: "See install and app logs under Observability & Management > Logging, without SSH. Creates a dynamic group and policy (needs admin rights)."
+    default: true
   tenancy_ocid:
     type: string
   region:
