@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-agent-duniya",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "private": true,
   "description": "Self-hosted WhatsApp agent platform: many Claude-powered bots on one number, MCP tools, admin panel.",
   "type": "module",

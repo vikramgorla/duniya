@@ -10,6 +10,8 @@ LOG=/var/log/duniya-install.log
 exec > >(tee -a "$LOG") 2>&1
 set -a; . /etc/duniya/bootstrap.env; set +a
 export DEBIAN_FRONTEND=noninteractive
+# Ubuntu 24.04's needrestart restarts services after apt installs; during setup only list, never restart.
+export NEEDRESTART_MODE=l NEEDRESTART_SUSPEND=1
 
 # ---------- live progress page on port 80 ----------
 STATUS_DIR=/run/duniya-status
@@ -86,9 +88,28 @@ HTML
 done
 RENDER
   chmod 755 /usr/local/sbin/duniya-status-render
+  # Runtime units (gone after a reboot) with Restart=always: if Ubuntu's needrestart or anything else restarts or
+  # kills them while packages install, systemd brings the page straight back.
   systemctl stop duniya-status-page duniya-status-render 2>/dev/null || true
-  systemd-run -q --unit=duniya-status-render /usr/local/sbin/duniya-status-render "$1" || true
-  systemd-run -q --unit=duniya-status-page python3 -m http.server 80 --bind 0.0.0.0 --directory "$STATUS_DIR" || true
+  install -d /run/systemd/system
+  cat > /run/systemd/system/duniya-status-render.service <<UNIT
+[Unit]
+Description=whatsapp-agent-duniya install progress (renderer)
+[Service]
+ExecStart=/usr/local/sbin/duniya-status-render "$1"
+Restart=always
+RestartSec=2
+UNIT
+  cat > /run/systemd/system/duniya-status-page.service <<UNIT
+[Unit]
+Description=whatsapp-agent-duniya install progress page on port 80
+[Service]
+ExecStart=/usr/bin/python3 -m http.server 80 --bind 0.0.0.0 --directory $STATUS_DIR
+Restart=always
+RestartSec=2
+UNIT
+  systemctl daemon-reload
+  systemctl restart duniya-status-render duniya-status-page || true
 }
 
 open_web_ports() { # OCI Ubuntu images REJECT everything but SSH in iptables

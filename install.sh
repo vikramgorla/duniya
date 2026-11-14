@@ -129,6 +129,7 @@ EOF
 [ "$ASSUME_YES" -eq 1 ] || [ "$(ask 'Continue? (y/n)' y)" = "y" ] || die "Cancelled"
 
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=l NEEDRESTART_SUSPEND=1  # don't let needrestart restart services in the middle of the install
 # On a fresh cloud VM, unattended-upgrades holds the apt lock for several minutes after boot; wait instead of failing.
 echo 'DPkg::Lock::Timeout "1200";' > /etc/apt/apt.conf.d/90duniya-wait-for-lock
 trap 'echo "whatsapp-agent-duniya install FAILED at line $LINENO (see output above)" >&2' ERR
@@ -314,12 +315,23 @@ EOF
     fi
   fi
   install -d -m 0755 /etc/caddy
+  # Visiting the server's bare IP (e.g. the install-progress address http://<ip>/) forwards to the real panel
+  # address; https on a bare IP can't have a certificate, so Caddy's default redirect would end in an error.
+  SERVER_IP="$(public_ip || true)"
   cat > /etc/caddy/Caddyfile <<EOF
 $HOSTNAME_PUBLIC {
 	encode gzip
 	reverse_proxy 127.0.0.1:$PORT
 }
 EOF
+  if [ -n "$SERVER_IP" ] && [ "$SERVER_IP" != "$HOSTNAME_PUBLIC" ]; then
+    cat >> /etc/caddy/Caddyfile <<EOF
+
+http://$SERVER_IP {
+	redir https://$HOSTNAME_PUBLIC{uri} 302
+}
+EOF
+  fi
   open_web_ports
   systemctl enable -q caddy && systemctl reload-or-restart caddy
   systemctl disable -q --now cloudflared 2>/dev/null || true
