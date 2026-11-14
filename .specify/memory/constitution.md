@@ -16,10 +16,12 @@ ban risk that conservative behaviour keeps small.
 ### II. Generic Core, Bots as Plugins
 
 The deployment is a generic multi-bot platform. Core code (`src/core`, `src/channels`, `src/panel`)
-MUST NOT contain bot-specific names, prompts, tools or business rules. Each bot MUST live in its own
-folder under `bots/<id>/` and be fully described by declarative config (`bot.json`), a prompt, and
-optional code hooks (local tools, message hooks, role logic). Adding a bot MUST NOT require changes to
-core code. Channels MUST sit behind a small interface so channels other than WhatsApp can be added.
+MUST NOT contain bot-specific names, prompts, tools or business rules. Bots are data: they MUST be
+created, edited, exported and imported from the admin panel and be fully described by a validated
+configuration (instructions, tool services, per-role rules, confirmation, schedules, memory). Templates
+(`templates/`) and optional code plugins (`plugins/<name>/`) are files; no bot may require code changes.
+Data models MUST carry a tenant identifier so hosted multi-tenancy can be added later. Channels MUST sit
+behind a small interface so channels other than WhatsApp can be added.
 
 *Rationale*: panduga.ch is the first bot, not the product; the platform must host other bots (e.g.
 carpool) without forks.
@@ -54,12 +56,13 @@ and see channel health from the panel without shell access.
 
 ### VI. Free-Tier, Everything as Code
 
-All infrastructure MUST be declared in this repository (Terraform + GitHub Actions + cloud-init) and
-reproducible from GitHub alone. The default target is an OCI Always Free `VM.Standard.E2.1.Micro`
-(1 GB RAM): the running service MUST stay under 400 MB RSS in normal operation and MUST NOT need
-native build toolchains. The VM MUST expose no inbound ports by default; the panel is reached through
-a Cloudflare Tunnel or SSH port-forward. Code updates MUST be possible in place without rebuilding
-infrastructure.
+Every supported deployment path (one-command installer, Docker, OCI Resource Manager stack, Terraform +
+GitHub Actions) MUST be declared in this repository and use the same installer logic. The service MUST
+run on a 1 GB VM (e.g. OCI Always Free `VM.Standard.E2.1.Micro`): under 400 MB RSS in normal operation and
+no native build toolchains. The app MUST bind to localhost; inbound exposure is the operator's explicit
+choice (direct HTTPS on 80/443 via a local proxy, Cloudflare Tunnel, or none), and no other ports are opened.
+OCI and Cloudflare are examples, not requirements. Code updates MUST be possible in place (panel or
+installer) without rebuilding infrastructure, and MUST keep all data.
 
 *Rationale*: zero hosting cost, no hand-configured servers, minimal attack surface.
 
@@ -86,7 +89,10 @@ confirmation, routing) verifiable on every push.
   HTML, and it MUST NOT be able to change roles, tool permissions or configuration.
 - Bots MUST NOT post personal details (phone numbers, emails, health or payment details) in group
   chats; such answers belong in direct messages.
-- The service MUST run as an unprivileged system user with systemd hardening.
+- The service MUST run as an unprivileged system user with systemd hardening (or as a non-root container user).
+- Model access MUST respect provider terms: Anthropic via API keys only (no Claude subscription OAuth);
+  ChatGPT plans only through OpenAI's official Sign in with ChatGPT flow. Provider credentials are secrets.
+- Backups MUST be encrypted with an owner passphrase before leaving the server.
 
 ## Development Workflow
 
@@ -94,7 +100,7 @@ confirmation, routing) verifiable on every push.
   → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` → `/speckit-implement` →
   `/speckit-converge` until converged.
 - Stack: Node.js 22 LTS (ES modules), built-in `node:sqlite`, `node:test`; dependencies limited to
-  Baileys, the Anthropic SDK, the MCP SDK, pino and qrcode. New runtime dependencies need a stated
+  Baileys, the Anthropic SDK, the MCP SDK, pino and qrcode (other providers via `fetch`). New runtime dependencies need a stated
   reason in the plan.
 - Live operator settings (bot toggles, organizers, chats, schedules, secrets) live in the data
   directory and MUST survive code updates; repository files hold defaults only.
@@ -110,4 +116,4 @@ principle removed or redefined; MINOR: principle or section added or materially 
 clarification), and reviewed in a pull request. Reviewers verify constitution compliance for every
 change.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-14
+**Version**: 1.1.0 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-14

@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-14
 
-**Status**: Implemented
+**Status**: Implemented; superseded in part by [008](../008-install-and-exposure/spec.md) (one installer, optional Cloudflare, OCI as an example)
 
 **Input**: User description: "Set up everything in OCI; code must be on GitHub; infrastructure as code from
 GitHub — I can create an API key. Can it run on an Oracle always-free VM? Can it be VM.Standard.E2.1.Micro?

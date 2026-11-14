@@ -1,6 +1,6 @@
 # Quickstart: Free-Tier Deployment from GitHub
 
-Full operator guide: [docs/SETUP.md](../../docs/SETUP.md).
+Operator guide (now an advanced example): [docs/deploy/terraform-github-actions.md](../../docs/deploy/terraform-github-actions.md). Terraform moved to `infra/oci/` (feature 008).
 
 ## Local validation
 

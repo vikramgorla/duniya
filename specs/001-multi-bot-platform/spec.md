@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-14
 
-**Status**: Implemented
+**Status**: Implemented (bot storage superseded by [005](../005-app-managed-bots/spec.md): bots are now data in the app)
 
 **Input**: User description: "I have panduga.ch which also has an MCP server; this is a multi-family event we
 are organizing. I want an agent in a WhatsApp group helping organizers and participants. I don't want

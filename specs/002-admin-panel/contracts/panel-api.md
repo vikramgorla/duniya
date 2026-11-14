@@ -34,5 +34,5 @@ All endpoints except `GET /`, `GET /healthz`, `GET /api/session` and `POST /api/
 | POST | `/api/whatsapp/pair` | `{ phone }` | `{ code }` |
 | POST | `/api/whatsapp/logout` | | `{ ok }` |
 | POST | `/api/whatsapp/restart` | | `{ ok }` |
-| POST | `/api/system/update` | | `{ code, log }` then process restarts if code 0 |
+| POST | `/api/updates/apply` | | `{ code, log }` then restarts (owner; see feature 008) |
 | POST | `/api/system/restart` | | `{ ok }` then restarts |
