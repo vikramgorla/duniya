@@ -158,7 +158,7 @@ const tryApi = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toa
 const ago = (ts) => { const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s / 60)}m` : s < 86400 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`; };
 const time = (ts) => (ts ? new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
-const TYPE_CLASS = { 'message.in': 'info', 'message.out': 'ok', 'tool.call': '', 'tool.error': 'bad', error: 'bad', 'confirm.created': 'warn', 'confirm.applied': 'ok', 'confirm.cancelled': 'warn', 'channel.status': 'info', 'schedule.run': 'info', 'bot.updated': '', 'bot.created': 'ok', 'bot.deleted': 'warn', system: '', 'memory.summary': 'info', 'memory.history': '', 'memory.note.added': 'ok', 'memory.note.removed': 'warn', 'memory.erased': 'bad', 'model.usage': '', 'backup.done': 'ok', 'backup.restore': 'warn', 'backup.settings': '' };
+const TYPE_CLASS = { 'message.in': 'info', 'message.out': 'ok', 'tool.call': '', 'tool.error': 'bad', error: 'bad', 'confirm.created': 'warn', 'confirm.applied': 'ok', 'confirm.cancelled': 'warn', 'channel.status': 'info', 'schedule.run': 'info', 'bot.updated': '', 'bot.created': 'ok', 'bot.deleted': 'warn', system: '', 'memory.summary': 'info', 'memory.history': '', 'memory.note.added': 'ok', 'memory.note.removed': 'warn', 'memory.erased': 'bad', 'model.usage': '', 'backup.done': 'ok', 'backup.restore': 'warn', 'backup.settings': '', 'mcp.call': 'info', 'mcp.register': '' };
 function toggle(checked, onchange, disabled) { return h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked, disabled: disabled || !can('admin'), onchange: (e) => onchange(e.target.checked) }), h('span')); }
 // replaceChildren/append would print null/false as text; drop them everywhere.
 for (const fn of ['replaceChildren', 'append']) {
@@ -940,7 +940,7 @@ async function renderSecrets() {
 
 // ---------- settings ----------
 async function renderSettings() {
-  const [bots, lg] = await Promise.all([api('GET', '/api/bots'), api('GET', '/api/logging').catch(() => null)]);
+  const [bots, lg, ai] = await Promise.all([api('GET', '/api/bots'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null)]);
   const cur = h('input', { type: 'password', placeholder: 'current', autocomplete: 'current-password' });
   const next = h('input', { type: 'password', placeholder: 'new (12+ characters)', autocomplete: 'new-password' });
   const cards = [
@@ -949,6 +949,7 @@ async function renderSettings() {
     h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default bot for DMs without a trigger'),
       h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmBot: e.target.value }), 'Saved') },
         h('option', { value: '' }, '— first bot that accepts the sender —'), bots.map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmBot === b.id }, b.name)))),
+    ai ? assistantsCard(ai) : null,
     lg ? loggingCard(lg) : null,
     h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any bot can send:'),
       h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups'))),
@@ -968,6 +969,35 @@ async function renderSettings() {
         un, ue, ur, up, h('button', { class: 'btn primary' }, 'Add user'))));
   }
   $('#main').replaceChildren(h('div', { class: 'grid' }, cards));
+}
+
+// ---------- Connected AI assistants (017) ----------
+function copyButton(text) {
+  return h('button', { class: 'btn', type: 'button', onclick: async (e) => {
+    try { await navigator.clipboard.writeText(text); e.target.textContent = 'Copied ✓'; setTimeout(() => { e.target.textContent = 'Copy'; }, 1500); } catch { toast('Select the address and copy it'); }
+  } }, 'Copy');
+}
+function assistantsCard(a) {
+  const url = h('input', { value: a.mcpUrl, readonly: true, 'aria-label': 'Address for AI assistants', onfocus: (e) => e.target.select() });
+  const steps = (title, items) => h('details', {}, h('summary', { style: 'cursor:pointer;font-weight:600;margin:10px 0 4px' }, title), h('ol', { class: 'small', style: 'margin:6px 0 0;padding-left:20px' }, items.map((x) => h('li', { style: 'margin:3px 0' }, x))));
+  const others = a.grants.some((g) => g.userId !== a.you);
+  const revoke = (g) => confirm(`Disconnect ${g.clientName}${g.userId !== a.you ? ` (${g.username})` : ''}? It stops working right away. You can connect it again later.`)
+    && tryApi(async () => { await api('DELETE', `/api/assistants/${g.userId}/${encodeURIComponent(g.clientId)}`); renderSettings(); }, 'Disconnected');
+  return h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Connected AI assistants'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Manage this app by chatting with ChatGPT or Claude: “which bots are on?”, “turn off the carpool bot”, “what happened in the Panduga group today?”. The assistant signs in as you and can do what your account can do.'),
+    a.https ? null : h('div', { class: 'note warn' }, 'This address only works on this network. ChatGPT and Claude need the public https address of this app: set up internet access first (Caddy or Cloudflare, see the install guide), then open the panel at that address and come back here.'),
+    h('label', {}, 'Address to paste in your assistant'), h('div', { class: 'row nowrap' }, url, copyButton(a.mcpUrl)),
+    steps('ChatGPT', ['In ChatGPT open Settings → Apps & Connectors → Advanced settings and turn on Developer mode.', 'Go back to Apps & Connectors and click Create. Name it “Duniya”, paste the address above as the MCP server URL, choose OAuth, and click Create.', 'A Duniya page opens: sign in if asked, check what it may do, and click Approve.', 'In a new chat, turn on the Duniya connector (+ → Developer mode) and ask away.']),
+    steps('Claude', ['In Claude open Settings → Connectors and click Add custom connector.', 'Name it “Duniya”, paste the address above as the remote MCP server URL, and click Add.', 'Click Connect. A Duniya page opens: sign in if asked, check what it may do, and click Approve.']),
+    h('div', { class: 'note' }, h('b', {}, `With your ${S.user.role} account an assistant can: `), a.abilities.join('. '), '. ',
+      S.user.role === 'viewer' ? '' : 'Risky actions (deleting a bot, erasing memory, changing secrets or users, restoring a backup, updates, restarts) always ask for a second confirmation.'),
+    h('h3', {}, 'Connected'),
+    a.grants.length ? h('table', {}, h('tbody', {}, a.grants.map((g) => h('tr', {},
+      h('td', {}, h('b', {}, g.clientName), g.redirectHost ? h('div', { class: 'small muted' }, g.redirectHost) : null),
+      others ? h('td', {}, g.username, ' ', h('span', { class: 'pill' }, g.role)) : null,
+      h('td', { class: 'small muted' }, `connected ${ago(g.connectedAt)} ago`, h('br'), g.lastUsedAt ? `last used ${ago(g.lastUsedAt)} ago` : 'not used yet'),
+      h('td', { style: 'text-align:right' }, h('button', { class: 'btn small danger', onclick: () => revoke(g) }, 'Disconnect'))))))
+      : h('p', { class: 'small muted' }, 'No AI assistants connected yet. Follow the steps above; it takes about a minute.'));
 }
 
 function loggingCard({ settings, categories }) {

@@ -1,0 +1,21 @@
+# Tasks: Admin MCP Server
+
+- [X] T001 Research the MCP authorization spec, client behaviour and SameSite consent flow (research.md)
+- [X] T002 Move `clientIp` / `isHttps` / `cookie` to `src/panel/http-util.js`; add `baseUrl`, `minuteLimiter`
+- [X] T003 `src/core/admin-oauth.js`: tables, registration, codes + PKCE, tokens (hashed), refresh rotation + reuse detection, revocation, grants, confirm codes
+- [X] T004 Clean grants/tokens when a user is deleted (`onUserDeleted` in store.js)
+- [X] T005 Metadata endpoints (RFC 9728, RFC 8414) and CORS for MCP/OAuth endpoints only
+- [X] T006 Consent page: same-site reload, sign-in form, abilities by role, Approve/Deny, CSRF, CSP
+- [X] T007 Token and revocation endpoints; resource binding
+- [X] T008 `/mcp` stateless Streamable HTTP with the SDK `Server`; 401 + `WWW-Authenticate`; 405 for GET/DELETE; 60/min per token
+- [X] T009 `invoke` / `routeRole` in `startPanel`; dispatcher hook before route matching
+- [X] T010 Tool catalogue (`src/panel/admin-tools.js`) covering every panel area; role from routes; hidden when not allowed
+- [X] T011 Risky tools: preview + confirm code; `confirm_action`
+- [X] T012 Activity: `mcp` category, `mcp.call` per call (masked secrets), `config` for grants/revokes/reuse, `confirm.*`
+- [X] T013 Activity filter by chat (`listActivity`, `/api/activity?chat=`)
+- [X] T014 Panel API `/api/assistants` (list, disconnect)
+- [X] T015 Settings card "Connected AI assistants" (address + Copy, ChatGPT/Claude steps, abilities, list, Disconnect)
+- [X] T016 E2E test `test/admin-mcp.test.js` (SDK OAuth helpers + MCP client)
+- [X] T017 README section; spec artifacts
+- [X] T018 DESIGN.md checklist: consent, sign-in and Settings card checked in light/dark on phone and desktop (headless Chrome)
+- [ ] T019 Manual check with real ChatGPT and Claude connectors against a public deployment

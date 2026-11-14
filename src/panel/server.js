@@ -32,6 +32,8 @@ function guardLocal(user, before, after) {
     throw Object.assign(new Error('Only the owner can add or change local tool services (they run code on this server)'), { status: 403 });
   }
 }
+import { clientIp, isHttps, cookie } from './http-util.js';
+import { createAdminMcp } from './admin-mcp.js';
 import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES } from '../core/mcp-oauth.js';
 
 const PUBLIC = resolve(import.meta.dirname, 'public');
@@ -59,16 +61,6 @@ export function bootstrapAuth() {
 }
 
 // ---------- helpers ----------
-// Forwarded headers are only trusted when a local proxy (Caddy, cloudflared) is configured (TRUST_PROXY=1).
-const clientIp = (req) => (env.trustProxy
-  ? req.headers['cf-connecting-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress
-  : req.socket.remoteAddress) || '';
-const isHttps = (req) => (env.trustProxy && (req.headers['x-forwarded-proto'] === 'https' || !!req.headers['cf-visitor']?.includes('https')))
-  || !!req.socket.encrypted;
-function cookie(req, name) {
-  const m = (req.headers.cookie || '').match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
-  return m ? decodeURIComponent(m[1]) : null;
-}
 function send(res, status, body, headers = {}) {
   const isObj = typeof body !== 'string' && !Buffer.isBuffer(body);
   res.writeHead(status, {
@@ -176,7 +168,7 @@ export function startPanel({ channel, extend = [] }) {
   });
 
   // ---------- activity ----------
-  route('GET', '/api/activity', async (req, res, body, q) => listActivity({ limit: q.get('limit'), bot: q.get('bot') || '', before: Number(q.get('before') || 0) }));
+  route('GET', '/api/activity', async (req, res, body, q) => listActivity({ limit: q.get('limit'), bot: q.get('bot') || '', chat: q.get('chat') || '', before: Number(q.get('before') || 0) }));
   route('GET', '/api/events', async (req, res) => {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive', 'x-accel-buffering': 'no' });
     res.write('retry: 3000\n\n');
@@ -436,6 +428,41 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
   // Other features (providers, backups, updates) add their routes with the same role gates.
   for (const fn of [].concat(extend)) fn(route, { channel });
 
+  // ---------- admin MCP for AI assistants (017) ----------
+  // Tools run these same route handlers in-process as the approving user, with the same role gates.
+  const findRoute = (method, pathname) => routes.find((x) => x.method === method && x.re.test(pathname));
+  const routeRole = (method, path) => {
+    const r = findRoute(method, new URL(path, 'http://x').pathname);
+    return r ? (r.public ? 'viewer' : r.role) : null; // null: that feature's routes are not mounted
+  };
+  async function invoke(user, method, path, body = {}, { host = '' } = {}) {
+    const url = new URL(path, 'http://x');
+    const r = findRoute(method, url.pathname);
+    if (!r) throw Object.assign(new Error('Not found'), { status: 404 });
+    if (!r.public && ROLE_RANK[user.role] < ROLE_RANK[r.role]) {
+      throw Object.assign(new Error(user.role === 'viewer' ? 'Read-only account' : `Requires ${r.role} role`), { status: 403 });
+    }
+    const req = { method, url: path, headers: { host, 'content-type': 'application/json' }, socket: { remoteAddress: 'mcp' }, on() {} };
+    const chunks = [];
+    const res = {
+      statusCode: 200, headersSent: false, setHeader() {}, on() {},
+      writeHead(status) { this.statusCode = status; this.headersSent = true; return this; },
+      write(c) { chunks.push(Buffer.from(c)); return true; },
+      end(c) { if (c) chunks.push(Buffer.from(c)); },
+    };
+    let out = await r.handler(req, res, body ?? {}, url.searchParams, url.pathname.match(r.re).groups || {}, user);
+    let status = 200;
+    if (out === null) {
+      status = res.statusCode;
+      const text = Buffer.concat(chunks).toString('utf8');
+      try { out = JSON.parse(text); } catch { out = text; }
+    } else if (Array.isArray(out) && typeof out[0] === 'number' && out.length === 2) [status, out] = out;
+    if (status >= 400) throw Object.assign(new Error(out?.error || `Failed (${status})`), { status });
+    return out ?? { ok: true };
+  }
+  const adminMcp = createAdminMcp({ invoke, routeRole });
+  adminMcp.panelRoutes(route);
+
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     try {
@@ -443,6 +470,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
         return send(res, 200, readFileSync(resolve(PUBLIC, 'index.html')), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
       }
       if (url.pathname === '/healthz') return send(res, 200, 'ok');
+      if (await adminMcp.handle(req, res, url)) return;
       const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));
       if (!r) return send(res, 404, { error: 'Not found' });
       let user = null;
