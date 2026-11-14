@@ -1,7 +1,7 @@
 title: "WhatsApp agents (whatsapp-agent-duniya)"
 description: "Self-hosted WhatsApp agents with an admin panel, on an Always Free VM."
 schemaVersion: 1.1.0
-version: "1.0.1"
+version: "1.0.2"
 locale: "en"
 
 variableGroups:
@@ -78,7 +78,9 @@ variables:
     required: false
   ssh_ingress_cidr:
     type: string
-    title: "Allow SSH from (optional CIDR, e.g. 203.0.113.4/32)"
+    title: "Allow SSH from (CIDR; key-only login)"
+    description: "Default allows SSH from anywhere with your key. Narrow to your IP, e.g. 203.0.113.4/32, or clear to block SSH."
+    default: "0.0.0.0/0"
     required: false
   tenancy_ocid:
     type: string

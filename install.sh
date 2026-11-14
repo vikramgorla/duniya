@@ -129,6 +129,9 @@ EOF
 [ "$ASSUME_YES" -eq 1 ] || [ "$(ask 'Continue? (y/n)' y)" = "y" ] || die "Cancelled"
 
 export DEBIAN_FRONTEND=noninteractive
+# On a fresh cloud VM, unattended-upgrades holds the apt lock for several minutes after boot; wait instead of failing.
+echo 'DPkg::Lock::Timeout "1200";' > /etc/apt/apt.conf.d/90duniya-wait-for-lock
+trap 'echo "whatsapp-agent-duniya install FAILED at line $LINENO (see output above)" >&2' ERR
 
 # ---------- swap for small machines ----------
 MEM_MB=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)

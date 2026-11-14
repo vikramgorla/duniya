@@ -87,8 +87,8 @@ variable "ssh_public_key" {
 
 variable "ssh_ingress_cidr" {
   type        = string
-  default     = ""
-  description = "Optional CIDR allowed to SSH (e.g. your IP/32). Empty = no SSH from the internet."
+  default     = "0.0.0.0/0"
+  description = "CIDR allowed to SSH (key-only login). Narrow it to your IP/32, or empty = no SSH from the internet."
 }
 
 variable "repo_url" {
