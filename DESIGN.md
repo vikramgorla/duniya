@@ -1,6 +1,6 @@
 # Duniya design language
 
-*Duniya* means "the world". The panel should feel calm, warm and personal: a tool a family-event organiser opens on
+*Duniya* means "the world". The panel should feel bright, friendly and personal: a tool a family-event organiser opens on
 an iPad between two errands, not an enterprise console. This document is the reference for every screen. When you
 add or change UI, check it against the principles and the checklist at the end.
 
@@ -23,33 +23,33 @@ add or change UI, check it against the principles and the checklist at the end.
 7. **Works on a phone and an iPad.** Touch targets ≥ 36 px, horizontal scrolling only inside tab bars and tables,
    no hover-only affordances.
 
-## Visual language
+## Visual language — "Aurora" (since v1.6)
+
+Inspired by the friendly, colourful feel of modern AI assistants (e.g. Microsoft Copilot) — **inspiration only**:
+no copied logos, icons, illustrations or brand colours. Our own mark (a world with an orbit) stays.
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
-| `--bg` | `#f7f3ec` warm paper | `#11131c` night | page |
-| `--card` | `#fffdf9` | `#1a1d2a` | cards, inputs |
-| `--ink` | `#1c2030` | `#ece9e2` | text |
-| `--muted` | `#6d6a73` | `#9a98a3` | secondary text |
-| `--accent` | `#0b7a75` peacock teal | `#3cc4b7` | primary actions, active tab, success |
-| `--marigold` | `#e39b2d` | `#f2b553` | highlights, brand orbit, warnings |
-| `--bad` | `#b53a4e` | `#f08a9b` | errors, destructive actions |
-| `--info` | `#2f5fb3` | `#8db3f5` | neutral notes |
+| `--bg` | `#f5f6fb` | `#0c0e1a` | page, under a soft mesh of violet, azure, teal and coral glows |
+| `--card` | white 74 % + blur | `#1a1e32` 72 % + blur | frosted-glass cards |
+| `--ink` / `--muted` | `#151729` / `#5d6178` | `#eef0fb` / `#a2a7c2` | text |
+| `--grad` | violet `#7c5cff` → blue `#4a6cff` → teal `#1fb6c9` | same | primary buttons, active tab, hero, big numbers, meters, toggles |
+| `--grad-warm` | coral `#ff8a4c` → pink `#ff5e8a` | same | "hot" meters, attention |
+| `--accent` | `#5a4ff3` | `#8f86ff` | links, focus rings, selected segments |
+| `--ok` / `--warn` / `--bad` / `--info` | teal / amber / rose / blue (soft backgrounds) | lighter variants | states |
 
-- **Background:** paper with two soft glows (teal top-left, marigold top-right). Never a flat grey.
-- **Type:** system UI font for text; rounded display font (`ui-rounded` / SF Pro Rounded) for the brand, headings and
-  big numbers. Numbers use tabular figures. Sizes: page text 15 px, small 13 px, card titles 17 px, stats 30 px.
-- **Shape:** cards 18 px radius with a hairline border and a soft shadow; inputs 12 px; buttons, tabs, pills and
-  segmented controls are fully rounded.
-- **Brand mark:** a teal world with a marigold orbit (`logo()` in the panel). Used in the header, login and favicon.
-- **Header:** sticky, translucent with blur; brand + WhatsApp status dot on the left, user on the right; tabs are
-  pills below, the active tab filled with the accent.
-- **Status:** `pill ok/warn/bad/info` for short states; `note ok/warn/bad/info` for a sentence about the state;
-  coloured dots with a halo for live connection state.
-- **Data:** stat tiles (eyebrow label, big number, one muted line, optional meter and sparkline). Meters turn
-  marigold→red above 85 %.
-- **Motion:** 150 ms colour transitions, a small press scale on buttons, a spinner for work in progress. Nothing
-  else moves.
+- **Surfaces:** frosted glass cards (backdrop blur, translucent white, hairline light border), 22 px radius, soft
+  violet-tinted shadow; inputs solid, 14 px radius; buttons, tabs, pills fully rounded.
+- **Colour use:** gradients are for the *one* most important thing on screen (primary action, active tab, hero,
+  key number). Everything else stays calm and neutral.
+- **Type:** Segoe UI Variable (Windows) / SF Pro (Apple) / Inter; display weight 600–700 with slight negative
+  tracking; tabular numbers. Big numbers use gradient text.
+- **Icons:** simple 24 px line icons (1.7 px stroke, round caps) next to tab names, drawn by us.
+- **Hero:** Overview opens with a gradient greeting card ("Good afternoon, Vik") that says in one line whether
+  everything is running.
+- **Brand mark:** gradient world (violet→teal) with a coral orbit (`logo()`), also the favicon.
+- **Status:** `pill` / `note` with soft tinted backgrounds; live dots with a halo.
+- **Motion:** 150 ms colour transitions, a small press scale, a spinner for work in progress; nothing else moves.
 
 ## Components (in `src/panel/public/index.html`)
 

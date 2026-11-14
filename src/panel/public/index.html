@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Duniya · WhatsApp agents</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2710%27 fill=%27%230b7a75%27/%3E%3Cellipse cx=%2716%27 cy=%2716%27 rx=%2715%27 ry=%275.5%27 fill=%27none%27 stroke=%27%23e39b2d%27 stroke-width=%272.2%27 transform=%27rotate(-22 16 16)%27/%3E%3C/svg%3E">
-<meta name="theme-color" content="#f7f3ec">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2710%27 fill=%27%235a4ff3%27/%3E%3Cellipse cx=%2716%27 cy=%2716%27 rx=%2715%27 ry=%275.5%27 fill=%27none%27 stroke=%27%23ff7a59%27 stroke-width=%272.2%27 transform=%27rotate(-22 16 16)%27/%3E%3C/svg%3E">
+<meta name="theme-color" content="#f5f6fb">
 <style>
-  /* Duniya design language — see DESIGN.md. Warm paper, ink, peacock teal, marigold. */
+  /* Duniya design language — see DESIGN.md. Base tokens; the Aurora layer at the end overrides them. */
   :root {
     --bg: #f7f3ec; --bg-2: #efe9df; --card: #fffdf9; --ink: #1c2030; --muted: #6d6a73; --line: #e6dfd3; --line-2: #d9d0c1;
     --accent: #0b7a75; --accent-ink: #ffffff; --accent-soft: #dff1ee; --marigold: #e39b2d; --marigold-soft: #fbefd9;
@@ -164,6 +164,80 @@
   .choice span { font-size: 13px; color: var(--muted); }
   .row.nowrap > input { flex: 1; }
   @media (max-width: 640px) { main { padding: 14px 12px 40px; } .card { padding: 16px; border-radius: 16px; } .bar { padding: 10px 14px 4px; } }
+  /* ---- Aurora layer (v1.6): vivid gradients, frosted glass, friendly icons. See DESIGN.md. ---- */
+  :root {
+    --bg: #f5f6fb; --bg-2: #eceef7; --card: rgba(255,255,255,.74); --card-solid: #ffffff; --ink: #151729; --muted: #5d6178;
+    --line: rgba(21,23,41,.08); --line-2: rgba(21,23,41,.15);
+    --accent: #5a4ff3; --accent-2: #2b86ff; --accent-3: #12b5a6; --accent-4: #ff7a59; --accent-ink: #ffffff; --accent-soft: #eceaff;
+    --grad: linear-gradient(120deg, #7c5cff 0%, #4a6cff 45%, #1fb6c9 100%);
+    --grad-warm: linear-gradient(120deg, #ff8a4c 0%, #ff5e8a 100%);
+    --marigold: #ff7a59; --marigold-soft: #fff0ea;
+    --warn: #a14d00; --warn-soft: #fff1df; --bad: #d2364f; --bad-soft: #ffe8ec; --info: #2160d8; --info-soft: #e7f0ff;
+    --ok: #0f8f7f; --ok-soft: #dcf6f1;
+    --radius: 22px; --radius-s: 14px;
+    --shadow: 0 1px 1px rgba(21,23,41,.04), 0 12px 32px -14px rgba(74,60,200,.22);
+    --glow: 0 8px 22px -8px rgba(90,79,243,.55);
+    --font-display: "Segoe UI Variable Display", "Segoe UI Variable", -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0c0e1a; --bg-2: #161a2c; --card: rgba(26,30,50,.72); --card-solid: #1a1e32; --ink: #eef0fb; --muted: #a2a7c2;
+      --line: rgba(255,255,255,.08); --line-2: rgba(255,255,255,.16);
+      --accent: #8f86ff; --accent-ink: #ffffff; --accent-soft: rgba(143,134,255,.16);
+      --marigold: #ff9a76; --marigold-soft: rgba(255,154,118,.14);
+      --warn: #ffc27a; --warn-soft: rgba(255,170,90,.14); --bad: #ff8fa3; --bad-soft: rgba(255,95,130,.15); --info: #8fb8ff; --info-soft: rgba(80,140,255,.15);
+      --ok: #5be0cc; --ok-soft: rgba(40,200,180,.14);
+      --shadow: 0 1px 1px rgba(0,0,0,.3), 0 14px 36px -14px rgba(0,0,0,.6); --glow: 0 8px 24px -8px rgba(124,92,255,.65); }
+  }
+  body {
+    background:
+      radial-gradient(900px 600px at 0% 0%, rgba(124,92,255,.20), transparent 60%),
+      radial-gradient(800px 520px at 100% 0%, rgba(43,134,255,.16), transparent 60%),
+      radial-gradient(900px 700px at 80% 100%, rgba(31,182,201,.14), transparent 60%),
+      radial-gradient(700px 520px at 10% 100%, rgba(255,122,89,.12), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+  }
+  h1, h2, h3, .brand, .display, .stat { font-family: var(--font-display); letter-spacing: -0.015em; }
+  .card h2 { font-weight: 650; }
+  header { background: color-mix(in srgb, var(--bg) 62%, transparent); border-bottom: 1px solid var(--line); }
+  .brand { font-weight: 700; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .brand small, .brand .dot { -webkit-text-fill-color: initial; }
+  .brand small { color: var(--muted); }
+  nav { gap: 6px; }
+  nav button { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; }
+  nav button svg { width: 17px; height: 17px; flex: none; opacity: .85; }
+  nav button.on { background: var(--grad); color: #fff; box-shadow: var(--glow); }
+  nav button.on svg { opacity: 1; }
+  .card { background: var(--card); border: 1px solid color-mix(in srgb, #fff 55%, var(--line)); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); }
+  @media (prefers-color-scheme: dark) { .card { border-color: var(--line); } }
+  fieldset { background: color-mix(in srgb, var(--card-solid) 55%, transparent); border-color: var(--line); }
+  .btn.primary, button.btn.primary { background: var(--grad); border: 0; color: #fff; box-shadow: var(--glow); padding: 9px 16px; }
+  .btn.primary:hover { filter: brightness(1.07) saturate(1.1); }
+  .btn { background: color-mix(in srgb, var(--card-solid) 85%, transparent); border-color: var(--line-2); }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.danger:hover { border-color: var(--bad); color: var(--bad); }
+  input, select, textarea { background: var(--card-solid); border-color: var(--line-2); border-radius: var(--radius-s); }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); } .note.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.info { background: var(--info-soft); color: var(--info); }
+  .note { border: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
+  .dot.ok { background: #16c2a5; box-shadow: 0 0 0 3px rgba(22,194,165,.22); }
+  .stat { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700; }
+  .stat small { -webkit-text-fill-color: var(--muted); }
+  .eyebrow { color: var(--accent); }
+  .meter > i { background: var(--grad); } .meter.hot > i { background: var(--grad-warm); }
+  .spark path.l { stroke: var(--accent); } .spark path.a { fill: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .toggle input:checked + span { background: var(--grad); }
+  .seg { background: color-mix(in srgb, var(--bg-2) 85%, transparent); }
+  .seg button.on { background: var(--card-solid); color: var(--accent); font-weight: 600; box-shadow: 0 1px 3px rgba(21,23,41,.12); }
+  .bubble.me { background: var(--grad); color: #fff; }
+  .number-card { background: color-mix(in srgb, var(--card-solid) 60%, transparent); border-color: var(--line); }
+  .feed li { border-bottom-style: solid; border-bottom-color: var(--line); }
+  .toast { background: #151729; color: #fff; }
+  .hero { position: relative; overflow: hidden; border: 0; color: #fff; background: var(--grad); box-shadow: var(--glow); }
+  .hero::after { content: ""; position: absolute; inset: auto -60px -80px auto; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.35), transparent 65%); }
+  .hero h2, .hero p, .hero .muted { color: #fff; }
+  .hero .muted { opacity: .85; }
 </style>
 </head>
 <body>
@@ -188,12 +262,36 @@ function h(tag, attrs, ...kids) {
   return el;
 }
 const $ = (s) => document.querySelector(s);
+/** Small line icons for the tabs (24×24, stroke = currentColor). */
+const ICONS = {
+  overview: 'M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z',
+  activity: 'M3 12h4l2.5-6 4 12 2.5-6H21',
+  bots: 'M8 8V6.5a4 4 0 0 1 8 0V8M5 10a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3zM9.5 14h.01M14.5 14h.01',
+  chats: 'M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9zM9 9.5h6M9 12.5h4',
+  models: 'M12 3.5l1.8 4.7 4.7 1.8-4.7 1.8L12 16.5l-1.8-4.7L5.5 10l4.7-1.8zM18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z',
+  server: 'M5 5h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM5 13h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zM8 8h.01M8 16h.01',
+  backups: 'M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9a4.5 4.5 0 0 1 .5 9zM12 11v5M9.5 13.5 12 11l2.5 2.5',
+  pending: 'M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 8v4.5l3 2',
+  secrets: 'M14.5 4a5.5 5.5 0 1 1-4.9 8L4 17.6V20h2.5v-2h2v-2h2l.9-.9A5.5 5.5 0 0 1 14.5 4zM15.5 8.5h.01',
+  settings: 'M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-1.9 1.1L15 20.5h-4l-.3-2a7 7 0 0 1-1.9-1.1l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-3l-1.6-1.2 2-3.4 1.9.7a7 7 0 0 1 1.9-1.1L11 3.5h4l.3 2a7 7 0 0 1 1.9 1.1l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 3z',
+};
+function icon(name) {
+  const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS(ns, 'path'); p.setAttribute('d', ICONS[name] || ''); p.setAttribute('fill', 'none'); p.setAttribute('stroke', 'currentColor');
+  p.setAttribute('stroke-width', '1.7'); p.setAttribute('stroke-linecap', 'round'); p.setAttribute('stroke-linejoin', 'round');
+  svg.append(p); return svg;
+}
 /** Brand mark: a world (teal) with an orbit (marigold) — Duniya means "world". */
 function logo() {
   const ns = 'http://www.w3.org/2000/svg'; const el = (t, a) => { const e = document.createElementNS(ns, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); return e; };
   const svg = el('svg', { viewBox: '0 0 32 32', class: 'logo', 'aria-hidden': 'true' });
-  svg.append(el('circle', { cx: 16, cy: 16, r: 10, fill: 'var(--accent)' }), el('path', { d: 'M9 13c3 2 9 2 14-1M8.5 19c4 1.6 10 1.6 15-1.5', stroke: 'color-mix(in srgb, var(--accent-ink) 55%, transparent)', 'stroke-width': 1.2, fill: 'none' }),
-    el('ellipse', { cx: 16, cy: 16, rx: 15, ry: 5.5, fill: 'none', stroke: 'var(--marigold)', 'stroke-width': 2.2, transform: 'rotate(-22 16 16)' }));
+  const gid = `lg${Math.random().toString(36).slice(2, 8)}`;
+  const defs = el('defs', {}); const lg = el('linearGradient', { id: gid, x1: 0, y1: 0, x2: 1, y2: 1 });
+  lg.append(el('stop', { offset: '0', 'stop-color': '#7c5cff' }), el('stop', { offset: '.55', 'stop-color': '#4a6cff' }), el('stop', { offset: '1', 'stop-color': '#1fb6c9' }));
+  defs.append(lg);
+  svg.append(defs, el('circle', { cx: 16, cy: 16, r: 10, fill: `url(#${gid})` }), el('path', { d: 'M9 13c3 2 9 2 14-1M8.5 19c4 1.6 10 1.6 15-1.5', stroke: 'rgba(255,255,255,.55)', 'stroke-width': 1.2, fill: 'none' }),
+    el('ellipse', { cx: 16, cy: 16, rx: 15, ry: 5.5, fill: 'none', stroke: '#ff7a59', 'stroke-width': 2.2, transform: 'rotate(-22 16 16)' }));
   return svg;
 }
 function toast(msg) { const t = h('div', { class: 'toast' }, msg); document.body.append(t); setTimeout(() => t.remove(), 3500); }
@@ -355,7 +453,7 @@ let statusTimer = null;
 async function boot() {
   const app = $('#app'); app.replaceChildren();
   document.body.classList.toggle('readonly', !can('admin'));
-  const nav = h('nav', {}, TABS().map(([id, label]) => h('button', { 'data-tab': id, onclick: () => (location.hash === `#${id}` ? show(id) : (location.hash = id)) }, label)));
+  const nav = h('nav', {}, TABS().map(([id, label]) => h('button', { 'data-tab': id, onclick: () => (location.hash === `#${id}` ? show(id) : (location.hash = id)) }, icon(id), label)));
   app.append(
     h('header', {}, h('div', { class: 'bar' }, h('div', { class: 'brand' }, logo(), 'Duniya', h('span', { class: 'dot', id: 'wa-dot', title: 'WhatsApp' }), h('small', { id: 'brand-sub' }, 'agents')),
       h('div', { style: 'flex:1' }), h('span', { class: 'small muted' }, `${S.user.username} · ${S.user.role}`),
@@ -451,7 +549,15 @@ async function renderOverview(soft) {
     reusedUpdates || h('div', { id: 'updates-box' }));
   const recent = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('div', { class: 'row spread' }, h('h2', {}, 'Recent activity'), h('button', { class: 'btn small', onclick: () => show('activity') }, 'All activity')),
     h('ul', { class: 'feed', id: 'recent' }, S.feed.slice(0, 8).map(feedItem)));
-  $('#main').replaceChildren(h('div', { class: 'grid' }, wa, control, server, recent));
+  const hr = new Date().getHours();
+  const hello = hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+  const live = st.bots.filter((b) => b.enabled).length; const open = numbers.filter((n) => n.status === 'open').length;
+  const allGood = !st.settings.paused && open === numbers.length && live > 0;
+  const hero = h('div', { class: 'card hero', style: 'margin-bottom:16px' },
+    h('h2', { style: 'font-size:24px;margin:0 0 4px' }, `${hello}, ${S.user.username}`),
+    h('p', { style: 'margin:0;font-size:15px' }, st.settings.paused ? 'All bots are paused. Turn them back on under Control when you are ready.'
+      : `${live} bot${live === 1 ? '' : 's'} live · WhatsApp ${open}/${numbers.length} connected${st.pending ? ` · ${st.pending} change${st.pending > 1 ? 's' : ''} waiting for confirmation` : ''}${allGood ? ' · everything is running ✨' : ''}`));
+  $('#main').replaceChildren(hero, h('div', { class: 'grid' }, wa, control, server, recent));
   if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
 }
