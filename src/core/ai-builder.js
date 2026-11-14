@@ -70,7 +70,7 @@ export async function draftBot({ bot = null, request, model = 'auto', people = [
   const messages = [{ role: 'user', content: `Context (JSON):\n${JSON.stringify(context, null, 1)}\n\nAdmin's request:\n${text}` }];
   let lastError = '';
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await modelChat({ model, purpose: 'bot', system: GUIDE, messages, tools: [TOOL], maxTokens: 4000 });
+    const res = await modelChat({ model, purpose: 'bot', system: GUIDE, messages, tools: [TOOL], maxTokens: 4000, usage: { bot: bot?.id || '', kind: 'ai-helper' } });
     const call = res.content.find((b) => b.type === 'tool_use' && b.name === TOOL.name);
     let input = call?.input;
     if (!input) { // models without tool use: accept JSON in text

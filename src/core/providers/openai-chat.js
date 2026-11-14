@@ -65,7 +65,12 @@ export function chatCompletionsProvider({ baseUrl, key, official = false }) {
   return {
     async listModels() {
       const json = await request(`${base}/models`, key());
-      return (json.data || json.models || []).map((m) => ({ id: m.id || m.slug, label: m.name || m.display_name || m.id || m.slug })).filter((m) => m.id);
+      // OpenRouter-style listings publish prices (USD per token): keep them as USD per 1M tokens for usage costs.
+      const per1M = (v) => (v === undefined || v === null || v === '' || Number.isNaN(Number(v)) || Number(v) < 0 ? undefined : Number(v) * 1e6);
+      return (json.data || json.models || []).map((m) => {
+        const pin = per1M(m.pricing?.prompt); const pout = per1M(m.pricing?.completion);
+        return { id: m.id || m.slug, label: m.name || m.display_name || m.id || m.slug, ...(pin !== undefined && pout !== undefined ? { price: { in: pin, out: pout } } : {}) };
+      }).filter((m) => m.id);
     },
     async chat({ model, system, messages, tools, maxTokens }) {
       const body = {

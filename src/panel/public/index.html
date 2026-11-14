@@ -237,6 +237,12 @@
   .number-card { background: color-mix(in srgb, var(--bg) 40%, var(--card)); border-color: var(--line); border-radius: var(--radius-s); }
   pre { background: #0d0f13; color: #d6dae3; }
   .toast { background: var(--ink); color: var(--bg); border-radius: 10px; font-family: var(--mono); font-size: 13px; }
+  main.loading { opacity: .55; transition: opacity .15s; pointer-events: none; }
+  main.loading::before { content: ""; position: fixed; top: 0; left: 0; height: 3px; width: 40%; z-index: 30; background: var(--signal); box-shadow: 0 0 10px var(--signal); animation: loadbar 1s ease-in-out infinite; }
+  @keyframes loadbar { 0% { left: -40%; } 100% { left: 100%; } }
+  .bars { width: 100%; height: 140px; display: block; }
+  .bars rect { fill: var(--ink); } .bars rect:hover { fill: var(--signal-deep); }
+  @media (prefers-color-scheme: dark) { .bars rect { fill: var(--signal); } }
   /* status console on Overview */
   .console { display: grid; grid-template-columns: 1fr auto; gap: 14px 24px; align-items: center; margin-bottom: 16px; }
   .console h2 { font-size: 26px; margin: 2px 0 0; }
@@ -276,6 +282,7 @@ const ICONS = {
   bots: 'M8 8V6.5a4 4 0 0 1 8 0V8M5 10a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3zM9.5 14h.01M14.5 14h.01',
   chats: 'M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9zM9 9.5h6M9 12.5h4',
   models: 'M12 3.5l1.8 4.7 4.7 1.8-4.7 1.8L12 16.5l-1.8-4.7L5.5 10l4.7-1.8zM18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z',
+  usage: 'M5 19V10M10 19V5M15 19v-7M20 19v-4M3 19.5h18',
   server: 'M5 5h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM5 13h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zM8 8h.01M8 16h.01',
   backups: 'M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9a4.5 4.5 0 0 1 .5 9zM12 11v5M9.5 13.5 12 11l2.5 2.5',
   pending: 'M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 8v4.5l3 2',
@@ -379,7 +386,7 @@ const S = { tab: 'overview', user: null, status: null, feed: [], feedBot: '', es
 const RANK = { viewer: 1, admin: 2, owner: 3 };
 const can = (role) => S.user && RANK[S.user.role] >= RANK[role];
 const TABS = () => [['overview', 'Overview'], ['activity', 'Activity'], ['bots', 'Bots'], ['chats', 'Chats'], ['models', 'Models'],
-  ['server', 'Server'], can('owner') && ['backups', 'Backups'], ['pending', 'Pending'], ['secrets', 'Secrets'], ['settings', 'Settings']].filter(Boolean);
+  ['server', 'Server'], ['usage', 'Usage'], can('owner') && ['backups', 'Backups'], ['pending', 'Pending'], ['secrets', 'Secrets'], ['settings', 'Settings']].filter(Boolean);
 
 // ---------- login & first-run setup ----------
 async function renderLogin() {
@@ -484,8 +491,16 @@ function show(tab) {
   S.tab = tab;
   if (location.hash.slice(1).split('/')[0] !== tab) history.replaceState(null, '', `#${tab}`);
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-  const r = { overview: renderOverview, server: renderServer, activity: renderActivity, bots: renderBots, chats: renderChats, models: renderModels, backups: renderBackups, pending: renderPending, secrets: renderSecrets, settings: renderSettings }[tab];
-  Promise.resolve(r?.()).catch((e) => toast(e.message));
+  const seq = (S.renderSeq = (S.renderSeq || 0) + 1);
+  const main = $('#main');
+  const slow = setTimeout(() => { if (S.renderSeq === seq) main?.classList.add('loading'); }, 120);
+  const r = { overview: renderOverview, server: renderServer, usage: renderUsage, activity: renderActivity, bots: renderBots, chats: renderChats, models: renderModels, backups: renderBackups, pending: renderPending, secrets: renderSecrets, settings: renderSettings }[tab];
+  Promise.resolve(r?.()).catch((e) => toast(e.message)).finally(() => {
+    clearTimeout(slow);
+    if (S.renderSeq === seq) { main?.classList.remove('loading'); S.renderDone = seq; return; }
+    // A slower, older tab finished after a newer one and drew over it: draw the current tab again.
+    if ((S.renderDone || 0) > seq && S.tab) show(S.tab);
+  });
 }
 function connectEvents() {
   S.es?.close();
@@ -719,6 +734,61 @@ async function renderServer() {
   serverTimer = setInterval(tiles, 10000);
 }
 
+// ---------- usage & cost (023) ----------
+const fmtTok = (n) => (!n ? '0' : n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}K` : String(n));
+const fmtCost = (c) => (c == null ? '—' : c === 0 ? '$0' : c < 0.01 ? '<$0.01' : `$${c < 10 ? c.toFixed(2) : Math.round(c)}`);
+const usageLine = (u) => (u ? `${fmtTok(u.input + u.output)} tokens · ${u.unpriced && !u.cost ? 'price not set' : fmtCost(u.cost)}${u.unpriced && u.cost ? '+' : ''}` : 'no use yet');
+let usageCache = null;
+/** Last-30-days usage per bot, chat, provider and model (cached 60 s) for inline badges. */
+async function usageSummary() {
+  if (usageCache && Date.now() - usageCache.at < 60000) return usageCache.v;
+  const v = await api('GET', '/api/usage/summary?period=30d').catch(() => null);
+  usageCache = { at: Date.now(), v }; return v;
+}
+let usagePeriod = '30d';
+async function renderUsage() {
+  const [byDay, byBot, byChat, byProv, byModel, byKind, sum, chats, bots] = await Promise.all(['day', 'bot', 'chat', 'provider', 'model', 'kind']
+    .map((g) => api('GET', `/api/usage?period=${usagePeriod}&groupBy=${g}`)).concat([usageSummary(), api('GET', '/api/chats').catch(() => []), api('GET', '/api/bots').catch(() => [])]));
+  const t = byDay.total;
+  const chatName = Object.fromEntries(chats.map((c) => [c.id, c.name])); const botName = Object.fromEntries(bots.map((b) => [b.id, b.name]));
+  const KIND = { reply: 'Replies', summary: 'Memory summaries', scheduled: 'Scheduled posts', 'ai-helper': 'AI helper', test: 'Tests' };
+  const seg = h('div', { class: 'seg' }, [['1d', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['90d', '90 days'], ['all', 'All']].map(([v, l]) => h('button', { class: usagePeriod === v ? 'on' : '', onclick: () => { usagePeriod = v; renderUsage(); } }, l)));
+  const tile = (eyebrow, stat, sub) => h('div', { class: 'card' }, h('div', { class: 'eyebrow' }, eyebrow), h('div', { class: 'stat' }, stat), sub ? h('div', { class: 'small muted' }, sub) : null);
+  // daily bars
+  const days = byDay.rows; const max = Math.max(1, ...days.map((d) => d.input + d.output));
+  const ns = 'http://www.w3.org/2000/svg'; const chart = document.createElementNS(ns, 'svg'); chart.setAttribute('viewBox', `0 0 ${Math.max(days.length, 1) * 10} 60`); chart.setAttribute('preserveAspectRatio', 'none'); chart.setAttribute('class', 'bars');
+  days.forEach((d, i) => { const hgt = ((d.input + d.output) / max) * 56; const r = document.createElementNS(ns, 'rect'); r.setAttribute('x', i * 10 + 1.5); r.setAttribute('y', 60 - hgt); r.setAttribute('width', 7); r.setAttribute('height', Math.max(hgt, 0.5)); r.setAttribute('rx', 1.5);
+    const tt = document.createElementNS(ns, 'title'); tt.textContent = `${d.key}: ${fmtTok(d.input + d.output)} tokens, ${fmtCost(d.cost)}`; r.append(tt); chart.append(r); });
+  const table = (title, rep, name, extra) => h('div', { class: 'card' }, h('h2', {}, title), rep.rows.length ? h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, ''), h('th', { style: 'text-align:right' }, 'Calls'), h('th', { style: 'text-align:right' }, 'Tokens in / out'), h('th', { style: 'text-align:right' }, 'Cost'), extra ? h('th', {}, 'Price / 1M (in · out)') : null)),
+    h('tbody', {}, rep.rows.map((r) => h('tr', {}, h('td', {}, name(r.key)), h('td', { class: 'num', style: 'text-align:right' }, r.calls), h('td', { class: 'num', style: 'text-align:right' }, `${fmtTok(r.input)} / ${fmtTok(r.output)}`),
+      h('td', { class: 'num', style: 'text-align:right' }, r.plan === r.calls ? 'in plan' : r.unpriced === r.calls ? 'price not set' : fmtCost(r.cost)), extra ? h('td', {}, extra(r.key)) : null)))) : h('p', { class: 'small muted' }, 'Nothing in this period.'));
+  const priceEditor = (ref) => {
+    const [prov] = ref.split(':');
+    if (sum?.plans?.[prov]) return h('span', { class: 'pill ok' }, sum.plans[prov]);
+    if (/:free$/.test(ref)) return h('span', { class: 'pill ok' }, 'free');
+    const cur = sum?.prices?.[ref];
+    const i = h('input', { type: 'number', step: '0.01', min: 0, value: cur?.in ?? '', placeholder: 'in', style: 'width:76px' });
+    const o = h('input', { type: 'number', step: '0.01', min: 0, value: cur?.out ?? '', placeholder: 'out', style: 'width:76px' });
+    return can('admin') ? h('div', { class: 'row nowrap', style: 'gap:6px' }, i, o, h('button', { class: 'btn small', onclick: () => tryApi(async () => { await api('PUT', '/api/usage/prices', { model: ref, input: i.value, output: o.value }); usageCache = null; renderUsage(); }, 'Price saved') }, 'Save'))
+      : h('span', { class: 'small muted' }, cur ? `$${cur.in} · $${cur.out}` : '—');
+  };
+  $('#main').replaceChildren(
+    h('div', { class: 'card console' }, h('div', {}, h('div', { class: 'eyebrow' }, 'Usage & cost'), h('h2', {}, `${fmtTok(t.input + t.output)} tokens · ${t.unpriced === t.calls && t.calls ? 'price not set' : fmtCost(t.cost)}`)), seg),
+    h('div', { class: 'tiles' },
+      tile('Tokens in', fmtTok(t.input), 'what bots read: instructions, chat context, tool results'),
+      tile('Tokens out', fmtTok(t.output), 'what bots wrote'),
+      tile('Estimated cost', fmtCost(t.cost), t.unpriced ? `${t.unpriced} call(s) without a price — set prices under “By model”` : t.plan ? `${t.plan} call(s) included in your plans` : 'from the prices below'),
+      tile('Model calls', String(t.calls || 0), `${(byKind.rows.find((r) => r.key === 'reply')?.calls) || 0} replies`)),
+    h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Per day'), days.length ? chart : h('p', { class: 'small muted' }, 'Nothing in this period.')),
+    h('div', { class: 'grid', style: 'margin-top:16px;align-items:start' },
+      table('By bot', byBot, (k) => botName[k] || k || '(no bot)'),
+      table('By chat', byChat, (k) => chatName[k] || (k ? k.replace(/@.*/, '') : '(no chat)')),
+      table('By provider', byProv, (k) => k),
+      table('By kind', byKind, (k) => KIND[k] || k)),
+    h('div', { style: 'margin-top:16px' }, table('By model', byModel, (k) => k, priceEditor)),
+    h('p', { class: 'small muted' }, 'Costs are estimates from the prices you set (or the provider publishes, e.g. OpenRouter). ChatGPT plan and Copilot calls are included in those plans. Your provider’s bill is the source of truth.'));
+}
+
 // ---------- activity ----------
 function feedItem(a) {
   const detail = h('pre', { class: 'hide' }, a.detail ? JSON.stringify(a.detail, null, 2) : '(no details)');
@@ -761,7 +831,7 @@ function modelSelect(models, value, { withInherit = false, autoLabel = 'Auto (be
 async function renderBots() {
   const route = location.hash.split('/');
   if (route[1]) return renderBotEditor(decodeURIComponent(route[1]));
-  const [bots, templates] = await Promise.all([api('GET', '/api/bots'), api('GET', '/api/templates')]);
+  const [bots, templates, us] = await Promise.all([api('GET', '/api/bots'), api('GET', '/api/templates'), usageSummary()]);
   const tpl = h('select', {}, templates.map((t) => h('option', { value: t.id }, t.name)));
   const name = h('input', { placeholder: 'Bot name' });
   const fileIn = h('input', { type: 'file', accept: '.json,application/json', class: 'hide', onchange: async () => {
@@ -786,6 +856,7 @@ async function renderBots() {
       Object.keys(b.config.mcpServers || {}).map((k) => h('span', { class: 'pill' }, `tools: ${k}`)),
       b.config.confirm ? h('span', { class: 'pill warn' }, 'changes need confirm') : null,
       b.config.memory?.enabled !== false ? h('span', { class: 'pill ok' }, 'memory') : null),
+    h('div', { class: 'small muted num' }, h('a', { href: '#usage' }, '30 days: '), usageLine(us?.bot?.[b.id])),
     b.needs.length ? h('div', { class: 'note warn' }, `Needs secrets: ${b.needs.join(', ')}`) : null,
     b.missingPlugins.length ? h('div', { class: 'note warn' }, `Missing plugins: ${b.missingPlugins.join(', ')}`) : null,
     h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => openBot(b.id) }, can('admin') ? 'Edit & test' : 'View & test'))));
@@ -1100,7 +1171,7 @@ async function aiHelper({ botId = '', title, placeholder, applyLabel, onApply })
 let chatsFilter = 'all';
 async function renderChats() {
   $('#main').replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading chats…')));
-  const [chats, bots, models] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/bots'), loadModels().catch(() => ({ models: [] }))]);
+  const [chats, bots, models, us] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/bots'), loadModels().catch(() => ({ models: [] })), usageSummary()]);
   const memBox = h('div', {});
   const multi = new Set(chats.map((c) => c.number)).size > 1;
   const savePrefs = (c, patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, patch)); }, 'Saved');
@@ -1111,7 +1182,8 @@ async function renderChats() {
       h('tbody', {}, shown.map((c) => h('tr', {},
         h('td', {}, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, c.name || c.id), h('span', { class: `pill ${c.isGroup ? 'info' : ''}` }, c.isGroup ? 'group' : 'person'), multi ? h('span', { class: 'pill' }, c.numberLabel) : null),
           h('div', { class: 'small muted' }, c.isGroup ? `${c.size || 0} members` : c.phone ? `+${c.phone}` : '', c.lastAt ? ` · last message ${ago(c.lastAt)} ago` : ''),
-          h('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => renderMemory(c, memBox) }, 'Memory')),
+          us?.chat?.[c.id] ? h('div', { class: 'small muted num' }, `30 days: ${usageLine(us.chat[c.id])}`) : null,
+          h('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory')),
         h('td', { style: 'min-width:170px' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, bot: e.target.value || null }); c.bot = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
           h('option', { value: '' }, c.isGroup ? '— no bot —' : '— default for direct messages —'), bots.map((b) => h('option', { value: b.id, selected: c.bot === b.id }, b.name)))),
         h('td', { style: 'min-width:200px' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) })),
@@ -1124,6 +1196,33 @@ async function renderChats() {
     h('p', { class: 'small muted' }, 'Choose which bot answers in each group or with each person, and optionally a different model or logging level for that chat. A person assigned to a bot is always answered by it; unassigned direct messages go to the default bot of the number. Messages in groups are remembered so a bot added later has context.'),
     list), memBox);
 }
+/** Stored messages of a chat (admins): newest at the bottom, search, load older. Viewing is logged. */
+function messagesCard(c) {
+  const enc = encodeURIComponent(c.id);
+  const log = h('div', { class: 'chatlog', style: 'max-height:520px' });
+  const q = h('input', { placeholder: 'Search the stored messages', style: 'max-width:320px' });
+  let oldest = 0; let rows = [];
+  const more = h('button', { class: 'btn small', onclick: () => load(true) }, 'Load older');
+  const bubble = (m) => h('div', { class: `bubble ${m.fromBot ? 'me' : 'bot'}` },
+    h('div', { class: 'small', style: 'opacity:.75;margin-bottom:2px' }, m.fromBot ? 'Bot' : (m.name || (m.sender ? `+${m.sender}` : 'someone')), ` · ${time(m.ts)}`, m.addressed ? ' · to the bot' : ''),
+    m.quoted ? h('div', { class: 'small', style: 'opacity:.75;border-left:2px solid currentColor;padding-left:6px;margin:2px 0 4px' }, m.quoted) : null, m.text);
+  async function load(older) {
+    const page = await tryApi(() => api('GET', `/api/chats/${enc}/messages?limit=50${older && oldest ? `&before=${oldest}` : ''}${q.value.trim() ? `&q=${encodeURIComponent(q.value.trim())}` : ''}`));
+    if (!page) return;
+    rows = older ? [...page.reverse(), ...rows] : page.reverse();
+    oldest = rows[0]?.id || 0;
+    log.replaceChildren(...(rows.length ? rows.map(bubble) : [h('p', { class: 'small muted' }, q.value.trim() ? 'No stored message matches.' : 'No stored messages for this chat.')]));
+    more.classList.toggle('hide', page.length < 50);
+    if (!older) log.scrollTop = log.scrollHeight;
+  }
+  const card = h('div', { class: 'card', style: 'margin-top:16px' },
+    h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, `Messages · ${c.name}`), h('form', { class: 'row nowrap', style: 'flex:0 1 420px', onsubmit: (e) => { e.preventDefault(); load(false); } }, q, h('button', { class: 'btn small' }, 'Search'))),
+    h('p', { class: 'small muted' }, 'Messages the bots have stored for context (groups always; direct chats only when a bot answered). Only admins and owners can read them, and each look is recorded in the activity log.'),
+    h('div', { style: 'text-align:center' }, more), log);
+  load(false);
+  return card;
+}
+
 async function renderMemory(c, box) {
   const enc = encodeURIComponent(c.id);
   const m = await api('GET', `/api/chats/${enc}/memory`);
@@ -1137,6 +1236,7 @@ async function renderMemory(c, box) {
     h('div', { class: 'row mut', style: 'margin-top:10px' },
       h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('POST', `/api/chats/${enc}/memory/summarize`); renderMemory(c, box); }, 'Summary rebuilt') }, 'Rebuild summary'),
       h('button', { class: 'btn danger', onclick: () => confirm(`Erase all stored messages, the summary and notes for “${c.name}”?`) && tryApi(async () => { await api('DELETE', `/api/chats/${enc}/memory`); renderMemory(c, box); }, 'Memory erased') }, 'Erase memory'))));
+  if (can('admin')) box.append(messagesCard(c));
   box.scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -1177,12 +1277,14 @@ function testBox(id) {
 /** One provider card: what it is + cost, then either the steps to connect or the connected state. */
 function providerCard({ id, mark, title, cost, tag, p, steps, form, connected, extra, ownerOnly }) {
   const isOn = p?.connected;
+  const u = providerCard.usage?.provider?.[id];
   const pill = isOn ? h('span', { class: 'pill ok' }, `✓ Connected · ${p.models} model${p.models === 1 ? '' : 's'}`)
     : p?.error ? h('span', { class: 'pill bad' }, 'Needs attention') : h('span', { class: 'pill' }, 'Not connected');
   const t = isOn ? testBox(id) : null;
   return h('div', { class: `card pcard${isOn ? ' on' : ''}`, id: `prov-${id}` },
     h('div', { class: 'phead' }, h('span', { class: `pmark ${mark}` }, title[0]), h('h2', {}, title), pill),
     h('div', { class: 'small muted pcost' }, cost),
+    u ? h('div', { class: 'small num', style: 'margin-top:6px' }, h('a', { href: '#usage' }, 'Last 30 days: '), usageLine(u)) : null,
     tag ? h('div', { class: 'ptags' }, tag) : null,
     p?.error ? h('div', { class: 'note bad' }, p.error) : null,
     isOn ? h('div', {}, connected, h('div', { class: 'row', style: 'margin-top:10px' }, t.btn, extra), t.out)
@@ -1205,7 +1307,8 @@ const saveSecretKey = (name) => async (value) => { await api('PUT', '/api/secret
 const replaceKey = (form) => h('details', { class: 'small mut' }, h('summary', {}, 'Replace key'), form);
 
 async function renderModels() {
-  const [provs, models] = await Promise.all([api('GET', '/api/providers'), loadModels(true)]);
+  const [provs, models, us] = await Promise.all([api('GET', '/api/providers'), loadModels(true), usageSummary()]);
+  providerCard.usage = us;
   const by = Object.fromEntries(provs.map((p) => [p.id, p]));
   const anyOn = provs.some((p) => p.connected);
   const go = (id) => () => document.getElementById(`prov-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });

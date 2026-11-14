@@ -150,3 +150,13 @@ export function namesInChat(chat) {
   for (const r of rows) if (!out[r.sender] && r.name) out[r.sender] = r.name;
   return out;
 }
+
+/** Stored messages of a chat, newest first (for admins in the panel). */
+export function listMessages(chat, { before = 0, limit = 50, q = '' } = {}) {
+  const lim = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const args = [chat]; let where = 'chat = ?';
+  if (Number(before)) { where += ' AND id < ?'; args.push(Number(before)); }
+  if (q) { where += ' AND text LIKE ?'; args.push(`%${String(q).slice(0, 100)}%`); }
+  return db.prepare(`SELECT id, sender, name, text, quoted, from_bot AS fromBot, addressed, ts FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim)
+    .map((m) => ({ ...m, fromBot: !!m.fromBot, addressed: !!m.addressed }));
+}

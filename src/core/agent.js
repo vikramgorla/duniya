@@ -81,7 +81,7 @@ export async function runAgent(ctx) {
     let res;
     try {
       res = await modelChat({
-        model: chatModel(bot, chat), purpose: 'bot', maxTokens: bot.maxTokens,
+        model: chatModel(bot, chat), purpose: 'bot', maxTokens: bot.maxTokens, usage: { bot: bot.id, chat, kind: ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : 'reply' },
         system: systemPrompt({ bot, role, isGroup, chatName: ctx.chatName }), tools: defs, messages,
       });
     } catch (e) {

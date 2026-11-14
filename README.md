@@ -22,6 +22,8 @@ Run AI assistants in your WhatsApp groups, on your own server, managed from a we
   server's welcome screen).
 - **Several WhatsApp numbers**, groups and 1:1 chats: choose the bot, the model (or Auto) and the logging level per
   chat.
+- **Usage & cost**: tokens and estimated cost by bot, chat, provider and model, next to each and in a Usage tab.
+- **Stored messages**: admins can read and search what the bots stored for each chat (each look is logged).
 - **Server page**: CPU, memory, disk, network, logs, OS updates and restart — no SSH needed.
 - **Admin panel**: live activity (every message, tool call, model and token count), pause switch, users with
   roles, encrypted secrets, WhatsApp QR / pairing code, in-place updates.

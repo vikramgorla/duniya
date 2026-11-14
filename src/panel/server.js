@@ -12,7 +12,7 @@ import {
   listTemplates, templateConfig, exportBot, importBot, listPlugins,
 } from '../core/bots.js';
 import { referencedSecrets } from '../core/schema.js';
-import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat } from '../core/db.js';
+import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages } from '../core/db.js';
 import { bus, activity, loggingSettings, resetLoggingCache, LOG_CATEGORIES } from '../core/events.js';
 import { allChatPrefs, setChatPrefs, seenChats } from '../core/chat-prefs.js';
 import { runAgent, handleConfirmCommand, applyPending } from '../core/agent.js';
@@ -22,6 +22,7 @@ import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
 import { humanCode } from '../core/crypto.js';
 import { organizerConnection, oauthClientOf } from '../core/tools.js';
 import { draftBot } from '../core/ai-builder.js';
+import { usageReport, listPrices, setPrice, PLAN_PROVIDERS } from '../core/usage.js';
 import { installPackage, installedInfo } from '../core/mcp-local.js';
 import { snapshot as sysSnapshot, metricsHistory, osUpdates, logs as sysLogs, opsStatus, requestOp } from '../core/system.js';
 
@@ -383,6 +384,13 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     return next;
   });
   route('POST', '/api/chats/bind', async (req, res, body, q, p, user) => { await bindChat(String(body.chat), body.bot || null, user.username); return { ok: true }; });
+  // Stored messages of a chat (024): admins and owners only; each look is recorded.
+  route('GET', '/api/chats/:chat/messages', async (req, res, body, q, p, user) => {
+    const chat = decodeURIComponent(p.chat);
+    const rows = listMessages(chat, { before: q.get('before'), limit: q.get('limit'), q: q.get('q') || '' });
+    if (!q.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${q.get('q') ? ` (search “${String(q.get('q')).slice(0, 40)}”)` : ''}` });
+    return rows;
+  }, { role: 'admin' });
   route('GET', '/api/chats/:chat/memory', async (req, res, body, q, p) => memoryView(decodeURIComponent(p.chat)));
   route('POST', '/api/chats/:chat/memory/summarize', async (req, res, body, q, p) => {
     const chat = decodeURIComponent(p.chat);
@@ -422,6 +430,20 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     setSecret(String(body.name || ''), String(body.value || ''));
     activity('system', { summary: `Secret ${body.value ? 'set' : 'removed'}: ${body.name} (by ${user.username})` });
     return { ok: true };
+  });
+
+  // ---------- usage & cost (023) ----------
+  const periodFrom = (pr) => ({ '1d': Date.now() - 86400000, '7d': Date.now() - 7 * 86400000, '30d': Date.now() - 30 * 86400000, '90d': Date.now() - 90 * 86400000, all: 0 }[pr || '30d'] ?? Date.now() - 30 * 86400000);
+  route('GET', '/api/usage', async (req, res, body, q) => usageReport({ from: periodFrom(q.get('period')), groupBy: q.get('groupBy') || 'bot', bot: q.get('bot') || '', chat: q.get('chat') || '' }));
+  route('GET', '/api/usage/summary', async (req, res, body, q) => {
+    const from = periodFrom(q.get('period'));
+    const by = (g) => Object.fromEntries(usageReport({ from, groupBy: g }).rows.map((r) => [r.key, r]));
+    return { period: q.get('period') || '30d', bot: by('bot'), chat: by('chat'), provider: by('provider'), model: by('model'), prices: listPrices(), plans: PLAN_PROVIDERS };
+  });
+  route('PUT', '/api/usage/prices', async (req, res, body, q, p, user) => {
+    const out = setPrice(String(body.model || ''), { input: body.input, output: body.output });
+    activity('config', { summary: `Price for ${body.model}: ${out ? `$${out.in} in / $${out.out} out per 1M tokens` : 'removed'} (${user.username})` });
+    return { model: body.model, price: out };
   });
 
   // ---------- server metrics & maintenance (011) ----------

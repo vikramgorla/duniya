@@ -70,7 +70,7 @@ export async function maybeSummarize(chat, bot, { force = false } = {}) {
   try {
     const tz = bot?.timezone || env.timezone;
     const res = await modelChat({
-      model: 'auto', purpose: 'background',
+      model: 'auto', purpose: 'background', usage: { bot: bot?.id || '', chat, kind: 'summary' },
       maxTokens: 1200,
       system: SUMMARY_SYSTEM,
       messages: [{

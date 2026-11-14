@@ -1,6 +1,7 @@
 // Provider registry (006): model listing, model refs ("provider:model"), auto resolution, unified chat().
 import { getSecret, getSetting, updateSettings, setSecret } from '../store.js';
 import * as anthropic from './anthropic.js';
+import { recordUsage } from '../usage.js';
 import * as chatgpt from './chatgpt.js';
 import * as copilot from './copilot.js';
 import { chatCompletionsProvider } from './openai-chat.js';
@@ -184,13 +185,18 @@ export function resolveModel(ref, purpose = 'bot') {
  * Unified chat call. Input/output use Anthropic-style blocks.
  * Returns { content, stop_reason, usage, model: 'provider:model' }.
  */
-export async function chat({ model = 'auto', purpose = 'bot', system, messages, tools = [], maxTokens = 1024 }) {
+export async function chat({ model = 'auto', purpose = 'bot', system, messages, tools = [], maxTokens = 1024, usage = {} }) {
   if (!parseRef(model) || parseRef(model).model === 'auto') await warmModels();
   const r = resolveModel(model, purpose);
   const p = providerById(r.provider);
   if (!p) throw Object.assign(new Error(`Unknown model provider "${r.provider}"`), { code: 'no_model' });
   if (!p.configured) throw Object.assign(new Error(`Provider "${p.name}" is not connected`), { code: 'no_model' });
   const res = await p.adapter.chat({ model: r.model, system, messages, tools, maxTokens });
+  try { // usage & cost (023)
+    const published = modelCache.get(p.id)?.models?.find((m) => m.id === r.model)?.price || null;
+    recordUsage({ ...usage, kind: usage.kind || (purpose === 'background' ? 'summary' : 'reply'), provider: p.id, model: r.model,
+      input: res.usage?.input_tokens || 0, output: res.usage?.output_tokens || 0, published });
+  } catch { /* never fail a reply because of bookkeeping */ }
   return { ...res, model: r.ref };
 }
 
@@ -202,7 +208,7 @@ export async function testProvider(id, model) {
   const started = Date.now();
   try {
     if (!model) await providerModels(p);
-    const res = await chat({ model: model ? `${id}:${model}` : `${id}:auto`, purpose: 'background', maxTokens: 60,
+    const res = await chat({ model: model ? `${id}:${model}` : `${id}:auto`, purpose: 'background', maxTokens: 60, usage: { kind: 'test' },
       system: 'You are checking a connection. Answer in one short friendly sentence.', messages: [{ role: 'user', content: 'Say hi' }] });
     const reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
     return { ok: true, model: res.model, reply: reply.slice(0, 500) || '(empty reply)', ms: Date.now() - started };
