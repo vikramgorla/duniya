@@ -8,6 +8,7 @@ import {
   listBotRows, getBotRow, saveBotRow, deleteBotRow, countBots, setSecret, getSecret, updateSettings,
 } from './store.js';
 import { activity } from './events.js';
+import { deleteBotConnections } from './mcp-oauth.js';
 
 const LEGACY_BOTS_DIR = resolve(ROOT, process.env.BOTS_DIR || 'bots');
 let bots = new Map();
@@ -167,6 +168,7 @@ export async function updateBot(id, patch, by = '') {
 export function deleteBot(id, by = '') {
   if (!deleteBotRow(id)) throw Object.assign(new Error(`Unknown bot ${id}`), { status: 404 });
   bots.delete(id);
+  deleteBotConnections(id);
   activity('bot.deleted', { bot: id, summary: `Deleted${by ? ` by ${by}` : ''}` });
 }
 

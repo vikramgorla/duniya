@@ -1,5 +1,6 @@
 import { interpolate } from './store.js';
 import { mcpConnection } from './mcp.js';
+import { isConnected, runtimeProvider } from './mcp-oauth.js';
 import { memoryTools, memoryEnabled, MEMORY_DEFAULT_ALLOW } from './memory.js';
 
 /** "panduga:*_preview" style globs. */
@@ -14,6 +15,14 @@ const exposedName = (server, tool) => `${server}__${tool}`.replace(/[^a-zA-Z0-9_
 function connectionFor(bot, serverKey, role) {
   const srv = interpolate(bot.mcpServers[serverKey]);
   if (!srv?.url) throw new Error(`MCP server "${serverKey}" has no url (set its secret in the panel)`);
+  if (srv.auth === 'oauth') {
+    // Participants use their own sign-in when connected, otherwise the organizer's (tools still limited per role).
+    const who = role === 'participant' && isConnected(bot.id, serverKey, 'participant', srv.url) ? 'participant' : 'organizer';
+    if (!isConnected(bot.id, serverKey, who, srv.url)) {
+      throw new Error(`Tool service "${serverKey}" is not signed in. An admin needs to click Connect in the panel (Bots → ${bot.name || bot.id}).`);
+    }
+    return mcpConnection(srv.url, { identity: `oauth:${bot.id}:${serverKey}:${who}`, authProvider: runtimeProvider(bot.id, serverKey, who, srv.url) });
+  }
   const tokens = srv.tokens || {};
   // Participants use their own token when configured, otherwise the organizer/default token;
   // the per-role allowlist below is enforced either way.

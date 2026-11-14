@@ -19,6 +19,8 @@ import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool, mcpConnection } from '../core/mcp.js';
 import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
 import { humanCode } from '../core/crypto.js';
+import { organizerConnection } from '../core/tools.js';
+import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES } from '../core/mcp-oauth.js';
 
 const PUBLIC = resolve(import.meta.dirname, 'public');
 const loginAttempts = new Map(); // ip -> [ts]
@@ -204,8 +206,56 @@ export function startPanel({ channel, extend = [] }) {
     send(res, 200, JSON.stringify(doc, null, 2), { 'content-type': 'application/json', 'content-disposition': `attachment; filename="${p.id}.bot.json"` });
     return null;
   });
+  // ---------- tool service sign-in (009) ----------
+  route('POST', '/api/bots/:id/probe', async (req, res, body) => {
+    const url = interpolate(String(body.url || '')).trim();
+    if (!url) return [400, { error: 'Enter the tool service URL first' }];
+    return probeServer(url);
+  });
+  route('GET', '/api/bots/:id/connections', async (req, res, body, q, p) => listConnections(p.id));
+  route('POST', '/api/bots/:id/connections/:server/:role', async (req, res, body, q, p, user) => {
+    const bot = getBot(p.id);
+    const srv = bot?.mcpServers?.[p.server];
+    if (!srv) return [404, { error: 'Save the bot with this tool service first' }];
+    if (srv.auth !== 'oauth') return [400, { error: 'This tool service is not set to Sign in' }];
+    if (!OAUTH_ROLES.includes(p.role)) return [400, { error: 'Unknown role' }];
+    const url = interpolate(srv.url);
+    if (!url) return [400, { error: 'The tool service URL is empty' }];
+    const redirectUri = `${isHttps(req) ? 'https' : 'http'}://${req.headers.host}/oauth/mcp/callback`;
+    return startSignIn({ botId: bot.id, server: p.server, role: p.role, url, redirectUri, by: user.username });
+  });
+  route('DELETE', '/api/bots/:id/connections/:server/:role', async (req, res, body, q, p, user) => {
+    disconnectOAuth(p.id, p.server, p.role, user.username);
+    return { ok: true };
+  });
+  // The browser comes back here from the service. SameSite=Strict means no session cookie on this cross-site
+  // navigation: the single-use state proves the sign-in was started by an admin; the page then returns to the panel.
+  route('GET', '/oauth/mcp/callback', async (req, res, body, q) => {
+    let ok = true; let msg; let botId = '';
+    try {
+      const r = await finishSignIn({ state: q.get('state'), code: q.get('code'), error: q.get('error'), errorDescription: q.get('error_description') });
+      botId = r.botId; msg = `Connected ${r.server} for ${r.role}s.`;
+    } catch (e) { ok = false; msg = e.message; botId = e.botId || ''; }
+    const esc = (x) => String(x).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+    const back = botId ? `/#bots/${encodeURIComponent(botId)}` : '/';
+    const html = `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>${ok ? 'Connected' : 'Sign-in failed'}</title>
+<body style="font:16px -apple-system,system-ui,sans-serif;display:grid;place-items:center;min-height:90vh;margin:0;background:#f4f6f5;color:#14201b">
+<div style="background:#fff;border:1px solid #e3e8e5;border-radius:16px;padding:28px;max-width:440px;text-align:center">
+<div style="font-size:40px">${ok ? '✅' : '⚠️'}</div><h2 style="margin:8px 0">${ok ? 'Connected' : 'Sign-in did not complete'}</h2>
+<p style="color:#5b6a63">${esc(msg)}</p><p><a href="${esc(back)}" id=b style="color:#128c7e;font-weight:600">Back to the panel</a></p></div>
+${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})},1200)</script>` : ''}`;
+    send(res, ok ? 200 : 400, html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP });
+    return null;
+  }, { public: true });
+
   route('POST', '/api/bots/:id/discover', async (req, res, body, q, p) => {
     let url; let token;
+    if (body.auth === 'oauth') {
+      const bot = getBot(p.id);
+      if (!bot?.mcpServers?.[body.server] || bot.mcpServers[body.server].auth !== 'oauth') return [400, { error: 'Save the bot and connect the tool service first' }];
+      const tools = await organizerConnection(bot, body.server).listTools();
+      return tools.map((t) => ({ name: t.name, description: (t.description || '').slice(0, 300) }));
+    }
     if (body.url) { url = interpolate(String(body.url)); token = interpolate(String(body.token || '')); } else {
       const bot = getBot(p.id);
       const srv = bot?.mcpServers?.[body.server];

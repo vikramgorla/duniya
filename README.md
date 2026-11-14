@@ -4,7 +4,8 @@ Run AI assistants in your WhatsApp groups, on your own server, managed from a we
 
 - **Bots built in the panel**: instructions, triggers, who can message them, organizers, schedules. Start from a
   template or import a bot file.
-- **Tools via MCP**: connect any MCP server and tick which tools participants and organizers may use. Changes go
+- **Tools via MCP**: connect any MCP server (**Sign in** with OAuth when the server supports it, or a token) and tick
+  which tools participants and organizers may use. Changes go
   through a **confirm step**: the bot prepares them and an organizer replies `confirm CODE` before anything happens.
 - **Group memory**: bots follow the whole conversation, keep a running summary of long discussions, remember notes
   on request and can search older messages.
@@ -73,7 +74,7 @@ Prefer infrastructure-as-code from your own fork? [docs/deploy/terraform-github-
 2. **Overview**: scan the QR with the bot's WhatsApp (*Settings → Linked devices*), or use a pairing code.
 3. **Models**: paste an Anthropic or OpenAI key, add an OpenAI-compatible endpoint, or *Sign in with ChatGPT*.
 4. **Bots → New bot**: pick a template, write the instructions, add organizers, connect tool services
-   (*Discover tools* → tick per role), save. Use the **test console** to try it.
+   (URL → *Check* → *Connect* to sign in, or a token; *Discover tools* → tick per role), save. Use the **test console** to try it.
 5. Add the bot number to a WhatsApp group. **Chats** → choose the bot for that group.
 6. In the group: `!yourtrigger hello` (or @mention the bot).
 7. **Backups**: set a passphrase, connect GitHub or S3, turn on the schedule.

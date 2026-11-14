@@ -93,6 +93,8 @@ export async function setup({ bindings = {}, env = {}, legacy = null, extend = n
     t.store.setSecret('PANDUGA_TOKEN_ORGANIZER', 'org');
     await t.bots.createBot({ id: 'panduga', config: {
       ...t.bots.templateConfig('event-assistant-panduga'), name: 'Panduga', model: 'claude-sonnet-5-5',
+      // token-based service (OAuth sign-in has its own test, mcp-oauth.test.js)
+      mcpServers: { panduga: { url: '${PANDUGA_MCP_URL}', tokens: { organizer: '${PANDUGA_TOKEN_ORGANIZER}', participant: '${PANDUGA_TOKEN_MEMBER}' } } },
       chats: ['g1@g.us'], organizers: ['+41 79 000 00 01'], ...(bindings.panduga || {}),
     } });
     await t.bots.createBot({ id: 'helper', config: {

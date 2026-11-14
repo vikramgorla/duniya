@@ -1,12 +1,14 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { onSecretChange } from './store.js';
+import { onOAuthChange } from './mcp-oauth.js';
 
-/** Pool of MCP connections keyed by url + token. */
+/** Pool of MCP connections keyed by url + credential (token, or an OAuth sign-in identity). */
 class McpConnection {
-  constructor(url, token) {
+  constructor(url, token, authProvider = null) {
     this.url = url;
     this.token = token;
+    this.authProvider = authProvider;
     this.client = null;
     this.tools = null;
     this.toolsAt = 0;
@@ -14,7 +16,7 @@ class McpConnection {
 
   async connect() {
     const headers = this.token ? { Authorization: `Bearer ${this.token}` } : {};
-    const transport = new StreamableHTTPClientTransport(new URL(this.url), { requestInit: { headers } });
+    const transport = new StreamableHTTPClientTransport(new URL(this.url), { requestInit: { headers }, authProvider: this.authProvider || undefined });
     const client = new Client({ name: 'whatsapp-agent-duniya', version: '1.0.0' });
     await client.connect(transport);
     this.client = client;
@@ -31,7 +33,7 @@ class McpConnection {
         return tools;
       } catch (e) {
         this.client = null;
-        if (attempt === 1) throw new Error(`MCP ${this.url}: ${e.message}`);
+        if (e.reconnect || attempt === 1) throw new Error(e.reconnect ? e.message : `MCP ${this.url}: ${e.message}`);
       }
     }
   }
@@ -45,7 +47,7 @@ class McpConnection {
         return { isError: !!res.isError, text };
       } catch (e) {
         this.client = null;
-        if (attempt === 1) return { isError: true, text: `Tool error: ${e.message}` };
+        if (e.reconnect || attempt === 1) return { isError: true, text: `Tool error: ${e.message}` };
       }
     }
   }
@@ -55,9 +57,15 @@ class McpConnection {
 
 const pool = new Map();
 
-export function mcpConnection(url, token = '') {
-  const key = `${url}\n${token}`;
-  if (!pool.has(key)) pool.set(key, new McpConnection(url, token));
+/**
+ * mcpConnection(url, token) or mcpConnection(url, { authProvider, identity }) for OAuth sign-ins
+ * (identity = a stable key such as "oauth:<bot>:<server>:<role>").
+ */
+export function mcpConnection(url, cred = '') {
+  const oauth = cred && typeof cred === 'object' ? cred : null;
+  const token = oauth ? '' : String(cred || '');
+  const key = `${url}\n${oauth ? oauth.identity : token}`;
+  if (!pool.has(key)) pool.set(key, new McpConnection(url, token, oauth?.authProvider));
   return pool.get(key);
 }
 
@@ -68,3 +76,4 @@ export async function resetMcpPool() {
 }
 
 onSecretChange(() => { resetMcpPool(); });
+onOAuthChange(() => { resetMcpPool(); });

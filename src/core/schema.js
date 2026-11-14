@@ -108,13 +108,13 @@ export function validateBotConfig(input) {
   for (const [key, srv] of Object.entries(c.mcpServers || {})) {
     if (!SERVER_KEY_RE.test(key)) fail(`mcpServers.${key}`, 'name must be lowercase letters, digits or _');
     const tokens = srv?.tokens || {};
-    out.mcpServers[key] = {
-      url: urlOrRef(srv?.url, `mcpServers.${key}.url`),
-      tokens: {
-        organizer: tokenRef(tokens.organizer ?? srv?.token, `mcpServers.${key}.tokens.organizer`),
-        participant: tokenRef(tokens.participant, `mcpServers.${key}.tokens.participant`),
-      },
+    const t = {
+      organizer: tokenRef(tokens.organizer ?? srv?.token, `mcpServers.${key}.tokens.organizer`),
+      participant: tokenRef(tokens.participant, `mcpServers.${key}.tokens.participant`),
     };
+    const authMode = srv?.auth ?? (t.organizer || t.participant ? 'token' : 'none');
+    if (!['oauth', 'token', 'none'].includes(authMode)) fail(`mcpServers.${key}.auth`, 'must be oauth, token or none');
+    out.mcpServers[key] = { url: urlOrRef(srv?.url, `mcpServers.${key}.url`), auth: authMode, tokens: authMode === 'token' ? t : { organizer: '', participant: '' } };
   }
 
   const confirm = c.confirm && (c.confirm.preview || c.confirm.tool) ? c.confirm : null;

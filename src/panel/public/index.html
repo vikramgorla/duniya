@@ -320,7 +320,7 @@ async function renderBots() {
 function openBot(id) { location.hash = `bots/${encodeURIComponent(id)}`; }
 
 async function renderBotEditor(id) {
-  const [b, models, plugins] = await Promise.all([api('GET', `/api/bots/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', '/api/plugins')]);
+  const [b, models, plugins, conns] = await Promise.all([api('GET', `/api/bots/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', '/api/plugins'), api('GET', `/api/bots/${encodeURIComponent(id)}/connections`).catch(() => [])]);
   const c = structuredClone(b.config);
   const F = {};
   const inp = (key, attrs = {}) => (F[key] = h('input', { value: c[key] ?? '', ...attrs }));
@@ -336,7 +336,8 @@ async function renderBotEditor(id) {
   F.organizers = h('textarea', { value: lines(c.organizers), style: 'min-height:60px' });
   F.participants = h('textarea', { value: lines(c.participants), style: 'min-height:50px' });
   // Tool services
-  const servers = Object.entries(c.mcpServers || {}).map(([key, s]) => ({ key, url: s.url, org: s.tokens?.organizer || '', part: s.tokens?.participant || '' }));
+  const servers = Object.entries(c.mcpServers || {}).map(([key, s]) => ({ key, url: s.url, auth: s.auth || 'token', savedUrl: s.url, savedAuth: s.auth, org: s.tokens?.organizer || '', part: s.tokens?.participant || '' }));
+  const ROLE_LABEL = { organizer: 'Organizers', participant: 'Participants' };
   const rules = { participant: [...(c.tools?.participant || [])], organizer: [...(c.tools?.organizer || [])], deny: [...(c.tools?.deny || [])] };
   const rulesBox = { participant: h('textarea', { value: lines(rules.participant), style: 'min-height:60px' }), organizer: h('textarea', { value: lines(rules.organizer), style: 'min-height:60px' }), deny: h('textarea', { value: lines(rules.deny), style: 'min-height:40px' }) };
   const glob = (p) => new RegExp(`^${p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
@@ -349,11 +350,41 @@ async function renderBotEditor(id) {
       const org = h('input', { value: s.org, placeholder: '${ORGANIZER_TOKEN_SECRET}', oninput: (e) => (s.org = e.target.value.trim()) });
       const part = h('input', { value: s.part, placeholder: '${PARTICIPANT_TOKEN_SECRET} (optional)', oninput: (e) => (s.part = e.target.value.trim()) });
       const grid = h('div', {});
+      const authSel = h('select', { onchange: (e) => { s.auth = e.target.value; drawServers(); } },
+        [['oauth', 'Sign in (OAuth)'], ['token', 'Token (secret)'], ['none', 'No credentials']].map(([v, l]) => h('option', { value: v, selected: s.auth === v }, l)));
+      const savedSame = s.savedAuth === 'oauth' && s.auth === 'oauth' && s.savedUrl === s.url && s.key;
+      const connRow = (role) => {
+        const cn = conns.find((x) => x.server === s.key && x.role === role && x.url === s.url);
+        const status = !savedSame ? h('span', { class: 'small muted' }, 'Save the bot to connect')
+          : !cn ? h('span', { class: 'pill' }, role === 'participant' ? 'Not connected (uses the organizer sign-in, participant tools only)' : 'Not connected')
+            : cn.status === 'connected' ? h('span', { class: 'pill ok' }, `Connected${cn.connectedBy ? ` by ${cn.connectedBy}` : ''} · ${time(cn.connectedAt)}`)
+              : h('span', { class: 'pill warn' }, 'Reconnect needed');
+        const connect = async () => {
+          if (!savedSame && !(await save())) return;
+          const r = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/connections/${encodeURIComponent(s.key)}/${role}`));
+          if (r?.authorizeUrl) location.href = r.authorizeUrl;
+        };
+        return h('div', { class: 'row', style: 'align-items:center;margin-top:6px' }, h('b', { style: 'min-width:110px' }, ROLE_LABEL[role]), status,
+          h('button', { class: 'btn small', onclick: connect }, cn ? 'Reconnect' : 'Connect'),
+          cn ? h('button', { class: 'btn small danger mut', onclick: async () => { if (await tryApi(() => api('DELETE', `/api/bots/${encodeURIComponent(id)}/connections/${encodeURIComponent(s.key)}/${role}`), 'Signed out')) { conns.splice(conns.indexOf(cn), 1); drawServers(); } } }, 'Disconnect') : null);
+      };
+      const check = h('button', { class: 'btn small', onclick: async () => {
+        const r = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/probe`, { url: s.url }));
+        if (!r) return;
+        const moved = r.url !== s.url && !s.url.startsWith('${');
+        if (moved) s.url = r.url;
+        s.auth = r.auth;
+        drawServers();
+        toast(`${r.auth === 'oauth' ? `Uses sign-in (OAuth)${r.name ? `: ${r.name}` : ''}` : r.auth === 'none' ? 'Open, no credentials needed' : 'Needs a token'}${moved ? ' · URL updated to the final address' : ''}`);
+      } }, 'Check');
+      const creds = s.auth === 'oauth'
+        ? h('div', { style: 'margin-top:8px' }, h('div', { class: 'small muted' }, 'Sign in on the service for each role. You will come back here when done.'), connRow('organizer'), connRow('participant'))
+        : s.auth === 'token' ? h('div', {}, field('Organizer credential (secret reference)', org), field('Participant credential (optional; least privilege)', part)) : null;
       return h('fieldset', {}, h('legend', {}, s.key || 'new tool service'),
-        h('div', { class: 'row' }, key, url), field('Organizer credential (secret reference)', org), field('Participant credential (optional; least privilege)', part),
+        h('div', { class: 'row' }, key, url, check), field('Authentication', authSel), creds,
         h('div', { class: 'row', style: 'margin-top:8px' },
           h('button', { class: 'btn small', onclick: async () => {
-            const tools = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/discover`, { url: s.url, token: s.org }));
+            const tools = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/discover`, s.auth === 'oauth' ? { auth: 'oauth', server: s.key } : { url: s.url, token: s.auth === 'token' ? s.org : '' }));
             if (!tools) return;
             const fq = (t) => `${s.key}:${t.name}`;
             const set = (role, name, on) => {
@@ -407,7 +438,7 @@ async function renderBotEditor(id) {
       triggers: splitLines(F.triggers.value), respondToMentions: F.respondToMentions.checked, dm: F.dm.value,
       organizers: splitLines(F.organizers.value), participants: splitLines(F.participants.value), timezone: F.timezone.value.trim(),
       historySize: Number(F.historySize.value), maxTokens: Number(F.maxTokens.value), memory: { enabled: F.memory.checked },
-      mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, { url: s.url, tokens: { organizer: s.org, participant: s.part } }])),
+      mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, { url: s.url, auth: s.auth, tokens: s.auth === 'token' ? { organizer: s.org, participant: s.part } : {} }])),
       tools: { participant: splitLines(rulesBox.participant.value), organizer: splitLines(rulesBox.organizer.value), deny: splitLines(rulesBox.deny.value) },
       confirm: F.confirmOn.checked ? { preview: F.cPreview.value.trim(), tool: F.cTool.value.trim(), idField: F.cId.value.trim(), ttlMinutes: Number(F.cTtl.value) } : null,
       schedules: scheds, plugins: F.plugins.map((l) => l.querySelector('input')).filter((x) => x.checked).map((x) => x.value),
@@ -415,7 +446,9 @@ async function renderBotEditor(id) {
     try {
       const r = await api('PUT', `/api/bots/${encodeURIComponent(id)}`, config);
       toast(r.warnings?.length ? `Saved — ${r.warnings.join('; ')}` : 'Saved');
-    } catch (e) { toast(e.field ? `${e.field}: ${e.message.replace(/^[^:]+: /, '')}` : e.message); }
+      for (const sv of servers) { sv.savedUrl = sv.url; sv.savedAuth = sv.auth; }
+      return true;
+    } catch (e) { toast(e.field ? `${e.field}: ${e.message.replace(/^[^:]+: /, '')}` : e.message); return false; }
   }
 
   // Test console
@@ -452,8 +485,8 @@ async function renderBotEditor(id) {
           field('Organizers (phone numbers with country code, one per line)', F.organizers, 'Organizers can use organizer tools and confirm changes.'),
           field('Extra participants allowed to DM', F.participants)),
         h('fieldset', {}, h('legend', {}, 'Tool services (MCP)'),
-          h('p', { class: 'small muted', style: 'margin-top:0' }, 'Credentials are references to Secrets, like ${PANDUGA_TOKEN}. Discover tools, then tick what each role may use.'),
-          srvList, h('button', { class: 'btn small mut', onclick: () => { servers.push({ key: '', url: '', org: '', part: '' }); drawServers(); } }, '+ Add tool service'),
+          h('p', { class: 'small muted', style: 'margin-top:0' }, 'Enter the service URL and click Check: services that support sign-in (OAuth) get a Connect button; others use a token stored under Secrets, like ${MY_TOKEN}. Then discover tools and tick what each role may use.'),
+          srvList, h('button', { class: 'btn small mut', onclick: () => { servers.push({ key: '', url: '', auth: 'oauth', org: '', part: '' }); drawServers(); } }, '+ Add tool service'),
           h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted' }, 'Advanced: tool rules'),
             field('Participant rules', rulesBox.participant), field('Organizer rules', rulesBox.organizer), field('Never allowed', rulesBox.deny))),
         h('fieldset', {}, h('legend', {}, 'Changes need confirmation'),
