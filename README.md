@@ -55,7 +55,7 @@ See [docs/deploy/docker.md](docs/deploy/docker.md).
 
 ### Deploy to Oracle Cloud (Always Free)
 
-[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/oci-stack.zip)
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip)
 
 Creates a free VM that installs itself. Walkthrough and tips: [docs/deploy/oci-free-tier.md](docs/deploy/oci-free-tier.md).
 Prefer infrastructure-as-code from your own fork? [docs/deploy/terraform-github-actions.md](docs/deploy/terraform-github-actions.md).

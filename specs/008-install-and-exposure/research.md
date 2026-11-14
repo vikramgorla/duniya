@@ -15,7 +15,7 @@
 ## Deploy to Oracle Cloud button
 
 - `https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=<zip>`; zip from
-  `https://github.com/<owner>/<repo>/releases/latest/download/oci-stack.zip` (public repo).
+  `https://github.com/<owner>/<repo>/releases/latest/download/whatsapp-agent-duniya.zip` (public repo).
 - Resource Manager provides `tenancy_ocid`, `region`, `compartment_ocid` variables; `schema.yaml` defines the form.
 
 ## Updates

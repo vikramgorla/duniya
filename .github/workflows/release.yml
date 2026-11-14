@@ -44,14 +44,14 @@ jobs:
 
       - name: Build OCI Resource Manager stack zip
         if: steps.v.outputs.skip == 'false'
-        run: cd infra/oci && zip -r ../../oci-stack.zip . -x '.terraform/*' '*.tfstate*' 'backend.tf'
+        run: cd infra/oci && zip -r ../../whatsapp-agent-duniya.zip . -x '.terraform/*' '*.tfstate*' 'backend.tf'
 
       - name: Create GitHub release (creates the tag if needed)
         if: steps.v.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ steps.v.outputs.version }}" oci-stack.zip \
+          gh release create "${{ steps.v.outputs.version }}" whatsapp-agent-duniya.zip \
             --target "$GITHUB_SHA" --title "${{ steps.v.outputs.version }}" --generate-notes
 
       - uses: docker/setup-qemu-action@v3
