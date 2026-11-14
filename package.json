@@ -18,5 +18,8 @@
     "baileys": "7.0.0-rc14",
     "pino": "^10.4.0",
     "qrcode": "^1.5.4"
+  },
+  "optionalDependencies": {
+    "@github/copilot-sdk": "1.0.34"
   }
 }

@@ -10,8 +10,10 @@ Run AI assistants in your WhatsApp groups, on your own server, managed from a we
   through a **confirm step**: the bot prepares them and an organizer replies `confirm CODE` before anything happens.
 - **Group memory**: bots follow the whole conversation, keep a running summary of long discussions, remember notes
   on request and can search older messages.
-- **Your choice of models**: Anthropic API key, OpenAI API key, any OpenAI-compatible endpoint (OpenRouter, Ollama,
-  …), or your **ChatGPT Plus/Pro plan** via Sign in with ChatGPT. Pick per bot, or *Auto*.
+- **Your choice of models**, set up with guided steps: OpenRouter in one tap (free models only, if you like),
+  Anthropic API key, OpenAI API key, any OpenAI-compatible endpoint (Ollama, …), your **ChatGPT Plus/Pro plan** via
+  Sign in with ChatGPT, or your **GitHub Copilot** allowance via the official Copilot SDK (optional package). Pick per
+  bot, or *Auto*; test each connection with one tap.
 - **Several WhatsApp numbers**, groups and 1:1 chats: choose the bot, the model (or Auto) and the logging level per
   chat.
 - **Server page**: CPU, memory, disk, network, logs, OS updates and restart — no SSH needed.
