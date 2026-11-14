@@ -3,6 +3,7 @@ import { listBots, getBot, botForChat, roleIn } from './bots.js';
 import { runAgent, handleConfirmCommand } from './agent.js';
 import { logMessage } from './db.js';
 import { activity } from './events.js';
+import { maybeSummarize } from './memory.js';
 
 const rate = new Map();
 function rateLimited(key) {
@@ -14,10 +15,7 @@ function rateLimited(key) {
 }
 
 const isAnyOrganizer = (phone) => !!phone && listBots().some((b) => b.organizers.includes(phone));
-
-function startsWithTrigger(bot, lower) {
-  return (bot.triggers || []).find((t) => lower.startsWith(t));
-}
+const startsWithTrigger = (bot, lower) => (bot.triggers || []).find((t) => lower.startsWith(t));
 
 function stripTriggers(bot, text) {
   let t = text.replace(/@\d{5,}/g, ' ').trim();
@@ -46,11 +44,43 @@ async function botForDm(msg, channel) {
   return null;
 }
 
-/** Build the router for a channel. */
+const summarizeLater = (chat, bot) => { maybeSummarize(chat, bot).catch(() => {}); };
+
+/** Store WhatsApp history batches (link/reconnect sync). Never replies. Group chats only. */
+export function createHistoryHandler() {
+  return async function onHistory(msgs) {
+    const touched = new Map();
+    let stored = 0;
+    for (const m of msgs) {
+      if (!m.isGroup) continue; // never store private chats from history
+      const bot = botForChat(m.chat);
+      const id = logMessage({
+        channel: m.channel, chat: m.chat, bot: bot?.id || '', msgId: m.msgId, sender: m.phone, name: m.senderName,
+        text: m.text, quoted: m.quoted, fromBot: m.fromMe, ts: m.ts,
+      });
+      if (id) { stored++; touched.set(m.chat, bot); }
+    }
+    if (stored) activity('memory.history', { summary: `Stored ${stored} history message(s) from ${touched.size} group(s)` });
+    for (const [chat, bot] of touched) summarizeLater(chat, bot);
+  };
+}
+
+/** Build the live message router for a channel. */
 export function createRouter(channel) {
   return async function onMessage(msg) {
-    if (getSettings().paused) return;
     const lower = msg.text.trim().toLowerCase();
+    const groupBot = msg.isGroup ? botForChat(msg.chat) : null;
+
+    // Groups: remember everything said (bound or not, paused or not) so bots have context.
+    let rowId = 0;
+    if (msg.isGroup) {
+      rowId = logMessage({
+        channel: msg.channel, chat: msg.chat, bot: groupBot?.id || '', msgId: msg.msgId, sender: msg.phone,
+        name: msg.senderName, text: msg.text, quoted: msg.quoted, ts: msg.ts,
+      });
+      summarizeLater(msg.chat, groupBot);
+    }
+    if (getSettings().paused) return;
 
     // Admin helpers for organizers of any bot
     if (isAnyOrganizer(msg.phone)) {
@@ -65,12 +95,16 @@ export function createRouter(channel) {
       }
     }
 
-    const bot = msg.isGroup ? botForChat(msg.chat) : await botForDm(msg, channel);
+    const bot = msg.isGroup ? groupBot : await botForDm(msg, channel);
     if (!bot || !bot.enabled) return;
+    if (!msg.isGroup) {
+      rowId = logMessage({
+        channel: msg.channel, chat: msg.chat, bot: bot.id, msgId: msg.msgId, sender: msg.phone,
+        name: msg.senderName, text: msg.text, quoted: msg.quoted, addressed: true, ts: msg.ts,
+      });
+    }
 
     const role = bot.hooks.role ? (await bot.hooks.role(msg, bot)) || roleIn(bot, msg.phone) : roleIn(bot, msg.phone);
-    logMessage({ channel: msg.channel, chat: msg.chat, bot: bot.id, sender: msg.phone, name: msg.senderName, text: msg.text });
-
     const isConfirm = /^(confirm|cancel)\s+[a-z0-9]{4}$/i.test(lower);
     const addressed = !msg.isGroup
       || (bot.respondToMentions && (msg.mentioned || msg.replyToBot))
@@ -97,7 +131,7 @@ export function createRouter(channel) {
     activity('message.in', {
       bot: bot.id, chat: msg.chat,
       summary: `${msg.senderName} (${role}): ${text}`,
-      detail: { phone: msg.phone, isGroup: msg.isGroup },
+      detail: { phone: msg.phone, isGroup: msg.isGroup, quoted: msg.quoted || undefined },
     });
 
     if (out === undefined) {
@@ -105,7 +139,8 @@ export function createRouter(channel) {
       await channel.typing?.(msg.chat);
       const ctx = {
         bot, role, chat: msg.chat, senderName: msg.senderName, requester: msg.phone,
-        text, isGroup: msg.isGroup, source: msg.channel,
+        text, isGroup: msg.isGroup, source: msg.channel, msgRowId: rowId,
+        chatName: msg.isGroup ? await channel.chatName?.(msg.chat) : '',
       };
       try {
         out = await runAgent(ctx);
@@ -117,8 +152,11 @@ export function createRouter(channel) {
     if (out) await reply(out);
 
     async function reply(text) {
-      await channel.send(msg.chat, text, { quoted: msg.raw });
-      logMessage({ channel: msg.channel, chat: msg.chat, bot: bot.id, sender: 'bot', name: 'Assistant', text, fromBot: true });
+      const sent = await channel.send(msg.chat, text, { quoted: msg.raw });
+      logMessage({
+        channel: msg.channel, chat: msg.chat, bot: bot.id, msgId: sent?.msgId || null, sender: 'bot',
+        name: 'Assistant', text, fromBot: true,
+      });
       activity('message.out', { bot: bot.id, chat: msg.chat, summary: text });
     }
   };

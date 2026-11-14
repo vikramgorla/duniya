@@ -1,23 +1,15 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { env, getSecret, onSecretChange } from './config.js';
-import { history, addPending, takePending, peekPending, dropPending } from './db.js';
+import { env } from './config.js';
+import { addPending, takePending, peekPending, dropPending } from './db.js';
+import { claude } from './llm.js';
+import { buildContext } from './memory.js';
 import { activity } from './events.js';
 import { toolsFor, matchesAny, organizerConnection } from './tools.js';
-
-let anthropic = null;
-onSecretChange((name) => { if (name === 'ANTHROPIC_API_KEY') anthropic = null; });
-function claude() {
-  const apiKey = getSecret('ANTHROPIC_API_KEY');
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set (Panel → Secrets)');
-  if (!anthropic) anthropic = new Anthropic({ apiKey });
-  return anthropic;
-}
 
 const MAX_TOOL_ROUNDS = 8;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from({ length: 4 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
 
-function systemPrompt({ bot, role, isGroup }) {
+function systemPrompt({ bot, role, isGroup, chatName }) {
   const now = new Date().toLocaleString('en-GB', { timeZone: bot.timezone || env.timezone });
   const roleText = role === 'organizer'
     ? (bot.confirm
@@ -26,7 +18,8 @@ function systemPrompt({ bot, role, isGroup }) {
     : 'They are a participant: they can ask questions. If they want something changed, say an organizer needs to do it.';
   return [
     bot.prompt.trim(),
-    `Current time: ${now} (${bot.timezone || env.timezone}). Chat type: ${isGroup ? 'WhatsApp group (shared, keep personal details out)' : 'WhatsApp direct message'}.`,
+    `Current time: ${now} (${bot.timezone || env.timezone}). Chat type: ${isGroup ? 'WhatsApp group (shared, keep personal details out)' : 'WhatsApp direct message'}${chatName ? ` named "${chatName}"` : ''}.`,
+    'You see the recent conversation of this chat, a running summary of older discussion and saved notes. Use them to stay aware of what people have said and decided. When someone asks you to remember something, save it with the memory tool. If something older is not in your context, search the chat history before saying you do not know.',
     roleText,
     'Write for WhatsApp: short plain text, *bold* sparingly, simple "-" lists, no markdown headings or tables.',
     bot.extraPrompt?.trim() || '',
@@ -57,13 +50,10 @@ export async function runAgent(ctx) {
   const { defs, run, meta } = await toolsFor(bot, role);
   for (const err of meta.get('__errors') || []) activity('error', { bot: bot.id, chat, summary: err });
 
-  const past = history(chat, bot.historySize)
-    .filter((m) => !(m.from_bot === 0 && m.text === text))
-    .map((m) => `${m.from_bot ? 'Assistant' : m.name || m.sender}: ${m.text}`)
-    .join('\n');
+  const memory = buildContext({ bot, chat, excludeId: ctx.msgRowId || 0 });
   const messages = [{
     role: 'user',
-    content: `${past ? `Recent chat:\n${past}\n\n` : ''}New message from ${senderName} (${role}):\n${text}`,
+    content: `${memory ? `${memory}\n\n` : ''}New message from ${senderName} (${role}):\n${text}`,
   }];
 
   const codes = [];
@@ -74,7 +64,7 @@ export async function runAgent(ctx) {
     const res = await claude().messages.create({
       model: bot.model,
       max_tokens: bot.maxTokens,
-      system: systemPrompt({ bot, role, isGroup }),
+      system: systemPrompt({ bot, role, isGroup, chatName: ctx.chatName }),
       tools: defs,
       messages,
     });

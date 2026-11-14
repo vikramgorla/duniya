@@ -1,5 +1,6 @@
 import { interpolate } from './config.js';
 import { mcpConnection } from './mcp.js';
+import { memoryTools, memoryEnabled, MEMORY_DEFAULT_ALLOW } from './memory.js';
 
 /** "panduga:*_preview" style globs. */
 export function globToRegex(glob) {
@@ -64,6 +65,17 @@ export async function toolsFor(bot, role) {
     const name = exposedName('local', t.name);
     defs.push({ name, description: t.description || '', input_schema: t.input_schema || { type: 'object', properties: {} } });
     meta.set(name, { kind: 'local', fq, tool: t });
+  }
+
+  if (memoryEnabled(bot)) {
+    const memAllow = [...allow, ...(MEMORY_DEFAULT_ALLOW[role] || [])];
+    for (const t of memoryTools) {
+      const fq = `memory:${t.name}`;
+      if (!t.roles.includes(role) || !matchesAny(fq, memAllow) || matchesAny(fq, deny)) continue;
+      const name = exposedName('memory', t.name);
+      defs.push({ name, description: t.description, input_schema: t.input_schema });
+      meta.set(name, { kind: 'local', fq, tool: t });
+    }
   }
 
   async function run(name, input, ctx) {

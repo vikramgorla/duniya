@@ -31,6 +31,14 @@ export const env = {
   adminPassword: process.env.ADMIN_PASSWORD || '',
   timezone: process.env.TZ_DEFAULT || 'Europe/Zurich',
   rateLimitPerMin: Number(process.env.RATE_LIMIT_PER_MIN || 6),
+  summaryModel: process.env.SUMMARY_MODEL || 'claude-haiku-5-5',
+  memory: {
+    summarizeBatch: Number(process.env.MEMORY_SUMMARIZE_BATCH || 40),
+    retentionDays: Number(process.env.MEMORY_RETENTION_DAYS || 90),
+    maxMessagesPerChat: Number(process.env.MEMORY_MAX_MESSAGES || 5000),
+    maxNotesPerChat: 200,
+    notesInContext: 40,
+  },
 };
 
 export const digits = (s) => String(s ?? '').replace(/\D/g, '');

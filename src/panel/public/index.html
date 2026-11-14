@@ -97,7 +97,7 @@ async function api(method, path, body) {
 }
 const ago = (ts) => { const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s / 60)}m` : s < 86400 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`; };
 const time = (ts) => new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-const TYPE_CLASS = { 'message.in': 'info', 'message.out': 'ok', 'tool.call': '', 'tool.error': 'bad', error: 'bad', 'confirm.created': 'warn', 'confirm.applied': 'ok', 'confirm.cancelled': 'warn', 'channel.status': 'info', 'schedule.run': 'info', 'bot.updated': '', system: '' };
+const TYPE_CLASS = { 'message.in': 'info', 'message.out': 'ok', 'tool.call': '', 'tool.error': 'bad', error: 'bad', 'confirm.created': 'warn', 'confirm.applied': 'ok', 'confirm.cancelled': 'warn', 'channel.status': 'info', 'schedule.run': 'info', 'bot.updated': '', system: '', 'memory.summary': 'info', 'memory.history': '', 'memory.note.added': 'ok', 'memory.note.removed': 'warn', 'memory.erased': 'bad' };
 function toggle(checked, onchange) { return h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked, onchange: (e) => onchange(e.target.checked) }), h('span')); }
 
 // ---------- state ----------
@@ -304,13 +304,30 @@ async function renderChats() {
   const m = $('#main');
   m.replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading groups…')));
   const [chats, bots] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/bots')]);
+  const memBox = h('div', { id: 'memory-box' });
   const rows = chats.map((c) => h('tr', {},
-    h('td', {}, h('b', {}, c.name), h('div', { class: 'small muted' }, `${c.size} members · ${c.id}`)),
+    h('td', {}, h('b', {}, c.name), h('div', { class: 'small muted' }, `${c.size} members · ${c.id}`),
+      h('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => renderMemory(c, memBox) }, 'Memory')),
     h('td', { style: 'width:200px' }, h('select', { onchange: async (e) => { await api('POST', '/api/chats/bind', { chat: c.id, bot: e.target.value || null }); toast(e.target.value ? `Bound to ${e.target.value}` : 'Unbound'); } },
       h('option', { value: '' }, '— no bot —'), bots.map((b) => h('option', { value: b.id, selected: c.bot === b.id }, b.name))))));
   m.replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'WhatsApp groups'),
     h('p', { class: 'small muted' }, 'Add the bot number to a group in WhatsApp, then pick which bot answers there. Each group has at most one bot.'),
-    chats.length ? h('table', {}, h('tbody', {}, rows)) : h('p', { class: 'muted' }, 'No groups yet (or WhatsApp is not connected).')));
+    chats.length ? h('table', {}, h('tbody', {}, rows)) : h('p', { class: 'muted' }, 'No groups yet (or WhatsApp is not connected).')), memBox);
+}
+async function renderMemory(c, box) {
+  const enc = encodeURIComponent(c.id);
+  const m = await api('GET', `/api/chats/${enc}/memory`);
+  const notes = m.notes.map((n) => h('li', { style: 'margin:6px 0' }, h('span', {}, n.text), h('span', { class: 'small muted' }, ` — ${n.author || '?'} (${n.role || 'note'}), ${time(n.ts)} `),
+    h('button', { class: 'btn small', onclick: async () => { await api('DELETE', `/api/notes/${n.id}`); toast('Note deleted'); renderMemory(c, box); } }, 'Delete')));
+  box.replaceChildren(h('div', { class: 'card', style: 'margin-top:14px' },
+    h('div', { class: 'row spread' }, h('h2', {}, `Memory · ${c.name}`), h('span', { class: 'pill' }, `${m.messageCount} stored messages`)),
+    h('label', {}, m.updatedAt ? `Running summary (updated ${time(m.updatedAt)})` : 'Running summary'),
+    h('pre', {}, m.summary || '(no summary yet — it starts once older messages accumulate)'),
+    h('label', {}, `Notes (${m.notes.length})`), m.notes.length ? h('ul', { class: 'small' }, notes) : h('p', { class: 'small muted' }, 'No notes.'),
+    h('div', { class: 'row', style: 'margin-top:10px' },
+      h('button', { class: 'btn', onclick: async (e) => { e.target.disabled = true; try { await api('POST', `/api/chats/${enc}/memory/summarize`); toast('Summary rebuilt'); } catch (x) { toast(x.message); } renderMemory(c, box); } }, 'Rebuild summary'),
+      h('button', { class: 'btn danger', onclick: async () => { if (confirm(`Erase all stored messages, the summary and notes for "${c.name}"?`)) { await api('DELETE', `/api/chats/${enc}/memory`); toast('Memory erased'); renderMemory(c, box); } } }, 'Erase memory'))));
+  box.scrollIntoView({ behavior: 'smooth' });
 }
 
 // ---------- pending ----------

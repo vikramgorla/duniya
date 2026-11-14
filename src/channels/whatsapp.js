@@ -20,6 +20,7 @@ const AUTH_DIR = resolve(DATA_DIR, 'whatsapp-auth');
 export function createWhatsAppChannel() {
   let sock = null;
   let onMessage = () => {};
+  let onHistory = () => {};
   let state = { status: 'starting', qr: null, pairingCode: null, me: null, since: Date.now(), lastError: null };
   let retries = 0;
   let stopping = false;
@@ -71,8 +72,13 @@ export function createWhatsAppChannel() {
       }
     });
 
+    // History delivered on link/reconnect (store only, never answered)
+    sock.ev.on('messaging-history.set', async ({ messages }) => {
+      await deliverHistory(messages || []);
+    });
+
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-      if (type !== 'notify') return;
+      if (type !== 'notify') { await deliverHistory(messages || []); return; }
       for (const msg of messages) {
         try {
           const info = await normalize(msg);
@@ -84,6 +90,19 @@ export function createWhatsAppChannel() {
     });
   }
 
+  async function deliverHistory(messages) {
+    const out = [];
+    for (const m of messages) {
+      try { const info = await normalize(m, { includeOwn: true }); if (info) out.push(info); } catch { /* skip */ }
+    }
+    if (out.length) {
+      try { await onHistory(out); } catch (e) { activity('error', { summary: `History store failed: ${e.message}` }); }
+    }
+  }
+
+  const textOf = (c) => c?.conversation || c?.extendedTextMessage?.text || c?.imageMessage?.caption
+    || c?.videoMessage?.caption || c?.documentMessage?.caption || '';
+
   async function phoneOf(jid, alt) {
     for (const j of [alt, jid]) if (isPnUser(j)) return digits(jidNormalizedUser(j).split('@')[0]);
     if (isLidUser(jid)) {
@@ -93,21 +112,24 @@ export function createWhatsAppChannel() {
     return '';
   }
 
-  async function normalize(msg) {
-    if (!msg.message || msg.key.fromMe) return null;
+  async function normalize(msg, { includeOwn = false } = {}) {
+    if (!msg?.message || (msg.key.fromMe && !includeOwn)) return null;
     const chat = msg.key.remoteJid;
     if (!chat || chat === 'status@broadcast' || chat.endsWith('@newsletter')) return null;
     const c = normalizeMessageContent(msg.message);
-    const text = c?.conversation || c?.extendedTextMessage?.text || c?.imageMessage?.caption || c?.videoMessage?.caption || '';
+    const text = textOf(c);
     if (!text.trim()) return null;
     const isGroup = !!isJidGroup(chat);
-    const senderJid = isGroup ? msg.key.participant : chat;
-    const phone = await phoneOf(senderJid, isGroup ? msg.key.participantAlt : msg.key.remoteJidAlt);
-    const ctx = c?.extendedTextMessage?.contextInfo;
+    const fromMe = !!msg.key.fromMe;
+    const senderJid = fromMe ? sock.user?.id : isGroup ? msg.key.participant : chat;
+    const phone = fromMe ? '' : await phoneOf(senderJid, isGroup ? msg.key.participantAlt : msg.key.remoteJidAlt);
+    const ctx = c?.extendedTextMessage?.contextInfo || c?.imageMessage?.contextInfo || c?.videoMessage?.contextInfo;
+    const quoted = ctx?.quotedMessage ? textOf(normalizeMessageContent(ctx.quotedMessage)).slice(0, 500) : '';
     const botIds = [sock.user?.id, sock.user?.lid].filter(Boolean).map(jidNormalizedUser);
+    const ts = Number(msg.messageTimestamp || 0) * 1000 || Date.now();
     return {
-      channel: 'whatsapp', raw: msg, chat, isGroup, text, phone, senderJid,
-      senderName: msg.pushName || phone || 'someone',
+      channel: 'whatsapp', raw: msg, chat, isGroup, text, phone, senderJid, fromMe, quoted, msgId: msg.key.id || null, ts,
+      senderName: fromMe ? 'Assistant' : msg.pushName || phone || 'someone',
       mentioned: (ctx?.mentionedJid || []).some((j) => botIds.includes(jidNormalizedUser(j))),
       replyToBot: !!ctx?.participant && botIds.includes(jidNormalizedUser(ctx.participant)),
     };
@@ -123,10 +145,20 @@ export function createWhatsAppChannel() {
 
   return {
     id: 'whatsapp',
-    async start(handler) { onMessage = handler; await connect(); },
+    async start(handler, { onHistory: historyHandler } = {}) {
+      onMessage = handler;
+      if (historyHandler) onHistory = historyHandler;
+      await connect();
+    },
+    /** Sends text; returns { msgId } of the sent message. */
     async send(chat, text, { quoted } = {}) {
       if (state.status !== 'open') throw new Error('WhatsApp is not connected');
-      return sock.sendMessage(chat, { text }, quoted ? { quoted } : undefined);
+      const sent = await sock.sendMessage(chat, { text }, quoted ? { quoted } : undefined);
+      return { msgId: sent?.key?.id || null };
+    },
+    async chatName(chat) {
+      if (!isJidGroup(chat) || state.status !== 'open') return '';
+      try { return (await groupMeta(chat)).subject || ''; } catch { return ''; }
     },
     async typing(chat) { await sock?.sendPresenceUpdate('composing', chat).catch(() => {}); },
     async listChats() {

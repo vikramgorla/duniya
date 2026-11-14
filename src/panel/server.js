@@ -10,6 +10,9 @@ import { bus, activity } from '../core/events.js';
 import { runAgent, handleConfirmCommand, applyPending } from '../core/agent.js';
 import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool } from '../core/mcp.js';
+import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
+import { deleteNote, getNote } from '../core/db.js';
+import { botForChat } from '../core/bots.js';
 
 const PUBLIC = resolve(import.meta.dirname, 'public');
 const SESSION_MS = 7 * 24 * 3600 * 1000;
@@ -175,6 +178,22 @@ export function startPanel({ channel }) {
     return [...chats, ...missing].map((c) => ({ ...c, bot: owner.get(c.id) || '' }));
   });
   route('POST', '/api/chats/bind', async (req, res, body) => { bindChat(String(body.chat), body.bot || null); return { ok: true }; });
+
+  // ---------- memory (004) ----------
+  route('GET', '/api/chats/:chat/memory', async (req, res, body, q, p) => memoryView(decodeURIComponent(p.chat)));
+  route('POST', '/api/chats/:chat/memory/summarize', async (req, res, body, q, p) => {
+    const chat = decodeURIComponent(p.chat);
+    const summary = await maybeSummarize(chat, botForChat(chat), { force: true });
+    return { summary: summary ?? memoryView(chat).summary };
+  });
+  route('DELETE', '/api/chats/:chat/memory', async (req, res, body, q, p) => { eraseChatMemory(decodeURIComponent(p.chat)); return { ok: true }; });
+  route('DELETE', '/api/notes/:id', async (req, res, body, q, p) => {
+    const note = getNote(p.id);
+    if (!note) return [404, { error: 'Not found' }];
+    deleteNote(p.id);
+    activity('memory.note.removed', { chat: note.chat, summary: `#${p.id} (panel)` });
+    return { ok: true };
+  });
 
   // ---------- pending ----------
   route('GET', '/api/pending', async () => listPending());

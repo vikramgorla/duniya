@@ -19,7 +19,7 @@ WhatsApp groups / DMs
 
 | Bot | What it does |
 |---|---|
-| `panduga` | panduga.ch event assistant: agenda, menu, rooms, shopping via the panduga.ch MCP. Organizers make changes with preview + `confirm CODE`. |
+| `panduga` | panduga.ch event assistant: agenda, menu, rooms, shopping via the panduga.ch MCP, aware of the group's discussion. Organizers make changes with preview + `confirm CODE`. |
 | `_template` | Copy to start a new bot (shows MCP config, local tools, hooks). Ignored while it starts with `_`. |
 
 ## Setup
@@ -57,6 +57,21 @@ Follow **[docs/SETUP.md](docs/SETUP.md)**: create an OCI API key, add GitHub sec
 
 Add a bot: copy `bots/_template` to `bots/<id>`, edit it, push, then click **Update from GitHub** and **Reload bots** in the panel. Bind a group to it on the **Chats** tab.
 
+## Memory (context awareness)
+
+Every bot sees what is happening in its group, not only messages addressed to it:
+
+- **All group messages are stored** (bound or not, including reply-quotes and the history WhatsApp delivers when
+  the number is linked), so a bot bound later still has context. Retention: 90 days / 5,000 messages per chat.
+- **Recent messages** (last 30, per bot `historySize`) go to the model verbatim.
+- **Rolling summary**: older messages are folded into a per-chat summary (decisions, plans, open questions, who is
+  who) by a low-cost model (`SUMMARY_MODEL`, default `claude-haiku-5-5`) in the background.
+- **Notes**: "remember that…" saves a note via `memory__remember`; organizers can `memory__forget`;
+  `memory__search_history` finds older messages by keyword.
+- Memory is passed as information, never as instructions, and can't change roles or permissions.
+- Panel → Chats → **Memory** shows the summary, notes and message count, and can rebuild or erase it.
+- Opt out per bot with `"memory": { "enabled": false }`.
+
 ## Admin panel
 
 - **Overview**: WhatsApp status, QR / pairing code, unlink, pause-all kill switch, per-bot on/off, server info, *Update from GitHub*.
@@ -68,12 +83,28 @@ Add a bot: copy `bots/_template` to `bots/<id>`, edit it, push, then click **Upd
 
 Login is password-based (scrypt, HttpOnly SameSite=Strict session cookie, rate-limited). It listens on 127.0.0.1 only; put Cloudflare Access in front of the tunnel hostname for a second factor.
 
+## Spec-driven development (GitHub Spec Kit)
+
+This repo is built with [GitHub Spec Kit](https://github.com/github/spec-kit). The constitution is in
+`.specify/memory/constitution.md`; every feature has `spec.md`, `plan.md`, `research.md`, `data-model.md`,
+`contracts/`, `quickstart.md` and `tasks.md` under `specs/`:
+
+| Feature | Spec |
+|---|---|
+| 001 Multi-bot platform | [specs/001-multi-bot-platform](specs/001-multi-bot-platform/spec.md) |
+| 002 Admin panel | [specs/002-admin-panel](specs/002-admin-panel/spec.md) |
+| 003 OCI deployment from GitHub | [specs/003-oci-deployment](specs/003-oci-deployment/spec.md) |
+| 004 Group memory | [specs/004-group-memory](specs/004-group-memory/spec.md) |
+
+New work: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` →
+`/speckit-implement` → `/speckit-converge` (Claude Code skills are in `.claude/skills/`).
+
 ## Development
 
 ```bash
 npm install
 ADMIN_PASSWORD=dev-password-123 npm start   # panel on http://127.0.0.1:8080, QR shown there
-npm test                                    # e2e: fake MCP server + fake Claude API + fake channel
+npm test                                    # e2e: fake MCP server + fake Claude API + fake channel (20 scenarios)
 ```
 
 Layout: `src/channels/` (WhatsApp), `src/core/` (router, bots, agent, tools, MCP pool, scheduler, db, events), `src/panel/` (API + single-file UI), `bots/`, `deploy/` (install/update/backup), `infra/terraform/`, `.github/workflows/`.

@@ -34,8 +34,8 @@ export async function runSchedule(bot, sched, channel, { force = false } = {}) {
       });
       const skip = !reply || reply.trim() === 'SKIP';
       if (!skip) {
-        await channel.send(chat, reply);
-        logMessage({ chat, bot: bot.id, sender: 'bot', name: 'Assistant', text: reply, fromBot: true });
+        const sent = await channel.send(chat, reply);
+        logMessage({ chat, bot: bot.id, msgId: sent?.msgId || null, sender: 'bot', name: 'Assistant', text: reply, fromBot: true });
       }
       activity('schedule.run', { bot: bot.id, chat, summary: `${sched.id}: ${skip ? 'skipped' : 'posted'}`, detail: { reply } });
       results.push({ chat, reply: skip ? null : reply });
