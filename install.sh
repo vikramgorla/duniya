@@ -260,6 +260,7 @@ open_web_ports() {
 }
 
 if [ "$EXPOSURE" = "domain" ] || [ "$EXPOSURE" = "ip" ]; then
+  systemctl stop duniya-status-page duniya-status-render 2>/dev/null || true  # first-boot progress page (OCI bootstrap)
   if ! command -v caddy >/dev/null; then
     say "Installing Caddy (automatic HTTPS)"
     curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg

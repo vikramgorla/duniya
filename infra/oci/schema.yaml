@@ -1,7 +1,7 @@
 title: "WhatsApp agents (whatsapp-agent-duniya)"
 description: "Self-hosted WhatsApp agents with an admin panel, on an Always Free VM."
 schemaVersion: 1.1.0
-version: "1.0.3"
+version: "1.0.4"
 locale: "en"
 
 variableGroups:
@@ -37,8 +37,9 @@ variables:
       eq: [exposure, tunnel]
   admin_password:
     type: password
-    title: "Owner password (optional)"
-    description: "Creates user 'admin'. Leave empty to use the one-time setup code instead."
+    title: "Owner password"
+    description: "You sign in to the panel as user 'admin' with this password (min. 10 characters)."
+    required: true
   update_mode:
     type: enum
     title: "Updates"
@@ -84,8 +85,8 @@ variables:
   enable_logs:
     type: boolean
     title: "Send logs to OCI Logging"
-    description: "See install and app logs under Observability & Management > Logging, without SSH. Creates a dynamic group and policy (needs admin rights)."
-    default: true
+    description: "Paid (Pay As You Go) accounts only: Always Free accounts can't run log agents. Install progress is shown at the server address either way."
+    default: false
   tenancy_ocid:
     type: string
   region:

@@ -110,6 +110,6 @@ variable "git_token" {
 
 variable "enable_logs" {
   type        = bool
-  default     = true
-  description = "Ship install and app logs to OCI Logging (Observability & Management > Logging > Log groups). Creates a dynamic group and policy."
+  default     = false
+  description = "Pay As You Go accounts only (Always Free allows 0 log agents). Ship install and app logs to OCI Logging (Observability & Management > Logging > Log groups). Creates a dynamic group and policy."
 }
