@@ -35,7 +35,20 @@ export function setUpdateSettings(patch) {
   updateSettings({ updates: next });
   return next;
 }
-export const updateStatus = () => { try { return JSON.parse(kvGet('updates:status') || 'null'); } catch { return null; } };
+const savedStatus = () => { try { return JSON.parse(kvGet('updates:status') || 'null'); } catch { return null; } };
+// The version this process is running (read once at start; an update restarts the process).
+export const RUNNING_VERSION = (() => { try { return `v${JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')).version}`; } catch { return 'unknown'; } })();
+
+/** Last check, corrected for what is running now (a check saved before an update + restart is otherwise stale). */
+export const updateStatus = () => {
+  const st = savedStatus();
+  if (!st) return null;
+  if (st.channel === 'stable' && parseVersion(RUNNING_VERSION)) {
+    const current = RUNNING_VERSION;
+    return { ...st, current, available: !!(st.latest && parseVersion(st.latest) && compareVersions(current, st.latest) < 0) };
+  }
+  return st;
+};
 
 /** Check the remote. Returns status { current, latest, available, target, checkedAt }. */
 export async function checkForUpdate({ root = ROOT, channel = getUpdateSettings().channel } = {}) {
@@ -55,7 +68,7 @@ export async function checkForUpdate({ root = ROOT, channel = getUpdateSettings(
     latest = remote.slice(0, 7); target = 'main';
     available = remote !== head && (await git(['merge-base', '--is-ancestor', 'HEAD', 'origin/main'], root).then(() => true, () => false));
   }
-  const status = { current, latest, available, target, channel, checkedAt: Date.now(), lastResult: updateStatus()?.lastResult || null };
+  const status = { current, latest, available, target, channel, checkedAt: Date.now(), lastResult: savedStatus()?.lastResult || null };
   if (root === ROOT) kvSet('updates:status', JSON.stringify(status));
   return status;
 }
@@ -68,8 +81,8 @@ export function applyUpdate({ root = ROOT, target } = {}) {
     p.on('close', (code) => {
       const out = { code, log: log.slice(-6000) };
       if (root === ROOT) {
-        const st = updateStatus() || {};
-        kvSet('updates:status', JSON.stringify({ ...st, lastResult: { at: Date.now(), ok: code === 0, log: out.log.slice(-1000) } }));
+        const st = savedStatus() || {};
+        kvSet('updates:status', JSON.stringify({ ...st, lastResult: { at: Date.now(), ok: code === 0, target: target || 'latest', from: RUNNING_VERSION, log: out.log.slice(-1000) } }));
         activity(code === 0 ? 'system' : 'error', { summary: code === 0 ? `Updated to ${target || 'latest'}` : 'Update failed (previous version kept)', detail: out.log.slice(-2000) });
       }
       r(out);

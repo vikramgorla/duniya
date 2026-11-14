@@ -19,7 +19,17 @@ import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool, mcpConnection } from '../core/mcp.js';
 import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
 import { humanCode } from '../core/crypto.js';
-import { organizerConnection } from '../core/tools.js';
+import { organizerConnection, oauthClientOf } from '../core/tools.js';
+import { installPackage, installedInfo } from '../core/mcp-local.js';
+
+// Local tool services run third-party code on this server: only owners may add or change them.
+const localSig = (cfg) => JSON.stringify(Object.entries(cfg?.mcpServers || {}).filter(([, v]) => v?.type === 'local')
+  .map(([k, v]) => [k, String(v.package || '').trim(), v.args || [], v.env || {}, !!v.allowScripts]).sort());
+function guardLocal(user, before, after) {
+  if (user?.role !== 'owner' && localSig(after) !== localSig(before)) {
+    throw Object.assign(new Error('Only the owner can add or change local tool services (they run code on this server)'), { status: 403 });
+  }
+}
 import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES } from '../core/mcp-oauth.js';
 
 const PUBLIC = resolve(import.meta.dirname, 'public');
@@ -180,16 +190,20 @@ export function startPanel({ channel, extend = [] }) {
   route('GET', '/api/bots', async () => listBots().map(botView));
   route('POST', '/api/bots', async (req, res, body, q, p, user) => {
     const base = body.template ? templateConfig(body.template) : {};
+    guardLocal(user, {}, { ...base, ...(body.config || {}) });
     const { bot, warnings } = await createBot({ id: body.id, config: { ...base, ...(body.config || {}) }, by: user.username });
     return [201, { ...botView(bot), warnings }];
   });
   route('POST', '/api/bots/import', async (req, res, body, q, p, user) => {
+    guardLocal(user, {}, body?.config);
     const { bot, warnings } = await importBot(body, user.username);
     return [201, { ...botView(bot), warnings }];
   });
   route('POST', '/api/bots/reload', async () => { await loadBots(); await resetMcpPool(); activity('system', { summary: 'Bots reloaded' }); return listBots().map(botView); });
   route('GET', '/api/bots/:id', async (req, res, body, q, p) => { const b = getBot(p.id); return b ? botView(b) : [404, { error: 'Not found' }]; });
   route('PUT', '/api/bots/:id', async (req, res, body, q, p, user) => {
+    const before = getBot(p.id);
+    if (body.mcpServers !== undefined) guardLocal(user, before, body);
     const { bot, warnings } = await updateBot(p.id, body, user.username);
     return { ...botView(bot), warnings };
   });
@@ -198,6 +212,7 @@ export function startPanel({ channel, extend = [] }) {
     const src = getBot(p.id);
     if (!src) return [404, { error: 'Not found' }];
     const { hooks, id, updatedAt, ...config } = src;
+    guardLocal(user, {}, config);
     const { bot } = await createBot({ id: body.id, config: { ...config, name: `${config.name} (copy)`, chats: [] }, by: user.username });
     return [201, botView(bot)];
   });
@@ -212,6 +227,21 @@ export function startPanel({ channel, extend = [] }) {
     if (!url) return [400, { error: 'Enter the tool service URL first' }];
     return probeServer(url);
   });
+  route('GET', '/api/bots/:id/local', async (req, res, body, q, p) => {
+    const bot = getBot(p.id);
+    if (!bot) return [404, { error: 'Not found' }];
+    return Object.entries(bot.mcpServers || {}).filter(([, v]) => v.type === 'local').map(([server, v]) => {
+      const i = installedInfo(v.package, v.allowScripts);
+      return { server, package: v.package, installed: i ? { name: i.name, version: i.version, at: i.at } : null };
+    });
+  });
+  route('POST', '/api/bots/:id/local/:server/install', async (req, res, body, q, p, user) => {
+    const srv = getBot(p.id)?.mcpServers?.[p.server];
+    if (!srv || srv.type !== 'local') return [404, { error: 'Save the bot with this local tool service first' }];
+    const i = await installPackage(srv.package, { allowScripts: srv.allowScripts, fresh: !!body.fresh, by: user.username });
+    await resetMcpPool();
+    return { name: i.name, version: i.version, at: i.at };
+  }, { role: 'owner' });
   route('GET', '/api/bots/:id/connections', async (req, res, body, q, p) => listConnections(p.id));
   route('POST', '/api/bots/:id/connections/:server/:role', async (req, res, body, q, p, user) => {
     const bot = getBot(p.id);
@@ -222,7 +252,7 @@ export function startPanel({ channel, extend = [] }) {
     const url = interpolate(srv.url);
     if (!url) return [400, { error: 'The tool service URL is empty' }];
     const redirectUri = `${isHttps(req) ? 'https' : 'http'}://${req.headers.host}/oauth/mcp/callback`;
-    return startSignIn({ botId: bot.id, server: p.server, role: p.role, url, redirectUri, by: user.username });
+    return startSignIn({ botId: bot.id, server: p.server, role: p.role, url, redirectUri, by: user.username, client: oauthClientOf(interpolate(srv)) });
   });
   route('DELETE', '/api/bots/:id/connections/:server/:role', async (req, res, body, q, p, user) => {
     disconnectOAuth(p.id, p.server, p.role, user.username);
@@ -250,9 +280,12 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
 
   route('POST', '/api/bots/:id/discover', async (req, res, body, q, p) => {
     let url; let token;
-    if (body.auth === 'oauth') {
+    if (body.auth === 'oauth' || body.type === 'local') {
       const bot = getBot(p.id);
-      if (!bot?.mcpServers?.[body.server] || bot.mcpServers[body.server].auth !== 'oauth') return [400, { error: 'Save the bot and connect the tool service first' }];
+      const saved = bot?.mcpServers?.[body.server];
+      if (!saved || (body.type === 'local' ? saved.type !== 'local' : saved.auth !== 'oauth')) {
+        return [400, { error: body.type === 'local' ? 'Save the bot with this local tool service first' : 'Save the bot and connect the tool service first' }];
+      }
       const tools = await organizerConnection(bot, body.server).listTools();
       return tools.map((t) => ({ name: t.name, description: (t.description || '').slice(0, 300) }));
     }
@@ -263,7 +296,8 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
       url = interpolate(srv.url); token = interpolate(srv.tokens?.organizer || '');
     }
     if (!url) return [400, { error: 'URL is empty (is its secret set?)' }];
-    const tools = await mcpConnection(url, token).listTools();
+    const headers = interpolate(body.headers && typeof body.headers === 'object' ? body.headers : {});
+    const tools = await mcpConnection(url, { token, headers }).listTools();
     return tools.map((t) => ({ name: t.name, description: (t.description || '').slice(0, 300) }));
   });
   route('POST', '/api/bots/:id/test', async (req, res, body, q, p) => {

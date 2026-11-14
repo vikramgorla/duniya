@@ -180,6 +180,15 @@ test('US3: Sign in with ChatGPT — connect, list plan models, tool call over Re
   assert.equal(creds.client_id, 'oaiapp_123');
   assert.ok(!JSON.stringify((await t.api(owner, 'GET', '/api/secrets')).body).includes('chatgpt-access'));
 
+  // ChatGPT as the only provider: Auto must use it (regression: "No model available" with 8 ChatGPT models)
+  const keepKey = t.store.getSecret('ANTHROPIC_API_KEY');
+  const compat = t.store.getSetting('providers', []);
+  t.store.setSecret('ANTHROPIC_API_KEY', ''); t.store.updateSettings({ providers: [], defaultModel: 'auto', backgroundModel: 'auto' });
+  const onlyChatgpt = (await t.api(owner, 'GET', '/api/models')).body;
+  assert.equal(onlyChatgpt.problem, undefined, onlyChatgpt.problem);
+  assert.equal(onlyChatgpt.resolvedDefault, 'chatgpt:gpt-6.1-sol');
+  t.store.setSecret('ANTHROPIC_API_KEY', keepKey); t.store.updateSettings({ providers: compat });
+
   await t.bots.updateBot('panduga', { model: 'chatgpt:gpt-6.1-sol' });
   oa.respScript.push(
     [{ type: 'function_call', call_id: 'fc_1', name: 'panduga__agenda_list', arguments: '{}' }],

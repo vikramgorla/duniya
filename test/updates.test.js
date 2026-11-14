@@ -14,6 +14,25 @@ const git = (cwd, ...args) => execFileSync('git', args, { cwd, env: gitEnv, stdi
 before(async () => { t = await setup(); u = await import('../src/core/updates.js'); });
 after(() => t.close());
 
+test('status saved before an update is corrected after the restart (regression)', async () => {
+  const { kvSet } = await import('../src/core/db.js');
+  kvSet('updates:status', JSON.stringify({ current: 'v0.0.1', latest: u.RUNNING_VERSION, available: true, channel: 'stable', checkedAt: Date.now() }));
+  const st = u.updateStatus();
+  assert.equal(st.current, u.RUNNING_VERSION);
+  assert.equal(st.available, false);
+  kvSet('updates:status', JSON.stringify({ current: u.RUNNING_VERSION, latest: 'v99.0.0', available: false, channel: 'stable', checkedAt: Date.now() }));
+  assert.equal(u.updateStatus().available, true);
+  kvSet('updates:status', 'null');
+});
+
+test('auto model choice from any provider list', async () => {
+  const { autoPick } = await import('../src/core/providers/index.js');
+  const list = [{ id: 'text-embedding-3' }, { id: 'gpt-6-mini' }, { id: 'gpt-6' }, { id: 'whisper-2' }];
+  assert.equal(autoPick(list, 'bot'), 'gpt-6');
+  assert.equal(autoPick(list, 'background'), 'gpt-6-mini');
+  assert.equal(autoPick([{ id: 'tts-1' }], 'bot'), null);
+});
+
 test('version helpers', () => {
   assert.equal(u.compareVersions('v1.2.3', 'v1.10.0'), -1);
   assert.equal(u.compareVersions('1.2.3', 'v1.2.3'), 0);

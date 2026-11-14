@@ -94,6 +94,14 @@ confirmation, routing) verifiable on every push.
   ChatGPT plans only through OpenAI's official Sign in with ChatGPT flow. Provider credentials are secrets.
 - Backups MUST be encrypted with an owner passphrase before leaving the server.
 
+### Local Tool Services
+
+Tool services that run as packages on the server (npm or GitHub, over stdio) execute third-party code with the
+app's privileges. Only the owner role MAY add, change or install them; the panel MUST say so plainly; npm install
+scripts MUST be off unless the owner allows them per service; the installed version MUST be recorded and shown; and
+the process MUST receive a scrubbed environment (PATH, network/proxy settings and the env the owner configured —
+never the app's own secrets or settings).
+
 ## Development Workflow
 
 - Process: `/speckit-constitution` (rarely) → `/speckit-specify` → `/speckit-clarify` (when ambiguous)
@@ -116,4 +124,4 @@ principle removed or redefined; MINOR: principle or section added or materially 
 clarification), and reviewed in a pull request. Reviewers verify constitution compliance for every
 change.
 
-**Version**: 1.1.0 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-14
+**Version**: 1.2.0 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-14

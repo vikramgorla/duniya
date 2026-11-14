@@ -12,22 +12,30 @@ export const matchesAny = (name, patterns = []) => patterns.some((p) => globToRe
 
 const exposedName = (server, tool) => `${server}__${tool}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
 
+/** A pre-registered OAuth app (client id / secret) for services without automatic registration. */
+export const oauthClientOf = (srv) => (srv.oauthClient?.id ? { id: srv.oauthClient.id, secret: srv.oauthClient.secret || '' } : null);
+
 function connectionFor(bot, serverKey, role) {
   const srv = interpolate(bot.mcpServers[serverKey]);
+  if (srv?.type === 'local') {
+    // One process per bot service; roles are separated by the per-role tool lists below.
+    return mcpConnection(`local:${bot.id}:${serverKey}`, { local: { spec: srv.package, allowScripts: !!srv.allowScripts, args: srv.args || [], env: srv.env || {} } });
+  }
   if (!srv?.url) throw new Error(`MCP server "${serverKey}" has no url (set its secret in the panel)`);
+  const headers = srv.headers || {};
   if (srv.auth === 'oauth') {
     // Participants use their own sign-in when connected, otherwise the organizer's (tools still limited per role).
     const who = role === 'participant' && isConnected(bot.id, serverKey, 'participant', srv.url) ? 'participant' : 'organizer';
     if (!isConnected(bot.id, serverKey, who, srv.url)) {
       throw new Error(`Tool service "${serverKey}" is not signed in. An admin needs to click Connect in the panel (Bots → ${bot.name || bot.id}).`);
     }
-    return mcpConnection(srv.url, { identity: `oauth:${bot.id}:${serverKey}:${who}`, authProvider: runtimeProvider(bot.id, serverKey, who, srv.url) });
+    return mcpConnection(srv.url, { identity: `oauth:${bot.id}:${serverKey}:${who}`, headers, authProvider: runtimeProvider(bot.id, serverKey, who, srv.url, oauthClientOf(srv)) });
   }
   const tokens = srv.tokens || {};
   // Participants use their own token when configured, otherwise the organizer/default token;
   // the per-role allowlist below is enforced either way.
   const token = (role === 'participant' && tokens.participant) || tokens.organizer || srv.token || '';
-  return mcpConnection(srv.url, token);
+  return mcpConnection(srv.url, { token, headers });
 }
 
 /** Organizer-level connection (used to apply confirmed changes). */

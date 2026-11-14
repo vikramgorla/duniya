@@ -67,8 +67,9 @@ export function deleteBotConnections(botId) {
  * runtime providers read/write the stored row (token refresh) and mark the row when a new sign-in is needed.
  */
 class Provider {
-  constructor({ botId, server, role, url, redirectUri, pendingState = null }) {
+  constructor({ botId, server, role, url, redirectUri, pendingState = null, client = null }) {
     Object.assign(this, { botId, server, role, url, pendingState });
+    this.fixedClient = client?.id ? { client_id: client.id, ...(client.secret ? { client_secret: client.secret } : {}) } : null;
     this.interactive = !!pendingState;
     if (this.interactive) {
       this.data = pendingState.data;
@@ -86,12 +87,15 @@ class Provider {
     return {
       client_name: 'whatsapp-agent-duniya', client_uri: 'https://github.com/vikramgorla/whatsapp-agent-duniya',
       redirect_uris: [this._redirect], grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'],
-      token_endpoint_auth_method: 'none',
+      token_endpoint_auth_method: this.fixedClient?.client_secret ? 'client_secret_basic' : 'none',
     };
   }
   state() { return this.pendingState?.state; }
-  clientInformation() { return this.data.client; }
-  saveClientInformation(info) { this.data.client = info; this.data.redirectUri = this._redirect; this.persist(); }
+  clientInformation() { return this.fixedClient || this.data.client; }
+  get saveClientInformation() {
+    if (this.fixedClient) return undefined; // a pre-registered app is never re-registered
+    return (info) => { this.data.client = info; this.data.redirectUri = this._redirect; this.persist(); };
+  }
   tokens() { return this.data.tokens; }
   saveTokens(tokens) {
     this.data.tokens = tokens; this.data.tokensAt = Date.now(); this.data.redirectUri = this._redirect;
@@ -126,20 +130,20 @@ class Provider {
 }
 
 /** Provider used by MCP connections at runtime (adds the bearer token, refreshes it on 401). */
-export const runtimeProvider = (botId, server, role, url) => new Provider({ botId, server, role, url });
+export const runtimeProvider = (botId, server, role, url, client = null) => new Provider({ botId, server, role, url, client });
 
 function sweep() {
   for (const [k, p] of pending) if (p.expires < Date.now()) pending.delete(k);
 }
 
 /** Start a sign-in; returns the service's authorization URL to open in the browser. */
-export async function startSignIn({ botId, server, role, url, redirectUri, by = '' }) {
+export async function startSignIn({ botId, server, role, url, redirectUri, by = '', client = null }) {
   if (!OAUTH_ROLES.includes(role)) throw Object.assign(new Error('Unknown role'), { status: 400 });
   sweep();
   const state = newToken(24);
-  const p = { state, botId, server, role, url, redirectUri, by, data: {}, expires: Date.now() + PENDING_TTL };
+  const p = { state, botId, server, role, url, redirectUri, by, client, data: {}, expires: Date.now() + PENDING_TTL };
   pending.set(state, p);
-  const prov = new Provider({ botId, server, role, url, redirectUri, pendingState: p });
+  const prov = new Provider({ botId, server, role, url, redirectUri, pendingState: p, client });
   try {
     const result = await auth(prov, { serverUrl: url });
     if (result === 'AUTHORIZED') throw new Error('The service did not ask for a sign-in');
@@ -159,7 +163,7 @@ export async function finishSignIn({ state, code, error, errorDescription }) {
   pending.delete(state);
   if (error) throw Object.assign(new Error(`The service did not approve the sign-in (${errorDescription || error}).`), { botId: p.botId });
   if (!code) throw Object.assign(new Error('The service returned no authorization code.'), { botId: p.botId });
-  const prov = new Provider({ ...p, pendingState: p });
+  const prov = new Provider({ ...p, pendingState: p, client: p.client });
   try {
     const result = await auth(prov, { serverUrl: p.url, authorizationCode: code });
     if (result !== 'AUTHORIZED' || !p.data.tokens) throw new Error('no tokens received');

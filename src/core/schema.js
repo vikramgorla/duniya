@@ -1,4 +1,5 @@
 // Bot configuration: defaults, validation and normalisation (005). Single source of truth for bot shape.
+import { validPackageSpec } from './mcp-local.js';
 import { digits } from './config.js';
 
 export const BOT_DEFAULTS = Object.freeze({
@@ -33,6 +34,22 @@ export class ValidationError extends Error {
   constructor(field, message) { super(`${field}: ${message}`); this.field = field; this.status = 400; }
 }
 const fail = (field, msg) => { throw new ValidationError(field, msg); };
+const HEADER_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/;
+const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+/** { NAME: value } with validated names; values are text or contain ${SECRET} references. */
+function kvMap(v, field, nameRe, reserved = []) {
+  if (v == null) return {};
+  if (typeof v !== 'object' || Array.isArray(v)) fail(field, 'must be an object of name: value');
+  const out = {};
+  const entries = Object.entries(v);
+  if (entries.length > 30) fail(field, 'at most 30 entries');
+  for (const [k, val] of entries) {
+    if (!nameRe.test(k)) fail(field, `"${k}" is not a valid name`);
+    if (reserved.includes(k.toLowerCase()) || reserved.includes(k)) fail(field, `"${k}" is managed by the app`);
+    out[k] = str(val, `${field}.${k}`, { max: 2000 });
+  }
+  return out;
+}
 
 const str = (v, field, { max = 200, min = 0 } = {}) => {
   const s = String(v ?? '').trim();
@@ -112,9 +129,26 @@ export function validateBotConfig(input) {
       organizer: tokenRef(tokens.organizer ?? srv?.token, `mcpServers.${key}.tokens.organizer`),
       participant: tokenRef(tokens.participant, `mcpServers.${key}.tokens.participant`),
     };
+    const f = `mcpServers.${key}`;
+    const type = srv?.type ?? 'remote';
+    if (!['remote', 'local'].includes(type)) fail(`${f}.type`, 'must be remote or local');
+    if (type === 'local') {
+      const spec = str(srv?.package, `${f}.package`, { min: 1, max: 200 }).trim();
+      if (!validPackageSpec(spec)) fail(`${f}.package`, 'must look like name, name@version, @scope/name or github:owner/repo#ref');
+      const args = list(srv?.args ?? [], `${f}.args`).map((a) => str(a, `${f}.args`, { max: 500 }));
+      if (args.length > 30) fail(`${f}.args`, 'at most 30 arguments');
+      out.mcpServers[key] = { type, package: spec, args, env: kvMap(srv?.env, `${f}.env`, ENV_NAME_RE, ['PATH', 'HOME']), allowScripts: !!srv?.allowScripts };
+      continue;
+    }
     const authMode = srv?.auth ?? (t.organizer || t.participant ? 'token' : 'none');
-    if (!['oauth', 'token', 'none'].includes(authMode)) fail(`mcpServers.${key}.auth`, 'must be oauth, token or none');
-    out.mcpServers[key] = { url: urlOrRef(srv?.url, `mcpServers.${key}.url`), auth: authMode, tokens: authMode === 'token' ? t : { organizer: '', participant: '' } };
+    if (!['oauth', 'token', 'none'].includes(authMode)) fail(`${f}.auth`, 'must be oauth, token or none');
+    const entry = { type, url: urlOrRef(srv?.url, `${f}.url`), auth: authMode, tokens: authMode === 'token' ? t : { organizer: '', participant: '' },
+      headers: kvMap(srv?.headers, `${f}.headers`, HEADER_NAME_RE, ['host', 'content-length', 'content-type', 'accept', 'authorization', 'mcp-session-id', 'mcp-protocol-version']) };
+    const oc = srv?.oauthClient;
+    if (authMode === 'oauth' && oc && (oc.id || oc.secret)) {
+      entry.oauthClient = { id: str(oc.id, `${f}.oauthClient.id`, { min: 1, max: 300 }).trim(), secret: tokenRef(oc.secret, `${f}.oauthClient.secret`) };
+    }
+    out.mcpServers[key] = entry;
   }
 
   const confirm = c.confirm && (c.confirm.preview || c.confirm.tool) ? c.confirm : null;

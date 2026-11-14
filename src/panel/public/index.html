@@ -53,6 +53,7 @@
   .pill.bad { background: var(--bad-soft); color: var(--bad); } .pill.info { background: var(--info-soft); color: var(--info); }
   .note { background: var(--info-soft); color: var(--info); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin: 8px 0; }
   .note.warn { background: var(--warn-soft); color: var(--warn); }
+  .note.ok { background: var(--accent-soft); color: var(--accent); }
   .feed { list-style: none; margin: 0; padding: 0; }
   .feed li { border-bottom: 1px solid var(--line); padding: 8px 2px; cursor: pointer; }
   .feed li:last-child { border-bottom: 0; }
@@ -115,6 +116,11 @@ const time = (ts) => (ts ? new Date(ts).toLocaleString([], { month: 'short', day
 const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const TYPE_CLASS = { 'message.in': 'info', 'message.out': 'ok', 'tool.call': '', 'tool.error': 'bad', error: 'bad', 'confirm.created': 'warn', 'confirm.applied': 'ok', 'confirm.cancelled': 'warn', 'channel.status': 'info', 'schedule.run': 'info', 'bot.updated': '', 'bot.created': 'ok', 'bot.deleted': 'warn', system: '', 'memory.summary': 'info', 'memory.history': '', 'memory.note.added': 'ok', 'memory.note.removed': 'warn', 'memory.erased': 'bad', 'model.usage': '', 'backup.done': 'ok', 'backup.restore': 'warn', 'backup.settings': '' };
 function toggle(checked, onchange, disabled) { return h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked, disabled: disabled || !can('admin'), onchange: (e) => onchange(e.target.checked) }), h('span')); }
+// replaceChildren/append would print null/false as text; drop them everywhere.
+for (const fn of ['replaceChildren', 'append']) {
+  const orig = Element.prototype[fn];
+  Element.prototype[fn] = function (...kids) { return orig.apply(this, kids.flat(Infinity).filter((k) => k != null && k !== false)); };
+}
 const field = (label, el, hint) => h('div', {}, h('label', {}, label), el, hint ? h('div', { class: 'small muted', style: 'margin-top:3px' }, hint) : null);
 const lines = (arr) => (arr || []).join('\n');
 const splitLines = (s) => String(s || '').split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
@@ -234,28 +240,46 @@ async function renderOverview(soft) {
   if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
   if (can('owner')) renderUpdates($('#updates-box'));
 }
-async function renderUpdates(box) {
+async function renderUpdates(box, note = '') {
   const u = await api('GET', '/api/updates').catch(() => null); if (!u || !box) return;
   const st = u.status || {};
+  const lr = st.lastResult;
   const mode = h('select', {}, ['notify', 'auto', 'off'].map((m) => h('option', { value: m, selected: u.settings.mode === m }, { notify: 'Notify me', auto: 'Install automatically', off: 'Off' }[m])));
   const channel = h('select', {}, ['stable', 'main'].map((m) => h('option', { value: m, selected: u.settings.channel === m }, m === 'stable' ? 'Stable releases' : 'Latest (main)')));
-  const at = h('input', { value: u.settings.at, style: 'max-width:90px' });
+  const at = h('input', { value: u.settings.at, style: 'max-width:90px', title: 'Time of day for automatic installs' });
   const log = h('pre', { class: 'hide' });
+  // One clear status line: what is running, and whether something newer exists.
+  const state = !st.checkedAt
+    ? h('div', { class: 'note' }, h('b', {}, `Running ${st.current || 'this version'}`), ' · not checked for updates yet')
+    : st.available
+      ? h('div', { class: 'note warn' }, h('b', {}, `Update available: ${st.latest}`), ` · running ${st.current}`)
+      : h('div', { class: 'note ok' }, h('b', {}, `✓ Up to date: ${st.current}`), h('span', { class: 'muted' }, ` · checked ${ago(st.checkedAt)} ago`));
+  const last = lr ? h('p', { class: 'small muted' }, lr.ok ? `Last update: ${lr.from ? `${lr.from} → ` : ''}${lr.target} on ${time(lr.at)}` : `Last update failed on ${time(lr.at)}; the previous version kept running.`) : null;
+  const updateBtn = st.available && u.install !== 'docker' ? h('button', { class: 'btn primary', onclick: async (e) => {
+    if (!confirm(`Install ${st.latest} and restart? The bots pause for about a minute.`)) return;
+    const from = st.current;
+    box.querySelectorAll('button').forEach((b) => (b.disabled = true));
+    e.target.textContent = `Installing ${st.latest}…`;
+    const r = await tryApi(() => api('POST', '/api/updates/apply'));
+    if (!r || r.code !== 0) { if (r) { log.textContent = r.log; log.classList.remove('hide'); } renderUpdates(box, 'The update failed; the previous version is still running.'); return; }
+    e.target.textContent = 'Restarting…';
+    // wait for the new version to answer, then show the result
+    for (let i = 0; i < 60; i++) {
+      await new Promise((ok) => setTimeout(ok, 3000));
+      const v = await api('GET', '/api/updates').catch(() => null);
+      if (v?.status?.current && v.status.current !== from) { toast(`Updated to ${v.status.current}`); location.reload(); return; }
+    }
+    renderUpdates(box, 'The service has not come back yet. Refresh this page in a minute.');
+  } }, `Update to ${st.latest}`) : null;
   box.replaceChildren(h('h3', {}, 'Updates'),
     u.install === 'docker' ? h('div', { class: 'note' }, 'Docker install: update with  docker compose pull && docker compose up -d') : null,
-    st.checkedAt ? h('p', { class: 'small' }, st.available ? h('span', { class: 'pill warn' }, `Update available: ${st.latest}`) : h('span', { class: 'pill ok' }, 'Up to date'), h('span', { class: 'muted' }, ` · ${st.current} · checked ${ago(st.checkedAt)} ago`)) : h('p', { class: 'small muted' }, 'Not checked yet.'),
-    st.lastResult && !st.lastResult.ok ? h('div', { class: 'note warn' }, `Last update failed (${time(st.lastResult.at)}); the previous version is running.`) : null,
-    h('div', { class: 'row' }, mode, channel, at, h('button', { class: 'btn', onclick: () => tryApi(() => api('PUT', '/api/updates/settings', { mode: mode.value, channel: channel.value, at: at.value }), 'Saved') }, 'Save')),
-    h('div', { class: 'row', style: 'margin-top:8px' },
-      h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('POST', '/api/updates/check'); renderUpdates(box); }) }, 'Check now'),
-      st.available && u.install !== 'docker' ? h('button', { class: 'btn primary', onclick: async (e) => {
-        if (!confirm(`Install ${st.latest} and restart?`)) return;
-        e.target.disabled = true; e.target.textContent = 'Updating…';
-        const r = await tryApi(() => api('POST', '/api/updates/apply'));
-        if (r) { log.textContent = r.log; log.classList.remove('hide'); if (r.code === 0) { toast('Updated, restarting…'); setTimeout(() => location.reload(), 9000); } }
-        e.target.disabled = false; e.target.textContent = 'Update now';
-      } }, 'Update now') : null,
-      h('button', { class: 'btn', onclick: () => confirm('Restart the service?') && api('POST', '/api/system/restart').catch(() => {}).then(() => { toast('Restarting…'); setTimeout(() => location.reload(), 6000); }) }, 'Restart')),
+    note ? h('div', { class: 'note warn' }, note) : null,
+    state, last,
+    h('div', { class: 'row', style: 'margin-top:8px' }, updateBtn,
+      h('button', { class: 'btn', onclick: (e) => tryApi(async () => { e.target.disabled = true; e.target.textContent = 'Checking…'; await api('POST', '/api/updates/check'); renderUpdates(box); }) }, 'Check now')),
+    h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted' }, 'Update settings'),
+      h('div', { class: 'row', style: 'margin-top:8px' }, mode, channel, at, h('button', { class: 'btn', onclick: () => tryApi(() => api('PUT', '/api/updates/settings', { mode: mode.value, channel: channel.value, at: at.value }), 'Saved') }, 'Save')),
+      h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: () => confirm('Restart the service?') && api('POST', '/api/system/restart').catch(() => {}).then(() => { toast('Restarting…'); setTimeout(() => location.reload(), 6000); }) }, 'Restart service'))),
     log);
 }
 
@@ -320,7 +344,7 @@ async function renderBots() {
 function openBot(id) { location.hash = `bots/${encodeURIComponent(id)}`; }
 
 async function renderBotEditor(id) {
-  const [b, models, plugins, conns] = await Promise.all([api('GET', `/api/bots/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', '/api/plugins'), api('GET', `/api/bots/${encodeURIComponent(id)}/connections`).catch(() => [])]);
+  const [b, models, plugins, conns, locals] = await Promise.all([api('GET', `/api/bots/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', '/api/plugins'), api('GET', `/api/bots/${encodeURIComponent(id)}/connections`).catch(() => []), api('GET', `/api/bots/${encodeURIComponent(id)}/local`).catch(() => [])]);
   const c = structuredClone(b.config);
   const F = {};
   const inp = (key, attrs = {}) => (F[key] = h('input', { value: c[key] ?? '', ...attrs }));
@@ -336,7 +360,12 @@ async function renderBotEditor(id) {
   F.organizers = h('textarea', { value: lines(c.organizers), style: 'min-height:60px' });
   F.participants = h('textarea', { value: lines(c.participants), style: 'min-height:50px' });
   // Tool services
-  const servers = Object.entries(c.mcpServers || {}).map(([key, s]) => ({ key, url: s.url, auth: s.auth || 'token', savedUrl: s.url, savedAuth: s.auth, org: s.tokens?.organizer || '', part: s.tokens?.participant || '' }));
+  const kvLines = (o, sep) => Object.entries(o || {}).map(([k, v]) => `${k}${sep}${v}`).join('\n');
+  const parseKv = (text, sep) => Object.fromEntries(splitLines(text).map((l) => { const i = l.indexOf(sep); return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : [l.trim(), '']; }));
+  const servers = Object.entries(c.mcpServers || {}).map(([key, s]) => ({ key, type: s.type || 'remote', url: s.url || '', auth: s.auth || 'token', savedUrl: s.url, savedAuth: s.auth, savedType: s.type || 'remote', savedPkg: s.package,
+    org: s.tokens?.organizer || '', part: s.tokens?.participant || '', headers: kvLines(s.headers, ': '), oauthId: s.oauthClient?.id || '', oauthSecret: s.oauthClient?.secret || '',
+    pkg: s.package || '', args: (s.args || []).join('\n'), env: kvLines(s.env, '='), allowScripts: !!s.allowScripts }));
+  const isOwner = S.user?.role === 'owner';
   const ROLE_LABEL = { organizer: 'Organizers', participant: 'Participants' };
   const rules = { participant: [...(c.tools?.participant || [])], organizer: [...(c.tools?.organizer || [])], deny: [...(c.tools?.deny || [])] };
   const rulesBox = { participant: h('textarea', { value: lines(rules.participant), style: 'min-height:60px' }), organizer: h('textarea', { value: lines(rules.organizer), style: 'min-height:60px' }), deny: h('textarea', { value: lines(rules.deny), style: 'min-height:40px' }) };
@@ -380,11 +409,50 @@ async function renderBotEditor(id) {
       const creds = s.auth === 'oauth'
         ? h('div', { style: 'margin-top:8px' }, h('div', { class: 'small muted' }, 'Sign in on the service for each role. You will come back here when done.'), connRow('organizer'), connRow('participant'))
         : s.auth === 'token' ? h('div', {}, field('Organizer credential (secret reference)', org), field('Participant credential (optional; least privilege)', part)) : null;
+      const typeSel = h('select', { style: 'max-width:230px', onchange: (e) => { s.type = e.target.value; drawServers(); } },
+        [['remote', 'Remote (URL)'], ['local', 'Local (npm or GitHub package)']].map(([v, l]) => h('option', { value: v, selected: s.type === v }, l)));
+      const ta = (prop, ph, rows = 2) => h('textarea', { value: s[prop], placeholder: ph, style: `min-height:${rows * 22 + 16}px`, oninput: (e) => (s[prop] = e.target.value) });
+      const redirectUri = `${location.origin}/oauth/mcp/callback`;
+      const advanced = h('details', { style: 'margin-top:8px' }, h('summary', { class: 'small muted' }, 'Advanced'),
+        field('Extra headers (one per line, Name: value; values may use ${SECRET})', ta('headers', 'X-API-Key: ${MY_API_KEY}')),
+        s.auth === 'oauth' ? h('div', {},
+          h('div', { class: 'small muted', style: 'margin-top:8px' }, 'Own OAuth app: only if the service does not let apps register themselves. Register this redirect URL with the service:'),
+          h('div', { class: 'row', style: 'align-items:center' }, h('code', { class: 'small' }, redirectUri), h('button', { class: 'btn small', onclick: () => { navigator.clipboard?.writeText(redirectUri); toast('Copied'); } }, 'Copy')),
+          h('div', { class: 'row' }, h('input', { value: s.oauthId, placeholder: 'Client ID', oninput: (e) => (s.oauthId = e.target.value.trim()) }),
+            h('input', { value: s.oauthSecret, placeholder: 'Client secret as ${SECRET} (optional)', oninput: (e) => (s.oauthSecret = e.target.value.trim()) }))) : null);
+      if (s.type === 'local') {
+        const st = locals.find((x) => x.server === s.key && x.package === s.pkg);
+        const savedLocal = s.savedType === 'local' && s.savedPkg === s.pkg && s.key;
+        const install = async (fresh) => {
+          if (!savedLocal && !(await save())) return;
+          toast('Installing… this can take a minute');
+          const r = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/local/${encodeURIComponent(s.key)}/install`, { fresh }));
+          if (r) { locals.splice(0, locals.length, ...(await api('GET', `/api/bots/${encodeURIComponent(id)}/local`))); drawServers(); toast(`Installed ${r.name}@${r.version}`); }
+        };
+        const pkg = h('input', { value: s.pkg, placeholder: '@scope/server@1.2.3 or github:owner/repo#tag', disabled: !isOwner, oninput: (e) => (s.pkg = e.target.value.trim()) });
+        return h('fieldset', {}, h('legend', {}, s.key || 'new tool service'),
+          h('div', { class: 'row' }, key, typeSel),
+          h('div', { class: 'note warn', style: 'margin-top:8px' }, 'A local tool service runs that package’s code on this server, with the same access as the app (including its data). Only add packages you trust, and pin a version.'),
+          field('Package', pkg),
+          h('div', { class: 'row' }, field('Arguments (one per line)', ta('args', '--read-only', 2)), field('Environment (NAME=value; values may use ${SECRET})', ta('env', 'API_KEY=${MY_KEY}', 2))),
+          h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.allowScripts, disabled: !isOwner, onchange: (e) => (s.allowScripts = e.target.checked) }), 'Allow install scripts (needed by some GitHub packages that build themselves)'),
+          h('div', { class: 'row', style: 'align-items:center;margin-top:8px' },
+            st?.installed ? h('span', { class: 'pill ok' }, `Installed ${st.installed.name}@${st.installed.version}`) : h('span', { class: 'pill' }, savedLocal ? 'Not installed yet (installs on first use)' : 'Save to install'),
+            isOwner ? h('button', { class: 'btn small', onclick: () => install(false) }, st?.installed ? 'Reinstall' : 'Install') : h('span', { class: 'small muted' }, 'Only the owner can install or change local tool services'),
+            isOwner && st?.installed ? h('button', { class: 'btn small', onclick: () => install(true) }, 'Update (fresh install)') : null),
+          h('div', { class: 'row', style: 'margin-top:8px' }, discoverButton({ type: 'local', server: s.key }),
+            h('button', { class: 'btn small danger mut', disabled: !isOwner, onclick: () => { servers.splice(i, 1); drawServers(); } }, 'Remove')),
+          grid);
+      }
       return h('fieldset', {}, h('legend', {}, s.key || 'new tool service'),
-        h('div', { class: 'row' }, key, url, check), field('Authentication', authSel), creds,
+        h('div', { class: 'row' }, key, typeSel), h('div', { class: 'row', style: 'margin-top:6px' }, url, check), field('Authentication', authSel), creds, advanced,
         h('div', { class: 'row', style: 'margin-top:8px' },
-          h('button', { class: 'btn small', onclick: async () => {
-            const tools = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/discover`, s.auth === 'oauth' ? { auth: 'oauth', server: s.key } : { url: s.url, token: s.auth === 'token' ? s.org : '' }));
+          discoverButton(s.auth === 'oauth' ? { auth: 'oauth', server: s.key } : { url: s.url, token: s.auth === 'token' ? s.org : '', headers: parseKv(s.headers, ':') }),
+          h('button', { class: 'btn small danger mut', onclick: () => { servers.splice(i, 1); drawServers(); } }, 'Remove')),
+        grid);
+      function discoverButton(reqBody) {
+        return h('button', { class: 'btn small', onclick: async () => {
+            const tools = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/discover`, reqBody));
             if (!tools) return;
             const fq = (t) => `${s.key}:${t.name}`;
             const set = (role, name, on) => {
@@ -399,9 +467,8 @@ async function renderBotEditor(id) {
             grid.replaceChildren(h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, `${tools.length} tools`), h('th', { class: 'c' }, 'Participants'), h('th', { class: 'c' }, 'Organizers'))),
               h('tbody', {}, tools.map((t) => h('tr', {}, h('td', {}, h('b', {}, t.name), h('div', { class: 'small muted' }, t.description)),
                 ...['participant', 'organizer'].map((role) => h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: allowedNow[role].has(t.name), onchange: (e) => set(role, t.name, e.target.checked) }))))))));
-          } }, 'Discover tools'),
-          h('button', { class: 'btn small danger mut', onclick: () => { servers.splice(i, 1); drawServers(); } }, 'Remove')),
-        grid);
+          } }, 'Discover tools');
+      }
     }));
   }
   drawServers();
@@ -438,7 +505,10 @@ async function renderBotEditor(id) {
       triggers: splitLines(F.triggers.value), respondToMentions: F.respondToMentions.checked, dm: F.dm.value,
       organizers: splitLines(F.organizers.value), participants: splitLines(F.participants.value), timezone: F.timezone.value.trim(),
       historySize: Number(F.historySize.value), maxTokens: Number(F.maxTokens.value), memory: { enabled: F.memory.checked },
-      mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, { url: s.url, auth: s.auth, tokens: s.auth === 'token' ? { organizer: s.org, participant: s.part } : {} }])),
+      mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, s.type === 'local'
+        ? { type: 'local', package: s.pkg, args: splitLines(s.args), env: parseKv(s.env, '='), allowScripts: s.allowScripts }
+        : { type: 'remote', url: s.url, auth: s.auth, tokens: s.auth === 'token' ? { organizer: s.org, participant: s.part } : {}, headers: parseKv(s.headers, ':'),
+          ...(s.auth === 'oauth' && s.oauthId ? { oauthClient: { id: s.oauthId, secret: s.oauthSecret } } : {}) }])),
       tools: { participant: splitLines(rulesBox.participant.value), organizer: splitLines(rulesBox.organizer.value), deny: splitLines(rulesBox.deny.value) },
       confirm: F.confirmOn.checked ? { preview: F.cPreview.value.trim(), tool: F.cTool.value.trim(), idField: F.cId.value.trim(), ttlMinutes: Number(F.cTtl.value) } : null,
       schedules: scheds, plugins: F.plugins.map((l) => l.querySelector('input')).filter((x) => x.checked).map((x) => x.value),
@@ -446,7 +516,7 @@ async function renderBotEditor(id) {
     try {
       const r = await api('PUT', `/api/bots/${encodeURIComponent(id)}`, config);
       toast(r.warnings?.length ? `Saved — ${r.warnings.join('; ')}` : 'Saved');
-      for (const sv of servers) { sv.savedUrl = sv.url; sv.savedAuth = sv.auth; }
+      for (const sv of servers) { sv.savedUrl = sv.url; sv.savedAuth = sv.auth; sv.savedType = sv.type; sv.savedPkg = sv.pkg; }
       return true;
     } catch (e) { toast(e.field ? `${e.field}: ${e.message.replace(/^[^:]+: /, '')}` : e.message); return false; }
   }
@@ -539,8 +609,8 @@ async function renderModels() {
   const secretForm = (name, placeholder) => { const v = h('input', { type: 'password', placeholder }); return h('form', { class: 'row mut', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name, value: v.value }), v.value ? 'Saved' : 'Removed')) renderModels(); } }, v, h('button', { class: 'btn' }, 'Save')); };
   const statusPill = (p) => h('span', { class: `pill ${p.connected ? 'ok' : p.error ? 'bad' : ''}` }, p.connected ? `${p.models} models` : p.error ? 'error' : 'not connected');
   const by = Object.fromEntries(provs.map((p) => [p.id, p]));
-  const opts = (sel) => [h('option', { value: 'auto' }, 'Auto'), models.models.map((m) => h('option', { value: m.ref, selected: sel === m.ref }, m.label))];
-  const def = h('select', {}, opts(models.defaultModel)); const bg = h('select', {}, opts(models.backgroundModel));
+  const opts = (sel, resolved) => [h('option', { value: 'auto' }, `Auto${resolved ? ` (${resolved})` : ''}`), models.models.map((m) => h('option', { value: m.ref, selected: sel === m.ref }, m.label))];
+  const def = h('select', {}, opts(models.defaultModel, models.resolvedDefault)); const bg = h('select', {}, opts(models.backgroundModel, models.resolvedBackground));
   // ChatGPT
   const cg = by.chatgpt; const paste = h('input', { placeholder: 'http://127.0.0.1:1455/auth/callback?code=…' });
   const cgFlow = h('div', {});

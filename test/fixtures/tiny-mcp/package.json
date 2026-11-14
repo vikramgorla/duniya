@@ -1,0 +1,1 @@
+{ "name": "tiny-mcp", "version": "1.2.3", "private": true, "type": "module", "bin": { "tiny-mcp": "server.js" } }

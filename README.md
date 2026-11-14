@@ -4,8 +4,9 @@ Run AI assistants in your WhatsApp groups, on your own server, managed from a we
 
 - **Bots built in the panel**: instructions, triggers, who can message them, organizers, schedules. Start from a
   template or import a bot file.
-- **Tools via MCP**: connect any MCP server (**Sign in** with OAuth when the server supports it, or a token) and tick
-  which tools participants and organizers may use. Changes go
+- **Tools via MCP**: connect remote MCP servers (**Sign in** with OAuth, your own OAuth app, a token, or custom
+  headers) or install **local** ones from npm or GitHub (owner only), and tick which tools participants and
+  organizers may use. Changes go
   through a **confirm step**: the bot prepares them and an organizer replies `confirm CODE` before anything happens.
 - **Group memory**: bots follow the whole conversation, keep a running summary of long discussions, remember notes
   on request and can search older messages.

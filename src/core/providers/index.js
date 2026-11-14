@@ -90,6 +90,21 @@ export function parseRef(ref) {
   return { provider: s.slice(0, i), model: s.slice(i + 1), ref: s };
 }
 
+const NOT_CHAT = /embed|whisper|tts|dall-e|image|audio|moderation|realtime|transcri|search|davinci|babbage|codex-mini/i;
+const SMALL = /mini|nano|haiku|flash|small|lite/i;
+/** Auto choice from a provider's list: the first chat model (a small one for background work, when there is one). */
+export function autoPick(models, purpose = 'bot') {
+  const chat = models.map((m) => m.id).filter((id) => id && !NOT_CHAT.test(id));
+  if (!chat.length) return null;
+  if (purpose === 'background') return chat.find((id) => SMALL.test(id)) || chat[0];
+  return chat.find((id) => !SMALL.test(id)) || chat[0];
+}
+
+/** Make sure model lists of connected providers are loaded (cached 10 min), so "auto" can choose. */
+export async function warmModels() {
+  await Promise.all(providers().filter((p) => p.configured && p.id !== 'anthropic').map((p) => providerModels(p)));
+}
+
 export function resolveModel(ref, purpose = 'bot') {
   const parsed = parseRef(ref);
   if (parsed) return parsed;
@@ -104,6 +119,12 @@ export function resolveModel(ref, purpose = 'bot') {
     if (def && providerById(def.provider)?.configured) return def;
   }
   if (anthropic.configured()) return parseRef(`anthropic:${anthropic.RECOMMENDED.bot}`);
+  // Any other connected provider: pick from its (cached) model list, in the order providers are listed.
+  for (const p of providers()) {
+    if (!p.configured || p.id === 'anthropic') continue;
+    const pick = autoPick(modelCache.get(p.id)?.models || [], purpose);
+    if (pick) return parseRef(`${p.id}:${pick}`);
+  }
   throw Object.assign(new Error('No model available: connect a provider and choose a default model (Models)'), { code: 'no_model' });
 }
 
@@ -112,6 +133,7 @@ export function resolveModel(ref, purpose = 'bot') {
  * Returns { content, stop_reason, usage, model: 'provider:model' }.
  */
 export async function chat({ model = 'auto', purpose = 'bot', system, messages, tools = [], maxTokens = 1024 }) {
+  if (!parseRef(model)) await warmModels();
   const r = resolveModel(model, purpose);
   const p = providerById(r.provider);
   if (!p) throw Object.assign(new Error(`Unknown model provider "${r.provider}"`), { code: 'no_model' });
