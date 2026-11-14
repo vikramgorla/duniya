@@ -207,9 +207,19 @@ function connectEvents() {
 
 // ---------- overview ----------
 let overviewBusy = false;
+let overviewSig = '';
 async function renderOverview(soft) {
   const st = S.status; if (!st) return;
+  // The 5-second status poll only rebuilds the page when something visible changed; uptime and memory are updated
+  // in place. (Rebuilding every time made the page flicker, the update box reloading each time.)
+  const { uptimeSec, memoryMb, ...rest } = st;
+  const sig = JSON.stringify({ ...rest, channel: { ...rest.channel, since: undefined } });
+  if (soft && sig === overviewSig && $('#ov-uptime')) {
+    $('#ov-uptime').textContent = ago(Date.now() - uptimeSec * 1000); $('#ov-memory').textContent = `${memoryMb} MB`;
+    return;
+  }
   if (soft && (overviewBusy || $('#main')?.contains(document.activeElement))) return;
+  overviewSig = sig;
   const c = st.channel;
   const phone = h('input', { placeholder: 'Bot number, e.g. 41791234567', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
   const wa = h('div', { class: 'card' },
@@ -230,15 +240,16 @@ async function renderOverview(soft) {
       h('td', {}, h('b', {}, b.name), h('div', { class: 'small muted' }, `${b.chats} chat(s)`)),
       h('td', { style: 'text-align:right' }, toggle(b.enabled, (v) => tryApi(async () => { await api('PUT', `/api/bots/${b.id}`, { enabled: v }); refreshStatus(); }, `${b.name} ${v ? 'on' : 'off'}`))))) : h('tr', {}, h('td', { class: 'muted' }, 'No bots yet — create one under Bots.')))),
     st.pending ? h('p', {}, h('span', { class: 'pill warn' }, `${st.pending} pending confirmation(s)`)) : null);
+  const reusedUpdates = soft && $('#updates-box')?.childElementCount ? $('#updates-box') : null;
   const server = h('div', { class: 'card' }, h('h2', {}, 'Server'),
-    h('table', {}, h('tbody', {}, [['Version', st.version], ['Uptime', ago(Date.now() - st.uptimeSec * 1000)], ['Memory', `${st.memoryMb} MB`], ['Node', st.node]]
-      .map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v))))),
-    h('div', { id: 'updates-box' }));
+    h('table', {}, h('tbody', {}, [['Version', st.version], ['Uptime', ago(Date.now() - st.uptimeSec * 1000), 'ov-uptime'], ['Memory', `${st.memoryMb} MB`, 'ov-memory'], ['Node', st.node]]
+      .map(([k, v, id]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', id ? { id } : {}, v))))),
+    reusedUpdates || h('div', { id: 'updates-box' }));
   const recent = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('div', { class: 'row spread' }, h('h2', {}, 'Recent activity'), h('button', { class: 'btn small', onclick: () => show('activity') }, 'All activity')),
     h('ul', { class: 'feed', id: 'recent' }, S.feed.slice(0, 8).map(feedItem)));
   $('#main').replaceChildren(h('div', { class: 'grid' }, wa, control, server, recent));
   if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
-  if (can('owner')) renderUpdates($('#updates-box'));
+  if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
 }
 async function renderUpdates(box, note = '') {
   const u = await api('GET', '/api/updates').catch(() => null); if (!u || !box) return;
