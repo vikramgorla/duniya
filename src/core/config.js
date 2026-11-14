@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
+import { applyPendingRestore } from './restore-apply.js';
 
 export const ROOT = resolve(import.meta.dirname, '..', '..');
 
@@ -22,6 +23,8 @@ if (existsSync(bootEnvFile)) {
 
 export const DATA_DIR = resolve(ROOT, process.env.DATA_DIR || 'data');
 mkdirSync(DATA_DIR, { recursive: true });
+// A restore staged from the panel (007) is applied here, before anything opens the database.
+applyPendingRestore(DATA_DIR);
 
 export const BOTS_DIR = resolve(ROOT, process.env.BOTS_DIR || 'bots');
 
@@ -31,7 +34,7 @@ export const env = {
   adminPassword: process.env.ADMIN_PASSWORD || '',
   timezone: process.env.TZ_DEFAULT || 'Europe/Zurich',
   rateLimitPerMin: Number(process.env.RATE_LIMIT_PER_MIN || 6),
-  summaryModel: process.env.SUMMARY_MODEL || 'claude-haiku-5-5',
+  trustProxy: ['1', 'true', 'yes'].includes(String(process.env.TRUST_PROXY || '').toLowerCase()),
   memory: {
     summarizeBatch: Number(process.env.MEMORY_SUMMARIZE_BATCH || 40),
     retentionDays: Number(process.env.MEMORY_RETENTION_DAYS || 90),
@@ -56,45 +59,6 @@ export function writeJson(file, value, mode = 0o600) {
   renameSync(`${p}.tmp`, p);
 }
 
-// ---- Secrets: managed from the panel, stored in DATA_DIR/secrets.json (0600) ----
-let secrets = readJson('secrets.json', {});
-const secretListeners = new Set();
-
-export function getSecret(name) {
-  return secrets[name] ?? process.env[name] ?? '';
-}
-export function listSecrets() {
-  const names = new Set([...Object.keys(secrets)]);
-  return [...names].sort().map((name) => ({ name, set: !!secrets[name] }));
-}
-export function setSecret(name, value) {
-  if (!/^[A-Z][A-Z0-9_]{1,63}$/.test(name)) throw new Error('Secret names must be UPPER_SNAKE_CASE');
-  if (value) secrets[name] = value; else delete secrets[name];
-  writeJson('secrets.json', secrets);
-  for (const fn of secretListeners) fn(name);
-}
-export const onSecretChange = (fn) => secretListeners.add(fn);
-
-/** Replace ${VAR} with secrets/env values. */
-export function interpolate(value) {
-  if (typeof value === 'string') return value.replace(/\$\{([A-Z0-9_]+)\}/g, (_, k) => getSecret(k));
-  if (Array.isArray(value)) return value.map(interpolate);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, interpolate(v)]));
-  }
-  return value;
-}
-
-// ---- Global settings (panel-editable) ----
-let settings = readJson('settings.json', { paused: false, defaultDmBot: '' });
-export const getSettings = () => settings;
-export function updateSettings(patch) {
-  settings = { ...settings, ...patch };
-  writeJson('settings.json', settings);
-  return settings;
-}
-
-export function reloadForTests() {
-  secrets = readJson('secrets.json', {});
-  settings = readJson('settings.json', { paused: false, defaultDmBot: '' });
-}
+// Secrets and settings live in the database since 005 (see store.js). Re-exported here for convenience.
+export const PLUGINS_DIR = resolve(ROOT, process.env.PLUGINS_DIR || 'plugins');
+export const TEMPLATES_DIR = resolve(ROOT, process.env.TEMPLATES_DIR || 'templates');

@@ -1,5 +1,5 @@
-// Optional code hooks for a bot. Delete this file if the bot only needs MCP tools.
-// Everything here is optional.
+// Example plugin: attach it to a bot under Bots → Plugins ("example-dice").
+// Plugins are optional code add-ons: tools the model can call, commands, or custom roles.
 
 export default {
   /** Called once when the bot is loaded. */

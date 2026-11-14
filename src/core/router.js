@@ -1,4 +1,5 @@
-import { env, getSettings } from './config.js';
+import { env } from './config.js';
+import { getSettings } from './store.js';
 import { listBots, getBot, botForChat, roleIn } from './bots.js';
 import { runAgent, handleConfirmCommand } from './agent.js';
 import { logMessage } from './db.js';

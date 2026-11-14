@@ -1,116 +1,116 @@
-# whatsapp-agent-duniya
+# Duniya — self-hosted WhatsApp agents
 
-Self-hosted WhatsApp agents on one number. Each **bot** is a folder with a prompt, the MCP servers it may use, per-role tool rules and optional code hooks. A built-in **admin panel** shows what every bot is doing in real time and lets you control it. Runs on an Oracle Cloud Always Free VM, deployed from this repo with Terraform + GitHub Actions, and reachable through a Cloudflare Tunnel (no open ports).
+Run AI assistants in your WhatsApp groups, on your own server, managed from a web panel.
 
-No WhatsApp Business API: the server links to a normal WhatsApp number as a *linked device* via [Baileys](https://github.com/WhiskeySockets/Baileys).
+- **Bots built in the panel**: instructions, triggers, who can message them, organizers, schedules. Start from a
+  template or import a bot file.
+- **Tools via MCP**: connect any MCP server and tick which tools participants and organizers may use. Changes go
+  through a **confirm step**: the bot prepares them and an organizer replies `confirm CODE` before anything happens.
+- **Group memory**: bots follow the whole conversation, keep a running summary of long discussions, remember notes
+  on request and can search older messages.
+- **Your choice of models**: Anthropic API key, OpenAI API key, any OpenAI-compatible endpoint (OpenRouter, Ollama,
+  …), or your **ChatGPT Plus/Pro plan** via Sign in with ChatGPT. Pick per bot, or *Auto*.
+- **Admin panel**: live activity (every message, tool call, model and token count), pause switch, users with
+  roles, encrypted secrets, WhatsApp QR / pairing code, in-place updates.
+- **Encrypted backups** on a schedule to this server, a **private GitHub repo** the app creates for you, or any
+  **S3-compatible** bucket; restore in a few clicks.
+- **No commercial WhatsApp connector**: the server links to a normal WhatsApp number as a linked device
+  ([Baileys](https://github.com/WhiskeySockets/Baileys)). Use a dedicated number.
 
-```
-WhatsApp groups / DMs
-        │
-  channels/whatsapp ── router ──► bot (bots/<id>/) ──► Claude (tool use)
-        │                │                      ├─ MCP servers (role-filtered)
-        │                │                      └─ local tools (index.js hooks)
-        │                └─ confirm gate: "*_preview" → organizer replies "confirm CODE"
-        └─ admin panel (127.0.0.1:8080 → Cloudflare Tunnel): status, QR, live activity,
-           bots, chat binding, pending changes, secrets, update from GitHub
-```
+Runs comfortably on a 1 GB VM (~180 MB RAM), including Oracle Cloud's Always Free tier.
 
-**Bots included**
+## Install
 
-| Bot | What it does |
-|---|---|
-| `panduga` | panduga.ch event assistant: agenda, menu, rooms, shopping via the panduga.ch MCP, aware of the group's discussion. Organizers make changes with preview + `confirm CODE`. |
-| `_template` | Copy to start a new bot (shows MCP config, local tools, hooks). Ignored while it starts with `_`. |
+### One command (Ubuntu/Debian, x86_64 or arm64)
 
-## Setup
-
-Follow **[docs/SETUP.md](docs/SETUP.md)**: create an OCI API key, add GitHub secrets, run the *Infrastructure (OCI)* workflow, open the panel, scan the QR, add secrets, bind groups. About 20 minutes.
-
-## How bots work
-
-`bots/<id>/bot.json`:
-
-```jsonc
-{
-  "name": "Panduga",
-  "model": "claude-sonnet-5-5",
-  "triggers": ["!panduga"],            // group messages starting with this (or @mentions/replies) wake the bot
-  "dm": "members",                     // who may DM: none | organizers | members (of its groups) | anyone
-  "mcpServers": {
-    "panduga": { "url": "${PANDUGA_MCP_URL}",          // ${NAME} = secret set in the panel
-                 "tokens": { "organizer": "${PANDUGA_TOKEN_ORGANIZER}", "participant": "${PANDUGA_TOKEN_MEMBER}" } }
-  },
-  "tools": {                           // "<server>:<tool>" globs; "local:<name>" for hook tools
-    "participant": ["panduga:agenda_*", "panduga:menu_list"],
-    "organizer": ["panduga:*"],
-    "deny": []
-  },
-  "confirm": { "preview": "panduga:*_preview", "tool": "panduga:confirm", "idField": "confirm_id", "ttlMinutes": 9 },
-  "schedules": [{ "id": "morning", "at": "08:00", "days": "daily", "chats": "all", "prompt": "…" }]
-}
+```bash
+curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash
 ```
 
-- `prompt.md`: the bot's instructions.
-- `index.js` (optional): `tools` (local tools the model can call), `onMessage` (answer without Claude, e.g. commands), `role` (custom organizer logic), `init`.
-- **Roles** are enforced in code: a participant never receives organizer tools, and the confirm tool is never given to the model. When a preview tool returns a `confirm_id`, the server keeps it, hides it from the model, and posts a 4-letter code. Only an organizer replying `confirm CODE` in the same chat (or Apply in the panel) runs it.
-- **Live settings** (enabled, triggers, organizers, chats, schedules, extra prompt, model) are edited in the panel and stored in `DATA_DIR/bots/<id>.json`, so deploys never overwrite them.
+It asks how the panel should be reached. Or say it up front:
 
-Add a bot: copy `bots/_template` to `bots/<id>`, edit it, push, then click **Update from GitHub** and **Reload bots** in the panel. Bind a group to it on the **Chats** tab.
+| Option | Panel address | Open ports |
+|---|---|---|
+| `--domain agents.example.com` | `https://agents.example.com` (automatic certificate) | 80, 443 |
+| `--ip-https` | `https://<your-ip>.sslip.io` (automatic certificate, no domain needed) | 80, 443 |
+| `--cloudflare-token <token>` | your Cloudflare Tunnel hostname ([guide](docs/deploy/cloudflare-tunnel.md)) | none |
+| `--local-only` | `ssh -L 8080:127.0.0.1:8080 you@server` → `http://localhost:8080` | none |
 
-## Memory (context awareness)
+```bash
+curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash -s -- --ip-https --yes
+```
 
-Every bot sees what is happening in its group, not only messages addressed to it:
+The installer prints the panel address and a **one-time setup code** to create your owner account. Run it again
+any time to update or change how the panel is reached; your data stays. `--help` lists every option.
 
-- **All group messages are stored** (bound or not, including reply-quotes and the history WhatsApp delivers when
-  the number is linked), so a bot bound later still has context. Retention: 90 days / 5,000 messages per chat.
-- **Recent messages** (last 30, per bot `historySize`) go to the model verbatim.
-- **Rolling summary**: older messages are folded into a per-chat summary (decisions, plans, open questions, who is
-  who) by a low-cost model (`SUMMARY_MODEL`, default `claude-haiku-5-5`) in the background.
-- **Notes**: "remember that…" saves a note via `memory__remember`; organizers can `memory__forget`;
-  `memory__search_history` finds older messages by keyword.
-- Memory is passed as information, never as instructions, and can't change roles or permissions.
-- Panel → Chats → **Memory** shows the summary, notes and message count, and can rebuild or erase it.
-- Opt out per bot with `"memory": { "enabled": false }`.
+### Docker
 
-## Admin panel
+```bash
+git clone https://github.com/vikramgorla/whatsapp-agent-duniya && cd whatsapp-agent-duniya
+cp .env.example .env            # optional: DOMAIN, TUNNEL_TOKEN, ADMIN_PASSWORD
+docker compose up -d            # or: --profile https / --profile tunnel
+```
 
-- **Overview**: WhatsApp status, QR / pairing code, unlink, pause-all kill switch, per-bot on/off, server info, *Update from GitHub*.
-- **Activity**: live stream of messages in/out, every tool call (input/output, timing), confirmations, schedule runs and errors.
-- **Bots**: settings editor, schedules with *Run now*, and a test console that talks to the bot with real tools without posting to WhatsApp.
-- **Chats**: all groups the number is in; choose which bot answers each.
-- **Pending**: changes waiting for confirmation (apply/cancel).
-- **Secrets**: API keys and tokens, write-only, stored in `DATA_DIR/secrets.json` (0600).
+See [docs/deploy/docker.md](docs/deploy/docker.md).
 
-Login is password-based (scrypt, HttpOnly SameSite=Strict session cookie, rate-limited). It listens on 127.0.0.1 only; put Cloudflare Access in front of the tunnel hostname for a second factor.
+### Deploy to Oracle Cloud (Always Free)
 
-## Spec-driven development (GitHub Spec Kit)
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/oci-stack.zip)
 
-This repo is built with [GitHub Spec Kit](https://github.com/github/spec-kit). The constitution is in
-`.specify/memory/constitution.md`; every feature has `spec.md`, `plan.md`, `research.md`, `data-model.md`,
-`contracts/`, `quickstart.md` and `tasks.md` under `specs/`:
+Creates a free VM that installs itself. Walkthrough and tips: [docs/deploy/oci-free-tier.md](docs/deploy/oci-free-tier.md).
+Prefer infrastructure-as-code from your own fork? [docs/deploy/terraform-github-actions.md](docs/deploy/terraform-github-actions.md).
 
-| Feature | Spec |
-|---|---|
-| 001 Multi-bot platform | [specs/001-multi-bot-platform](specs/001-multi-bot-platform/spec.md) |
-| 002 Admin panel | [specs/002-admin-panel](specs/002-admin-panel/spec.md) |
-| 003 OCI deployment from GitHub | [specs/003-oci-deployment](specs/003-oci-deployment/spec.md) |
-| 004 Group memory | [specs/004-group-memory](specs/004-group-memory/spec.md) |
+## First steps in the panel
 
-New work: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` →
-`/speckit-implement` → `/speckit-converge` (Claude Code skills are in `.claude/skills/`).
+1. **Setup**: enter the setup code, choose your username and password.
+2. **Overview**: scan the QR with the bot's WhatsApp (*Settings → Linked devices*), or use a pairing code.
+3. **Models**: paste an Anthropic or OpenAI key, add an OpenAI-compatible endpoint, or *Sign in with ChatGPT*.
+4. **Bots → New bot**: pick a template, write the instructions, add organizers, connect tool services
+   (*Discover tools* → tick per role), save. Use the **test console** to try it.
+5. Add the bot number to a WhatsApp group. **Chats** → choose the bot for that group.
+6. In the group: `!yourtrigger hello` (or @mention the bot).
+7. **Backups**: set a passphrase, connect GitHub or S3, turn on the schedule.
+
+## How it works
+
+```
+WhatsApp (linked device) ─► router ─► bot (stored in the app) ─► model provider (Anthropic / OpenAI / ChatGPT / compatible)
+                              │            ├─ MCP tool services (per-role allow lists, enforced in code)
+                              │            ├─ memory: recent messages + running summary + notes + search
+                              │            └─ plugins (optional code: tools, commands)
+                              └─ confirm gate: *_preview results held; an organizer replies "confirm CODE"
+Admin panel (localhost:8080 behind Caddy / Cloudflare Tunnel / SSH) · SQLite · encrypted secrets & backups
+```
+
+- **Roles**: organizers (phone numbers per bot) get organizer tools and can confirm changes; everyone else in a bound
+  group is a participant. The model never sees or calls the confirm tool.
+- **Panel users**: owner (everything), admin (bots, chats, models, memory), viewer (read-only).
+- **Plugins** (`plugins/<name>/index.js`) add local tools or commands for advanced cases; see `plugins/example-dice`.
+- **Bot templates** live in `templates/`; bots themselves are data in the app (export/import as JSON).
 
 ## Development
 
 ```bash
 npm install
-ADMIN_PASSWORD=dev-password-123 npm start   # panel on http://127.0.0.1:8080, QR shown there
-npm test                                    # e2e: fake MCP server + fake Claude API + fake channel (20 scenarios)
+ADMIN_PASSWORD=dev-password-123 npm start     # panel on http://127.0.0.1:8080
+npm test                                      # e2e with fake WhatsApp, Claude, OpenAI, MCP, GitHub and S3
 ```
 
-Layout: `src/channels/` (WhatsApp), `src/core/` (router, bots, agent, tools, MCP pool, scheduler, db, events), `src/panel/` (API + single-file UI), `bots/`, `deploy/` (install/update/backup), `infra/terraform/`, `.github/workflows/`.
+Built with [GitHub Spec Kit](https://github.com/github/spec-kit): the constitution is
+`.specify/memory/constitution.md` and every feature has its spec, plan and tasks under `specs/`:
+[001 platform](specs/001-multi-bot-platform/spec.md) · [002 admin panel](specs/002-admin-panel/spec.md) ·
+[003 OCI deployment](specs/003-oci-deployment/spec.md) · [004 group memory](specs/004-group-memory/spec.md) ·
+[005 app-managed bots & users](specs/005-app-managed-bots/spec.md) · [006 model providers](specs/006-model-providers/spec.md) ·
+[007 backups](specs/007-backups/spec.md) · [008 install & updates](specs/008-install-and-exposure/spec.md).
+New work: `/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-implement` → `/speckit-converge`.
+
+Releases: bump `package.json`, tag `vX.Y.Z`, push the tag. The release workflow attaches the OCI stack zip and
+publishes the Docker image to `ghcr.io/vikramgorla/whatsapp-agent-duniya`.
 
 ## Notes
 
-- **Use a dedicated number** (a prepaid SIM). Unofficial clients can get a number banned; this bot only replies when addressed and is rate-limited.
-- **OCI idle reclamation**: Always Free VMs with low CPU/network can be reclaimed. Upgrade the tenancy to Pay-As-You-Go (you still pay nothing within Always Free limits) and keep backups (`deploy/backup.sh`, nightly; set `BACKUP_RCLONE_REMOTE` for off-VM copies).
-- Memory on an E2.1.Micro: ~180 MB RSS for the app with two bots, plus 2 GB swap as a safety net.
+- Use a **dedicated WhatsApp number**. Unofficial clients can be banned; bots only reply when addressed and are
+  rate-limited to keep that risk low. Tell your groups that the assistant keeps context.
+- Claude **subscriptions** (Pro/Max) can't be used by third-party apps under Anthropic's terms, so Claude needs an
+  API key. ChatGPT plan usage uses OpenAI's official open-source flow (preview).
+- GitHub *device login* for backups needs a GitHub OAuth App client id (Device Flow enabled); pasting a token always works.

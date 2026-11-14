@@ -1,6 +1,7 @@
 locals {
   compartment = var.compartment_ocid != "" ? var.compartment_ocid : var.tenancy_ocid
   is_flex     = length(regexall("Flex$", var.shape)) > 0
+  direct_web  = contains(["ip", "domain"], var.exposure)
   tags        = { app = var.name }
 
   # Shell-safe KEY='value' lines (single quotes escaped)
@@ -8,12 +9,25 @@ locals {
     REPO_URL        = var.repo_url
     BRANCH          = var.branch
     GIT_TOKEN       = var.git_token
-    ADMIN_PASSWORD  = var.admin_password
+    EXPOSURE        = var.exposure
+    DOMAIN          = var.domain
     CF_TUNNEL_TOKEN = var.cf_tunnel_token
+    ADMIN_PASSWORD  = var.admin_password
+    UPDATE_MODE     = var.update_mode
   } : "${k}='${replace(v, "'", "'\\''")}'"])
+
+  user_data = join("\n", [
+    "#!/bin/bash",
+    "install -d -m 700 /etc/duniya",
+    "echo '${base64encode(local.bootstrap_env)}' | base64 -d > /etc/duniya/bootstrap.env",
+    "chmod 600 /etc/duniya/bootstrap.env",
+    "echo '${filebase64("${path.module}/bootstrap.sh")}' | base64 -d > /usr/local/sbin/duniya-bootstrap",
+    "chmod 700 /usr/local/sbin/duniya-bootstrap",
+    "/usr/local/sbin/duniya-bootstrap",
+  ])
 }
 
-# ---------- placement: pick the first availability domain that offers the shape ----------
+# ---------- placement: first availability domain that offers the shape ----------
 data "oci_identity_availability_domains" "ads" {
   compartment_id = var.tenancy_ocid
 }
@@ -42,7 +56,7 @@ data "oci_core_images" "ubuntu" {
   sort_order               = "DESC"
 }
 
-# ---------- network: VCN, public subnet, egress only (no inbound unless ssh_ingress_cidr set) ----------
+# ---------- network ----------
 resource "oci_core_vcn" "main" {
   compartment_id = local.compartment
   display_name   = "${var.name}-vcn"
@@ -80,13 +94,25 @@ resource "oci_core_security_list" "main" {
     protocol    = "all"
   }
 
-  # Path MTU discovery
   ingress_security_rules {
     protocol = "1"
     source   = "0.0.0.0/0"
     icmp_options {
       type = 3
       code = 4
+    }
+  }
+
+  # 80/443 only when the panel is served directly (exposure = ip or domain)
+  dynamic "ingress_security_rules" {
+    for_each = local.direct_web ? [80, 443] : []
+    content {
+      protocol = "6"
+      source   = "0.0.0.0/0"
+      tcp_options {
+        min = ingress_security_rules.value
+        max = ingress_security_rules.value
+      }
     }
   }
 
@@ -143,24 +169,14 @@ resource "oci_core_instance" "app" {
   }
 
   metadata = merge(
-    {
-      user_data = base64encode(templatefile("${path.module}/cloud-init.yaml.tftpl", {
-        bootstrap_env_b64 = base64encode(local.bootstrap_env)
-        bootstrap_sh_b64  = filebase64("${path.module}/bootstrap.sh")
-      }))
-    },
+    { user_data = base64encode(local.user_data) },
     var.ssh_public_key != "" ? { ssh_authorized_keys = var.ssh_public_key } : {}
   )
-
-  agent_config {
-    is_monitoring_disabled = false
-  }
 
   freeform_tags = local.tags
 
   lifecycle {
-    # Don't rebuild the VM when a newer Ubuntu image appears or bootstrap values change;
-    # code updates happen in place from the admin panel.
+    # Code updates happen in place (panel/installer); don't rebuild the VM for new images or changed bootstrap values.
     ignore_changes = [source_details[0].source_id, metadata["user_data"], availability_domain]
   }
 }

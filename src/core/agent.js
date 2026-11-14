@@ -1,6 +1,6 @@
 import { env } from './config.js';
 import { addPending, takePending, peekPending, dropPending } from './db.js';
-import { claude } from './llm.js';
+import { chat as modelChat } from './providers/index.js';
 import { buildContext } from './memory.js';
 import { activity } from './events.js';
 import { toolsFor, matchesAny, organizerConnection } from './tools.js';
@@ -24,6 +24,17 @@ function systemPrompt({ bot, role, isGroup, chatName }) {
     'Write for WhatsApp: short plain text, *bold* sparingly, simple "-" lists, no markdown headings or tables.',
     bot.extraPrompt?.trim() || '',
   ].filter(Boolean).join('\n\n');
+}
+
+/** Errors the bot should explain instead of a generic failure. */
+export function friendlyModelError(e) {
+  const code = e?.code || '';
+  if (code === 'subscription_sharing_usage_limit_exceeded' || code === 'subscription_sharing_usage_unavailable') {
+    return 'I have reached the ChatGPT plan usage limit for now. Please try again later.';
+  }
+  if (code === 'subscription_sharing_user_not_eligible') return 'The connected ChatGPT account is not eligible for plan usage (Plus or Pro needed).';
+  if (code === 'no_model') return 'No AI model is configured yet. An admin needs to connect a model provider.';
+  return null;
 }
 
 export function extractConfirmId(text, field = 'confirm_id') {
@@ -61,13 +72,19 @@ export async function runAgent(ctx) {
   let usage = { input: 0, output: 0 };
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-    const res = await claude().messages.create({
-      model: bot.model,
-      max_tokens: bot.maxTokens,
-      system: systemPrompt({ bot, role, isGroup, chatName: ctx.chatName }),
-      tools: defs,
-      messages,
-    });
+    let res;
+    try {
+      res = await modelChat({
+        model: bot.model, purpose: 'bot', maxTokens: bot.maxTokens,
+        system: systemPrompt({ bot, role, isGroup, chatName: ctx.chatName }), tools: defs, messages,
+      });
+    } catch (e) {
+      const friendly = friendlyModelError(e);
+      if (!friendly) throw e;
+      activity('error', { bot: bot.id, chat, summary: `Model error: ${e.message}`, detail: { code: e.code } });
+      return friendly;
+    }
+    ctx.model = res.model;
     usage.input += res.usage?.input_tokens || 0;
     usage.output += res.usage?.output_tokens || 0;
     reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
@@ -111,6 +128,7 @@ export async function runAgent(ctx) {
     reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${bot.confirm.ttlMinutes || 9} min).`;
   }
   ctx.usage = usage;
+  activity('model.usage', { bot: bot.id, chat, summary: `${ctx.model || bot.model}: ${usage.input} in / ${usage.output} out` });
   return reply.trim() || null;
 }
 

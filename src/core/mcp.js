@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { onSecretChange } from './config.js';
+import { onSecretChange } from './store.js';
 
 /** Pool of MCP connections keyed by url + token. */
 class McpConnection {

@@ -33,7 +33,7 @@ test('US1: the bot reply is remembered too', async () => {
 test('US1: messages in an unbound group are kept and used after binding', async () => {
   await t.route(t.msg({ chat: 'g9@g.us', senderName: 'Kiran', text: 'Kumars are vegetarian' }));
   assert.equal(t.sent.filter((s) => s.chat === 'g9@g.us').length, 0);
-  t.bots.bindChat('g9@g.us', 'panduga');
+  await t.bots.bindChat('g9@g.us', 'panduga');
   const ctx = await ask({ chat: 'g9@g.us', text: '!panduga who is vegetarian?' });
   assert.match(ctx, /Kiran: Kumars are vegetarian/);
 });
@@ -57,7 +57,7 @@ test('US1: history sync is stored once and never answered', async () => {
 
 test('US2: long discussions are folded into a running summary used in context', async () => {
   const chat = 'g5@g.us';
-  t.bots.bindChat(chat, 'panduga');
+  await t.bots.bindChat(chat, 'panduga');
   t.summaryReqs.length = 0;
   for (let i = 1; i <= 40; i++) await t.route(t.msg({ chat, senderName: 'P', text: `planning message ${i}${i === 3 ? ' — bus at 7:00 from Aigle station' : ''}` }));
   await t.waitFor(() => t.memory.memoryView(chat).summary);
@@ -81,7 +81,7 @@ test('US2: search_history finds older messages of the same chat', async () => {
 
 test('US2: summariser failure does not break replies', async () => {
   const chat = 'g6@g.us';
-  t.bots.bindChat(chat, 'panduga');
+  await t.bots.bindChat(chat, 'panduga');
   t.summaryFail = true;
   for (let i = 1; i <= 40; i++) await t.route(t.msg({ chat, text: `msg ${i}` }));
   await new Promise((r) => setTimeout(r, 200));
@@ -113,13 +113,12 @@ test('US3: remember saves a note used later; only organizers can forget', async 
 });
 
 test('US3: a bot can opt out of memory', async () => {
-  const helper = t.bots.getBot('helper');
-  helper.memory = { enabled: false };
+  await t.bots.updateBot('helper', { memory: { enabled: false } });
   t.claudeReqs.length = 0;
   t.script.push([{ type: 'text', text: 'ok' }]);
   await t.route(t.msg({ chat: 'g2@g.us', phone: '41790000003', text: '!help hi' }));
   assert.ok(!t.toolNames(0).some((n) => n.startsWith('memory__')));
-  helper.memory = { enabled: true };
+  await t.bots.updateBot('helper', { memory: { enabled: true } });
 });
 
 test('US4: panel shows and erases a chat memory', async () => {

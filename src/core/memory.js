@@ -4,7 +4,7 @@ import {
   history, messagesAfter, getChatMemory, setChatMemory, addNote, listNotes, deleteNote,
   searchMessages, messageCount, eraseChat,
 } from './db.js';
-import { claude } from './llm.js';
+import { chat as modelChat } from './providers/index.js';
 import { activity } from './events.js';
 
 export const DEFAULT_WINDOW = 30;
@@ -69,9 +69,9 @@ export async function maybeSummarize(chat, bot, { force = false } = {}) {
   running.add(chat);
   try {
     const tz = bot?.timezone || env.timezone;
-    const res = await claude().messages.create({
-      model: env.summaryModel,
-      max_tokens: 1200,
+    const res = await modelChat({
+      model: 'auto', purpose: 'background',
+      maxTokens: 1200,
       system: SUMMARY_SYSTEM,
       messages: [{
         role: 'user',

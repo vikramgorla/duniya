@@ -1,0 +1,21 @@
+{
+  "name": "New bot",
+  "description": "Start from scratch: a helpful group assistant with memory.",
+  "model": "auto",
+  "prompt": "You are a friendly assistant in this WhatsApp group. Keep answers short and helpful. Use the conversation context and saved notes. If you don't know something, say so.",
+  "triggers": [
+    "!bot"
+  ],
+  "dm": "members",
+  "mcpServers": {},
+  "tools": {
+    "participant": [],
+    "organizer": [],
+    "deny": []
+  },
+  "confirm": null,
+  "schedules": [],
+  "memory": {
+    "enabled": true
+  }
+}

@@ -1,4 +1,4 @@
-import { interpolate } from './config.js';
+import { interpolate } from './store.js';
 import { mcpConnection } from './mcp.js';
 import { memoryTools, memoryEnabled, MEMORY_DEFAULT_ALLOW } from './memory.js';
 

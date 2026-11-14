@@ -7,7 +7,7 @@ let t;
 before(async () => { t = await setup(); });
 after(() => t.close());
 
-test('001/US3: loads bots from folders, ignores _template', () => {
+test('001/US3 + 005: bots load from the app store', () => {
   assert.deepEqual(t.bots.listBots().map((b) => b.id).sort(), ['helper', 'panduga']);
 });
 
@@ -88,10 +88,10 @@ test('001/US4: DM routing: group member reaches panduga; strangers get nothing',
 
 test('001: paused stops replies', async () => {
   t.sent.length = 0;
-  t.config.updateSettings({ paused: true });
+  t.store.updateSettings({ paused: true });
   await t.route(t.msg({ text: '!panduga hi' }));
   assert.equal(t.sent.length, 0);
-  t.config.updateSettings({ paused: false });
+  t.store.updateSettings({ paused: false });
 });
 
 test('002: panel auth, CSRF guard, bot edit validation, secrets never returned, activity', async () => {
@@ -103,9 +103,9 @@ test('002: panel auth, CSRF guard, bot edit validation, secrets never returned, 
   assert.equal((await get('/api/status')).channel.status, 'open');
   assert.equal((await fetch(`${t.base}/api/settings`, { method: 'POST', headers: { cookie, 'content-type': 'text/plain' }, body: 'paused=1' })).status, 415);
   const updated = await (await json('PUT', '/api/bots/panduga', { triggers: ['!pd', '!panduga'], organizers: ['+41 79 000 00 01', '+91 98450 00000'] })).json();
-  assert.deepEqual(updated.triggers, ['!pd', '!panduga']);
-  assert.deepEqual(updated.organizers, ['41790000001', '919845000000']);
-  assert.equal((await json('PUT', '/api/bots/panduga', { mcpServers: {} })).status, 400, 'MCP config not editable');
+  assert.deepEqual(updated.config.triggers, ['!pd', '!panduga']);
+  assert.deepEqual(updated.config.organizers, ['41790000001', '919845000000']);
+  assert.equal((await json('PUT', '/api/bots/panduga', { dm: 'everyone' })).status, 400, 'invalid DM policy rejected');
   assert.equal((await json('PUT', '/api/bots/panduga', { schedules: [{ at: '8am' }] })).status, 400, 'bad schedule rejected');
   const secrets = await get('/api/secrets');
   assert.ok(secrets.find((s) => s.name === 'PANDUGA_TOKEN_MEMBER' && s.usedByBots && !s.set));

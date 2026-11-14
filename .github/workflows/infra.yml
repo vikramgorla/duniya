@@ -1,4 +1,4 @@
-name: Infrastructure (OCI)
+name: Infrastructure (OCI, advanced example)
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ on:
         default: plan
   push:
     branches: [main]
-    paths: ["infra/terraform/**", ".github/workflows/infra.yml"]
+    paths: ["infra/oci/**", ".github/workflows/infra.yml"]
 
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra/terraform
+        working-directory: infra/oci
     env:
       TF_IN_AUTOMATION: "1"
       TF_INPUT: "0"
@@ -40,6 +40,9 @@ jobs:
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       TF_VAR_ssh_ingress_cidr: ${{ vars.SSH_INGRESS_CIDR }}
       TF_VAR_shape: ${{ vars.SHAPE || 'VM.Standard.E2.1.Micro' }}
+      TF_VAR_exposure: ${{ vars.EXPOSURE || 'ip' }}
+      TF_VAR_domain: ${{ vars.DOMAIN }}
+      TF_VAR_update_mode: ${{ vars.UPDATE_MODE || 'notify' }}
       TF_VAR_repo_url: https://github.com/${{ github.repository }}.git
       TF_VAR_branch: ${{ github.event.repository.default_branch }}
 
@@ -49,7 +52,7 @@ jobs:
       - name: Check required secrets
         run: |
           missing=""
-          for s in OCI_TENANCY_OCID OCI_USER_OCID OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_REGION ADMIN_PASSWORD; do
+          for s in OCI_TENANCY_OCID OCI_USER_OCID OCI_FINGERPRINT OCI_PRIVATE_KEY OCI_REGION; do
             [ -n "${!s}" ] || missing="$missing $s"
           done
           if [ -n "$missing" ]; then echo "::error::Missing repository secrets:$missing"; exit 1; fi
@@ -59,7 +62,6 @@ jobs:
           OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
           OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
           OCI_REGION: ${{ secrets.OCI_REGION }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
 
       - name: Write OCI API key config
         run: |
@@ -101,8 +103,9 @@ jobs:
           terraform_version: "1.17.2"
           terraform_wrapper: false
 
-      - name: terraform init
+      - name: terraform init (remote state in OCI Object Storage)
         run: |
+          printf 'terraform {\n  backend "oci" {\n    key = "whatsapp-agent-duniya/terraform.tfstate"\n  }\n}\n' > backend.tf
           terraform init \
             -backend-config="bucket=$STATE_BUCKET" \
             -backend-config="namespace=${{ steps.state.outputs.namespace }}" \
@@ -122,10 +125,9 @@ jobs:
           {
             echo "## Deployed"
             echo '```'
-            terraform output -raw next_steps
+            echo "Panel: $(terraform output -raw panel_url)"
             echo
-            echo "public_ip: $(terraform output -raw public_ip)"
-            echo "image: $(terraform output -raw image)"
+            terraform output -raw next_steps
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

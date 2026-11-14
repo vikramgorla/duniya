@@ -1,117 +1,148 @@
 import http from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { execFile, spawn } from 'node:child_process';
-import { env, ROOT, readJson, writeJson, listSecrets, setSecret, getSettings, updateSettings } from '../core/config.js';
-import { listBots, getBot, botView, updateBot, bindChat, loadBots } from '../core/bots.js';
-import { listActivity, listPending, dropPending, takePending } from '../core/db.js';
+import { execFile } from 'node:child_process';
+import { env, ROOT, DATA_DIR } from '../core/config.js';
+import {
+  listSecrets, setSecret, getSettings, updateSettings, interpolate, countUsers, createUser, listUsers, updateUser,
+  deleteUser, authenticate, createSession, sessionUser, deleteSession,
+} from '../core/store.js';
+import {
+  listBots, getBot, botView, createBot, updateBot, deleteBot, bindChat, loadBots, botForChat,
+  listTemplates, templateConfig, exportBot, importBot, listPlugins,
+} from '../core/bots.js';
+import { referencedSecrets } from '../core/schema.js';
+import { listActivity, listPending, dropPending, takePending, deleteNote, getNote } from '../core/db.js';
 import { bus, activity } from '../core/events.js';
 import { runAgent, handleConfirmCommand, applyPending } from '../core/agent.js';
 import { runSchedule } from '../core/scheduler.js';
-import { resetMcpPool } from '../core/mcp.js';
+import { resetMcpPool, mcpConnection } from '../core/mcp.js';
 import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
-import { deleteNote, getNote } from '../core/db.js';
-import { botForChat } from '../core/bots.js';
+import { humanCode } from '../core/crypto.js';
 
 const PUBLIC = resolve(import.meta.dirname, 'public');
-const SESSION_MS = 7 * 24 * 3600 * 1000;
-const sessions = new Map(); // token -> expires
 const loginAttempts = new Map(); // ip -> [ts]
 const startedAt = Date.now();
+const ROLE_RANK = { viewer: 1, admin: 2, owner: 3 };
+const SETUP_FILE = resolve(DATA_DIR, 'setup-code.txt');
+let setupCode = null;
 
-// ---------- password ----------
-function hashPw(pw, salt = randomBytes(16).toString('hex')) {
-  return { salt, hash: scryptSync(pw, salt, 32).toString('hex') };
-}
-function checkPassword(pw) {
-  const stored = readJson('admin.json', null);
-  if (stored?.hash) {
-    const { hash } = hashPw(pw, stored.salt);
-    return timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(stored.hash, 'hex'));
+// ---------- first owner ----------
+export function bootstrapAuth() {
+  if (countUsers() > 0) { rmSync(SETUP_FILE, { force: true }); return; }
+  if (env.adminPassword) {
+    try {
+      createUser({ username: 'admin', role: 'owner', password: env.adminPassword });
+      activity('system', { summary: 'Owner "admin" created from ADMIN_PASSWORD' });
+      return;
+    } catch (e) {
+      console.error(`ADMIN_PASSWORD not usable (${e.message}); falling back to a setup code`);
+    }
   }
-  if (!env.adminPassword) return false;
-  const a = Buffer.from(scryptSync(pw, 'x', 32));
-  const b = Buffer.from(scryptSync(env.adminPassword, 'x', 32));
-  return timingSafeEqual(a, b);
+  setupCode = existsSync(SETUP_FILE) ? readFileSync(SETUP_FILE, 'utf8').trim() : humanCode(10);
+  writeFileSync(SETUP_FILE, setupCode, { mode: 0o600 });
+  console.log(`\n  First-run setup code: ${setupCode}\n  Open the admin panel and enter it to create the owner account.\n`);
 }
-const passwordConfigured = () => !!(readJson('admin.json', null)?.hash || env.adminPassword);
 
 // ---------- helpers ----------
-const clientIp = (req) => req.headers['cf-connecting-ip'] || req.socket.remoteAddress || '';
-const isHttps = (req) => req.headers['x-forwarded-proto'] === 'https' || !!req.headers['cf-visitor']?.includes('https');
-
+// Forwarded headers are only trusted when a local proxy (Caddy, cloudflared) is configured (TRUST_PROXY=1).
+const clientIp = (req) => (env.trustProxy
+  ? req.headers['cf-connecting-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress
+  : req.socket.remoteAddress) || '';
+const isHttps = (req) => (env.trustProxy && (req.headers['x-forwarded-proto'] === 'https' || !!req.headers['cf-visitor']?.includes('https')))
+  || !!req.socket.encrypted;
 function cookie(req, name) {
   const m = (req.headers.cookie || '').match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
   return m ? decodeURIComponent(m[1]) : null;
-}
-function authed(req) {
-  const t = cookie(req, 'duniya_session');
-  const exp = t && sessions.get(t);
-  if (!exp || exp < Date.now()) { if (t) sessions.delete(t); return false; }
-  return true;
 }
 function send(res, status, body, headers = {}) {
   const isObj = typeof body !== 'string' && !Buffer.isBuffer(body);
   res.writeHead(status, {
     'content-type': isObj ? 'application/json' : 'text/plain; charset=utf-8',
-    'cache-control': 'no-store',
-    'x-content-type-options': 'nosniff',
-    'referrer-policy': 'no-referrer',
-    ...headers,
+    'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', ...headers,
   });
   res.end(isObj ? JSON.stringify(body) : body);
 }
 async function readBody(req) {
   let size = 0; const chunks = [];
-  for await (const c of req) { size += c.length; if (size > 1e6) throw new Error('Body too large'); chunks.push(c); }
+  for await (const c of req) { size += c.length; if (size > 2e6) throw new Error('Body too large'); chunks.push(c); }
   const raw = Buffer.concat(chunks).toString('utf8');
   return raw ? JSON.parse(raw) : {};
 }
-function gitVersion() {
-  return new Promise((r) => execFile('git', ['log', '-1', '--format=%h %cs %s'], { cwd: ROOT }, (e, out) => r(e ? 'unknown' : out.trim())));
+const gitVersion = () => new Promise((r) => execFile('git', ['log', '-1', '--format=%h %cs %s'], { cwd: ROOT }, (e, out) => r(e ? 'unknown' : out.trim())));
+function rateLimitLogin(ip) {
+  const recent = (loginAttempts.get(ip) || []).filter((t) => Date.now() - t < 60000);
+  recent.push(Date.now()); loginAttempts.set(ip, recent);
+  return recent.length > 5;
+}
+function setSessionCookie(req, res, userId) {
+  const { token, maxAge } = createSession(userId, clientIp(req));
+  res.setHeader('set-cookie', `duniya_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${isHttps(req) ? '; Secure' : ''}`);
 }
 
-const INDEX_HTML = () => readFileSync(resolve(PUBLIC, 'index.html'));
 const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
-export function startPanel({ channel }) {
+export function startPanel({ channel, extend = [] }) {
+  bootstrapAuth();
   const routes = [];
-  const route = (method, pattern, handler) => routes.push({ method, re: new RegExp(`^${pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)')}$`), handler });
+  /** opts.role: minimum role (default: viewer for GET, admin otherwise). opts.public: no auth. */
+  const route = (method, pattern, handler, opts = {}) => routes.push({
+    method, handler, public: !!opts.public,
+    role: opts.role || (method === 'GET' ? 'viewer' : 'admin'),
+    re: new RegExp(`^${pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)')}$`),
+  });
 
-  // ---------- auth ----------
-  route('GET', '/api/session', async (req) => ({ authed: authed(req), passwordConfigured: passwordConfigured() }));
+  // ---------- session / setup ----------
+  route('GET', '/api/session', async (req) => {
+    const user = sessionUser(cookie(req, 'duniya_session'));
+    return { authed: !!user, user, needsSetup: countUsers() === 0 };
+  }, { public: true });
+  route('POST', '/api/setup', async (req, res, body) => {
+    if (countUsers() > 0) return [409, { error: 'Already set up' }];
+    if (rateLimitLogin(clientIp(req))) return [429, { error: 'Too many attempts, wait a minute' }];
+    if (!setupCode || String(body.code || '').trim().toUpperCase() !== setupCode) return [403, { error: 'Wrong setup code (see the server log or installer output)' }];
+    const user = createUser({ username: body.username || 'admin', email: body.email, role: 'owner', password: body.password });
+    rmSync(SETUP_FILE, { force: true }); setupCode = null;
+    activity('system', { summary: `Owner "${user.username}" created via setup` });
+    setSessionCookie(req, res, user.id);
+    return { ok: true, user };
+  }, { public: true });
   route('POST', '/api/login', async (req, res, body) => {
     const ip = clientIp(req);
-    const recent = (loginAttempts.get(ip) || []).filter((t) => Date.now() - t < 60000);
-    if (recent.length >= 5) return [429, { error: 'Too many attempts, wait a minute' }];
-    recent.push(Date.now()); loginAttempts.set(ip, recent);
-    if (!checkPassword(String(body.password || ''))) {
-      activity('system', { summary: `Panel login failed from ${ip}` });
-      return [401, { error: 'Wrong password' }];
-    }
-    const token = randomBytes(32).toString('hex');
-    sessions.set(token, Date.now() + SESSION_MS);
-    activity('system', { summary: `Panel login from ${ip}` });
-    res.setHeader('set-cookie', `duniya_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MS / 1000}${isHttps(req) ? '; Secure' : ''}`);
-    return { ok: true };
+    if (rateLimitLogin(ip)) return [429, { error: 'Too many attempts, wait a minute' }];
+    const user = authenticate(body.username || 'admin', String(body.password || ''));
+    if (!user) { activity('system', { summary: `Panel login failed for "${body.username || 'admin'}" from ${ip}` }); return [401, { error: 'Wrong username or password' }]; }
+    setSessionCookie(req, res, user.id);
+    activity('system', { summary: `Panel login: ${user.username} from ${ip}` });
+    return { ok: true, user };
   }, { public: true });
   route('POST', '/api/logout', async (req, res) => {
-    sessions.delete(cookie(req, 'duniya_session'));
+    deleteSession(cookie(req, 'duniya_session'));
     res.setHeader('set-cookie', 'duniya_session=; Path=/; Max-Age=0');
     return { ok: true };
-  });
-  route('POST', '/api/password', async (req, res, body) => {
-    if (!checkPassword(String(body.current || ''))) return [400, { error: 'Current password is wrong' }];
-    if (String(body.next || '').length < 12) return [400, { error: 'Use at least 12 characters' }];
-    writeJson('admin.json', hashPw(String(body.next)));
-    sessions.clear();
-    activity('system', { summary: 'Panel password changed' });
+  }, { role: 'viewer' });
+  route('POST', '/api/password', async (req, res, body, q, p, user) => {
+    if (!authenticate(user.username, String(body.current || ''))) return [400, { error: 'Current password is wrong' }];
+    updateUser(user.id, { password: String(body.next || '') });
+    activity('system', { summary: `Password changed: ${user.username}` });
     return { ok: true };
-  });
+  }, { role: 'viewer' });
+
+  // ---------- users (owner) ----------
+  route('GET', '/api/users', async () => listUsers(), { role: 'owner' });
+  route('POST', '/api/users', async (req, res, body, q, p, user) => {
+    const u = createUser(body); activity('system', { summary: `User ${u.username} (${u.role}) added by ${user.username}` }); return u;
+  }, { role: 'owner' });
+  route('PUT', '/api/users/:id', async (req, res, body, q, p, user) => {
+    const u = updateUser(p.id, body); activity('system', { summary: `User ${u.username} updated by ${user.username}` }); return u;
+  }, { role: 'owner' });
+  route('DELETE', '/api/users/:id', async (req, res, body, q, p, user) => {
+    deleteUser(p.id); activity('system', { summary: `User #${p.id} removed by ${user.username}` }); return { ok: true };
+  }, { role: 'owner' });
 
   // ---------- overview ----------
-  route('GET', '/api/status', async () => ({
+  route('GET', '/api/status', async (req, res, body, q, p, user) => ({
+    user,
     channel: await channel.status(),
     settings: getSettings(),
     version: await gitVersion(),
@@ -121,11 +152,11 @@ export function startPanel({ channel }) {
     bots: listBots().map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })),
     pending: listPending().length,
   }));
-  route('POST', '/api/settings', async (req, res, body) => {
+  route('POST', '/api/settings', async (req, res, body, q, p, user) => {
     const patch = {};
     if ('paused' in body) patch.paused = !!body.paused;
     if ('defaultDmBot' in body) patch.defaultDmBot = String(body.defaultDmBot || '');
-    activity('system', { summary: `Settings: ${JSON.stringify(patch)}` });
+    activity('system', { summary: `Settings by ${user.username}: ${JSON.stringify(patch)}` });
     return updateSettings(patch);
   });
 
@@ -142,12 +173,49 @@ export function startPanel({ channel }) {
   });
 
   // ---------- bots ----------
+  route('GET', '/api/templates', async () => listTemplates());
+  route('GET', '/api/plugins', async () => listPlugins());
   route('GET', '/api/bots', async () => listBots().map(botView));
-  route('GET', '/api/bots/:id', async (req, res, body, q, p) => {
-    const b = getBot(p.id); return b ? botView(b) : [404, { error: 'Not found' }];
+  route('POST', '/api/bots', async (req, res, body, q, p, user) => {
+    const base = body.template ? templateConfig(body.template) : {};
+    const { bot, warnings } = await createBot({ id: body.id, config: { ...base, ...(body.config || {}) }, by: user.username });
+    return [201, { ...botView(bot), warnings }];
   });
-  route('PUT', '/api/bots/:id', async (req, res, body, q, p) => botView(updateBot(p.id, body)));
+  route('POST', '/api/bots/import', async (req, res, body, q, p, user) => {
+    const { bot, warnings } = await importBot(body, user.username);
+    return [201, { ...botView(bot), warnings }];
+  });
   route('POST', '/api/bots/reload', async () => { await loadBots(); await resetMcpPool(); activity('system', { summary: 'Bots reloaded' }); return listBots().map(botView); });
+  route('GET', '/api/bots/:id', async (req, res, body, q, p) => { const b = getBot(p.id); return b ? botView(b) : [404, { error: 'Not found' }]; });
+  route('PUT', '/api/bots/:id', async (req, res, body, q, p, user) => {
+    const { bot, warnings } = await updateBot(p.id, body, user.username);
+    return { ...botView(bot), warnings };
+  });
+  route('DELETE', '/api/bots/:id', async (req, res, body, q, p, user) => { deleteBot(p.id, user.username); return { ok: true }; });
+  route('POST', '/api/bots/:id/duplicate', async (req, res, body, q, p, user) => {
+    const src = getBot(p.id);
+    if (!src) return [404, { error: 'Not found' }];
+    const { hooks, id, updatedAt, ...config } = src;
+    const { bot } = await createBot({ id: body.id, config: { ...config, name: `${config.name} (copy)`, chats: [] }, by: user.username });
+    return [201, botView(bot)];
+  });
+  route('GET', '/api/bots/:id/export', async (req, res, body, q, p) => {
+    const doc = exportBot(p.id);
+    send(res, 200, JSON.stringify(doc, null, 2), { 'content-type': 'application/json', 'content-disposition': `attachment; filename="${p.id}.bot.json"` });
+    return null;
+  });
+  route('POST', '/api/bots/:id/discover', async (req, res, body, q, p) => {
+    let url; let token;
+    if (body.url) { url = interpolate(String(body.url)); token = interpolate(String(body.token || '')); } else {
+      const bot = getBot(p.id);
+      const srv = bot?.mcpServers?.[body.server];
+      if (!srv) return [404, { error: 'Unknown tool service' }];
+      url = interpolate(srv.url); token = interpolate(srv.tokens?.organizer || '');
+    }
+    if (!url) return [400, { error: 'URL is empty (is its secret set?)' }];
+    const tools = await mcpConnection(url, token).listTools();
+    return tools.map((t) => ({ name: t.name, description: (t.description || '').slice(0, 300) }));
+  });
   route('POST', '/api/bots/:id/test', async (req, res, body, q, p) => {
     const bot = getBot(p.id);
     if (!bot) return [404, { error: 'Not found' }];
@@ -160,16 +228,16 @@ export function startPanel({ channel }) {
     const ctx = { bot, role, chat, senderName: 'Panel admin', requester: 'panel', text, isGroup: false, source: 'panel' };
     const reply = await runAgent(ctx);
     activity('message.out', { bot: bot.id, chat, summary: reply || '(no reply)' });
-    return { reply, usage: ctx.usage };
+    return { reply, usage: ctx.usage, model: ctx.model };
   });
   route('POST', '/api/bots/:id/schedules/:sid/run', async (req, res, body, q, p) => {
     const bot = getBot(p.id);
-    const s = bot?.schedules.find((x) => x.id === p.sid);
+    const s = bot?.schedules.find((x) => x.id === decodeURIComponent(p.sid));
     if (!s) return [404, { error: 'Not found' }];
     return runSchedule(bot, s, channel, { force: true });
   });
 
-  // ---------- chats ----------
+  // ---------- chats + memory ----------
   route('GET', '/api/chats', async () => {
     const chats = await channel.listChats();
     const owner = new Map(listBots().flatMap((b) => b.chats.map((c) => [c, b.id])));
@@ -177,28 +245,26 @@ export function startPanel({ channel }) {
     const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: '(not a member / offline)', size: 0 }));
     return [...chats, ...missing].map((c) => ({ ...c, bot: owner.get(c.id) || '' }));
   });
-  route('POST', '/api/chats/bind', async (req, res, body) => { bindChat(String(body.chat), body.bot || null); return { ok: true }; });
-
-  // ---------- memory (004) ----------
+  route('POST', '/api/chats/bind', async (req, res, body, q, p, user) => { await bindChat(String(body.chat), body.bot || null, user.username); return { ok: true }; });
   route('GET', '/api/chats/:chat/memory', async (req, res, body, q, p) => memoryView(decodeURIComponent(p.chat)));
   route('POST', '/api/chats/:chat/memory/summarize', async (req, res, body, q, p) => {
     const chat = decodeURIComponent(p.chat);
     const summary = await maybeSummarize(chat, botForChat(chat), { force: true });
     return { summary: summary ?? memoryView(chat).summary };
   });
-  route('DELETE', '/api/chats/:chat/memory', async (req, res, body, q, p) => { eraseChatMemory(decodeURIComponent(p.chat)); return { ok: true }; });
-  route('DELETE', '/api/notes/:id', async (req, res, body, q, p) => {
+  route('DELETE', '/api/chats/:chat/memory', async (req, res, body, q, p, user) => { eraseChatMemory(decodeURIComponent(p.chat), user.username); return { ok: true }; });
+  route('DELETE', '/api/notes/:id', async (req, res, body, q, p, user) => {
     const note = getNote(p.id);
     if (!note) return [404, { error: 'Not found' }];
     deleteNote(p.id);
-    activity('memory.note.removed', { chat: note.chat, summary: `#${p.id} (panel)` });
+    activity('memory.note.removed', { chat: note.chat, summary: `#${p.id} (panel, ${user.username})` });
     return { ok: true };
   });
 
   // ---------- pending ----------
   route('GET', '/api/pending', async () => listPending());
-  route('DELETE', '/api/pending/:code', async (req, res, body, q, p) => {
-    dropPending(p.code); activity('confirm.cancelled', { summary: `${p.code} (panel)` }); return { ok: true };
+  route('DELETE', '/api/pending/:code', async (req, res, body, q, p, user) => {
+    dropPending(p.code); activity('confirm.cancelled', { summary: `${p.code} (panel, ${user.username})` }); return { ok: true };
   });
   route('POST', '/api/pending/:code/apply', async (req, res, body, q, p) => {
     const row = takePending(p.code);
@@ -208,16 +274,16 @@ export function startPanel({ channel }) {
 
   // ---------- secrets ----------
   route('GET', '/api/secrets', async () => {
-    const names = new Set(listSecrets().map((s) => s.name));
+    const stored = new Map(listSecrets().map((s) => [s.name, s.set]));
     const wanted = new Set(['ANTHROPIC_API_KEY']);
-    for (const b of listBots()) JSON.stringify(b.mcpServers).replace(/\$\{([A-Z0-9_]+)\}/g, (_, k) => wanted.add(k));
-    return [...new Set([...names, ...wanted])].sort().map((name) => ({
-      name, set: listSecrets().some((s) => s.name === name && s.set) || !!process.env[name], usedByBots: wanted.has(name),
+    for (const b of listBots()) for (const s of referencedSecrets(b)) wanted.add(s);
+    return [...new Set([...stored.keys(), ...wanted])].sort().map((name) => ({
+      name, set: !!stored.get(name) || !!process.env[name], usedByBots: wanted.has(name),
     }));
   });
-  route('PUT', '/api/secrets', async (req, res, body) => {
+  route('PUT', '/api/secrets', async (req, res, body, q, p, user) => {
     setSecret(String(body.name || ''), String(body.value || ''));
-    activity('system', { summary: `Secret ${body.value ? 'set' : 'removed'}: ${body.name}` });
+    activity('system', { summary: `Secret ${body.value ? 'set' : 'removed'}: ${body.name} (by ${user.username})` });
     return { ok: true };
   });
 
@@ -227,48 +293,43 @@ export function startPanel({ channel }) {
   route('POST', '/api/whatsapp/restart', async () => { await channel.restart(); return { ok: true }; });
 
   // ---------- system ----------
-  route('POST', '/api/system/update', async () => {
-    activity('system', { summary: 'Update requested from panel' });
-    const out = await new Promise((r) => {
-      const p = spawn('bash', [resolve(ROOT, 'deploy/update.sh')], { cwd: ROOT });
-      let log = ''; p.stdout.on('data', (d) => (log += d)); p.stderr.on('data', (d) => (log += d));
-      p.on('close', (code) => r({ code, log: log.slice(-6000) }));
-    });
-    if (out.code === 0) {
-      activity('system', { summary: 'Updated; restarting' });
-      setTimeout(() => process.exit(0), 500); // systemd restarts us
-    } else {
-      activity('error', { summary: 'Update failed', detail: out.log });
-    }
-    return out;
-  });
-  route('POST', '/api/system/restart', async () => { setTimeout(() => process.exit(0), 300); return { ok: true }; });
+  route('POST', '/api/system/restart', async () => { setTimeout(() => process.exit(0), 300); return { ok: true }; }, { role: 'owner' });
+
+  // Other features (providers, backups, updates) add their routes with the same role gates.
+  for (const fn of [].concat(extend)) fn(route, { channel });
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     try {
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-        return send(res, 200, INDEX_HTML(), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
+        return send(res, 200, readFileSync(resolve(PUBLIC, 'index.html')), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
       }
       if (url.pathname === '/healthz') return send(res, 200, 'ok');
       const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));
       if (!r) return send(res, 404, { error: 'Not found' });
-      const isPublic = url.pathname === '/api/login' || url.pathname === '/api/session';
-      if (!isPublic && !authed(req)) return send(res, 401, { error: 'Login required' });
+      let user = null;
+      if (!r.public) {
+        user = sessionUser(cookie(req, 'duniya_session'));
+        if (!user) return send(res, 401, { error: 'Login required' });
+        if (ROLE_RANK[user.role] < ROLE_RANK[r.role]) {
+          return send(res, 403, { error: user.role === 'viewer' ? 'Read-only account' : `Requires ${r.role} role` });
+        }
+      }
       if (req.method !== 'GET' && !String(req.headers['content-type'] || '').startsWith('application/json')) {
         return send(res, 415, { error: 'JSON required' }); // CSRF guard (with SameSite=Strict)
       }
       const body = req.method === 'GET' ? {} : await readBody(req);
-      const out = await r.handler(req, res, body, url.searchParams, url.pathname.match(r.re).groups || {});
-      if (out === null) return; // streaming
+      const out = await r.handler(req, res, body, url.searchParams, url.pathname.match(r.re).groups || {}, user);
+      if (out === null) return;
       if (Array.isArray(out) && typeof out[0] === 'number' && out.length === 2) return send(res, out[0], out[1]);
       return send(res, 200, out ?? { ok: true });
     } catch (e) {
-      if (!res.headersSent) send(res, 400, { error: e.message });
+      if (!res.headersSent) send(res, e.status || 400, { error: e.message, field: e.field });
     }
   });
   server.listen(env.panelPort, env.panelHost, () => {
-    console.log(`Admin panel on http://${env.panelHost}:${env.panelPort}${passwordConfigured() ? '' : ' (WARNING: no ADMIN_PASSWORD set — login disabled)'}`);
+    console.log(`Admin panel on http://${env.panelHost}:${env.panelPort}`);
   });
   return server;
 }
+

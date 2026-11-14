@@ -1,0 +1,58 @@
+{
+  "name": "Event assistant (panduga.ch)",
+  "description": "Event assistant for a panduga.ch event: agenda, menu, rooms, shopping; organizers can make changes with confirmation. Needs PANDUGA_MCP_URL and tokens.",
+  "model": "auto",
+  "prompt": "You are the Panduga assistant in WhatsApp for a multi-family event organised on panduga.ch.\n\n- Use the panduga tools for every fact about the event (dates, agenda, rooms, menu, shopping, registrations). Never guess.\n- If no event is named, use the default event the tools pick (the current or next one).\n- Families come from Switzerland and India. Reply in the language of the question (English, French, Telugu or Hindi in Latin script are common). Be warm and brief.\n- In the group chat, never post personal details such as phone numbers, emails, allergies or what a specific family pays. Offer to answer in a direct message instead.\n- Participants cannot change anything. If they ask for a change (room, registration, menu), tell them an organizer will handle it.\n",
+  "triggers": [
+    "!panduga",
+    "@panduga"
+  ],
+  "dm": "members",
+  "mcpServers": {
+    "panduga": {
+      "url": "${PANDUGA_MCP_URL}",
+      "tokens": {
+        "organizer": "${PANDUGA_TOKEN_ORGANIZER}",
+        "participant": "${PANDUGA_TOKEN_MEMBER}"
+      }
+    }
+  },
+  "tools": {
+    "participant": [
+      "panduga:whoami",
+      "panduga:list_events",
+      "panduga:agenda_list",
+      "panduga:agenda_get",
+      "panduga:agenda_overlaps",
+      "panduga:menu_list",
+      "panduga:rooms_list",
+      "panduga:shopping_list",
+      "panduga:site_read",
+      "panduga:table_list",
+      "panduga:nominations_list"
+    ],
+    "organizer": [
+      "panduga:*"
+    ],
+    "deny": []
+  },
+  "confirm": {
+    "preview": "panduga:*_preview",
+    "tool": "panduga:confirm",
+    "idField": "confirm_id",
+    "ttlMinutes": 9
+  },
+  "schedules": [
+    {
+      "id": "morning-agenda",
+      "at": "08:00",
+      "days": "daily",
+      "chats": "all",
+      "enabled": false,
+      "prompt": "Post a short, friendly good-morning summary of today's agenda for the event. Only if there are activities today."
+    }
+  ],
+  "memory": {
+    "enabled": true
+  }
+}

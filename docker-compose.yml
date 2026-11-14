@@ -1,0 +1,42 @@
+# docker compose up -d                          → panel on http://127.0.0.1:8080 (this machine only)
+# docker compose --profile https up -d          → https://$DOMAIN via Caddy (ports 80/443)
+# docker compose --profile tunnel up -d         → Cloudflare Tunnel ($TUNNEL_TOKEN), no open ports
+# Settings go in a .env file next to this one (see .env.example).
+services:
+  app:
+    image: ghcr.io/vikramgorla/whatsapp-agent-duniya:latest
+    build: .
+    restart: unless-stopped
+    environment:
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      TRUST_PROXY: "1"
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      TZ_DEFAULT: ${TZ_DEFAULT:-Europe/Zurich}
+    volumes:
+      - duniya-data:/data
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  caddy:
+    profiles: ["https"]
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [app]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env for the https profile}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/Caddyfile.compose:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on: [app]
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env for the tunnel profile}
+    # In Cloudflare, point the tunnel's public hostname to http://app:8080
+
+volumes:
+  duniya-data:
+  caddy-data:

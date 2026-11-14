@@ -1,168 +1,222 @@
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
+// Bot registry (005): bots are database records; templates are JSON files; plugins are optional code.
+import { readdirSync, readFileSync, existsSync, rmSync, renameSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { BOTS_DIR, digits, readJson, writeJson } from './config.js';
+import { ROOT, DATA_DIR, PLUGINS_DIR, TEMPLATES_DIR, digits } from './config.js';
+import { validateBotConfig, referencedSecrets, slugify, BOT_ID_RE, ValidationError } from './schema.js';
+import {
+  listBotRows, getBotRow, saveBotRow, deleteBotRow, countBots, setSecret, getSecret, updateSettings,
+} from './store.js';
 import { activity } from './events.js';
 
-/**
- * A bot is a folder in bots/ with a bot.json (and optional prompt.md and index.js hooks).
- * Folders starting with "_" or "." are ignored (templates).
- *
- * Fields an admin can change from the panel are stored as overrides in DATA_DIR/bots/<id>.json,
- * so the repo stays the source of defaults and deploys never clobber live settings.
- */
-export const EDITABLE = [
-  'enabled', 'model', 'maxTokens', 'triggers', 'respondToMentions', 'chats', 'dm',
-  'organizers', 'participants', 'extraPrompt', 'schedules', 'historySize',
-];
-
-const DEFAULTS = {
-  enabled: true,
-  model: 'claude-sonnet-5-5',
-  maxTokens: 1024,
-  triggers: [],
-  respondToMentions: true,
-  chats: [],
-  dm: 'members', // none | organizers | members | anyone
-  organizers: [],
-  participants: [],
-  extraPrompt: '',
-  schedules: [],
-  historySize: 30,
-  memory: { enabled: true },
-  mcpServers: {},
-  tools: { participant: [], organizer: [], deny: [] },
-  confirm: null,
-};
-
+const LEGACY_BOTS_DIR = resolve(ROOT, process.env.BOTS_DIR || 'bots');
 let bots = new Map();
+const pluginCache = new Map();
 
-function validatePatch(patch) {
-  const out = {};
-  for (const [k, v] of Object.entries(patch)) {
-    if (!EDITABLE.includes(k)) throw new Error(`Field "${k}" is not editable`);
-    switch (k) {
-      case 'enabled': case 'respondToMentions': out[k] = !!v; break;
-      case 'maxTokens': case 'historySize': {
-        const n = Number(v);
-        if (!Number.isInteger(n) || n < 1 || n > 8192) throw new Error(`${k} must be 1–8192`);
-        out[k] = n; break;
-      }
-      case 'model': case 'extraPrompt': out[k] = String(v ?? '').slice(0, 8000); break;
-      case 'dm':
-        if (!['none', 'organizers', 'members', 'anyone'].includes(v)) throw new Error('dm must be none|organizers|members|anyone');
-        out[k] = v; break;
-      case 'triggers': out[k] = (v || []).map((t) => String(t).trim().toLowerCase()).filter(Boolean); break;
-      case 'chats': out[k] = [...new Set((v || []).map(String).filter(Boolean))]; break;
-      case 'organizers': case 'participants': out[k] = [...new Set((v || []).map(digits).filter((d) => d.length >= 6))]; break;
-      case 'schedules':
-        if (!Array.isArray(v)) throw new Error('schedules must be a list');
-        out[k] = v.map((s, i) => {
-          if (!/^\d{2}:\d{2}$/.test(s.at || '')) throw new Error(`schedule ${i + 1}: "at" must be HH:MM`);
-          return {
-            id: String(s.id || `s${i + 1}`), at: s.at, days: String(s.days || 'daily'),
-            prompt: String(s.prompt || ''), chats: s.chats === 'all' || !s.chats ? 'all' : [].concat(s.chats),
-            enabled: s.enabled !== false,
-          };
-        });
-        break;
-      default: out[k] = v;
+// ---------- plugins ----------
+async function loadPlugin(name) {
+  if (pluginCache.has(name)) return pluginCache.get(name);
+  const candidates = [resolve(PLUGINS_DIR, name, 'index.js'), resolve(LEGACY_BOTS_DIR, name, 'index.js')];
+  const file = candidates.find((f) => existsSync(f));
+  let mod = null;
+  if (file) {
+    try { mod = (await import(`${pathToFileURL(file).href}?t=${Date.now()}`)).default || null; } catch (e) {
+      activity('error', { summary: `Plugin "${name}" failed to load: ${e.message}` });
     }
   }
-  return out;
+  pluginCache.set(name, mod);
+  return mod;
 }
 
-async function loadOne(dir) {
-  const id = dir;
-  const base = resolve(BOTS_DIR, dir);
-  const def = JSON.parse(readFileSync(resolve(base, 'bot.json'), 'utf8'));
-  const promptFile = resolve(base, def.prompt || 'prompt.md');
-  const prompt = existsSync(promptFile) ? readFileSync(promptFile, 'utf8') : '';
-  let hooks = {};
-  const hookFile = resolve(base, 'index.js');
-  if (existsSync(hookFile)) {
-    const mod = await import(`${pathToFileURL(hookFile).href}?t=${Date.now()}`);
-    hooks = mod.default || mod;
+export function listPlugins() {
+  if (!existsSync(PLUGINS_DIR)) return [];
+  return readdirSync(PLUGINS_DIR, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && existsSync(resolve(PLUGINS_DIR, d.name, 'index.js')))
+    .map((d) => ({ name: d.name, tools: (pluginCache.get(d.name)?.tools || []).map((t) => t.name) }));
+}
+
+async function hooksFor(config, id) {
+  const hooks = { tools: [], onMessage: null, role: null, missing: [] };
+  const handlers = [];
+  const roles = [];
+  for (const name of config.plugins || []) {
+    const p = await loadPlugin(name);
+    if (!p) { hooks.missing.push(name); continue; }
+    for (const t of p.tools || []) hooks.tools.push({ ...t, plugin: name });
+    if (p.onMessage) handlers.push(p.onMessage);
+    if (p.role) roles.push(p.role);
+    try { await p.init?.({ bot: { id, ...config } }); } catch (e) { activity('error', { bot: id, summary: `Plugin ${name} init: ${e.message}` }); }
   }
-  const overrides = readJson(`bots/${id}.json`, {});
-  const bot = {
-    ...DEFAULTS, ...def, ...overrides, id, name: def.name || id, description: def.description || '',
-    tools: { ...DEFAULTS.tools, ...(def.tools || {}) }, prompt, hooks, dir: base,
-  };
-  bot.organizers = bot.organizers.map(digits);
-  bot.participants = bot.participants.map(digits);
-  return bot;
+  if (handlers.length) {
+    hooks.onMessage = async (ctx) => {
+      for (const h of handlers) { const r = await h(ctx); if (typeof r === 'string' && r) return r; }
+      return undefined;
+    };
+  }
+  if (roles.length) {
+    hooks.role = async (msg, bot) => {
+      for (const r of roles) { const v = await r(msg, bot); if (v) return v; }
+      return undefined;
+    };
+  }
+  if (hooks.missing.length) activity('error', { bot: id, summary: `Missing plugin(s): ${hooks.missing.join(', ')}` });
+  return hooks;
 }
 
+async function toRuntime(row) {
+  return { ...row.config, id: row.id, updatedAt: row.updatedAt, hooks: await hooksFor(row.config, row.id) };
+}
+
+// ---------- legacy migration (pre-005 file-based bots) ----------
+function readJsonFile(file, fallback) {
+  try { return JSON.parse(readFileSync(file, 'utf8')); } catch { return fallback; }
+}
+function migrateLegacy() {
+  const secretsFile = resolve(DATA_DIR, 'secrets.json');
+  if (existsSync(secretsFile)) {
+    for (const [k, v] of Object.entries(readJsonFile(secretsFile, {}))) if (v && !getSecret(k)) setSecret(k, v);
+    rmSync(secretsFile, { force: true });
+    activity('system', { summary: 'Migrated secrets to encrypted storage' });
+  }
+  const settingsFile = resolve(DATA_DIR, 'settings.json');
+  if (existsSync(settingsFile)) {
+    updateSettings(readJsonFile(settingsFile, {}));
+    renameSync(settingsFile, `${settingsFile}.migrated`);
+  }
+  if (countBots() > 0 || !existsSync(LEGACY_BOTS_DIR)) return;
+  for (const ent of readdirSync(LEGACY_BOTS_DIR, { withFileTypes: true })) {
+    if (!ent.isDirectory() || /^[_.]/.test(ent.name)) continue;
+    const dir = resolve(LEGACY_BOTS_DIR, ent.name);
+    if (!existsSync(resolve(dir, 'bot.json'))) continue;
+    try {
+      const def = readJsonFile(resolve(dir, 'bot.json'), {});
+      const promptFile = resolve(dir, def.prompt || 'prompt.md');
+      const overrides = readJsonFile(resolve(DATA_DIR, 'bots', `${ent.name}.json`), {});
+      const merged = {
+        ...def, ...overrides, name: def.name || ent.name,
+        prompt: existsSync(promptFile) ? readFileSync(promptFile, 'utf8') : (def.prompt || 'You are a helpful assistant.'),
+        extraPrompt: overrides.extraPrompt || def.extraPrompt || '',
+        plugins: existsSync(resolve(dir, 'index.js')) ? [ent.name] : [],
+      };
+      const { config } = validateBotConfig(merged);
+      saveBotRow(ent.name, config, 'migration');
+      activity('system', { bot: ent.name, summary: `Imported legacy bot "${config.name}"` });
+    } catch (e) {
+      activity('error', { bot: ent.name, summary: `Legacy bot import failed: ${e.message}` });
+    }
+  }
+}
+
+// ---------- registry ----------
 export async function loadBots() {
+  migrateLegacy();
   const next = new Map();
-  if (existsSync(BOTS_DIR)) {
-    for (const ent of readdirSync(BOTS_DIR, { withFileTypes: true })) {
-      if (!ent.isDirectory() || /^[_.]/.test(ent.name)) continue;
-      if (!existsSync(resolve(BOTS_DIR, ent.name, 'bot.json'))) continue;
-      try {
-        const bot = await loadOne(ent.name);
-        next.set(bot.id, bot);
-        await bot.hooks.init?.({ bot });
-      } catch (e) {
-        activity('error', { bot: ent.name, summary: `Failed to load bot: ${e.message}` });
-      }
-    }
-  }
+  for (const row of listBotRows()) next.set(row.id, await toRuntime(row));
   bots = next;
   return [...bots.values()];
+}
+async function refresh(id) {
+  const row = getBotRow(id);
+  if (row) bots.set(id, await toRuntime(row)); else bots.delete(id);
+  return bots.get(id);
 }
 
 export const listBots = () => [...bots.values()];
 export const getBot = (id) => bots.get(id);
+export const botForChat = (chat) => listBots().find((b) => b.chats.includes(chat));
+export const roleIn = (bot, phone) => (phone && bot.organizers.includes(digits(phone)) ? 'organizer' : 'participant');
 
-export function updateBot(id, patch) {
-  const bot = bots.get(id);
-  if (!bot) throw new Error(`Unknown bot ${id}`);
-  const clean = validatePatch(patch);
-  if (clean.chats) {
-    // A chat belongs to one bot: remove it from others.
-    for (const other of bots.values()) {
-      if (other.id === id) continue;
-      const kept = other.chats.filter((c) => !clean.chats.includes(c));
-      if (kept.length !== other.chats.length) {
-        other.chats = kept;
-        writeJson(`bots/${other.id}.json`, { ...readJson(`bots/${other.id}.json`, {}), chats: kept });
-      }
+function releaseChats(chats, exceptId, by) {
+  for (const other of listBots()) {
+    if (other.id === exceptId) continue;
+    const kept = other.chats.filter((c) => !chats.includes(c));
+    if (kept.length !== other.chats.length) {
+      const row = getBotRow(other.id);
+      saveBotRow(other.id, { ...row.config, chats: kept }, by);
+      other.chats = kept;
     }
   }
-  Object.assign(bot, clean);
-  writeJson(`bots/${id}.json`, { ...readJson(`bots/${id}.json`, {}), ...clean });
-  activity('bot.updated', { bot: id, summary: `Updated ${Object.keys(clean).join(', ')}` });
-  return bot;
 }
 
-export function bindChat(chat, botId) {
-  for (const b of bots.values()) {
-    if (b.chats.includes(chat) && b.id !== botId) updateBot(b.id, { chats: b.chats.filter((c) => c !== chat) });
+export async function createBot({ id, config, by = '' }) {
+  const { config: clean, warnings } = validateBotConfig(config);
+  let botId = id ? String(id).toLowerCase() : slugify(clean.name);
+  if (!BOT_ID_RE.test(botId)) throw new ValidationError('id', 'must be 2–41 lowercase letters, digits or -');
+  if (getBotRow(botId)) {
+    if (id) throw Object.assign(new Error(`A bot with id "${botId}" already exists`), { status: 409 });
+    let n = 2; while (getBotRow(`${botId}-${n}`)) n++;
+    botId = `${botId}-${n}`;
+  }
+  if (clean.chats.length) releaseChats(clean.chats, botId, by);
+  saveBotRow(botId, clean, by);
+  activity('bot.created', { bot: botId, summary: `Created "${clean.name}"${by ? ` by ${by}` : ''}`, detail: { warnings } });
+  return { bot: await refresh(botId), warnings };
+}
+
+export async function updateBot(id, patch, by = '') {
+  const row = getBotRow(id);
+  if (!row) throw Object.assign(new Error(`Unknown bot ${id}`), { status: 404 });
+  const { config: clean, warnings } = validateBotConfig({ ...row.config, ...patch });
+  if (patch.chats) releaseChats(clean.chats, id, by);
+  saveBotRow(id, clean, by);
+  if (patch.plugins) for (const p of clean.plugins) pluginCache.delete(p);
+  activity('bot.updated', { bot: id, summary: `Updated ${Object.keys(patch).join(', ')}${by ? ` by ${by}` : ''}`, detail: { warnings } });
+  return { bot: await refresh(id), warnings };
+}
+
+export function deleteBot(id, by = '') {
+  if (!deleteBotRow(id)) throw Object.assign(new Error(`Unknown bot ${id}`), { status: 404 });
+  bots.delete(id);
+  activity('bot.deleted', { bot: id, summary: `Deleted${by ? ` by ${by}` : ''}` });
+}
+
+export async function bindChat(chat, botId, by = '') {
+  for (const b of listBots()) {
+    if (b.chats.includes(chat) && b.id !== botId) await updateBot(b.id, { chats: b.chats.filter((c) => c !== chat) }, by);
   }
   if (botId) {
-    const b = bots.get(botId);
-    if (!b) throw new Error(`Unknown bot ${botId}`);
-    if (!b.chats.includes(chat)) updateBot(botId, { chats: [...b.chats, chat] });
+    const b = getBot(botId);
+    if (!b) throw Object.assign(new Error(`Unknown bot ${botId}`), { status: 404 });
+    if (!b.chats.includes(chat)) await updateBot(botId, { chats: [...b.chats, chat] }, by);
   }
 }
 
-export const botForChat = (chat) => listBots().find((b) => b.chats.includes(chat));
-
-export function roleIn(bot, phone) {
-  if (phone && bot.organizers.includes(phone)) return 'organizer';
-  return 'participant';
+// ---------- templates, export/import ----------
+export function listTemplates() {
+  if (!existsSync(TEMPLATES_DIR)) return [];
+  return readdirSync(TEMPLATES_DIR).filter((f) => f.endsWith('.json')).map((f) => {
+    const t = readJsonFile(resolve(TEMPLATES_DIR, f), {});
+    return { id: f.replace(/\.json$/, ''), name: t.name || f, description: t.description || '' };
+  }).sort((a, b) => (a.id === 'blank' ? -1 : b.id === 'blank' ? 1 : a.name.localeCompare(b.name)));
+}
+export function templateConfig(id) {
+  if (!/^[a-z0-9-]+$/.test(id)) throw new ValidationError('template', 'invalid');
+  const file = resolve(TEMPLATES_DIR, `${id}.json`);
+  if (!existsSync(file)) throw Object.assign(new Error(`Unknown template ${id}`), { status: 404 });
+  return readJsonFile(file, {});
 }
 
-/** Public view for the panel (no hooks, no secrets). */
+export function exportBot(id) {
+  const row = getBotRow(id);
+  if (!row) throw Object.assign(new Error(`Unknown bot ${id}`), { status: 404 });
+  const { chats, organizers, participants, ...config } = row.config;
+  return { format: 'duniya-bot', version: 1, id, exportedAt: new Date().toISOString(), config, secrets: referencedSecrets(row.config) };
+}
+
+export async function importBot(doc, by = '') {
+  if (!doc || doc.format !== 'duniya-bot' || !doc.config) throw new ValidationError('file', 'not a bot export (format duniya-bot)');
+  const config = { ...doc.config, chats: [], organizers: [], participants: [] };
+  return createBot({ config, by });
+}
+
 export function botView(bot) {
-  const { hooks, dir, prompt, ...rest } = bot;
+  const config = { ...bot };
+  delete config.hooks; delete config.id; delete config.updatedAt;
+  const needs = referencedSecrets(bot).filter((s) => !getSecret(s));
   return {
-    ...rest,
-    promptPreview: prompt.slice(0, 2000),
-    hasHooks: Object.keys(hooks || {}).length > 0,
-    localTools: (hooks?.tools || []).map((t) => t.name),
-    mcpServers: Object.fromEntries(Object.entries(bot.mcpServers).map(([k, v]) => [k, { url: v.url }])),
+    id: bot.id, name: bot.name, description: bot.description, enabled: bot.enabled, config, needs,
+    updatedAt: bot.updatedAt,
+    localTools: (bot.hooks?.tools || []).map((t) => t.name),
+    missingPlugins: bot.hooks?.missing || [],
   };
 }

@@ -2,7 +2,8 @@ node_modules/
 data/
 backups/
 .env
-infra/terraform/.terraform/
-infra/terraform/*.tfstate*
-infra/terraform/*.tfvars
-!infra/terraform/example.tfvars
+infra/oci/.terraform/
+infra/oci/*.tfstate*
+infra/oci/backend.tf
+infra/oci/*.tfvars
+

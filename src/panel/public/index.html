@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Duniya · agent admin</title>
+<title>Duniya · WhatsApp agents</title>
 <link rel="icon" href="data:,">
 <style>
   :root {
@@ -21,41 +21,51 @@
   body { margin: 0; background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.5; }
   header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
   .bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; max-width: 1100px; margin: 0 auto; }
-  .brand { font-weight: 600; letter-spacing: .2px; }
-  .brand small { color: var(--muted); font-weight: 400; margin-left: 6px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); display: inline-block; }
+  .brand { font-weight: 600; } .brand small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); display: inline-block; flex: none; }
   .dot.ok { background: #1d9e75; } .dot.warn { background: #ba7517; } .dot.bad { background: #e24b4a; }
   nav { display: flex; gap: 2px; overflow-x: auto; padding: 0 12px; max-width: 1100px; margin: 0 auto; scrollbar-width: none; }
   nav button { background: none; border: 0; padding: 10px 12px; color: var(--muted); font: inherit; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
   nav button.on { color: var(--ink); border-bottom-color: var(--accent); }
   main { max-width: 1100px; margin: 0 auto; padding: 16px; }
   .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
   .card h2 { font-size: 15px; margin: 0 0 10px; font-weight: 600; }
+  .card h3 { font-size: 14px; margin: 16px 0 6px; font-weight: 600; }
+  fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin: 0 0 14px; min-width: 0; }
+  legend { font-weight: 600; padding: 0 6px; }
   .muted { color: var(--muted); } .small { font-size: 13px; }
-  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .spread { justify-content: space-between; }
-  button.btn, .btn { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .row > input, .row > select, .row > div { flex: 1; min-width: 120px; }
+  .spread { justify-content: space-between; } .nowrap { flex-wrap: nowrap; }
+  button.btn, .btn { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; text-decoration: none; display: inline-block; }
   .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
   .btn.danger { color: var(--bad); border-color: var(--bad); }
+  .btn.small { padding: 4px 9px; font-size: 13px; }
   .btn:disabled { opacity: .5; cursor: default; }
   input, select, textarea { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; width: 100%; }
+  input[type=checkbox] { width: auto; }
   textarea { min-height: 80px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+  textarea.prose { font-family: inherit; font-size: 14px; min-height: 140px; }
   label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  label.inline { display: inline-flex; gap: 6px; align-items: center; margin: 4px 12px 4px 0; color: var(--ink); font-size: 14px; }
   .pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--line); color: var(--ink); white-space: nowrap; }
   .pill.ok { background: var(--accent-soft); color: var(--accent); } .pill.warn { background: var(--warn-soft); color: var(--warn); }
   .pill.bad { background: var(--bad-soft); color: var(--bad); } .pill.info { background: var(--info-soft); color: var(--info); }
+  .note { background: var(--info-soft); color: var(--info); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin: 8px 0; }
+  .note.warn { background: var(--warn-soft); color: var(--warn); }
   .feed { list-style: none; margin: 0; padding: 0; }
   .feed li { border-bottom: 1px solid var(--line); padding: 8px 2px; cursor: pointer; }
   .feed li:last-child { border-bottom: 0; }
-  .feed .meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .feed .meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
   .feed .sum { white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
   pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-word; max-height: 360px; }
-  table { width: 100%; border-collapse: collapse; } td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; } th { font-size: 12px; color: var(--muted); font-weight: 500; }
-  .toggle { position: relative; width: 40px; height: 22px; flex: none; } .toggle input { opacity: 0; width: 0; height: 0; }
+  table { width: 100%; border-collapse: collapse; } td, th { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; } th { font-size: 12px; color: var(--muted); font-weight: 500; }
+  td.c, th.c { text-align: center; }
+  .toggle { position: relative; width: 40px; height: 22px; flex: none; display: inline-block; margin: 0; } .toggle input { opacity: 0; width: 0; height: 0; }
   .toggle span { position: absolute; inset: 0; background: var(--line); border-radius: 999px; transition: .15s; cursor: pointer; }
   .toggle span::after { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .15s; }
   .toggle input:checked + span { background: var(--accent); } .toggle input:checked + span::after { transform: translateX(18px); }
+  .toggle input:disabled + span { opacity: .5; cursor: default; }
   .qr { background: #fff; padding: 8px; border-radius: 8px; width: 220px; max-width: 100%; }
   .center { min-height: 80vh; display: grid; place-items: center; }
   .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 14px; z-index: 20; max-width: 90vw; }
@@ -63,13 +73,15 @@
   .bubble { padding: 8px 10px; border-radius: 10px; max-width: 85%; white-space: pre-wrap; word-break: break-word; }
   .bubble.me { align-self: flex-end; background: var(--accent-soft); } .bubble.bot { align-self: flex-start; background: var(--bg); border: 1px solid var(--line); }
   .hide { display: none !important; }
+  .code { font-family: ui-monospace, Menlo, monospace; font-size: 22px; letter-spacing: 3px; font-weight: 600; }
+  .readonly .mut { display: none !important; }
 </style>
 </head>
 <body>
 <div id="app"></div>
 <script>
 'use strict';
-// ---------- tiny DOM helper: all user/WhatsApp text goes through textContent ----------
+// ---------- DOM helper: untrusted text only ever goes through textContent ----------
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
@@ -80,74 +92,100 @@ function h(tag, attrs, ...kids) {
     else if (k === 'checked') el.checked = !!v;
     else el.setAttribute(k, v === true ? '' : v);
   }
-  for (const kid of kids.flat()) {
+  for (const kid of kids.flat(Infinity)) {
     if (kid == null || kid === false) continue;
     el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
   }
   return el;
 }
 const $ = (s) => document.querySelector(s);
-function toast(msg) { const t = h('div', { class: 'toast' }, msg); document.body.append(t); setTimeout(() => t.remove(), 3000); }
+function toast(msg) { const t = h('div', { class: 'toast' }, msg); document.body.append(t); setTimeout(() => t.remove(), 3500); }
 async function api(method, path, body) {
-  const res = await fetch(path, { method, headers: body !== undefined || method !== 'GET' ? { 'content-type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : (method !== 'GET' ? '{}' : undefined) });
-  if (res.status === 401 && path !== '/api/login') { renderLogin(); throw new Error('Login required'); }
+  const opts = { method, headers: {} };
+  if (method !== 'GET') { opts.headers['content-type'] = 'application/json'; opts.body = JSON.stringify(body ?? {}); }
+  const res = await fetch(path, opts);
+  if (res.status === 401 && !['/api/login', '/api/setup'].includes(path)) { renderLogin(); throw new Error('Please sign in'); }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { field: data.field });
   return data;
 }
+const tryApi = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message); return undefined; } };
 const ago = (ts) => { const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s / 60)}m` : s < 86400 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`; };
-const time = (ts) => new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-const TYPE_CLASS = { 'message.in': 'info', 'message.out': 'ok', 'tool.call': '', 'tool.error': 'bad', error: 'bad', 'confirm.created': 'warn', 'confirm.applied': 'ok', 'confirm.cancelled': 'warn', 'channel.status': 'info', 'schedule.run': 'info', 'bot.updated': '', system: '', 'memory.summary': 'info', 'memory.history': '', 'memory.note.added': 'ok', 'memory.note.removed': 'warn', 'memory.erased': 'bad' };
-function toggle(checked, onchange) { return h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked, onchange: (e) => onchange(e.target.checked) }), h('span')); }
+const time = (ts) => (ts ? new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
+const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+const TYPE_CLASS = { 'message.in': 'info', 'message.out': 'ok', 'tool.call': '', 'tool.error': 'bad', error: 'bad', 'confirm.created': 'warn', 'confirm.applied': 'ok', 'confirm.cancelled': 'warn', 'channel.status': 'info', 'schedule.run': 'info', 'bot.updated': '', 'bot.created': 'ok', 'bot.deleted': 'warn', system: '', 'memory.summary': 'info', 'memory.history': '', 'memory.note.added': 'ok', 'memory.note.removed': 'warn', 'memory.erased': 'bad', 'model.usage': '', 'backup.done': 'ok', 'backup.restore': 'warn', 'backup.settings': '' };
+function toggle(checked, onchange, disabled) { return h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked, disabled: disabled || !can('admin'), onchange: (e) => onchange(e.target.checked) }), h('span')); }
+const field = (label, el, hint) => h('div', {}, h('label', {}, label), el, hint ? h('div', { class: 'small muted', style: 'margin-top:3px' }, hint) : null);
+const lines = (arr) => (arr || []).join('\n');
+const splitLines = (s) => String(s || '').split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
 
 // ---------- state ----------
-const S = { tab: 'overview', status: null, bots: [], feed: [], feedBot: '', es: null };
-const TABS = [['overview', 'Overview'], ['activity', 'Activity'], ['bots', 'Bots'], ['chats', 'Chats'], ['pending', 'Pending'], ['secrets', 'Secrets'], ['settings', 'Settings']];
+const S = { tab: 'overview', user: null, status: null, feed: [], feedBot: '', es: null, editing: null };
+const RANK = { viewer: 1, admin: 2, owner: 3 };
+const can = (role) => S.user && RANK[S.user.role] >= RANK[role];
+const TABS = () => [['overview', 'Overview'], ['activity', 'Activity'], ['bots', 'Bots'], ['chats', 'Chats'], ['models', 'Models'],
+  can('owner') && ['backups', 'Backups'], ['pending', 'Pending'], ['secrets', 'Secrets'], ['settings', 'Settings']].filter(Boolean);
 
-// ---------- login ----------
+// ---------- login & first-run setup ----------
 async function renderLogin() {
   S.es?.close(); S.es = null;
   const app = $('#app'); app.replaceChildren();
   let info = {}; try { info = await (await fetch('/api/session')).json(); } catch {}
-  if (info.authed) return boot();
-  const pw = h('input', { type: 'password', placeholder: 'Admin password', autocomplete: 'current-password' });
-  const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:20px' });
-  const go = async (e) => {
+  if (info.authed) { S.user = info.user; return boot(); }
+  const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:20px;margin-top:6px' });
+  if (info.needsSetup) {
+    const code = h('input', { placeholder: 'Setup code', autocomplete: 'one-time-code', style: 'text-transform:uppercase' });
+    const user = h('input', { placeholder: 'Username', value: 'admin', autocomplete: 'username' });
+    const pw = h('input', { type: 'password', placeholder: 'Password (12+ characters)', autocomplete: 'new-password' });
+    app.append(h('div', { class: 'center' }, h('form', { class: 'card', style: 'width:min(400px,92vw)', onsubmit: async (e) => {
+      e.preventDefault();
+      try { const r = await api('POST', '/api/setup', { code: code.value, username: user.value, password: pw.value }); S.user = r.user; boot(); } catch (x) { err.textContent = x.message; }
+    } }, h('h2', {}, 'Welcome — create the owner account'),
+      h('p', { class: 'small muted' }, 'Enter the one-time setup code shown by the installer (or in the server log: journalctl -u whatsapp-agent-duniya).'),
+      field('Setup code', code), field('Username', user), field('Password', pw), err,
+      h('button', { class: 'btn primary', style: 'width:100%;margin-top:8px' }, 'Create account'))));
+    return code.focus();
+  }
+  const user = h('input', { placeholder: 'Username', value: 'admin', autocomplete: 'username' });
+  const pw = h('input', { type: 'password', placeholder: 'Password', autocomplete: 'current-password' });
+  app.append(h('div', { class: 'center' }, h('form', { class: 'card', style: 'width:min(360px,92vw)', onsubmit: async (e) => {
     e.preventDefault();
-    try { await api('POST', '/api/login', { password: pw.value }); boot(); } catch (x) { err.textContent = x.message; }
-  };
-  app.append(h('div', { class: 'center' }, h('form', { class: 'card', style: 'width:min(360px,92vw)', onsubmit: go },
-    h('h2', {}, 'Duniya agent admin'),
-    info.passwordConfigured ? null : h('p', { class: 'small', style: 'color:var(--warn)' }, 'No admin password configured on the server (ADMIN_PASSWORD).'),
-    pw, err, h('button', { class: 'btn primary', style: 'width:100%' }, 'Sign in'))));
+    try { const r = await api('POST', '/api/login', { username: user.value, password: pw.value }); S.user = r.user; boot(); } catch (x) { err.textContent = x.message; }
+  } }, h('h2', {}, 'Duniya · WhatsApp agents'), field('Username', user), field('Password', pw), err,
+    h('button', { class: 'btn primary', style: 'width:100%;margin-top:8px' }, 'Sign in'))));
   pw.focus();
 }
 
 // ---------- shell ----------
+let statusTimer = null;
 async function boot() {
   const app = $('#app'); app.replaceChildren();
-  const dot = h('span', { class: 'dot', id: 'wa-dot' });
-  const nav = h('nav', {}, TABS.map(([id, label]) => h('button', { 'data-tab': id, onclick: () => show(id) }, label)));
+  document.body.classList.toggle('readonly', !can('admin'));
+  const nav = h('nav', {}, TABS().map(([id, label]) => h('button', { 'data-tab': id, onclick: () => (location.hash === `#${id}` ? show(id) : (location.hash = id)) }, label)));
   app.append(
-    h('header', {}, h('div', { class: 'bar' }, dot, h('div', { class: 'brand' }, 'Duniya', h('small', { id: 'brand-sub' }, 'agents')),
-      h('div', { style: 'flex:1' }), h('button', { class: 'btn small', onclick: async () => { await api('POST', '/api/logout'); renderLogin(); } }, 'Sign out')), nav),
+    h('header', {}, h('div', { class: 'bar' }, h('span', { class: 'dot', id: 'wa-dot' }), h('div', { class: 'brand' }, 'Duniya', h('small', { id: 'brand-sub' }, 'agents')),
+      h('div', { style: 'flex:1' }), h('span', { class: 'small muted' }, `${S.user.username} · ${S.user.role}`),
+      h('button', { class: 'btn small', onclick: async () => { await api('POST', '/api/logout').catch(() => {}); S.user = null; renderLogin(); } }, 'Sign out')), nav),
     h('main', { id: 'main' }));
   connectEvents();
   await refreshStatus();
-  setInterval(refreshStatus, 5000);
-  show(location.hash.slice(1) || 'overview');
+  clearInterval(statusTimer); statusTimer = setInterval(refreshStatus, 5000);
+  show((location.hash.slice(1) || 'overview').split('/')[0]);
 }
 async function refreshStatus() {
   try { S.status = await api('GET', '/api/status'); } catch { return; }
   const st = S.status.channel.status;
-  const dot = $('#wa-dot'); if (dot) dot.className = `dot ${st === 'open' ? 'ok' : st === 'qr' || st === 'reconnecting' || st === 'starting' ? 'warn' : 'bad'}`;
+  const dot = $('#wa-dot'); if (dot) dot.className = `dot ${st === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(st) ? 'warn' : 'bad'}`;
   const sub = $('#brand-sub'); if (sub) sub.textContent = S.status.settings.paused ? 'paused' : `${S.status.bots.filter((b) => b.enabled).length} bots live`;
   if (S.tab === 'overview') renderOverview(true);
 }
 function show(tab) {
-  S.tab = tab; location.hash = tab;
+  if (!TABS().some(([id]) => id === tab)) tab = 'overview';
+  S.tab = tab;
+  if (location.hash.slice(1).split('/')[0] !== tab) history.replaceState(null, '', `#${tab}`);
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-  ({ overview: renderOverview, activity: renderActivity, bots: renderBots, chats: renderChats, pending: renderPending, secrets: renderSecrets, settings: renderSettings })[tab]?.();
+  const r = { overview: renderOverview, activity: renderActivity, bots: renderBots, chats: renderChats, models: renderModels, backups: renderBackups, pending: renderPending, secrets: renderSecrets, settings: renderSettings }[tab];
+  Promise.resolve(r?.()).catch((e) => toast(e.message));
 }
 function connectEvents() {
   S.es?.close();
@@ -163,214 +201,494 @@ function connectEvents() {
 
 // ---------- overview ----------
 let overviewBusy = false;
-function renderOverview(soft) {
+async function renderOverview(soft) {
   const st = S.status; if (!st) return;
-  if (soft && overviewBusy) return; // don't clobber an open input
-  const m = $('#main'); const c = st.channel;
-  const statusPill = h('span', { class: `pill ${c.status === 'open' ? 'ok' : c.status === 'qr' ? 'warn' : 'bad'}` }, c.status);
+  if (soft && (overviewBusy || $('#main')?.contains(document.activeElement))) return;
+  const c = st.channel;
   const phone = h('input', { placeholder: 'Bot number, e.g. 41791234567', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
   const wa = h('div', { class: 'card' },
-    h('div', { class: 'row spread' }, h('h2', {}, 'WhatsApp'), statusPill),
+    h('div', { class: 'row spread' }, h('h2', {}, 'WhatsApp'), h('span', { class: `pill ${c.status === 'open' ? 'ok' : c.status === 'qr' ? 'warn' : 'bad'}` }, c.status)),
     c.status === 'open' ? h('p', {}, 'Connected as ', h('b', {}, (c.me || '').split(':')[0].split('@')[0]), h('span', { class: 'muted small' }, ` · since ${time(c.since)}`)) : null,
-    c.qrDataUrl ? h('div', {}, h('p', { class: 'small muted' }, 'WhatsApp → Settings → Linked devices → Link a device, then scan:'), h('img', { class: 'qr', src: c.qrDataUrl, alt: 'WhatsApp QR code' })) : null,
-    c.status !== 'open' ? h('div', {}, h('label', {}, 'Or link with a pairing code'), h('div', { class: 'row' }, phone,
-      h('button', { class: 'btn', onclick: async () => { try { const r = await api('POST', '/api/whatsapp/pair', { phone: phone.value }); toast(`Pairing code: ${r.code}`); overviewBusy = false; refreshStatus(); } catch (e) { toast(e.message); } } }, 'Get code'))) : null,
-    c.pairingCode ? h('p', {}, 'Pairing code: ', h('b', { style: 'font-size:20px;letter-spacing:2px' }, c.pairingCode)) : null,
+    c.qrDataUrl && can('admin') ? h('div', {}, h('p', { class: 'small muted' }, 'On the bot phone: WhatsApp → Settings → Linked devices → Link a device, then scan:'), h('img', { class: 'qr', src: c.qrDataUrl, alt: 'WhatsApp QR code' })) : null,
+    c.status !== 'open' && can('admin') ? h('div', {}, h('label', {}, 'Or link with a pairing code'), h('div', { class: 'row' }, phone,
+      h('button', { class: 'btn', onclick: () => tryApi(async () => { const r = await api('POST', '/api/whatsapp/pair', { phone: phone.value }); overviewBusy = false; toast(`Pairing code: ${r.code}`); refreshStatus(); }) }, 'Get code'))) : null,
+    c.pairingCode ? h('p', {}, 'Pairing code: ', h('span', { class: 'code' }, c.pairingCode)) : null,
     c.lastError ? h('p', { class: 'small', style: 'color:var(--bad)' }, c.lastError) : null,
-    h('div', { class: 'row', style: 'margin-top:10px' },
-      h('button', { class: 'btn', onclick: async () => { await api('POST', '/api/whatsapp/restart'); toast('Reconnecting…'); } }, 'Reconnect'),
-      h('button', { class: 'btn danger', onclick: async () => { if (confirm('Unlink this WhatsApp number? You will need to scan a new QR.')) { await api('POST', '/api/whatsapp/logout'); toast('Logged out'); } } }, 'Unlink')));
-
-  const control = h('div', { class: 'card' },
-    h('h2', {}, 'Control'),
-    h('div', { class: 'row spread' }, h('div', {}, h('b', {}, 'Pause all bots'), h('div', { class: 'small muted' }, 'Kill switch: stops all replies and schedules')),
-      toggle(st.settings.paused, async (v) => { await api('POST', '/api/settings', { paused: v }); toast(v ? 'Paused' : 'Resumed'); refreshStatus(); })),
-    h('table', { style: 'margin-top:10px' }, h('tbody', {}, st.bots.map((b) => h('tr', {},
+    h('div', { class: 'row mut', style: 'margin-top:10px' },
+      h('button', { class: 'btn', onclick: () => tryApi(() => api('POST', '/api/whatsapp/restart'), 'Reconnecting…') }, 'Reconnect'),
+      h('button', { class: 'btn danger', onclick: () => confirm('Unlink this WhatsApp number? You will need to scan a new QR.') && tryApi(() => api('POST', '/api/whatsapp/logout'), 'Logged out') }, 'Unlink')));
+  const control = h('div', { class: 'card' }, h('h2', {}, 'Control'),
+    h('div', { class: 'row spread nowrap' }, h('div', {}, h('b', {}, 'Pause all bots'), h('div', { class: 'small muted' }, 'Stops all replies and scheduled posts')),
+      toggle(st.settings.paused, (v) => tryApi(async () => { await api('POST', '/api/settings', { paused: v }); refreshStatus(); }, v ? 'Paused' : 'Resumed'))),
+    h('table', { style: 'margin-top:10px' }, h('tbody', {}, st.bots.length ? st.bots.map((b) => h('tr', {},
       h('td', {}, h('b', {}, b.name), h('div', { class: 'small muted' }, `${b.chats} chat(s)`)),
-      h('td', { style: 'text-align:right' }, toggle(b.enabled, async (v) => { await api('PUT', `/api/bots/${b.id}`, { enabled: v }); toast(`${b.name} ${v ? 'enabled' : 'disabled'}`); refreshStatus(); })))))),
+      h('td', { style: 'text-align:right' }, toggle(b.enabled, (v) => tryApi(async () => { await api('PUT', `/api/bots/${b.id}`, { enabled: v }); refreshStatus(); }, `${b.name} ${v ? 'on' : 'off'}`))))) : h('tr', {}, h('td', { class: 'muted' }, 'No bots yet — create one under Bots.')))),
     st.pending ? h('p', {}, h('span', { class: 'pill warn' }, `${st.pending} pending confirmation(s)`)) : null);
-
-  const updLog = h('pre', { class: 'hide' });
-  const sys = h('div', { class: 'card' },
-    h('h2', {}, 'Server'),
-    h('table', {}, h('tbody', {},
-      [['Version', st.version], ['Uptime', ago(Date.now() - st.uptimeSec * 1000)], ['Memory', `${st.memoryMb} MB`], ['Node', st.node]]
-        .map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v))))),
-    h('div', { class: 'row', style: 'margin-top:10px' },
-      h('button', { class: 'btn primary', onclick: async (e) => {
-        if (!confirm('Pull the latest code from GitHub and restart?')) return;
-        e.target.disabled = true; e.target.textContent = 'Updating…';
-        try { const r = await api('POST', '/api/system/update'); updLog.textContent = r.log; updLog.classList.remove('hide'); toast(r.code === 0 ? 'Updated, restarting…' : 'Update failed'); if (r.code === 0) setTimeout(() => location.reload(), 8000); }
-        catch (x) { toast(x.message); } finally { e.target.disabled = false; e.target.textContent = 'Update from GitHub'; }
-      } }, 'Update from GitHub'),
-      h('button', { class: 'btn', onclick: async () => { if (confirm('Restart the service?')) { await api('POST', '/api/system/restart').catch(() => {}); toast('Restarting…'); setTimeout(() => location.reload(), 6000); } } }, 'Restart')),
-    updLog);
-
+  const server = h('div', { class: 'card' }, h('h2', {}, 'Server'),
+    h('table', {}, h('tbody', {}, [['Version', st.version], ['Uptime', ago(Date.now() - st.uptimeSec * 1000)], ['Memory', `${st.memoryMb} MB`], ['Node', st.node]]
+      .map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v))))),
+    h('div', { id: 'updates-box' }));
   const recent = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('div', { class: 'row spread' }, h('h2', {}, 'Recent activity'), h('button', { class: 'btn small', onclick: () => show('activity') }, 'All activity')),
     h('ul', { class: 'feed', id: 'recent' }, S.feed.slice(0, 8).map(feedItem)));
-  m.replaceChildren(h('div', { class: 'grid' }, wa, control, sys, recent));
-  if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; const r = $('#recent'); if (r) r.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
+  $('#main').replaceChildren(h('div', { class: 'grid' }, wa, control, server, recent));
+  if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
+  if (can('owner')) renderUpdates($('#updates-box'));
+}
+async function renderUpdates(box) {
+  const u = await api('GET', '/api/updates').catch(() => null); if (!u || !box) return;
+  const st = u.status || {};
+  const mode = h('select', {}, ['notify', 'auto', 'off'].map((m) => h('option', { value: m, selected: u.settings.mode === m }, { notify: 'Notify me', auto: 'Install automatically', off: 'Off' }[m])));
+  const channel = h('select', {}, ['stable', 'main'].map((m) => h('option', { value: m, selected: u.settings.channel === m }, m === 'stable' ? 'Stable releases' : 'Latest (main)')));
+  const at = h('input', { value: u.settings.at, style: 'max-width:90px' });
+  const log = h('pre', { class: 'hide' });
+  box.replaceChildren(h('h3', {}, 'Updates'),
+    u.install === 'docker' ? h('div', { class: 'note' }, 'Docker install: update with  docker compose pull && docker compose up -d') : null,
+    st.checkedAt ? h('p', { class: 'small' }, st.available ? h('span', { class: 'pill warn' }, `Update available: ${st.latest}`) : h('span', { class: 'pill ok' }, 'Up to date'), h('span', { class: 'muted' }, ` · ${st.current} · checked ${ago(st.checkedAt)} ago`)) : h('p', { class: 'small muted' }, 'Not checked yet.'),
+    st.lastResult && !st.lastResult.ok ? h('div', { class: 'note warn' }, `Last update failed (${time(st.lastResult.at)}); the previous version is running.`) : null,
+    h('div', { class: 'row' }, mode, channel, at, h('button', { class: 'btn', onclick: () => tryApi(() => api('PUT', '/api/updates/settings', { mode: mode.value, channel: channel.value, at: at.value }), 'Saved') }, 'Save')),
+    h('div', { class: 'row', style: 'margin-top:8px' },
+      h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('POST', '/api/updates/check'); renderUpdates(box); }) }, 'Check now'),
+      st.available && u.install !== 'docker' ? h('button', { class: 'btn primary', onclick: async (e) => {
+        if (!confirm(`Install ${st.latest} and restart?`)) return;
+        e.target.disabled = true; e.target.textContent = 'Updating…';
+        const r = await tryApi(() => api('POST', '/api/updates/apply'));
+        if (r) { log.textContent = r.log; log.classList.remove('hide'); if (r.code === 0) { toast('Updated, restarting…'); setTimeout(() => location.reload(), 9000); } }
+        e.target.disabled = false; e.target.textContent = 'Update now';
+      } }, 'Update now') : null,
+      h('button', { class: 'btn', onclick: () => confirm('Restart the service?') && api('POST', '/api/system/restart').catch(() => {}).then(() => { toast('Restarting…'); setTimeout(() => location.reload(), 6000); }) }, 'Restart')),
+    log);
 }
 
 // ---------- activity ----------
 function feedItem(a) {
   const detail = h('pre', { class: 'hide' }, a.detail ? JSON.stringify(a.detail, null, 2) : '(no details)');
-  return h('li', { onclick: () => detail.classList.toggle('hide') },
+  const li = h('li', { onclick: () => detail.classList.toggle('hide') },
     h('div', { class: 'meta' }, h('span', { class: `pill ${TYPE_CLASS[a.type] ?? ''}` }, a.type), a.bot ? h('span', {}, a.bot) : null,
       a.chat ? h('span', { title: a.chat }, a.chat.split('@')[0].slice(-8)) : null, h('span', { style: 'margin-left:auto' }, time(a.ts))),
     h('div', { class: 'sum' }, a.summary), detail);
+  if (a.id) li.dataset.id = a.id;
+  return li;
 }
 async function renderActivity() {
-  const m = $('#main');
-  const sel = h('select', { onchange: async (e) => { S.feedBot = e.target.value; await load(); }, style: 'max-width:220px' },
-    h('option', { value: '' }, 'All bots'), (S.status?.bots || []).map((b) => h('option', { value: b.id, selected: S.feedBot === b.id }, b.name)));
+  const bots = await api('GET', '/api/bots');
+  const sel = h('select', { style: 'max-width:220px', onchange: async (e) => { S.feedBot = e.target.value; await load(); } },
+    h('option', { value: '' }, 'All bots'), bots.map((b) => h('option', { value: b.id, selected: S.feedBot === b.id }, b.name)));
   const list = h('ul', { class: 'feed', id: 'feed' });
-  const more = h('button', { class: 'btn', onclick: async () => { const last = list.lastChild?.dataset?.id; const rows = await api('GET', `/api/activity?limit=200&bot=${encodeURIComponent(S.feedBot)}&before=${last || 0}`); rows.forEach((r) => { const li = feedItem(r); li.dataset.id = r.id; list.append(li); }); } }, 'Load older');
-  m.replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'Live activity'), sel), h('p', { class: 'small muted' }, 'Messages, tool calls, confirmations and errors, newest first. Tap an entry for details.'), list, h('div', { style: 'margin-top:10px' }, more)));
-  async function load() {
-    const rows = await api('GET', `/api/activity?limit=200&bot=${encodeURIComponent(S.feedBot)}`);
-    list.replaceChildren(...rows.map((r) => { const li = feedItem(r); li.dataset.id = r.id; return li; }));
-  }
+  const more = h('button', { class: 'btn', onclick: async () => { const last = list.lastChild?.dataset?.id; (await api('GET', `/api/activity?limit=200&bot=${encodeURIComponent(S.feedBot)}&before=${last || 0}`)).forEach((r) => list.append(feedItem(r))); } }, 'Load older');
+  $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'Live activity'), sel),
+    h('p', { class: 'small muted' }, 'Messages, tool calls, confirmations, models used and errors — newest first. Tap an entry for details.'), list, h('div', { style: 'margin-top:10px' }, more)));
+  async function load() { list.replaceChildren(...(await api('GET', `/api/activity?limit=200&bot=${encodeURIComponent(S.feedBot)}`)).map(feedItem)); }
   await load();
 }
 
 // ---------- bots ----------
+let modelsCache = null;
+const loadModels = async (refresh) => (modelsCache = !refresh && modelsCache ? modelsCache : await api('GET', `/api/models${refresh ? '?refresh=1' : ''}`));
 async function renderBots() {
-  const m = $('#main');
-  S.bots = await api('GET', '/api/bots');
-  m.replaceChildren(h('div', { class: 'row spread', style: 'margin-bottom:12px' }, h('div', { class: 'muted small' }, 'Bots live in the repo under bots/<id>/. Settings below are stored on the server and survive updates.'),
-    h('button', { class: 'btn', onclick: async () => { await api('POST', '/api/bots/reload'); toast('Reloaded from disk'); renderBots(); } }, 'Reload bots')),
-  h('div', { class: 'grid' }, S.bots.map(botCard)));
+  const route = location.hash.split('/');
+  if (route[1]) return renderBotEditor(decodeURIComponent(route[1]));
+  const [bots, templates] = await Promise.all([api('GET', '/api/bots'), api('GET', '/api/templates')]);
+  const tpl = h('select', {}, templates.map((t) => h('option', { value: t.id }, t.name)));
+  const name = h('input', { placeholder: 'Bot name' });
+  const fileIn = h('input', { type: 'file', accept: '.json,application/json', class: 'hide', onchange: async () => {
+    const f = fileIn.files[0]; if (!f) return;
+    const r = await tryApi(async () => api('POST', '/api/bots/import', JSON.parse(await f.text())), 'Imported');
+    if (r) openBot(r.id);
+  } });
+  const create = h('div', { class: 'card mut', style: 'margin-bottom:14px' }, h('h2', {}, 'New bot'),
+    h('div', { class: 'row' }, tpl, name, h('button', { class: 'btn primary', onclick: async () => {
+      const base = templates.find((t) => t.id === tpl.value);
+      const r = await tryApi(() => api('POST', '/api/bots', { template: tpl.value, config: name.value.trim() ? { name: name.value.trim() } : {} }), `Created from “${base?.name}”`);
+      if (r) openBot(r.id);
+    } }, 'Create'), h('button', { class: 'btn', onclick: () => fileIn.click() }, 'Import…'), fileIn),
+    h('div', { class: 'small muted', style: 'margin-top:6px' }, templates.find((t) => t.id === tpl.value)?.description || ''));
+  tpl.onchange = () => { create.lastChild.textContent = templates.find((t) => t.id === tpl.value)?.description || ''; };
+  const cards = bots.map((b) => h('div', { class: 'card' },
+    h('div', { class: 'row spread nowrap', style: 'align-items:flex-start' }, h('div', { style: 'flex:1;min-width:0' }, h('h2', { style: 'margin:0' }, b.name), h('div', { class: 'small muted' }, b.description || b.id)),
+      toggle(b.enabled, (v) => tryApi(() => api('PUT', `/api/bots/${b.id}`, { enabled: v }), `${b.name} ${v ? 'on' : 'off'}`))),
+    h('div', { class: 'row small', style: 'margin:10px 0' },
+      h('span', { class: 'pill info' }, b.config.model === 'auto' ? 'model: auto' : b.config.model),
+      h('span', { class: 'pill' }, `${b.config.chats.length} chat(s)`), h('span', { class: 'pill' }, `${b.config.organizers.length} organizer(s)`),
+      Object.keys(b.config.mcpServers || {}).map((k) => h('span', { class: 'pill' }, `tools: ${k}`)),
+      b.config.confirm ? h('span', { class: 'pill warn' }, 'changes need confirm') : null,
+      b.config.memory?.enabled !== false ? h('span', { class: 'pill ok' }, 'memory') : null),
+    b.needs.length ? h('div', { class: 'note warn' }, `Needs secrets: ${b.needs.join(', ')}`) : null,
+    b.missingPlugins.length ? h('div', { class: 'note warn' }, `Missing plugins: ${b.missingPlugins.join(', ')}`) : null,
+    h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => openBot(b.id) }, can('admin') ? 'Edit & test' : 'View & test'))));
+  $('#main').replaceChildren(create, bots.length ? h('div', { class: 'grid' }, cards) : h('p', { class: 'muted' }, 'No bots yet.'));
 }
-function botCard(b) {
-  const f = {};
-  const field = (key, label, el) => { f[key] = el; return h('div', {}, h('label', {}, label), el); };
-  const lines = (arr) => (arr || []).join('\n');
-  const form = h('div', {},
-    field('model', 'Model', h('input', { value: b.model })),
-    field('triggers', 'Triggers (comma separated, e.g. !panduga)', h('input', { value: (b.triggers || []).join(', ') })),
-    field('dm', 'Direct messages', h('select', {}, ['members', 'organizers', 'anyone', 'none'].map((v) => h('option', { value: v, selected: b.dm === v }, { members: 'Members of its groups + listed participants', organizers: 'Organizers only', anyone: 'Anyone', none: 'Nobody' }[v])))),
-    field('organizers', 'Organizer phone numbers (one per line, with country code)', h('textarea', { value: lines(b.organizers), style: 'min-height:60px' })),
-    field('participants', 'Extra participants allowed to DM (one per line)', h('textarea', { value: lines(b.participants), style: 'min-height:50px' })),
-    field('extraPrompt', 'Extra instructions (added to the bot prompt)', h('textarea', { value: b.extraPrompt || '' })),
-    field('schedules', 'Schedules (JSON: [{"id":"digest","at":"08:00","days":"daily","prompt":"…","chats":"all"}])', h('textarea', { value: JSON.stringify(b.schedules || [], null, 2) })),
-    h('div', { class: 'row' }, field('historySize', 'History (msgs)', h('input', { type: 'number', value: b.historySize, style: 'width:110px' })), field('maxTokens', 'Max tokens', h('input', { type: 'number', value: b.maxTokens, style: 'width:110px' }))),
-    h('div', { class: 'row', style: 'margin-top:10px' }, h('span', { class: 'small' }, 'Reply when @mentioned'), toggle(b.respondToMentions, (v) => (f.respondToMentions = v))),
-    h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn primary', onclick: save }, 'Save')));
-  async function save() {
-    try {
-      const patch = {
-        model: f.model.value.trim(), triggers: f.triggers.value.split(',').map((s) => s.trim()).filter(Boolean), dm: f.dm.value,
-        organizers: f.organizers.value.split('\n'), participants: f.participants.value.split('\n'), extraPrompt: f.extraPrompt.value,
-        schedules: JSON.parse(f.schedules.value || '[]'), historySize: Number(f.historySize.value), maxTokens: Number(f.maxTokens.value),
-      };
-      if (typeof f.respondToMentions === 'boolean') patch.respondToMentions = f.respondToMentions;
-      await api('PUT', `/api/bots/${b.id}`, patch); toast('Saved');
-    } catch (e) { toast(e.message); }
-  }
-  const scheds = (b.schedules || []).map((s) => h('div', { class: 'row spread small', style: 'margin:4px 0' }, h('span', {}, `${s.id} · ${s.at} ${s.days}`),
-    h('button', { class: 'btn small', onclick: async () => { const r = await api('POST', `/api/bots/${b.id}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${r.length} chat(s)` : 'No chats bound'); } }, 'Run now')));
+function openBot(id) { location.hash = `bots/${encodeURIComponent(id)}`; }
 
-  // test console
+async function renderBotEditor(id) {
+  const [b, models, plugins] = await Promise.all([api('GET', `/api/bots/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', '/api/plugins')]);
+  const c = structuredClone(b.config);
+  const F = {};
+  const inp = (key, attrs = {}) => (F[key] = h('input', { value: c[key] ?? '', ...attrs }));
+  // General
+  const modelSel = (F.model = h('select', {}, h('option', { value: 'auto' }, `Auto${models.resolvedDefault ? ` (${models.resolvedDefault})` : ''}`),
+    models.models.map((m) => h('option', { value: m.ref, selected: c.model === m.ref }, m.label)),
+    c.model !== 'auto' && !models.models.some((m) => m.ref === c.model) ? h('option', { value: c.model, selected: true }, `${c.model} (not available)`) : null));
+  F.dm = h('select', {}, [['members', 'Members of its groups + listed participants'], ['organizers', 'Organizers only'], ['anyone', 'Anyone'], ['none', 'Nobody']].map(([v, l]) => h('option', { value: v, selected: c.dm === v }, l)));
+  F.enabled = h('input', { type: 'checkbox', checked: c.enabled }); F.respondToMentions = h('input', { type: 'checkbox', checked: c.respondToMentions });
+  F.memory = h('input', { type: 'checkbox', checked: c.memory?.enabled !== false });
+  F.prompt = h('textarea', { class: 'prose', value: c.prompt });
+  F.triggers = h('input', { value: (c.triggers || []).join(', ') });
+  F.organizers = h('textarea', { value: lines(c.organizers), style: 'min-height:60px' });
+  F.participants = h('textarea', { value: lines(c.participants), style: 'min-height:50px' });
+  // Tool services
+  const servers = Object.entries(c.mcpServers || {}).map(([key, s]) => ({ key, url: s.url, org: s.tokens?.organizer || '', part: s.tokens?.participant || '' }));
+  const rules = { participant: [...(c.tools?.participant || [])], organizer: [...(c.tools?.organizer || [])], deny: [...(c.tools?.deny || [])] };
+  const rulesBox = { participant: h('textarea', { value: lines(rules.participant), style: 'min-height:60px' }), organizer: h('textarea', { value: lines(rules.organizer), style: 'min-height:60px' }), deny: h('textarea', { value: lines(rules.deny), style: 'min-height:40px' }) };
+  const glob = (p) => new RegExp(`^${p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
+  const allowed = (role, fq) => splitLines(rulesBox[role].value).some((r) => glob(r).test(fq));
+  const srvList = h('div', {});
+  function drawServers() {
+    srvList.replaceChildren(...servers.map((s, i) => {
+      const key = h('input', { value: s.key, placeholder: 'name (e.g. panduga)', oninput: (e) => (s.key = e.target.value.trim()) });
+      const url = h('input', { value: s.url, placeholder: 'https://…/mcp or ${SECRET_NAME}', oninput: (e) => (s.url = e.target.value.trim()) });
+      const org = h('input', { value: s.org, placeholder: '${ORGANIZER_TOKEN_SECRET}', oninput: (e) => (s.org = e.target.value.trim()) });
+      const part = h('input', { value: s.part, placeholder: '${PARTICIPANT_TOKEN_SECRET} (optional)', oninput: (e) => (s.part = e.target.value.trim()) });
+      const grid = h('div', {});
+      return h('fieldset', {}, h('legend', {}, s.key || 'new tool service'),
+        h('div', { class: 'row' }, key, url), field('Organizer credential (secret reference)', org), field('Participant credential (optional; least privilege)', part),
+        h('div', { class: 'row', style: 'margin-top:8px' },
+          h('button', { class: 'btn small', onclick: async () => {
+            const tools = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/discover`, { url: s.url, token: s.org }));
+            if (!tools) return;
+            const fq = (t) => `${s.key}:${t.name}`;
+            const set = (role, name, on) => {
+              const cur = splitLines(rulesBox[role].value).filter((r) => r !== `${s.key}:*`);
+              const keep = cur.filter((r) => !r.startsWith(`${s.key}:`));
+              const mine = tools.filter((t) => (t.name === name ? on : allowedNow[role].has(t.name))).map((t) => t.name);
+              allowedNow[role] = new Set(mine);
+              const out = mine.length === tools.length ? [`${s.key}:*`] : mine.map((n) => `${s.key}:${n}`);
+              rulesBox[role].value = [...keep, ...out].join('\n');
+            };
+            const allowedNow = { participant: new Set(tools.filter((t) => allowed('participant', fq(t))).map((t) => t.name)), organizer: new Set(tools.filter((t) => allowed('organizer', fq(t))).map((t) => t.name)) };
+            grid.replaceChildren(h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, `${tools.length} tools`), h('th', { class: 'c' }, 'Participants'), h('th', { class: 'c' }, 'Organizers'))),
+              h('tbody', {}, tools.map((t) => h('tr', {}, h('td', {}, h('b', {}, t.name), h('div', { class: 'small muted' }, t.description)),
+                ...['participant', 'organizer'].map((role) => h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: allowedNow[role].has(t.name), onchange: (e) => set(role, t.name, e.target.checked) }))))))));
+          } }, 'Discover tools'),
+          h('button', { class: 'btn small danger mut', onclick: () => { servers.splice(i, 1); drawServers(); } }, 'Remove')),
+        grid);
+    }));
+  }
+  drawServers();
+  // Confirmation
+  F.confirmOn = h('input', { type: 'checkbox', checked: !!c.confirm });
+  F.cPreview = h('input', { value: c.confirm?.preview || '', placeholder: 'panduga:*_preview' });
+  F.cTool = h('input', { value: c.confirm?.tool || '', placeholder: 'panduga:confirm' });
+  F.cId = h('input', { value: c.confirm?.idField || 'confirm_id' });
+  F.cTtl = h('input', { type: 'number', value: c.confirm?.ttlMinutes || 9, style: 'max-width:90px' });
+  // Schedules
+  const scheds = structuredClone(c.schedules || []);
+  const schedBox = h('div', {});
+  function drawScheds() {
+    schedBox.replaceChildren(...scheds.map((s, i) => h('fieldset', {},
+      h('legend', {}, s.id || `schedule ${i + 1}`),
+      h('div', { class: 'row' }, h('input', { value: s.id || '', placeholder: 'id', style: 'max-width:140px', oninput: (e) => (s.id = e.target.value) }),
+        h('input', { value: s.at || '08:00', placeholder: 'HH:MM', style: 'max-width:90px', oninput: (e) => (s.at = e.target.value) }),
+        h('input', { value: s.days || 'daily', placeholder: 'daily or mon,wed', style: 'max-width:160px', oninput: (e) => (s.days = e.target.value) }),
+        h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.enabled !== false, onchange: (e) => (s.enabled = e.target.checked) }), 'on')),
+      h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', value: s.prompt || '', placeholder: 'What to post, e.g. a short summary of today’s agenda', oninput: (e) => (s.prompt = e.target.value) }),
+      h('div', { class: 'row', style: 'margin-top:6px' },
+        h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('POST', `/api/bots/${encodeURIComponent(id)}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${r.length} chat(s)` : 'No chats bound'); }) }, 'Run now'),
+        h('button', { class: 'btn small danger mut', onclick: () => { scheds.splice(i, 1); drawScheds(); } }, 'Remove')))));
+  }
+  drawScheds();
+  F.plugins = plugins.map((p) => h('label', { class: 'inline' }, h('input', { type: 'checkbox', value: p.name, checked: (c.plugins || []).includes(p.name) }), p.name));
+  F.timezone = h('input', { value: c.timezone || '', placeholder: 'Europe/Zurich (default)' });
+  F.historySize = h('input', { type: 'number', value: c.historySize, style: 'max-width:110px' });
+  F.maxTokens = h('input', { type: 'number', value: c.maxTokens, style: 'max-width:110px' });
+
+  async function save() {
+    const config = {
+      name: F.name.value, description: F.description.value, enabled: F.enabled.checked, model: F.model.value, prompt: F.prompt.value,
+      triggers: splitLines(F.triggers.value), respondToMentions: F.respondToMentions.checked, dm: F.dm.value,
+      organizers: splitLines(F.organizers.value), participants: splitLines(F.participants.value), timezone: F.timezone.value.trim(),
+      historySize: Number(F.historySize.value), maxTokens: Number(F.maxTokens.value), memory: { enabled: F.memory.checked },
+      mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, { url: s.url, tokens: { organizer: s.org, participant: s.part } }])),
+      tools: { participant: splitLines(rulesBox.participant.value), organizer: splitLines(rulesBox.organizer.value), deny: splitLines(rulesBox.deny.value) },
+      confirm: F.confirmOn.checked ? { preview: F.cPreview.value.trim(), tool: F.cTool.value.trim(), idField: F.cId.value.trim(), ttlMinutes: Number(F.cTtl.value) } : null,
+      schedules: scheds, plugins: F.plugins.map((l) => l.querySelector('input')).filter((x) => x.checked).map((x) => x.value),
+    };
+    try {
+      const r = await api('PUT', `/api/bots/${encodeURIComponent(id)}`, config);
+      toast(r.warnings?.length ? `Saved — ${r.warnings.join('; ')}` : 'Saved');
+    } catch (e) { toast(e.field ? `${e.field}: ${e.message.replace(/^[^:]+: /, '')}` : e.message); }
+  }
+
+  // Test console
   const log = h('div', { class: 'chatlog' });
   const role = h('select', { style: 'max-width:150px' }, h('option', { value: 'participant' }, 'as participant'), h('option', { value: 'organizer' }, 'as organizer'));
   const input = h('input', { placeholder: 'Ask the bot something…' });
-  const testForm = h('form', { class: 'row', onsubmit: async (e) => {
+  const testForm = h('form', { class: 'row mut', onsubmit: async (e) => {
     e.preventDefault(); const text = input.value.trim(); if (!text) return;
     log.append(h('div', { class: 'bubble me' }, text)); input.value = '';
     const wait = h('div', { class: 'bubble bot muted' }, '…'); log.append(wait); log.scrollTop = 1e9;
-    try { const r = await api('POST', `/api/bots/${b.id}/test`, { text, role: role.value }); wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); }
+    try { const r = await api('POST', `/api/bots/${encodeURIComponent(id)}/test`, { text, role: role.value }); wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); if (r.model) wait.title = r.model; }
     catch (x) { wait.textContent = `Error: ${x.message}`; }
     log.scrollTop = 1e9;
   } }, role, input, h('button', { class: 'btn' }, 'Send'));
 
-  const details = h('div', { class: 'hide' }, form);
-  return h('div', { class: 'card' },
-    h('div', { class: 'row spread', style: 'flex-wrap:nowrap;align-items:flex-start' }, h('div', { style: 'flex:1;min-width:0' }, h('h2', { style: 'margin:0' }, b.name), h('div', { class: 'small muted' }, b.description || b.id)),
-      toggle(b.enabled, async (v) => { await api('PUT', `/api/bots/${b.id}`, { enabled: v }); toast(`${b.name} ${v ? 'enabled' : 'disabled'}`); })),
-    h('div', { class: 'row small', style: 'margin:10px 0' },
-      h('span', { class: 'pill' }, `${b.chats.length} chat(s)`), h('span', { class: 'pill' }, `${b.organizers.length} organizer(s)`),
-      Object.keys(b.mcpServers || {}).map((k) => h('span', { class: 'pill info' }, `MCP: ${k}`)),
-      (b.localTools || []).map((t) => h('span', { class: 'pill ok' }, `tool: ${t}`)),
-      b.confirm ? h('span', { class: 'pill warn' }, 'changes need confirm') : null),
-    scheds.length ? h('div', {}, h('label', {}, 'Schedules'), scheds) : null,
-    h('label', {}, 'Test console (real tools, does not post to WhatsApp)'), log, testForm,
-    h('div', { style: 'margin-top:12px' }, h('button', { class: 'btn', onclick: (e) => { details.classList.toggle('hide'); e.target.textContent = details.classList.contains('hide') ? 'Edit settings' : 'Hide settings'; } }, 'Edit settings')),
-    details);
+  $('#main').replaceChildren(
+    h('div', { class: 'row spread', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: () => { location.hash = 'bots'; } }, '← All bots'),
+      h('div', { class: 'row' },
+        h('a', { class: 'btn', href: `/api/bots/${encodeURIComponent(id)}/export`, download: `${id}.bot.json` }, 'Export'),
+        h('button', { class: 'btn mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openBot(r.id); } }, 'Duplicate'),
+        h('button', { class: 'btn danger mut', onclick: async () => { if (confirm(`Delete “${c.name}”? Its group bindings are removed; chat memory stays until erased.`) && await tryApi(() => api('DELETE', `/api/bots/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'bots'; } } }, 'Delete'),
+        h('button', { class: 'btn primary mut', onclick: save }, 'Save'))),
+    h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(340px,1fr));align-items:start' },
+      h('div', { class: 'card' },
+        b.needs.length ? h('div', { class: 'note warn' }, `Set these under Secrets: ${b.needs.join(', ')}`) : null,
+        h('fieldset', {}, h('legend', {}, 'General'),
+          field('Name', inp('name')), field('Description', inp('description')),
+          h('div', { class: 'row', style: 'margin-top:8px' }, h('label', { class: 'inline' }, F.enabled, 'Enabled'), h('label', { class: 'inline' }, F.memory, 'Group memory'), h('label', { class: 'inline' }, F.respondToMentions, 'Reply when @mentioned')),
+          field('Model', modelSel, models.problem || 'Auto uses the default model set under Models.'),
+          field('Triggers', F.triggers, 'Group messages starting with one of these wake the bot, e.g. !panduga'),
+          field('Who may message it directly', F.dm)),
+        h('fieldset', {}, h('legend', {}, 'Instructions'), F.prompt),
+        h('fieldset', {}, h('legend', {}, 'People'),
+          field('Organizers (phone numbers with country code, one per line)', F.organizers, 'Organizers can use organizer tools and confirm changes.'),
+          field('Extra participants allowed to DM', F.participants)),
+        h('fieldset', {}, h('legend', {}, 'Tool services (MCP)'),
+          h('p', { class: 'small muted', style: 'margin-top:0' }, 'Credentials are references to Secrets, like ${PANDUGA_TOKEN}. Discover tools, then tick what each role may use.'),
+          srvList, h('button', { class: 'btn small mut', onclick: () => { servers.push({ key: '', url: '', org: '', part: '' }); drawServers(); } }, '+ Add tool service'),
+          h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted' }, 'Advanced: tool rules'),
+            field('Participant rules', rulesBox.participant), field('Organizer rules', rulesBox.organizer), field('Never allowed', rulesBox.deny))),
+        h('fieldset', {}, h('legend', {}, 'Changes need confirmation'),
+          h('label', { class: 'inline' }, F.confirmOn, 'Hold changes until an organizer replies “confirm CODE”'),
+          h('div', { class: 'row' }, field('Preview tools', F.cPreview), field('Confirm tool', F.cTool)),
+          h('div', { class: 'row' }, field('Confirmation id field', F.cId), field('Valid for (minutes)', F.cTtl))),
+        h('fieldset', {}, h('legend', {}, 'Scheduled posts'), schedBox, h('button', { class: 'btn small mut', onclick: () => { scheds.push({ id: `s${scheds.length + 1}`, at: '08:00', days: 'daily', prompt: '', chats: 'all', enabled: true }); drawScheds(); } }, '+ Add schedule')),
+        h('fieldset', {}, h('legend', {}, 'Advanced'),
+          plugins.length ? field('Plugins', h('div', {}, F.plugins)) : null,
+          field('Timezone', F.timezone), h('div', { class: 'row' }, field('Recent messages in context', F.historySize), field('Max reply tokens', F.maxTokens))),
+        h('div', { class: 'row mut' }, h('button', { class: 'btn primary', onclick: save }, 'Save'))),
+      h('div', { class: 'card', style: 'position:sticky;top:110px' }, h('h2', {}, 'Test console'),
+        h('p', { class: 'small muted' }, 'Uses real tools and the saved settings; nothing is posted to WhatsApp.'), log, testForm)));
 }
 
-// ---------- chats ----------
+// ---------- chats + memory ----------
 async function renderChats() {
-  const m = $('#main');
-  m.replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading groups…')));
+  $('#main').replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading groups…')));
   const [chats, bots] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/bots')]);
-  const memBox = h('div', { id: 'memory-box' });
+  const memBox = h('div', {});
   const rows = chats.map((c) => h('tr', {},
     h('td', {}, h('b', {}, c.name), h('div', { class: 'small muted' }, `${c.size} members · ${c.id}`),
       h('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => renderMemory(c, memBox) }, 'Memory')),
-    h('td', { style: 'width:200px' }, h('select', { onchange: async (e) => { await api('POST', '/api/chats/bind', { chat: c.id, bot: e.target.value || null }); toast(e.target.value ? `Bound to ${e.target.value}` : 'Unbound'); } },
+    h('td', { style: 'width:200px' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/chats/bind', { chat: c.id, bot: e.target.value || null }), e.target.value ? 'Bound' : 'Unbound') },
       h('option', { value: '' }, '— no bot —'), bots.map((b) => h('option', { value: b.id, selected: c.bot === b.id }, b.name))))));
-  m.replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'WhatsApp groups'),
-    h('p', { class: 'small muted' }, 'Add the bot number to a group in WhatsApp, then pick which bot answers there. Each group has at most one bot.'),
+  $('#main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'WhatsApp groups'),
+    h('p', { class: 'small muted' }, 'Add the bot number to a group in WhatsApp, then choose which bot answers there. Each group has at most one bot. Messages in all groups are remembered so a bot added later has context.'),
     chats.length ? h('table', {}, h('tbody', {}, rows)) : h('p', { class: 'muted' }, 'No groups yet (or WhatsApp is not connected).')), memBox);
 }
 async function renderMemory(c, box) {
   const enc = encodeURIComponent(c.id);
   const m = await api('GET', `/api/chats/${enc}/memory`);
-  const notes = m.notes.map((n) => h('li', { style: 'margin:6px 0' }, h('span', {}, n.text), h('span', { class: 'small muted' }, ` — ${n.author || '?'} (${n.role || 'note'}), ${time(n.ts)} `),
-    h('button', { class: 'btn small', onclick: async () => { await api('DELETE', `/api/notes/${n.id}`); toast('Note deleted'); renderMemory(c, box); } }, 'Delete')));
   box.replaceChildren(h('div', { class: 'card', style: 'margin-top:14px' },
     h('div', { class: 'row spread' }, h('h2', {}, `Memory · ${c.name}`), h('span', { class: 'pill' }, `${m.messageCount} stored messages`)),
     h('label', {}, m.updatedAt ? `Running summary (updated ${time(m.updatedAt)})` : 'Running summary'),
     h('pre', {}, m.summary || '(no summary yet — it starts once older messages accumulate)'),
-    h('label', {}, `Notes (${m.notes.length})`), m.notes.length ? h('ul', { class: 'small' }, notes) : h('p', { class: 'small muted' }, 'No notes.'),
-    h('div', { class: 'row', style: 'margin-top:10px' },
-      h('button', { class: 'btn', onclick: async (e) => { e.target.disabled = true; try { await api('POST', `/api/chats/${enc}/memory/summarize`); toast('Summary rebuilt'); } catch (x) { toast(x.message); } renderMemory(c, box); } }, 'Rebuild summary'),
-      h('button', { class: 'btn danger', onclick: async () => { if (confirm(`Erase all stored messages, the summary and notes for "${c.name}"?`)) { await api('DELETE', `/api/chats/${enc}/memory`); toast('Memory erased'); renderMemory(c, box); } } }, 'Erase memory'))));
+    h('label', {}, `Notes (${m.notes.length})`),
+    m.notes.length ? h('ul', { class: 'small' }, m.notes.map((n) => h('li', { style: 'margin:6px 0' }, n.text, h('span', { class: 'muted' }, ` — ${n.author || '?'} (${n.role || 'note'}), ${time(n.ts)} `),
+      h('button', { class: 'btn small mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/notes/${n.id}`); renderMemory(c, box); }, 'Note deleted') }, 'Delete')))) : h('p', { class: 'small muted' }, 'No notes.'),
+    h('div', { class: 'row mut', style: 'margin-top:10px' },
+      h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('POST', `/api/chats/${enc}/memory/summarize`); renderMemory(c, box); }, 'Summary rebuilt') }, 'Rebuild summary'),
+      h('button', { class: 'btn danger', onclick: () => confirm(`Erase all stored messages, the summary and notes for “${c.name}”?`) && tryApi(async () => { await api('DELETE', `/api/chats/${enc}/memory`); renderMemory(c, box); }, 'Memory erased') }, 'Erase memory'))));
   box.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ---------- models ----------
+async function renderModels() {
+  const [provs, models, secrets] = await Promise.all([api('GET', '/api/providers'), loadModels(true), api('GET', '/api/secrets')]);
+  const isSet = (n) => secrets.find((s) => s.name === n)?.set;
+  const secretForm = (name, placeholder) => { const v = h('input', { type: 'password', placeholder }); return h('form', { class: 'row mut', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name, value: v.value }), v.value ? 'Saved' : 'Removed')) renderModels(); } }, v, h('button', { class: 'btn' }, 'Save')); };
+  const statusPill = (p) => h('span', { class: `pill ${p.connected ? 'ok' : p.error ? 'bad' : ''}` }, p.connected ? `${p.models} models` : p.error ? 'error' : 'not connected');
+  const by = Object.fromEntries(provs.map((p) => [p.id, p]));
+  const opts = (sel) => [h('option', { value: 'auto' }, 'Auto'), models.models.map((m) => h('option', { value: m.ref, selected: sel === m.ref }, m.label))];
+  const def = h('select', {}, opts(models.defaultModel)); const bg = h('select', {}, opts(models.backgroundModel));
+  // ChatGPT
+  const cg = by.chatgpt; const paste = h('input', { placeholder: 'http://127.0.0.1:1455/auth/callback?code=…' });
+  const cgFlow = h('div', {});
+  const cgCard = h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'ChatGPT plan (Sign in with ChatGPT)'), statusPill(cg)),
+    h('p', { class: 'small muted' }, 'Use a ChatGPT Plus/Pro plan’s included usage. Official OpenAI flow for open-source apps.'),
+    cg.connected ? h('p', {}, `Connected as ${cg.account || 'account'}`) : null, cg.error ? h('div', { class: 'note warn' }, cg.error) : null,
+    can('owner') ? h('div', { class: 'row' },
+      h('button', { class: 'btn primary', onclick: async () => {
+        const r = await tryApi(() => api('POST', '/api/providers/chatgpt/start')); if (!r) return;
+        cgFlow.replaceChildren(h('ol', { class: 'small' },
+          h('li', {}, h('a', { href: r.authorizeUrl, target: '_blank', rel: 'noopener' }, 'Open the ChatGPT sign-in'), ' and allow plan usage.'),
+          h('li', {}, 'Your browser then shows a page that can’t be reached (address starting with http://127.0.0.1:1455). That’s expected.'),
+          h('li', {}, 'Copy that page’s full address and paste it here:')),
+          h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); const d = await tryApi(() => api('POST', '/api/providers/chatgpt/complete', { callbackUrl: paste.value })); if (d) { toast(`Connected ${d.email} · ${d.models} models`); renderModels(); } } }, paste, h('button', { class: 'btn primary' }, 'Finish')));
+      } }, cg.connected ? 'Sign in again' : 'Sign in with ChatGPT'),
+      cg.connected ? h('button', { class: 'btn danger', onclick: () => confirm('Disconnect ChatGPT?') && tryApi(async () => { await api('DELETE', '/api/providers/chatgpt'); renderModels(); }, 'Disconnected') }, 'Disconnect') : null) : h('p', { class: 'small muted' }, 'Only owners can connect accounts.'),
+    cgFlow);
+  // Compatible
+  const cid = h('input', { placeholder: 'id, e.g. openrouter' }); const cname = h('input', { placeholder: 'Name' });
+  const curl = h('input', { placeholder: 'https://openrouter.ai/api/v1' }); const ckey = h('input', { type: 'password', placeholder: 'API key (optional)' });
+  const compat = provs.filter((p) => p.type === 'compatible');
+  $('#main').replaceChildren(
+    models.problem ? h('div', { class: 'note warn', style: 'margin-bottom:12px' }, models.problem) : null,
+    h('div', { class: 'grid' },
+      h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'Anthropic (Claude)'), statusPill(by.anthropic)),
+        h('p', { class: 'small muted' }, 'Paste an API key from console.anthropic.com. (Claude Pro/Max subscriptions can’t be used by third-party apps under Anthropic’s terms.)'),
+        by.anthropic.error ? h('div', { class: 'note warn' }, by.anthropic.error) : null, secretForm('ANTHROPIC_API_KEY', isSet('ANTHROPIC_API_KEY') ? '•••• saved — paste to replace' : 'sk-ant-…')),
+      h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'OpenAI (API key)'), statusPill(by.openai)),
+        by.openai.error ? h('div', { class: 'note warn' }, by.openai.error) : null, secretForm('OPENAI_API_KEY', isSet('OPENAI_API_KEY') ? '•••• saved — paste to replace' : 'sk-…')),
+      cgCard,
+      h('div', { class: 'card' }, h('h2', {}, 'OpenAI-compatible endpoints'),
+        h('p', { class: 'small muted' }, 'OpenRouter, Ollama, LM Studio, vLLM, Groq, Mistral… anything with an OpenAI-style /chat/completions.'),
+        compat.length ? h('table', {}, h('tbody', {}, compat.map((p) => h('tr', {}, h('td', {}, h('b', {}, p.name), h('div', { class: 'small muted' }, `${p.id} · ${p.baseUrl}`), p.error ? h('div', { class: 'small', style: 'color:var(--bad)' }, p.error) : null),
+          h('td', {}, statusPill(p)), h('td', {}, h('button', { class: 'btn small danger mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/providers/compatible/${p.id}`); renderModels(); }, 'Removed') }, 'Remove')))))) : null,
+        h('form', { class: 'mut', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('POST', '/api/providers/compatible', { id: cid.value.trim(), name: cname.value.trim(), baseUrl: curl.value.trim(), key: ckey.value }), 'Saved')) renderModels(); } },
+          h('div', { class: 'row' }, cid, cname), h('div', { class: 'row', style: 'margin-top:6px' }, curl, ckey), h('button', { class: 'btn', style: 'margin-top:6px' }, 'Add endpoint'))),
+      h('div', { class: 'card' }, h('h2', {}, 'Default models'),
+        field('Default model (bots on Auto)', def, models.resolvedDefault ? `Auto currently means ${models.resolvedDefault}` : ''),
+        field('Background model (memory summaries)', bg, models.resolvedBackground ? `Auto currently means ${models.resolvedBackground}` : ''),
+        h('button', { class: 'btn primary mut', style: 'margin-top:10px', onclick: () => tryApi(async () => { await api('POST', '/api/models/defaults', { defaultModel: def.value, backgroundModel: bg.value }); modelsCache = null; renderModels(); }, 'Saved') }, 'Save'),
+        h('button', { class: 'btn', style: 'margin:10px 0 0 8px', onclick: async () => { modelsCache = null; await api('GET', '/api/providers?refresh=1'); renderModels(); } }, 'Refresh model lists'))));
+}
+
+// ---------- backups (owner) ----------
+async function renderBackups() {
+  const b = await api('GET', '/api/backups'); const s = b.settings;
+  const pass = h('input', { type: 'password', placeholder: b.passphraseSet ? '•••• set — enter a new one to change' : 'At least 12 characters — keep it safe!' });
+  const sched = h('select', {}, [['hourly', 'Every hour'], ['6h', 'Every 6 hours'], ['daily', 'Daily'], ['weekly', 'Weekly']].map(([v, l]) => h('option', { value: v, selected: s.schedule === v }, l)));
+  const at = h('input', { value: s.at, style: 'max-width:90px' }); const wd = h('select', { style: 'max-width:90px' }, ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => h('option', { value: d, selected: s.weekday === d }, d)));
+  const keep = h('input', { type: 'number', value: s.keep, style: 'max-width:90px' });
+  const en = h('input', { type: 'checkbox', checked: s.enabled }); const wa = h('input', { type: 'checkbox', checked: s.includeWhatsApp });
+  const saveSettings = (patch) => tryApi(async () => { await api('PUT', '/api/backups/settings', patch); renderBackups(); }, 'Saved');
+  const last = b.last;
+  // GitHub
+  const ghToken = h('input', { type: 'password', placeholder: 'GitHub token (fine-grained: repo contents read/write)' });
+  const ghRepo = h('input', { value: s.github.repo, placeholder: 'owner/duniya-backups' });
+  const clientId = h('input', { value: s.githubClientId, placeholder: 'GitHub OAuth app client id (Device Flow enabled)' });
+  const ghFlow = h('div', {});
+  const pollLoop = async (interval) => {
+    for (let i = 0; i < 120; i++) {
+      await new Promise((r) => setTimeout(r, interval * 1000));
+      const r = await api('POST', '/api/backups/github/poll').catch((e) => ({ status: 'error', error: e.message }));
+      if (r.status === 'connected') { toast(`Connected as ${r.login}`); return renderBackups(); }
+      if (r.status !== 'pending') { ghFlow.replaceChildren(h('div', { class: 'note warn' }, `GitHub: ${r.status}${r.error ? ` (${r.error})` : ''}`)); return; }
+    }
+  };
+  // S3
+  const se = h('input', { value: s.s3.endpoint, placeholder: 'https://<account>.r2.cloudflarestorage.com' });
+  const sr = h('input', { value: s.s3.region, placeholder: 'auto / us-east-1 / eu-zurich-1' });
+  const sb = h('input', { value: s.s3.bucket, placeholder: 'bucket' }); const sp = h('input', { value: s.s3.prefix, placeholder: 'duniya/' });
+  const ak = h('input', { placeholder: b.s3.keysSet ? '•••• saved' : 'Access key id' }); const sk = h('input', { type: 'password', placeholder: b.s3.keysSet ? '•••• saved' : 'Secret access key' });
+  // Restore
+  const src = h('select', {}, h('option', { value: 'local' }, 'This server'), s.github.enabled ? h('option', { value: 'github' }, 'GitHub') : null, s.s3.enabled ? h('option', { value: 's3' }, 'S3') : null);
+  const files = h('select', {}); const rpass = h('input', { type: 'password', placeholder: 'Backup passphrase' });
+  const loadFiles = async () => { const l = await tryApi(() => api('GET', `/api/backups/list?source=${src.value}`)) || []; files.replaceChildren(...l.map((f) => h('option', { value: f.file }, `${f.file} · ${kb(f.size)}`))); };
+  src.onchange = loadFiles;
+
+  $('#main').replaceChildren(h('div', { class: 'grid' },
+    h('div', { class: 'card' }, h('h2', {}, 'Schedule'),
+      h('p', { class: 'small muted' }, 'Backups include bots, users, settings, secrets, chat memory and (optionally) the WhatsApp link. They are encrypted with your passphrase before leaving the server — without it they cannot be restored.'),
+      field('Passphrase', h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/backups/passphrase', { passphrase: pass.value }), 'Passphrase saved')) renderBackups(); } }, pass, h('button', { class: 'btn' }, 'Save'))),
+      h('div', { class: 'row', style: 'margin-top:10px' }, h('label', { class: 'inline' }, en, 'Scheduled backups'), h('label', { class: 'inline' }, wa, 'Include WhatsApp link')),
+      h('div', { class: 'row' }, sched, at, wd, h('span', { class: 'small muted' }, 'keep'), keep),
+      h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn primary', onclick: () => saveSettings({ enabled: en.checked, includeWhatsApp: wa.checked, schedule: sched.value, at: at.value, weekday: wd.value, keep: Number(keep.value) }) }, 'Save'),
+        h('button', { class: 'btn', onclick: async (e) => { e.target.disabled = true; const r = await tryApi(() => api('POST', '/api/backups/run')); e.target.disabled = false; if (r) { toast(`Backup ${r.file}: ${Object.entries(r.results).map(([k, v]) => `${k} ${v}`).join(', ')}`); renderBackups(); } } }, 'Back up now')),
+      last ? h('p', { class: 'small' }, `Last: ${time(last.at)} · ${kb(last.size)} · `, Object.entries(last.results).map(([k, v]) => h('span', { class: `pill ${v.startsWith('ok') ? 'ok' : 'bad'}`, style: 'margin-right:4px' }, `${k}: ${v}`))) : null,
+      b.local.length ? h('details', {}, h('summary', { class: 'small muted' }, `${b.local.length} on this server`), h('ul', { class: 'small' }, b.local.map((f) => h('li', {}, h('a', { href: `/api/backups/download/${f.file}` }, f.file), ` · ${kb(f.size)}`)))) : null),
+    h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'GitHub (private repository)'), h('span', { class: `pill ${b.github.connected ? 'ok' : ''}` }, b.github.connected ? `as ${b.github.login || '?'}` : 'not connected')),
+      !b.github.connected ? h('p', { class: 'small muted' }, 'No GitHub account? ', h('a', { href: b.github.signupUrl, target: '_blank', rel: 'noopener' }, 'Create one'), ' (free), then come back.') : null,
+      !b.github.connected && b.github.clientIdSet ? h('button', { class: 'btn primary', onclick: async () => {
+        const r = await tryApi(() => api('POST', '/api/backups/github/device')); if (!r) return;
+        ghFlow.replaceChildren(h('p', {}, 'Open ', h('a', { href: r.verificationUri, target: '_blank', rel: 'noopener' }, r.verificationUri), ' and enter:'), h('p', { class: 'code' }, r.userCode), h('p', { class: 'small muted' }, 'Waiting for approval…'));
+        pollLoop(r.interval || 5);
+      } }, 'Connect GitHub') : null,
+      ghFlow,
+      !b.github.connected ? h('form', { class: 'row', style: 'margin-top:8px', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/backups/github/token', { token: ghToken.value }), 'Token saved')) renderBackups(); } }, ghToken, h('button', { class: 'btn' }, 'Use token')) : null,
+      b.github.connected ? h('div', {},
+        field('Repository', h('div', { class: 'row' }, ghRepo, h('button', { class: 'btn', onclick: () => saveSettings({ github: { enabled: true, repo: ghRepo.value.trim() } }) }, 'Use'))),
+        !s.github.repo ? h('button', { class: 'btn primary', style: 'margin-top:8px', onclick: () => tryApi(async () => { await api('POST', '/api/backups/github/create-repo', {}); renderBackups(); }, 'Private repo created') }, 'Create private repo “duniya-backups”') : null,
+        h('div', { class: 'row', style: 'margin-top:8px' }, h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.github.enabled, onchange: (e) => saveSettings({ github: { enabled: e.target.checked } }) }), 'Back up to GitHub'),
+          h('button', { class: 'btn small', onclick: async () => { const r = await api('POST', '/api/backups/test/github'); toast(r.ok ? 'GitHub OK' : r.error); } }, 'Test'),
+          h('button', { class: 'btn small danger', onclick: () => confirm('Disconnect GitHub?') && tryApi(async () => { await api('DELETE', '/api/backups/github'); renderBackups(); }) }, 'Disconnect'))) : null,
+      h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted' }, 'GitHub app for device login'),
+        h('p', { class: 'small muted' }, 'Device login needs a GitHub OAuth app with “Enable Device Flow” (github.com → Settings → Developer settings → OAuth Apps). Paste its client id:'),
+        h('div', { class: 'row' }, clientId, h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('PUT', '/api/backups/github/client-id', { clientId: clientId.value }); renderBackups(); }, 'Saved') }, 'Save')))),
+    h('div', { class: 'card' }, h('h2', {}, 'S3-compatible storage'),
+      h('p', { class: 'small muted' }, 'Cloudflare R2, OCI Object Storage (S3 API), AWS S3, MinIO…'),
+      field('Endpoint', se), h('div', { class: 'row' }, field('Region', sr), field('Bucket', sb), field('Prefix', sp)),
+      h('div', { class: 'row', style: 'margin-top:8px' }, ak, sk, h('button', { class: 'btn', onclick: () => tryApi(() => api('PUT', '/api/backups/s3/keys', { accessKeyId: ak.value, secretAccessKey: sk.value }), 'Keys saved') }, 'Save keys')),
+      h('div', { class: 'row', style: 'margin-top:8px' },
+        h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.s3.enabled, id: 's3on' }), 'Back up to S3'),
+        h('button', { class: 'btn primary', onclick: () => saveSettings({ s3: { enabled: $('#s3on').checked, endpoint: se.value.trim(), region: sr.value.trim() || 'auto', bucket: sb.value.trim(), prefix: sp.value.trim() } }) }, 'Save'),
+        h('button', { class: 'btn', onclick: async () => { const r = await api('POST', '/api/backups/test/s3'); toast(r.ok ? 'S3 OK' : r.error); } }, 'Test'))),
+    h('div', { class: 'card' }, h('h2', {}, 'Restore'),
+      h('div', { class: 'note warn' }, 'Restoring replaces bots, users, settings, secrets, memory and the WhatsApp link with the backup, then restarts. The current data is kept aside on the server.'),
+      h('div', { class: 'row' }, src, h('button', { class: 'btn', onclick: loadFiles }, 'List')), h('div', { style: 'margin-top:6px' }, files), h('div', { style: 'margin-top:6px' }, rpass),
+      h('button', { class: 'btn danger', style: 'margin-top:8px', onclick: async () => {
+        if (!files.value) return toast('Pick a backup');
+        if (!confirm(`Restore ${files.value}? The server restarts and you sign in with the accounts from the backup.`)) return;
+        const r = await tryApi(() => api('POST', '/api/backups/restore', { source: src.value, file: files.value, passphrase: rpass.value }));
+        if (r) { toast('Restoring… the page reloads shortly'); setTimeout(() => location.reload(), 10000); }
+      } }, 'Restore'))));
+  loadFiles();
 }
 
 // ---------- pending ----------
 async function renderPending() {
   const rows = await api('GET', '/api/pending');
   $('#main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Pending confirmations'),
-    h('p', { class: 'small muted' }, 'Changes an organizer asked for that are waiting for "confirm CODE". You can also apply or cancel them here.'),
+    h('p', { class: 'small muted' }, 'Changes an organizer asked for, waiting for “confirm CODE”. You can apply or cancel them here too.'),
     rows.length ? h('table', {}, h('tbody', {}, rows.map((p) => h('tr', {},
       h('td', {}, h('b', {}, p.code), h('div', { class: 'small muted' }, `${p.bot} · ${p.tool} · expires in ${Math.max(0, Math.round((p.expires - Date.now()) / 60000))} min`), h('pre', {}, p.summary)),
-      h('td', { style: 'white-space:nowrap' },
-        h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('POST', `/api/pending/${p.code}/apply`); toast(r.result); } catch (e) { toast(e.message); } renderPending(); } }, 'Apply'), ' ',
-        h('button', { class: 'btn', onclick: async () => { await api('DELETE', `/api/pending/${p.code}`); renderPending(); } }, 'Cancel')))))) : h('p', { class: 'muted' }, 'Nothing pending.')));
+      h('td', { style: 'white-space:nowrap' }, h('button', { class: 'btn primary mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/pending/${p.code}/apply`)); if (r) toast(r.result); renderPending(); } }, 'Apply'), ' ',
+        h('button', { class: 'btn mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/pending/${p.code}`); renderPending(); }) }, 'Cancel')))))) : h('p', { class: 'muted' }, 'Nothing pending.')));
 }
 
 // ---------- secrets ----------
 async function renderSecrets() {
   const rows = await api('GET', '/api/secrets');
   const name = h('input', { placeholder: 'NAME_LIKE_THIS' }); const val = h('input', { type: 'password', placeholder: 'value' });
-  const setRow = (n) => { const v = h('input', { type: 'password', placeholder: 'new value' });
-    return h('tr', {}, h('td', {}, h('code', {}, n.name), n.usedByBots ? h('div', { class: 'small muted' }, 'used by a bot') : null),
-      h('td', {}, h('span', { class: `pill ${n.set ? 'ok' : 'bad'}` }, n.set ? 'set' : 'missing')),
-      h('td', {}, h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); await api('PUT', '/api/secrets', { name: n.name, value: v.value }); toast(v.value ? 'Saved' : 'Removed'); renderSecrets(); } }, v, h('button', { class: 'btn' }, 'Save')))); };
   $('#main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Secrets'),
-    h('p', { class: 'small muted' }, 'API keys and tokens, stored on the server only (never shown again). Bots reference them as ${NAME} in bot.json. Save an empty value to remove.'),
-    h('table', {}, h('tbody', {}, rows.map(setRow))),
-    h('label', {}, 'Add a secret'), h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); try { await api('PUT', '/api/secrets', { name: name.value.trim(), value: val.value }); toast('Saved'); renderSecrets(); } catch (x) { toast(x.message); } } }, name, val, h('button', { class: 'btn primary' }, 'Add'))));
+    h('p', { class: 'small muted' }, 'API keys and tokens, stored encrypted on the server and never shown again. Bots reference them as ${NAME}. Save an empty value to remove.'),
+    h('table', {}, h('tbody', {}, rows.map((n) => { const v = h('input', { type: 'password', placeholder: 'new value' });
+      return h('tr', {}, h('td', {}, h('code', {}, n.name), n.usedByBots ? h('div', { class: 'small muted' }, 'used by a bot') : null),
+        h('td', {}, h('span', { class: `pill ${n.set ? 'ok' : 'bad'}` }, n.set ? 'set' : 'missing')),
+        h('td', {}, h('form', { class: 'row mut', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name: n.name, value: v.value }), v.value ? 'Saved' : 'Removed')) renderSecrets(); } }, v, h('button', { class: 'btn' }, 'Save')))); }))),
+    h('div', { class: 'mut' }, h('label', {}, 'Add a secret'), h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name: name.value.trim(), value: val.value }), 'Saved')) renderSecrets(); } }, name, val, h('button', { class: 'btn primary' }, 'Add')))));
 }
 
 // ---------- settings ----------
 async function renderSettings() {
-  const st = S.status; const bots = await api('GET', '/api/bots');
+  const bots = await api('GET', '/api/bots');
   const cur = h('input', { type: 'password', placeholder: 'current', autocomplete: 'current-password' });
-  const next = h('input', { type: 'password', placeholder: 'new (12+ chars)', autocomplete: 'new-password' });
-  $('#main').replaceChildren(h('div', { class: 'grid' },
+  const next = h('input', { type: 'password', placeholder: 'new (12+ characters)', autocomplete: 'new-password' });
+  const cards = [
+    h('div', { class: 'card' }, h('h2', {}, 'Your password'), cur, h('div', { style: 'height:8px' }), next,
+      h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => tryApi(async () => { await api('POST', '/api/password', { current: cur.value, next: next.value }); cur.value = next.value = ''; }, 'Password changed') }, 'Change password')),
     h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default bot for DMs without a trigger'),
-      h('select', { onchange: async (e) => { await api('POST', '/api/settings', { defaultDmBot: e.target.value }); toast('Saved'); } },
-        h('option', { value: '' }, '— first bot that accepts the sender —'), bots.map((b) => h('option', { value: b.id, selected: st.settings.defaultDmBot === b.id }, b.name)))),
-    h('div', { class: 'card' }, h('h2', {}, 'Admin password'), cur, h('div', { style: 'height:8px' }), next,
-      h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: async () => { try { await api('POST', '/api/password', { current: cur.value, next: next.value }); toast('Changed — sign in again'); renderLogin(); } catch (e) { toast(e.message); } } }, 'Change password')),
-    h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'As an organizer of any bot you can send:'),
-      h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups')))));
+      h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmBot: e.target.value }), 'Saved') },
+        h('option', { value: '' }, '— first bot that accepts the sender —'), bots.map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmBot === b.id }, b.name)))),
+    h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any bot can send:'),
+      h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups'))),
+  ];
+  if (can('owner')) {
+    const users = await api('GET', '/api/users');
+    const un = h('input', { placeholder: 'username' }); const ue = h('input', { placeholder: 'email (optional)' });
+    const ur = h('select', {}, h('option', { value: 'admin' }, 'Admin'), h('option', { value: 'viewer' }, 'Viewer (read-only)'), h('option', { value: 'owner' }, 'Owner'));
+    const up = h('input', { type: 'password', placeholder: 'initial password (12+)' });
+    cards.unshift(h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Users'),
+      h('p', { class: 'small muted' }, 'Owners manage everything incl. users, backups and updates. Admins manage bots, chats, models and memory. Viewers can only look.'),
+      h('table', {}, h('tbody', {}, users.map((u) => h('tr', {}, h('td', {}, h('b', {}, u.username), h('div', { class: 'small muted' }, u.email || '')),
+        h('td', {}, h('select', { onchange: (e) => tryApi(() => api('PUT', `/api/users/${u.id}`, { role: e.target.value }), 'Role changed').then((r) => r || renderSettings()) },
+          ['owner', 'admin', 'viewer'].map((r) => h('option', { value: r, selected: u.role === r }, r)))),
+        h('td', {}, u.id === S.user.id ? h('span', { class: 'small muted' }, 'you') : h('button', { class: 'btn small danger', onclick: () => confirm(`Remove ${u.username}?`) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}`); renderSettings(); }, 'Removed') }, 'Remove')))))),
+      h('form', { class: 'row', style: 'margin-top:10px', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('POST', '/api/users', { username: un.value, email: ue.value, role: ur.value, password: up.value }), 'User added')) renderSettings(); } },
+        un, ue, ur, up, h('button', { class: 'btn primary' }, 'Add user'))));
+  }
+  $('#main').replaceChildren(h('div', { class: 'grid' }, cards));
 }
 
+window.addEventListener('hashchange', () => { if (S.user) show(location.hash.slice(1).split('/')[0] || 'overview'); });
 renderLogin();
 </script>
 </body>

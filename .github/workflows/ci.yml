@@ -19,5 +19,34 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - name: Shell scripts parse
-        run: for f in deploy/*.sh infra/terraform/bootstrap.sh; do bash -n "$f"; done
+
+  scripts-and-infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell scripts
+        run: |
+          for f in install.sh deploy/*.sh infra/oci/bootstrap.sh; do bash -n "$f"; done
+          shellcheck -S warning install.sh deploy/*.sh infra/oci/bootstrap.sh
+      - name: Installer dry run
+        run: bash install.sh --dry-run --yes --domain agents.example.com
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.17.2"
+      - name: Terraform (OCI stack)
+        working-directory: infra/oci
+        run: |
+          terraform fmt -check
+          terraform init -backend=false
+          terraform validate
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: whatsapp-agent-duniya:ci

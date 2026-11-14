@@ -1,13 +1,13 @@
 // Shared e2e harness: fake MCP server, scripted fake Claude API, fake WhatsApp channel, real core + panel.
 import http from 'node:http';
-import { mkdtempSync, mkdirSync, writeFileSync, cpSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
-export async function setup({ bindings = {}, env = {} } = {}) {
+export async function setup({ bindings = {}, env = {}, legacy = null, extend = null, beforeImport = null } = {}) {
   const t = {
     mcpCalls: [], claudeReqs: [], summaryReqs: [], script: [], sent: [],
     summaryText: 'Decisions: take the 9:10 train. Rao family arrives Saturday.', summaryFail: false,
@@ -36,6 +36,11 @@ export async function setup({ bindings = {}, env = {} } = {}) {
   }).listen(0);
 
   t.claudeHttp = http.createServer(async (req, res) => {
+    if (req.method === 'GET') { // models list
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ data: [{ id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5', type: 'model', created_at: '2026-01-01T00:00:00Z' }, { id: 'claude-haiku-5-5', display_name: 'Claude Haiku 5.5', type: 'model', created_at: '2026-01-01T00:00:00Z' }], has_more: false, first_id: 'a', last_id: 'b' }));
+      return;
+    }
     let d = ''; for await (const c of req) d += c;
     const body = JSON.parse(d);
     const isSummary = String(body.system || '').startsWith('You maintain the running memory');
@@ -67,22 +72,14 @@ export async function setup({ bindings = {}, env = {} } = {}) {
   });
 
   const tmp = mkdtempSync(join(tmpdir(), 'duniya-'));
-  const bots = join(tmp, 'bots');
-  cpSync(resolve(import.meta.dirname, '../bots/panduga'), join(bots, 'panduga'), { recursive: true });
-  mkdirSync(join(bots, 'helper'));
-  writeFileSync(join(bots, 'helper', 'bot.json'), JSON.stringify({ name: 'Helper', triggers: ['!help'], dm: 'organizers' }));
-  cpSync(resolve(import.meta.dirname, '../bots/_template/index.js'), join(bots, 'helper', 'index.js'));
-  mkdirSync(join(tmp, 'data', 'bots'), { recursive: true });
-  writeFileSync(join(tmp, 'data', 'bots', 'panduga.json'), JSON.stringify({ chats: ['g1@g.us'], organizers: ['+41 79 000 00 01'], ...(bindings.panduga || {}) }));
-  writeFileSync(join(tmp, 'data', 'bots', 'helper.json'), JSON.stringify({ chats: ['g2@g.us'], organizers: ['41790000001'], ...(bindings.helper || {}) }));
-  writeFileSync(join(tmp, 'data', 'secrets.json'), JSON.stringify({
-    ANTHROPIC_API_KEY: 'test', PANDUGA_MCP_URL: `http://127.0.0.1:${t.mcpHttp.address().port}/mcp`, PANDUGA_TOKEN_ORGANIZER: 'org',
-  }));
-
+  t.tmp = tmp;
+  if (legacy) legacy(tmp, t); // lets a test lay out pre-005 files before startup
   Object.assign(process.env, {
-    DATA_DIR: join(tmp, 'data'), BOTS_DIR: bots, ANTHROPIC_BASE_URL: `http://127.0.0.1:${t.claudeHttp.address().port}`,
+    DATA_DIR: join(tmp, 'data'), BOTS_DIR: join(tmp, 'legacy-bots'), ANTHROPIC_BASE_URL: `http://127.0.0.1:${t.claudeHttp.address().port}`,
     ADMIN_PASSWORD: 'correct horse battery', PANEL_PORT: '0', ...env,
   });
+  if (beforeImport) await beforeImport(t);
+  t.store = await import('../src/core/store.js');
   t.bots = await import('../src/core/bots.js');
   t.router = await import('../src/core/router.js');
   t.agent = await import('../src/core/agent.js');
@@ -90,16 +87,40 @@ export async function setup({ bindings = {}, env = {} } = {}) {
   t.memory = await import('../src/core/memory.js');
   t.db = await import('../src/core/db.js');
   await t.bots.loadBots();
+  if (!legacy) {
+    t.store.setSecret('ANTHROPIC_API_KEY', 'test');
+    t.store.setSecret('PANDUGA_MCP_URL', `http://127.0.0.1:${t.mcpHttp.address().port}/mcp`);
+    t.store.setSecret('PANDUGA_TOKEN_ORGANIZER', 'org');
+    await t.bots.createBot({ id: 'panduga', config: {
+      ...t.bots.templateConfig('event-assistant-panduga'), name: 'Panduga', model: 'claude-sonnet-5-5',
+      chats: ['g1@g.us'], organizers: ['+41 79 000 00 01'], ...(bindings.panduga || {}),
+    } });
+    await t.bots.createBot({ id: 'helper', config: {
+      name: 'Helper', prompt: 'You help.', model: 'claude-sonnet-5-5', triggers: ['!help'], dm: 'organizers',
+      chats: ['g2@g.us'], organizers: ['41790000001'], plugins: ['example-dice'], ...(bindings.helper || {}),
+    } });
+  }
   t.route = t.router.createRouter(t.channel);
   t.onHistory = t.router.createHistoryHandler();
-  t.panel = (await import('../src/panel/server.js')).startPanel({ channel: t.channel });
+  const { providerRoutes } = await import('../src/panel/routes/providers.js');
+  const { backupRoutes } = await import('../src/panel/routes/backups.js');
+  const { updateRoutes } = await import('../src/panel/routes/updates.js');
+  t.restarts = 0;
+  t.panel = (await import('../src/panel/server.js')).startPanel({ channel: t.channel, extend: [providerRoutes, (route) => backupRoutes(route, { restart: () => { t.restarts++; } }), (route) => updateRoutes(route, { restart: () => { t.restarts++; } }), ...(extend || [])] });
   await new Promise((r) => (t.panel.listening ? r() : t.panel.once('listening', r)));
   t.base = `http://127.0.0.1:${t.panel.address().port}`;
   t.toolNames = (i) => t.claudeReqs[i].tools.map((x) => x.name).sort();
   t.userTurn = (i) => t.claudeReqs[i].messages[0].content;
-  t.login = async () => {
-    const r = await fetch(`${t.base}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'correct horse battery' }) });
+  t.login = async (username = 'admin', password = 'correct horse battery') => {
+    const r = await fetch(`${t.base}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username, password }) });
+    if (r.status !== 200) throw new Error(`login ${username}: ${r.status}`);
     return r.headers.get('set-cookie').split(';')[0];
+  };
+  t.api = async (cookie, method, path, body) => {
+    const r = await fetch(t.base + path, { method, headers: { cookie, ...(method !== 'GET' ? { 'content-type': 'application/json' } : {}) }, body: method !== 'GET' ? JSON.stringify(body ?? {}) : undefined });
+    const text = await r.text();
+    let json; try { json = JSON.parse(text); } catch { json = text; }
+    return { status: r.status, body: json };
   };
   t.waitFor = async (fn, ms = 3000) => {
     const end = Date.now() + ms;
