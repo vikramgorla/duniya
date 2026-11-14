@@ -20,3 +20,8 @@ EOT
 output "instance_id" {
   value = oci_core_instance.app.id
 }
+
+output "manage_stack_url" {
+  description = "Open Resource Manager to update (Edit → new zip → Apply) or remove (Destroy, then Delete) this stack"
+  value       = "https://cloud.oracle.com/resourcemanager/stacks?region=${var.region}"
+}
