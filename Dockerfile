@@ -5,7 +5,8 @@ ENV NODE_ENV=production \
     PANEL_PORT=8080 \
     DUNIYA_INSTALL=docker
 # git: local tool services can be installed from GitHub (github:owner/repo#ref)
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+# ffmpeg + bzip2 (043): WhatsApp voice notes (Ogg/Opus) and the optional on-server speech models
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates ffmpeg bzip2 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
