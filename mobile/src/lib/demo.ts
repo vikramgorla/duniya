@@ -106,7 +106,17 @@ async function route(method: string, path: string, body: any): Promise<unknown> 
   throw new ApiError('Not available in the demo', 400);
 }
 
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const demoApi: ApiClient = {
   get: (p) => route('GET', p, null) as any, post: (p, b) => route('POST', p, b ?? {}) as any,
   put: (p, b) => route('PUT', p, b ?? {}) as any, del: (p) => route('DELETE', p, null) as any,
+  // #66: the Ask box streams steps in the demo too (no network)
+  stream: async (p, b, onEvent) => {
+    if (p !== '/api/owner/ask/stream') throw new ApiError('Not available in the demo', 400);
+    for (const e of [{ type: 'step', step: 'thinking' }, { type: 'text', text: 'Let me look at the chats that are on.', final: false },
+      { type: 'step', step: 'tool', tool: 'list_visible_chats', ok: true }, { type: 'step', step: 'thinking' }, { type: 'step', step: 'tool', tool: 'chat_recap', ok: true }, { type: 'step', step: 'thinking' }]) {
+      await pause(350); onEvent(e);
+    }
+    return { type: 'done', ...(route('POST', '/api/owner/ask', b) as object) } as any;
+  },
 };

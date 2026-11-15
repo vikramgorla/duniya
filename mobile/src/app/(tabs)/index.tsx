@@ -6,6 +6,7 @@ import { Alert, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Logo } from '@/components/Logo';
 import { Body, Button, Card, Divider, Field, H2, Label, Led, LedLabel, ListRow, Loading, Mono, Note, Pill, Row, Screen, Spread, Title, Toggle } from '@/components/ui';
+import { applyAskEvent, stepLabel, type AskProgress } from '@/lib/api-core';
 import { can, useAuth } from '@/lib/auth';
 import { ago, duration } from '@/lib/format';
 import { headline, numbersOf, numberState, numberTone } from '@/lib/status';
@@ -96,19 +97,22 @@ function Console({ st, canAdmin, onPause, onPending }: { st: Status; canAdmin: b
   );
 }
 
-/** Ask (044): the owner assistant, same API as the panel's Ask box. Changes need Confirm. */
+/** Ask (044, streaming #66): the owner assistant, same API as the panel's Ask box. Steps and partial text show as the
+ *  answer comes in; changes need Confirm. */
 type Held = { code: string; preview: string };
 function Ask() {
+  const t = useTheme();
   const { api } = useAuth();
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [reply, setReply] = useState('');
+  const [progress, setProgress] = useState<AskProgress>({ steps: [], text: '' });
   const [held, setHeld] = useState<Held[]>([]);
   const send = async () => {
     if (!q.trim() || busy) return;
-    setBusy(true); setReply(''); setHeld([]);
+    setBusy(true); setReply(''); setHeld([]); setProgress({ steps: [], text: '' });
     try {
-      const r = await api!.post<{ reply: string; confirms: Held[] }>('/api/owner/ask', { question: q });
+      const r = await api!.stream<{ reply: string; confirms: Held[] }>('/api/owner/ask/stream', { question: q }, (e) => setProgress((p) => applyAskEvent(p, e)));
       setReply(r.reply); setHeld(r.confirms || []); setQ('');
     } catch (e) { Alert.alert('No answer', (e as Error).message); }
     setBusy(false);
@@ -118,13 +122,21 @@ function Ask() {
     catch (e) { Alert.alert('Not changed', (e as Error).message); }
     setHeld((h) => h.filter((x) => x !== c));
   };
+  const tools = progress.steps.filter((s) => s.step !== 'thinking');
+  const rounds = progress.steps.length - tools.length;
+  const shown = busy ? progress.text : reply;
   return (
     <Card>
       <H2>Ask</H2>
-      <Body small muted>Looks across the chats that are on (not those private to members). Changes need your Confirm.</Body>
+      <Body small muted>Looks across the chats that are on (not those private to members). You see each step as it works; changes need your Confirm.</Body>
       <Field label="Your question" placeholder="What did the families decide this week?" value={q} onChangeText={setQ} multiline style={{ minHeight: 70 }} />
-      <Button kind="primary" title="Ask" busy={busy} disabled={!q.trim()} onPress={send} />
-      {reply ? <Note><Body selectable>{reply}</Body></Note> : null}
+      <Button kind="primary" title={busy ? (tools.length ? `Step ${rounds}…` : 'Looking through your chats…') : 'Ask'} busy={busy} disabled={!q.trim()} onPress={send} />
+      {tools.length ? (
+        <View accessibilityLiveRegion="polite" accessibilityLabel={`${tools.length} steps`} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {tools.slice(-8).map((s, i) => <Pill key={i} tone={s.step === 'held' ? 'warn' : s.ok ? 'plain' : 'bad'}>{stepLabel(s)}</Pill>)}
+        </View>
+      ) : null}
+      {shown ? <Note><Body selectable style={busy ? { color: t.muted } : undefined}>{shown}</Body></Note> : null}
       {held.map((c) => (
         <Note key={c.code} tone="warn">
           <Body>{c.preview}</Body>

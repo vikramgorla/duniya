@@ -5,7 +5,7 @@ icon is the store-safe Duniya logo (no third-party marks). Everything the app do
 the signed-in user's role, so new server features appear here only when a screen is added for them.
 
 Native iOS and Android app for owners and admins of a Duniya server: status console with the **Ask** box (the owner
-assistant: questions about your chats, changes with Confirm), agents (on/off, edit basics, "Change with AI"), chats
+assistant: questions about your chats, changes with Confirm; the answer streams in step by step through `expo/fetch`), agents (on/off, edit basics, "Change with AI"), chats
 (assign agent, model, stored messages), activity, usage, server health and updates, and changes waiting for
 confirmation. One codebase: React Native with [Expo](https://expo.dev) (SDK 58, TypeScript,
 expo-router). Spec: [`specs/027-mobile-app`](../specs/027-mobile-app/spec.md).

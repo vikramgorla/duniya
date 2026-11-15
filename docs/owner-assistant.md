@@ -33,9 +33,11 @@
 | | |
 |---|---|
 | **Tools** | the admin MCP tools with your panel role (viewers read-only, without message contents; tools that take keys or passwords stay in the panel), plus `list_visible_chats`, `search_messages`, `chat_recap` |
+| **Ask box** | the answer streams in: each step shows as it happens (✓ looked up, ⏸ change held, ✕ failed; tool names only) and the assistant's text appears after each step; changes still wait for **Confirm** (panel and mobile app) |
 | **Model** | the default model with fallback, or one chosen in the same card |
 | **Storage** | its conversation is stored separately, never in chat memory |
 | **Audit** | every question and action is in Activity (`owner.*`, always recorded) |
+| **API** | `POST /api/owner/ask` (whole answer) or `POST /api/owner/ask/stream` (newline-delimited JSON: `step`, `text`, `done`, `error`) |
 | **Admin MCP** | `get_owner_assistant`, `set_chat_private` |
 
 > [!NOTE]

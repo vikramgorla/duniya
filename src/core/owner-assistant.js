@@ -308,8 +308,11 @@ function systemPrompt(user, source) {
 /**
  * One question from a linked user (WhatsApp) or a panel user (Ask box). Returns { reply, confirms: [{ code, preview }] }.
  * source: 'whatsapp' | 'panel'; surface: where a confirmation must come from.
+ * onEvent (optional, #66 streaming Ask box): called with { type: 'step', step: 'thinking' | 'tool' | 'held', … } and
+ * { type: 'text', text } as the turn goes on. Steps carry tool names and counts only, never arguments or results.
  */
-export async function ask({ user, text, source, surface }) {
+export async function ask({ user, text, source, surface, onEvent = null }) {
+  const emit = (e) => { try { onEvent?.(e); } catch { /* a closed stream must not break the turn */ } };
   if (!wiring) throw bad('The owner assistant is not ready yet', 503);
   const question = String(text || '').trim().slice(0, 4000);
   if (!question) throw bad('Ask a question');
@@ -334,6 +337,7 @@ export async function ask({ user, text, source, surface }) {
   const fallback = fallbackSettings();
   for (let round = 0; round <= MAX_ROUNDS; round++) {
     let res;
+    emit({ type: 'step', step: 'thinking', round });
     try {
       res = await modelChat({ model: ownerSettings().model, purpose: 'agent', maxTokens: 1500, system: systemPrompt(user, source), tools: defs, messages, fallback, turn,
         usage: { agent: 'owner-assistant', chat: '', kind: 'owner' } });
@@ -345,6 +349,7 @@ export async function ask({ user, text, source, surface }) {
     }
     reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
     const calls = res.content.filter((b) => b.type === 'tool_use');
+    if (reply) emit({ type: 'text', text: reply, final: res.stop_reason !== 'tool_use' || !calls.length });
     if (res.stop_reason !== 'tool_use' || !calls.length) break;
     messages.push({ role: 'assistant', content: res.content });
     const results = [];
@@ -367,6 +372,7 @@ export async function ask({ user, text, source, surface }) {
         }
       } catch (e) { isError = true; content = e.message || String(e); }
       content = content.slice(0, 12000);
+      emit({ type: 'step', step: tool && !tool.readOnly && !isError ? 'held' : 'tool', tool: call.name, ok: !isError });
       activity('owner.tool', { summary: `Owner assistant (${user.username}): ${call.name}${isError ? ` failed — ${clip(content, 120)}` : tool && !tool.readOnly ? ' (held for confirmation)' : ''}`.slice(0, 480),
         detail: { tool: call.name, args, ok: !isError } });
       results.push({ type: 'tool_result', tool_use_id: call.id, is_error: isError, content });

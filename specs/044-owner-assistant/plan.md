@@ -28,6 +28,17 @@
 - Tests: `test/owner-assistant.test.js`; the harness switches the notice off for older tests (`{ privacyNotice: true }`
   turns it on), like `chatsOn`.
 
+### #66 (v2.11.0): streaming Ask box
+
+- `ask({ …, onEvent })` emits `step` / `text` events (one small, additive change; no provider change). The route
+  `POST /api/owner/ask/stream` writes them as NDJSON (chunked; `x-accel-buffering: no`; not compressed by the bundled
+  Caddy `encode`, which leaves `application/x-ndjson` alone) and ends with `done` or `error`.
+- Panel: `apiStream()` (fetch + `ReadableStream`, text fallback), `askSteps()` chips, soft Overview refresh skipped
+  while an answer streams; the newest Ask card draws (`S.ask.redraw`).
+- App: `ndjsonReader`, `readStream`, `applyAskEvent`, `stepLabel` in `mobile/src/lib/api-core.ts`;
+  `createClient({ streamFetchFn })` gets `expo/fetch` (readable body, part of Expo Go); the demo streams fake steps.
+- Small servers: no buffering of the answer, one interval timer per open request, nothing new kept in memory.
+
 ## Constitution Check
 
 - II generic core: no agent-specific names; the assistant is platform functionality, its tools are the admin tools.
