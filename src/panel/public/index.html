@@ -1784,7 +1784,7 @@ async function renderAgentEditor(id) {
         h('fieldset', {}, h('legend', {}, 'Monthly spending cap'), await capEditor('agent', id, models)),
         h('fieldset', {}, h('legend', {}, 'Scheduled posts'), schedBox, h('button', { class: 'btn small mut', onclick: () => { scheds.push({ id: `s${scheds.length + 1}`, at: '08:00', days: 'daily', prompt: '', chats: 'all', enabled: true }); drawScheds(); } }, '+ Add schedule')),
         h('fieldset', {}, h('legend', {}, 'Advanced'),
-          plugins.length ? field('Plugins', h('div', {}, F.plugins)) : null,
+          plugins.length ? field('Plugins', h('div', {}, F.plugins), 'Optional code add-ons installed on this server (in the plugins/ folder) for things settings can\'t do: extra tools, quick commands or custom role rules. “example-dice” is a sample for developers (a dice-rolling tool and a !ping → pong reply); leave it off. For ready-made tools, add a tool service (MCP) instead.') : null,
           field('Timezone', F.timezone), h('div', { class: 'row' }, field('Recent messages in context', F.historySize), field('Max reply tokens', F.maxTokens))),
         h('div', { class: 'row mut' }, h('button', { class: 'btn primary', onclick: save }, 'Save'))),
       h('div', { class: 'card', id: 'test-console', style: 'position:sticky;top:110px;scroll-margin-top:110px' }, h('h2', {}, 'Test console'),

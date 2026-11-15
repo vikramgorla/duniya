@@ -131,6 +131,11 @@
       "breaking": false,
       "title": "Triggers work anywhere in a message",
       "summary": "\"can mochi help?\" now wakes the agent whose trigger is mochi; only whole words count. A trigger at the start is still removed from what the agent reads."
+    },
+    "2.13.1": {
+      "breaking": false,
+      "title": "Plugin help text",
+      "summary": "The agent editor explains what plugins are and that example-dice is a developer sample; docs point to MCP tool services for ready-made tools."
     }
   }
 }

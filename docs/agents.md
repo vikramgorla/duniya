@@ -70,7 +70,11 @@ Local services from npm or GitHub are owner-only (scrubbed environment, install 
 - Admin MCP: `list_global_tool_services`, `add_global_tool_service`, `remove_global_tool_service`.
 
 > [!TIP]
-> **Plugins** (`plugins/<name>/index.js`) add local tools or commands for advanced cases; see `plugins/example-dice`.
+> **Plugins** (`plugins/<name>/index.js`) are Duniya-specific code add-ons for advanced cases (local tools, quick
+> commands, custom role rules); `example-dice` is a developer sample (a dice tool and `!ping` → `pong`), so leave it off.
+> Plugins are not a cross-app standard and there is no plugin marketplace. The standard way to give agents ready-made
+> tools is **MCP**: add a tool service (Agents → Tool services, or Settings → Tool services for all agents) from the
+> thousands of servers listed in the official MCP Registry (registry.modelcontextprotocol.io).
 
 ## WhatsApp actions
 
