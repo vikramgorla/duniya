@@ -172,6 +172,20 @@
   .cue-select { display: inline-block; border: 1px solid var(--line-2); border-radius: 8px; padding: 2px 8px; background: var(--card); }
   .pasteform { margin-top: 4px; } .pasteform .row > input { min-width: 0; }
   .testout:empty { display: none; } .testout .note { margin-top: 10px; }
+  /* first-run checklist (#36), quiet reasons (#34), test console tools (#37) */
+  .checklist { margin-bottom: 16px; }
+  .checklist-steps { list-style: none; margin: 12px 0 0; padding: 0; }
+  .checklist-steps li { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px dashed var(--line); flex-wrap: wrap; }
+  .checklist-steps li:last-child { border-bottom: 0; }
+  .checklist-steps .ck { flex: none; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font: 600 13px var(--mono); background: var(--bg-2); color: var(--muted); }
+  .checklist-steps li.done .ck { background: var(--ok-soft); color: var(--ok); }
+  .checklist-steps li.next .ck { background: var(--signal); color: var(--signal-ink); }
+  .checklist-steps .ck-body { flex: 1 1 200px; min-width: 0; }
+  .checklist-steps li.done b { color: var(--muted); font-weight: 500; }
+  .quiet { margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toolset { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; }
+  .toolset li { padding: 3px 0; overflow-wrap: anywhere; } .toolset code { font-size: 12px; }
+  @media (max-width: 640px) { .toolset code { font-size: 13px; } }
   .card details { margin-top: 4px; } .card summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 6px 0; }
   .start h2 { margin-top: 4px; }
   .choices { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-top: 12px; }
@@ -675,6 +689,7 @@ async function renderOverview(soft) {
   const sig = JSON.stringify({ ...rest, channel: { ...rest.channel, since: undefined } });
   if (soft && sig === overviewSig && $('#ov-uptime')) {
     $('#ov-uptime').textContent = ago(Date.now() - uptimeSec * 1000); $('#ov-memory').textContent = `${memoryMb} MB`;
+    if (Date.now() - (S.checklistAt || 0) > 15000) { refreshChecklist(); refreshSilences(); }
     return;
   }
   if (soft && (overviewBusy || $('#main')?.contains(document.activeElement))) return;
@@ -702,7 +717,7 @@ async function renderOverview(soft) {
         n.id !== 'main' && can('owner') ? h('button', { class: 'btn small danger', onclick: () => confirm(`Remove the number “${n.label}”? Its chats keep their memory; agents bound to them stop answering there.`) && tryApi(async () => { await api('DELETE', `/api/whatsapp/numbers/${n.id}`); refreshStatus(); }, 'Removed') }, 'Remove') : null));
   };
   const newLabel = h('input', { placeholder: 'Name, e.g. Shop', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
-  const wa = h('div', { class: 'card' },
+  const wa = h('div', { class: 'card', id: 'ov-whatsapp' },
     h('div', { class: 'row spread' }, h('h2', {}, 'WhatsApp numbers'), h('span', { class: 'pill' }, `${numbers.filter((n) => n.status === 'open').length}/${numbers.length} connected`)),
     numbers.map(numberBlock),
     can('owner') ? h('details', { class: 'mut' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, '+ Add another number'),
@@ -736,10 +751,91 @@ async function renderOverview(soft) {
       led('Chats on', st.enabledChats ? true : null, String(st.enabledChats ?? 0)),
       led('Waiting', st.pending ? null : true, String(st.pending || 0))),
     st.enabledChats === 0 ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
-  $('#main').replaceChildren(hero, h('div', { class: 'grid' }, wa, control, server, recent));
+  const silencesSlot = h('div', { id: 'ov-silences-slot', style: `grid-column:1/-1${S.silences?.length ? '' : ';display:none'}` }, S.silences?.length ? silencesCard(S.silences, refreshSilences) : null);
+  $('#main').replaceChildren(hero, checklistBox(), h('div', { class: 'grid' }, wa, control, server, silencesSlot, recent));
+  refreshSilences();
   if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
 }
+// ---------- first-run checklist (#36) ----------
+const CHECK_ACTION = { provider: 'Connect a provider', whatsapp: 'Link WhatsApp', agent: 'Create an agent', chat: 'Open Chats', reply: 'Open test console' };
+function goTo(href) {
+  return (e) => { // links inside Overview scroll instead of reloading the page
+    if (!href.startsWith('#overview/')) return;
+    e.preventDefault(); document.getElementById(`ov-${href.split('/')[1]}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+}
+function drawChecklist(box, c) {
+  if (!c || c.complete || c.dismissed) return box.replaceChildren();
+  const next = c.steps.find((s) => !s.done);
+  box.replaceChildren(h('div', { class: 'card checklist' },
+    h('div', { class: 'row spread' }, h('div', {}, h('div', { class: 'eyebrow' }, 'Get started'), h('h2', { style: 'margin:2px 0 0' }, `${c.done} of ${c.total} steps done`)),
+      can('admin') ? h('button', { class: 'btn small', title: 'Hide this checklist', onclick: () => tryApi(async () => { S.checklist = await api('PUT', '/api/checklist', { dismissed: true }); drawChecklist(box, S.checklist); }, 'Checklist hidden') }, 'Hide') : null),
+    h('ol', { class: 'checklist-steps' }, c.steps.map((s, i) => h('li', { class: s.done ? 'done' : s === next ? 'next' : '' },
+      h('span', { class: 'ck', 'aria-label': s.done ? 'done' : `step ${i + 1}` }, s.done ? '✓' : String(i + 1)),
+      h('div', { class: 'ck-body' }, h('b', {}, s.title), s.done ? null : h('div', { class: 'small muted' }, s.hint)),
+      s.done ? h('span', { class: 'pill ok' }, 'done') : h('a', { class: `btn small${s === next ? ' primary' : ''}`, href: s.href, onclick: goTo(s.href) }, CHECK_ACTION[s.id] || 'Open'))))));
+}
+function checklistBox() {
+  const box = h('div', { id: 'ov-checklist' });
+  drawChecklist(box, S.checklist);
+  refreshChecklist(box);
+  return box;
+}
+async function refreshChecklist(box = $('#ov-checklist')) {
+  S.checklistAt = Date.now();
+  const c = await api('GET', '/api/checklist').catch(() => null);
+  if (!c || !box) return;
+  if (JSON.stringify(c) === JSON.stringify(S.checklist) && box.childElementCount === (c.complete || c.dismissed ? 0 : 1)) return; // nothing changed: no redraw
+  S.checklist = c; drawChecklist(box, c);
+}
+
+// ---------- why agents stayed silent (#34) ----------
+/** One-click fix for a silence, or null. `after` runs once fixed (the record is cleared). */
+function silenceFix(s, after, { onChats = false } = {}) {
+  if (!can('admin')) return null;
+  const agentHref = (sub = '') => `#agents/${encodeURIComponent(s.agent)}${sub}`;
+  const act = (label, fn, ok) => h('button', { class: 'btn small', onclick: () => tryApi(async () => {
+    await fn(); await api('DELETE', `/api/silences?chat=${encodeURIComponent(s.chat)}&reason=${s.reason}`); refreshStatus(); after?.();
+  }, ok) }, label);
+  const link = (label, href) => h('a', { class: 'btn small', href }, label);
+  switch (s.fix) {
+    case 'chat_on': return act('Switch chat on', () => api('PUT', `/api/chats/${encodeURIComponent(s.chat)}/prefs`, { enabled: true }), 'On — agents may answer here');
+    case 'agent_on': return s.agent ? act(`Switch ${s.agentName || 'agent'} on`, () => api('PUT', `/api/agents/${encodeURIComponent(s.agent)}`, { enabled: true }), 'Agent on') : null;
+    case 'resume': return act('Resume agents', () => api('POST', '/api/settings', { paused: false }), 'Resumed');
+    case 'triggers': return s.agent ? link('Open triggers', agentHref('/triggers')) : null;
+    case 'agent': return s.agent ? link('Who may message it', agentHref('/dm')) : null;
+    case 'assign': return onChats ? null : link('Choose an agent', '#chats');
+    case 'models': return link('Open Models', '#models');
+    case 'usage': return link('Open Usage', '#usage');
+    default: return null;
+  }
+}
+const quietLine = (s) => `Quiet: ${s.label} ×${s.count}`;
+function silencesCard(rows, after) {
+  const top = rows.slice(0, 6);
+  if (!top.length) return null;
+  return h('div', { class: 'card', id: 'ov-silences' },
+    h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Why agents stayed quiet'), h('span', { class: 'pill' }, 'last 7 days')),
+    h('p', { class: 'small muted' }, 'Messages an agent did not answer, and why. Only counts are kept — never the messages.'),
+    h('table', { class: 'stack flat' }, h('tbody', {}, top.map((s) => h('tr', {},
+      h('td', { 'data-label': '' }, h('b', {}, s.chatName || 'Unnamed chat'), s.agentName ? h('span', { class: 'small muted' }, ` · ${s.agentName}`) : null,
+        h('div', { class: `small${s.reason === 'not_addressed' ? ' muted' : ''}`, style: s.reason === 'not_addressed' ? '' : 'color:var(--warn)', title: s.explain }, quietLine(s)),
+        h('div', { class: 'small muted' }, `${s.explain} Last ${ago(s.lastTs)} ago${s.sampleSender ? ` · e.g. ${s.sampleSender}` : ''}`)),
+      h('td', { 'data-label': '', style: 'text-align:right;white-space:nowrap' }, silenceFix(s, after),
+        can('admin') ? h('button', { class: 'btn small mut', title: 'Forget this record', onclick: () => tryApi(async () => { await api('DELETE', `/api/silences?chat=${encodeURIComponent(s.chat)}&reason=${s.reason}${s.agent ? `&agent=${encodeURIComponent(s.agent)}` : ''}`); after?.(); }, 'Cleared') }, 'Clear') : null))))));
+}
+async function refreshSilences() {
+  const slot = $('#ov-silences-slot'); if (!slot) return;
+  const r = await api('GET', '/api/silences?days=7&limit=6').catch(() => null);
+  if (!r) return;
+  const sig = JSON.stringify(r.silences.map((s) => [s.chat, s.agent, s.reason, s.count, s.chatName]));
+  if (sig === S.silencesSig && (slot.childElementCount > 0) === (r.silences.length > 0)) return;
+  S.silences = r.silences; S.silencesSig = sig;
+  slot.replaceChildren(...[silencesCard(r.silences, refreshSilences)].filter(Boolean));
+  slot.style.display = r.silences.length ? '' : 'none';
+}
+
 /**
  * Follow an update to the end, whatever happens to this page: checks every 3 s; notices when the service goes away
  * (restart) and when it answers again, then reloads the page on the new version. Never stops on a failed request;
@@ -1341,18 +1437,51 @@ async function renderAgentEditor(id) {
     } catch (e) { toast(e.field ? `${e.field}: ${e.message.replace(/^[^:]+: /, '')}` : e.message); return false; }
   }
 
-  // Test console
+  // Test console — "Test as…" (#37): a role and a chat; shows the tools that role gets. Never sends to WhatsApp.
   const log = h('div', { class: 'chatlog' });
-  const role = h('select', { style: 'max-width:150px' }, h('option', { value: 'participant' }, 'as participant'), h('option', { value: 'organizer' }, 'as organizer'));
+  const role = h('select', { 'aria-label': 'Test as role', onchange: () => { loadTools(); } }, h('option', { value: 'participant' }, 'a participant'), h('option', { value: 'organizer' }, 'an organizer'));
+  const testChat = h('select', { 'aria-label': 'Test in chat', onchange: () => chatHint() }, h('option', { value: 'new' }, 'a new direct chat'));
+  const chatInfo = new Map();
+  const hintBox = h('div', {});
+  const chatHint = () => {
+    const ci = chatInfo.get(testChat.value);
+    hintBox.replaceChildren(ci && !ci.enabled ? h('div', { class: 'note warn' }, `“${ci.name}” is Off in Chats, so in WhatsApp the agent stays silent there. The test still answers, using that chat’s memory.`) : null);
+  };
+  api('GET', '/api/chats').then((all) => {
+    for (const ch of all.filter((x) => (b.config.chats || []).includes(x.id))) {
+      chatInfo.set(ch.id, ch);
+      testChat.append(h('option', { value: ch.id }, `${ch.isGroup ? 'group' : 'chat'}: ${ch.name || ch.id}`));
+    }
+  }).catch(() => {});
+  const toolsBox = h('details', { class: 'small' }, h('summary', { style: 'cursor:pointer' }, 'Tools for this role…'));
+  async function loadTools() {
+    const r0 = role.value;
+    toolsBox.replaceChildren(h('summary', { style: 'cursor:pointer' }, h('span', { class: 'spinner' }), ' Loading tools…'));
+    const r = await api('GET', `/api/agents/${encodeURIComponent(id)}/test-tools?role=${r0}`).catch((x) => ({ error: x.message }));
+    if (role.value !== r0) return; // changed meanwhile
+    const who = r0 === 'organizer' ? 'organizers' : 'participants';
+    toolsBox.replaceChildren(h('summary', { style: 'cursor:pointer' }, r.error ? `Tools for ${who}: could not load` : `Tools ${who} get (${r.count})`),
+      r.error ? h('div', { class: 'note bad' }, r.error) : null,
+      (r.errors || []).map((x) => h('div', { class: 'note warn' }, `A tool service did not answer: ${x}`)),
+      r.services?.length ? r.services.map((sv) => h('div', { style: 'margin-top:8px' }, h('b', {}, sv.name), sv.global ? h('span', { class: 'pill', style: 'margin-left:6px' }, 'global') : null,
+        h('ul', { class: 'toolset' }, sv.tools.map((t) => h('li', {}, h('code', {}, t.name), t.description && t.description !== t.name ? h('span', { class: 'muted' }, ` — ${t.description}`) : null)))))
+        : r.error ? null : h('p', { class: 'muted' }, `No tools: ${who} only get answers from the instructions and memory.`),
+      h('p', { class: 'muted', style: 'margin-bottom:0' }, 'WhatsApp actions are not carried out here: the test shows what the agent would do.'));
+  }
+  loadTools();
   const input = h('input', { placeholder: 'Ask the agent something…' });
   const testForm = h('form', { class: 'row mut', onsubmit: async (e) => {
     e.preventDefault(); const text = input.value.trim(); if (!text) return;
-    log.append(h('div', { class: 'bubble me' }, text)); input.value = '';
+    const as = role.value === 'organizer' ? 'organizer' : 'participant'; const where = testChat.value;
+    log.append(h('div', { class: 'bubble me', title: `as ${as}` }, text)); input.value = '';
     const wait = h('div', { class: 'bubble agent muted' }, '…'); log.append(wait); log.scrollTop = 1e9;
-    try { const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/test`, { text, role: role.value }); wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); if (r.model) wait.title = r.model; }
-    catch (x) { wait.textContent = `Error: ${x.message}`; }
+    try {
+      const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/test`, { text, role: as, chat: where });
+      wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); if (r.model) wait.title = `${r.model} · as ${as}`;
+    } catch (x) { wait.textContent = `Error: ${x.message}`; }
     log.scrollTop = 1e9;
-  } }, role, input, h('button', { class: 'btn' }, 'Send'));
+  } }, input, h('button', { class: 'btn' }, 'Send'));
+  const testAs = h('div', { class: 'row mut' }, h('label', { class: 'small', style: 'flex:0 0 auto;margin:0' }, 'Test as'), role, h('label', { class: 'small', style: 'flex:0 0 auto;margin:0' }, 'in'), testChat);
 
   // Shared memory (#8): notes the agent keeps across all its chats; organizers save them from WhatsApp.
   const sharedMemBox = h('fieldset', {}, h('legend', {}, 'Shared memory'));
@@ -1411,7 +1540,12 @@ async function renderAgentEditor(id) {
           field('Timezone', F.timezone), h('div', { class: 'row' }, field('Recent messages in context', F.historySize), field('Max reply tokens', F.maxTokens))),
         h('div', { class: 'row mut' }, h('button', { class: 'btn primary', onclick: save }, 'Save'))),
       h('div', { class: 'card', id: 'test-console', style: 'position:sticky;top:110px;scroll-margin-top:110px' }, h('h2', {}, 'Test console'),
-        h('p', { class: 'small muted' }, 'Uses real tools and the saved settings; nothing is posted to WhatsApp.'), log, testForm)));
+        h('p', { class: 'small muted' }, 'Uses real tools and the saved settings; nothing is posted to WhatsApp. Pick a role and a chat to see what each person would get.'),
+        testAs, hintBox, toolsBox, log, testForm)));
+  // Deep links: #agents/<id>/test, /triggers, /dm (first-run checklist, quiet reasons)
+  const sub = location.hash.split('/')[2];
+  const target = { test: $('#test-console'), triggers: F.triggers, dm: F.dm }[sub];
+  if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (sub !== 'test') target.focus({ preventScroll: true }); else input.focus({ preventScroll: true }); }
 }
 
 // ---------- chats + memory ----------
@@ -1599,7 +1733,9 @@ async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply 
 let chatsFilter = 'all';
 async function renderChats() {
   $('#main').replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading chats…')));
-  const [chats, agents, models, us] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/agents'), loadModels().catch(() => ({ models: [] })), usageSummary()]);
+  const [chats, agents, models, us, quiet] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/agents'), loadModels().catch(() => ({ models: [] })), usageSummary(), api('GET', '/api/silences?days=7').catch(() => ({ silences: [] }))]);
+  const quietBy = new Map(); // #34: why agents stayed quiet, per chat (most frequent first)
+  for (const q of quiet.silences) { if (!quietBy.has(q.chat)) quietBy.set(q.chat, []); quietBy.get(q.chat).push(q); }
   const memBox = h('div', {});
   const multi = new Set(chats.map((c) => c.number)).size > 1;
   const savePrefs = (c, patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, patch)); }, 'Saved');
@@ -1613,6 +1749,8 @@ async function renderChats() {
           h('div', { class: 'small muted' }, c.isGroup ? `${c.size || 0} members` : c.phone ? `+${c.phone}` : '', c.lastAt ? ` · last message ${ago(c.lastAt)} ago` : ''),
           us?.chat?.[c.id] ? h('div', { class: 'small muted num' }, `30 days: ${usageLine(us.chat[c.id])}`) : null,
           !c.enabled ? h('div', { class: 'small', style: 'color:var(--warn)' }, `Off — ignored${c.ignored ? ` (${c.ignored} message${c.ignored > 1 ? 's' : ''} since restart)` : ''}`) : null,
+          (quietBy.get(c.id) || []).slice(0, 2).map((q) => h('div', { class: 'quiet' }, h('span', { class: `small${q.reason === 'not_addressed' ? ' muted' : ''}`, style: q.reason === 'not_addressed' ? '' : 'color:var(--warn)', title: `${q.explain} Last ${ago(q.lastTs)} ago.` }, quietLine(q)),
+            silenceFix(q, () => renderChats(), { onChats: true }))),
           h('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory')),
         h('td', { style: 'min-width:170px', 'data-label': 'Agent' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, agent: e.target.value || null }); c.agent = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
           h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),

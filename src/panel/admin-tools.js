@@ -98,10 +98,25 @@ export const TOOLS = [
     run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/schedules/${enc(a.schedule_id)}/run`) },
   { name: 'test_agent', calls: [['POST', '/api/agents/x/test']],
     description: 'Send a test message to an agent, like the panel\'s test console, and get its reply. Nothing is posted to WhatsApp. "as" picks the sender\'s role (organizer or participant).',
-    input: { agent_id: str('Agent id'), text: str('Message text'), as: { type: 'string', enum: ['organizer', 'participant'], description: 'Sender role (default participant)' } }, required: ['agent_id', 'text'],
-    run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/test`, { text: a.text, role: ROLE_TEXT[a.as] || 'participant' }) },
+    input: { agent_id: str('Agent id'), text: str('Message text'), as: { type: 'string', enum: ['organizer', 'participant'], description: 'Sender role (default participant)' },
+      chat: str('Test as if in this chat of the agent (its memory, group or direct, model); omit for a new direct chat') }, required: ['agent_id', 'text'],
+    run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/test`, { text: a.text, role: ROLE_TEXT[a.as] || 'participant', chat: a.chat || 'new' }) },
+  { name: 'list_agent_tools', readOnly: true, calls: [['GET', '/api/agents/x/test-tools']],
+    description: 'The tools an agent can use for a role (organizer or participant), grouped by tool service — what the test console shows under "Test as…".',
+    input: { agent_id: str('Agent id'), as: { type: 'string', enum: ['organizer', 'participant'], description: 'Role (default participant)' } }, required: ['agent_id'],
+    run: (a, x) => x.call('GET', `/api/agents/${enc(a.agent_id)}/test-tools?role=${ROLE_TEXT[a.as] || 'participant'}`) },
 
   // ---------- chats & memory ----------
+  { name: 'list_silences', readOnly: true, calls: [['GET', '/api/silences']],
+    description: 'Why agents stayed silent, per chat, agent and reason (chat off, not mentioned, no agent, agent off, paused, direct messages off, sender not allowed, rate limit, model error, empty answer, budget cap), with a count, last time and a sample sender. Never message text. Most frequent first.',
+    input: { chat: str('Only this chat id (optional)'), agent_id: str('Only this agent (optional)'), reason: str('Only this reason key (optional)'), days: int('Look back this many days (default 7)', { minimum: 1, maximum: 400 }) },
+    run: async (a, x) => {
+      const q = new URLSearchParams({ days: String(a.days || 7) });
+      if (a.chat) q.set('chat', a.chat);
+      if (a.agent_id) q.set('agent', a.agent_id);
+      if (a.reason) q.set('reason', a.reason);
+      return (await x.call('GET', `/api/silences?${q}`)).silences.map((r) => ({ chat: r.chat, agent: r.agent || undefined, reason: r.reason, label: r.label, explain: r.explain, count: r.count, last: iso(r.lastTs), sampleSender: r.sampleSender || undefined }));
+    } },
   { name: 'list_chats', readOnly: true, calls: [['GET', '/api/chats']], description: 'WhatsApp groups and 1:1 chats the numbers know, with their agent, model and logging settings.', input: {},
     run: (a, x) => x.call('GET', '/api/chats') },
   { name: 'assign_chat', calls: [['POST', '/api/chats/bind']], description: 'Choose which agent answers in a chat. Empty agent_id removes the agent from the chat.',
