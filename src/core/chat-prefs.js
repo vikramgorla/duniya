@@ -17,25 +17,34 @@ db.exec(`
 export const LOGGING_LEVELS = ['inherit', 'off', 'minimal', 'normal', 'verbose'];
 const MODEL_RE = /^(inherit|auto|[a-z][a-z0-9-]{1,30}:[A-Za-z0-9._:/@+-]{1,120})$/;
 
+// 032 (issue #10): chats are OFF until an admin switches them on. Messages from chats that are off are never stored
+// or sent to a model.
+for (const [col, type] of [['enabled', 'INTEGER NOT NULL DEFAULT 0']]) {
+  try { db.exec(`ALTER TABLE chat_prefs ADD COLUMN ${col} ${type}`); } catch { /* exists */ }
+}
 const cache = new Map();
 export function getChatPrefs(chat) {
-  if (!chat) return { model: 'inherit', logging: 'inherit' };
+  if (!chat) return { model: 'inherit', logging: 'inherit', enabled: false };
   if (cache.has(chat)) return cache.get(chat);
-  const r = db.prepare('SELECT model, logging FROM chat_prefs WHERE tenant_id = ? AND chat = ?').get(TENANT, chat);
-  const v = { model: r?.model || 'inherit', logging: r?.logging || 'inherit' };
+  const r = db.prepare('SELECT model, logging, enabled FROM chat_prefs WHERE tenant_id = ? AND chat = ?').get(TENANT, chat);
+  const v = { model: r?.model || 'inherit', logging: r?.logging || 'inherit', enabled: !!r?.enabled };
   cache.set(chat, v);
   return v;
 }
-export function setChatPrefs(chat, { model, logging }) {
+export function setChatPrefs(chat, { model, logging, enabled }) {
   const cur = getChatPrefs(chat);
-  const next = { model: model ?? cur.model, logging: logging ?? cur.logging };
+  const next = { model: model ?? cur.model, logging: logging ?? cur.logging, enabled: enabled === undefined ? cur.enabled : !!enabled };
   if (!MODEL_RE.test(next.model)) throw Object.assign(new Error('model must be inherit, auto, provider:auto or provider:model'), { status: 400, field: 'model' });
   if (!LOGGING_LEVELS.includes(next.logging)) throw Object.assign(new Error(`logging must be one of ${LOGGING_LEVELS.join(', ')}`), { status: 400, field: 'logging' });
-  db.prepare('INSERT OR REPLACE INTO chat_prefs (tenant_id, chat, model, logging, updated_at) VALUES (?, ?, ?, ?, ?)').run(TENANT, chat, next.model, next.logging, Date.now());
+  db.prepare('INSERT OR REPLACE INTO chat_prefs (tenant_id, chat, model, logging, enabled, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run(TENANT, chat, next.model, next.logging, next.enabled ? 1 : 0, Date.now());
   cache.set(chat, next);
   return next;
 }
-export const allChatPrefs = () => Object.fromEntries(db.prepare('SELECT chat, model, logging FROM chat_prefs WHERE tenant_id = ?').all(TENANT).map((r) => [r.chat, { model: r.model, logging: r.logging }]));
+export const allChatPrefs = () => Object.fromEntries(db.prepare('SELECT chat, model, logging, enabled FROM chat_prefs WHERE tenant_id = ?').all(TENANT).map((r) => [r.chat, { model: r.model, logging: r.logging, enabled: !!r.enabled }]));
+export const isChatEnabled = (chat) => getChatPrefs(chat).enabled;
+export const enabledChats = () => db.prepare('SELECT chat FROM chat_prefs WHERE tenant_id = ? AND enabled = 1').all(TENANT).map((r) => r.chat);
+/** Count of messages ignored because the chat is off (shown on the Chats page; in memory only). */
+export const ignoredCounts = new Map();
 
 /** Remember chats the numbers have seen (name/number only, never message text), so 1:1 chats can be managed. */
 const seenAt = new Map();

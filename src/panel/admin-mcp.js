@@ -12,6 +12,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { ROOT } from '../core/config.js';
 import { authenticate, createSession, sessionUser } from '../core/store.js';
+import { passwordLoginAllowed } from '../core/google-signin.js';
 import { activity } from '../core/events.js';
 import { sha256 } from '../core/crypto.js';
 import {
@@ -183,7 +184,9 @@ ${user.role === 'viewer' ? '' : '<div class=note>Risky actions (deleting a bot, 
 <h1>Sign in to connect ${esc(chk.client.name)}</h1>
 <p class="muted small">Use your Duniya panel account. Next you will see what ${esc(chk.client.name)} will be allowed to do.</p>
 ${error ? `<div class="note bad">${esc(error)}</div>` : ''}
-<form method=post action="/oauth/authorize">${hidden(p)}
+${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched off on this panel. Sign in with Google in a new tab, then come back and press Continue.</div>
+<div class=row><a class="btn primary" href="/auth/google/start" target=_blank rel=noopener>Sign in with Google</a><a class=btn href="" onclick="location.reload();return false">Continue</a></div>`}
+<form method=post action="/oauth/authorize"${passwordLoginAllowed() ? '' : ' hidden'}>${hidden(p)}
 <label for=u>Username</label><input type=text id=u name=username autocomplete=username autocapitalize=none required value="admin">
 <label for=pw>Password</label><input type=password id=pw name=password autocomplete=current-password required autofocus>
 <div class=row><button class="btn primary" name=action value=login>Sign in</button><button class="btn" name=action value=deny formnovalidate>Cancel</button></div></form>`,
@@ -206,6 +209,7 @@ ${error ? `<div class="note bad">${esc(error)}</div>` : ''}
     if (p.action === 'login') {
       const ip = clientIp(req);
       if (limitLogin(`login:${ip}`)) return loginPage(res, p, chk, { error: 'Too many attempts, wait a minute.' });
+      if (!passwordLoginAllowed()) return loginPage(res, p, chk, { error: 'Password sign-in is switched off. Use Sign in with Google.' });
       user = authenticate(p.username || 'admin', String(p.password || ''));
       if (!user) { activity('system', { summary: `Panel login failed for "${p.username || 'admin'}" from ${ip} (${chk.client.mobile ? 'mobile app' : 'AI assistant'} sign-in)` }); return loginPage(res, p, chk, { error: 'Wrong username or password.' }); }
       const s = createSession(user.id, ip);

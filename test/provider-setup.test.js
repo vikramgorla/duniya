@@ -106,7 +106,7 @@ test('OpenRouter preset: one tap, key kept secret, free-only filter, auto picks 
   assert.ok(orr.auths.includes('Bearer sk-or-v1-abc'));
   assert.ok(!JSON.stringify((await t.api(owner, 'GET', '/api/secrets')).body).includes('sk-or-v1-abc'), 'key never returned');
 
-  let models = (await t.api(owner, 'GET', '/api/models?refresh=1')).body.models.filter((m) => m.provider === 'openrouter');
+  const models = (await t.api(owner, 'GET', '/api/models?refresh=1')).body.models.filter((m) => m.provider === 'openrouter');
   assert.deepEqual(models.map((m) => m.ref).sort(), ['openrouter:google/gemma-4-27b-it:free', 'openrouter:meta-llama/llama-4-maverick:free']);
 
   // switch off → all models; on again (without re-entering the key)

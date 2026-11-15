@@ -5,23 +5,25 @@ import { execFile } from 'node:child_process';
 import { env, ROOT, DATA_DIR } from '../core/config.js';
 import {
   listSecrets, setSecret, getSettings, updateSettings, interpolate, countUsers, createUser, listUsers, updateUser,
-  deleteUser, authenticate, createSession, sessionUser, deleteSession, getUser,
+  deleteUser, authenticate, sessionUser, deleteSession, getUser,
 } from '../core/store.js';
 import {
   listBots, getBot, botView, createBot, updateBot, deleteBot, bindChat, loadBots, botForChat,
   listTemplates, templateConfig, exportBot, importBot, listPlugins,
 } from '../core/bots.js';
 import { referencedSecrets } from '../core/schema.js';
-import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages } from '../core/db.js';
+import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages, listNotes } from '../core/db.js';
 import { bus, activity, loggingSettings, resetLoggingCache, LOG_CATEGORIES } from '../core/events.js';
-import { allChatPrefs, setChatPrefs, seenChats } from '../core/chat-prefs.js';
+import { allChatPrefs, setChatPrefs, seenChats, ignoredCounts, enabledChats } from '../core/chat-prefs.js';
 import { runAgent, handleConfirmCommand, applyPending } from '../core/agent.js';
 import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool, mcpConnection } from '../core/mcp.js';
+import { listContacts, saveContact, removeContact, getContact } from '../core/contacts.js';
 import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
 import { humanCode } from '../core/crypto.js';
 import { organizerConnection, oauthClientOf } from '../core/tools.js';
 import { draftBot } from '../core/ai-builder.js';
+import { setWhatsAppChannel, whatsappToolCatalog, isGroupChat } from '../core/whatsapp-tools.js';
 import { usageReport, listPrices, setPrice, PLAN_PROVIDERS } from '../core/usage.js';
 import { installPackage, installedInfo } from '../core/mcp-local.js';
 import { snapshot as sysSnapshot, metricsHistory, osUpdates, logs as sysLogs, opsStatus, requestOp } from '../core/system.js';
@@ -35,9 +37,11 @@ function guardLocal(user, before, after) {
   }
 }
 import {
-  CSP, clientIp, isHttps, cookie, send, setSessionCookie, limiter, resultPage, uploadAllowed, setSetupCode, checkSetupCode,
+  CSP, clientIp, isHttps, cookie, send, setSessionCookie, limiter, uploadAllowed, setSetupCode, checkSetupCode,
 } from './http.js';
 import { googleRoutes, googleReady } from './routes/google.js';
+import { webRoutes } from './routes/web.js';
+import { passwordLoginAllowed } from '../core/google-signin.js';
 import { createAdminMcp } from './admin-mcp.js';
 import { validateAccess } from '../core/admin-oauth.js';
 import { baseUrl, minuteLimiter } from './http-util.js';
@@ -97,6 +101,7 @@ export function requestUser(req) {
 
 export function startPanel({ channel, extend = [] }) {
   bootstrapAuth();
+  setWhatsAppChannel(channel);
   const routes = [];
   /** opts.role: minimum role (default: viewer for GET, admin otherwise). opts.public: no auth. */
   /** opts.raw: the handler reads the (binary) request body itself; see uploadAllowed() for the CSRF guard. */
@@ -110,7 +115,7 @@ export function startPanel({ channel, extend = [] }) {
   // ---------- session / setup ----------
   route('GET', '/api/session', async (req) => {
     const { user = null } = requestUser(req);
-    return { authed: !!user, user, needsSetup: countUsers() === 0, google: googleReady() };
+    return { authed: !!user, user, needsSetup: countUsers() === 0, google: googleReady(), passwordLogin: passwordLoginAllowed() };
   }, { public: true });
   route('POST', '/api/setup', async (req, res, body) => {
     if (countUsers() > 0) return [409, { error: 'Already set up' }];
@@ -125,6 +130,7 @@ export function startPanel({ channel, extend = [] }) {
   route('POST', '/api/login', async (req, res, body) => {
     const ip = clientIp(req);
     if (rateLimitLogin(ip)) return [429, { error: 'Too many attempts, wait a minute' }];
+    if (!passwordLoginAllowed()) { activity('system', { summary: `Password sign-in refused for "${body.username || 'admin'}" from ${ip} (only Google allowed)` }); return [403, { error: 'Password sign-in is switched off. Use Sign in with Google.' }]; }
     const user = authenticate(body.username || 'admin', String(body.password || ''));
     if (!user) { activity('system', { summary: `Panel login failed for "${body.username || 'admin'}" from ${ip}` }); return [401, { error: 'Wrong username or password' }]; }
     setSessionCookie(req, res, user.id);
@@ -146,10 +152,12 @@ export function startPanel({ channel, extend = [] }) {
 
   // ---------- Sign in with Google, invites (019) ----------
   googleRoutes(route);
+  webRoutes(route); // web address & access (031)
 
   // ---------- users (owner) ----------
   route('GET', '/api/users', async () => listUsers(), { role: 'owner' });
   route('POST', '/api/users', async (req, res, body, q, p, user) => {
+    if (!passwordLoginAllowed()) return [400, { error: 'Password sign-in is switched off: invite this person with Google instead (Users → Invite).' }];
     const u = createUser(body); activity('system', { summary: `User ${u.username} (${u.role}) added by ${user.username}` }); return u;
   }, { role: 'owner' });
   route('PUT', '/api/users/:id', async (req, res, body, q, p, user) => {
@@ -161,7 +169,7 @@ export function startPanel({ channel, extend = [] }) {
 
   // ---------- overview ----------
   route('GET', '/api/status', async (req, res, body, q, p, user) => ({
-    user,
+    user, enabledChats: enabledChats().length,
     channel: await channel.status(),
     settings: getSettings(),
     version: await gitVersion(),
@@ -379,13 +387,15 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: '(not a member / offline)', size: 0, isGroup: !/@(s\.whatsapp\.net|lid)$/.test(id) }));
     return [...groups, ...people, ...missing].map((c) => {
       const number = c.number || (c.id.includes('#') ? c.id.split('#')[0] : 'main');
-      return { ...c, number, numberLabel: numbers.get(number) || number, bot: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit' };
+      return { ...c, number, numberLabel: numbers.get(number) || number, bot: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit',
+        enabled: !!prefs[c.id]?.enabled, ignored: ignoredCounts.get(c.id) || 0 };
     });
   });
   route('PUT', '/api/chats/:chat/prefs', async (req, res, body, q, p, user) => {
     const chat = decodeURIComponent(p.chat);
-    const out = setChatPrefs(chat, { model: body.model, logging: body.logging });
-    activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging} (${user.username})` });
+    const out = setChatPrefs(chat, { model: body.model, logging: body.logging, enabled: body.enabled });
+    if (body.enabled !== undefined) { ignoredCounts.delete(chat); activity('config', { chat, summary: `Chat switched ${out.enabled ? 'ON — agents may answer here' : 'OFF — agents ignore it'} (${user.username})` }); }
+    else activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging} (${user.username})` });
     return out;
   });
   // ---------- activity logging settings (011) ----------
@@ -411,6 +421,53 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     if (!q.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${q.get('q') ? ` (search “${String(q.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;
   }, { role: 'admin' });
+  // ---------- WhatsApp group tools for admins (026): same channel functions as the bots' whatsapp tools ----------
+  route('GET', '/api/whatsapp/tools', async () => whatsappToolCatalog());
+  const ADMIN_RANK = { superadmin: 2, admin: 1 };
+  const waGroup = (p) => {
+    const chat = decodeURIComponent(p.chat);
+    if (!isGroupChat(chat)) throw Object.assign(new Error('This is not a WhatsApp group'), { status: 400 });
+    if (typeof channel.groupInfo !== 'function') throw Object.assign(new Error('WhatsApp actions are not available'), { status: 501 });
+    return chat;
+  };
+  const waLog = (chat, user, summary, detail) => activity('whatsapp.action', { bot: botForChat(chat)?.id || '', chat, summary: `${summary} (panel, ${user.username})`, detail: { ...detail, by: user.username, source: 'panel' } });
+  route('GET', '/api/chats/:chat/whatsapp', async (req, res, body, q, p) => {
+    const chat = waGroup(p);
+    const g = await channel.groupInfo(chat);
+    const names = namesInChat(chat);
+    return { ...g, participants: g.participants.map((m) => ({ ...m, name: names[m.phone] || '' }))
+      .sort((a, b) => ((ADMIN_RANK[b.admin] || 0) - (ADMIN_RANK[a.admin] || 0)) || (a.name || a.phone || '~').localeCompare(b.name || b.phone || '~')) };
+  }, { role: 'admin' });
+  route('GET', '/api/chats/:chat/whatsapp/invite', async (req, res, body, q, p, user) => {
+    const chat = waGroup(p);
+    const r = await channel.groupInviteLink(chat);
+    waLog(chat, user, 'Invite link viewed', { tool: 'group_invite_link' });
+    return r;
+  }, { role: 'admin' });
+  route('POST', '/api/chats/:chat/whatsapp/invite/revoke', async (req, res, body, q, p, user) => {
+    const chat = waGroup(p);
+    const r = await channel.groupRevokeInvite(chat);
+    waLog(chat, user, 'Invite link reset', { tool: 'revoke_invite_link' });
+    return r;
+  });
+  route('PUT', '/api/chats/:chat/whatsapp', async (req, res, body, q, p, user) => {
+    const chat = waGroup(p);
+    const done = [];
+    if (typeof body.subject === 'string') {
+      if (!body.subject.trim()) return [400, { error: 'The group name cannot be empty', field: 'subject' }];
+      await channel.groupSubject(chat, body.subject.trim()); done.push(`name “${body.subject.trim().slice(0, 60)}”`);
+    }
+    if (typeof body.description === 'string') { await channel.groupDescription(chat, body.description); done.push('description'); }
+    const settings = Object.fromEntries(['announcement', 'locked', 'joinApproval'].filter((k) => typeof body[k] === 'boolean').map((k) => [k, body[k]]));
+    if (Object.keys(settings).length) {
+      await channel.groupSettings(chat, settings);
+      const label = { announcement: 'only admins send', locked: 'only admins edit info', joinApproval: 'approve new members' };
+      done.push(...Object.entries(settings).map(([k, v]) => `${label[k]} ${v ? 'on' : 'off'}`));
+    }
+    if (!done.length) return [400, { error: 'Nothing to change' }];
+    waLog(chat, user, `Group updated: ${done.join(', ')}`, { tool: 'update_group', input: body });
+    return { ok: true, changed: done };
+  });
   route('GET', '/api/chats/:chat/memory', async (req, res, body, q, p) => memoryView(decodeURIComponent(p.chat)));
   route('POST', '/api/chats/:chat/memory/summarize', async (req, res, body, q, p) => {
     const chat = decodeURIComponent(p.chat);
@@ -418,6 +475,20 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     return { summary: summary ?? memoryView(chat).summary };
   });
   route('DELETE', '/api/chats/:chat/memory', async (req, res, body, q, p, user) => { eraseChatMemory(decodeURIComponent(p.chat), user.username); return { ok: true }; });
+  // ---------- contacts (#11) ----------
+  route('GET', '/api/contacts', async (req, res, body, q) => listContacts({ q: q.get('q') || '', sharedOnly: q.get('shared') === '1' }));
+  route('PUT', '/api/contacts/:phone', async (req, res, body, q, p, user) => saveContact({ ...body, phone: decodeURIComponent(p.phone) }, user.username));
+  route('DELETE', '/api/contacts/:phone', async (req, res, body, q, p, user) => {
+    if (!getContact(decodeURIComponent(p.phone))) return [404, { error: 'Not found' }];
+    removeContact(decodeURIComponent(p.phone), user.username);
+    return { ok: true };
+  });
+
+  // Shared agent memory (#8): notes an agent keeps across all its chats.
+  route('GET', '/api/bots/:id/memory', async (req, res, body, q, p) => {
+    if (!getBot(p.id)) return [404, { error: 'Not found' }];
+    return { notes: listNotes(`agent:${p.id}`).map((n) => ({ id: n.id, text: n.text, author: n.author, role: n.role, ts: n.ts })) };
+  });
   route('DELETE', '/api/notes/:id', async (req, res, body, q, p, user) => {
     const note = getNote(p.id);
     if (!note) return [404, { error: 'Not found' }];
@@ -576,7 +647,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
       if (Array.isArray(out) && typeof out[0] === 'number' && out.length === 2) return send(res, out[0], out[1]);
       return send(res, 200, out ?? { ok: true });
     } catch (e) {
-      if (!res.headersSent) send(res, e.status || 400, { error: e.message, field: e.field });
+      if (!res.headersSent) send(res, e.status || 400, { error: e.message, field: e.field, needsConfirm: e.needsConfirm, warnings: e.warnings, check: e.check });
     }
   });
   server.listen(env.panelPort, env.panelHost, () => {
