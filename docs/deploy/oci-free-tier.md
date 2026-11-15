@@ -57,6 +57,8 @@ Console labels checked November 2026; some pages show **tabs**, others a **Resou
      open ports) or `local`.
    - **Owner password** (required, 10+ characters): you sign in as `admin` with it.
    - **Shape**: keep `VM.Standard.E2.1.Micro` unless you have A1 capacity.
+   - **SSH public key** (optional): add one **now** if you may ever want a shell on the server; Oracle can't add it
+     later ([SSH access](#ssh-access)).
 4. **Next** → tick **Run apply** → **Create**. The job page opens.
 5. When the job shows **Succeeded**, **reload the page** → **Application information** → **Watch the install**. It
    opens your panel when ready.
@@ -117,6 +119,23 @@ Console labels checked November 2026; some pages show **tabs**, others a **Resou
 The installer opens 80/443 in OCI's iptables for direct HTTPS. Manage it like any server:
 [Install → Managing your server](../install.md#managing-your-server).
 
+### SSH access
+
+You don't need SSH for everyday use: updates, OS updates, restarts and logs are in the panel, and since 2.17 the
+maintenance helper updates itself. A shell is still handy for `sudo duniya doctor` or `reset-password`.
+
+> [!IMPORTANT]
+> Oracle only takes the SSH key **when the VM is created**: you can't add one to a running instance later. Changing
+> the key in the stack would replace the VM: if a Plan says *must be replaced*, stop (see
+> [Update the stack](#update-the-stack-infrastructure)). No key at install means no shell, short of a
+> [recreate](#recreate-from-scratch) with a backup.
+
+1. No key yet? Open **Cloud Shell** (the `>_` icon top right in the Oracle console) and run
+   `ssh-keygen -t ed25519 -f ~/.ssh/duniya -N ""`, then `cat ~/.ssh/duniya.pub` and copy the line.
+2. Paste it into **SSH public key** in the stack form (or **Add SSH keys → Paste public keys** in Option B).
+3. To connect, also set **Allow SSH from** to your IP (`203.0.113.4/32`), then `ssh -i ~/.ssh/duniya ubuntu@<public-ip>`.
+   Leave it empty to keep port 22 closed until you need it (edit the stack later: that part can change).
+
 ## Update the app
 
 Nothing to do in Oracle: the app updates itself and **keeps everything**.
@@ -127,7 +146,8 @@ Nothing to do in Oracle: the app updates itself and **keeps everything**.
 4. Optional: **Update settings** → *Install automatically* at a time of day.
 
 Or `sudo duniya update` over SSH. OS: **Server → OS updates & maintenance → Install OS updates** → **Restart
-server** if asked.
+server** if asked. The maintenance helper updates itself after an app update; a server whose helper predates 2.17 and
+has no SSH key needs a [recreate](#recreate-from-scratch) once ([why](../upgrading.md#the-maintenance-helper)).
 
 ## Update the stack (infrastructure)
 

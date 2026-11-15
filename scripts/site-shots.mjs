@@ -75,6 +75,7 @@ const CARDS = [
   ['card-privacy', 'settings', '', 'box:Privacy notice', 900],
   ['card-web-access', 'settings', '', 'box:Web address & access', 900],
   ['card-small-server', 'server', '', 'box:This server', 1100],
+  ['card-small-mode', 'settings', '', '#small-mode', 900],
   ['card-assistants', 'settings', '', 'box:Connected AI assistants', 900],
   ['card-logging', 'settings', '', 'box:Activity log', 600],
   ['card-mcp', 'agents/carpool', 'T.openAll(T.box("Tool services"));', 'box:Tool services', 600],

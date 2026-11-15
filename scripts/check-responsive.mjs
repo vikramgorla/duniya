@@ -81,16 +81,28 @@ const STATES = [
   { name: 'server', hash: 'server', wait: 2000, js: 'T.openAll();' },
   // #96: OS updates grouped (will install / rolling out gradually / held back), the restart banner and last-run summary
   { name: 'server-os-updates', hash: 'server', wait: 2000, js: "T.openAll(); document.getElementById('restart-needed')?.scrollIntoView(); await T.wait(300);" },
-  // #96: an older root helper (in-panel app update cannot replace it): no gradual button, a note to run sudo duniya update
+  // #96, 056: a root helper too old to update itself: no gradual button, a note to run sudo duniya update once or reinstall
   { name: 'server-old-helper', hash: 'server', wait: 2000, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u) === '/api/system/ops' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json();
-        return new Response(JSON.stringify({ ...j, helperVersion: 1, helperCurrent: false, result: null, reboot: { required: false, packages: [] } })); }
+        return new Response(JSON.stringify({ ...j, helperVersion: 1, helperCurrent: false, helperOutdated: true, helperSelfUpdate: false, result: null, reboot: { required: false, packages: [] } })); }
       if (String(u) === '/api/system') { const j = await r.clone().json(); return new Response(JSON.stringify({ ...j, rebootRequired: false, reboot: { required: false, packages: [] } })); }
-      return r; };`, js: 'T.openAll();' },
+      return r; };`, js: "T.openAll(); document.getElementById('helper-update')?.scrollIntoView(); await T.wait(300);" },
+  // 056: a helper that can update itself but is older than this release's: the Update maintenance helper button
+  { name: 'server-helper-update', hash: 'server', wait: 2000, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
+      if (String(u) === '/api/system/ops' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json();
+        return new Response(JSON.stringify({ ...j, helperVersion: 3, helperBundled: 4, helperCurrent: true, helperOutdated: true, helperSelfUpdate: true, result: null, reboot: { required: false, packages: [] } })); }
+      if (String(u) === '/api/system') { const j = await r.clone().json(); return new Response(JSON.stringify({ ...j, rebootRequired: false, reboot: { required: false, packages: [] } })); }
+      return r; };`, js: "T.openAll(); document.getElementById('helper-update')?.scrollIntoView(); await T.wait(300);" },
   { name: 'backups', hash: 'backups', js: 'T.openAll();' },
   { name: 'pending', hash: 'pending' },
   { name: 'secrets', hash: 'secrets' },
   { name: 'settings', hash: 'settings', wait: 2000, js: 'T.openAll();' },
+  // 055: Settings → Server, Small server mode (one switch for heavier features on a small server)
+  { name: 'settings-small-mode', hash: 'settings', wait: 2000, js: "document.getElementById('small-mode')?.scrollIntoView(); await T.wait(300);" },
+  // 055: Small server mode off on a small server: a saved local tool service is shown as not started, with why
+  { name: 'agent-local-blocked', hash: 'agents/carpool', wait: 2000, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
+      if (String(u) === '/api/status') { const j = await r.clone().json(); return new Response(JSON.stringify({ ...j, server: { ...j.server, size: 'small', smallMode: false } })); }
+      return r; };`, js: "T.openAll(); document.getElementById('local-blocked')?.scrollIntoView(); await T.wait(300);" },
   // #77: a new domain was added while Google sign-in is on (callout with the values for Google Cloud)
   { name: 'settings-web-google', hash: 'settings', wait: 2500, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u) === '/api/web' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); const old = j.current?.host || 'agents.example.org';

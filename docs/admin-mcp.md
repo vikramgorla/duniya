@@ -60,7 +60,7 @@ rotation). Spec: [`specs/017-admin-mcp/`](../specs/017-admin-mcp/spec.md).
 | People & memory | contacts, memory, WhatsApp groups, WhatsApp numbers, users |
 | Models | models, accounts, fallback, photos & voice |
 | Tools | global tool services, browse and add from the MCP Registry (`search_mcp_registry`, `add_tool_service_from_registry`), secrets, confirmations, logging |
-| Server | updates (incl. breaking releases: `apply_update` with `breaking: true`, `snooze_update_decision`), metrics (with hosting), OS updates (`list_os_updates`: will install / rolling out gradually / held back; `run_maintenance` `os-update` or `os-update-all` to include gradual updates; restart-needed status), restart, backups |
+| Server | updates (incl. breaking releases: `apply_update` with `breaking: true`, `snooze_update_decision`), metrics (with hosting), OS updates (`list_os_updates`: will install / rolling out gradually / held back; `run_maintenance` `os-update` or `os-update-all` to include gradual updates; restart-needed status), the root maintenance helper (`get_maintenance_status` → `helperOutdated`, `helperSelfUpdate`; `run_maintenance` `update-helper`), Small server mode (`set_small_server_mode`, confirm required), restart, backups |
 
 The list is in `src/panel/admin-tools.js`; a feature that adds panel functionality adds its tool there
 ([AGENTS.md](../AGENTS.md)). The [owner assistant](owner-assistant.md) uses the same tools from WhatsApp.

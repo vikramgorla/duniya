@@ -107,8 +107,9 @@ Or skip the URL hunting: **Browse tool services** (below).
 | Not supported here | PyPI, Docker (OCI), NuGet and MCPB packages and SSE-only hosts: this app runs only streamable-HTTP hosts and npm packages over stdio |
 
 > [!WARNING]
-> **Local packages run code on this server.** Only the owner can add them, and they are refused on small servers
-> (1 GB / 1 CPU): choose a hosted one there. A trust hint says who published an entry, not that the code is safe.
+> **Local packages run code on this server.** Only the owner can add them, and on small servers (1 GB / 1 CPU) they
+> are refused, here and everywhere else, unless [Small server mode](small-servers.md#small-server-mode) is on:
+> choose a hosted one there. A trust hint says who published an entry, not that the code is safe.
 
 > [!NOTE]
 > **Settings → Tool services → MCP Registry** (owner): switch browsing off, or point it at a private registry with the
@@ -116,7 +117,9 @@ Or skip the URL hunting: **Browse tool services** (below).
 > minutes. Admin MCP and the owner assistant: `search_mcp_registry`, `add_tool_service_from_registry` (confirm
 > required; keys are set with `set_secret` or in the panel, never passed to the tool).
 
-Local services from npm or GitHub are owner-only (scrubbed environment, install scripts off unless allowed).
+Local services from npm or GitHub are owner-only (scrubbed environment, install scripts off unless allowed). On a
+small server they are refused and saved ones are not started, unless
+[Small server mode](small-servers.md#small-server-mode) is on.
 
 **Global tool services** (035): define once under **Settings → Tool services** for every agent.
 
