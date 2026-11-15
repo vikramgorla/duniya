@@ -628,8 +628,8 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
         return send(res, 200, readFileSync(resolve(PUBLIC, 'index.html')), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
       }
       if (url.pathname === '/healthz') return send(res, 200, 'ok');
-      if (req.method === 'GET' && url.pathname === '/qr.js') {
-        return send(res, 200, readFileSync(resolve(PUBLIC, 'qr.js')), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=3600' });
+      if (req.method === 'GET' && (url.pathname === '/qr.js' || url.pathname === '/diff.js')) {
+        return send(res, 200, readFileSync(resolve(PUBLIC, url.pathname.slice(1))), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=3600' });
       }
       if (await adminMcp.handle(req, res, url)) return;
       const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));

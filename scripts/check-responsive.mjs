@@ -34,6 +34,9 @@ const STATES = [
   { name: 'activity', hash: 'activity', js: "document.querySelector('#feed li')?.click();" },
   { name: 'agents', hash: 'agents' },
   { name: 'agents-ai-draft', hash: 'agents', js: "const ta = document.querySelector('#main textarea'); ta.value = 'A helper for our running club'; await T.click('Draft', 'button', 2500);" },
+  { name: 'agent-editor-ai-diff', hash: 'agents/carpool', wait: 2500, js: "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies, make Lea an organizer, weather before rides'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); document.querySelector('.dskip')?.click();" },
+  { name: 'agent-editor-ai-side', hash: 'agents/carpool', wait: 2500, js: "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); await T.click('Side by side', 'button', 300);" },
+  { name: 'agent-editor-ai-whole', hash: 'agents/carpool', wait: 2500, js: "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); await T.click('Whole new text', 'button', 300);" },
   { name: 'agent-editor', hash: 'agents/carpool', wait: 2500, js: 'T.openAll();' },
   { name: 'agent-editor-tools', hash: 'agents/carpool', wait: 2500, js: "await T.click('Choose tools for this agent', 'button', 1500); T.openAll();" },
   { name: 'agent-editor-test', hash: 'agents/school', wait: 2500, js: "const i = document.querySelector('input[placeholder^=\"Ask the\"]'); i.value = 'When are the museum trip forms due?'; await T.click('Send', 'button', 1800);" },
@@ -55,6 +58,7 @@ const STATES = [
 ];
 const PRELUDE = `const T = {
   wait: (ms) => new Promise((r) => setTimeout(r, ms)),
+  async until(sel, ms = 15000) { for (let t = 0; t < ms && !document.querySelector(sel); t += 100) await T.wait(100); },
   openAll: () => document.querySelectorAll('details').forEach((d) => { d.open = true; }),
   async click(text, sel = 'button,a,summary', ms = 900) {
     const el = [...document.querySelectorAll(sel)].find((e) => e.textContent.trim().includes(text) && e.offsetParent);

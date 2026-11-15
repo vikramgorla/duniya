@@ -12,6 +12,22 @@ import { pathToFileURL } from 'node:url';
 const ROOT = resolve(import.meta.dirname, '..');
 export const DEMO_PASSWORD = 'demo-password-123';
 
+/** What the fake AI helper proposes when asked to change the car-pooling agent (shows the review's diff, #32). */
+const EDIT_PROPOSAL = {
+  summary: 'Replies get shorter and warmer, Lea becomes an organizer, people can ask for the weather before a ride, and the morning post moves to 06:30 with a new Sunday-evening preview.',
+  changes: {
+    prompt: 'You coordinate car pooling for this WhatsApp group (school runs, office commute, trips).\n\n- When someone offers a ride, save it as a note: driver, date, departure time and place, destination, free seats.\n- When someone needs a ride, save it as a note and match it with an offer; tell both people clearly.\n- Answer questions like "who drives tomorrow?" or "any seat to Geneva on Friday?" from the notes and recent messages.\n- When a ride is full, cancelled or done, update or remove the note (organizers can remove notes).\n- If rain or snow is forecast for a ride, mention it and suggest leaving 10 minutes earlier.\n- Be precise with times and places; always repeat the date as weekday + date to avoid mix-ups.\n- Keep replies very short and warm, in the language of the question. One emoji at most.',
+    triggers: ['!ride', '!lift'],
+    model: 'anthropic:claude-sonnet-5-5',
+    organizers: ['+41790000002', '+41790000003'],
+    tools: { participant: ['transport:*', 'calendar:events_list', 'weather:forecast'], organizer: ['calendar:*'], deny: [] },
+    schedules: [
+      { id: 'todays-rides', at: '06:30', days: 'mon,tue,wed,thu,fri', enabled: true, prompt: "Post today's rides from the notes: for each ride, driver, departure time and place, destination and who is riding. Mention seats still free. If no rides are planned today, post nothing." },
+      { id: 'week-ahead', at: '19:00', days: 'sun', enabled: true, prompt: 'Post the rides planned for the coming week and ask who still needs a seat.' },
+    ],
+  },
+};
+
 /** Local stand-in for the Anthropic, ChatGPT and OpenRouter APIs. */
 async function fakeModels() {
   const server = http.createServer(async (req, res) => {
@@ -31,8 +47,9 @@ async function fakeModels() {
     if (u.startsWith('/anthropic/v1/messages')) {
       const body = JSON.parse(d || '{}');
       const draft = (body.tools || []).some((t) => t.name === 'propose_agent');
+      const edit = draft && JSON.stringify(body.messages || []).includes('\\"mode\\": \\"edit\\"');
       await new Promise((r) => setTimeout(r, draft ? 900 : 500));
-      const content = draft ? [{ type: 'tool_use', id: 'tu1', name: 'propose_agent', input: {
+      const content = edit ? [{ type: 'tool_use', id: 'tu1', name: 'propose_agent', input: EDIT_PROPOSAL }] : draft ? [{ type: 'tool_use', id: 'tu1', name: 'propose_agent', input: {
         summary: 'A friendly helper for your running club: it keeps the weekly run schedule, answers “where do we meet?” and posts a reminder every Saturday evening.',
         changes: {
           name: 'Running club', description: 'Weekly runs, meeting points and pace groups for the club.',
