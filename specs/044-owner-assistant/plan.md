@@ -9,7 +9,7 @@
   `confirmLink`, `unlink`, `userForPhone`); data scope (`visibleChats` = on and not private, `hideChats` drops list
   entries about private chats from any tool output); core tools `list_visible_chats` (viewer), `search_messages` and
   `chat_recap` (admin); `ask()` — tool loop like the runner (8 rounds, fallback per call), every non-read-only tool
-  held with a 4-character code in memory (`resolveConfirm`); `chunkText()`; `handleOwnerMessage(msg, channel)` for
+  held with a 4-character code in SQLite (`ttl_state`, encrypted, 10 min; #64) (`resolveConfirm`); `chunkText()`; `handleOwnerMessage(msg, channel)` for
   the router.
 - Admin tools run in-process through the panel's `invoke()` and `routeRole()` (exactly the admin MCP's gates). The
   panel registers them with `setOwnerToolRunner()` so core does not import panel code.
@@ -47,7 +47,7 @@
 - IV human confirmation: every change held; codes single-use, 10 minutes, bound to user and surface; no confirm tool
   for the model.
 - V observable: `owner.*` audit entries always recorded; link changes, privacy-notice posts and opt-outs recorded.
-- VI: no new dependencies; two small tables, two columns; in-memory confirm codes.
+- VI: no new dependencies; two small tables, two columns; confirm codes in `ttl_state` (#64) so a restart keeps them.
 - VIII: plain-language cards; one state per link; responsive check passes at 375 / 1440 in light and dark.
 - Security: untrusted text stays data (prompt says so; panel renders text only); secrets never pass through WhatsApp;
   link codes stored hashed, brute-force limited.

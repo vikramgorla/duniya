@@ -20,3 +20,5 @@
 - [X] T012 Admin MCP `set_chat_settings`: partial fallback change keeps the other half (reads `GET /api/chats`)
 - [X] T013 Tests `test/chat-fallback-editor.test.js`; responsive state `chats-fallback`
 - [X] T014 Docs `docs/models.md`, `docs/admin-mcp.md`; screenshots `chats-*`, `card-fallback` retaken; version 2.11.0
+- [X] T011 (#64) Breaker states stored in `ttl_state` with expiry (pause end + 24 h; reconnect 30 days or until reset);
+  `loadStored()`; `test/restart-state.test.js` restarts in a new process

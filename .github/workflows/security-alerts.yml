@@ -1,0 +1,56 @@
+name: Security alerts mirror
+
+# Mirrors the open code-scanning alerts into one GitHub issue ("Security alerts (automatic)"), so people and agents
+# that can read issues but not the Security tab (e.g. coding agents whose GitHub access excludes security events)
+# can see and fix them. Runs after CodeQL on main, daily, and on demand.
+on:
+  workflow_run:
+    workflows: [CodeQL]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: read
+  issues: write
+
+concurrency:
+  group: security-alerts-mirror
+  cancel-in-progress: true
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update the alerts issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const title = 'Security alerts (automatic)';
+            const alerts = await github.paginate(github.rest.codeScanning.listAlertsForRepo, { owner, repo, state: 'open', ref: 'refs/heads/main', per_page: 100 });
+            const rows = alerts.map((a) => {
+              const loc = a.most_recent_instance?.location || {};
+              const sev = a.rule?.security_severity_level || a.rule?.severity || '';
+              const msg = (a.most_recent_instance?.message?.text || '').replace(/\s+/g, ' ').slice(0, 200);
+              return `| [#${a.number}](${a.html_url}) | ${sev} | \`${a.rule?.id || ''}\` | \`${loc.path || ''}:${loc.start_line || ''}\` | ${msg.replace(/\|/g, '\\|')} |`;
+            });
+            const body = [
+              'Open **code-scanning alerts on `main`**, updated automatically after every CodeQL run and daily.',
+              'Fix them in a normal PR (see AGENTS.md); this issue closes itself when none are left.',
+              '',
+              alerts.length ? '| Alert | Severity | Rule | Where | Message |\n|---|---|---|---|---|\n' + rows.join('\n') : '_No open alerts._',
+              '',
+              `<sub>Updated ${new Date().toISOString()}</sub>`,
+            ].join('\n');
+            const existing = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'all', labels: 'area: security', per_page: 100 }))
+              .find((i) => i.title === title && !i.pull_request);
+            if (!existing) {
+              if (!alerts.length) return;
+              await github.rest.issues.create({ owner, repo, title, body, labels: ['type: security', 'area: security', 'priority: high', 'status: triage'] });
+              return;
+            }
+            await github.rest.issues.update({ owner, repo, issue_number: existing.number, body, state: alerts.length ? 'open' : 'closed' });

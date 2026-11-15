@@ -62,7 +62,7 @@ p{color:#6d6a73}a{color:#0b7a75;font-weight:600}
 @media (prefers-color-scheme:dark){body{background:#11131c;color:#ece9e2}.c{background:#1a1d2a;border-color:#2a2e3e}p{color:#9a98a3}a{color:#3cc4b7}}</style>
 <body><div class=c><div style="font-size:40px">${ok ? '✅' : '⚠️'}</div><h2 style="margin:8px 0">${esc(title)}</h2>
 <p>${esc(message)}</p><p><a href="${esc(back)}">${esc(backLabel)}</a></p></div>
-${ok && autoMs != null ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})},${Number(autoMs)})</script>` : ''}`;
+${ok && autoMs != null ? `<meta http-equiv=refresh content="${Math.max(0, Math.round(Number(autoMs) / 1000))};url=${esc(back)}">` : ''}`;
   send(res, status || (ok ? 200 : 400), html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': csp, 'x-frame-options': 'DENY' });
   return null;
 }

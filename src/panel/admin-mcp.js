@@ -20,6 +20,14 @@ import {
   saveGrant, listGrants, revokeGrant, createConfirm, takeConfirm, redirectAllowed, MOBILE_CLIENT_ID,
 } from '../core/admin-oauth.js';
 import { baseUrl, clientIp, cookie, isHttps, minuteLimiter } from './http-util.js';
+
+/** The token of an `Authorization: Bearer <token>` header (linear-time parsing, no regex backtracking). */
+function bearerToken(header) {
+  const h = String(header || '').trim();
+  if (h.length > 4096 || h.slice(0, 7).toLowerCase() !== 'bearer ') return undefined;
+  const t = h.slice(7).trim();
+  return t && !/\s/.test(t) ? t : undefined;
+}
 import { TOOLS, scrub } from './admin-tools.js';
 
 const VERSION = (() => { try { return JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')).version; } catch { return '0'; } })();
@@ -305,7 +313,7 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
   ];
 
   async function mcp(req, res) {
-    const bearer = (/^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || '')) || [])[1]?.trim();
+    const bearer = bearerToken(req.headers.authorization);
     const auth = validateAccess(bearer, resourceOf(req));
     if (!auth) {
       const meta = `${baseUrl(req)}/.well-known/oauth-protected-resource/mcp`;

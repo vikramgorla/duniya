@@ -154,7 +154,7 @@ never the app's own secrets or settings).
   `<type>/<issue>-<slug>` branches, squash-merged after the required checks; nobody pushes to `main`. Details and the
   Definition of Done: `AGENTS.md`.
 - Releases: bump the version (semver) in `package.json`, `package-lock.json` and `infra/oci/schema.yaml` (CI checks
-  they match) and merge to `main`; the release workflow tags and publishes, and servers update from the panel.
+  they match), add a `releases.json` entry for every version, and merge to `main`; the release workflow tags and publishes, and servers update from the panel.
   Infrastructure changes run `plan` on push and require a manual `apply`.
 
 ## Governance

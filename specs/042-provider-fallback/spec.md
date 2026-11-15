@@ -57,7 +57,8 @@ specific setting wins (chat > agent > global).
 - Within one turn the account that answered stays first (stateful Copilot sessions continue).
 - The Test button addresses one account directly: no fallback, ignores pauses, success clears the pause.
 - Background summaries and the AI helper use the same fallback.
-- Pauses live in memory: a restart probes every account again.
+- Pauses, back-off counts and "needs reconnect" are stored in SQLite (`ttl_state`, #64) and survive a restart; only
+  the in-flight probe flag is not stored, so the first call after a restart probes.
 
 ### User Story 5 - Edit a chat's fallback chain in the panel (Priority: P3, #65, v2.11.0)
 
