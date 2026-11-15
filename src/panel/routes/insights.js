@@ -10,7 +10,7 @@ import { toolsFor } from '../../core/tools.js';
 import { activity } from '../../core/events.js';
 import '../../core/usage.js'; // the usage table
 
-const SERVICE_NAME = { memory: 'Memory', contacts: 'Contacts', whatsapp: 'WhatsApp actions', local: 'Built-in (plugins)' };
+const SERVICE_NAME = { memory: 'Memory', contacts: 'Contacts', whatsapp: 'WhatsApp actions', local: 'Built-in' };
 
 /** First-run checklist (#36): live state of the five setup steps. */
 export async function checklist(channel) {

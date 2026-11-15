@@ -81,6 +81,8 @@ const CARDS = [
   ['card-registry', 'agents/carpool', "await T.click('Browse tool services', 'button', 1500);", 'dialog.dlg', 900],
   ['card-wa-actions', 'agents/carpool', 'T.openAll(T.box("WhatsApp actions"));', 'box:WhatsApp actions', 600],
   ['card-people', 'agents/carpool', '', 'box:People & roles', 600],
+  ['card-quick', 'agents/carpool', '', '#quick-answers', 600],
+  ['card-quick-test', 'agents/carpool/test', "const i = document.querySelector('#test-console input[placeholder^=\"Ask the\"]'); i.value = '!rides'; await T.click('Send', 'button', 900); i.value = 'where is the pick-up point in Geneva?'; await T.click('Send', 'button', 900);", '#test-console', 1100],
   ['card-wa-group', 'chats', "[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button')?.click(); await T.until('.wa-card input'); await T.wait(600);", '.wa-card', 900],
   ['card-memory', 'chats', "[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button')?.click(); await T.wait(1800);", 'box:Memory', 900],
 ];

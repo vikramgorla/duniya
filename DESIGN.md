@@ -73,7 +73,8 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
 cell; `stack flat` for long lists), `.tscroll` (key/value tables that keep their columns), `label.tick` (a checkbox on
 its own with a 40 px tap area), `meter`, `spark(values)`, `pill`, `note`, `seg` (segmented control), `toggle`,
 `btn` (`primary`, `danger`, `small`), `number-card`, `feed`, `bubble` (test console), `spinner`, `modelSelect()`
-(Auto / provider · Auto / specific model), `field(label, input, hint)`.
+(Auto / provider · Auto / specific model), `field(label, input, hint)`, `.qa-row` + `.qa-preview` (an editable row of
+user-written text with a live *Preview* filled with sample values; rows stack on phones).
 
 ## Writing
 

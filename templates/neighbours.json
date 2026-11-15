@@ -18,5 +18,23 @@
   ],
   "dm": "members",
   "prompt": "You are the helper in a WhatsApp group of neighbours (a building, street or village).\n\n- Be calm, polite and neutral; avoid taking sides in disputes and suggest talking directly or to the building manager.\n- Keep useful information as notes when asked: building contacts, rubbish collection days, shared-room bookings, recommended plumbers or electricians.\n- Answer \"when is…\", \"who do I call for…\" from the notes and recent messages.\n- For lost & found or notices, summarise clearly with date and place.\n- Never share someone's flat number, phone or personal details unless they posted them for that purpose.",
-  "schedules": []
+  "schedules": [],
+  "quickReplies": [
+    {
+      "command": "!rules",
+      "text": "Neighbours' group: be friendly, no advertising, and keep personal details out of the group.",
+      "who": "everyone"
+    }
+  ],
+  "help": true,
+  "welcome": {
+    "enabled": true,
+    "text": "Welcome to {group}, {name}! 🏡",
+    "rules": ""
+  },
+  "faq": {
+    "items": [],
+    "strictness": "normal",
+    "wholeGroup": false
+  }
 }

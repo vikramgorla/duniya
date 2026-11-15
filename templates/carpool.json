@@ -26,5 +26,28 @@
       "enabled": true,
       "prompt": "Post today's rides from the notes: for each ride, driver, departure time and place, destination and who is riding. Mention seats still free. If no rides are planned today, post nothing."
     }
-  ]
+  ],
+  "quickReplies": [
+    {
+      "command": "!rides",
+      "text": "How rides work here:\n- Offer: \"!ride offering Mon 7:30 from Aigle to school, 3 seats\"\n- Need one: \"!ride need a seat Tue 16:00 school → Aigle\"\n- Ask: \"!ride who drives tomorrow?\"\nToday's rides are posted every weekday morning.",
+      "who": "everyone"
+    },
+    {
+      "command": "!rules",
+      "text": "Car pool rules:\n- Be on time; tell the group early if you can't drive.\n- Booster seats for kids under 150 cm.\n- Cancel your seat as soon as plans change.",
+      "who": "everyone"
+    }
+  ],
+  "help": true,
+  "welcome": {
+    "enabled": true,
+    "text": "Welcome {name} to {group}! 🚗 Type !rides to see how to offer or find a seat.",
+    "rules": ""
+  },
+  "faq": {
+    "items": [],
+    "strictness": "normal",
+    "wholeGroup": false
+  }
 }

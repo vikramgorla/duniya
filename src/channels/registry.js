@@ -31,7 +31,7 @@ export const numbersSetting = () => {
 /** `factory` makes one channel per number (tests pass fakes). */
 export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) {
   const sessions = new Map(); // id -> channel
-  let handler = null; let historyHandler = null;
+  let handler = null; let historyHandler = null; let joinHandler = null;
 
   const make = (n) => factory({ number: n.id, label: n.label, authDir: resolve(DATA_DIR, n.id === MAIN ? 'whatsapp-auth' : `whatsapp-auth-${n.id}`) });
   const wrapMsg = (n) => (m) => ({ ...m, chat: chatKey(n.id, m.chat), number: n.id });
@@ -45,7 +45,8 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
       try { noteChat({ chat: msg.chat, number: n.id, isGroup: msg.isGroup, name: msg.isGroup ? '' : msg.senderName, phone: msg.isGroup ? '' : msg.phone }); } catch { /* best effort */ }
       return handler(msg);
     }, { onHistory: async (msgs, meta = {}) => historyHandler?.(msgs.map(wrap), { ...meta, // #91: keys and chats in app chat ids
-      keys: (meta.keys || []).map((k) => ({ ...k, chat: chatKey(n.id, k.chat), number: n.id })), chats: (meta.chats || []).map((c) => chatKey(n.id, c)) }) });
+      keys: (meta.keys || []).map((k) => ({ ...k, chat: chatKey(n.id, k.chat), number: n.id })), chats: (meta.chats || []).map((c) => chatKey(n.id, c)) }),
+    onJoin: async (ev) => joinHandler?.({ ...ev, chat: chatKey(n.id, ev.chat) }) }); // 054: welcome
     return ch;
   }
   const route = (chat) => {
@@ -84,8 +85,8 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
       const g = await byNumber(number).groupCreate(subject, people);
       return { ...g, id: chatKey(number || MAIN, g.id) };
     },
-    async start(onMessage, { onHistory } = {}) {
-      handler = onMessage; historyHandler = onHistory || null;
+    async start(onMessage, { onHistory, onJoin } = {}) {
+      handler = onMessage; historyHandler = onHistory || null; joinHandler = onJoin || null;
       for (const n of numbersSetting()) await startOne(n);
     },
     async send(chat, text, opts) { const { ch, jid } = route(chat); return ch.send(jid, text, opts); },

@@ -7,12 +7,13 @@ export const FIELD_LABEL: Record<string, string> = {
   name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', dm: 'Who may message it directly',
   organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', globalMcp: 'Global tool services', tools: 'Tool rules', confirm: 'Confirmation',
   schedules: 'Scheduled posts', memory: 'Group memory', model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens',
-  plugins: 'Plugins', enabled: 'Enabled', media: 'Photos & voice',
+  enabled: 'Enabled', media: 'Photos & voice',
+  quickReplies: 'Quick replies', help: '!help list', welcome: 'Welcome message', faq: 'FAQ auto-answers',
 };
 // The editor's sections, in the editor's order: the review groups changes the same way.
 const SECTIONS: [string, string[]][] = [['General', ['name', 'description', 'enabled', 'memory', 'respondToMentions', 'model', 'triggers', 'dm']], ['Instructions', ['prompt']],
-  ['People & roles', ['organizers', 'participants']], ['Tool services', ['mcpServers', 'globalMcp', 'tools']], ['Photos & voice', ['media']], ['Changes need confirmation', ['confirm']],
-  ['Scheduled posts', ['schedules']], ['Advanced', ['plugins', 'timezone', 'historySize', 'maxTokens']]];
+  ['Quick replies, welcome & FAQ', ['quickReplies', 'help', 'welcome', 'faq']], ['People & roles', ['organizers', 'participants']], ['Tool services', ['mcpServers', 'globalMcp', 'tools']], ['Photos & voice', ['media']], ['Changes need confirmation', ['confirm']],
+  ['Scheduled posts', ['schedules']], ['Advanced', ['timezone', 'historySize', 'maxTokens']]];
 const ORDER = SECTIONS.flatMap(([, f]) => f);
 export const sectionOf = (f: string) => (SECTIONS.find(([, fs]) => fs.includes(f)) || ['Other'])[0];
 const DM_LABEL: Record<string, string> = { none: 'Nobody', organizers: 'Organizers only', members: 'Members of its groups', anyone: 'Anyone' };
@@ -44,6 +45,7 @@ export function scalar(field: string, v: Any, ctx: Ctx = {}): string {
   if (field === 'model') return modelLabel(v, ctx.models);
   if (field === 'dm') return DM_LABEL[v] || String(v ?? '—');
   if (field === 'memory') return v?.enabled === false ? 'off' : 'on';
+  if (field === 'welcome') return v?.enabled ? `on — “${trunc(v.text || 'Welcome {name} to {group}! 👋', 60)}”${v.rules ? ' + rules' : ''}` : 'off';
   if (field === 'confirm') return v ? `on (preview ${v.preview || '—'}, confirm with ${v.tool || '—'})` : 'off';
   if (field === 'media' && v) return [v.photos !== false && 'photos', v.documents !== false && 'PDFs', v.stickers && 'stickers', v.voiceNotes !== false && 'voice notes',
     `voice replies: ${({ never: 'never', voice: 'to voice notes', always: 'always' } as Record<string, string>)[v.voiceReply || 'never']}`,
@@ -56,7 +58,10 @@ export function scalar(field: string, v: Any, ctx: Ctx = {}): string {
 /** List-like fields as [{ k: key, l: readable label, v: value for "changed" checks }]. */
 export const LISTS: Record<string, (v: Any, ctx: Ctx) => ListItem[]> = {
   triggers: (v) => (v || []).map((x: string) => ({ k: x, l: x })),
-  plugins: (v) => (v || []).map((x: string) => ({ k: x, l: x })),
+  names: (v) => (v || []).map((x: string) => ({ k: x, l: x })),
+  quickReplies: (v) => (v || []).map((q: Any) => ({ k: q.command, l: `${q.command}${q.who === 'organizers' ? ' (organizers)' : ''} → ${trunc(q.text, 70)}`, v: q })),
+  faq: (v) => [...(v?.items || []).map((it: Any) => ({ k: String(it.questions?.[0] || (it.keywords || []).join(', ')).toLowerCase(), l: `${trunc(it.questions?.[0] || (it.keywords || []).join(', '), 50)} → ${trunc(it.answer, 50)}`, v: it })),
+    ...(v ? [{ k: '~match', l: `Match: ${v.strictness === 'strict' ? 'strict' : 'normal'}${v.wholeGroup ? ', in the whole group' : ', when addressed'}`, v: [v.strictness, !!v.wholeGroup] }] : [])],
   organizers: (v, c) => (v || []).map((p: string) => ({ k: String(p).replace(/\D/g, ''), l: personLabel(p, c.names) })),
   participants: (v, c) => (v || []).map((p: string) => ({ k: String(p).replace(/\D/g, ''), l: personLabel(p, c.names) })),
   mcpServers: (v) => Object.entries(v || {}).map(([k, s]) => ({ k, l: serverLabel(k, s), v: s })),
@@ -93,7 +98,7 @@ export function changeView(ch: { field: string; before: unknown; after: unknown 
     return { kind: 'list', field, section, label, head: `${label}: ${list.n}`, list, added: 0, removed: 0 };
   }
   if (field === 'globalMcp') {
-    const list = { ...listChange(LISTS.plugins(b?.disabled, ctx), LISTS.plugins(a?.disabled, ctx)), addedTitle: 'Turned off', removedTitle: 'Turned on again' };
+    const list = { ...listChange(LISTS.names(b?.disabled, ctx), LISTS.names(a?.disabled, ctx)), addedTitle: 'Turned off', removedTitle: 'Turned on again' };
     return { kind: 'list', field, section, label, head: `${label}: ${list.n.replace('added', 'turned off').replace('removed', 'turned on')}`, list, added: 0, removed: 0 };
   }
   if (field === 'tools') {

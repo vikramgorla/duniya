@@ -26,6 +26,9 @@ for (const col of ['private', 'notice_off']) {
 for (const [col, type] of [['last_msg_id', 'TEXT'], ['last_from_me', 'INTEGER'], ['last_participant', 'TEXT'], ['last_msg_at', 'INTEGER']]) {
   if (!db.prepare('PRAGMA table_info(chats_seen)').all().some((c) => c.name === col)) db.exec(`ALTER TABLE chats_seen ADD COLUMN ${col} ${type}`);
 }
+// 054: per-chat "Welcome new members" override: inherit (the agent's setting) | on | off.
+if (!db.prepare('PRAGMA table_info(chat_prefs)').all().some((c) => c.name === 'welcome')) db.exec("ALTER TABLE chat_prefs ADD COLUMN welcome TEXT NOT NULL DEFAULT 'inherit'");
+export const WELCOME_MODES = ['inherit', 'on', 'off'];
 const parseFallback = (v) => { try { return v ? cleanOverride(JSON.parse(v)) : { mode: 'inherit', chain: [] }; } catch { return { mode: 'inherit', chain: [] }; } };
 
 export const LOGGING_LEVELS = ['inherit', 'off', 'minimal', 'normal', 'verbose'];
@@ -35,28 +38,31 @@ const MODEL_RE = /^(inherit|auto|[a-z][a-z0-9-]{1,30}:[A-Za-z0-9._:/@+-]{1,120})
 // or sent to a model (chat_prefs.enabled).
 const cache = new Map();
 export function getChatPrefs(chat) {
-  if (!chat) return { model: 'inherit', logging: 'inherit', enabled: false, fallback: parseFallback(''), private: false, noticeOff: false };
+  if (!chat) return { model: 'inherit', logging: 'inherit', enabled: false, fallback: parseFallback(''), private: false, noticeOff: false, welcome: 'inherit' };
   if (cache.has(chat)) return cache.get(chat);
-  const r = db.prepare('SELECT model, logging, enabled, fallback, private, notice_off FROM chat_prefs WHERE tenant_id = ? AND chat = ?').get(TENANT, chat);
-  const v = { model: r?.model || 'inherit', logging: r?.logging || 'inherit', enabled: !!r?.enabled, fallback: parseFallback(r?.fallback), private: !!r?.private, noticeOff: !!r?.notice_off };
+  const r = db.prepare('SELECT model, logging, enabled, fallback, private, notice_off, welcome FROM chat_prefs WHERE tenant_id = ? AND chat = ?').get(TENANT, chat);
+  const v = { model: r?.model || 'inherit', logging: r?.logging || 'inherit', enabled: !!r?.enabled, fallback: parseFallback(r?.fallback), private: !!r?.private, noticeOff: !!r?.notice_off, welcome: WELCOME_MODES.includes(r?.welcome) ? r.welcome : 'inherit' };
   cache.set(chat, v);
   return v;
 }
-export function setChatPrefs(chat, { model, logging, enabled, fallback, private: priv, noticeOff }) {
+export function setChatPrefs(chat, { model, logging, enabled, fallback, private: priv, noticeOff, welcome }) {
   const cur = getChatPrefs(chat);
   const next = { model: model ?? cur.model, logging: logging ?? cur.logging, enabled: enabled === undefined ? cur.enabled : !!enabled,
     fallback: fallback === undefined ? cur.fallback : cleanOverride(fallback, 'fallback'),
-    private: priv === undefined ? cur.private : !!priv, noticeOff: noticeOff === undefined ? cur.noticeOff : !!noticeOff };
+    private: priv === undefined ? cur.private : !!priv, noticeOff: noticeOff === undefined ? cur.noticeOff : !!noticeOff,
+    welcome: welcome ?? cur.welcome };
   if (!MODEL_RE.test(next.model)) throw Object.assign(new Error('model must be inherit, auto, provider:auto or provider:model'), { status: 400, field: 'model' });
+  if (!WELCOME_MODES.includes(next.welcome)) throw Object.assign(new Error('welcome must be inherit, on or off'), { status: 400, field: 'welcome' });
   if (!LOGGING_LEVELS.includes(next.logging)) throw Object.assign(new Error(`logging must be one of ${LOGGING_LEVELS.join(', ')}`), { status: 400, field: 'logging' });
   const fb = next.fallback.mode === 'inherit' && !next.fallback.chain.length ? '' : JSON.stringify(next.fallback);
-  db.prepare('INSERT OR REPLACE INTO chat_prefs (tenant_id, chat, model, logging, enabled, fallback, private, notice_off, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(TENANT, chat, next.model, next.logging, next.enabled ? 1 : 0, fb, next.private ? 1 : 0, next.noticeOff ? 1 : 0, Date.now());
+  db.prepare('INSERT OR REPLACE INTO chat_prefs (tenant_id, chat, model, logging, enabled, fallback, private, notice_off, welcome, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(TENANT, chat, next.model, next.logging, next.enabled ? 1 : 0, fb, next.private ? 1 : 0, next.noticeOff ? 1 : 0, next.welcome, Date.now());
   cache.set(chat, next);
   return next;
 }
-export const allChatPrefs = () => Object.fromEntries(db.prepare('SELECT chat, model, logging, enabled, fallback, private, notice_off FROM chat_prefs WHERE tenant_id = ?').all(TENANT)
-  .map((r) => [r.chat, { model: r.model, logging: r.logging, enabled: !!r.enabled, fallback: parseFallback(r.fallback), private: !!r.private, noticeOff: !!r.notice_off }]));
+export const allChatPrefs = () => Object.fromEntries(db.prepare('SELECT chat, model, logging, enabled, fallback, private, notice_off, welcome FROM chat_prefs WHERE tenant_id = ?').all(TENANT)
+  .map((r) => [r.chat, { model: r.model, logging: r.logging, enabled: !!r.enabled, fallback: parseFallback(r.fallback), private: !!r.private, noticeOff: !!r.notice_off,
+    welcome: WELCOME_MODES.includes(r.welcome) ? r.welcome : 'inherit' }]));
 /** 044: chats marked "private to members" (never visible to the owner assistant or the Ask box). */
 export const privateChats = () => db.prepare('SELECT chat FROM chat_prefs WHERE tenant_id = ? AND private = 1').all(TENANT).map((r) => r.chat);
 export const isChatPrivate = (chat) => getChatPrefs(chat).private;

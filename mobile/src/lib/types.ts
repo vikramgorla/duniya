@@ -24,13 +24,17 @@ export interface AgentConfig {
   schedules?: { id: string; at: string; days?: string; enabled?: boolean; prompt?: string }[];
   memory?: { enabled?: boolean };
   globalMcp?: { disabled?: string[] };
-  plugins?: string[];
+  /** 054: built-in answers (no AI) — edited in the web panel. */
+  quickReplies?: { command: string; text: string; who?: 'everyone' | 'organizers' }[];
+  help?: boolean;
+  welcome?: { enabled?: boolean; text?: string; rules?: string };
+  faq?: { items?: { questions?: string[]; keywords?: string[]; answer: string }[]; strictness?: 'strict' | 'normal'; wholeGroup?: boolean };
 }
 /** A tool service defined once for all agents (Settings → Tool services in the web panel). */
 export interface GlobalTool { name: string; type: string; on: boolean; replaced: boolean; defaults?: { organizer?: string[]; participant?: string[] } }
 export interface Agent {
   id: string; name: string; description?: string; enabled: boolean; config: AgentConfig; needs: string[];
-  updatedAt?: number; localTools: string[]; missingPlugins: string[]; globalTools?: GlobalTool[];
+  updatedAt?: number; globalTools?: GlobalTool[];
 }
 
 export interface Chat {

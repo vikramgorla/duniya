@@ -45,6 +45,14 @@
   .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; min-width: 0; box-shadow: var(--shadow); }
   .card h2 { font-size: 17px; margin: 0 0 12px; font-weight: 700; }
   .card h3 { font-size: 15px; margin: 18px 0 8px; font-weight: 700; }
+  /* 054: quick replies, welcome & FAQ rows (stack on phones) */
+  .qa-rows { display: grid; gap: 10px; margin: 6px 0 8px; }
+  .qa-row { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 10px 12px; background: var(--card); min-width: 0; }
+  .qa-row .row > input, .qa-row .row > select { flex: 1 1 140px; width: auto; }
+  .qa-preview { margin-top: 6px; padding: 8px 10px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--bg-2) 70%, transparent); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .qa-preview .eyebrow { display: block; margin-bottom: 2px; }
+  h3.qa-h { margin: 16px 0 4px; font-size: 15px; }
+  label.welcome-pick { gap: 6px; justify-content: flex-start; } label.welcome-pick select { width: auto; padding: 4px 8px; min-height: 40px; }
   .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
   .stat { font-family: var(--font-display); font-size: 30px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .stat small { font-size: 14px; color: var(--muted); font-weight: 500; margin-left: 4px; }
@@ -1422,7 +1430,6 @@ async function renderAgents() {
       b.config.memory?.enabled !== false ? h('span', { class: 'pill ok' }, 'memory') : null),
     h('div', { class: 'small muted num' }, h('a', { href: '#usage' }, '30 days: '), usageLine(us?.agent?.[b.id])),
     b.needs.length ? h('div', { class: 'note warn' }, `Needs secrets: ${b.needs.join(', ')}`) : null,
-    b.missingPlugins.length ? h('div', { class: 'note warn' }, `Missing plugins: ${b.missingPlugins.join(', ')}`) : null,
     h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => openAgent(b.id) }, can('admin') ? 'Edit & test' : 'View & test'))));
   const aiCreate = can('admin') ? await aiHelper({ title: [h('span', { class: 'ai-chip' }, 'AI'), 'Create an agent with AI'], applyLabel: 'Create this agent',
     placeholder: 'Describe the agent in your own words, e.g. “An assistant for our family festival group: answers agenda and menu questions from panduga, replies in English or Telugu, posts tomorrow’s agenda every evening at 8.”',
@@ -1546,7 +1553,7 @@ function toolServiceEditor(s, o) {
 }
 
 async function renderAgentEditor(id) {
-  const [b, models, plugins, conns, locals, waTools] = await Promise.all([api('GET', `/api/agents/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', '/api/plugins'), api('GET', `/api/agents/${encodeURIComponent(id)}/connections`).catch(() => []), api('GET', `/api/agents/${encodeURIComponent(id)}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => [])]);
+  const [b, models, conns, locals, waTools] = await Promise.all([api('GET', `/api/agents/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', `/api/agents/${encodeURIComponent(id)}/connections`).catch(() => []), api('GET', `/api/agents/${encodeURIComponent(id)}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => [])]);
   const mediaCaps = await api('GET', '/api/media').catch(() => null);
   const registry = can('admin') ? await api('GET', '/api/tool-services/registry/settings').catch(() => null) : null; // 052: Browse
   const c = structuredClone(b.config);
@@ -1694,7 +1701,6 @@ async function renderAgentEditor(id) {
         h('button', { class: 'btn small danger mut', onclick: () => { scheds.splice(i, 1); drawScheds(); } }, 'Remove')))));
   }
   drawScheds();
-  F.plugins = plugins.map((p) => h('label', { class: 'inline' }, h('input', { type: 'checkbox', value: p.name, checked: (c.plugins || []).includes(p.name) }), p.name));
   F.timezone = h('input', { value: c.timezone || '', placeholder: 'Europe/Zurich (default)' });
   // Photos & voice (043)
   const md = { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', ...(c.media || {}), createImages: { organizer: true, participant: false, ...(c.media?.createImages || {}) } };
@@ -1724,8 +1730,8 @@ async function renderAgentEditor(id) {
       mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, serverConfig(s)])), globalMcp: { disabled: [...globalOff] },
       tools: { participant: splitLines(rulesBox.participant.value), organizer: splitLines(rulesBox.organizer.value), deny: splitLines(rulesBox.deny.value) },
       confirm: F.confirmOn.checked ? { preview: F.cPreview.value.trim(), tool: F.cTool.value.trim(), idField: F.cId.value.trim(), ttlMinutes: Number(F.cTtl.value) } : null,
-      schedules: scheds, plugins: F.plugins.map((l) => l.querySelector('input')).filter((x) => x.checked).map((x) => x.value),
-      media: md,
+      schedules: scheds,
+      media: md, ...quickBox.value(),
     };
     try {
       const r = await api('PUT', `/api/agents/${encodeURIComponent(id)}`, config);
@@ -1776,6 +1782,9 @@ async function renderAgentEditor(id) {
     try {
       const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/test`, { text, role: as, chat: where });
       wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); if (r.model) wait.title = `${r.answeredBy || r.model} · as ${as}`;
+      // 054: which path answered — a quick reply, the FAQ (no AI, no tokens) or the model
+      const path = r.path === 'quick' ? `${r.answeredBy || 'Quick reply'} · no AI` : r.path === 'faq' ? 'FAQ answer · no AI' : r.path === 'model' ? `Model${r.model ? ` · ${modelLabel(r.answeredBy && r.answeredBy.includes(':') ? r.answeredBy : r.model, models)}` : ''}` : '';
+      if (path) wait.after(h('div', { class: 'small muted test-path', style: 'align-self:flex-start;margin:-2px 0 4px 4px' }, path.charAt(0).toUpperCase() + path.slice(1)));
       const fbl = fallbackLine(r.fallback); // 042: which model really answered, and why it switched
       if (fbl) wait.after(h('div', { class: 'small muted', style: 'align-self:flex-start;margin:-2px 0 4px 4px' }, `${fbl}.`));
     } catch (x) { wait.textContent = `Error: ${x.message}`; }
@@ -1783,6 +1792,7 @@ async function renderAgentEditor(id) {
   } }, input, h('button', { class: 'btn' }, 'Send'));
   const testAs = h('div', { class: 'row mut' }, h('label', { class: 'small', style: 'flex:0 0 auto;margin:0' }, 'Test as'), role, h('label', { class: 'small', style: 'flex:0 0 auto;margin:0' }, 'in'), testChat);
 
+  const quickBox = quickAnswersEditor(c, b);
   // Shared memory (#8): notes the agent keeps across all its chats; organizers save them from WhatsApp.
   const sharedMemBox = h('fieldset', {}, h('legend', {}, 'Shared memory'));
   const loadSharedMem = async () => {
@@ -1815,6 +1825,7 @@ async function renderAgentEditor(id) {
           field('Triggers', F.triggers, 'A message containing one of these words (anywhere, as a whole word) wakes the agent, e.g. mochi or !panduga'),
           field('Who may message it directly', F.dm)),
         h('fieldset', {}, h('legend', {}, 'Instructions'), F.prompt),
+        quickBox.el,
         sharedMemBox,
         h('fieldset', {}, h('legend', {}, 'People & roles'),
           h('p', { class: 'small muted', style: 'margin-top:0' }, 'Organizers can use organizer tools and confirm changes. Everyone else in the agent’s groups is a participant.'),
@@ -1841,7 +1852,6 @@ async function renderAgentEditor(id) {
         h('fieldset', {}, h('legend', {}, 'Monthly spending cap'), await capEditor('agent', id, models)),
         h('fieldset', {}, h('legend', {}, 'Scheduled posts'), schedBox, h('button', { class: 'btn small mut', onclick: () => { scheds.push({ id: `s${scheds.length + 1}`, at: '08:00', days: 'daily', prompt: '', chats: 'all', enabled: true }); drawScheds(); } }, '+ Add schedule')),
         h('fieldset', {}, h('legend', {}, 'Advanced'),
-          plugins.length ? field('Plugins', h('div', {}, F.plugins), 'Optional code add-ons installed on this server (in the plugins/ folder) for things settings can\'t do: extra tools, quick commands or custom role rules. “example-dice” is a sample for developers (a dice-rolling tool and a !ping → pong reply); leave it off. For ready-made tools, add a tool service (MCP) instead.') : null,
           field('Timezone', F.timezone), h('div', { class: 'row' }, field('Recent messages in context', F.historySize), field('Max reply tokens', F.maxTokens))),
         h('div', { class: 'row mut' }, h('button', { class: 'btn primary', onclick: save }, 'Save'))),
       h('div', { class: 'card', id: 'test-console', style: 'position:sticky;top:110px;scroll-margin-top:110px' }, h('h2', {}, 'Test console'),
@@ -1853,15 +1863,89 @@ async function renderAgentEditor(id) {
   if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (sub !== 'test') target.focus({ preventScroll: true }); else input.focus({ preventScroll: true }); }
 }
 
+/**
+ * 054: "Quick replies, welcome & FAQ" — built-in answers without AI. Rows to add / edit / remove, a live preview with
+ * sample values, phone-friendly (every row stacks). value() returns { quickReplies, help, welcome, faq } for save().
+ */
+function quickAnswersEditor(c, b) {
+  const ro = !can('admin');
+  const qr = structuredClone(c.quickReplies || []);
+  const faq = { items: [], strictness: 'normal', wholeGroup: false, ...structuredClone(c.faq || {}) };
+  const wel = { enabled: false, text: '', rules: '', ...structuredClone(c.welcome || {}) };
+  const sample = { name: 'Anu', group: 'your group', date: new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(',', '') };
+  const fill = (t, v) => String(t || '').replace(/\{(name|group|date|rules)\}/g, (m, k) => (v[k] === undefined ? m : v[k])).trim();
+  const preview = (text) => h('div', { class: 'qa-preview small' }, h('span', { class: 'eyebrow' }, 'Preview'), h('div', {}, fill(text, sample) || '—'));
+  const help = h('input', { type: 'checkbox', checked: !!c.help, disabled: ro });
+  const qrBox = h('div', { class: 'qa-rows' });
+  function drawQr() {
+    qrBox.replaceChildren(...qr.map((q, i) => {
+      const prev = h('div', {}, preview(q.text));
+      const who = h('select', { disabled: ro, 'aria-label': 'Who may use it', onchange: (e) => { q.who = e.target.value; } },
+        [['everyone', 'Everyone'], ['organizers', 'Organizers only']].map(([v, l]) => h('option', { value: v, selected: (q.who || 'everyone') === v }, l)));
+      return h('div', { class: 'qa-row' },
+        h('div', { class: 'row' }, h('input', { value: q.command || '', placeholder: '!rides', 'aria-label': 'Command', class: 'mono', style: 'max-width:160px', disabled: ro, oninput: (e) => { q.command = e.target.value.trim(); } }), who,
+          ro ? null : h('button', { type: 'button', class: 'btn small danger mut', onclick: () => { qr.splice(i, 1); drawQr(); } }, 'Remove')),
+        h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', value: q.text || '', disabled: ro, 'aria-label': 'Answer', placeholder: 'The answer, e.g. Rides this week: Mon Anu, Tue Ravi… Placeholders: {name} {group} {date}',
+          oninput: (e) => { q.text = e.target.value; prev.replaceChildren(preview(q.text)); } }), prev);
+    }), qr.length ? '' : h('p', { class: 'small muted' }, 'No quick replies yet.'));
+  }
+  drawQr();
+  // Welcome
+  const welOn = h('input', { type: 'checkbox', checked: !!wel.enabled, disabled: ro, onchange: (e) => { wel.enabled = e.target.checked; } });
+  const welPrev = h('div', {});
+  const drawWelPrev = () => { const t = wel.text || 'Welcome {name} to {group}! 👋'; welPrev.replaceChildren(preview(fill(wel.rules && !t.includes('{rules}') ? `${t}\n\n{rules}` : t, { ...sample, name: '@Mia', rules: wel.rules }))); };
+  const welText = h('textarea', { class: 'prose', style: 'min-height:56px', value: wel.text, disabled: ro, placeholder: 'Welcome {name} to {group}! 👋', oninput: (e) => { wel.text = e.target.value; drawWelPrev(); } });
+  const welRules = h('textarea', { class: 'prose', style: 'min-height:56px', value: wel.rules, disabled: ro, placeholder: 'Optional, e.g. Be kind. Rides are posted on Sundays.', oninput: (e) => { wel.rules = e.target.value; drawWelPrev(); } });
+  drawWelPrev();
+  // FAQ
+  const faqBox = h('div', { class: 'qa-rows' });
+  function drawFaq() {
+    faqBox.replaceChildren(...faq.items.map((it, i) => {
+      const prev = h('div', {}, preview(it.answer));
+      return h('div', { class: 'qa-row' },
+        field('Questions (one way of asking per line)', h('textarea', { class: 'prose', style: 'min-height:50px', value: (it.questions || []).join('\n'), disabled: ro, placeholder: 'When does the bus leave?', oninput: (e) => { it.questions = e.target.value.split('\n').map((x) => x.trim()).filter(Boolean); } })),
+        field('Keywords (optional, comma separated)', h('input', { value: (it.keywords || []).join(', '), disabled: ro, placeholder: 'bus, departure', oninput: (e) => { it.keywords = e.target.value.split(',').map((x) => x.trim()).filter(Boolean); } })),
+        field('Answer', h('textarea', { class: 'prose', style: 'min-height:56px', value: it.answer || '', disabled: ro, oninput: (e) => { it.answer = e.target.value; prev.replaceChildren(preview(it.answer)); } })),
+        prev, ro ? null : h('div', { class: 'row', style: 'margin-top:6px' }, h('button', { type: 'button', class: 'btn small danger mut', onclick: () => { faq.items.splice(i, 1); drawFaq(); } }, 'Remove')));
+    }), faq.items.length ? '' : h('p', { class: 'small muted' }, 'No questions yet.'));
+  }
+  drawFaq();
+  const strict = h('div', { class: 'seg', role: 'group', 'aria-label': 'How closely a message must match' }, [['normal', 'Normal'], ['strict', 'Strict']].map(([v, l]) => h('button', {
+    type: 'button', class: faq.strictness === v ? 'on' : '', disabled: ro, onclick: (e) => { faq.strictness = v; strict.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); } }, l)));
+  const whole = h('input', { type: 'checkbox', checked: !!faq.wholeGroup, disabled: ro, onchange: (e) => { faq.wholeGroup = e.target.checked; } });
+  const el = h('fieldset', { id: 'quick-answers' }, h('legend', {}, 'Quick replies, welcome & FAQ'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Answered instantly from text you write: no AI, no tokens. Placeholders: {name} (who asked), {group}, {date}. Test them in the test console.'),
+    h('h3', { class: 'qa-h' }, 'Quick replies'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'A command as the whole message or its first word (any case), e.g. !rides — no trigger needed.'),
+    qrBox, ro ? null : h('button', { type: 'button', class: 'btn small mut', onclick: () => { qr.push({ command: '', text: '', who: 'everyone' }); drawQr(); } }, '+ Add quick reply'),
+    h('div', { style: 'margin-top:8px' }, h('label', { class: 'inline' }, help, '“!help” lists these commands and the triggers')),
+    h('h3', { class: 'qa-h' }, 'Welcome new members'),
+    h('label', { class: 'inline' }, welOn, 'Greet people who join a group (once per person)'),
+    field('Message', welText, '{name} becomes an @mention of the new members (people added together get one message), {rules} the rules below. Chats that are off get nothing; a single chat can override this under Chats.'),
+    field('Group rules', welRules), welPrev,
+    h('h3', { class: 'qa-h' }, 'FAQ auto-answers'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'When a message to the agent clearly matches a question, it gets your answer. Otherwise the agent answers as usual and knows these answers too.'),
+    faqBox, ro ? null : h('button', { type: 'button', class: 'btn small mut', onclick: () => { faq.items.push({ questions: [], keywords: [], answer: '' }); drawFaq(); } }, '+ Add question'),
+    field('Match', strict, 'Normal: most of a question\'s words or all keywords. Strict: the whole question or every keyword.'),
+    h('div', { style: 'margin-top:8px' }, h('label', { class: 'inline' }, whole, 'Answer FAQ in the whole group (not only when the agent is addressed)')));
+  return {
+    el,
+    value: () => ({ quickReplies: qr.filter((q) => q.command || q.text), help: help.checked, welcome: wel,
+      faq: { ...faq, items: faq.items.filter((it) => (it.questions || []).length || (it.keywords || []).length || it.answer) } }),
+  };
+}
+
 // ---------- chats + memory ----------
 // ---------- AI helper (016) ----------
 const FIELD_LABEL = { name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', dm: 'Who may message it directly',
   organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', globalMcp: 'Global tool services', tools: 'Tool rules', confirm: 'Confirmation', schedules: 'Scheduled posts', memory: 'Group memory',
-  model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', plugins: 'Plugins', enabled: 'Enabled', media: 'Photos & voice' };
+  model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', enabled: 'Enabled', media: 'Photos & voice',
+  quickReplies: 'Quick replies', help: '!help list', welcome: 'Welcome message', faq: 'FAQ auto-answers' };
 // The editor's sections, in the editor's order: the review groups changes the same way.
 const AI_SECTIONS = [['General', ['name', 'description', 'enabled', 'memory', 'respondToMentions', 'model', 'triggers', 'dm']], ['Instructions', ['prompt']],
+  ['Quick replies, welcome & FAQ', ['quickReplies', 'help', 'welcome', 'faq']],
   ['People & roles', ['organizers', 'participants']], ['Tool services', ['mcpServers', 'globalMcp', 'tools']], ['Photos & voice', ['media']], ['Changes need confirmation', ['confirm']],
-  ['Scheduled posts', ['schedules']], ['Advanced', ['plugins', 'timezone', 'historySize', 'maxTokens']]];
+  ['Scheduled posts', ['schedules']], ['Advanced', ['timezone', 'historySize', 'maxTokens']]];
 const AI_ORDER = AI_SECTIONS.flatMap(([, f]) => f);
 const sectionOf = (f) => (AI_SECTIONS.find(([, fs]) => fs.includes(f)) || ['Other'])[0];
 const DM_LABEL = { none: 'Nobody', organizers: 'Organizers only', members: 'Members of its groups', anyone: 'Anyone' };
@@ -1885,6 +1969,7 @@ function aiScalar(field, v, ctx) {
   if (field === 'model') return modelLabel(v, ctx.models);
   if (field === 'dm') return DM_LABEL[v] || String(v ?? '—');
   if (field === 'memory') return v?.enabled === false ? 'off' : 'on';
+  if (field === 'welcome') return v?.enabled ? `on — “${trunc(v.text || 'Welcome {name} to {group}! 👋', 60)}”${v.rules ? ' + rules' : ''}` : 'off';
   if (field === 'confirm') return v ? `on (preview ${v.preview || '—'}, confirm with ${v.tool || '—'})` : 'off';
   if (field === 'media' && v) return [v.photos !== false && 'photos', v.documents !== false && 'PDFs', v.stickers && 'stickers', v.voiceNotes !== false && 'voice notes',
     `voice replies: ${({ never: 'never', voice: 'to voice notes', always: 'always' })[v.voiceReply || 'never']}`, `pictures: ${[v.createImages?.organizer !== false && 'organizers', v.createImages?.participant && 'participants'].filter(Boolean).join(' + ') || 'nobody'}`].filter(Boolean).join(', ');
@@ -1895,7 +1980,10 @@ function aiScalar(field, v, ctx) {
 /** List-like fields as [{ k: key, l: readable label, v: value for "changed" checks }]. */
 const AI_LISTS = {
   triggers: (v) => (v || []).map((x) => ({ k: x, l: x })),
-  plugins: (v) => (v || []).map((x) => ({ k: x, l: x })),
+  names: (v) => (v || []).map((x) => ({ k: x, l: x })),
+  quickReplies: (v) => (v || []).map((q) => ({ k: q.command, l: `${q.command}${q.who === 'organizers' ? ' (organizers)' : ''} → ${trunc(q.text, 70)}`, v: q })),
+  faq: (v) => [...(v?.items || []).map((it) => ({ k: (it.questions?.[0] || (it.keywords || []).join(', ')).toLowerCase(), l: `${trunc(it.questions?.[0] || (it.keywords || []).join(', '), 50)} → ${trunc(it.answer, 50)}`, v: it })),
+    ...(v ? [{ k: '~match', l: `Match: ${v.strictness === 'strict' ? 'strict' : 'normal'}${v.wholeGroup ? ', in the whole group' : ', when addressed'}`, v: [v.strictness, !!v.wholeGroup] }] : [])],
   organizers: (v, c) => (v || []).map((p) => ({ k: String(p).replace(/\D/g, ''), l: personLabel(p, c.names) })),
   participants: (v, c) => (v || []).map((p) => ({ k: String(p).replace(/\D/g, ''), l: personLabel(p, c.names) })),
   mcpServers: (v) => Object.entries(v || {}).map(([k, s]) => ({ k, l: serverLabel(k, s), v: s })),
@@ -1968,7 +2056,7 @@ function changeCard(ch, ctx) {
   } else if (AI_LISTS[ch.field]) {
     const v = listDiffView(AI_LISTS[ch.field](ch.before, ctx), AI_LISTS[ch.field](ch.after, ctx), { describe: ch.field === 'schedules' ? schedChange : null }); body = v.el; head = `${label}: ${v.n}`;
   } else if (ch.field === 'globalMcp') {
-    const v = listDiffView(AI_LISTS.plugins(ch.before?.disabled), AI_LISTS.plugins(ch.after?.disabled), { added: 'Turned off', removed: 'Turned on again' }); body = v.el; head = `${label}: ${v.n.replace('added', 'turned off').replace('removed', 'turned on')}`;
+    const v = listDiffView(AI_LISTS.names(ch.before?.disabled), AI_LISTS.names(ch.after?.disabled), { added: 'Turned off', removed: 'Turned on again' }); body = v.el; head = `${label}: ${v.n.replace('added', 'turned off').replace('removed', 'turned on')}`;
   } else if (ch.field === 'tools') {
     const roles = [['participant', 'Participants may use'], ['organizer', 'Organizers may use'], ['deny', 'Never allowed']];
     const parts = roles.map(([role, t]) => { const f = (v) => (v?.[role] || []).map((x) => ({ k: x, l: ruleLabel(x) })); const a = f(ch.before); const b = f(ch.after);
@@ -2153,7 +2241,11 @@ async function renderChats() {
             h('label', { class: 'tick small', title: 'The agent keeps working here, but the owner assistant and the Ask box never see this chat.' },
               h('input', { type: 'checkbox', checked: !!c.private, disabled: !can('admin'), onchange: (e) => savePrefs(c, { private: e.target.checked }) }), ' Private to members'),
             c.isGroup ? h('label', { class: 'tick small', title: c.noticePostedAt ? `Privacy notice posted ${ago(c.noticePostedAt)} ago` : 'Posted once when this group is switched on' },
-              h('input', { type: 'checkbox', checked: !c.noticeOff, disabled: !can('admin'), onchange: (e) => savePrefs(c, { noticeOff: !e.target.checked }) }), ' Privacy notice') : null)),
+              h('input', { type: 'checkbox', checked: !c.noticeOff, disabled: !can('admin'), onchange: (e) => savePrefs(c, { noticeOff: !e.target.checked }) }), ' Privacy notice') : null,
+            // 054: "Welcome new members" for this group: the agent setting, or always on / off here
+            c.isGroup ? h('label', { class: 'tick small welcome-pick', title: 'Greet people who join this group (once per person), with the agent’s welcome text' }, 'Welcome new members',
+              h('select', { class: 'small', disabled: !can('admin'), 'aria-label': `Welcome new members in ${c.name || c.id}`, onchange: (e) => savePrefs(c, { welcome: e.target.value }) },
+                [['inherit', `As the agent (${agents.find((x) => x.id === c.agent)?.config?.welcome?.enabled ? 'on' : 'off'})`], ['on', 'On'], ['off', 'Off']].map(([v, l]) => h('option', { value: v, selected: (c.welcome || 'inherit') === v }, l)))) : null)),
         h('td', { style: 'min-width:170px', 'data-label': 'Agent' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, agent: e.target.value || null }); c.agent = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
           h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),
         h('td', { style: 'min-width:200px', 'data-label': 'Model' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) }),

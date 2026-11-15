@@ -198,7 +198,7 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
   let seq = 0;
   t.channel = {
     id: 'whatsapp',
-    send: async (chat, text) => { t.sent.push({ chat, text }); return { msgId: `out-${++seq}` }; },
+    send: async (chat, text, opts) => { t.sent.push({ chat, text, ...(opts?.mentions ? { mentions: opts.mentions } : {}) }); return { msgId: `out-${++seq}` }; },
     typing: async () => {},
     chatName: async (chat) => (chat === 'g1@g.us' ? 'Panduga families' : ''),
     listChats: async () => [{ id: 'g1@g.us', name: 'Panduga families', size: 12 }, { id: 'g2@g.us', name: 'Carpool', size: 6 }],
@@ -261,7 +261,7 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
   t.tmp = tmp;
   Object.assign(process.env, {
     DATA_DIR: join(tmp, 'data'), ANTHROPIC_BASE_URL: `http://127.0.0.1:${t.claudeHttp.address().port}`,
-    ADMIN_PASSWORD: 'correct horse battery', PANEL_PORT: '0', ...env,
+    ADMIN_PASSWORD: 'correct horse battery', PANEL_PORT: '0', WELCOME_DELAY_MS: '20', WELCOME_GAP_MS: '0', ...env,
   });
   if (beforeImport) await beforeImport(t);
   t.store = await import('../src/core/store.js');
@@ -287,7 +287,7 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
     } });
     await t.agents.createAgent({ id: 'helper', config: {
       name: 'Helper', prompt: 'You help.', model: 'claude-sonnet-5-5', triggers: ['!help'], dm: 'organizers',
-      chats: ['g2@g.us'], organizers: ['41790000001'], plugins: ['example-dice'], ...(bindings.helper || {}),
+      chats: ['g2@g.us'], organizers: ['41790000001'], ...(bindings.helper || {}),
     } });
   }
   // #10: chats are off by default. Tests written before that switch on the chats they use; tests about the
@@ -299,6 +299,7 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
   }
   t.route = t.router.createRouter(t.channel);
   t.onHistory = t.router.createHistoryHandler();
+  t.onJoin = t.router.createJoinHandler(t.channel); // 054: people joined a group ({ chat, participants: [{ jid, phone }] })
   const { providerRoutes } = await import('../src/panel/routes/providers.js');
   const { backupRoutes } = await import('../src/panel/routes/backups.js');
   const { updateRoutes } = await import('../src/panel/routes/updates.js');

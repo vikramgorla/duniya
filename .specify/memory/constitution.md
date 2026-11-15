@@ -1,5 +1,9 @@
 <!--
-Sync Impact Report (1.3.2 → 1.4.0, MINOR)
+Sync Impact Report (1.4.0 → 1.4.1, PATCH)
+- Principle II renamed "Generic Core, Agents as Data": code plugins were removed (#101); templates are the only agent
+  files. No other principle changed. Templates: no change needed. Follow-up: none.
+
+Previous (1.3.2 → 1.4.0, MINOR)
 - Added principle IX "Definition of Done & Documentation" (AGENTS.md is the single source of truth for working rules).
 - Development Workflow: issues, branches, REST, version bump in three files, docs as part of every change.
 - Templates updated: .specify/templates/plan-template.md, tasks-template.md, checklist-template.md (final DoD tasks).
@@ -20,13 +24,13 @@ addressed and be rate-limited, to keep ban risk low.
 *Rationale*: the owners explicitly rejected commercial WhatsApp connectors; unofficial clients carry
 ban risk that conservative behaviour keeps small.
 
-### II. Generic Core, Agents as Plugins
+### II. Generic Core, Agents as Data
 
 The deployment is a generic multi-agent platform. Core code (`src/core`, `src/channels`, `src/panel`)
 MUST NOT contain agent-specific names, prompts, tools or business rules. Agents are data: they MUST be
 created, edited, exported and imported from the admin panel and be fully described by a validated
 configuration (instructions, tool services, per-role rules, confirmation, schedules, memory). Templates
-(`templates/`) and optional code plugins (`plugins/<name>/`) are files; no agent may require code changes.
+(`templates/`) are files; no agent may require code changes, and there is no per-agent code (#101).
 Data models MUST carry a tenant identifier so hosted multi-tenancy can be added later. Channels MUST sit
 behind a small interface so channels other than WhatsApp can be added.
 
@@ -166,4 +170,4 @@ principle removed or redefined; MINOR: principle or section added or materially 
 clarification), and reviewed in a pull request. Reviewers verify constitution compliance for every
 change.
 
-**Version**: 1.4.0 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-15
+**Version**: 1.4.1 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-15

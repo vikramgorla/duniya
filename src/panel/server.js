@@ -9,13 +9,15 @@ import {
 } from '../core/store.js';
 import {
   listAgents, getAgent, agentView, createAgent, updateAgent, deleteAgent, bindChat, loadAgents, agentForChat,
-  listTemplates, templateConfig, exportAgent, importAgent, listPlugins,
+  listTemplates, templateConfig, exportAgent, importAgent,
 } from '../core/agents.js';
 import { referencedSecrets } from '../core/schema.js';
 import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages, listNotes } from '../core/db.js';
 import { bus, activity, loggingSettings, resetLoggingCache, LOG_CATEGORIES } from '../core/events.js';
 import { allChatPrefs, setChatPrefs, seenChats, ignoredCounts, enabledChats, isChatEnabled } from '../core/chat-prefs.js';
 import { runAgent, handleConfirmCommand, applyPending } from '../core/runner.js';
+import { stripTriggers } from '../core/router.js';
+import { builtinAnswer, todayText } from '../core/quick.js';
 import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool, mcpConnection } from '../core/mcp.js';
 import { listContacts, saveContact, removeContact, getContact } from '../core/contacts.js';
@@ -223,7 +225,6 @@ export function startPanel({ channel, extend = [] }) {
 
   // ---------- agents ----------
   route('GET', '/api/templates', async () => listTemplates());
-  route('GET', '/api/plugins', async () => listPlugins());
   route('GET', '/api/agents', async () => listAgents().map(agentView));
   route('POST', '/api/agents', async (req, res, body, q, p, user) => {
     const base = body.template ? templateConfig(body.template) : {};
@@ -248,7 +249,7 @@ export function startPanel({ channel, extend = [] }) {
   route('POST', '/api/agents/:id/duplicate', async (req, res, body, q, p, user) => {
     const src = getAgent(p.id);
     if (!src) return [404, { error: 'Not found' }];
-    const { hooks, id, updatedAt, ...config } = src;
+    const { id, updatedAt, ...config } = src;
     guardLocal(user, {}, config);
     const { agent } = await createAgent({ id: body.id, config: { ...config, name: `${config.name} (copy)`, chats: [] }, by: user.username });
     return [201, agentView(agent)];
@@ -388,11 +389,20 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
     const confirm = await handleConfirmCommand({ agent, text, role, chat });
     if (confirm !== undefined) return { reply: confirm };
     activity('message.in', { agent: agent.id, chat, summary: `Panel test (${role}${pick ? ` in ${pick}` : ''}): ${text}` });
+    const chatName = isGroup ? await channel.chatName?.(pick).catch(() => '') : '';
+    // 054: the same built-in answers WhatsApp gets (quick reply, !help, FAQ); the console shows which path answered.
+    const stripped = stripTriggers(agent, text);
+    const built = builtinAnswer(agent, { texts: [text, stripped], question: stripped, role, faqAllowed: true,
+      values: { name: 'Panel admin', group: chatName || (isGroup ? 'the group' : 'this chat'), date: todayText(agent.timezone) } });
+    if (built) {
+      activity('message.out', { agent: agent.id, chat, summary: `${built.text} (${built.label})` });
+      return { reply: built.text, path: built.kind, answeredBy: built.label, role, chat: pick || 'new', ...(pick ? { chatOn: isChatEnabled(pick) } : {}) };
+    }
     const ctx = { agent, role, chat, senderName: 'Panel admin', requester: 'panel', text, isGroup, source: 'panel',
-      contextChat: pick, chatName: isGroup ? await channel.chatName?.(pick).catch(() => '') : '' };
+      contextChat: pick, chatName };
     const reply = await runAgent(ctx);
     activity('message.out', { agent: agent.id, chat, summary: reply || '(no reply)' });
-    return { reply, usage: ctx.usage, model: ctx.model, answeredBy: ctx.answeredBy || '', fallback: ctx.fallback || null, role, chat: pick || 'new', ...(pick ? { chatOn: isChatEnabled(pick) } : {}) };
+    return { reply, path: 'model', usage: ctx.usage, model: ctx.model, answeredBy: ctx.answeredBy || '', fallback: ctx.fallback || null, role, chat: pick || 'new', ...(pick ? { chatOn: isChatEnabled(pick) } : {}) };
   });
   route('POST', '/api/agents/:id/schedules/:sid/run', async (req, res, body, q, p) => {
     const agent = getAgent(p.id);
@@ -425,7 +435,7 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
       const number = c.number || (c.id.includes('#') ? c.id.split('#')[0] : 'main');
       return { ...c, number, numberLabel: numbers.get(number) || number, agent: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit',
         fallback: prefs[c.id]?.fallback || { mode: 'inherit', chain: [] }, enabled: !!prefs[c.id]?.enabled, ignored: ignoredCounts.get(c.id) || 0,
-        private: !!prefs[c.id]?.private, noticeOff: !!prefs[c.id]?.noticeOff, noticePostedAt: c.isGroup ? noticePostedAt(c.id) : null, history: historyStatus(c.id) };
+        private: !!prefs[c.id]?.private, noticeOff: !!prefs[c.id]?.noticeOff, welcome: prefs[c.id]?.welcome || 'inherit', noticePostedAt: c.isGroup ? noticePostedAt(c.id) : null, history: historyStatus(c.id) };
     });
   });
   route('PUT', '/api/chats/:chat/prefs', async (req, res, body, q, p, user) => {
@@ -437,6 +447,10 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
       setChatPrefs(chat, { private: !!body.private });
       activity('config', { chat, summary: `Chat ${body.private ? 'marked private to members — hidden from the owner assistant' : 'no longer private to members'} (${user.username})` });
     }
+    if (body.welcome !== undefined) { // 054: "Welcome new members" for this chat (inherit = the agent's setting)
+      setChatPrefs(chat, { welcome: String(body.welcome) });
+      activity('config', { chat, summary: `Welcome new members: ${body.welcome === 'inherit' ? 'as the agent is set' : body.welcome} for this chat (${user.username})` });
+    }
     const out = setChatPrefs(chat, { model: body.model, logging: body.logging, enabled: body.enabled, fallback: body.fallback });
     if (body.enabled !== undefined) {
       ignoredCounts.delete(chat); activity('config', { chat, summary: `Chat switched ${out.enabled ? 'ON — agents may answer here' : 'OFF — agents ignore it'} (${user.username})` });
@@ -445,7 +459,7 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
       if (out.enabled && !wasOn && historyLoadCount() > 0) {
         try { await loadChatHistory(chat, { by: user.username, reason: 'switch_on' }); } catch (e) { activity('memory.history', { chat, summary: `Could not ask the phone for earlier messages: ${e.message}` }); }
       }
-    } else if (body.private !== undefined || body.noticeOff !== undefined) { /* recorded above */ } else activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging}, fallback ${out.fallback.mode}${out.fallback.chain.length ? ` (${out.fallback.chain.join(' → ')})` : ''} (${user.username})` });
+    } else if (body.private !== undefined || body.noticeOff !== undefined || body.welcome !== undefined) { /* recorded above */ } else activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging}, fallback ${out.fallback.mode}${out.fallback.chain.length ? ` (${out.fallback.chain.join(' → ')})` : ''} (${user.username})` });
     return { ...out, history: historyStatus(chat) };
   });
   // #91: "Load recent messages": ask the linked phone for earlier messages of a chat that is on (status by polling).

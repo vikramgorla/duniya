@@ -3,6 +3,7 @@ flowchart TD
   AL -- "off" --> X["dropped"]
   AL -- "on" --> R["Router<br/>triggers, roles, rate limits"]
   R -- "owner DM" --> OA["Owner assistant"]
+  R -- "command, FAQ" --> Q["Quick replies<br/>FAQ, no AI"]
   R --> AG["Agent<br/>stored in the app"]
   AG --> M["Model provider<br/>+ fallback"]
   AG --> T["MCP tools<br/>per-role allow lists"]
@@ -10,8 +11,6 @@ flowchart TD
   T -- "preview tools" --> CG["Confirm gate:<br/>organizer replies<br/>confirm CODE"]
   M ~~~ MEM
   M ~~~ W
-  DB ~~~ PL
   AG --> MEM["Memory<br/>messages, notes"]
-  AG --> PL["Plugins<br/>optional"]
   AG --> DB[("SQLite<br/>encrypted secrets")]
   P["Panel, app,<br/>admin MCP"] --> DB

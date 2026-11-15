@@ -48,7 +48,7 @@ The panel's **Server** page has a **Hosting help** card that links to the right 
 
 | | Guide | Use this when… |
 |---|---|---|
-| <img src="img/thumb-agents.webp" alt="" width="120"> | **[Agents, tools & memory](agents.md)** | you create or change an agent, roles, MCP tools, memory, contacts, numbers |
+| <img src="img/thumb-agents.webp" alt="" width="120"> | **[Agents, tools & memory](agents.md)** | you create or change an agent, quick replies, welcome and FAQ, roles, MCP tools, memory, contacts, numbers |
 | <img src="img/thumb-ask.webp" alt="" width="120"> | **[Owner assistant](owner-assistant.md)** | you want recaps and changes from your own WhatsApp, alerts, a weekly summary |
 | <img src="img/thumb-assistants.webp" alt="" width="120"> | **[Manage from ChatGPT or Claude](admin-mcp.md)** | you want to run Duniya by chatting with an AI assistant |
 | `PHONE` | **[Mobile app](mobile-app.md)** | you want status, Ask and confirmations on your phone |

@@ -26,5 +26,23 @@
       "enabled": false,
       "prompt": "Post the open action items from the notes, grouped by owner, with due dates. Keep it short."
     }
-  ]
+  ],
+  "quickReplies": [
+    {
+      "command": "!rules",
+      "text": "Team chat: keep it work-friendly, no customer data here, and use \"!team\" to ask the assistant.",
+      "who": "everyone"
+    }
+  ],
+  "help": true,
+  "welcome": {
+    "enabled": true,
+    "text": "Welcome to {group}, {name}! 👋",
+    "rules": ""
+  },
+  "faq": {
+    "items": [],
+    "strictness": "normal",
+    "wholeGroup": false
+  }
 }
