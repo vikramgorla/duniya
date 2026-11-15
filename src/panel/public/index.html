@@ -316,7 +316,7 @@ async function api(method, path, body) {
   const res = await fetch(path, opts);
   if (res.status === 401 && !['/api/login', '/api/setup'].includes(path)) { renderLogin(); throw new Error('Please sign in'); }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { field: data.field });
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { field: data.field, data, status: res.status });
   return data;
 }
 const tryApi = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message); return undefined; } };
@@ -399,6 +399,15 @@ async function renderLogin() {
   const brand = () => [h('div', { style: 'display:flex;justify-content:center;margin:4px 0 6px' }, Object.assign(logo(), { style: 'width:76px;height:76px' })),
     h('h2', { style: 'text-align:center;font-size:24px;margin-bottom:2px' }, 'Duniya')];
   if (info.needsSetup) return renderSetup(app, brand);
+  if (info.google && info.passwordLogin === false) { // 028: the owner allows only Sign in with Google
+    app.append(h('div', { class: 'center' }, h('div', { class: 'card', style: 'width:min(360px,92vw)' }, brand(),
+      h('p', { class: 'small muted', style: 'text-align:center;margin:0 0 6px' }, 'Your WhatsApp agents'),
+      h('a', { class: 'btn google', href: '/auth/google/start', style: 'width:100%;justify-content:center;margin-top:10px' }, gLogo(), 'Sign in with Google'),
+      h('p', { class: 'small muted', style: 'text-align:center;margin:14px 0 0' }, 'This panel only allows Sign in with Google.'),
+      h('details', { class: 'small muted', style: 'margin-top:8px' }, h('summary', { style: 'cursor:pointer' }, 'Owner locked out?'),
+        h('p', { style: 'margin:6px 0 0' }, 'On the server, run ', h('code', {}, 'sudo duniya enable-password-login'), ' (Docker: ', h('code', {}, 'docker compose exec app duniya enable-password-login'), '), then sign in with your password.')))));
+    return;
+  }
   const user = h('input', { placeholder: 'Username', value: 'admin', autocomplete: 'username' });
   const pw = h('input', { type: 'password', placeholder: 'Password', autocomplete: 'current-password' });
   app.append(h('div', { class: 'center' }, h('form', { class: 'card', style: 'width:min(360px,92vw)', onsubmit: async (e) => {
@@ -1701,8 +1710,8 @@ async function renderSettings() {
       h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups'))),
   ];
   if (can('owner')) {
-    const [users, inv, gcfg] = await Promise.all([api('GET', '/api/users'), api('GET', '/api/invites'), api('GET', '/api/auth/google')]);
-    cards.unshift(usersCard(users, inv), googleSetupCard(gcfg));
+    const [users, inv, gcfg, signin, web] = await Promise.all([api('GET', '/api/users'), api('GET', '/api/invites'), api('GET', '/api/auth/google'), api('GET', '/api/auth/signin').catch(() => null), api('GET', '/api/web').catch(() => null)]);
+    cards.unshift(usersCard(users, inv, signin), signin ? signinCard(signin) : null, googleSetupCard(gcfg), web ? webAccessCard(web) : null);
   }
   $('#main').replaceChildren(h('div', { class: 'grid' }, cards));
 }
@@ -1751,7 +1760,26 @@ function inviteMessage(i, panelUrl) {
   return `Hi! You're invited to the Duniya admin panel as ${i.role}.\n\nOpen ${panelUrl} and choose “Sign in with Google” with ${i.email}.\nThe invite is valid until ${until}.`;
 }
 
-function usersCard(users, inv) {
+/** 028: owner switch "Only allow Sign in with Google". */
+function signinCard(st) {
+  const busy = h('span', { class: 'small muted' });
+  const set = async (v) => {
+    if (v && !confirm(`Switch off password sign-in? Everyone must use Sign in with Google from now on.${st.withoutGoogle.length ? `\n\nThese accounts have no Google link and can no longer sign in: ${st.withoutGoogle.join(', ')}.` : ''}\n\nIf Google ever stops working, run “sudo duniya enable-password-login” on the server.`)) return renderSettings();
+    await tryApi(() => api('PUT', '/api/auth/signin', { googleOnly: v }), v ? 'Only Google sign-in from now on' : 'Password sign-in is back on');
+    renderSettings();
+  };
+  const sw = toggle(st.on, set, !st.on && !st.canEnable);
+  return h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Sign-in'),
+    h('span', { class: `pill ${st.active ? 'ok' : ''}` }, st.active ? 'Google only' : 'Google and password')),
+    h('p', { class: 'small muted' }, 'Turn off passwords so the panel can only be opened with a Google account you approved. Invites keep working.'),
+    h('label', { class: 'inline' }, sw, 'Only allow Sign in with Google'), busy,
+    !st.on && !st.canEnable ? h('div', { class: 'note', style: 'margin-top:8px' }, st.reason) : null,
+    st.on && !st.active ? h('div', { class: 'note warn', style: 'margin-top:8px' }, 'Sign in with Google is not working right now, so passwords are allowed until it is set up again.') : null,
+    st.withoutGoogle.length ? h('p', { class: 'small muted', style: 'margin-bottom:0' }, `${st.active ? 'Cannot sign in now' : 'Would lose access'} (no Google link): ${st.withoutGoogle.join(', ')}.`) : null,
+    h('p', { class: 'small muted', style: 'margin-bottom:0' }, 'Locked out? On the server: ', h('code', {}, 'sudo duniya enable-password-login')));
+}
+
+function usersCard(users, inv, signin) {
   const un = h('input', { placeholder: 'username' }); const ue = h('input', { placeholder: 'email (optional, lets them use Google)' });
   const roleSel = (val) => h('select', {}, h('option', { value: 'admin', selected: val === 'admin' }, 'Admin'), h('option', { value: 'viewer', selected: val === 'viewer' }, 'Viewer (read-only)'), h('option', { value: 'owner', selected: val === 'owner' }, 'Owner'));
   const ur = roleSel('admin'); const up = h('input', { type: 'password', placeholder: 'initial password (12+)' });
@@ -1782,7 +1810,7 @@ function usersCard(users, inv) {
         copyBtn(() => inviteMessage(i, inv.panelUrl), 'Copy message'),
         h('button', { class: 'btn small', title: 'Give them 14 more days', onclick: () => tryApi(async () => { await api('POST', `/api/invites/${i.id}/renew`); renderSettings(); }, 'Invite renewed for 14 days') }, 'Resend'),
         h('button', { class: 'btn small danger', onclick: () => confirm(`Revoke the invite for ${i.email}? They can no longer sign in with it.`) && tryApi(async () => { await api('DELETE', `/api/invites/${i.id}`); renderSettings(); }, 'Invite revoked') }, 'Revoke'))))) : null,
-    h('details', { style: 'margin-top:12px' }, h('summary', { class: 'small muted' }, 'Add a user with a password instead'),
+    signin?.active ? null : h('details', { style: 'margin-top:12px' }, h('summary', { class: 'small muted' }, 'Add a user with a password instead'),
       h('form', { class: 'row', style: 'margin-top:10px', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('POST', '/api/users', { username: un.value, email: ue.value, role: ur.value, password: up.value }), 'User added')) renderSettings(); } },
         un, ue, ur, up, h('button', { class: 'btn primary' }, 'Add user'))));
 }
@@ -1831,6 +1859,103 @@ function googleSetupCard(g) {
       h('details', {}, h('summary', { class: 'small muted' }, 'Setup steps and addresses'), steps,
         h('button', { class: 'btn small danger', onclick: () => confirm('Remove Google sign-in? People who only use Google cannot sign in until you set it up again (accounts and links are kept).') && tryApi(async () => { await api('DELETE', '/api/auth/google'); renderSettings(); }, 'Removed') }, 'Remove Google sign-in'))]
       : [steps, result]);
+}
+
+/** 031: custom domain, certificate state and IP allow-list ("Only Cloudflare", own list), applied by the root helper. */
+function webAccessCard(initial) {
+  const card = h('div', { class: 'card', style: 'grid-column:1/-1' });
+  let timer = null;
+  const draw = (w) => {
+    clearTimeout(timer);
+    const av = w.availability; const cert = w.cert || {};
+    const applied = w.applied; const restricted = w.restricted;
+    const accessLabel = !applied ? 'open to everyone' : applied.cloudflareOnly ? (applied.allow.length ? `Cloudflare + ${applied.allow.length} addresses` : 'only Cloudflare') : applied.allow.length ? `allow-list · ${applied.allow.length}` : 'open to everyone';
+    const certLine = cert.state === 'valid' ? h('span', {}, '✓ Certificate valid', cert.issuer ? ` · ${cert.issuer}` : '', cert.daysLeft != null ? ` · ${cert.daysLeft} days left (renews automatically)` : '')
+      : cert.state === 'invalid' ? h('span', { style: 'color:var(--bad)' }, `✗ Certificate problem${cert.error ? `: ${cert.error}` : ''}`)
+        : h('span', { class: 'muted' }, w.current.host ? 'No certificate found on this server' : 'No public address yet');
+    const statusBox = w.pending ? h('div', { class: 'note' }, h('span', { class: 'spinner' }), h('b', {}, w.pending === 'waiting' ? ` Getting the HTTPS certificate for ${w.last?.host || 'the new address'}…` : ' Applying the new settings…'),
+      w.last?.startedAt ? ` started ${ago(w.last.startedAt)} ago. ` : ' ', 'If HTTPS does not come up within 4 minutes, the previous address comes back by itself.')
+      : w.last && ['failed', 'rolled-back'].includes(w.last.state) && Date.now() - (w.last.endedAt || 0) < 86400000 ? h('div', { class: 'note bad' }, h('b', {}, w.last.state === 'rolled-back' ? 'Rolled back. ' : 'Not applied. '), w.last.message, ` (${ago(w.last.endedAt)} ago)`)
+        : w.last?.state === 'done' && Date.now() - (w.last.endedAt || 0) < 3600000 ? h('div', { class: 'note ok' }, h('b', {}, '✓ '), w.last.message) : null;
+
+    // ----- domain -----
+    const dom = h('input', { placeholder: 'agents.example.com', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'none', value: w.current.host && !/\.sslip\.io$/.test(w.current.host) ? w.current.host : '' });
+    const dnsBox = h('div', {});
+    const useBtn = h('button', { class: 'btn primary', disabled: true }, 'Use this domain');
+    const showCheck = (r) => {
+      useBtn.disabled = !r.ok || r.domain === w.current.host;
+      dnsBox.replaceChildren(h('div', { class: `note ${r.ok ? 'ok' : 'warn'}`, style: 'margin-top:8px' }, r.ok ? h('b', {}, '✓ ') : null, r.text),
+        r.ok ? null : h('div', { style: 'overflow-x:auto;margin-top:6px' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Type'), h('th', {}, 'Name'), h('th', {}, 'Value'))),
+          h('tbody', {}, h('tr', {}, h('td', {}, h('code', {}, r.record.type)), h('td', {}, h('code', {}, r.record.name), ' ', copyBtn(r.record.name)), h('td', {}, h('code', {}, r.record.value), ' ', r.serverIp ? copyBtn(r.record.value) : null))))),
+        r.ok ? null : h('p', { class: 'small muted' }, 'At your DNS provider (e.g. Cloudflare, your registrar): add the record, keep the TTL on automatic, wait a minute, then check again. Using Cloudflare: “DNS only” (grey cloud) until the certificate works.'));
+    };
+    const check = async (btn) => {
+      btn.disabled = true; btn.replaceChildren(h('span', { class: 'spinner' }), ' Checking…');
+      const r = await tryApi(() => api('POST', '/api/web/check', { domain: dom.value }));
+      btn.disabled = false; btn.textContent = 'Check DNS';
+      if (r) showCheck(r);
+    };
+    useBtn.onclick = async () => {
+      const d = dom.value.trim().toLowerCase();
+      if (!confirm(`Move the panel to https://${d}?\n\nThe web server gets a certificate for it (about a minute). If HTTPS does not come up within 4 minutes, the current address comes back automatically. The old address keeps forwarding to the new one.\n\nAfter the move, update the addresses in Google sign-in and AI assistants if you use them.`)) return;
+      await applyNow({ domain: d });
+    };
+
+    // ----- access -----
+    const st = { mode: w.settings.cloudflareOnly ? 'cloudflare' : w.settings.allow.length ? 'list' : 'open' };
+    const list = h('textarea', { rows: 4, placeholder: '203.0.113.7\n198.51.100.0/24\n2001:db8::/32', spellcheck: 'false' }); list.value = w.settings.allow.join('\n');
+    const mine = h('input', { type: 'checkbox', checked: w.settings.alwaysAllowMine !== false });
+    const listBox = h('div', {}, field('Allowed addresses (one per line: an IP or a range like 203.0.113.0/24)', list),
+      h('label', { class: 'inline', style: 'margin-top:6px' }, mine, `Always allow my current address (${w.you.ip || 'unknown'})`));
+    const cfExtra = h('details', {}, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Also limit to my own addresses (advanced)'));
+    const modeHint = h('p', { class: 'small muted', style: 'margin:6px 0' });
+    const HINT = {
+      open: 'Anyone who knows the address can see the sign-in page (passwords and Google still protect it).',
+      cloudflare: `Only Cloudflare’s servers may connect, so visitors must come through your Cloudflare-proxied domain (orange cloud). Cloudflare’s address list (${w.cloudflare.ranges} ranges${w.cloudflare.updatedAt ? `, updated ${ago(w.cloudflare.updatedAt)} ago` : ''}) is refreshed daily.`,
+      list: 'Only the addresses below may open the panel. Good for a fixed office or home connection.',
+    };
+    const placeList = () => { modeHint.textContent = HINT[st.mode]; if (st.mode === 'list') modeHint.after(listBox); else if (st.mode === 'cloudflare') { cfExtra.append(listBox); } else listBox.remove(); cfExtra.classList.toggle('hide', st.mode !== 'cloudflare'); };
+    const seg = h('div', { class: 'seg' }, [['open', 'Everyone'], ['cloudflare', 'Only Cloudflare'], ['list', 'Only my list']].map(([v, l]) => h('button', { type: 'button', class: st.mode === v ? 'on' : '',
+      onclick: (e) => { st.mode = v; seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); placeList(); } }, l)));
+    const accessBody = () => ({ cloudflareOnly: st.mode === 'cloudflare', allow: st.mode === 'list' || (st.mode === 'cloudflare' && cfExtra.open) ? splitLines(list.value) : [], alwaysAllowMine: mine.checked });
+    const pre = h('pre', { style: 'max-height:320px' });
+    const applyNow = async (extra, confirmLockout = false) => {
+      try {
+        await api('PUT', '/api/web', { ...accessBody(), ...extra, confirmLockout });
+        toast('Applying…'); draw(await api('GET', '/api/web'));
+      } catch (e) {
+        if (e.data?.needsConfirm && confirm(`${e.message}\n\nIf you get locked out, run on the server: sudo duniya open-access\n\nApply anyway?`)) return applyNow(extra, true);
+        if (!e.data?.needsConfirm) toast(e.message);
+      }
+    };
+    const busy = !!w.pending;
+    card.replaceChildren(
+      h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Web address & access'), h('span', { class: `pill ${restricted ? 'info' : ''}` }, accessLabel)),
+      h('p', { class: 'small muted' }, 'Choose the address people use to open this panel, and who may open it at all.'),
+      h('table', {}, h('tbody', {},
+        h('tr', {}, h('td', { class: 'muted small' }, 'Address'), h('td', {}, w.current.url ? h('a', { href: w.current.url, target: '_blank', rel: 'noopener' }, w.current.url) : h('span', { class: 'muted' }, 'none (only on the server)'))),
+        h('tr', {}, h('td', { class: 'muted small' }, 'HTTPS'), h('td', {}, certLine)),
+        h('tr', {}, h('td', { class: 'muted small' }, 'Access'), h('td', {}, restricted ? `Restricted: ${accessLabel}` : 'Open to everyone')),
+        h('tr', {}, h('td', { class: 'muted small' }, 'You'), h('td', {}, `${w.you.ip || 'unknown'}${w.you.viaCloudflare ? ' · through Cloudflare' : ''}`)))),
+      statusBox,
+      av.ok ? [
+        h('h3', {}, 'Your own domain'),
+        h('p', { class: 'small muted', style: 'margin-top:0' }, `Point a name you own to this server${w.serverIp ? ` (${w.serverIp})` : ''}, check it, then switch. The certificate is free and renews by itself.`),
+        h('div', { class: 'row' }, dom, h('button', { class: 'btn', disabled: busy, onclick: (e) => check(e.currentTarget) }, 'Check DNS'), useBtn), dnsBox,
+        h('h3', {}, 'Who can open the panel'),
+        h('div', { style: 'overflow-x:auto' }, seg), modeHint, cfExtra,
+        h('div', { class: 'row', style: 'margin-top:10px' },
+          h('button', { class: 'btn primary', disabled: busy, onclick: () => applyNow({}) }, 'Apply access'),
+          st.mode === 'cloudflare' || w.settings.cloudflareOnly ? h('button', { class: 'btn small', onclick: () => tryApi(async () => { await api('POST', '/api/web/cloudflare/refresh'); draw(await api('GET', '/api/web')); }, 'Cloudflare list updated') }, 'Refresh Cloudflare list') : null),
+        h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Show the web server configuration this creates'),
+          h('button', { class: 'btn small', style: 'margin:8px 0', onclick: async () => { const r = await tryApi(() => api('POST', '/api/web/preview', { ...accessBody(), domain: dom.value.trim() || undefined })); if (r) pre.textContent = r.caddyfile; } }, 'Preview'), pre),
+        h('p', { class: 'small muted', style: 'margin-bottom:0' }, 'Locked out? On the server run ', h('code', {}, 'sudo duniya open-access'), ' to allow everyone again.'),
+      ] : h('div', { class: 'note', style: 'margin-top:10px' }, av.text));
+    if (av.ok) { placeList(); if (busy) card.querySelectorAll('input,textarea,.seg button').forEach((x) => { x.disabled = true; }); }
+    if (w.pending) timer = setTimeout(async () => { if (!card.isConnected) return; try { draw(await api('GET', '/api/web')); } catch {} }, 4000);
+  };
+  draw(initial);
+  return card;
 }
 
 function loggingCard({ settings, categories }) {

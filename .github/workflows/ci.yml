@@ -26,8 +26,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Shell scripts
         run: |
-          for f in install.sh deploy/*.sh infra/oci/bootstrap.sh; do bash -n "$f"; done
-          shellcheck -S warning install.sh deploy/*.sh infra/oci/bootstrap.sh
+          for f in install.sh deploy/*.sh deploy/duniya deploy/ops/duniya-ops infra/oci/bootstrap.sh infra/gcp/deploy.sh; do bash -n "$f"; done
+          shellcheck -S warning install.sh deploy/*.sh deploy/duniya deploy/ops/duniya-ops infra/oci/bootstrap.sh infra/gcp/deploy.sh
       - name: Installer dry run
         run: bash install.sh --dry-run --yes --domain agents.example.com
       - uses: hashicorp/setup-terraform@v3

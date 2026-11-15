@@ -38,6 +38,8 @@ import {
   CSP, clientIp, isHttps, cookie, send, setSessionCookie, limiter, resultPage, uploadAllowed, setSetupCode, checkSetupCode,
 } from './http.js';
 import { googleRoutes, googleReady } from './routes/google.js';
+import { webRoutes } from './routes/web.js';
+import { passwordLoginAllowed } from '../core/google-signin.js';
 import { createAdminMcp } from './admin-mcp.js';
 import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES } from '../core/mcp-oauth.js';
 
@@ -90,7 +92,7 @@ export function startPanel({ channel, extend = [] }) {
   // ---------- session / setup ----------
   route('GET', '/api/session', async (req) => {
     const user = sessionUser(cookie(req, 'duniya_session'));
-    return { authed: !!user, user, needsSetup: countUsers() === 0, google: googleReady() };
+    return { authed: !!user, user, needsSetup: countUsers() === 0, google: googleReady(), passwordLogin: passwordLoginAllowed() };
   }, { public: true });
   route('POST', '/api/setup', async (req, res, body) => {
     if (countUsers() > 0) return [409, { error: 'Already set up' }];
@@ -105,6 +107,7 @@ export function startPanel({ channel, extend = [] }) {
   route('POST', '/api/login', async (req, res, body) => {
     const ip = clientIp(req);
     if (rateLimitLogin(ip)) return [429, { error: 'Too many attempts, wait a minute' }];
+    if (!passwordLoginAllowed()) { activity('system', { summary: `Password sign-in refused for "${body.username || 'admin'}" from ${ip} (only Google allowed)` }); return [403, { error: 'Password sign-in is switched off. Use Sign in with Google.' }]; }
     const user = authenticate(body.username || 'admin', String(body.password || ''));
     if (!user) { activity('system', { summary: `Panel login failed for "${body.username || 'admin'}" from ${ip}` }); return [401, { error: 'Wrong username or password' }]; }
     setSessionCookie(req, res, user.id);
@@ -126,10 +129,12 @@ export function startPanel({ channel, extend = [] }) {
 
   // ---------- Sign in with Google, invites (019) ----------
   googleRoutes(route);
+  webRoutes(route); // web address & access (031)
 
   // ---------- users (owner) ----------
   route('GET', '/api/users', async () => listUsers(), { role: 'owner' });
   route('POST', '/api/users', async (req, res, body, q, p, user) => {
+    if (!passwordLoginAllowed()) return [400, { error: 'Password sign-in is switched off: invite this person with Google instead (Users → Invite).' }];
     const u = createUser(body); activity('system', { summary: `User ${u.username} (${u.role}) added by ${user.username}` }); return u;
   }, { role: 'owner' });
   route('PUT', '/api/users/:id', async (req, res, body, q, p, user) => {
@@ -543,7 +548,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
       if (Array.isArray(out) && typeof out[0] === 'number' && out.length === 2) return send(res, out[0], out[1]);
       return send(res, 200, out ?? { ok: true });
     } catch (e) {
-      if (!res.headersSent) send(res, e.status || 400, { error: e.message, field: e.field });
+      if (!res.headersSent) send(res, e.status || 400, { error: e.message, field: e.field, needsConfirm: e.needsConfirm, warnings: e.warnings, check: e.check });
     }
   });
   server.listen(env.panelPort, env.panelHost, () => {

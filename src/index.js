@@ -10,6 +10,8 @@ import { updateRoutes } from './panel/routes/updates.js';
 import { startUpdateScheduler } from './core/updates.js';
 import { activity } from './core/events.js';
 import { startMetrics } from './core/system.js';
+import { startRuntimeFile } from './core/runtime.js';
+import { startWebAccess } from './core/webaccess.js';
 
 await loadBots();
 console.log(`Bots: ${listBots().map((b) => `${b.id}${b.enabled ? '' : ' (disabled)'}`).join(', ') || 'none'}`);
@@ -21,6 +23,8 @@ startScheduler(whatsapp);
 startBackupScheduler();
 startUpdateScheduler();
 startMetrics();
+startRuntimeFile(whatsapp);
+startWebAccess();
 activity('system', { summary: 'Started' });
 
 process.on('unhandledRejection', (e) => activity('error', { summary: `Unhandled: ${e?.message || e}` }));

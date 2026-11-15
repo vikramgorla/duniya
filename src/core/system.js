@@ -17,7 +17,10 @@ export const OPS_ACTIONS = {
   'restart-web': 'Restart the web server (Caddy)',
   'restart-tunnel': 'Restart the Cloudflare tunnel',
   reboot: 'Reboot the server',
+  'apply-web-config': 'Apply the web address & access settings',
 };
+// 031: the root-owned copy of deploy/ops/webconfig.mjs the helper runs (present once the installer ran with 031).
+export const OPS_WEBCONFIG = process.env.DUNIYA_OPS_WEBCONFIG || '/usr/local/lib/duniya-ops/webconfig.mjs';
 export const LOG_UNITS = ['whatsapp-agent-duniya', 'caddy', 'cloudflared', 'duniya-ops'];
 
 const read = (f) => { try { return readFileSync(f, 'utf8'); } catch { return ''; } };
@@ -125,12 +128,13 @@ export function opsStatus() {
   try { status = JSON.parse(read(`${OPS_STATE_DIR}/status.json`) || 'null'); } catch { /* none */ }
   return { available: opsAvailable(), actions: OPS_ACTIONS, status, log: read(`${OPS_STATE_DIR}/last.log`).split('\n').slice(-120).join('\n') };
 }
-export function requestOp(action, by = '') {
+export function requestOp(action, by = '', { files = {} } = {}) {
   if (!OPS_ACTIONS[action]) throw Object.assign(new Error('Unknown action'), { status: 400 });
   if (!opsAvailable()) throw Object.assign(new Error('Server maintenance is not set up on this install. Re-run the installer once (or redeploy) to enable it.'), { status: 400 });
   const cur = opsStatus().status;
   if (cur?.state === 'running' && Date.now() - (cur.startedAt || 0) < 60 * 60000) throw Object.assign(new Error(`Already running: ${cur.action}`), { status: 409 });
   mkdirSync(OPS_REQUEST_DIR, { recursive: true });
+  for (const [name, content] of Object.entries(files)) writeFileSync(`${OPS_REQUEST_DIR}/${name}`, content, { mode: 0o640 }); // read by the helper
   writeFileSync(`${OPS_REQUEST_DIR}/request`, `${action}\n`);
   updCache = null;
   activity('system', { summary: `${OPS_ACTIONS[action]} requested${by ? ` by ${by}` : ''}` });

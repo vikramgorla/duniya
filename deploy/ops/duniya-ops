@@ -2,25 +2,116 @@
 # Root maintenance helper for whatsapp-agent-duniya (installed to /usr/local/sbin/duniya-ops by install.sh).
 # Started by duniya-ops.path when the app writes an action word to the request file. Accepts ONLY the actions
 # below; never executes anything taken from the request beyond matching it against this list.
+#
+# apply-web-config (031): reads web-config.json written by the app, validates and renders it with the root-owned
+# copy of webconfig.mjs (never the app's own code), checks it with `caddy validate`, reloads Caddy, waits for HTTPS
+# and rolls back to the previous Caddyfile if it does not come up. On success PUBLIC_URL/TRUST_PROXY are updated.
 set -uo pipefail
-REQ_DIR=/var/lib/duniya/ops-request
-STATE_DIR=/var/lib/duniya-ops
+# Paths can be overridden for the automated tests only (systemd starts this with a clean environment).
+REQ_DIR=${DUNIYA_OPS_REQUEST_DIR:-/var/lib/duniya/ops-request}
+STATE_DIR=${DUNIYA_OPS_STATE_DIR:-/var/lib/duniya-ops}
 REQ="$REQ_DIR/request"
-install -d -m 755 -o root -g root "$STATE_DIR"
+WEBCONFIG=${DUNIYA_OPS_WEBCONFIG:-/usr/local/lib/duniya-ops/webconfig.mjs}
+CADDYFILE=${DUNIYA_OPS_CADDYFILE:-/etc/caddy/Caddyfile}
+APP_ENV=${DUNIYA_OPS_APP_ENV:-/etc/duniya/app.env}
+INSTALL_CONF=${DUNIYA_OPS_INSTALL_CONF:-/etc/duniya/install.conf}
+HTTPS_WAIT=${DUNIYA_HTTPS_WAIT:-240}
+HTTPS_POLL=${DUNIYA_HTTPS_POLL:-5}
+install -d -m 755 "$STATE_DIR"
 [ -f "$REQ" ] || exit 0
 # Read at most one short line; ignore anything that is not a known action (do not echo unknown content).
 ACTION="$(head -c 32 "$REQ" 2>/dev/null | head -n1 | tr -cd 'a-z-')"
 rm -f "$REQ"
-case "$ACTION" in os-update|os-cleanup|restart-web|restart-tunnel|reboot) ;; *) exit 0 ;; esac
+case "$ACTION" in os-update|os-cleanup|restart-web|restart-tunnel|reboot|apply-web-config) ;; *) exit 0 ;; esac
 
 LOG="$STATE_DIR/last.log"
 STATUS="$STATE_DIR/status.json"
+WEB_STATUS="$STATE_DIR/web-status.json"
 now() { date +%s%3N; }
 START=$(now)
 write_status() { # state code
   printf '{"action":"%s","state":"%s","code":%s,"startedAt":%s,"endedAt":%s}\n' "$ACTION" "$1" "${2:-null}" "$START" "$([ "$1" = running ] && echo null || now)" > "$STATUS.tmp"
   chmod 644 "$STATUS.tmp"; mv -f "$STATUS.tmp" "$STATUS"
 }
+# web_status STATE "message" [host] — message and host are fixed strings or validated values (no request content).
+web_status() {
+  local msg
+  msg="$(printf '%s' "$2" | tr -d '\000-\037' | tr -cd "[:alnum:] .,:;/()_@+'=-" | head -c 400)"
+  printf '{"state":"%s","message":"%s","host":"%s","startedAt":%s,"endedAt":%s,"at":%s}\n' "$1" "$msg" "${3:-}" "$START" \
+    "$(case "$1" in running|waiting) echo null ;; *) now ;; esac)" "$(now)" > "$WEB_STATUS.tmp"
+  chmod 644 "$WEB_STATUS.tmp"; mv -f "$WEB_STATUS.tmp" "$WEB_STATUS"
+}
+set_kv() { # file KEY VALUE — VALUE is validated by webconfig.mjs ([a-z0-9.:/-] only)
+  local f="$1" k="$2" v="$3"
+  [ -f "$f" ] || return 0
+  if grep -q "^$k=" "$f"; then sed -i "s|^$k=.*|$k=$v|" "$f"; else echo "$k=$v" >> "$f"; fi
+}
+
+apply_web_config() {
+  local work="$STATE_DIR/web-work" caddy_ver out host="" public_url="" trust="" exposure=""
+  rm -rf "$work"; install -d -m 700 "$work"
+  web_status running "Checking the new settings"
+  local node_bin
+  node_bin="$(command -v node)" || { echo "Node.js is missing"; web_status failed "Node.js is missing on this server"; return 1; }
+  [ -f "$WEBCONFIG" ] || { echo "$WEBCONFIG is missing: re-run the installer once"; web_status failed "This server needs a one-time update: re-run the installer"; return 1; }
+  command -v caddy >/dev/null || { echo "Caddy is not installed"; web_status failed "The web server (Caddy) is not installed. Re-run the installer with --ip-https or --domain"; return 1; }
+  # Copy the request out of the app-writable directory first (size-limited), then only ever read the copy.
+  head -c 65536 "$REQ_DIR/web-config.json" > "$work/request.json" 2>/dev/null || { web_status failed "No settings were sent"; return 1; }
+  rm -f "$REQ_DIR/web-config.json"
+  caddy_ver="$(caddy version 2>/dev/null | awk '{print $1}' | tr -cd 'v0-9.')"
+  echo "Web server: Caddy ${caddy_ver:-unknown}"
+  if ! out="$(cd / && env -i PATH=/usr/bin:/bin "$node_bin" "$WEBCONFIG" render "$work/request.json" --out "$work/Caddyfile" --caddy-version "${caddy_ver:-2.6.0}" 2>&1)"; then
+    echo "$out"; web_status failed "The settings were refused: ${out#invalid web config: }"; return 1
+  fi
+  while IFS='=' read -r k v; do
+    [[ "$v" =~ ^[a-z0-9.:/-]+$ ]] || continue
+    case "$k" in HOST) host="$v" ;; PUBLIC_URL) public_url="$v" ;; TRUST_PROXY) trust="$v" ;; EXPOSURE) exposure="$v" ;; esac
+  done <<< "$out"
+  [ -n "$host" ] || { web_status failed "The settings were refused"; return 1; }
+  echo "New address: https://$host"
+  if ! caddy validate --adapter caddyfile --config "$work/Caddyfile" >> "$work/validate.log" 2>&1; then
+    tail -n 20 "$work/validate.log"; web_status failed "The web server did not accept the new configuration (nothing changed)" "$host"; return 1
+  fi
+  # Keep the current config as the rollback point; the last config that worked is kept as Caddyfile.last-good.
+  cp -f "$CADDYFILE" "$STATE_DIR/Caddyfile.prev" 2>/dev/null || true
+  install -m 0644 "$work/Caddyfile" "$CADDYFILE"
+  if ! systemctl reload caddy 2>>"$work/validate.log" && ! systemctl restart caddy; then
+    rollback "$host" "The web server did not take the new configuration"; return 1
+  fi
+  web_status waiting "Getting the HTTPS certificate for $host" "$host"
+  echo "Waiting up to $HTTPS_WAIT s for https://$host …"
+  local t0 ok=0
+  t0=$(date +%s)
+  while [ $(( $(date +%s) - t0 )) -lt "$HTTPS_WAIT" ]; do
+    if curl -fsS --max-time 10 -o /dev/null --resolve "$host:443:127.0.0.1" "https://$host/healthz" 2>/dev/null; then ok=1; break; fi
+    sleep "$HTTPS_POLL"
+  done
+  if [ "$ok" -ne 1 ]; then
+    journalctl -u caddy -n 15 --no-pager 2>/dev/null | sed 's/^/  caddy: /'
+    rollback "$host" "HTTPS did not come up for $host within $((HTTPS_WAIT / 60)) minutes, so the previous address was restored. Check the DNS record and that ports 80 and 443 are open"
+    return 1
+  fi
+  cp -f "$CADDYFILE" "$STATE_DIR/Caddyfile.last-good"
+  install -m 0644 "$work/request.json" "$STATE_DIR/web-applied.json"
+  set_kv "$APP_ENV" PUBLIC_URL "$public_url"
+  set_kv "$APP_ENV" TRUST_PROXY "$trust"
+  set_kv "$APP_ENV" DUNIYA_EXPOSURE "$exposure"
+  set_kv "$INSTALL_CONF" EXPOSURE "'$exposure'"
+  [ "$exposure" = domain ] && set_kv "$INSTALL_CONF" DOMAIN "'$host'"
+  echo "HTTPS works at https://$host"
+  web_status 'done' "Live at https://$host" "$host"
+  rm -rf "$work"
+  return 0
+}
+rollback() { # host message
+  echo "Rolling back: $2"
+  if [ -f "$STATE_DIR/Caddyfile.prev" ]; then
+    install -m 0644 "$STATE_DIR/Caddyfile.prev" "$CADDYFILE"
+    systemctl reload caddy 2>/dev/null || systemctl restart caddy 2>/dev/null || true
+  fi
+  web_status rolled-back "$2" "$1"
+}
+
 : > "$LOG"; chmod 644 "$LOG"
 write_status running
 export DEBIAN_FRONTEND=noninteractive
@@ -33,6 +124,7 @@ APT=(apt-get -y -q -o DPkg::Lock::Timeout=600 -o Dpkg::Options::=--force-confdef
     restart-web) systemctl restart caddy && systemctl is-active caddy ;;
     restart-tunnel) systemctl restart cloudflared && systemctl is-active cloudflared ;;
     reboot) echo "Rebooting in 5 seconds"; true ;;
+    apply-web-config) apply_web_config ;;
   esac
 } >> "$LOG" 2>&1
 CODE=$?
