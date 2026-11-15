@@ -1757,7 +1757,7 @@ async function renderAgentEditor(id) {
           h('div', { class: 'row', style: 'margin-top:8px' }, h('label', { class: 'inline' }, F.enabled, 'Enabled'), h('label', { class: 'inline' }, F.memory, 'Group memory'), h('label', { class: 'inline' }, F.respondToMentions, 'Reply when @mentioned')),
           field('Model', modelSel, models.problem || 'Auto uses the default model set under Models.'),
           field('When the model is unavailable', fbPick.el, 'Usage limit, outage or expired sign-in: answer with another model instead of failing. Refused requests never switch, and tools never run twice.'),
-          field('Triggers', F.triggers, 'Group messages starting with one of these wake the agent, e.g. !panduga'),
+          field('Triggers', F.triggers, 'A message containing one of these words (anywhere, as a whole word) wakes the agent, e.g. mochi or !panduga'),
           field('Who may message it directly', F.dm)),
         h('fieldset', {}, h('legend', {}, 'Instructions'), F.prompt),
         sharedMemBox,
