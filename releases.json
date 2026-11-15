@@ -109,6 +109,11 @@
       "title": "Security alerts handled automatically",
       "summary": "Reviewed false-positive code-scanning alerts are dismissed automatically from a reviewed list; real findings are fixed in code."
     },
+    "2.11.2": {
+      "breaking": false,
+      "title": "Mobile demo fix",
+      "summary": "The mobile app's demo mode shows the Ask box's final answer again (a missing await, found by code scanning)."
+    },
     "2.12.0": {
       "breaking": false,
       "title": "The Ask box writes its answer word by word",
