@@ -31,7 +31,7 @@
 <table>
 <tr>
 <td width="33%" valign="top"><a href="docs/agents.md"><img src="docs/img/thumb-agents.webp" alt="AI helper showing a visual diff of an agent change" width="100%"></a><br><b>Agents in plain words</b><br>Templates or describe it; review a visual diff.</td>
-<td width="33%" valign="top"><a href="docs/privacy.md"><img src="docs/img/thumb-privacy.webp" alt="Privacy notice settings" width="100%"></a><br><b>Silent by default</b><br>Chats are off until you switch them on. Set up a person's chat before they write.</td>
+<td width="33%" valign="top"><a href="docs/privacy.md"><img src="docs/img/thumb-privacy.webp" alt="Privacy notice settings" width="100%"></a><br><b>Silent by default</b><br>Chats are off until you switch them on; then recent messages load from your phone. Set up a person's chat before they write.</td>
 <td width="33%" valign="top"><a href="docs/owner-assistant.md"><img src="docs/img/thumb-ask.webp" alt="Ask box with a weekly recap" width="100%"></a><br><b>Ask about your chats</b><br>Recaps from WhatsApp, or streamed word by word in the Ask box.</td>
 </tr>
 <tr>
@@ -58,7 +58,7 @@
 <details><summary>Diagram as text</summary>
 
 1. A message arrives on the WhatsApp linked device.
-2. Is the chat switched on? If not, it is dropped, never stored, and the agent stays silent.
+2. Is the chat switched on? If not, it is dropped, never stored, and the agent stays silent (when you switch it on, its recent messages are loaded from your phone).
 3. The router checks the trigger, the role and the rate limits.
 4. The agent (stored in the app) answers with its model, which falls back to another one if needed.
 5. The agent can use tools: MCP services, WhatsApp actions and memory.

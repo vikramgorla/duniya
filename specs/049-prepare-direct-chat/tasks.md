@@ -12,7 +12,7 @@
       `test/admin-mcp.test.js`
 - [X] T008 Docs: agents, owner-assistant, admin-mcp, privacy, getting-started, README, website tick; screenshots
       `chats-*`, video `chat-on`
-- [X] T009 Version 2.13.0 (package.json, package-lock.json, infra/oci/schema.yaml) + releases.json entry
+- [X] T009 Version 2.14.0 (package.json, package-lock.json, infra/oci/schema.yaml) + releases.json entry
 - [X] T010 `npm test`, `npm run lint`, `npm run check:panel`, `npm run check:responsive`, `node scripts/ci-checks.mjs`
 - [ ] T011 PR via REST (`Closes #92`), squash-merge after checks (left to the maintainer)
 

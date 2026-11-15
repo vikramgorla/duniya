@@ -5,7 +5,8 @@
 **Do it:** panel → **Chats** → switch only the chats you want **on**.
 
 **In 30 seconds**
-- Off chats are dropped before storage and before any model call.
+- Off chats are dropped before storage and before any model call (only the id and time of the newest message are
+  kept, so recent messages can be loaded from your phone when you switch the chat on).
 - Switching a group on posts a one-time notice (your text; per-group opt-out).
 - Every look at stored messages is logged; contents are logged only where your policy allows.
 
@@ -26,6 +27,7 @@ When a group is switched on, the number posts once "Messages in this group are s
 context…" (edit under **Settings → Privacy notice**).
 
 - Posted again after the group was off only if the text changed or after 90 days.
+- Switching on also loads the group's recent messages from your phone, so "stored" covers those earlier messages too.
 - Per-group opt-out on **Chats** (recorded).
 - Direct messages get a line in the agent's first reply, once per person (can be switched off). An intro the agent
   sends to a [prepared direct chat](agents.md#set-up-a-direct-chat-before-the-person-writes) carries it too.
@@ -37,7 +39,8 @@ context…" (edit under **Settings → Privacy notice**).
 
 | | |
 |---|---|
-| **Stored messages** | only chats that are on, for memory, with retention limits. Admins and owners can read them; every look is in the activity log. Erase a chat's memory with one click |
+| **Stored messages** | only chats that are on, for memory, with retention limits. Switching a chat on loads its recent messages from your phone ([Agents → Earlier messages](agents.md#earlier-messages-when-a-chat-is-switched-on)). Admins and owners can read them; every look is in the activity log. Erase a chat's memory with one click |
+| **Chats that are off** | the id, time and sender id of the newest message only (no text, no names), to ask the phone for history later |
 | **Activity log** | minimal, normal or verbose, by category and per chat, with retention. Errors, confirmations, configuration changes and channel status are always recorded |
 | **Summaries** | the weekly summary and *Why agents stayed quiet* keep counts only |
 | **Personal details** | agents don't post phone numbers, emails, health or payment details in groups |

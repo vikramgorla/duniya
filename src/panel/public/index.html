@@ -1758,7 +1758,7 @@ async function renderAgentEditor(id) {
           h('div', { class: 'row', style: 'margin-top:8px' }, h('label', { class: 'inline' }, F.enabled, 'Enabled'), h('label', { class: 'inline' }, F.memory, 'Group memory'), h('label', { class: 'inline' }, F.respondToMentions, 'Reply when @mentioned')),
           field('Model', modelSel, models.problem || 'Auto uses the default model set under Models.'),
           field('When the model is unavailable', fbPick.el, 'Usage limit, outage or expired sign-in: answer with another model instead of failing. Refused requests never switch, and tools never run twice.'),
-          field('Triggers', F.triggers, 'Group messages starting with one of these wake the agent, e.g. !panduga'),
+          field('Triggers', F.triggers, 'A message containing one of these words (anywhere, as a whole word) wakes the agent, e.g. mochi or !panduga'),
           field('Who may message it directly', F.dm)),
         h('fieldset', {}, h('legend', {}, 'Instructions'), F.prompt),
         sharedMemBox,
@@ -2077,7 +2077,7 @@ async function renderChats() {
     const shown = chats.filter((c) => chatsFilter === 'all' || (chatsFilter === 'groups' ? c.isGroup : !c.isGroup));
     list.replaceChildren(shown.length ? h('table', { class: 'stack' }, h('thead', {}, h('tr', {}, h('th', {}, 'On'), h('th', {}, 'Chat'), h('th', {}, 'Agent'), h('th', {}, 'Model'), h('th', {}, 'Activity log'))),
       h('tbody', {}, shown.map((c) => h('tr', { style: c.enabled ? '' : 'opacity:.78' },
-        h('td', { style: 'width:52px', 'data-label': 'On' }, toggle(c.enabled, (v) => tryApi(async () => { await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, { enabled: v }); c.enabled = v; c.ignored = 0; draw(); }, v ? 'On — agents may answer here' : 'Off — agents ignore this chat'), !can('admin'))),
+        h('td', { style: 'width:52px', 'data-label': 'On' }, toggle(c.enabled, (v) => tryApi(async () => { const r = await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, { enabled: v }); c.enabled = v; c.ignored = 0; if (r.history) c.history = r.history; draw(); watchHistory(c); }, v ? 'On — agents may answer here' : 'Off — agents ignore this chat'), !can('admin'))),
         h('td', { 'data-label': '' }, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, c.name || c.id), h('span', { class: `pill ${c.isGroup ? 'info' : ''}` }, c.isGroup ? 'group' : 'person'), multi ? h('span', { class: 'pill' }, c.numberLabel) : null,
             c.waiting ? h('span', { class: 'pill warn', title: 'Set up before this person wrote; their first message goes to the agent chosen here' }, 'Waiting for the first message') : null),
           h('div', { class: 'small muted' }, c.isGroup ? `${c.size || 0} members` : c.phone ? `+${c.phone}` : '', c.lastAt ? ` · last message ${ago(c.lastAt)} ago` : ''),
@@ -2086,9 +2086,11 @@ async function renderChats() {
           capOf.get(c.id) ? h('div', { class: 'small num', style: `color:var(--${capOf.get(c.id).state === 'ok' ? 'muted' : 'warn'})` }, `Cap: ${Math.round(capOf.get(c.id).used * 100)}% used · ${capAmount(capOf.get(c.id))}`) : null,
           (quietBy.get(c.id) || []).slice(0, 2).map((q) => h('div', { class: 'quiet' }, h('span', { class: `small${q.reason === 'not_addressed' ? ' muted' : ''}`, style: q.reason === 'not_addressed' ? '' : 'color:var(--warn)', title: `${q.explain} Last ${ago(q.lastTs)} ago.` }, quietLine(q)),
             silenceFix(q, () => renderChats(), { onChats: true }))),
+          c.enabled ? histBox(c) : null,
           h('div', { class: 'row', style: 'gap:6px;margin-top:6px' },
             h('button', { class: 'btn small', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory'),
             h('button', { class: 'btn small', onclick: () => openCap(c) }, 'Spending cap'),
+            c.enabled && can('admin') ? histBtn(c) : null,
             !c.isGroup && can('admin') && c.enabled && c.agent ? h('button', { class: 'btn small', onclick: () => openIntro(c) }, c.introAt ? 'Send another intro…' : 'Send intro…') : null),
           // 044: hidden from the owner assistant / Ask box; per-group opt-out of the privacy notice (recorded)
           h('div', { class: 'row', style: 'gap:4px 14px;margin-top:4px' },
@@ -2105,13 +2107,53 @@ async function renderChats() {
         h('td', { style: 'min-width:130px', 'data-label': 'Logging' }, h('select', { disabled: !can('admin'), onchange: (e) => savePrefs(c, { logging: e.target.value }) },
           [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message an agent number, or add one with “Add a direct chat”.' : 'No chats yet (or WhatsApp is not connected).'));
   };
+  // #91: what the phone sent when a chat was switched on / "Load recent messages" (polled while loading; only the
+  // status line and the button are redrawn, so a select someone is using is left alone)
+  const hist = new Map(); // chat id -> { box, btn }
+  const histBox = (c) => { const box = h('div', {}, historyLine(c)); hist.set(c.id, { ...hist.get(c.id), box }); return box; };
+  const histBtn = (c) => {
+    const btn = h('button', { class: 'btn small', disabled: c.history?.state === 'loading', title: 'Ask your phone for the messages before the oldest stored one (keep the phone online)',
+      onclick: () => tryApi(async () => { c.history = (await api('POST', `/api/chats/${encodeURIComponent(c.id)}/history`, {})).status; showHist(c); watchHistory(c); }) }, 'Load recent messages');
+    hist.set(c.id, { ...hist.get(c.id), btn });
+    return btn;
+  };
+  const showHist = (c) => { const x = hist.get(c.id); x?.box?.replaceChildren(historyLine(c) || ''); if (x?.btn) x.btn.disabled = c.history?.state === 'loading'; };
+  const watching = new Set();
+  const watchHistory = async (c) => {
+    if (c.history?.state !== 'loading' || watching.has(c.id)) return;
+    watching.add(c.id);
+    try {
+      while (S.tab === 'chats' && document.body.contains(list)) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const r = await api('GET', `/api/chats/${encodeURIComponent(c.id)}/history`).catch(() => null);
+        if (!r) break;
+        c.history = r.status; showHist(c);
+        if (r.status?.state !== 'loading') break;
+      }
+    } finally { watching.delete(c.id); }
+  };
+  for (const c of chats) watchHistory(c);
   const seg = h('div', { class: 'seg' }, [['all', 'All'], ['groups', 'Groups'], ['people', 'People']].map(([v, l]) => h('button', { class: chatsFilter === v ? 'on' : '', onclick: (e) => { chatsFilter = v; seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === e.target)); draw(); } }, l)));
   draw();
   const addBtn = can('admin') ? h('button', { class: 'btn small primary', onclick: () => openAdd() }, '+ Add a direct chat') : null;
   $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Chats'), h('div', { class: 'row', style: 'gap:8px' }, addBtn, seg)),
-    h('p', { class: 'small muted' }, 'Agents only talk in chats that are switched On. A chat that is Off is ignored completely: nothing is stored and no model is called. For each chat that is on, choose the agent and optionally a model or logging level. (An agent set to answer “Anyone” also answers people whose chat is off.)'),
+    h('p', { class: 'small muted' }, 'Agents only talk in chats that are switched On. A chat that is Off is ignored completely: no message is stored (only the id and time of its newest one) and no model is called. When you switch a chat on, its recent messages are loaded from your phone. For each chat that is on, choose the agent and optionally a model or logging level. (An agent set to answer “Anyone” also answers people whose chat is off.)'),
+    h('label', { class: 'small muted row', style: 'gap:6px;margin:-4px 0 10px;flex-wrap:wrap' }, 'When a chat is switched on, load its last',
+      h('select', { style: 'width:auto;flex:0 0 auto;min-width:96px', disabled: !can('admin'), 'aria-label': 'Messages to load when a chat is switched on', onchange: (e) => tryApi(async () => { await api('POST', '/api/settings', { historyLoadCount: Number(e.target.value) }); refreshStatus(); }, 'Saved') },
+        [0, 25, 50, 100, 200].map((n) => h('option', { value: n, selected: Number(S.status?.settings?.historyLoadCount ?? 50) === n }, n ? String(n) : 'no'))),
+      'messages from your phone'),
     list), memBox);
   if (dmPrefill && can('admin')) { const pre = dmPrefill; dmPrefill = null; openAdd(pre); }
+}
+/** #91: status of loading earlier messages from the phone for one chat row (no message content). */
+function historyLine(c) {
+  const hs = c.history;
+  if (!hs) return null;
+  if (hs.state === 'loading') return h('div', { class: 'small muted', role: 'status' }, h('span', { class: 'spinner' }), ' Loading recent messages from your phone…');
+  if (hs.state === 'loaded') return h('div', { class: 'small muted', role: 'status' }, hs.loaded ? `Loaded ${hs.loaded} earlier message${hs.loaded === 1 ? '' : 's'}${hs.doneAt ? ` · ${ago(hs.doneAt)} ago` : ''}` : 'Your phone had no earlier messages for this chat');
+  if (hs.state === 'no_response') return h('div', { class: 'small', role: 'status', style: 'color:var(--warn)' }, 'Your phone didn’t send history (keep it online and try again)');
+  if (hs.state === 'no_anchor') return h('div', { class: 'small', role: 'status', style: 'color:var(--warn)' }, 'No message from this chat has reached the server yet: try again after the next message');
+  return h('div', { class: 'small', role: 'status', style: 'color:var(--warn)' }, `Couldn’t ask your phone: ${hs.error || 'unknown error'}`);
 }
 /** WhatsApp group tools for admins (026): members with admin badges, invite link, name/description, settings. */
 function whatsappCard(c) {

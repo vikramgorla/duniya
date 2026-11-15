@@ -373,7 +373,7 @@ export async function ask({ user, text, source, surface, onEvent = null }) {
         if (!tool) throw bad(`Unknown or not allowed tool: ${call.name}`, 403);
         const missing = (tool.required || []).filter((k) => args[k] === undefined || args[k] === null || args[k] === '');
         if (missing.length) throw bad(`Missing: ${missing.join(', ')}`);
-        if (!tool.readOnly) {
+        if (!tool.readOnly && !tool.noConfirm) { // noConfirm (#91): harmless actions, logged as owner.tool below
           const preview = await previewOf(tool, args, user);
           const code = newConfirm({ userId: user.id, surface, tool: tool.name, args, preview });
           held.push({ code, preview });
@@ -384,8 +384,8 @@ export async function ask({ user, text, source, surface, onEvent = null }) {
         }
       } catch (e) { isError = true; content = e.message || String(e); }
       content = content.slice(0, 12000);
-      emit({ type: 'step', step: tool && !tool.readOnly && !isError ? 'held' : 'tool', tool: call.name, ok: !isError });
-      activity('owner.tool', { summary: `Owner assistant (${user.username}): ${call.name}${isError ? ` failed — ${clip(content, 120)}` : tool && !tool.readOnly ? ' (held for confirmation)' : ''}`.slice(0, 480),
+      emit({ type: 'step', step: tool && !tool.readOnly && !tool.noConfirm && !isError ? 'held' : 'tool', tool: call.name, ok: !isError });
+      activity('owner.tool', { summary: `Owner assistant (${user.username}): ${call.name}${isError ? ` failed — ${clip(content, 120)}` : tool && !tool.readOnly && !tool.noConfirm ? ' (held for confirmation)' : ''}`.slice(0, 480),
         detail: { tool: call.name, args, ok: !isError } });
       results.push({ type: 'tool_result', tool_use_id: call.id, is_error: isError, content });
     }

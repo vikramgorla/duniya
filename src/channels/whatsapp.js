@@ -1,7 +1,7 @@
 import makeWASocket, {
   useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion,
   normalizeMessageContent, isJidGroup, isPnUser, isLidUser, jidNormalizedUser, Browsers,
-  decryptPollVote, BufferJSON, sha256, downloadMediaMessage,
+  decryptPollVote, BufferJSON, sha256, downloadMediaMessage, proto,
 } from 'baileys';
 import pino from 'pino';
 import QRCode from 'qrcode';
@@ -89,9 +89,10 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     });
 
     // History delivered on link/reconnect (store only, never answered)
-    sock.ev.on('messaging-history.set', async ({ messages, contacts }) => {
+    // #91: batches the phone sends on demand (fetchHistory) come here too, with syncType ON_DEMAND.
+    sock.ev.on('messaging-history.set', async ({ messages, contacts, chats, syncType }) => {
       if (contacts?.length) syncWhatsAppContacts(contacts);
-      await deliverHistory(messages || []);
+      await deliverHistory(messages || [], { onDemand: syncType === proto.HistorySync.HistorySyncType.ON_DEMAND, chats: (chats || []).map((c) => c.id).filter(Boolean) });
     });
     // Address-book names from the phone (#11); stored only, never shared with participants unless the owner says so.
     sock.ev.on('contacts.upsert', (list) => { syncWhatsAppContacts(list || []); });
@@ -110,13 +111,30 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     });
   }
 
-  async function deliverHistory(messages) {
+  /**
+   * #91: the key of a real message (what fetchHistory needs as an anchor), for every chat, also chats that are off:
+   * ids and time only, never content or names.
+   */
+  function anchorKeyOf(m) {
+    const k = m?.key; const jid = k?.remoteJid;
+    if (!k?.id || !jid || jid === 'status@broadcast' || jid.endsWith('@newsletter') || !m.message) return null;
+    const c = normalizeMessageContent(m.message);
+    if (!c || c.protocolMessage || c.reactionMessage || c.pollUpdateMessage) return null;
+    const ts = Number(m.messageTimestamp?.low ?? m.messageTimestamp ?? 0) * 1000;
+    if (!ts) return null;
+    const isGroup = !!isJidGroup(jid);
+    return { chat: jid, isGroup, msgId: k.id, fromMe: !!k.fromMe, participant: isGroup && !k.fromMe ? k.participant || '' : '', ts };
+  }
+
+  async function deliverHistory(messages, meta = {}) {
     const out = [];
+    const keys = [];
     for (const m of messages) {
+      const key = anchorKeyOf(m); if (key) keys.push(key);
       try { const info = await normalize(m, { includeOwn: true }); if (info) out.push(info); } catch { /* skip */ }
     }
-    if (out.length) {
-      try { await onHistory(out); } catch (e) { activity('error', { summary: `History store failed: ${e.message}` }); }
+    if (out.length || keys.length || meta.onDemand) {
+      try { await onHistory(out, { ...meta, keys }); } catch (e) { activity('error', { summary: `History store failed: ${e.message}` }); }
     }
   }
 
@@ -414,6 +432,16 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     async block(who) { const jid = toJid(who); await ready().updateBlockStatus(jid, 'block'); return { jid }; },
     async unblock(who) { const jid = toJid(who); await ready().updateBlockStatus(jid, 'unblock'); return { jid }; },
 
+    /**
+     * #91: ask the linked phone for up to `count` (max 50) messages before `anchor` { msgId, fromMe, participant, ts ms }.
+     * The answer arrives later as a history batch (onHistory with onDemand: true); the phone must be online.
+     */
+    async fetchHistory(jid, count, anchor) {
+      const s = ready();
+      if (!anchor?.msgId) throw Object.assign(new Error('No message of this chat is known yet'), { status: 409 });
+      const key = { remoteJid: jid, id: String(anchor.msgId), fromMe: !!anchor.fromMe, ...(isJidGroup(jid) && !anchor.fromMe && anchor.participant ? { participant: anchor.participant } : {}) };
+      return s.fetchMessageHistory(Math.max(1, Math.min(50, Number(count) || 50)), key, Number(anchor.ts) || Date.now());
+    },
     async start(handler, { onHistory: historyHandler } = {}) {
       onMessage = handler;
       if (historyHandler) onHistory = historyHandler;

@@ -21,6 +21,11 @@ if (!db.prepare('PRAGMA table_info(chat_prefs)').all().some((c) => c.name === 'f
 for (const col of ['private', 'notice_off']) {
   if (!db.prepare('PRAGMA table_info(chat_prefs)').all().some((c) => c.name === col)) db.exec(`ALTER TABLE chat_prefs ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`);
 }
+// #91: the newest message key and time per chat (any chat, also chats that are off): what WhatsApp needs to send
+// earlier messages on demand once a chat is switched on. Never message text or sender names.
+for (const [col, type] of [['last_msg_id', 'TEXT'], ['last_from_me', 'INTEGER'], ['last_participant', 'TEXT'], ['last_msg_at', 'INTEGER']]) {
+  if (!db.prepare('PRAGMA table_info(chats_seen)').all().some((c) => c.name === col)) db.exec(`ALTER TABLE chats_seen ADD COLUMN ${col} ${type}`);
+}
 const parseFallback = (v) => { try { return v ? cleanOverride(JSON.parse(v)) : { mode: 'inherit', chain: [] }; } catch { return { mode: 'inherit', chain: [] }; } };
 
 export const LOGGING_LEVELS = ['inherit', 'off', 'minimal', 'normal', 'verbose'];
@@ -71,6 +76,38 @@ export function noteChat({ chat, number = 'main', isGroup, name = '', phone = ''
     ON CONFLICT(tenant_id, chat) DO UPDATE SET name = COALESCE(NULLIF(excluded.name, ''), name), phone = COALESCE(NULLIF(excluded.phone, ''), phone), last_at = excluded.last_at, number = excluded.number`)
     .run(TENANT, chat, number, isGroup ? 1 : 0, String(name).slice(0, 100), String(phone).slice(0, 20), Date.now());
 }
-export const seenChats = ({ groups = null } = {}) => db.prepare('SELECT chat, number, is_group, name, phone, last_at FROM chats_seen WHERE tenant_id = ? ORDER BY last_at DESC LIMIT 500').all(TENANT)
+export const seenChats = ({ groups = null } = {}) => db.prepare('SELECT chat, number, is_group, name, phone, last_at FROM chats_seen WHERE tenant_id = ? AND last_at IS NOT NULL ORDER BY last_at DESC LIMIT 500').all(TENANT)
   .filter((r) => groups === null || !!r.is_group === groups)
   .map((r) => ({ id: r.chat, number: r.number, isGroup: !!r.is_group, name: r.name || '', phone: r.phone || '', lastAt: r.last_at }));
+
+/**
+ * #91: remember the newest message key of chats (metadata only: id, fromMe, participant jid, time). `list` items:
+ * { chat, number, isGroup, msgId, fromMe, participant, ts }. Only newer keys replace older ones. A chat known only this way
+ * (last_at NULL) stays out of seenChats(): the People list shows only people who messaged while the app ran.
+ */
+const upsertKey = db.prepare(`INSERT INTO chats_seen (tenant_id, chat, number, is_group, last_at, last_msg_id, last_from_me, last_participant, last_msg_at)
+  VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)
+  ON CONFLICT(tenant_id, chat) DO UPDATE SET last_msg_id = excluded.last_msg_id, last_from_me = excluded.last_from_me,
+    last_participant = excluded.last_participant, last_msg_at = excluded.last_msg_at
+  WHERE COALESCE(chats_seen.last_msg_at, 0) < excluded.last_msg_at`);
+export function noteLatestKeys(list) {
+  const newest = new Map();
+  for (const k of list || []) {
+    if (!k?.chat || !k.msgId || !Number(k.ts)) continue;
+    if ((newest.get(k.chat)?.ts || 0) < k.ts) newest.set(k.chat, k);
+  }
+  if (!newest.size) return 0;
+  db.exec('BEGIN');
+  try {
+    for (const k of newest.values()) {
+      upsertKey.run(TENANT, k.chat, k.number || 'main', k.isGroup ? 1 : 0, String(k.msgId).slice(0, 128), k.fromMe ? 1 : 0, String(k.participant || '').slice(0, 128), Number(k.ts));
+    }
+    db.exec('COMMIT');
+  } catch (e) { db.exec('ROLLBACK'); throw e; }
+  return newest.size;
+}
+/** #91: the newest message key remembered for a chat, or null. */
+export function latestKey(chat) {
+  const r = db.prepare('SELECT last_msg_id, last_from_me, last_participant, last_msg_at FROM chats_seen WHERE tenant_id = ? AND chat = ?').get(TENANT, chat);
+  return r?.last_msg_id ? { msgId: r.last_msg_id, fromMe: !!r.last_from_me, participant: r.last_participant || '', ts: r.last_msg_at } : null;
+}

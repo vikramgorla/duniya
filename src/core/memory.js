@@ -3,7 +3,7 @@ import { optionalPaused } from './resources.js';
 import { env } from './config.js';
 import {
   history, messagesAfter, getChatMemory, setChatMemory, addNote, listNotes, deleteNote, getNote, updateNote, searchNotes,
-  searchMessages, messageCount, eraseChat, recentReactions, recentPolls, pollTally,
+  searchMessages, messageCount, eraseChat, recentReactions, recentPolls, pollTally, storedSpan,
 } from './db.js';
 import { chat as modelChat } from './providers/index.js';
 import { activity } from './events.js';
@@ -85,8 +85,8 @@ export async function maybeSummarize(chat, agent, { force = false } = {}) {
   const windowRows = history(chat, windowFor(agent));
   if (!windowRows.length) return null;
   const boundary = force ? Number.MAX_SAFE_INTEGER : windowRows[0].id;
-  const mem = getChatMemory(chat) || { summary: '', upto_id: 0 };
-  const older = messagesAfter(chat, mem.upto_id || 0, boundary);
+  const mem = getChatMemory(chat) || { summary: '', upto_id: Number.MIN_SAFE_INTEGER }; // #91: earlier messages have ids <= 0
+  const older = messagesAfter(chat, mem.upto_id ?? 0, boundary);
   if (!older.length || (!force && older.length < env.memory.summarizeBatch)) return null;
 
   running.add(chat);
@@ -112,6 +112,52 @@ export async function maybeSummarize(chat, agent, { force = false } = {}) {
   } finally {
     running.delete(chat);
   }
+}
+
+/**
+ * #91: after earlier messages were loaded from the phone. Without a summary, build one from everything stored; with one,
+ * fold the earlier messages (they are older than what it covers) into it and keep its boundary.
+ */
+export async function summarizeAfterLoad(chat, agent, rowIds = []) {
+  if ((agent && !memoryEnabled(agent)) || running.has(chat)) return null;
+  const mem = getChatMemory(chat);
+  if (!mem?.summary) return maybeSummarize(chat, agent, { force: true });
+  const ids = new Set(rowIds);
+  const earlier = messagesAfter(chat, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER).filter((m) => ids.has(m.id));
+  if (!earlier.length) return null;
+  running.add(chat);
+  try {
+    const tz = agent?.timezone || env.timezone;
+    const res = await modelChat({
+      model: 'auto', purpose: 'background', usage: { agent: agent?.id || '', chat, kind: 'summary' }, maxTokens: 1200, system: SUMMARY_SYSTEM,
+      messages: [{ role: 'user', content: `<current_summary>\n${mem.summary}\n</current_summary>\n<new_messages note="these are EARLIER messages, from before the current summary">\n${earlier.map((m) => formatMessage(m, tz)).join('\n')}\n</new_messages>` }],
+    });
+    const summary = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+    if (!summary) return null;
+    setChatMemory(chat, summary, mem.upto_id);
+    activity('memory.summary', { agent: agent?.id, chat, summary: `Summary updated with ${earlier.length} earlier messages`, detail: { summary } });
+    return summary;
+  } catch (e) {
+    activity('error', { agent: agent?.id, chat, summary: `Summarising failed (will retry): ${e.message}` });
+    return null;
+  } finally {
+    running.delete(chat);
+  }
+}
+
+/**
+ * #91: one honest line for the agent about what it can know of this chat's past (so it never guesses). `excludeId`
+ * is the message being answered (not counted).
+ */
+export function historyNote(chat, { excludeId = 0, tz = env.timezone } = {}) {
+  const span = storedSpan(chat);
+  const count = span.count - (excludeId ? 1 : 0);
+  const hasSummary = !!getChatMemory(chat)?.summary;
+  if (count <= 0 && !hasSummary) {
+    return 'Stored history of this chat: none yet (nothing from before it was switched on is stored). You cannot see earlier messages. If someone asks about them, say so plainly instead of guessing, and mention that an admin can use "Load recent messages" for this chat on the panel\'s Chats page to load recent messages from the linked phone.';
+  }
+  const since = span.since ? new Date(span.since).toLocaleString('en-GB', { timeZone: tz, day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  return `Stored history of this chat: ${count} message${count === 1 ? '' : 's'}${since ? ` since ${since}` : ''}${hasSummary ? ', plus a running summary of older discussion' : ''}. Nothing before that is stored; do not guess about it. An admin can load earlier messages from the linked phone with "Load recent messages" on the Chats page.`;
 }
 
 export function memoryView(chat) {

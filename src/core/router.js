@@ -1,4 +1,5 @@
-import { isChatEnabled, ignoredCounts } from './chat-prefs.js';
+import { isChatEnabled, ignoredCounts, noteLatestKeys } from './chat-prefs.js';
+import { storeLoadedBatch, setHistoryChannel } from './history-load.js';
 import { env } from './config.js';
 import { getSettings } from './store.js';
 import { listAgents, getAgent, agentForChat, roleIn } from './agents.js';
@@ -28,12 +29,35 @@ function rateLimited(key) {
 }
 
 const isAnyOrganizer = (phone) => !!phone && listAgents().some((b) => b.organizers.includes(phone));
-const startsWithTrigger = (agent, lower) => (agent.triggers || []).find((t) => lower.startsWith(t));
+/** Index of a trigger in the text as a whole word (anywhere: "can mochi help?" works), or -1. */
+function triggerAt(trigger, lower) {
+  const word = /[\p{L}\p{N}_]/u;
+  for (let i = lower.indexOf(trigger); i !== -1; i = lower.indexOf(trigger, i + 1)) {
+    const before = i === 0 ? '' : lower[i - 1];
+    const after = lower[i + trigger.length] || '';
+    const edgeOk = (ch, inner) => !ch || !word.test(ch) || !word.test(inner);
+    if (edgeOk(before, trigger[0]) && edgeOk(after, trigger[trigger.length - 1])) return i;
+  }
+  return -1;
+}
+/** The agent's trigger found in the message (anywhere, earliest first), or undefined. */
+const findTrigger = (agent, lower) => {
+  let best; let at = Infinity;
+  for (const t of agent.triggers || []) { const i = triggerAt(t, lower); if (i !== -1 && i < at) { at = i; best = t; } }
+  return best;
+};
+/** Among agents, the one whose trigger appears earliest in the message. */
+const earliestTriggered = (agents, lower) => {
+  let best = null; let at = Infinity;
+  for (const b of agents) for (const t of b.triggers || []) { const i = triggerAt(t, lower); if (i !== -1 && i < at) { at = i; best = b; } }
+  return best;
+};
 
 function stripTriggers(agent, text) {
   let t = text.replace(/@\d{5,}/g, ' ').trim();
-  const trig = startsWithTrigger(agent, t.toLowerCase());
-  if (trig) t = t.slice(trig.length);
+  // A trigger at the start is an address ("!family …"): drop it. Elsewhere it is part of the sentence: keep the text.
+  const trig = findTrigger(agent, t.toLowerCase());
+  if (trig && t.toLowerCase().startsWith(trig)) t = t.slice(trig.length);
   return t.trim();
 }
 
@@ -63,11 +87,11 @@ async function agentForDm(msg, channel, { openOnly = false } = {}) {
     const open = listAgents().filter((b) => b.enabled && b.dm === 'anyone');
     const lower = msg.text.trim().toLowerCase();
     const numberDefault = (getSettings().whatsappNumbers || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
-    return open.find((b) => startsWithTrigger(b, lower)) || open.find((b) => b.id === numberDefault) || open.find((b) => b.id === getSettings().defaultDmAgent) || open[0] || null;
+    return earliestTriggered(open, lower) || open.find((b) => b.id === numberDefault) || open.find((b) => b.id === getSettings().defaultDmAgent) || open[0] || null;
   }
   const lower = msg.text.trim().toLowerCase();
   const enabled = listAgents().filter((b) => b.enabled);
-  const byTrigger = enabled.find((b) => startsWithTrigger(b, lower));
+  const byTrigger = earliestTriggered(enabled, lower);
   const numberDefault = (getSettings().whatsappNumbers || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
   const candidates = byTrigger ? [byTrigger]
     : [getAgent(numberDefault), getAgent(getSettings().defaultDmAgent), ...enabled].filter((b) => b?.enabled);
@@ -93,15 +117,35 @@ function dmSilence(msg) {
   if (!enabled.length) return { agent: all[0]?.id || '', reason: all.length ? 'agent_disabled' : 'no_agent' };
   const lower = msg.text.trim().toLowerCase();
   const numberDefault = (getSettings().whatsappNumbers || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
-  const c = enabled.find((b) => startsWithTrigger(b, lower)) || [getAgent(numberDefault), getAgent(getSettings().defaultDmAgent)].find((b) => b?.enabled) || enabled[0];
+  const c = earliestTriggered(enabled, lower) || [getAgent(numberDefault), getAgent(getSettings().defaultDmAgent)].find((b) => b?.enabled) || enabled[0];
   return { agent: c.id, reason: c.dm === 'none' ? 'dm_not_allowed' : 'role_not_allowed' };
 }
 
 const summarizeLater = (chat, agent) => { maybeSummarize(chat, agent).catch(() => {}); };
 
-/** Store WhatsApp history batches (link/reconnect sync). Never replies. Group chats only. */
+/**
+ * Store WhatsApp history batches (link/reconnect sync). Never replies. Group chats only.
+ * #91: every batch also updates the newest message key per chat (metadata only, also for chats that are off), and
+ * batches the phone sent on demand (`meta.onDemand`) go to history-load: stored before what is stored, chats that
+ * are on only (groups and people: the owner asked for them).
+ */
 export function createHistoryHandler() {
-  return async function onHistory(msgs) {
+  return async function onHistory(msgs, meta = {}) {
+    try {
+      noteLatestKeys(meta.keys || msgs.filter((m) => m.msgId).map((m) => ({ chat: m.chat, number: m.number, isGroup: m.isGroup, msgId: m.msgId, fromMe: m.fromMe, participant: m.isGroup && !m.fromMe ? m.senderJid : '', ts: m.ts })));
+    } catch (e) { activity('error', { summary: `Could not note chat keys: ${e.message}` }); }
+    if (meta.onDemand) {
+      const byChat = new Map((meta.chats || []).map((c) => [c, []]));
+      for (const m of msgs) {
+        if (m.kind && m.kind !== 'text') continue;
+        if (!byChat.has(m.chat)) byChat.set(m.chat, []);
+        const agent = agentForChat(m.chat);
+        byChat.get(m.chat).push({ channel: m.channel, agent: agent?.id || '', msgId: m.msgId, sender: m.phone, name: m.senderName,
+          text: m.text, quoted: m.quoted, fromAgent: m.fromMe, ts: m.ts, senderJid: m.fromMe ? '' : m.senderJid });
+      }
+      for (const [chat, rows] of byChat) storeLoadedBatch(chat, rows); // chats that are off: nothing stored
+      return;
+    }
     const touched = new Map();
     let stored = 0;
     for (const m of msgs) {
@@ -147,10 +191,15 @@ function recordEvent(msg) {
 /** Build the live message router for a channel. */
 export function createRouter(channel) {
   setWhatsAppChannel(channel);
+  setHistoryChannel(channel);
   registerMediaHandlers(channel);
   return async function onMessage(incoming) {
     // 049 (#92): a direct message from a prepared person may arrive from their LID; use the prepared chat id.
     const msg = resolveDirectChat(incoming);
+    // #91: newest message key per chat (metadata only, also while the chat is off) to load history when it goes on.
+    if (msg.msgId && (!msg.kind || msg.kind === 'text')) {
+      try { noteLatestKeys([{ chat: msg.chat, number: msg.number, isGroup: msg.isGroup, msgId: msg.msgId, fromMe: !!msg.fromMe, participant: msg.isGroup && !msg.fromMe ? msg.senderJid : '', ts: msg.ts }]); } catch { /* best effort */ }
+    }
     // Reactions and poll votes: recorded only for chats that are on (#10).
     if (msg.kind && msg.kind !== 'text') { if (isChatEnabled(msg.chat)) recordEvent(msg); return; }
     // Owner assistant (044): link codes and linked panel users' direct messages (unless they start with an agent trigger).
@@ -160,7 +209,7 @@ export function createRouter(channel) {
     const lower = wake.trim().toLowerCase();
     const groupAgent = msg.isGroup ? agentForChat(msg.chat) : null;
     // #34: would this message have woken an agent? (Only then is staying silent worth explaining.)
-    const wakes = !msg.isGroup || msg.mentioned || msg.replyToAgent || listAgents().some((b) => startsWithTrigger(b, lower));
+    const wakes = !msg.isGroup || msg.mentioned || msg.replyToAgent || listAgents().some((b) => findTrigger(b, lower));
     const sender = msg.senderName || (msg.phone ? `+${msg.phone}` : '');
     const quiet = (reason, agentId = groupAgent?.id || '') => silenceReason(reason, { chat: msg.chat, agent: agentId, sender });
 
@@ -212,7 +261,7 @@ export function createRouter(channel) {
     if (!agent || !agent.enabled) {
       if (msg.isGroup) {
         if (!groupAgent) { if (wakes) quiet('no_agent', ''); }
-        else if (msg.mentioned || msg.replyToAgent || startsWithTrigger(groupAgent, lower)) quiet('agent_disabled');
+        else if (msg.mentioned || msg.replyToAgent || findTrigger(groupAgent, lower)) quiet('agent_disabled');
       } else { const d = dmSilence(msg); quiet(d.reason, d.agent); }
       return;
     }
@@ -227,7 +276,7 @@ export function createRouter(channel) {
     const isConfirm = /^(confirm|cancel)\s+[a-z0-9]{4}$/i.test(lower);
     const addressed = !msg.isGroup
       || (agent.respondToMentions && (msg.mentioned || msg.replyToAgent))
-      || !!startsWithTrigger(agent, lower);
+      || !!findTrigger(agent, lower);
     const triggered = addressed || isConfirm;
 
     // Hooks can observe every routed message and optionally answer without the LLM.

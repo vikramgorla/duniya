@@ -11,6 +11,13 @@
 
 ![Agents page](site/img/agents-desktop.webp)
 
+
+> [!TIP]
+> **Triggers work anywhere in a message.** "can mochi help with this?" wakes the agent whose trigger is `mochi`, the
+> same as "mochi, help". Only whole words count (`mochiko` doesn't), case doesn't matter, and when several agents'
+> triggers appear, the first one in the message wins. In your own direct chat with the owner assistant, a trigger only
+> hands the message to that agent when the message *starts* with it, so you can talk *about* agents freely.
+
 ## Create and change agents
 
 | Way | How |
@@ -84,6 +91,22 @@ Admins can read, search (each look logged), rebuild or erase it. Tools:
 `memory__remember`, `list_notes`, `find_notes`, `update_note`, `forget` (last two organizers only), `search_history`.
 
 ![Memory card](site/img/card-memory.webp)
+
+### Earlier messages when a chat is switched on
+
+Chats start **off**, so the history WhatsApp sends when you link a number is not stored (only the id and time of each
+chat's newest message are kept). When you switch a chat **on**, the server asks your phone for its recent messages
+(default 50; *When a chat is switched on, load its last …* on **Chats**, 0–200) and builds the running summary from
+them. The chat row shows *Loading recent messages from your phone…*, then *Loaded N earlier messages*.
+
+- **Load recent messages** on a chat that is on asks for the messages before the oldest stored one (again for older
+  ones; at most every 30 s). Admin MCP: `load_chat_history`.
+- The phone must be **online** (WhatsApp answers from the phone, not from the server). No answer within a minute →
+  *Your phone didn't send history (keep it online and try again)*.
+- The agent is told what it has ("12 stored messages since 3 Nov …", or "none yet") and says so instead of guessing.
+
+> [!NOTE]
+> The newest message seen while the chat was off is the starting point, so that one message is not loaded itself.
 
 ## Contacts
 

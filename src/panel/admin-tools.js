@@ -33,7 +33,7 @@ async function numbers(x) {
   return ch?.numbers || (ch ? [{ id: 'main', label: 'Main', ...ch }] : []);
 }
 
-/** @type {Array<{name, description, input, required?, calls, risky?, readOnly?, run, preview?}>} */
+/** @type {Array<{name, description, input, required?, calls, risky?, readOnly?, noConfirm?, run, preview?}>} noConfirm: the owner assistant runs it without a confirm code (logged). */
 export const TOOLS = [
   // ---------- overview & activity ----------
   { name: 'get_overview', readOnly: true, calls: [['GET', '/api/status']],
@@ -135,6 +135,15 @@ export const TOOLS = [
       }
       return x.call('PUT', `/api/chats/${enc(a.chat)}/prefs`, { model: a.model, logging: a.logging, ...(fallback ? { fallback } : {}) });
     } },
+  // #91: chats that are off store nothing, so a chat switched on starts empty; these load earlier messages from the phone.
+  { name: 'load_chat_history', noConfirm: true, calls: [['POST', '/api/chats/x/history'], ['GET', '/api/chats/x/history']],
+    description: 'Load recent messages of a chat that is on from the linked phone ("Load recent messages" on the Chats page): asks WhatsApp for up to `count` messages from before the oldest stored one (default the setting, max 200), so the agent has earlier context and a summary. The phone must be online; the answer comes within about a minute. Call with status_only to see the status (state loading, loaded, no_response, no_anchor or failed; loaded = how many were stored). At most once per 30 s per chat. Only adds messages; nothing is sent to the chat.',
+    input: { chat: str('Chat id (see list_chats); the chat must be on'), count: int('How many messages (optional, 1–200)', { minimum: 1, maximum: 200 }), status_only: bool('Only show the status of the last load (optional)') }, required: ['chat'],
+    run: async (a, x) => (a.status_only ? x.call('GET', `/api/chats/${enc(a.chat)}/history`) : x.call('POST', `/api/chats/${enc(a.chat)}/history`, { count: a.count })) },
+  { name: 'set_history_on_switch_on', calls: [['POST', '/api/settings']],
+    description: 'How many earlier messages are loaded from the phone when a chat is switched on (0 = none, max 200, default 50).',
+    input: { count: int('Messages (0–200)', { minimum: 0, maximum: 200 }) }, required: ['count'],
+    run: async (a, x) => ({ historyLoadCount: (await x.call('POST', '/api/settings', { historyLoadCount: a.count })).historyLoadCount }) },
   // ---------- prepared direct chats (049, #92) ----------
   { name: 'prepare_direct_chat', calls: [['POST', '/api/direct-chats'], ['POST', '/api/chats/x/intro/preview'], ['POST', '/api/chats/x/intro']],
     risky: (a) => !!a.send_intro, // sending a message to the person needs confirm_action
