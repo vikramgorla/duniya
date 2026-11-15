@@ -66,29 +66,29 @@ const t = await setup({ env: { RATE_LIMIT_PER_MIN: '100' } });
 const cookie = await t.login();
 after(() => { fake.close(); t.close(); });
 
-await t.bots.createBot({ id: 'oauthbot', config: {
-  name: 'OAuth bot', prompt: 'You help.', model: 'claude-sonnet-5-5', triggers: ['!o'], dm: 'organizers', organizers: ['41790000001'],
+await t.agents.createAgent({ id: 'oauthagent', config: {
+  name: 'OAuth agent', prompt: 'You help.', model: 'claude-sonnet-5-5', triggers: ['!o'], dm: 'organizers', organizers: ['41790000001'],
   mcpServers: { svc: { url: `${BASE}/mcp`, auth: 'oauth' } },
   tools: { participant: ['svc:agenda_list'], organizer: ['svc:*'], deny: [] },
 } });
 
 let authUrl;
 test('US1: probe detects OAuth and follows the permanent redirect', async () => {
-  const r = await t.api(cookie, 'POST', '/api/bots/oauthbot/probe', { url: `${BASE}/old` });
+  const r = await t.api(cookie, 'POST', '/api/agents/oauthagent/probe', { url: `${BASE}/old` });
   assert.equal(r.status, 200);
   assert.deepEqual(r.body, { url: `${BASE}/mcp`, auth: 'oauth', name: 'Fake planner' });
-  const open = await t.api(cookie, 'POST', '/api/bots/panduga/probe', { url: '${PANDUGA_MCP_URL}' });
+  const open = await t.api(cookie, 'POST', '/api/agents/panduga/probe', { url: '${PANDUGA_MCP_URL}' });
   assert.equal(open.body.auth, 'none', 'the token-less fake MCP server is open');
 });
 
 test('US1: tools are unavailable until signed in', async () => {
-  const r = await t.api(cookie, 'POST', '/api/bots/oauthbot/discover', { auth: 'oauth', server: 'svc' });
+  const r = await t.api(cookie, 'POST', '/api/agents/oauthagent/discover', { auth: 'oauth', server: 'svc' });
   assert.equal(r.status, 400);
   assert.match(r.body.error, /not signed in/);
 });
 
 test('US1: connect → service sign-in page with PKCE, state, resource and scopes', async () => {
-  const r = await t.api(cookie, 'POST', '/api/bots/oauthbot/connections/svc/organizer');
+  const r = await t.api(cookie, 'POST', '/api/agents/oauthagent/connections/svc/organizer');
   assert.equal(r.status, 200, JSON.stringify(r.body));
   authUrl = new URL(r.body.authorizeUrl);
   assert.equal(authUrl.origin + authUrl.pathname, `${BASE}/authorize`);
@@ -101,7 +101,7 @@ test('US1: connect → service sign-in page with PKCE, state, resource and scope
   assert.equal(q.get('client_id'), 'client-1');
   assert.deepEqual(as.registered[0].redirect_uris, [`${t.base}/oauth/mcp/callback`]);
   assert.equal(t.mcpOauthRows?.() ?? t.db.db.prepare('SELECT COUNT(*) n FROM mcp_oauth').get().n, 0, 'nothing stored before the sign-in completes');
-  const viewer = await t.api('', 'POST', '/api/bots/oauthbot/connections/svc/organizer');
+  const viewer = await t.api('', 'POST', '/api/agents/oauthagent/connections/svc/organizer');
   assert.equal(viewer.status, 401, 'only signed-in admins can start');
 });
 
@@ -118,27 +118,27 @@ test('US1: callback completes the sign-in; state is single-use; tokens never exp
   const html = await r.text();
   assert.equal(r.status, 200, html);
   assert.match(html, /Connected svc for organizers/);
-  assert.match(html, /#bots\/oauthbot/);
+  assert.match(html, /#agents\/oauthagent/);
   const again = await fetch(`${t.base}/oauth/mcp/callback?code=code1&state=${q.get('state')}`);
   assert.equal(again.status, 400, 'state is single-use');
-  const conns = await t.api(cookie, 'GET', '/api/bots/oauthbot/connections');
+  const conns = await t.api(cookie, 'GET', '/api/agents/oauthagent/connections');
   assert.equal(conns.body.length, 1);
   assert.equal(conns.body[0].status, 'connected');
   assert.equal(conns.body[0].connectedBy, 'admin');
   assert.ok(!JSON.stringify(conns.body).includes('at1') && !JSON.stringify(conns.body).includes('rt1'));
   const enc = t.db.db.prepare('SELECT data_enc FROM mcp_oauth').get().data_enc;
   assert.ok(!enc.includes('at1') && !enc.includes('rt1'), 'stored encrypted');
-  const exp = await t.api(cookie, 'GET', '/api/bots/oauthbot/export');
+  const exp = await t.api(cookie, 'GET', '/api/agents/oauthagent/export');
   assert.ok(!JSON.stringify(exp.body).includes('at1'));
 });
 
 test('US1/US3: discover and use tools; participants fall back to the organizer sign-in with participant tools only', async () => {
-  const d = await t.api(cookie, 'POST', '/api/bots/oauthbot/discover', { auth: 'oauth', server: 'svc' });
+  const d = await t.api(cookie, 'POST', '/api/agents/oauthagent/discover', { auth: 'oauth', server: 'svc' });
   assert.deepEqual(d.body.map((x) => x.name).sort(), ['agenda_list', 'room_assign_preview', 'whoami']);
   assert.equal(as.bearers.at(-1), 'at1');
   t.script.push([{ type: 'tool_use', id: 'tu1', name: 'svc__agenda_list', input: {} }], [{ type: 'text', text: 'Puja at 10' }]);
   const n = t.claudeReqs.length;
-  const r = await t.api(cookie, 'POST', '/api/bots/oauthbot/test', { role: 'participant', text: 'agenda?' });
+  const r = await t.api(cookie, 'POST', '/api/agents/oauthagent/test', { role: 'participant', text: 'agenda?' });
   assert.equal(r.body.reply, 'Puja at 10');
   assert.deepEqual(t.toolNames(n).filter((x) => x.startsWith('svc__')), ['svc__agenda_list']);
 });
@@ -146,7 +146,7 @@ test('US1/US3: discover and use tools; participants fall back to the organizer s
 test('US2: an expired access token is refreshed automatically', async () => {
   as.valid.delete('at1');
   t.script.push([{ type: 'tool_use', id: 'tu2', name: 'svc__whoami', input: {} }], [{ type: 'text', text: 'You are the organizer' }]);
-  const r = await t.api(cookie, 'POST', '/api/bots/oauthbot/test', { role: 'organizer', text: 'who am I?' });
+  const r = await t.api(cookie, 'POST', '/api/agents/oauthagent/test', { role: 'organizer', text: 'who am I?' });
   assert.equal(r.body.reply, 'You are the organizer');
   assert.equal(as.refreshes, 1);
   assert.equal(as.bearers.at(-1), 'at2');
@@ -154,33 +154,33 @@ test('US2: an expired access token is refreshed automatically', async () => {
   assert.ok(!enc.includes('at2'));
 });
 
-test('US2: a refused refresh marks the connection "reconnect" and the bot says so', async () => {
+test('US2: a refused refresh marks the connection "reconnect" and the agent says so', async () => {
   as.refuseRefresh = true;
   as.valid.clear();
   t.script.push([{ type: 'tool_use', id: 'tu3', name: 'svc__whoami', input: {} }], [{ type: 'text', text: 'The planner is unavailable right now.' }]);
   const n = t.claudeReqs.length;
-  await t.api(cookie, 'POST', '/api/bots/oauthbot/test', { role: 'organizer', text: 'who am I?' });
+  await t.api(cookie, 'POST', '/api/agents/oauthagent/test', { role: 'organizer', text: 'who am I?' });
   const toolResult = JSON.stringify(t.claudeReqs[n + 1]?.messages ?? '');
   assert.match(toolResult, /reconnect/i);
-  const conns = await t.api(cookie, 'GET', '/api/bots/oauthbot/connections');
+  const conns = await t.api(cookie, 'GET', '/api/agents/oauthagent/connections');
   assert.equal(conns.body[0].status, 'reconnect');
   const acts = await t.api(cookie, 'GET', '/api/activity?limit=200');
   assert.ok(acts.body.some((a) => a.type === 'error' && /expired: reconnect/.test(a.summary)));
 });
 
-test('US3: disconnect and bot deletion remove stored sign-ins', async () => {
-  const d = await t.api(cookie, 'DELETE', '/api/bots/oauthbot/connections/svc/organizer');
+test('US3: disconnect and agent deletion remove stored sign-ins', async () => {
+  const d = await t.api(cookie, 'DELETE', '/api/agents/oauthagent/connections/svc/organizer');
   assert.equal(d.status, 200);
-  assert.equal((await t.api(cookie, 'GET', '/api/bots/oauthbot/connections')).body.length, 0);
-  t.db.db.prepare("INSERT INTO mcp_oauth (tenant_id, bot_id, server, role, url, data_enc, status) VALUES ('default','oauthbot','svc','participant','x','x','connected')").run();
-  await t.api(cookie, 'DELETE', '/api/bots/oauthbot');
+  assert.equal((await t.api(cookie, 'GET', '/api/agents/oauthagent/connections')).body.length, 0);
+  t.db.db.prepare("INSERT INTO mcp_oauth (tenant_id, agent_id, server, role, url, data_enc, status) VALUES ('default','oauthagent','svc','participant','x','x','connected')").run();
+  await t.api(cookie, 'DELETE', '/api/agents/oauthagent');
   assert.equal(t.db.db.prepare('SELECT COUNT(*) n FROM mcp_oauth').get().n, 0);
 });
 
 test('schema: auth must be oauth, token or none; oauth drops token references', async () => {
-  const bad = await t.api(cookie, 'PUT', '/api/bots/panduga', { mcpServers: { panduga: { url: 'https://x.example/mcp', auth: 'magic' } } });
+  const bad = await t.api(cookie, 'PUT', '/api/agents/panduga', { mcpServers: { panduga: { url: 'https://x.example/mcp', auth: 'magic' } } });
   assert.equal(bad.status, 400);
-  const ok = await t.api(cookie, 'PUT', '/api/bots/panduga', { mcpServers: { panduga: { url: 'https://x.example/mcp', auth: 'oauth', tokens: { organizer: '${PANDUGA_TOKEN_ORGANIZER}' } } } });
+  const ok = await t.api(cookie, 'PUT', '/api/agents/panduga', { mcpServers: { panduga: { url: 'https://x.example/mcp', auth: 'oauth', tokens: { organizer: '${PANDUGA_TOKEN_ORGANIZER}' } } } });
   assert.equal(ok.status, 200);
   assert.deepEqual(ok.body.config.mcpServers.panduga.tokens, { organizer: '', participant: '' });
 });

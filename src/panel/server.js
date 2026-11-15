@@ -8,21 +8,21 @@ import {
   deleteUser, authenticate, sessionUser, deleteSession, getUser,
 } from '../core/store.js';
 import {
-  listBots, getBot, botView, createBot, updateBot, deleteBot, bindChat, loadBots, botForChat,
-  listTemplates, templateConfig, exportBot, importBot, listPlugins,
-} from '../core/bots.js';
+  listAgents, getAgent, agentView, createAgent, updateAgent, deleteAgent, bindChat, loadAgents, agentForChat,
+  listTemplates, templateConfig, exportAgent, importAgent, listPlugins,
+} from '../core/agents.js';
 import { referencedSecrets } from '../core/schema.js';
 import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages, listNotes } from '../core/db.js';
 import { bus, activity, loggingSettings, resetLoggingCache, LOG_CATEGORIES } from '../core/events.js';
 import { allChatPrefs, setChatPrefs, seenChats, ignoredCounts, enabledChats } from '../core/chat-prefs.js';
-import { runAgent, handleConfirmCommand, applyPending } from '../core/agent.js';
+import { runAgent, handleConfirmCommand, applyPending } from '../core/runner.js';
 import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool, mcpConnection } from '../core/mcp.js';
 import { listContacts, saveContact, removeContact, getContact } from '../core/contacts.js';
 import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
 import { humanCode } from '../core/crypto.js';
 import { organizerConnection, oauthClientOf } from '../core/tools.js';
-import { draftBot } from '../core/ai-builder.js';
+import { draftAgent } from '../core/ai-builder.js';
 import { setWhatsAppChannel, whatsappToolCatalog, isGroupChat } from '../core/whatsapp-tools.js';
 import { usageReport, listPrices, setPrice, PLAN_PROVIDERS } from '../core/usage.js';
 import { installPackage, installedInfo } from '../core/mcp-local.js';
@@ -46,7 +46,9 @@ import { createAdminMcp } from './admin-mcp.js';
 import { validateAccess } from '../core/admin-oauth.js';
 import { baseUrl, minuteLimiter } from './http-util.js';
 import { mobileRoutes } from './routes/mobile.js';
-import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES } from '../core/mcp-oauth.js';
+import { toolServiceRoutes } from './routes/tool-services.js';
+import { globalServers } from '../core/global-mcp.js';
+import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES, GLOBAL_SCOPE } from '../core/mcp-oauth.js';
 
 const PUBLIC = resolve(import.meta.dirname, 'public');
 const startedAt = Date.now();
@@ -176,19 +178,19 @@ export function startPanel({ channel, extend = [] }) {
     uptimeSec: Math.round((Date.now() - startedAt) / 1000),
     memoryMb: Math.round(process.memoryUsage().rss / 1048576),
     node: process.version,
-    bots: listBots().map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })),
+    agents: listAgents().map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })),
     pending: listPending().length,
   }));
   route('POST', '/api/settings', async (req, res, body, q, p, user) => {
     const patch = {};
     if ('paused' in body) patch.paused = !!body.paused;
-    if ('defaultDmBot' in body) patch.defaultDmBot = String(body.defaultDmBot || '');
+    if ('defaultDmAgent' in body) patch.defaultDmAgent = String(body.defaultDmAgent || '');
     activity('system', { summary: `Settings by ${user.username}: ${JSON.stringify(patch)}` });
     return updateSettings(patch);
   });
 
   // ---------- activity ----------
-  route('GET', '/api/activity', async (req, res, body, q) => listActivity({ limit: q.get('limit'), bot: q.get('bot') || '', chat: q.get('chat') || '', before: Number(q.get('before') || 0) }));
+  route('GET', '/api/activity', async (req, res, body, q) => listActivity({ limit: q.get('limit'), agent: q.get('agent') || '', chat: q.get('chat') || '', before: Number(q.get('before') || 0) }));
   route('GET', '/api/events', async (req, res) => {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive', 'x-accel-buffering': 'no' });
     res.write('retry: 3000\n\n');
@@ -199,66 +201,66 @@ export function startPanel({ channel, extend = [] }) {
     return null;
   });
 
-  // ---------- bots ----------
+  // ---------- agents ----------
   route('GET', '/api/templates', async () => listTemplates());
   route('GET', '/api/plugins', async () => listPlugins());
-  route('GET', '/api/bots', async () => listBots().map(botView));
-  route('POST', '/api/bots', async (req, res, body, q, p, user) => {
+  route('GET', '/api/agents', async () => listAgents().map(agentView));
+  route('POST', '/api/agents', async (req, res, body, q, p, user) => {
     const base = body.template ? templateConfig(body.template) : {};
     guardLocal(user, {}, { ...base, ...(body.config || {}) });
-    const { bot, warnings } = await createBot({ id: body.id, config: { ...base, ...(body.config || {}) }, by: user.username });
-    return [201, { ...botView(bot), warnings }];
+    const { agent, warnings } = await createAgent({ id: body.id, config: { ...base, ...(body.config || {}) }, by: user.username });
+    return [201, { ...agentView(agent), warnings }];
   });
-  route('POST', '/api/bots/import', async (req, res, body, q, p, user) => {
+  route('POST', '/api/agents/import', async (req, res, body, q, p, user) => {
     guardLocal(user, {}, body?.config);
-    const { bot, warnings } = await importBot(body, user.username);
-    return [201, { ...botView(bot), warnings }];
+    const { agent, warnings } = await importAgent(body, user.username);
+    return [201, { ...agentView(agent), warnings }];
   });
-  route('POST', '/api/bots/reload', async () => { await loadBots(); await resetMcpPool(); activity('system', { summary: 'Bots reloaded' }); return listBots().map(botView); });
-  route('GET', '/api/bots/:id', async (req, res, body, q, p) => { const b = getBot(p.id); return b ? botView(b) : [404, { error: 'Not found' }]; });
-  route('PUT', '/api/bots/:id', async (req, res, body, q, p, user) => {
-    const before = getBot(p.id);
+  route('POST', '/api/agents/reload', async () => { await loadAgents(); await resetMcpPool(); activity('system', { summary: 'Agents reloaded' }); return listAgents().map(agentView); });
+  route('GET', '/api/agents/:id', async (req, res, body, q, p) => { const b = getAgent(p.id); return b ? agentView(b) : [404, { error: 'Not found' }]; });
+  route('PUT', '/api/agents/:id', async (req, res, body, q, p, user) => {
+    const before = getAgent(p.id);
     if (body.mcpServers !== undefined) guardLocal(user, before, body);
-    const { bot, warnings } = await updateBot(p.id, body, user.username);
-    return { ...botView(bot), warnings };
+    const { agent, warnings } = await updateAgent(p.id, body, user.username);
+    return { ...agentView(agent), warnings };
   });
-  route('DELETE', '/api/bots/:id', async (req, res, body, q, p, user) => { deleteBot(p.id, user.username); return { ok: true }; });
-  route('POST', '/api/bots/:id/duplicate', async (req, res, body, q, p, user) => {
-    const src = getBot(p.id);
+  route('DELETE', '/api/agents/:id', async (req, res, body, q, p, user) => { deleteAgent(p.id, user.username); return { ok: true }; });
+  route('POST', '/api/agents/:id/duplicate', async (req, res, body, q, p, user) => {
+    const src = getAgent(p.id);
     if (!src) return [404, { error: 'Not found' }];
     const { hooks, id, updatedAt, ...config } = src;
     guardLocal(user, {}, config);
-    const { bot } = await createBot({ id: body.id, config: { ...config, name: `${config.name} (copy)`, chats: [] }, by: user.username });
-    return [201, botView(bot)];
+    const { agent } = await createAgent({ id: body.id, config: { ...config, name: `${config.name} (copy)`, chats: [] }, by: user.username });
+    return [201, agentView(agent)];
   });
-  route('GET', '/api/bots/:id/export', async (req, res, body, q, p) => {
-    const doc = exportBot(p.id);
-    send(res, 200, JSON.stringify(doc, null, 2), { 'content-type': 'application/json', 'content-disposition': `attachment; filename="${p.id}.bot.json"` });
+  route('GET', '/api/agents/:id/export', async (req, res, body, q, p) => {
+    const doc = exportAgent(p.id);
+    send(res, 200, JSON.stringify(doc, null, 2), { 'content-type': 'application/json', 'content-disposition': `attachment; filename="${p.id}.agent.json"` });
     return null;
   });
   // ---------- people & roles (015) ----------
-  // Members of the bot's groups with their role. When no organizers are set yet, WhatsApp group admins are suggested.
-  route('GET', '/api/bots/:id/people', async (req, res, body, q, p) => {
-    const bot = getBot(p.id);
-    if (!bot) return [404, { error: 'Not found' }];
-    return peopleOf(bot);
+  // Members of the agent's groups with their role. When no organizers are set yet, WhatsApp group admins are suggested.
+  route('GET', '/api/agents/:id/people', async (req, res, body, q, p) => {
+    const agent = getAgent(p.id);
+    if (!agent) return [404, { error: 'Not found' }];
+    return peopleOf(agent);
   });
   // ---------- AI helper (016) ----------
-  route('POST', '/api/ai/bot-draft', async (req, res, body, q, p, user) => {
-    const bot = body.botId ? getBot(String(body.botId)) : null;
-    if (body.botId && !bot) return [404, { error: 'Bot not found' }];
-    const people = bot ? (await peopleOf(bot)).groups.flatMap((g) => g.members.filter((m) => m.phone).map((m) => ({ group: g.name, name: m.name, phone: m.phone, groupAdmin: m.admin }))) : [];
+  route('POST', '/api/ai/agent-draft', async (req, res, body, q, p, user) => {
+    const agent = body.agentId ? getAgent(String(body.agentId)) : null;
+    if (body.agentId && !agent) return [404, { error: 'Agent not found' }];
+    const people = agent ? (await peopleOf(agent)).groups.flatMap((g) => g.members.filter((m) => m.phone).map((m) => ({ group: g.name, name: m.name, phone: m.phone, groupAdmin: m.admin }))) : [];
     try {
-      const r = await draftBot({ bot, request: body.request, model: String(body.model || 'auto'), people, by: user.username });
+      const r = await draftAgent({ agent, request: body.request, model: String(body.model || 'auto'), people, by: user.username });
       return { ...r, names: Object.fromEntries(people.filter((x) => x.name).map((x) => [x.phone, x.name])) };
     } catch (e) {
       throw Object.assign(new Error(e.code === 'no_model' ? 'Connect a model provider first (Models).' : e.message), { status: e.status || 400 });
     }
   });
-  async function peopleOf(bot) {
-    const suggest = bot.organizers.length === 0;
+  async function peopleOf(agent) {
+    const suggest = agent.organizers.length === 0;
     const groups = [];
-    for (const chat of bot.chats.filter((c) => !/@(s\.whatsapp\.net|lid)$/.test(c))) {
+    for (const chat of agent.chats.filter((c) => !/@(s\.whatsapp\.net|lid)$/.test(c))) {
       let members = []; let error = '';
       try { members = await channel.groupMembers?.(chat) || []; } catch (e) { error = e.message; }
       const names = namesInChat(chat);
@@ -266,61 +268,61 @@ export function startPanel({ channel, extend = [] }) {
         chat, name: (await channel.chatName?.(chat).catch(() => '')) || chat, error,
         members: members.map((m) => ({
           phone: m.phone, admin: m.admin, name: names[m.phone] || '',
-          role: m.phone && bot.organizers.includes(m.phone) ? 'organizer' : suggest && m.admin && m.phone ? 'organizer' : 'participant',
+          role: m.phone && agent.organizers.includes(m.phone) ? 'organizer' : suggest && m.admin && m.phone ? 'organizer' : 'participant',
           suggested: suggest && m.admin && !!m.phone,
         })).sort((a, b) => (b.admin - a.admin) || (a.name || a.phone).localeCompare(b.name || b.phone)),
       });
     }
-    return { suggested: suggest, organizers: bot.organizers, participants: bot.participants, groups };
+    return { suggested: suggest, organizers: agent.organizers, participants: agent.participants, groups };
   }
 
   // ---------- tool service sign-in (009) ----------
-  route('POST', '/api/bots/:id/probe', async (req, res, body) => {
+  route('POST', '/api/agents/:id/probe', async (req, res, body) => {
     const url = interpolate(String(body.url || '')).trim();
     if (!url) return [400, { error: 'Enter the tool service URL first' }];
     return probeServer(url);
   });
-  route('GET', '/api/bots/:id/local', async (req, res, body, q, p) => {
-    const bot = getBot(p.id);
-    if (!bot) return [404, { error: 'Not found' }];
-    return Object.entries(bot.mcpServers || {}).filter(([, v]) => v.type === 'local').map(([server, v]) => {
+  route('GET', '/api/agents/:id/local', async (req, res, body, q, p) => {
+    const agent = getAgent(p.id);
+    if (!agent) return [404, { error: 'Not found' }];
+    return Object.entries(agent.mcpServers || {}).filter(([, v]) => v.type === 'local').map(([server, v]) => {
       const i = installedInfo(v.package, v.allowScripts);
       return { server, package: v.package, installed: i ? { name: i.name, version: i.version, at: i.at } : null };
     });
   });
-  route('POST', '/api/bots/:id/local/:server/install', async (req, res, body, q, p, user) => {
-    const srv = getBot(p.id)?.mcpServers?.[p.server];
-    if (!srv || srv.type !== 'local') return [404, { error: 'Save the bot with this local tool service first' }];
+  route('POST', '/api/agents/:id/local/:server/install', async (req, res, body, q, p, user) => {
+    const srv = getAgent(p.id)?.mcpServers?.[p.server];
+    if (!srv || srv.type !== 'local') return [404, { error: 'Save the agent with this local tool service first' }];
     const i = await installPackage(srv.package, { allowScripts: srv.allowScripts, fresh: !!body.fresh, by: user.username });
     await resetMcpPool();
     return { name: i.name, version: i.version, at: i.at };
   }, { role: 'owner' });
-  route('GET', '/api/bots/:id/connections', async (req, res, body, q, p) => listConnections(p.id));
-  route('POST', '/api/bots/:id/connections/:server/:role', async (req, res, body, q, p, user) => {
-    const bot = getBot(p.id);
-    const srv = bot?.mcpServers?.[p.server];
-    if (!srv) return [404, { error: 'Save the bot with this tool service first' }];
+  route('GET', '/api/agents/:id/connections', async (req, res, body, q, p) => listConnections(p.id));
+  route('POST', '/api/agents/:id/connections/:server/:role', async (req, res, body, q, p, user) => {
+    const agent = getAgent(p.id);
+    const srv = agent?.mcpServers?.[p.server];
+    if (!srv) return [404, { error: 'Save the agent with this tool service first' }];
     if (srv.auth !== 'oauth') return [400, { error: 'This tool service is not set to Sign in' }];
     if (!OAUTH_ROLES.includes(p.role)) return [400, { error: 'Unknown role' }];
     const url = interpolate(srv.url);
     if (!url) return [400, { error: 'The tool service URL is empty' }];
     const redirectUri = `${isHttps(req) ? 'https' : 'http'}://${req.headers.host}/oauth/mcp/callback`;
-    return startSignIn({ botId: bot.id, server: p.server, role: p.role, url, redirectUri, by: user.username, client: oauthClientOf(interpolate(srv)) });
+    return startSignIn({ agentId: agent.id, server: p.server, role: p.role, url, redirectUri, by: user.username, client: oauthClientOf(interpolate(srv)) });
   });
-  route('DELETE', '/api/bots/:id/connections/:server/:role', async (req, res, body, q, p, user) => {
+  route('DELETE', '/api/agents/:id/connections/:server/:role', async (req, res, body, q, p, user) => {
     disconnectOAuth(p.id, p.server, p.role, user.username);
     return { ok: true };
   });
   // The browser comes back here from the service. SameSite=Strict means no session cookie on this cross-site
   // navigation: the single-use state proves the sign-in was started by an admin; the page then returns to the panel.
   route('GET', '/oauth/mcp/callback', async (req, res, body, q) => {
-    let ok = true; let msg; let botId = '';
+    let ok = true; let msg; let agentId = '';
     try {
       const r = await finishSignIn({ state: q.get('state'), code: q.get('code'), error: q.get('error'), errorDescription: q.get('error_description') });
-      botId = r.botId; msg = `Connected ${r.server} for ${r.role}s.`;
-    } catch (e) { ok = false; msg = e.message; botId = e.botId || ''; }
+      agentId = r.agentId; msg = `Connected ${r.server} for ${r.role}s.`;
+    } catch (e) { ok = false; msg = e.message; agentId = e.agentId || ''; }
     const esc = (x) => String(x).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-    const back = botId ? `/#bots/${encodeURIComponent(botId)}` : '/';
+    const back = agentId === GLOBAL_SCOPE ? '/#settings' : agentId ? `/#agents/${encodeURIComponent(agentId)}` : '/';
     const html = `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>${ok ? 'Connected' : 'Sign-in failed'}</title>
 <body style="font:16px -apple-system,system-ui,sans-serif;display:grid;place-items:center;min-height:90vh;margin:0;background:#f4f6f5;color:#14201b">
 <div style="background:#fff;border:1px solid #e3e8e5;border-radius:16px;padding:28px;max-width:440px;text-align:center">
@@ -331,20 +333,20 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     return null;
   }, { public: true });
 
-  route('POST', '/api/bots/:id/discover', async (req, res, body, q, p) => {
+  route('POST', '/api/agents/:id/discover', async (req, res, body, q, p) => {
     let url; let token;
     if (body.auth === 'oauth' || body.type === 'local') {
-      const bot = getBot(p.id);
-      const saved = bot?.mcpServers?.[body.server];
+      const agent = getAgent(p.id);
+      const saved = agent?.mcpServers?.[body.server];
       if (!saved || (body.type === 'local' ? saved.type !== 'local' : saved.auth !== 'oauth')) {
-        return [400, { error: body.type === 'local' ? 'Save the bot with this local tool service first' : 'Save the bot and connect the tool service first' }];
+        return [400, { error: body.type === 'local' ? 'Save the agent with this local tool service first' : 'Save the agent and connect the tool service first' }];
       }
-      const tools = await organizerConnection(bot, body.server).listTools();
+      const tools = await organizerConnection(agent, body.server).listTools();
       return tools.map((t) => ({ name: t.name, description: (t.description || '').slice(0, 300) }));
     }
     if (body.url) { url = interpolate(String(body.url)); token = interpolate(String(body.token || '')); } else {
-      const bot = getBot(p.id);
-      const srv = bot?.mcpServers?.[body.server];
+      const agent = getAgent(p.id);
+      const srv = agent?.mcpServers?.[body.server];
       if (!srv) return [404, { error: 'Unknown tool service' }];
       url = interpolate(srv.url); token = interpolate(srv.tokens?.organizer || '');
     }
@@ -353,31 +355,31 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     const tools = await mcpConnection(url, { token, headers }).listTools();
     return tools.map((t) => ({ name: t.name, description: (t.description || '').slice(0, 300) }));
   });
-  route('POST', '/api/bots/:id/test', async (req, res, body, q, p) => {
-    const bot = getBot(p.id);
-    if (!bot) return [404, { error: 'Not found' }];
+  route('POST', '/api/agents/:id/test', async (req, res, body, q, p) => {
+    const agent = getAgent(p.id);
+    if (!agent) return [404, { error: 'Not found' }];
     const role = body.role === 'organizer' ? 'organizer' : 'participant';
     const chat = `panel:${p.id}`;
     const text = String(body.text || '').slice(0, 4000);
-    const confirm = await handleConfirmCommand({ bot, text, role, chat });
+    const confirm = await handleConfirmCommand({ agent, text, role, chat });
     if (confirm !== undefined) return { reply: confirm };
-    activity('message.in', { bot: bot.id, chat, summary: `Panel test (${role}): ${text}` });
-    const ctx = { bot, role, chat, senderName: 'Panel admin', requester: 'panel', text, isGroup: false, source: 'panel' };
+    activity('message.in', { agent: agent.id, chat, summary: `Panel test (${role}): ${text}` });
+    const ctx = { agent, role, chat, senderName: 'Panel admin', requester: 'panel', text, isGroup: false, source: 'panel' };
     const reply = await runAgent(ctx);
-    activity('message.out', { bot: bot.id, chat, summary: reply || '(no reply)' });
+    activity('message.out', { agent: agent.id, chat, summary: reply || '(no reply)' });
     return { reply, usage: ctx.usage, model: ctx.model };
   });
-  route('POST', '/api/bots/:id/schedules/:sid/run', async (req, res, body, q, p) => {
-    const bot = getBot(p.id);
-    const s = bot?.schedules.find((x) => x.id === decodeURIComponent(p.sid));
+  route('POST', '/api/agents/:id/schedules/:sid/run', async (req, res, body, q, p) => {
+    const agent = getAgent(p.id);
+    const s = agent?.schedules.find((x) => x.id === decodeURIComponent(p.sid));
     if (!s) return [404, { error: 'Not found' }];
-    return runSchedule(bot, s, channel, { force: true });
+    return runSchedule(agent, s, channel, { force: true });
   });
 
   // ---------- chats + memory ----------
   route('GET', '/api/chats', async () => {
     const groups = (await channel.listChats()).map((c) => ({ ...c, isGroup: true }));
-    const owner = new Map(listBots().flatMap((b) => b.chats.map((c) => [c, b.id])));
+    const owner = new Map(listAgents().flatMap((b) => b.chats.map((c) => [c, b.id])));
     const prefs = allChatPrefs();
     const numbers = new Map(((await channel.status()).numbers || []).map((n) => [n.id, n.label]));
     const known = new Set(groups.map((c) => c.id));
@@ -387,7 +389,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: '(not a member / offline)', size: 0, isGroup: !/@(s\.whatsapp\.net|lid)$/.test(id) }));
     return [...groups, ...people, ...missing].map((c) => {
       const number = c.number || (c.id.includes('#') ? c.id.split('#')[0] : 'main');
-      return { ...c, number, numberLabel: numbers.get(number) || number, bot: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit',
+      return { ...c, number, numberLabel: numbers.get(number) || number, agent: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit',
         enabled: !!prefs[c.id]?.enabled, ignored: ignoredCounts.get(c.id) || 0 };
     });
   });
@@ -413,7 +415,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     activity('config', { summary: `Activity logging: ${next.level}, keep ${next.retentionDays} days / ${next.maxEntries} entries (${user.username})` });
     return next;
   });
-  route('POST', '/api/chats/bind', async (req, res, body, q, p, user) => { await bindChat(String(body.chat), body.bot || null, user.username); return { ok: true }; });
+  route('POST', '/api/chats/bind', async (req, res, body, q, p, user) => { await bindChat(String(body.chat), body.agent || null, user.username); return { ok: true }; });
   // Stored messages of a chat (024): admins and owners only; each look is recorded.
   route('GET', '/api/chats/:chat/messages', async (req, res, body, q, p, user) => {
     const chat = decodeURIComponent(p.chat);
@@ -421,7 +423,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     if (!q.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${q.get('q') ? ` (search “${String(q.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;
   }, { role: 'admin' });
-  // ---------- WhatsApp group tools for admins (026): same channel functions as the bots' whatsapp tools ----------
+  // ---------- WhatsApp group tools for admins (026): same channel functions as the agents' whatsapp tools ----------
   route('GET', '/api/whatsapp/tools', async () => whatsappToolCatalog());
   const ADMIN_RANK = { superadmin: 2, admin: 1 };
   const waGroup = (p) => {
@@ -430,7 +432,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     if (typeof channel.groupInfo !== 'function') throw Object.assign(new Error('WhatsApp actions are not available'), { status: 501 });
     return chat;
   };
-  const waLog = (chat, user, summary, detail) => activity('whatsapp.action', { bot: botForChat(chat)?.id || '', chat, summary: `${summary} (panel, ${user.username})`, detail: { ...detail, by: user.username, source: 'panel' } });
+  const waLog = (chat, user, summary, detail) => activity('whatsapp.action', { agent: agentForChat(chat)?.id || '', chat, summary: `${summary} (panel, ${user.username})`, detail: { ...detail, by: user.username, source: 'panel' } });
   route('GET', '/api/chats/:chat/whatsapp', async (req, res, body, q, p) => {
     const chat = waGroup(p);
     const g = await channel.groupInfo(chat);
@@ -471,7 +473,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
   route('GET', '/api/chats/:chat/memory', async (req, res, body, q, p) => memoryView(decodeURIComponent(p.chat)));
   route('POST', '/api/chats/:chat/memory/summarize', async (req, res, body, q, p) => {
     const chat = decodeURIComponent(p.chat);
-    const summary = await maybeSummarize(chat, botForChat(chat), { force: true });
+    const summary = await maybeSummarize(chat, agentForChat(chat), { force: true });
     return { summary: summary ?? memoryView(chat).summary };
   });
   route('DELETE', '/api/chats/:chat/memory', async (req, res, body, q, p, user) => { eraseChatMemory(decodeURIComponent(p.chat), user.username); return { ok: true }; });
@@ -485,8 +487,8 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
   });
 
   // Shared agent memory (#8): notes an agent keeps across all its chats.
-  route('GET', '/api/bots/:id/memory', async (req, res, body, q, p) => {
-    if (!getBot(p.id)) return [404, { error: 'Not found' }];
+  route('GET', '/api/agents/:id/memory', async (req, res, body, q, p) => {
+    if (!getAgent(p.id)) return [404, { error: 'Not found' }];
     return { notes: listNotes(`agent:${p.id}`).map((n) => ({ id: n.id, text: n.text, author: n.author, role: n.role, ts: n.ts })) };
   });
   route('DELETE', '/api/notes/:id', async (req, res, body, q, p, user) => {
@@ -505,16 +507,17 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
   route('POST', '/api/pending/:code/apply', async (req, res, body, q, p) => {
     const row = takePending(p.code);
     if (!row) return [404, { error: 'Expired or not found' }];
-    return { result: await applyPending(getBot(row.bot), row) };
+    return { result: await applyPending(getAgent(row.agent), row) };
   });
 
   // ---------- secrets ----------
   route('GET', '/api/secrets', async () => {
     const stored = new Map(listSecrets().map((s) => [s.name, s.set]));
     const wanted = new Set(['ANTHROPIC_API_KEY']);
-    for (const b of listBots()) for (const s of referencedSecrets(b)) wanted.add(s);
+    for (const b of listAgents()) for (const s of referencedSecrets(b)) wanted.add(s);
+    for (const s of referencedSecrets({ mcpServers: globalServers() })) wanted.add(s);
     return [...new Set([...stored.keys(), ...wanted])].sort().map((name) => ({
-      name, set: !!stored.get(name) || !!process.env[name], usedByBots: wanted.has(name),
+      name, set: !!stored.get(name) || !!process.env[name], usedByAgents: wanted.has(name),
     }));
   });
   route('PUT', '/api/secrets', async (req, res, body, q, p, user) => {
@@ -525,11 +528,11 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
 
   // ---------- usage & cost (023) ----------
   const periodFrom = (pr) => ({ '1d': Date.now() - 86400000, '7d': Date.now() - 7 * 86400000, '30d': Date.now() - 30 * 86400000, '90d': Date.now() - 90 * 86400000, all: 0 }[pr || '30d'] ?? Date.now() - 30 * 86400000);
-  route('GET', '/api/usage', async (req, res, body, q) => usageReport({ from: periodFrom(q.get('period')), groupBy: q.get('groupBy') || 'bot', bot: q.get('bot') || '', chat: q.get('chat') || '' }));
+  route('GET', '/api/usage', async (req, res, body, q) => usageReport({ from: periodFrom(q.get('period')), groupBy: q.get('groupBy') || 'agent', agent: q.get('agent') || '', chat: q.get('chat') || '' }));
   route('GET', '/api/usage/summary', async (req, res, body, q) => {
     const from = periodFrom(q.get('period'));
     const by = (g) => Object.fromEntries(usageReport({ from, groupBy: g }).rows.map((r) => [r.key, r]));
-    return { period: q.get('period') || '30d', bot: by('bot'), chat: by('chat'), provider: by('provider'), model: by('model'), prices: listPrices(), plans: PLAN_PROVIDERS };
+    return { period: q.get('period') || '30d', agent: by('agent'), chat: by('chat'), provider: by('provider'), model: by('model'), prices: listPrices(), plans: PLAN_PROVIDERS };
   });
   route('PUT', '/api/usage/prices', async (req, res, body, q, p, user) => {
     const out = setPrice(String(body.model || ''), { input: body.input, output: body.output });
@@ -555,8 +558,8 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     return [201, await channel.addNumber({ id: body.id, label: body.label })];
   }, { role: 'owner' });
   route('PUT', '/api/whatsapp/numbers/:id', async (req, res, body, q, p) => {
-    if (body.dmBot !== undefined) {
-      const list = (getSettings().whatsappNumbers || [{ id: 'main', label: 'Main' }]).map((n) => (n.id === p.id ? { ...n, dmBot: String(body.dmBot || '') } : n));
+    if (body.dmAgent !== undefined) {
+      const list = (getSettings().whatsappNumbers || [{ id: 'main', label: 'Main' }]).map((n) => (n.id === p.id ? { ...n, dmAgent: String(body.dmAgent || '') } : n));
       updateSettings({ whatsappNumbers: list });
     }
     if (body.label) await channel.renameNumber?.(p.id, body.label);
@@ -566,6 +569,9 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
 
   // ---------- system ----------
   route('POST', '/api/system/restart', async () => { setTimeout(() => process.exit(0), 300); return { ok: true }; }, { role: 'owner' });
+
+  // ---------- global tool services (035): Settings → Tool services ----------
+  toolServiceRoutes(route);
 
   // ---------- mobile app (027): Settings → Mobile app ----------
   mobileRoutes(route);

@@ -4,6 +4,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { launchSpec } from './mcp-local.js';
 import { onSecretChange } from './store.js';
 import { onOAuthChange } from './mcp-oauth.js';
+import { onGlobalMcpChange } from './global-mcp.js';
 
 /** Pool of MCP connections keyed by url + credential (token, or an OAuth sign-in identity). */
 class McpConnection {
@@ -74,7 +75,7 @@ const pool = new Map();
 
 /**
  * mcpConnection(url, token) or mcpConnection(url, { authProvider, identity }) for OAuth sign-ins
- * (identity = a stable key such as "oauth:<bot>:<server>:<role>").
+ * (identity = a stable key such as "oauth:<agent>:<server>:<role>").
  */
 export function mcpConnection(url, cred = '') {
   const o = cred && typeof cred === 'object' ? cred : { token: String(cred || '') };
@@ -91,3 +92,4 @@ export async function resetMcpPool() {
 
 onSecretChange(() => { resetMcpPool(); });
 onOAuthChange(() => { resetMcpPool(); });
+onGlobalMcpChange(() => { resetMcpPool(); });

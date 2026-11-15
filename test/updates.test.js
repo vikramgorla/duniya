@@ -28,9 +28,9 @@ test('status saved before an update is corrected after the restart (regression)'
 test('auto model choice from any provider list', async () => {
   const { autoPick } = await import('../src/core/providers/index.js');
   const list = [{ id: 'text-embedding-3' }, { id: 'gpt-6-mini' }, { id: 'gpt-6' }, { id: 'whisper-2' }];
-  assert.equal(autoPick(list, 'bot'), 'gpt-6');
+  assert.equal(autoPick(list, 'agent'), 'gpt-6');
   assert.equal(autoPick(list, 'background'), 'gpt-6-mini');
-  assert.equal(autoPick([{ id: 'tts-1' }], 'bot'), null);
+  assert.equal(autoPick([{ id: 'tts-1' }], 'agent'), null);
 });
 
 test('version helpers', () => {

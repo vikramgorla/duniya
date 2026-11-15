@@ -1,12 +1,12 @@
 // Per-chat preferences (013/011): model choice and activity logging level for a single chat (group or person).
-// The bot a chat talks to stays in the bot's `chats` list (one source of truth for bindings).
+// The agent a chat talks to stays in the agent's `chats` list (one source of truth for bindings).
 import { db } from './db.js';
 
 const TENANT = 'default';
 db.exec(`
   CREATE TABLE IF NOT EXISTS chat_prefs (
     tenant_id TEXT NOT NULL, chat TEXT NOT NULL, model TEXT NOT NULL DEFAULT 'inherit', logging TEXT NOT NULL DEFAULT 'inherit',
-    updated_at INTEGER, PRIMARY KEY (tenant_id, chat)
+    enabled INTEGER NOT NULL DEFAULT 0, updated_at INTEGER, PRIMARY KEY (tenant_id, chat)
   );
   CREATE TABLE IF NOT EXISTS chats_seen (
     tenant_id TEXT NOT NULL, chat TEXT NOT NULL, number TEXT NOT NULL DEFAULT 'main', is_group INTEGER NOT NULL,
@@ -18,10 +18,7 @@ export const LOGGING_LEVELS = ['inherit', 'off', 'minimal', 'normal', 'verbose']
 const MODEL_RE = /^(inherit|auto|[a-z][a-z0-9-]{1,30}:[A-Za-z0-9._:/@+-]{1,120})$/;
 
 // 032 (issue #10): chats are OFF until an admin switches them on. Messages from chats that are off are never stored
-// or sent to a model.
-for (const [col, type] of [['enabled', 'INTEGER NOT NULL DEFAULT 0']]) {
-  try { db.exec(`ALTER TABLE chat_prefs ADD COLUMN ${col} ${type}`); } catch { /* exists */ }
-}
+// or sent to a model (chat_prefs.enabled).
 const cache = new Map();
 export function getChatPrefs(chat) {
   if (!chat) return { model: 'inherit', logging: 'inherit', enabled: false };

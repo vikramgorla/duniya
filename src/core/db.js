@@ -7,15 +7,15 @@ db.exec(`
   PRAGMA journal_mode = WAL;
   PRAGMA busy_timeout = 5000;
   CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY, channel TEXT, chat TEXT, bot TEXT, sender TEXT, name TEXT,
-    text TEXT, from_bot INTEGER DEFAULT 0, ts INTEGER
+    id INTEGER PRIMARY KEY, channel TEXT, chat TEXT, agent TEXT, msg_id TEXT, sender TEXT, sender_jid TEXT, name TEXT,
+    text TEXT, quoted TEXT, addressed INTEGER DEFAULT 0, from_agent INTEGER DEFAULT 0, ts INTEGER
   );
   CREATE TABLE IF NOT EXISTS activity (
-    id INTEGER PRIMARY KEY, ts INTEGER, type TEXT, bot TEXT, chat TEXT, summary TEXT, detail TEXT
+    id INTEGER PRIMARY KEY, ts INTEGER, type TEXT, agent TEXT, chat TEXT, summary TEXT, detail TEXT
   );
-  CREATE INDEX IF NOT EXISTS activity_bot ON activity(bot, id);
+  CREATE INDEX IF NOT EXISTS activity_agent ON activity(agent, id);
   CREATE TABLE IF NOT EXISTS pending (
-    code TEXT PRIMARY KEY, bot TEXT, server TEXT, confirm_tool TEXT, confirm_id TEXT,
+    code TEXT PRIMARY KEY, agent TEXT, server TEXT, confirm_tool TEXT, confirm_id TEXT,
     tool TEXT, chat TEXT, requester TEXT, summary TEXT, expires INTEGER
   );
   CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
@@ -23,16 +23,11 @@ db.exec(`
     chat TEXT PRIMARY KEY, summary TEXT, upto_id INTEGER DEFAULT 0, updated_at INTEGER
   );
   CREATE TABLE IF NOT EXISTS notes (
-    id INTEGER PRIMARY KEY, chat TEXT, bot TEXT, text TEXT, author TEXT, role TEXT, ts INTEGER
+    id INTEGER PRIMARY KEY, chat TEXT, agent TEXT, text TEXT, author TEXT, role TEXT, ts INTEGER
   );
   CREATE INDEX IF NOT EXISTS notes_chat ON notes(chat, id);
 `);
 
-// ---- migrations (004-group-memory) ----
-const cols = new Set(db.prepare('PRAGMA table_info(messages)').all().map((c) => c.name));
-for (const [col, type] of [['msg_id', 'TEXT'], ['quoted', 'TEXT'], ['addressed', 'INTEGER DEFAULT 0'], ['sender_jid', 'TEXT']]) {
-  if (!cols.has(col)) db.exec(`ALTER TABLE messages ADD COLUMN ${col} ${type}`);
-}
 db.exec(`
   CREATE INDEX IF NOT EXISTS messages_chat ON messages(chat, id);
   CREATE UNIQUE INDEX IF NOT EXISTS messages_chat_msgid ON messages(chat, msg_id) WHERE msg_id IS NOT NULL;
@@ -50,16 +45,16 @@ db.exec(`
 
 // ---- chat history ----
 const insMsg = db.prepare(`INSERT OR IGNORE INTO messages
-  (channel, chat, bot, msg_id, sender, name, text, quoted, addressed, from_bot, ts, sender_jid)
+  (channel, chat, agent, msg_id, sender, name, text, quoted, addressed, from_agent, ts, sender_jid)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 const recent = db.prepare('SELECT * FROM (SELECT * FROM messages WHERE chat = ? ORDER BY id DESC LIMIT ?) ORDER BY id');
 const pruneCap = db.prepare('DELETE FROM messages WHERE chat = ? AND id <= (SELECT id FROM messages WHERE chat = ? ORDER BY id DESC LIMIT 1 OFFSET ?)');
 const pruneAge = db.prepare('DELETE FROM messages WHERE ts < ?');
 
 /** Store a message once (dedup by chat + msgId). Returns the row id, or 0 if it was a duplicate. */
-export function logMessage({ channel = 'whatsapp', chat, bot = '', msgId = null, sender = '', name = '', text, quoted = '', addressed = false, fromBot = false, ts = Date.now(), senderJid = '' }) {
-  const r = insMsg.run(channel, chat, bot, msgId, sender, name, String(text ?? ''), String(quoted || '').slice(0, 500),
-    addressed ? 1 : 0, fromBot ? 1 : 0, ts, senderJid || '');
+export function logMessage({ channel = 'whatsapp', chat, agent = '', msgId = null, sender = '', name = '', text, quoted = '', addressed = false, fromAgent = false, ts = Date.now(), senderJid = '' }) {
+  const r = insMsg.run(channel, chat, agent, msgId, sender, name, String(text ?? ''), String(quoted || '').slice(0, 500),
+    addressed ? 1 : 0, fromAgent ? 1 : 0, ts, senderJid || '');
   if (Math.random() < 0.02) pruneMessages(chat);
   return r.changes ? Number(r.lastInsertRowid) : 0;
 }
@@ -84,9 +79,9 @@ export function setChatMemory(chat, summary, uptoId) {
 }
 
 // ---- notes ----
-export function addNote({ chat, bot, text, author, role }) {
-  const r = db.prepare('INSERT INTO notes (chat, bot, text, author, role, ts) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(chat, bot, String(text).slice(0, 500), author || '', role || '', Date.now());
+export function addNote({ chat, agent, text, author, role }) {
+  const r = db.prepare('INSERT INTO notes (chat, agent, text, author, role, ts) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(chat, agent, String(text).slice(0, 500), author || '', role || '', Date.now());
   db.prepare('DELETE FROM notes WHERE chat = ? AND id <= (SELECT id FROM notes WHERE chat = ? ORDER BY id DESC LIMIT 1 OFFSET ?)')
     .run(chat, chat, env.memory.maxNotesPerChat);
   return Number(r.lastInsertRowid);
@@ -108,7 +103,7 @@ export function searchNotes(chats, query, limit = 20) {
   return db.prepare(`SELECT * FROM notes WHERE chat IN (${chats.map(() => '?').join(',')}) AND text LIKE ? ESCAPE '\\' ORDER BY id DESC LIMIT ?`)
     .all(...chats, q, Math.min(Number(limit) || 20, 50));
 }
-export const deleteAgentNotes = (bot) => db.prepare('DELETE FROM notes WHERE chat = ?').run(`agent:${bot}`).changes;
+export const deleteAgentNotes = (agent) => db.prepare('DELETE FROM notes WHERE chat = ?').run(`agent:${agent}`).changes;
 
 export function eraseChat(chat) {
   db.prepare('DELETE FROM messages WHERE chat = ?').run(chat);
@@ -119,9 +114,9 @@ export function eraseChat(chat) {
 }
 
 // ---- activity log (what the panel shows) ----
-const insAct = db.prepare('INSERT INTO activity (ts, type, bot, chat, summary, detail) VALUES (?, ?, ?, ?, ?, ?)');
+const insAct = db.prepare('INSERT INTO activity (ts, type, agent, chat, summary, detail) VALUES (?, ?, ?, ?, ?, ?)');
 export function insertActivity(a) {
-  const r = insAct.run(a.ts, a.type, a.bot || '', a.chat || '', a.summary || '', a.detail ? JSON.stringify(a.detail) : '');
+  const r = insAct.run(a.ts, a.type, a.agent || '', a.chat || '', a.summary || '', a.detail ? JSON.stringify(a.detail) : '');
   return Number(r.lastInsertRowid);
 }
 /** Keep at most `max` entries and nothing older than `days`. */
@@ -129,10 +124,10 @@ export function pruneActivity({ days = 30, max = 5000 } = {}) {
   db.prepare('DELETE FROM activity WHERE id <= (SELECT id FROM activity ORDER BY id DESC LIMIT 1 OFFSET ?)').run(Math.max(100, max));
   db.prepare('DELETE FROM activity WHERE ts < ?').run(Date.now() - Math.max(1, days) * 86400000);
 }
-export function listActivity({ limit = 200, bot = '', chat = '', before = 0 } = {}) {
+export function listActivity({ limit = 200, agent = '', chat = '', before = 0 } = {}) {
   const lim = Math.min(Number(limit) || 200, 1000);
   const where = ['(? = 0 OR id < ?)']; const args = [before, before];
-  if (bot) { where.push('bot = ?'); args.push(bot); }
+  if (agent) { where.push('agent = ?'); args.push(agent); }
   if (chat) { where.push('chat = ?'); args.push(chat); }
   const rows = db.prepare(`SELECT * FROM activity WHERE ${where.join(' AND ')} ORDER BY id DESC LIMIT ?`).all(...args, lim);
   return rows.map((r) => ({ ...r, detail: r.detail ? JSON.parse(r.detail) : null }));
@@ -141,14 +136,14 @@ export function listActivity({ limit = 200, bot = '', chat = '', before = 0 } = 
 // ---- pending confirmations ----
 const expire = db.prepare('DELETE FROM pending WHERE expires < ?');
 const insPending = db.prepare(`INSERT OR REPLACE INTO pending
-  (code, bot, server, confirm_tool, confirm_id, tool, chat, requester, summary, expires)
+  (code, agent, server, confirm_tool, confirm_id, tool, chat, requester, summary, expires)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 const getPendingStmt = db.prepare('SELECT * FROM pending WHERE code = ?');
 const delPendingStmt = db.prepare('DELETE FROM pending WHERE code = ?');
 
 export function addPending(p) {
   expire.run(Date.now());
-  insPending.run(p.code, p.bot, p.server, p.confirmTool, p.confirmId, p.tool, p.chat, p.requester, p.summary || '', p.expires);
+  insPending.run(p.code, p.agent, p.server, p.confirmTool, p.confirmId, p.tool, p.chat, p.requester, p.summary || '', p.expires);
 }
 export function peekPending(code) { expire.run(Date.now()); return getPendingStmt.get(code); }
 export function takePending(code) {
@@ -159,7 +154,7 @@ export function takePending(code) {
 export const dropPending = (code) => delPendingStmt.run(code);
 export function listPending() {
   expire.run(Date.now());
-  return db.prepare('SELECT code, bot, tool, chat, requester, summary, expires FROM pending ORDER BY expires').all();
+  return db.prepare('SELECT code, agent, tool, chat, requester, summary, expires FROM pending ORDER BY expires').all();
 }
 
 // ---- key/value ----
@@ -170,7 +165,7 @@ export const kvSet = (k, v) => setKvStmt.run(k, String(v));
 
 /** Latest display name per sender phone seen in a chat (for member lists). */
 export function namesInChat(chat) {
-  const rows = db.prepare("SELECT sender, name FROM messages WHERE chat = ? AND sender != '' AND sender != 'bot' ORDER BY id DESC LIMIT 2000").all(chat);
+  const rows = db.prepare("SELECT sender, name FROM messages WHERE chat = ? AND sender != '' AND sender != 'agent' ORDER BY id DESC LIMIT 2000").all(chat);
   const out = {};
   for (const r of rows) if (!out[r.sender] && r.name) out[r.sender] = r.name;
   return out;
@@ -182,14 +177,14 @@ export function listMessages(chat, { before = 0, limit = 50, q = '' } = {}) {
   const args = [chat]; let where = 'chat = ?';
   if (Number(before)) { where += ' AND id < ?'; args.push(Number(before)); }
   if (q) { where += ' AND text LIKE ?'; args.push(`%${String(q).slice(0, 100)}%`); }
-  return db.prepare(`SELECT id, sender, name, text, quoted, from_bot AS fromBot, addressed, ts FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim)
-    .map((m) => ({ ...m, fromBot: !!m.fromBot, addressed: !!m.addressed }));
+  return db.prepare(`SELECT id, sender, name, text, quoted, from_agent AS fromAgent, addressed, ts FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim)
+    .map((m) => ({ ...m, fromAgent: !!m.fromAgent, addressed: !!m.addressed }));
 }
 
 // ---- WhatsApp reactions and polls (026) ----
 export const messageByMsgId = (chat, msgId) => db.prepare('SELECT * FROM messages WHERE chat = ? AND msg_id = ?').get(chat, String(msgId)) || null;
-/** Latest stored message of a chat sent by the bot (for "edit/delete my last message"). */
-export const lastBotMessage = (chat) => db.prepare('SELECT * FROM messages WHERE chat = ? AND from_bot = 1 AND msg_id IS NOT NULL ORDER BY id DESC LIMIT 1').get(chat) || null;
+/** Latest stored message of a chat sent by the agent (for "edit/delete my last message"). */
+export const lastAgentMessage = (chat) => db.prepare('SELECT * FROM messages WHERE chat = ? AND from_agent = 1 AND msg_id IS NOT NULL ORDER BY id DESC LIMIT 1').get(chat) || null;
 export function setMessageText(chat, msgId, text) {
   db.prepare('UPDATE messages SET text = ? WHERE chat = ? AND msg_id = ?').run(String(text), chat, String(msgId));
 }
@@ -199,7 +194,7 @@ export function saveReaction({ chat, msgId, sender, name = '', emoji = '', ts = 
   db.prepare('INSERT OR REPLACE INTO wa_reactions (chat, msg_id, sender, name, emoji, ts) VALUES (?, ?, ?, ?, ?, ?)').run(chat, String(msgId), sender, name, emoji, ts);
   db.prepare('DELETE FROM wa_reactions WHERE chat = ? AND ts < (SELECT ts FROM wa_reactions WHERE chat = ? ORDER BY ts DESC LIMIT 1 OFFSET 500)').run(chat, chat);
 }
-export const recentReactions = (chat, limit = 15) => db.prepare(`SELECT r.*, m.text AS target_text, m.from_bot AS target_from_bot FROM wa_reactions r
+export const recentReactions = (chat, limit = 15) => db.prepare(`SELECT r.*, m.text AS target_text, m.from_agent AS target_from_agent FROM wa_reactions r
   LEFT JOIN messages m ON m.chat = r.chat AND m.msg_id = r.msg_id WHERE r.chat = ? ORDER BY r.ts DESC LIMIT ?`).all(chat, limit).reverse();
 
 const pollRow = (r) => (r ? { ...r, options: JSON.parse(r.options || '[]'), votes: JSON.parse(r.votes || '{}') } : null);

@@ -3,16 +3,16 @@ import { useRouter } from 'expo-router';
 import { Alert, View } from 'react-native';
 import { Body, Card, Empty, H2, Label, Led, Loading, Pill, Row, Screen, Spread, Toggle } from '@/components/ui';
 import { can, useAuth } from '@/lib/auth';
-import type { Bot } from '@/lib/types';
+import type { Agent } from '@/lib/types';
 import { useData } from '@/lib/useData';
 
 export default function Agents() {
   const router = useRouter();
   const { api, user } = useAuth();
-  const { data, error, stale, refreshing, refresh, setData } = useData<Bot[]>('bots', (a) => a.get('/api/bots'));
-  const toggle = async (b: Bot, enabled: boolean) => {
+  const { data, error, stale, refreshing, refresh, setData } = useData<Agent[]>('agents', (a) => a.get('/api/agents'));
+  const toggle = async (b: Agent, enabled: boolean) => {
     setData(data?.map((x) => (x.id === b.id ? { ...x, enabled } : x)));
-    try { await api!.put(`/api/bots/${encodeURIComponent(b.id)}`, { enabled }); }
+    try { await api!.put(`/api/agents/${encodeURIComponent(b.id)}`, { enabled }); }
     catch (e) { setData(data); Alert.alert('Not changed', (e as Error).message); }
   };
   return (

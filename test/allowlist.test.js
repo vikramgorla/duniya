@@ -41,11 +41,11 @@ test('direct messages: off = ignored, even from organizers; an agent set to answ
   await t.route(dm('41790000001', 'hello organizer here'));
   await t.route(dm('41790000777', 'hello stranger here'));
   assert.equal(t.claudeReqs.length, n, 'nobody answered');
-  await t.bots.updateBot('helper', { dm: 'anyone' });
+  await t.agents.updateAgent('helper', { dm: 'anyone' });
   t.script.push([{ type: 'text', text: 'Open helper here' }]);
   await t.route(dm('41790000777', 'hello again'));
   assert.equal(t.sent.at(-1).text, 'Open helper here');
-  await t.bots.updateBot('helper', { dm: 'organizers' });
+  await t.agents.updateAgent('helper', { dm: 'organizers' });
 });
 
 test('organizer helpers still work in an off group, and store nothing', async () => {
@@ -55,9 +55,9 @@ test('organizer helpers still work in an off group, and store nothing', async ()
 });
 
 test('scheduled posts and history sync skip chats that are off', async () => {
-  await t.bots.updateBot('panduga', { schedules: [{ id: 'daily', at: '09:00', days: 'daily', prompt: 'Post the agenda', enabled: true }] });
+  await t.agents.updateAgent('panduga', { schedules: [{ id: 'daily', at: '09:00', days: 'daily', prompt: 'Post the agenda', enabled: true }] });
   const n = t.claudeReqs.length;
-  const r = await t.api(owner, 'POST', '/api/bots/panduga/schedules/daily/run');
+  const r = await t.api(owner, 'POST', '/api/agents/panduga/schedules/daily/run');
   assert.equal(r.status, 200);
   assert.equal(t.claudeReqs.length, n, 'no model call for an off chat');
   await t.onHistory([{ channel: 'whatsapp', isGroup: true, chat: 'g1@g.us', phone: '41790000002', senderName: 'Anu', text: 'old message', msgId: 'h1', ts: Date.now() - 1e6 }]);

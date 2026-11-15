@@ -4,20 +4,20 @@ import { View } from 'react-native';
 import { Body, Card, Divider, H2, Label, Loading, Mono, Row, Screen, Segmented, Spread, Stat } from '@/components/ui';
 import { compact, money, pct } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
-import type { Bot, UsageReport, UsageRow } from '@/lib/types';
+import type { Agent, UsageReport, UsageRow } from '@/lib/types';
 import { useData } from '@/lib/useData';
 
 type Period = '1d' | '7d' | '30d' | '90d';
 
 export default function Usage() {
   const [period, setPeriod] = useState<Period>('30d');
-  const byBot = useData<UsageReport>(`usage:bot:${period}`, (a) => a.get(`/api/usage?groupBy=bot&period=${period}`));
+  const byAgent = useData<UsageReport>(`usage:agent:${period}`, (a) => a.get(`/api/usage?groupBy=agent&period=${period}`));
   const byModel = useData<UsageReport>(`usage:model:${period}`, (a) => a.get(`/api/usage?groupBy=model&period=${period}`));
-  const bots = useData<Bot[]>('bots', (a) => a.get('/api/bots'));
-  const tot = byBot.data?.total;
-  const name = (k: string) => (k ? bots.data?.find((b) => b.id === k)?.name || k : 'Panel & AI helper');
+  const agents = useData<Agent[]>('agents', (a) => a.get('/api/agents'));
+  const tot = byAgent.data?.total;
+  const name = (k: string) => (k ? agents.data?.find((b) => b.id === k)?.name || k : 'Panel & AI helper');
   return (
-    <Screen onRefresh={() => { byBot.refresh(); byModel.reload(); }} refreshing={byBot.refreshing} error={byBot.data ? null : byBot.error} stale={byBot.stale}>
+    <Screen onRefresh={() => { byAgent.refresh(); byModel.reload(); }} refreshing={byAgent.refreshing} error={byAgent.data ? null : byAgent.error} stale={byAgent.stale}>
       <Segmented label="Period" value={period} onChange={setPeriod} options={[{ value: '1d', label: 'Today' }, { value: '7d', label: '7 days' }, { value: '30d', label: '30 days' }, { value: '90d', label: '90 days' }]} />
       {!tot ? <Loading /> : (
         <>
@@ -29,7 +29,7 @@ export default function Usage() {
             <Stat label="Tokens in" value={compact(tot.input)} />
             <Stat label="Tokens out" value={compact(tot.output)} />
           </Row>
-          <Breakdown title="By agent" rows={byBot.data!.rows} label={name} />
+          <Breakdown title="By agent" rows={byAgent.data!.rows} label={name} />
           {byModel.data ? <Breakdown title="By model" rows={byModel.data.rows} label={(k) => k.replace(/^[a-z-]+:/, '')} /> : null}
           <Body small muted style={{ textAlign: 'center' }}>Prices are set in the web panel (Usage) when a provider does not publish them.</Body>
         </>

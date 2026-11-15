@@ -60,7 +60,7 @@ Prefer infrastructure-as-code from your own fork? [deploy/terraform-github-actio
 - *Update the infrastructure:* **Edit stack**, upload the [latest stack zip](https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip), then **Apply**.
 - *See what the server is doing:* while it installs, open `http://<server-ip>/` for a live progress page; if the
   install fails, that page shows the error. On Pay As You Go accounts you can also turn on *Send logs to OCI Logging*.
-- *Remove everything:* run **Destroy**, then **Delete stack**. Take a backup first if you want to keep your bots.
+- *Remove everything:* run **Destroy**, then **Delete stack**. Take a backup first if you want to keep your agents.
 
 Runs comfortably on a 1 GB VM (~180 MB RAM).
 
@@ -106,7 +106,7 @@ service runs.
 | `create-user <name> --role admin\|viewer\|owner`, `list-users`, `set-role`, `remove-user` | manage panel accounts |
 | `enable-password-login` | switch passwords back on if "Only allow Sign in with Google" locked you out |
 | `show-setup-code` | the one-time code that creates the first owner |
-| `status` | version, uptime, WhatsApp numbers, bots, last backup |
+| `status` | version, uptime, WhatsApp numbers, agents, last backup |
 | `doctor` | checks DNS, HTTPS, ports, disk, memory, swap and prints fixes |
 | `backup-now`, `restart`, `logs [-f]`, `update [--check]` | maintenance |
 | `open-access` | remove the IP allow-list if it locked you out of the panel |
@@ -119,23 +119,32 @@ the panel and follow the three steps (install Expo Go, open the app, scan the co
 your panel account through the panel's own OAuth sign-in and can do what your account can do. Developer notes and
 store-build instructions: [`mobile/README.md`](../mobile/README.md). The server never installs `mobile/`.
 
+## Upgrading from 1.x to 2.0
+
+2.0 renames bots to agents everywhere (database tables, settings, API paths such as `/api/agents`, admin MCP tool
+names such as `create_agent`, export files `duniya-agent`) and has **no migration**: a 1.x database, a 1.x backup or a
+1.x agent export cannot be used. Install 2.0 on a fresh server (or remove the data directory), link WhatsApp again and
+set the agents up again (the AI helper and templates make this quick).
+
 ## First steps in the panel
 
 1. **Setup**: enter the setup code, choose your username and password.
-2. **Overview**: scan the QR with the bot's WhatsApp (*Settings → Linked devices*), or use a pairing code.
+2. **Overview**: scan the QR with the agent's WhatsApp (*Settings → Linked devices*), or use a pairing code.
 3. **Models**: connect OpenRouter in one tap, paste an Anthropic or OpenAI key, add an OpenAI-compatible endpoint,
    *Sign in with ChatGPT*, or connect GitHub Copilot.
-4. **Bots → New bot**: pick a template (or *Create a bot with AI*), write the instructions, add organizers, connect
+4. **Agents → New agent**: pick a template (or *Create an agent with AI*), write the instructions, add organizers, connect
    tool services (URL → *Check* → *Connect* to sign in, or a token; *Discover tools* → tick per role), save. Use the
-   **test console** to try it.
-5. Add the bot number to a WhatsApp group. **Chats** → switch the chat **on** and choose the bot. Chats are off until
+   **test console** to try it. Tool services every agent should have (a calendar, a shared planner) go under
+   **Settings → Tool services** instead: add them once, tick the default tools per role, and switch them off per agent
+   if needed (see below).
+5. Add the agent number to a WhatsApp group. **Chats** → switch the chat **on** and choose the agent. Chats are off until
    you switch them on: agents ignore them completely (nothing stored, no model call).
-6. In the group: `!yourtrigger hello` (or @mention the bot).
+6. In the group: `!yourtrigger hello` (or @mention the agent).
 7. **Backups**: set a passphrase, connect GitHub or S3, turn on the schedule.
 
 ## Manage it from ChatGPT or Claude
 
-The app is also an MCP server, so you can run it by chatting: "which bots are on?", "turn off the carpool bot",
+The app is also an MCP server, so you can run it by chatting: "which agents are on?", "turn off the carpool agent",
 "what happened in the school group today?". Open **Settings → Connected AI assistants**, copy the address
 (`https://YOUR-HOST/mcp`) and follow the short steps shown there:
 
@@ -144,7 +153,7 @@ The app is also an MCP server, so you can run it by chatting: "which bots are on
 - **Claude**: Settings → Connectors → Add custom connector → paste the address → Add → Connect.
 
 A Duniya page opens: sign in (if asked), check what the assistant may do, and click **Approve**. The assistant acts as
-you, with your panel role (viewers stay read-only; owner-only actions stay owner-only). Risky actions (deleting a bot,
+you, with your panel role (viewers stay read-only; owner-only actions stay owner-only). Risky actions (deleting an agent,
 erasing memory, secrets, users, WhatsApp numbers, backups restore, updates, restarts) return a preview and only happen
 after a second `confirm_action` call. Every call is in the activity log ("AI assistants (MCP)"); disconnect an
 assistant any time in the same card.
@@ -157,7 +166,7 @@ client registration, PKCE S256, resource-bound tokens (access 1 h, refresh 30 da
 ## How it works
 
 ```
-WhatsApp (linked device) ─► allow-list ─► router ─► bot (stored in the app) ─► model provider
+WhatsApp (linked device) ─► allow-list ─► router ─► agent (stored in the app) ─► model provider
                                             │            ├─ MCP tool services (per-role allow lists, enforced in code)
                                             │            ├─ WhatsApp actions (media, reactions, polls, group admin)
                                             │            ├─ memory: recent messages + running summary + notes + search
@@ -168,17 +177,23 @@ Admin panel (localhost:8080 behind Caddy / Cloudflare Tunnel / SSH) · SQLite ·
 
 - **Chats** are off by default (#10). Messages from chats that are off are dropped before storage and before any
   model call.
-- **Roles**: organizers (phone numbers per bot; while none are saved, the WhatsApp admins of its groups) get organizer
+- **Roles**: organizers (phone numbers per agent; while none are saved, the WhatsApp admins of its groups) get organizer
   tools and can confirm changes; everyone else in a bound group is a participant. The model never sees or calls the
   confirm tool.
-- **Panel users**: owner (everything), admin (bots, chats, models, memory), viewer (read-only). Sign in with a
+- **Panel users**: owner (everything), admin (agents, chats, models, memory), viewer (read-only). Sign in with a
   password or Google; owners invite people by email.
 - **Models**: OpenRouter (optionally free models only), Anthropic API key, OpenAI API key, any OpenAI-compatible
   endpoint (Ollama, …), your ChatGPT Plus/Pro plan via Sign in with ChatGPT, or your GitHub Copilot allowance via the
-  official Copilot SDK (downloaded only if you connect it). Pick per bot and per chat, or *Auto*.
+  official Copilot SDK (downloaded only if you connect it). Pick per agent and per chat, or *Auto*.
+- **Global tool services** (035): MCP servers defined once under **Settings → Tool services** are available to every
+  agent. An agent can switch one off (`globalMcp.disabled` in its config), and an agent's own service with the same name
+  replaces the global one for that agent. Tools still follow the agent's `server:tool` rules; for a role without explicit
+  rules for that service, the service's defaults apply (`server:-` = none). OAuth sign-ins are per service (shared by
+  all agents); local (npm/GitHub) services are owner-only. Admin MCP tools: `list_global_tool_services`,
+  `add_global_tool_service`, `remove_global_tool_service`.
 - **Plugins** (`plugins/<name>/index.js`) add local tools or commands for advanced cases; see `plugins/example-dice`.
-- **Bot templates** (`templates/`): New bot, School friends, Family, Car pooling, Office colleagues, Event planning,
-  Neighbours. Bots themselves are data in the app (export/import as JSON).
+- **Agent templates** (`templates/`): New agent, School friends, Family, Car pooling, Office colleagues, Event planning,
+  Neighbours. Agents themselves are data in the app (export/import as JSON).
 - **Several WhatsApp numbers**: chats on the first number keep their WhatsApp id; others are `<number>#<jid>`.
 
 ## Optional settings (environment)
@@ -191,7 +206,7 @@ Admin panel (localhost:8080 behind Caddy / Cloudflare Tunnel / SSH) · SQLite ·
 | `ADMIN_PASSWORD` | — | Create owner `admin` with this password on first start (otherwise a setup code is printed) |
 | `DATA_DIR` | `data` | SQLite database, WhatsApp sessions, local backups |
 | `TZ_DEFAULT` | `Europe/Zurich` | Default timezone for schedules |
-| `RATE_LIMIT_PER_MIN` | 6 | Requests one person may make to one bot per minute |
+| `RATE_LIMIT_PER_MIN` | 6 | Requests one person may make to one agent per minute |
 | `MEMORY_RETENTION_DAYS` / `MEMORY_MAX_MESSAGES` | 90 / 5000 | Stored-message limits per chat |
 | `WA_MEDIA_MAX_MB` | 16 | Largest media file an agent may send |
 | `UPDATE_MODE` | `notify` | `off`, `notify` or `auto` |
@@ -220,7 +235,7 @@ The project site lives in [`site/`](site/) (plain HTML/CSS, no build step) and i
 
 ## Notes
 
-- Use a **dedicated WhatsApp number**. Unofficial clients can be banned; bots only reply when addressed and are
+- Use a **dedicated WhatsApp number**. Unofficial clients can be banned; agents only reply when addressed and are
   rate-limited to keep that risk low. Tell your groups that the assistant keeps context.
 - Claude **subscriptions** (Pro/Max) can't be used by third-party apps under Anthropic's terms, so Claude needs an
   API key. ChatGPT plan usage uses OpenAI's official open-source flow (preview).

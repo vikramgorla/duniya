@@ -29,7 +29,7 @@ run_app() { # run bin/duniya.js as the app user with only the app's environment
 
 case "${1:-}" in
   restart)
-    echo "Restarting $SERVICE (bots are offline for a few seconds)…"
+    echo "Restarting $SERVICE (agents are offline for a few seconds)…"
     systemctl restart "$SERVICE" && sleep 2 && systemctl is-active -q "$SERVICE" && echo "✓ Restarted." || { echo "✗ The service did not come back. See: duniya logs" >&2; exit 1; }
     ;;
   logs)

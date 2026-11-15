@@ -8,7 +8,7 @@ import { Body, Button, Card, Divider, Field, H2, Label, Led, Loading, Mono, Note
 import { can, useAuth } from '@/lib/auth';
 import { ago } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
-import type { Bot } from '@/lib/types';
+import type { Agent } from '@/lib/types';
 import { useData } from '@/lib/useData';
 
 const DM: Record<string, string> = { off: 'nobody', organizers: 'organizers only', members: 'members of its groups', anyone: 'anyone' };
@@ -19,46 +19,47 @@ export default function AgentDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { api, user } = useAuth();
   const admin = can(user, 'admin');
-  const { data: bot, error, stale, refreshing, refresh, setData } = useData<Bot>(`bot:${id}`, (a) => a.get(`/api/bots/${encodeURIComponent(id)}`));
+  const { data: agent, error, stale, refreshing, refresh, setData } = useData<Agent>(`agent:${id}`, (a) => a.get(`/api/agents/${encodeURIComponent(id)}`));
   const [edits, setEdits] = useState<Partial<Record<'name' | 'description' | 'prompt' | 'triggers', string>>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
-  if (!bot) return <Screen error={error}><Loading /></Screen>;
-  const form = { name: bot.name, description: bot.description || '', prompt: bot.config.prompt || '', triggers: (bot.config.triggers || []).join(', '), ...edits };
+  if (!agent) return <Screen error={error}><Loading /></Screen>;
+  const form = { name: agent.name, description: agent.description || '', prompt: agent.config.prompt || '', triggers: (agent.config.triggers || []).join(', '), ...edits };
   const setForm = (f: typeof form) => setEdits(f);
 
   const patch: Record<string, unknown> = {};
-  if (form.name.trim() !== bot.name) patch.name = form.name.trim();
-  if (form.description !== (bot.description || '')) patch.description = form.description;
-  if (form.prompt !== (bot.config.prompt || '')) patch.prompt = form.prompt;
+  if (form.name.trim() !== agent.name) patch.name = form.name.trim();
+  if (form.description !== (agent.description || '')) patch.description = form.description;
+  if (form.prompt !== (agent.config.prompt || '')) patch.prompt = form.prompt;
   const trig = form.triggers.split(',').map((s) => s.trim()).filter(Boolean);
-  if (trig.join(',') !== (bot.config.triggers || []).join(',')) patch.triggers = trig;
+  if (trig.join(',') !== (agent.config.triggers || []).join(',')) patch.triggers = trig;
   const dirty = Object.keys(patch).length > 0;
 
   const save = async () => {
     setSaving(true); setSaved('');
     try {
-      const r = await api!.put<Bot & { warnings?: string[] }>(`/api/bots/${encodeURIComponent(bot.id)}`, patch);
+      const r = await api!.put<Agent & { warnings?: string[] }>(`/api/agents/${encodeURIComponent(agent.id)}`, patch);
       setData(r); setEdits({}); setSaved(r.warnings?.length ? `Saved. Note: ${r.warnings.join(' ')}` : 'Saved. The agent uses the new settings from its next message.');
     } catch (e) { Alert.alert('Not saved', (e as Error).message); } finally { setSaving(false); }
   };
   const toggle = async (enabled: boolean) => {
-    try { setData({ ...bot, enabled }); await api!.put(`/api/bots/${encodeURIComponent(bot.id)}`, { enabled }); }
-    catch (e) { setData(bot); Alert.alert('Not changed', (e as Error).message); }
+    try { setData({ ...agent, enabled }); await api!.put(`/api/agents/${encodeURIComponent(agent.id)}`, { enabled }); }
+    catch (e) { setData(agent); Alert.alert('Not changed', (e as Error).message); }
   };
-  const c = bot.config;
+  const c = agent.config;
   const services = Object.entries(c.mcpServers || {});
+  const globals = (agent.globalTools || []).filter((g) => !g.replaced);
   return (
     <Screen onRefresh={refresh} refreshing={refreshing} stale={stale}>
-      <Stack.Screen options={{ title: bot.name }} />
+      <Stack.Screen options={{ title: agent.name }} />
       <Card>
         <Spread>
-          <Row style={{ flex: 1 }}><Led tone={bot.enabled ? 'ok' : 'off'} size={11} /><H2 style={{ flex: 1 }}>{bot.enabled ? 'On — answers in its chats' : 'Off — stays silent'}</H2></Row>
-          <Toggle label="Agent on or off" value={bot.enabled} onChange={toggle} disabled={!admin} />
+          <Row style={{ flex: 1 }}><Led tone={agent.enabled ? 'ok' : 'off'} size={11} /><H2 style={{ flex: 1 }}>{agent.enabled ? 'On — answers in its chats' : 'Off — stays silent'}</H2></Row>
+          <Toggle label="Agent on or off" value={agent.enabled} onChange={toggle} disabled={!admin} />
         </Spread>
-        <Row wrap gap={8}><Label>{`${c.chats?.length || 0} chats`}</Label><Label>{`model ${c.model || 'auto'}`}</Label>{bot.updatedAt ? <Label>{`changed ${ago(bot.updatedAt)} ago`}</Label> : null}</Row>
-        {bot.needs.length ? <Note tone="warn">{`Missing secret${bot.needs.length > 1 ? 's' : ''}: ${bot.needs.join(', ')}. Add ${bot.needs.length > 1 ? 'them' : 'it'} in the web panel → Secrets.`}</Note> : null}
-        {admin ? <Button kind="primary" title="Change with AI" icon={<Icon name="ai" color={t.onPrimary} size={18} />} onPress={() => router.push({ pathname: '/ai/[id]', params: { id: bot.id } })}
+        <Row wrap gap={8}><Label>{`${c.chats?.length || 0} chats`}</Label><Label>{`model ${c.model || 'auto'}`}</Label>{agent.updatedAt ? <Label>{`changed ${ago(agent.updatedAt)} ago`}</Label> : null}</Row>
+        {agent.needs.length ? <Note tone="warn">{`Missing secret${agent.needs.length > 1 ? 's' : ''}: ${agent.needs.join(', ')}. Add ${agent.needs.length > 1 ? 'them' : 'it'} in the web panel → Secrets.`}</Note> : null}
+        {admin ? <Button kind="primary" title="Change with AI" icon={<Icon name="ai" color={t.onPrimary} size={18} />} onPress={() => router.push({ pathname: '/ai/[id]', params: { id: agent.id } })}
           accessibilityHint="Describe a change in your own words; you see it before it is saved" /> : null}
       </Card>
 
@@ -77,14 +78,20 @@ export default function AgentDetail() {
 
       <Card>
         <H2>Tools</H2>
-        {services.length === 0 && !bot.localTools.length ? <Body muted>No tool services: it only talks.</Body> : null}
+        {services.length === 0 && !globals.length && !agent.localTools.length ? <Body muted>No tool services: it only talks.</Body> : null}
         {services.map(([name, s]) => (
           <View key={name} style={{ gap: 2 }}>
             <Row><Mono style={{ fontWeight: '600' }}>{name}</Mono><Pill>{s.type === 'local' ? 'on this server' : s.auth === 'oauth' ? 'sign-in' : 'token'}</Pill></Row>
             <Body small muted numberOfLines={1}>{s.type === 'local' ? s.package : (s.url || '').replace(/^https?:\/\//, '')}</Body>
           </View>
         ))}
-        {bot.localTools.length ? <Body small muted>{`Plugin tools: ${bot.localTools.join(', ')}`}</Body> : null}
+        {globals.map((g) => (
+          <View key={`g-${g.name}`} style={{ gap: 2 }}>
+            <Row><Mono style={{ fontWeight: '600' }}>{g.name}</Mono><Pill>for all agents</Pill></Row>
+            <Body small muted>{g.on ? 'Used by this agent' : 'Switched off for this agent (change it in the web panel)'}</Body>
+          </View>
+        ))}
+        {agent.localTools.length ? <Body small muted>{`Plugin tools: ${agent.localTools.join(', ')}`}</Body> : null}
         <Divider />
         <Rules label="Participants may use" rules={c.tools?.participant} empty="nothing (they can only chat)" />
         <Rules label="Organizers may use" rules={c.tools?.organizer} empty="nothing" />

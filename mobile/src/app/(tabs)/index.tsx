@@ -55,7 +55,7 @@ export default function Overview() {
             </Card>
             <Card>
               <Spread><H2>Agents</H2><Button small kind="ghost" title="All agents" onPress={() => router.push('/agents')} /></Spread>
-              {st.bots.length ? st.bots.map((b) => (
+              {st.agents.length ? st.agents.map((b) => (
                 <ListRow key={b.id} title={b.name} subtitle={b.chats ? `${b.chats} chat${b.chats > 1 ? 's' : ''}` : 'not in any chat yet'}
                   left={<Led tone={st.settings.paused ? 'warn' : b.enabled ? 'ok' : 'off'} />} onPress={() => router.push({ pathname: '/agent/[id]', params: { id: b.id } })} />
               )) : <Body muted>No agents yet. Create one in the web panel (Agents → New), or with AI there.</Body>}
@@ -74,7 +74,7 @@ function Console({ st, canAdmin, onPause, onPending }: { st: Status; canAdmin: b
   const h = headline(st);
   const numbers = numbersOf(st);
   const open = numbers.filter((n) => n.status === 'open').length;
-  const live = st.bots.filter((b) => b.enabled).length;
+  const live = st.agents.filter((b) => b.enabled).length;
   return (
     <Card accessibilityLabel={h.text}>
       <Label>Status</Label>

@@ -44,20 +44,20 @@ test('participants get the send/react/poll tools by default, organizers all; pow
 });
 
 test('explicit whatsapp: rules replace the defaults; organizer-only tools stay off participants; deny wins', async () => {
-  const orig = structuredClone(t.bots.getBot('panduga').tools);
-  await t.bots.updateBot('panduga', { tools: { ...orig, participant: [...orig.participant, 'whatsapp:react', 'whatsapp:remove_participants'], deny: ['whatsapp:block'] } });
+  const orig = structuredClone(t.agents.getAgent('panduga').tools);
+  await t.agents.updateAgent('panduga', { tools: { ...orig, participant: [...orig.participant, 'whatsapp:react', 'whatsapp:remove_participants'], deny: ['whatsapp:block'] } });
   t.claudeReqs.length = 0;
   t.script.push([{ type: 'text', text: 'a' }], [{ type: 'text', text: 'b' }]);
   await t.route(t.msg({ text: '!panduga hi' }));
   await t.route(t.msg({ phone: ORG, text: '!panduga hi' }));
   assert.deepEqual(waNames(0), ['whatsapp__react']);
   assert.ok(!waNames(1).includes('whatsapp__block'), 'deny list wins');
-  await t.bots.updateBot('panduga', { tools: { ...orig, participant: [...orig.participant, 'whatsapp:-'] } });
+  await t.agents.updateAgent('panduga', { tools: { ...orig, participant: [...orig.participant, 'whatsapp:-'] } });
   t.claudeReqs.length = 0;
   t.script.push([{ type: 'text', text: 'c' }]);
   await t.route(t.msg({ text: '!panduga hi' }));
   assert.deepEqual(waNames(0), [], 'whatsapp:- = none');
-  await t.bots.updateBot('panduga', { tools: orig });
+  await t.agents.updateAgent('panduga', { tools: orig });
 });
 
 test('a participant cannot run an organizer-only tool even if the model calls it', async () => {
@@ -70,18 +70,18 @@ test('a participant cannot run an organizer-only tool even if the model calls it
 
 // ---------- each tool reaches the right channel function ----------
 test('every tool calls the matching channel function on the current chat and is logged as whatsapp.action', async () => {
-  // a bot message to react to / edit / delete
+  // an agent message to react to / edit / delete
   t.script.push([{ type: 'text', text: 'Bus leaves at 9:10' }]);
   await t.route(t.msg({ phone: ORG, text: '!panduga when is the bus?' }));
-  const botMsg = t.db.lastBotMessage('g1@g.us');
-  assert.equal(botMsg.text, 'Bus leaves at 9:10');
+  const agentMsg = t.db.lastAgentMessage('g1@g.us');
+  assert.equal(agentMsg.text, 'Bus leaves at 9:10');
   const cases = [
     ['send_media', { kind: 'image', url: 'https://example.com/flyer.png', caption: 'Flyer' }, 'sendMedia', (a) => a[0].kind === 'image' && a[0].url === 'https://example.com/flyer.png' && a[0].caption === 'Flyer'],
     ['send_location', { latitude: 46.317, longitude: 6.966, name: 'Aigle station' }, 'sendLocation', (a) => a[0].latitude === 46.317 && a[0].name === 'Aigle station'],
     ['send_contact', { name: 'Ravi', phone: '+41 79 111 22 33' }, 'sendContact', (a) => a[0].name === 'Ravi'],
-    ['react', { emoji: '👍', message: 'Bus leaves' }, 'react', (a) => a[0].msgId === botMsg.msg_id && a[0].fromMe === true && a[1] === '👍'],
-    ['reply', { text: 'Yes, 9:10', message: botMsg.msg_id }, null, null],
-    ['edit_message', { text: 'Bus leaves at 9:15', message: 'Bus leaves' }, 'editMessage', (a) => a[0] === botMsg.msg_id && a[1] === 'Bus leaves at 9:15'],
+    ['react', { emoji: '👍', message: 'Bus leaves' }, 'react', (a) => a[0].msgId === agentMsg.msg_id && a[0].fromMe === true && a[1] === '👍'],
+    ['reply', { text: 'Yes, 9:10', message: agentMsg.msg_id }, null, null],
+    ['edit_message', { text: 'Bus leaves at 9:15', message: 'Bus leaves' }, 'editMessage', (a) => a[0] === agentMsg.msg_id && a[1] === 'Bus leaves at 9:15'],
     ['create_poll', { question: 'Lunch?', options: ['Pizza', 'Dosa'] }, 'sendPoll', (a) => a[0].name === 'Lunch?' && a[0].multi === false],
     ['group_info', {}, 'groupInfo', () => true],
     ['group_invite_link', {}, 'groupInviteLink', () => true],
@@ -97,7 +97,7 @@ test('every tool calls the matching channel function on the current chat and is 
     ['profile_info', { person: '+41 79 000 00 02' }, 'profile', (a) => a[0] === '+41 79 000 00 02'],
     ['block', { person: '+41 79 666 00 00' }, 'block', (a) => a[0] === '+41 79 666 00 00'],
     ['unblock', { person: '+41 79 666 00 00' }, 'unblock', (a) => a[0] === '+41 79 666 00 00'],
-    ['delete_message', { message: botMsg.msg_id }, 'deleteMessage', (a) => a[0].fromMe === true && a[0].msgId === botMsg.msg_id],
+    ['delete_message', { message: agentMsg.msg_id }, 'deleteMessage', (a) => a[0].fromMe === true && a[0].msgId === agentMsg.msg_id],
   ];
   for (const [tool, input, fn, check] of cases) {
     const n = t.waCalls.length; const sent = t.sent.length;
@@ -115,8 +115,8 @@ test('every tool calls the matching channel function on the current chat and is 
     assert.match(act.summary, new RegExp(`^${tool} by `), `${tool} logged`);
     assert.equal(act.detail.tool, tool);
   }
-  assert.ok(t.db.history('g1@g.us', 50).some((m) => m.from_bot && m.text.startsWith('[poll: Lunch?')), 'own sends are stored for context');
-  assert.equal(t.db.messageByMsgId('g1@g.us', botMsg.msg_id).text, '[deleted]');
+  assert.ok(t.db.history('g1@g.us', 50).some((m) => m.from_agent && m.text.startsWith('[poll: Lunch?')), 'own sends are stored for context');
+  assert.equal(t.db.messageByMsgId('g1@g.us', agentMsg.msg_id).text, '[deleted]');
   assert.equal(t.events.categoryOf('whatsapp.action'), 'whatsapp');
   assert.equal(t.events.LOG_CATEGORIES.whatsapp, 'WhatsApp actions');
 });
@@ -133,11 +133,11 @@ test('group_info hides phone numbers from participants; profile_info is limited 
   assert.match(stranger.content, /people of this chat/);
 });
 
-test('acting on another chat needs that chat to be bound to the same bot (id or group name)', async () => {
+test('acting on another chat needs that chat to be bound to the same agent (id or group name)', async () => {
   const n = t.waCalls.length;
   const res = await callTool('set_group_subject', { subject: 'X', chat: 'g2@g.us' }, { phone: ORG });
   assert.equal(res.is_error, true);
-  assert.match(res.content, /only act in this chat or in other chats this bot is in/);
+  assert.match(res.content, /only act in this chat or in other chats this agent is in/);
   assert.equal(t.waCalls.length, n);
   // from a direct message, by group name
   const ok = await callTool('set_group_settings', { only_admins_edit_info: true, chat: 'Panduga families' }, { phone: ORG, isGroup: false, chat: `${ORG}@s.whatsapp.net` });
@@ -150,11 +150,11 @@ test('acting on another chat needs that chat to be bound to the same bot (id or 
 });
 
 // ---------- incoming reactions and poll votes reach the context ----------
-test('reactions to the bot and in bound groups are stored and summarised for the agent; others are ignored', async () => {
+test('reactions to the agent and in bound groups are stored and summarised for the agent; others are ignored', async () => {
   t.script.push([{ type: 'text', text: 'Dinner is at 7' }]);
   await t.route(t.msg({ text: '!panduga dinner?' }));
-  const bot = t.db.lastBotMessage('g1@g.us');
-  await t.route(t.msg({ kind: 'reaction', text: '', target: bot.msg_id, emoji: '👍', senderName: 'Meena', phone: '41790000004' }));
+  const agent = t.db.lastAgentMessage('g1@g.us');
+  await t.route(t.msg({ kind: 'reaction', text: '', target: agent.msg_id, emoji: '👍', senderName: 'Meena', phone: '41790000004' }));
   await t.route(t.msg({ chat: 'g8@g.us', text: 'unbound chatter', msgId: 'U1' }));
   await t.route(t.msg({ chat: 'g8@g.us', kind: 'reaction', text: '', target: 'U1', emoji: '😂' }));
   assert.equal(t.db.recentReactions('g8@g.us').length, 0, 'unbound group reactions to others are not kept');
@@ -164,8 +164,8 @@ test('reactions to the bot and in bound groups are stored and summarised for the
   assert.match(t.userTurn(0), /<reactions_and_polls>[\s\S]*Meena reacted 👍 to your message "Dinner is at 7"/);
   assert.ok(t.db.listActivity({ limit: 30 }).some((a) => a.type === 'whatsapp.reaction' && /Meena reacted/.test(a.summary)));
   // removing the reaction
-  await t.route(t.msg({ kind: 'reaction', text: '', target: bot.msg_id, emoji: '', senderName: 'Meena', phone: '41790000004' }));
-  assert.ok(!t.db.recentReactions('g1@g.us').some((r) => r.name === 'Meena' && r.msg_id === bot.msg_id));
+  await t.route(t.msg({ kind: 'reaction', text: '', target: agent.msg_id, emoji: '', senderName: 'Meena', phone: '41790000004' }));
+  assert.ok(!t.db.recentReactions('g1@g.us').some((r) => r.name === 'Meena' && r.msg_id === agent.msg_id));
 });
 
 test('poll votes are tallied (latest vote per person), shown in context and returned by poll_results', async () => {
@@ -188,7 +188,7 @@ test('poll votes are tallied (latest vote per person), shown in context and retu
   assert.ok(t.db.listActivity({ limit: 30 }).some((a) => a.type === 'whatsapp.vote' && /Ravi voted Mountain/.test(a.summary)));
 });
 
-test('media messages are stored as placeholders; a caption can still address the bot', async () => {
+test('media messages are stored as placeholders; a caption can still address the agent', async () => {
   t.claudeReqs.length = 0;
   t.script.push([{ type: 'text', text: 'Looks like a flyer' }]);
   await t.route(t.msg({ text: '[image: !panduga what is this?]', caption: '!panduga what is this?', media: true, msgId: 'IMG1' }));
@@ -374,7 +374,7 @@ test('channel (fake Baileys socket): sends, reactions, edits, groups, profile an
   assert.deepEqual(calls.at(-1), { fn: 'updateBlockStatus', args: ['41796660000@s.whatsapp.net', 'block'] });
   await ch.unblock('41796660000');
   assert.equal(calls.at(-1).args[1], 'unblock');
-  await ch.setProfileName('Duniya'); await ch.setProfileStatus('Bot');
+  await ch.setProfileName('Duniya'); await ch.setProfileStatus('Agent');
 });
 
 test('channel (fake socket): incoming media placeholders, reactions and encrypted poll votes', async () => {
@@ -402,7 +402,7 @@ test('channel (fake socket): incoming media placeholders, reactions and encrypte
   assert.equal(got.at(-1).kind, 'reaction'); assert.equal(got.at(-1).target, 'IN1'); assert.equal(got.at(-1).emoji, '❤️');
   assert.ok(t.db.recentReactions('g1@g.us').some((r) => r.msg_id === 'IN1' && r.emoji === '❤️'), 'stored via the router');
 
-  // the bot posts a poll; a member votes (encrypted like WhatsApp does)
+  // the agent posts a poll; a member votes (encrypted like WhatsApp does)
   const { msgId } = await ch.sendPoll('g1@g.us', { name: 'Dinner?', options: ['Pizza', 'Dosa'] });
   assert.equal(calls.filter((c) => c.fn === 'sendMessage').at(-1).args[1].poll.selectableCount, 1);
   const secret = baileys.BufferJSON && JSON.parse(t.db.getPoll('g1@g.us', msgId).message, baileys.BufferJSON.reviver).messageContextInfo.messageSecret;

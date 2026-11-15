@@ -139,7 +139,7 @@ export function parseRef(ref) {
 const NOT_CHAT = /embed|whisper|tts|dall-e|image|audio|moderation|realtime|transcri|search|davinci|babbage|codex-mini/i;
 const SMALL = /mini|nano|haiku|flash|small|lite/i;
 /** Auto choice from a provider's list: the first chat model (a small one for background work, when there is one). */
-export function autoPick(models, purpose = 'bot') {
+export function autoPick(models, purpose = 'agent') {
   const chat = models.map((m) => m.id).filter((id) => id && !NOT_CHAT.test(id));
   if (!chat.length) return null;
   if (purpose === 'background') return chat.find((id) => SMALL.test(id)) || chat[0];
@@ -151,12 +151,12 @@ export async function warmModels() {
   await Promise.all(providers().filter((p) => p.configured && p.id !== 'anthropic').map((p) => providerModels(p)));
 }
 
-export function resolveModel(ref, purpose = 'bot') {
+export function resolveModel(ref, purpose = 'agent') {
   const parsed = parseRef(ref);
   if (parsed && parsed.model === 'auto') { // "provider:auto": that provider's best model
     const p = providerById(parsed.provider);
     if (!p?.configured) throw Object.assign(new Error(`Provider "${parsed.provider}" is not connected`), { code: 'no_model' });
-    const pick = parsed.provider === 'anthropic' ? anthropic.RECOMMENDED[purpose === 'background' ? 'background' : 'bot'] : autoPick(modelCache.get(p.id)?.models || [], purpose);
+    const pick = parsed.provider === 'anthropic' ? anthropic.RECOMMENDED[purpose === 'background' ? 'background' : 'agent'] : autoPick(modelCache.get(p.id)?.models || [], purpose);
     if (!pick) throw Object.assign(new Error(`No usable model listed by ${p.name}`), { code: 'no_model' });
     return parseRef(`${parsed.provider}:${pick}`);
   }
@@ -171,7 +171,7 @@ export function resolveModel(ref, purpose = 'bot') {
     if (anthropic.configured()) return parseRef(`anthropic:${anthropic.RECOMMENDED.background}`);
     if (def && providerById(def.provider)?.configured) return def;
   }
-  if (anthropic.configured()) return parseRef(`anthropic:${anthropic.RECOMMENDED.bot}`);
+  if (anthropic.configured()) return parseRef(`anthropic:${anthropic.RECOMMENDED.agent}`);
   // Any other connected provider: pick from its (cached) model list, in the order providers are listed.
   for (const p of providers()) {
     if (!p.configured || p.id === 'anthropic') continue;
@@ -185,7 +185,7 @@ export function resolveModel(ref, purpose = 'bot') {
  * Unified chat call. Input/output use Anthropic-style blocks.
  * Returns { content, stop_reason, usage, model: 'provider:model' }.
  */
-export async function chat({ model = 'auto', purpose = 'bot', system, messages, tools = [], maxTokens = 1024, usage = {} }) {
+export async function chat({ model = 'auto', purpose = 'agent', system, messages, tools = [], maxTokens = 1024, usage = {} }) {
   if (!parseRef(model) || parseRef(model).model === 'auto') await warmModels();
   const r = resolveModel(model, purpose);
   const p = providerById(r.provider);

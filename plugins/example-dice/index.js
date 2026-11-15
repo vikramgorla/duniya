@@ -1,9 +1,9 @@
-// Example plugin: attach it to a bot under Bots → Plugins ("example-dice").
+// Example plugin: attach it to an agent under Agents → Plugins ("example-dice").
 // Plugins are optional code add-ons: tools the model can call, commands, or custom roles.
 
 export default {
-  /** Called once when the bot is loaded. */
-  async init({ bot }) {},
+  /** Called once when the agent is loaded. */
+  async init({ agent }) {},
 
   /**
    * Local tools the model can call, alongside MCP tools. Exposed as "local__<name>".
@@ -22,13 +22,13 @@ export default {
   ],
 
   /** Override the role of a sender ('organizer' | 'participant'), or return undefined for the default. */
-  async role(msg, bot) {},
+  async role(msg, agent) {},
 
   /**
-   * Sees every message routed to this bot (even ones that don't trigger it).
+   * Sees every message routed to this agent (even ones that don't trigger it).
    * Return a string to reply without calling Claude, or undefined to continue normally.
    */
-  async onMessage({ msg, bot, role, triggered, channel }) {
+  async onMessage({ msg, agent, role, triggered, channel }) {
     if (triggered && msg.text.trim().toLowerCase() === '!ping') return 'pong';
   },
 };

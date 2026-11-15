@@ -111,13 +111,13 @@ export const contactsTools = [
       required: ['phone'],
     },
     roles: ['organizer'],
-    async run(input, ctx) { return out(saveContact(input, `${ctx.senderName} via ${ctx.bot.id}`), true); },
+    async run(input, ctx) { return out(saveContact(input, `${ctx.senderName} via ${ctx.agent.id}`), true); },
   },
   {
     name: 'remove_contact',
     description: 'Remove a contact from the own list by phone number (organizers only).',
     input_schema: { type: 'object', properties: { phone: { type: 'string' } }, required: ['phone'] },
     roles: ['organizer'],
-    async run({ phone }, ctx) { return { removed: removeContact(phone, `${ctx.senderName} via ${ctx.bot.id}`) }; },
+    async run({ phone }, ctx) { return { removed: removeContact(phone, `${ctx.senderName} via ${ctx.agent.id}`) }; },
   },
 ];

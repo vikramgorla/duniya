@@ -8,15 +8,15 @@ import { chat as modelChat } from './providers/index.js';
 import { activity } from './events.js';
 
 export const DEFAULT_WINDOW = 30;
-export const memoryEnabled = (bot) => bot?.memory?.enabled !== false;
-const windowFor = (bot) => bot?.historySize || DEFAULT_WINDOW;
+export const memoryEnabled = (agent) => agent?.memory?.enabled !== false;
+const windowFor = (agent) => agent?.historySize || DEFAULT_WINDOW;
 
 const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
 function stamp(ts, tz = env.timezone) {
   return new Date(ts).toLocaleString('en-GB', { timeZone: tz, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 export function formatMessage(m, tz) {
-  const who = m.from_bot ? 'Assistant' : m.name || m.sender || 'someone';
+  const who = m.from_agent ? 'Assistant' : m.name || m.sender || 'someone';
   const q = m.quoted ? ` (replying to "${clip(m.quoted, 200)}")` : '';
   return `[${stamp(m.ts, tz)}] ${who}${q}: ${clip(m.text, 500)}`;
 }
@@ -25,14 +25,14 @@ export function formatMessage(m, tz) {
  * Build the memory part of the user turn: summary + notes + recent messages, fenced as information.
  * `excludeId` is the stored row id of the message being answered (it is appended separately).
  */
-export function buildContext({ bot, chat, excludeId = 0 }) {
-  const tz = bot?.timezone || env.timezone;
+export function buildContext({ agent, chat, excludeId = 0 }) {
+  const tz = agent?.timezone || env.timezone;
   const parts = [];
-  const recent = history(chat, windowFor(bot) + 1).filter((m) => m.id !== excludeId).slice(-windowFor(bot));
-  if (memoryEnabled(bot)) {
+  const recent = history(chat, windowFor(agent) + 1).filter((m) => m.id !== excludeId).slice(-windowFor(agent));
+  if (memoryEnabled(agent)) {
     const mem = getChatMemory(chat);
     if (mem?.summary) parts.push(`<group_memory updated="${stamp(mem.updated_at, tz)}">\n${mem.summary.trim()}\n</group_memory>`);
-    const shared = bot?.id ? listNotes(agentScope(bot), env.memory.notesInContext) : [];
+    const shared = agent?.id ? listNotes(agentScope(agent), env.memory.notesInContext) : [];
     if (shared.length) {
       parts.push(`<agent_memory note="shared by this agent across all its chats">\n${shared.map((n) => `- [#${n.id}, ${new Date(n.ts).toISOString().slice(0, 10)}] ${clip(n.text, 500)}`).join('\n')}\n</agent_memory>`);
     }
@@ -57,14 +57,14 @@ export function chatEventsSummary(chat, tz = env.timezone) {
     lines.push(`- Poll "${clip(p.name, 120)}" (${stamp(p.ts, tz)}, ${voters} voter${voters === 1 ? '' : 's'}): ${tally.map((o) => `${clip(o.name, 60)} ${o.votes}`).join(', ')}`);
   }
   for (const r of recentReactions(chat, 15)) {
-    const target = r.target_from_bot ? `your message "${clip(r.target_text, 80)}"` : r.target_text ? `"${clip(r.target_text, 80)}"` : 'a message';
+    const target = r.target_from_agent ? `your message "${clip(r.target_text, 80)}"` : r.target_text ? `"${clip(r.target_text, 80)}"` : 'a message';
     lines.push(`- [${stamp(r.ts, tz)}] ${r.name || 'someone'} reacted ${r.emoji} to ${target}`);
   }
   return lines;
 }
 
 // ---------- rolling summary ----------
-const SUMMARY_SYSTEM = `You maintain the running memory of a WhatsApp chat for an assistant bot.
+const SUMMARY_SYSTEM = `You maintain the running memory of a WhatsApp chat for an assistant agent.
 Update the existing summary with the new messages. Keep what still matters and drop chit-chat.
 Capture: decisions and agreements, plans with dates/times/places, commitments (who will do what),
 open questions, preferences people stated, and who is who (names, families, roles).
@@ -78,9 +78,9 @@ const running = new Set();
  * Fold messages older than the recent window into the summary when enough have accumulated.
  * Runs in the background; returns the new summary or null when nothing was done.
  */
-export async function maybeSummarize(chat, bot, { force = false } = {}) {
-  if ((bot && !memoryEnabled(bot)) || running.has(chat)) return null;
-  const windowRows = history(chat, windowFor(bot));
+export async function maybeSummarize(chat, agent, { force = false } = {}) {
+  if ((agent && !memoryEnabled(agent)) || running.has(chat)) return null;
+  const windowRows = history(chat, windowFor(agent));
   if (!windowRows.length) return null;
   const boundary = force ? Number.MAX_SAFE_INTEGER : windowRows[0].id;
   const mem = getChatMemory(chat) || { summary: '', upto_id: 0 };
@@ -89,9 +89,9 @@ export async function maybeSummarize(chat, bot, { force = false } = {}) {
 
   running.add(chat);
   try {
-    const tz = bot?.timezone || env.timezone;
+    const tz = agent?.timezone || env.timezone;
     const res = await modelChat({
-      model: 'auto', purpose: 'background', usage: { bot: bot?.id || '', chat, kind: 'summary' },
+      model: 'auto', purpose: 'background', usage: { agent: agent?.id || '', chat, kind: 'summary' },
       maxTokens: 1200,
       system: SUMMARY_SYSTEM,
       messages: [{
@@ -102,10 +102,10 @@ export async function maybeSummarize(chat, bot, { force = false } = {}) {
     const summary = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
     if (!summary) return null;
     setChatMemory(chat, summary, older.at(-1).id);
-    activity('memory.summary', { bot: bot?.id, chat, summary: `Summary updated with ${older.length} messages`, detail: { summary } });
+    activity('memory.summary', { agent: agent?.id, chat, summary: `Summary updated with ${older.length} messages`, detail: { summary } });
     return summary;
   } catch (e) {
-    activity('error', { bot: bot?.id, chat, summary: `Summarising failed (will retry): ${e.message}` });
+    activity('error', { agent: agent?.id, chat, summary: `Summarising failed (will retry): ${e.message}` });
     return null;
   } finally {
     running.delete(chat);
@@ -131,18 +131,18 @@ export function eraseChatMemory(chat, by = 'panel') {
 // ---------- memory tools (exposed as memory__<name>) ----------
 // Two scopes (#8): `chat` notes belong to one chat; `agent` notes are shared by the agent across all its chats.
 // Only organizers write shared notes, so people in one chat cannot plant instructions or facts for another chat.
-export const agentScope = (bot) => `agent:${bot.id}`;
+export const agentScope = (agent) => `agent:${agent.id}`;
 export const MEMORY_DEFAULT_ALLOW = {
   organizer: ['memory:*'],
   participant: ['memory:remember', 'memory:list_notes', 'memory:find_notes', 'memory:search_history'],
 };
-const noteOut = (n, bot) => ({
-  id: n.id, scope: n.chat === agentScope(bot) ? 'agent' : 'chat', text: n.text, author: n.author, date: new Date(n.ts).toISOString().slice(0, 10),
+const noteOut = (n, agent) => ({
+  id: n.id, scope: n.chat === agentScope(agent) ? 'agent' : 'chat', text: n.text, author: n.author, date: new Date(n.ts).toISOString().slice(0, 10),
 });
 /** A note this chat may touch: one of its own, or one of the agent's shared notes. */
 function ownNote(id, ctx) {
   const n = getNote(id);
-  if (!n || (n.chat !== ctx.chat && n.chat !== agentScope(ctx.bot))) throw new Error(`No note #${id} here`);
+  if (!n || (n.chat !== ctx.chat && n.chat !== agentScope(ctx.agent))) throw new Error(`No note #${id} here`);
   return n;
 }
 const scopeSchema = { type: 'string', enum: ['chat', 'agent'], description: 'chat (default) = only this chat; agent = shared with all chats of this agent (organizers only)' };
@@ -157,9 +157,9 @@ export const memoryTools = [
       if (!String(text || '').trim()) throw new Error('text is required');
       const shared = scope === 'agent';
       if (shared && ctx.role !== 'organizer') throw new Error('Only organizers can save notes shared across chats');
-      const chat = shared ? agentScope(ctx.bot) : ctx.chat;
-      const id = addNote({ chat, bot: ctx.bot.id, text: String(text).trim(), author: ctx.senderName, role: ctx.role });
-      activity('memory.note.added', { bot: ctx.bot.id, chat: ctx.chat, summary: `#${id}${shared ? ' (shared)' : ''} by ${ctx.senderName}: ${clip(text, 200)}` });
+      const chat = shared ? agentScope(ctx.agent) : ctx.chat;
+      const id = addNote({ chat, agent: ctx.agent.id, text: String(text).trim(), author: ctx.senderName, role: ctx.role });
+      activity('memory.note.added', { agent: ctx.agent.id, chat: ctx.chat, summary: `#${id}${shared ? ' (shared)' : ''} by ${ctx.senderName}: ${clip(text, 200)}` });
       return { saved: id, scope: shared ? 'agent' : 'chat' };
     },
   },
@@ -169,7 +169,7 @@ export const memoryTools = [
     input_schema: { type: 'object', properties: {} },
     roles: ['organizer', 'participant'],
     async run(_input, ctx) {
-      return [...listNotes(agentScope(ctx.bot)), ...listNotes(ctx.chat)].map((n) => noteOut(n, ctx.bot));
+      return [...listNotes(agentScope(ctx.agent)), ...listNotes(ctx.chat)].map((n) => noteOut(n, ctx.agent));
     },
   },
   {
@@ -179,7 +179,7 @@ export const memoryTools = [
     roles: ['organizer', 'participant'],
     async run({ query }, ctx) {
       if (String(query || '').trim().length < 2) throw new Error('query too short');
-      return searchNotes([ctx.chat, agentScope(ctx.bot)], String(query).trim()).map((n) => noteOut(n, ctx.bot));
+      return searchNotes([ctx.chat, agentScope(ctx.agent)], String(query).trim()).map((n) => noteOut(n, ctx.agent));
     },
   },
   {
@@ -191,7 +191,7 @@ export const memoryTools = [
       if (!String(text || '').trim()) throw new Error('text is required');
       const n = ownNote(id, ctx);
       updateNote(n.id, n.chat, String(text).trim());
-      activity('memory.note.added', { bot: ctx.bot.id, chat: ctx.chat, summary: `#${n.id} updated by ${ctx.senderName}: ${clip(text, 200)}` });
+      activity('memory.note.added', { agent: ctx.agent.id, chat: ctx.chat, summary: `#${n.id} updated by ${ctx.senderName}: ${clip(text, 200)}` });
       return { updated: n.id };
     },
   },
@@ -203,7 +203,7 @@ export const memoryTools = [
     async run({ id }, ctx) {
       const n = ownNote(id, ctx);
       const deleted = deleteNote(n.id, n.chat);
-      if (deleted) activity('memory.note.removed', { bot: ctx.bot.id, chat: ctx.chat, summary: `#${n.id} by ${ctx.senderName}` });
+      if (deleted) activity('memory.note.removed', { agent: ctx.agent.id, chat: ctx.chat, summary: `#${n.id} by ${ctx.senderName}` });
       return { deleted };
     },
   },
@@ -218,9 +218,9 @@ export const memoryTools = [
     roles: ['organizer', 'participant'],
     async run({ query, limit }, ctx) {
       if (String(query || '').trim().length < 2) throw new Error('query too short');
-      const tz = ctx.bot?.timezone || env.timezone;
+      const tz = ctx.agent?.timezone || env.timezone;
       return searchMessages(ctx.chat, String(query).trim(), limit).map((m) => ({
-        date: stamp(m.ts, tz), name: m.from_bot ? 'Assistant' : m.name || m.sender, text: clip(m.text, 500),
+        date: stamp(m.ts, tz), name: m.from_agent ? 'Assistant' : m.name || m.sender, text: clip(m.text, 500),
       }));
     },
   },

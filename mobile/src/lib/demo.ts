@@ -2,11 +2,11 @@
 // made up and stays on the phone; changes are kept in memory until the app is closed.
 import type { ApiClient } from './api-core';
 import { ApiError } from './api-core';
-import type { Activity, Bot, Chat, Pending, Status, StoredMessage } from './types';
+import type { Activity, Agent, Chat, Pending, Status, StoredMessage } from './types';
 
 const now = Date.now();
 const min = 60_000;
-const bots: Bot[] = [
+const agents: Agent[] = [
   { id: 'carpool', name: 'Carpool helper', description: 'Plans who drives the kids to school and to football.', enabled: true, needs: [], localTools: [], missingPlugins: [], updatedAt: now - 3 * 86400_000,
     config: { name: 'Carpool helper', description: 'Plans who drives the kids to school and to football.', model: 'auto', enabled: true, triggers: ['!carpool', '@carpool'], dm: 'members',
       prompt: 'You coordinate the school carpool for four families in WhatsApp.\n\n- Keep a weekly plan of who drives when.\n- When someone cannot drive, ask the group who can swap.\n- Be brief and friendly; reply in English or French.',
@@ -20,34 +20,34 @@ const bots: Bot[] = [
     config: { name: 'Neighbours', description: 'Building notices, parcels and the shared garden.', model: 'auto', enabled: false, triggers: ['!house'], dm: 'off', prompt: 'You help neighbours in one building.', tools: { participant: [], organizer: [], deny: [] }, organizers: [], chats: [], memory: { enabled: false } } },
 ];
 const chats: Chat[] = [
-  { id: 'g1@g.us', name: 'Gorla family', size: 23, isGroup: true, number: 'main', numberLabel: 'Main', bot: 'family', model: 'inherit', logging: 'inherit' },
-  { id: 'g2@g.us', name: 'School carpool', size: 8, isGroup: true, number: 'main', numberLabel: 'Main', bot: 'carpool', model: 'inherit', logging: 'inherit' },
-  { id: 'g3@g.us', name: 'Building Rue du Midi', size: 31, isGroup: true, number: 'main', numberLabel: 'Main', bot: '', model: 'inherit', logging: 'inherit' },
-  { id: '41790000003@s.whatsapp.net', name: 'Anu', isGroup: false, phone: '41790000003', number: 'main', numberLabel: 'Main', bot: '', model: 'inherit', logging: 'inherit', lastAt: now - 40 * min },
+  { id: 'g1@g.us', name: 'Gorla family', size: 23, isGroup: true, number: 'main', numberLabel: 'Main', agent: 'family', model: 'inherit', logging: 'inherit' },
+  { id: 'g2@g.us', name: 'School carpool', size: 8, isGroup: true, number: 'main', numberLabel: 'Main', agent: 'carpool', model: 'inherit', logging: 'inherit' },
+  { id: 'g3@g.us', name: 'Building Rue du Midi', size: 31, isGroup: true, number: 'main', numberLabel: 'Main', agent: '', model: 'inherit', logging: 'inherit' },
+  { id: '41790000003@s.whatsapp.net', name: 'Anu', isGroup: false, phone: '41790000003', number: 'main', numberLabel: 'Main', agent: '', model: 'inherit', logging: 'inherit', lastAt: now - 40 * min },
 ];
 let pending: Pending[] = [
-  { code: 'K7Q2', bot: 'carpool', tool: 'calendar:event_update', chat: 'g2@g.us', requester: 'Anu', summary: 'Move Thursday football pickup from 17:00 to 17:30 and make Rupa the driver', expires: now + 7 * min },
+  { code: 'K7Q2', agent: 'carpool', tool: 'calendar:event_update', chat: 'g2@g.us', requester: 'Anu', summary: 'Move Thursday football pickup from 17:00 to 17:30 and make Rupa the driver', expires: now + 7 * min },
 ];
 const acts: Activity[] = [
-  { id: 9, ts: now - 2 * min, type: 'confirm.created', bot: 'carpool', chat: 'g2@g.us', summary: 'Waiting for an organizer: move Thursday pickup to 17:30 (K7Q2)' },
-  { id: 8, ts: now - 3 * min, type: 'message.out', bot: 'carpool', chat: 'g2@g.us', summary: 'I can move Thursday’s pickup to 17:30 with Rupa driving. An organizer needs to confirm.' },
-  { id: 7, ts: now - 3 * min, type: 'tool.call', bot: 'carpool', chat: 'g2@g.us', summary: 'calendar:event_update_preview · 412 ms' },
-  { id: 6, ts: now - 4 * min, type: 'message.in', bot: 'carpool', chat: 'g2@g.us', summary: 'Anu: @carpool can we do 17:30 on Thursday? Rupa can drive' },
-  { id: 5, ts: now - 52 * min, type: 'message.out', bot: 'family', chat: 'g1@g.us', summary: 'Diwali dinner is on Saturday at 19:00 at Rupa’s. 14 people so far.' },
-  { id: 4, ts: now - 53 * min, type: 'message.in', bot: 'family', chat: 'g1@g.us', summary: 'Vedika: !family when is the Diwali dinner?' },
-  { id: 3, ts: now - 3 * 3600_000, type: 'schedule.run', bot: 'carpool', chat: 'g2@g.us', summary: 'monday-plan posted' },
-  { id: 2, ts: now - 5 * 3600_000, type: 'channel.status', bot: null, chat: null, summary: 'WhatsApp: open' },
-  { id: 1, ts: now - 26 * 3600_000, type: 'config', bot: 'neighbours', chat: null, summary: 'Neighbours switched off (admin)' },
+  { id: 9, ts: now - 2 * min, type: 'confirm.created', agent: 'carpool', chat: 'g2@g.us', summary: 'Waiting for an organizer: move Thursday pickup to 17:30 (K7Q2)' },
+  { id: 8, ts: now - 3 * min, type: 'message.out', agent: 'carpool', chat: 'g2@g.us', summary: 'I can move Thursday’s pickup to 17:30 with Rupa driving. An organizer needs to confirm.' },
+  { id: 7, ts: now - 3 * min, type: 'tool.call', agent: 'carpool', chat: 'g2@g.us', summary: 'calendar:event_update_preview · 412 ms' },
+  { id: 6, ts: now - 4 * min, type: 'message.in', agent: 'carpool', chat: 'g2@g.us', summary: 'Anu: @carpool can we do 17:30 on Thursday? Rupa can drive' },
+  { id: 5, ts: now - 52 * min, type: 'message.out', agent: 'family', chat: 'g1@g.us', summary: 'Diwali dinner is on Saturday at 19:00 at Rupa’s. 14 people so far.' },
+  { id: 4, ts: now - 53 * min, type: 'message.in', agent: 'family', chat: 'g1@g.us', summary: 'Vedika: !family when is the Diwali dinner?' },
+  { id: 3, ts: now - 3 * 3600_000, type: 'schedule.run', agent: 'carpool', chat: 'g2@g.us', summary: 'monday-plan posted' },
+  { id: 2, ts: now - 5 * 3600_000, type: 'channel.status', agent: null, chat: null, summary: 'WhatsApp: open' },
+  { id: 1, ts: now - 26 * 3600_000, type: 'config', agent: 'neighbours', chat: null, summary: 'Neighbours switched off (admin)' },
 ];
 const messages: StoredMessage[] = [
-  { id: 4, ts: now - 2 * min, name: 'Carpool helper', text: 'I can move Thursday’s pickup to 17:30 with Rupa driving. An organizer needs to confirm.', fromBot: true },
-  { id: 3, ts: now - 4 * min, name: 'Anu', sender: '41790000003', text: '@carpool can we do 17:30 on Thursday? Rupa can drive', fromBot: false, addressed: true },
-  { id: 2, ts: now - 30 * min, name: 'Rupa', sender: '41790000002', text: 'Football is 30 min later this week', fromBot: false },
-  { id: 1, ts: now - 31 * min, name: 'Vik', sender: '41790000001', text: 'Who has the booster seat?', fromBot: false },
+  { id: 4, ts: now - 2 * min, name: 'Carpool helper', text: 'I can move Thursday’s pickup to 17:30 with Rupa driving. An organizer needs to confirm.', fromAgent: true },
+  { id: 3, ts: now - 4 * min, name: 'Anu', sender: '41790000003', text: '@carpool can we do 17:30 on Thursday? Rupa can drive', fromAgent: false, addressed: true },
+  { id: 2, ts: now - 30 * min, name: 'Rupa', sender: '41790000002', text: 'Football is 30 min later this week', fromAgent: false },
+  { id: 1, ts: now - 31 * min, name: 'Vik', sender: '41790000001', text: 'Who has the booster seat?', fromAgent: false },
 ];
 const usageRow = (key: string, calls: number, input: number, output: number, cost: number | null) => ({ key, calls, input, output, cost, unpriced: cost == null ? calls : 0, plan: 0 });
 const usage: Record<string, ReturnType<typeof usageRow>[]> = {
-  bot: [usageRow('carpool', 212, 640_000, 52_000, 1.84), usageRow('family', 133, 410_000, 39_000, 1.21), usageRow('', 18, 90_000, 21_000, 0.31)],
+  agent: [usageRow('carpool', 212, 640_000, 52_000, 1.84), usageRow('family', 133, 410_000, 39_000, 1.21), usageRow('', 18, 90_000, 21_000, 0.31)],
   model: [usageRow('anthropic:claude-sonnet-5-5', 251, 880_000, 80_000, 3.02), usageRow('anthropic:claude-haiku-5-5', 112, 260_000, 32_000, 0.34)],
 };
 let paused = false;
@@ -59,7 +59,7 @@ function status(): Status {
     channel: { id: 'main', label: 'Main', status: 'open', me: '41790000099:1@s.whatsapp.net', since: now - 5 * 3600_000,
       numbers: [{ id: 'main', label: 'Main', status: 'open', me: '41790000099:1@s.whatsapp.net', since: now - 5 * 3600_000 }, { id: 'shop', label: 'Shop', status: 'reconnecting', since: now - 6 * min }] },
     settings: { paused }, version: 'v1.9.0 · demo', uptimeSec: 5 * 3600 + 120, memoryMb: 182, node: 'v22.23.4',
-    bots: bots.map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.config.chats?.length || 0 })), pending: pending.length,
+    agents: agents.map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.config.chats?.length || 0 })), pending: pending.length,
   };
 }
 
@@ -69,14 +69,14 @@ async function route(method: string, path: string, body: any): Promise<unknown> 
   let m: RegExpExecArray | null;
   if (method === 'GET') {
     if (p === '/api/status') return status();
-    if (p === '/api/bots') return bots;
-    if ((m = /^\/api\/bots\/([^/]+)$/.exec(p))) return bots.find((b) => b.id === decodeURIComponent(m![1]));
+    if (p === '/api/agents') return agents;
+    if ((m = /^\/api\/agents\/([^/]+)$/.exec(p))) return agents.find((b) => b.id === decodeURIComponent(m![1]));
     if (p === '/api/chats') return chats;
     if ((m = /^\/api\/chats\/([^/]+)\/messages$/.exec(p))) return decodeURIComponent(m[1]) === 'g2@g.us' ? messages : [];
     if (p === '/api/activity') return acts;
     if (p === '/api/pending') return pending;
     if (p === '/api/usage') {
-      const g = u.searchParams.get('groupBy') || 'bot'; const rows = usage[g] || usage.bot;
+      const g = u.searchParams.get('groupBy') || 'agent'; const rows = usage[g] || usage.agent;
       const total = rows.reduce((a, r) => ({ ...a, calls: a.calls + r.calls, input: a.input + r.input, output: a.output + r.output, cost: (a.cost || 0) + (r.cost || 0) }), usageRow('', 0, 0, 0, 0));
       return { from: now - 30 * 86400_000, to: now, groupBy: g, total, rows };
     }
@@ -85,20 +85,20 @@ async function route(method: string, path: string, body: any): Promise<unknown> 
     if (p === '/api/models') return { models: [{ ref: 'anthropic:claude-sonnet-5-5', provider: 'anthropic', label: 'Anthropic · Claude Sonnet 5.5' }, { ref: 'anthropic:claude-haiku-5-5', provider: 'anthropic', label: 'Anthropic · Claude Haiku 5.5' }], defaultModel: 'auto', resolvedDefault: 'anthropic:claude-sonnet-5-5' };
     if (p === '/api/session') return { authed: true, user: status().user };
   }
-  if (method === 'PUT' && (m = /^\/api\/bots\/([^/]+)$/.exec(p))) {
-    const b = bots.find((x) => x.id === decodeURIComponent(m![1]));
+  if (method === 'PUT' && (m = /^\/api\/agents\/([^/]+)$/.exec(p))) {
+    const b = agents.find((x) => x.id === decodeURIComponent(m![1]));
     if (!b) throw new ApiError('Not found', 404);
     Object.assign(b.config, body); if ('enabled' in body) b.enabled = !!body.enabled; if (body.name) b.name = body.name; if ('description' in body) b.description = body.description;
     return { ...b, warnings: [] };
   }
   if (method === 'POST' && p === '/api/settings') { paused = !!body.paused; return status().settings; }
-  if (method === 'POST' && p === '/api/chats/bind') { const c = chats.find((x) => x.id === body.chat); if (c) c.bot = body.bot || ''; return { ok: true }; }
+  if (method === 'POST' && p === '/api/chats/bind') { const c = chats.find((x) => x.id === body.chat); if (c) c.agent = body.agent || ''; return { ok: true }; }
   if (method === 'PUT' && (m = /^\/api\/chats\/([^/]+)\/prefs$/.exec(p))) { const c = chats.find((x) => x.id === decodeURIComponent(m![1])); if (c && body.model) c.model = body.model; return { model: c?.model, logging: c?.logging }; }
   if ((m = /^\/api\/pending\/([^/]+)(\/apply)?$/.exec(p))) { pending = pending.filter((x) => x.code !== m![1]); return m[2] ? { result: 'Applied (demo)' } : { ok: true }; }
   if (method === 'POST' && p === '/api/updates/apply') { updateRunning = { target: 'v1.9.1', startedAt: Date.now() }; setTimeout(() => { updateRunning = null; }, 8000); return { started: true, running: updateRunning }; }
   if (method === 'POST' && p === '/api/updates/check') return { current: 'v1.9.0', latest: 'v1.9.1', available: true };
-  if (method === 'POST' && p === '/api/ai/bot-draft') {
-    const b = bots.find((x) => x.id === body.botId);
+  if (method === 'POST' && p === '/api/ai/agent-draft') {
+    const b = agents.find((x) => x.id === body.agentId);
     const after = `${b?.config.prompt || ''}\n- ${String(body.request || '').trim()}`;
     return { summary: 'Added your request to the instructions.', questions: [], changes: [{ field: 'prompt', before: b?.config.prompt, after }], proposed: { ...b?.config, prompt: after }, warnings: [], model: 'demo' };
   }

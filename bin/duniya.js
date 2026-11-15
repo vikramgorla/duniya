@@ -35,10 +35,10 @@ ${bold('Accounts')}
   show-setup-code                         The one-time code that creates the first owner account
 
 ${bold('Server')}
-  status                                  Version, uptime, WhatsApp numbers and bots
+  status                                  Version, uptime, WhatsApp numbers and agents
   doctor                                  Check address, HTTPS, ports, disk and memory, with fixes
   backup-now                              Make an encrypted backup now (to every place set up under Backups)
-  restart                                 Restart the service (bots are offline for a few seconds)
+  restart                                 Restart the service (agents are offline for a few seconds)
   logs [-f]                               Show the service log (-f keeps following it)
   update [--check]                        Update to the newest release (--check only looks)
   open-access                             Remove the IP allow-list (if it locked you out of the panel)
@@ -197,11 +197,11 @@ const commands = {
     const nums = rt?.numbers || [];
     if (!nums.length) line('WhatsApp', dim('no numbers yet'));
     nums.forEach((n, i) => line(i ? '' : 'WhatsApp', `${n.label}: ${n.status === 'open' ? green(`connected${n.me ? ` as +${n.me}` : ''}`) : yellow(n.status === 'qr' ? 'waiting for the QR scan / pairing code' : n.status)}${rt.running ? '' : dim(' (last known)')}`));
-    const bots = s.listBotRows();
-    line('Bots', bots.length ? `${bots.filter((b) => b.config.enabled).length} on, ${bots.filter((b) => !b.config.enabled).length} off` : dim('none yet (Bots → New bot in the panel)'));
-    for (const b of bots) line('', `${b.config.enabled ? green('●') : dim('○')} ${b.config.name || b.id} ${dim(`· ${(b.config.chats || []).length} chat${(b.config.chats || []).length === 1 ? '' : 's'}`)}`);
+    const agents = s.listAgentRows();
+    line('Agents', agents.length ? `${agents.filter((b) => b.config.enabled).length} on, ${agents.filter((b) => !b.config.enabled).length} off` : dim('none yet (Agents → New agent in the panel)'));
+    for (const b of agents) line('', `${b.config.enabled ? green('●') : dim('○')} ${b.config.name || b.id} ${dim(`· ${(b.config.chats || []).length} chat${(b.config.chats || []).length === 1 ? '' : 's'}`)}`);
     line('Accounts', `${s.listUsers().length} · sign-in: ${!passwordLoginAllowed() ? 'Google only' : googleReady() ? 'Google and password' : 'password'}`);
-    if (s.getSetting('paused', false)) line('Paused', yellow('all bots are paused (Overview → Resume)'));
+    if (s.getSetting('paused', false)) line('Paused', yellow('all agents are paused (Overview → Resume)'));
     const { kvGet } = await import('../src/core/db.js');
     try { const last = JSON.parse(kvGet('backup:last') || 'null'); line('Backup', last ? `${ago(Date.now() - last.at)} ago · ${Object.entries(last.results).map(([k, v]) => `${k} ${v}`).join(', ')}` : dim('none yet')); } catch { /* none */ }
   },

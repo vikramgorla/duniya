@@ -6,7 +6,7 @@ onSecretChange((n) => { if (n === 'ANTHROPIC_API_KEY') client = null; });
 
 export const id = 'anthropic';
 export const configured = () => !!getSecret('ANTHROPIC_API_KEY');
-export const RECOMMENDED = { bot: 'claude-sonnet-5-5', background: 'claude-haiku-5-5' };
+export const RECOMMENDED = { agent: 'claude-sonnet-5-5', background: 'claude-haiku-5-5' };
 
 function sdk() {
   const apiKey = getSecret('ANTHROPIC_API_KEY');

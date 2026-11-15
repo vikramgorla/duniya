@@ -181,28 +181,28 @@ test('resource binding: an authorize request for another resource is refused; to
 test('tools via the SDK client: read and write as the approving user, logged as mcp.call', async () => {
   const c = await mcpClient(ownerSession.tokens.access_token);
   const names = (await c.listTools()).tools.map((x) => x.name);
-  for (const n of ['get_overview', 'list_bots', 'create_bot', 'delete_bot', 'list_users', 'restore_backup', 'confirm_action', 'list_whatsapp_numbers']) assert.ok(names.includes(n), n);
-  const del = (await c.listTools()).tools.find((x) => x.name === 'delete_bot');
+  for (const n of ['get_overview', 'list_agents', 'create_agent', 'delete_agent', 'list_users', 'restore_backup', 'confirm_action', 'list_whatsapp_numbers', 'list_global_tool_services', 'add_global_tool_service']) assert.ok(names.includes(n), n);
+  const del = (await c.listTools()).tools.find((x) => x.name === 'delete_agent');
   assert.equal(del.annotations.destructiveHint, true);
 
-  const bots = JSON.parse(text(await c.callTool({ name: 'list_bots', arguments: {} })));
-  assert.deepEqual(bots.map((b) => b.id).sort(), ['helper', 'panduga']);
+  const agents = JSON.parse(text(await c.callTool({ name: 'list_agents', arguments: {} })));
+  assert.deepEqual(agents.map((b) => b.id).sort(), ['helper', 'panduga']);
   const ov = JSON.parse(text(await c.callTool({ name: 'get_overview', arguments: {} })));
   assert.equal(ov.you.username, 'admin');
 
-  const w = await c.callTool({ name: 'set_bot_enabled', arguments: { bot_id: 'helper', enabled: false } });
+  const w = await c.callTool({ name: 'set_agent_enabled', arguments: { agent_id: 'helper', enabled: false } });
   assert.ok(!w.isError, text(w));
-  assert.equal(t.bots.getBot('helper').enabled, false);
-  await c.callTool({ name: 'set_bot_enabled', arguments: { bot_id: 'helper', enabled: true } });
+  assert.equal(t.agents.getAgent('helper').enabled, false);
+  await c.callTool({ name: 'set_agent_enabled', arguments: { agent_id: 'helper', enabled: true } });
 
   t.script.push([{ type: 'text', text: 'Hello from helper' }]);
-  const reply = JSON.parse(text(await c.callTool({ name: 'test_bot', arguments: { bot_id: 'helper', text: 'hi', as: 'organizer' } })));
+  const reply = JSON.parse(text(await c.callTool({ name: 'test_agent', arguments: { agent_id: 'helper', text: 'hi', as: 'organizer' } })));
   assert.equal(reply.reply, 'Hello from helper');
 
   const secrets = text(await c.callTool({ name: 'list_secrets', arguments: {} }));
   assert.ok(secrets.includes('PANDUGA_TOKEN_ORGANIZER') && !secrets.includes('"org"'), 'secret names only');
 
-  const log = t.db.listActivity({ limit: 50 }).find((a) => a.type === 'mcp.call' && a.summary.startsWith('set_bot_enabled'));
+  const log = t.db.listActivity({ limit: 50 }).find((a) => a.type === 'mcp.call' && a.summary.startsWith('set_agent_enabled'));
   assert.ok(log, 'tool call logged');
   assert.match(log.summary, /admin via Test assistant/);
   assert.equal(t.events.categoryOf('mcp.call'), 'mcp');
@@ -215,17 +215,17 @@ test('tools via the SDK client: read and write as the approving user, logged as 
 
 test('risky tools need confirm_action with a single-use code bound to the user', async () => {
   const c = await mcpClient(ownerSession.tokens.access_token);
-  const pre = await c.callTool({ name: 'delete_bot', arguments: { bot_id: 'helper' } });
+  const pre = await c.callTool({ name: 'delete_agent', arguments: { agent_id: 'helper' } });
   assert.ok(!pre.isError, text(pre));
-  assert.match(text(pre), /Delete the bot "Helper"/);
+  assert.match(text(pre), /Delete the agent "Helper"/);
   const code = pre.structuredContent.confirm_code;
   assert.ok(code);
-  assert.ok(t.bots.getBot('helper'), 'nothing deleted before confirmation');
+  assert.ok(t.agents.getAgent('helper'), 'nothing deleted before confirmation');
   const wrong = await c.callTool({ name: 'confirm_action', arguments: { confirm_code: 'WRONG123' } });
   assert.ok(wrong.isError);
   const ok = await c.callTool({ name: 'confirm_action', arguments: { confirm_code: code } });
   assert.ok(!ok.isError, text(ok));
-  assert.equal(t.bots.getBot('helper'), undefined);
+  assert.equal(t.agents.getAgent('helper'), undefined);
   const again = await c.callTool({ name: 'confirm_action', arguments: { confirm_code: code } });
   assert.ok(again.isError, 'single-use');
   const missing = await c.callTool({ name: 'erase_chat_memory', arguments: {} });
@@ -240,7 +240,7 @@ test('risky tools need confirm_action with a single-use code bound to the user',
   await c.callTool({ name: 'confirm_action', arguments: { confirm_code: sp.structuredContent.confirm_code } });
   assert.equal(t.store.getSecret('NEW_KEY'), 'sup3r-s3cret');
   assert.ok(!JSON.stringify(t.db.listActivity({ limit: 30 })).includes('sup3r-s3cret'), 'secret values never logged');
-  globalThis.ownerPendingCode = (await c.callTool({ name: 'delete_bot', arguments: { bot_id: 'panduga' } })).structuredContent.confirm_code;
+  globalThis.ownerPendingCode = (await c.callTool({ name: 'delete_agent', arguments: { agent_id: 'panduga' } })).structuredContent.confirm_code;
   await c.close();
 });
 
@@ -253,15 +253,15 @@ test('a viewer\'s assistant sees read tools only and cannot write or confirm', a
   assert.match(viewer.html, /cannot change anything|read-only/i);
   const c = await mcpClient(viewer.tokens.access_token);
   const names = (await c.listTools()).tools.map((x) => x.name);
-  assert.ok(names.includes('list_bots') && names.includes('list_activity'));
-  for (const n of ['create_bot', 'set_bot_enabled', 'delete_bot', 'confirm_action', 'list_users', 'list_os_updates']) assert.ok(!names.includes(n), n);
-  const w = await c.callTool({ name: 'set_bot_enabled', arguments: { bot_id: 'panduga', enabled: false } });
+  assert.ok(names.includes('list_agents') && names.includes('list_activity'));
+  for (const n of ['create_agent', 'set_agent_enabled', 'delete_agent', 'confirm_action', 'list_users', 'list_os_updates']) assert.ok(!names.includes(n), n);
+  const w = await c.callTool({ name: 'set_agent_enabled', arguments: { agent_id: 'panduga', enabled: false } });
   assert.ok(w.isError);
   assert.match(text(w), /Read-only/);
-  assert.equal(t.bots.getBot('panduga').enabled, true);
+  assert.equal(t.agents.getAgent('panduga').enabled, true);
   const steal = await c.callTool({ name: 'confirm_action', arguments: { confirm_code: globalThis.ownerPendingCode } });
   assert.ok(steal.isError, 'confirm codes are bound to the user');
-  assert.ok(t.bots.getBot('panduga'));
+  assert.ok(t.agents.getAgent('panduga'));
   await c.close();
 });
 
@@ -317,7 +317,7 @@ test('admins do not get owner-only tools; rate limit is 60 calls per minute per 
   const s = await tokensFor(await t.login('adam', 'admin password 12'), { name: 'Admin assistant' });
   const c = await mcpClient(s.tokens.access_token);
   const names = (await c.listTools()).tools.map((x) => x.name);
-  assert.ok(names.includes('create_bot') && names.includes('confirm_action'));
+  assert.ok(names.includes('create_agent') && names.includes('confirm_action'));
   for (const n of ['list_users', 'restore_backup', 'apply_update', 'run_maintenance', 'add_whatsapp_number']) assert.ok(!names.includes(n), n);
   await c.close();
   let last;

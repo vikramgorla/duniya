@@ -147,7 +147,7 @@ test('029: reset-password sets the given or a generated password and signs the a
   assert.match(await log(), /Password reset for adm from the server command line/);
 });
 
-test('029: status shows version, uptime, WhatsApp numbers and bots; doctor checks and suggests fixes', async () => {
+test('029: status shows version, uptime, WhatsApp numbers and agents; doctor checks and suggests fixes', async () => {
   const s = await duniya(['status']);
   assert.equal(s.code, 0, s.err);
   assert.match(s.out, /Duniya v\d+\.\d+\.\d+/);

@@ -7,7 +7,7 @@ import { Body, Button, Card, Divider, H2, Label, Led, Loading, Note, Row, Screen
 import { can, useAuth } from '@/lib/auth';
 import { ago, chatLabel } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
-import type { Bot, Chat, ModelList, StoredMessage } from '@/lib/types';
+import type { Agent, Chat, ModelList, StoredMessage } from '@/lib/types';
 import { useData } from '@/lib/useData';
 
 export default function ChatDetail() {
@@ -16,7 +16,7 @@ export default function ChatDetail() {
   const { api, user } = useAuth();
   const admin = can(user, 'admin');
   const chats = useData<Chat[]>('chats', (a) => a.get('/api/chats'));
-  const bots = useData<Bot[]>('bots', (a) => a.get('/api/bots'));
+  const agents = useData<Agent[]>('agents', (a) => a.get('/api/agents'));
   const models = useData<ModelList>(admin ? 'models' : null, (a) => a.get('/api/models'));
   const [msgs, setMsgs] = useState<StoredMessage[] | null>(null);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
@@ -24,9 +24,9 @@ export default function ChatDetail() {
   if (!chat) return <Screen error={chats.error}>{chats.data ? <Note tone="warn">This chat is not visible right now.</Note> : <Loading />}</Screen>;
 
   const update = (patch: Partial<Chat>) => chats.setData(chats.data?.map((c) => (c.id === id ? { ...c, ...patch } : c)));
-  const bind = async (bot: string) => {
-    const before = chat.bot; update({ bot });
-    try { await api!.post('/api/chats/bind', { chat: id, bot: bot || null }); } catch (e) { update({ bot: before }); Alert.alert('Not changed', (e as Error).message); }
+  const bind = async (agent: string) => {
+    const before = chat.agent; update({ agent });
+    try { await api!.post('/api/chats/bind', { chat: id, agent: agent || null }); } catch (e) { update({ agent: before }); Alert.alert('Not changed', (e as Error).message); }
   };
   const setModel = async (model: string) => {
     const before = chat.model; update({ model });
@@ -49,14 +49,14 @@ export default function ChatDetail() {
     <Screen onRefresh={chats.refresh} refreshing={chats.refreshing} stale={chats.stale}>
       <Stack.Screen options={{ title: chatLabel(chat.id, chat.name) }} />
       <Card>
-        <Row><Led tone={chat.bot ? 'ok' : 'off'} size={11} /><H2 style={{ flex: 1 }}>{chat.bot ? `${bots.data?.find((b) => b.id === chat.bot)?.name || chat.bot} answers here` : 'No agent answers here'}</H2></Row>
+        <Row><Led tone={chat.agent ? 'ok' : 'off'} size={11} /><H2 style={{ flex: 1 }}>{chat.agent ? `${agents.data?.find((b) => b.id === chat.agent)?.name || chat.agent} answers here` : 'No agent answers here'}</H2></Row>
         <Row wrap gap={8}><Label>{chat.isGroup ? `group · ${chat.size || 0} members` : 'direct chat'}</Label><Label>{`number ${chat.numberLabel}`}</Label></Row>
       </Card>
       <Card style={{ gap: 0 }}>
         <H2 style={{ marginBottom: 6 }}>Agent</H2>
         {!admin ? <Note>Only admins can change this.</Note> : null}
-        {option('none', 'No agent (off)', !chat.bot, () => bind(''))}
-        {(bots.data || []).map((b) => option(b.id, b.name, chat.bot === b.id, () => bind(b.id), b.enabled ? undefined : 'switched off'))}
+        {option('none', 'No agent (off)', !chat.agent, () => bind(''))}
+        {(agents.data || []).map((b) => option(b.id, b.name, chat.agent === b.id, () => bind(b.id), b.enabled ? undefined : 'switched off'))}
       </Card>
       {admin ? (
         <Card style={{ gap: 0 }}>
@@ -77,7 +77,7 @@ export default function ChatDetail() {
           ) : msgs.length === 0 ? <Body muted>No stored messages.</Body> : msgs.map((m, i) => (
             <View key={m.id} style={{ gap: 3 }}>
               {i ? <Divider /> : null}
-              <Spread><Label color={m.fromBot ? t.ok : undefined}>{m.fromBot ? `agent${m.name ? ` · ${m.name}` : ''}` : m.name || (m.sender ? `+${m.sender}` : 'someone')}</Label><Label>{`${ago(m.ts)} ago`}</Label></Spread>
+              <Spread><Label color={m.fromAgent ? t.ok : undefined}>{m.fromAgent ? `agent${m.name ? ` · ${m.name}` : ''}` : m.name || (m.sender ? `+${m.sender}` : 'someone')}</Label><Label>{`${ago(m.ts)} ago`}</Label></Spread>
               <Body selectable>{m.text}</Body>
             </View>
           ))}

@@ -1,4 +1,4 @@
-// Features 001 (multi-bot platform) and 002 (admin panel).
+// Features 001 (multi-agent platform) and 002 (admin panel).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setup } from './harness.js';
@@ -7,8 +7,8 @@ let t;
 before(async () => { t = await setup(); });
 after(() => t.close());
 
-test('001/US3 + 005: bots load from the app store', () => {
-  assert.deepEqual(t.bots.listBots().map((b) => b.id).sort(), ['helper', 'panduga']);
+test('001/US3 + 005: agents load from the app store', () => {
+  assert.deepEqual(t.agents.listAgents().map((b) => b.id).sort(), ['helper', 'panduga']);
 });
 
 test('001/US1: group message without trigger is stored but not answered', async () => {
@@ -65,7 +65,7 @@ test('001/US2: "no idea" style replies are not treated as commands', async () =>
   assert.equal(t.sent.length, 0);
 });
 
-test('001/US3: hook-based bot: local tool + onMessage shortcut', async () => {
+test('001/US3: hook-based agent: local tool + onMessage shortcut', async () => {
   t.sent.length = 0; t.claudeReqs.length = 0;
   await t.route(t.msg({ chat: 'g2@g.us', phone: '41790000001', text: '!ping', mentioned: true }));
   assert.equal(t.sent.at(-1).text, 'pong');
@@ -94,7 +94,7 @@ test('001: paused stops replies', async () => {
   t.store.updateSettings({ paused: false });
 });
 
-test('002: panel auth, CSRF guard, bot edit validation, secrets never returned, activity', async () => {
+test('002: panel auth, CSRF guard, agent edit validation, secrets never returned, activity', async () => {
   assert.equal((await fetch(`${t.base}/api/status`)).status, 401);
   assert.equal((await fetch(`${t.base}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"password":"nope"}' })).status, 401);
   const cookie = await t.login();
@@ -102,15 +102,15 @@ test('002: panel auth, CSRF guard, bot edit validation, secrets never returned, 
   const json = (method, p, body) => fetch(t.base + p, { method, headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify(body) });
   assert.equal((await get('/api/status')).channel.status, 'open');
   assert.equal((await fetch(`${t.base}/api/settings`, { method: 'POST', headers: { cookie, 'content-type': 'text/plain' }, body: 'paused=1' })).status, 415);
-  const updated = await (await json('PUT', '/api/bots/panduga', { triggers: ['!pd', '!panduga'], organizers: ['+41 79 000 00 01', '+91 98450 00000'] })).json();
+  const updated = await (await json('PUT', '/api/agents/panduga', { triggers: ['!pd', '!panduga'], organizers: ['+41 79 000 00 01', '+91 98450 00000'] })).json();
   assert.deepEqual(updated.config.triggers, ['!pd', '!panduga']);
   assert.deepEqual(updated.config.organizers, ['41790000001', '919845000000']);
-  assert.equal((await json('PUT', '/api/bots/panduga', { dm: 'everyone' })).status, 400, 'invalid DM policy rejected');
-  assert.equal((await json('PUT', '/api/bots/panduga', { schedules: [{ at: '8am' }] })).status, 400, 'bad schedule rejected');
+  assert.equal((await json('PUT', '/api/agents/panduga', { dm: 'everyone' })).status, 400, 'invalid DM policy rejected');
+  assert.equal((await json('PUT', '/api/agents/panduga', { schedules: [{ at: '8am' }] })).status, 400, 'bad schedule rejected');
   const secrets = await get('/api/secrets');
-  assert.ok(secrets.find((s) => s.name === 'PANDUGA_TOKEN_MEMBER' && s.usedByBots && !s.set));
+  assert.ok(secrets.find((s) => s.name === 'PANDUGA_TOKEN_MEMBER' && s.usedByAgents && !s.set));
   assert.ok(!JSON.stringify(secrets).includes('"org"'), 'secret values never returned');
-  assert.equal((await get('/api/chats')).find((c) => c.id === 'g1@g.us').bot, 'panduga');
+  assert.equal((await get('/api/chats')).find((c) => c.id === 'g1@g.us').agent, 'panduga');
   const acts = await get('/api/activity?limit=500');
   assert.ok(acts.some((a) => a.type === 'confirm.applied'));
   assert.ok(acts.some((a) => a.type === 'tool.call' && a.summary.startsWith('panduga:agenda_list')));

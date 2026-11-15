@@ -14,7 +14,7 @@ const ask = async (o, reply = 'ok') => {
   return t.userTurn(0);
 };
 
-test('US1: unaddressed messages and reply-quotes are in the bot context', async () => {
+test('US1: unaddressed messages and reply-quotes are in the agent context', async () => {
   await t.route(t.msg({ senderName: 'Ravi', text: "let's take the 9:10 train" }));
   await t.route(t.msg({ senderName: 'Meena', text: 'ok for us', quoted: "let's take the 9:10 train" }));
   const ctx = await ask({ text: '!panduga which train did we agree on?' });
@@ -25,7 +25,7 @@ test('US1: unaddressed messages and reply-quotes are in the bot context', async 
   assert.equal((ctx.match(/which train did we agree on/g) || []).length, 1, 'current message not duplicated in history');
 });
 
-test('US1: the bot reply is remembered too', async () => {
+test('US1: the agent reply is remembered too', async () => {
   const ctx = await ask({ text: '!panduga and what time again?' });
   assert.match(ctx, /Assistant: ok/);
 });
@@ -33,7 +33,7 @@ test('US1: the bot reply is remembered too', async () => {
 test('US1: messages in an unbound group are kept and used after binding', async () => {
   await t.route(t.msg({ chat: 'g9@g.us', senderName: 'Kiran', text: 'Kumars are vegetarian' }));
   assert.equal(t.sent.filter((s) => s.chat === 'g9@g.us').length, 0);
-  await t.bots.bindChat('g9@g.us', 'panduga');
+  await t.agents.bindChat('g9@g.us', 'panduga');
   const ctx = await ask({ chat: 'g9@g.us', text: '!panduga who is vegetarian?' });
   assert.match(ctx, /Kiran: Kumars are vegetarian/);
 });
@@ -43,7 +43,7 @@ test('US1: history sync is stored once and never answered', async () => {
   const batch = [
     t.msg({ chat: 'g7@g.us', msgId: 'H1', text: '!panduga old question', senderName: 'Old' }),
     t.msg({ chat: 'g7@g.us', msgId: 'H2', text: 'bus leaves at 7', senderName: 'Old' }),
-    t.msg({ chat: 'g7@g.us', msgId: 'H3', text: 'from the bot', fromMe: true }),
+    t.msg({ chat: 'g7@g.us', msgId: 'H3', text: 'from the agent', fromMe: true }),
     t.msg({ isGroup: false, chat: '4179@s.whatsapp.net', msgId: 'H4', text: 'private' }),
   ];
   const sentBefore = t.sent.length;
@@ -52,12 +52,12 @@ test('US1: history sync is stored once and never answered', async () => {
   assert.equal(t.db.messageCount('g7@g.us') - before, 3);
   assert.equal(t.db.messageCount('4179@s.whatsapp.net'), 0, 'private chats not stored from history');
   assert.equal(t.sent.length, sentBefore);
-  assert.equal(t.db.history('g7@g.us').find((m) => m.msg_id === 'H3').from_bot, 1);
+  assert.equal(t.db.history('g7@g.us').find((m) => m.msg_id === 'H3').from_agent, 1);
 });
 
 test('US2: long discussions are folded into a running summary used in context', async () => {
   const chat = 'g5@g.us';
-  await t.bots.bindChat(chat, 'panduga');
+  await t.agents.bindChat(chat, 'panduga');
   t.summaryReqs.length = 0;
   for (let i = 1; i <= 40; i++) await t.route(t.msg({ chat, senderName: 'P', text: `planning message ${i}${i === 3 ? ' — bus at 7:00 from Aigle station' : ''}` }));
   await t.waitFor(() => t.memory.memoryView(chat).summary);
@@ -81,7 +81,7 @@ test('US2: search_history finds older messages of the same chat', async () => {
 
 test('US2: summariser failure does not break replies', async () => {
   const chat = 'g6@g.us';
-  await t.bots.bindChat(chat, 'panduga');
+  await t.agents.bindChat(chat, 'panduga');
   t.summaryFail = true;
   for (let i = 1; i <= 40; i++) await t.route(t.msg({ chat, text: `msg ${i}` }));
   await new Promise((r) => setTimeout(r, 200));
@@ -112,13 +112,13 @@ test('US3: remember saves a note used later; only organizers can forget', async 
   assert.ok(!t.memory.memoryView('g1@g.us').notes.some((n) => n.id === note.id));
 });
 
-test('US3: a bot can opt out of memory', async () => {
-  await t.bots.updateBot('helper', { memory: { enabled: false } });
+test('US3: an agent can opt out of memory', async () => {
+  await t.agents.updateAgent('helper', { memory: { enabled: false } });
   t.claudeReqs.length = 0;
   t.script.push([{ type: 'text', text: 'ok' }]);
   await t.route(t.msg({ chat: 'g2@g.us', phone: '41790000003', text: '!help hi' }));
   assert.ok(!t.toolNames(0).some((n) => n.startsWith('memory__')));
-  await t.bots.updateBot('helper', { memory: { enabled: true } });
+  await t.agents.updateAgent('helper', { memory: { enabled: true } });
 });
 
 test('US4: panel shows and erases a chat memory', async () => {

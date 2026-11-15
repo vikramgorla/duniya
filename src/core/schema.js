@@ -1,8 +1,8 @@
-// Bot configuration: defaults, validation and normalisation (005). Single source of truth for bot shape.
+// Agent configuration: defaults, validation and normalisation (005). Single source of truth for agent shape.
 import { validPackageSpec } from './mcp-local.js';
 import { digits } from './config.js';
 
-export const BOT_DEFAULTS = Object.freeze({
+export const AGENT_DEFAULTS = Object.freeze({
   name: '',
   description: '',
   enabled: true,
@@ -21,12 +21,16 @@ export const BOT_DEFAULTS = Object.freeze({
   confirm: null,
   schedules: [],
   memory: { enabled: true },
+  globalMcp: { disabled: [] },
   plugins: [],
   timezone: '',
 });
 
-export const BOT_ID_RE = /^[a-z0-9][a-z0-9-]{1,40}$/;
-const SERVER_KEY_RE = /^[a-z][a-z0-9_]{0,30}$/;
+export const AGENT_ID_RE = /^[a-z0-9][a-z0-9-]{1,40}$/;
+export const SERVER_KEY_RE = /^[a-z][a-z0-9_]{0,30}$/;
+/** Rule prefixes of built-in tools: a tool service may not use these names. */
+export const RESERVED_SERVER_KEYS = ['local', 'memory', 'contacts', 'whatsapp'];
+const TOOL_GLOB_RE = /^[\w*?.-]+$/;
 const RULE_RE = /^(local|memory|[a-z][a-z0-9_]*):[\w*?.-]+$/;
 const SECRET_REF_RE = /^\$\{[A-Z][A-Z0-9_]{1,63}\}$/;
 
@@ -88,17 +92,46 @@ function tokenRef(v, field) {
   return s;
 }
 
+/** Validate one tool service (MCP server) definition: remote (URL + token/OAuth/none) or local (npm/GitHub package). */
+export function validateServer(key, srv, f = key) {
+  if (!SERVER_KEY_RE.test(key)) fail(f, 'name must be lowercase letters, digits or _');
+  if (RESERVED_SERVER_KEYS.includes(key)) fail(f, `"${key}" is the name of built-in tools; choose another name`);
+  const tokens = srv?.tokens || {};
+  const t = {
+    organizer: tokenRef(tokens.organizer, `${f}.tokens.organizer`),
+    participant: tokenRef(tokens.participant, `${f}.tokens.participant`),
+  };
+  const type = srv?.type ?? 'remote';
+  if (!['remote', 'local'].includes(type)) fail(`${f}.type`, 'must be remote or local');
+  if (type === 'local') {
+    const spec = str(srv?.package, `${f}.package`, { min: 1, max: 200 }).trim();
+    if (!validPackageSpec(spec)) fail(`${f}.package`, 'must look like name, name@version, @scope/name or github:owner/repo#ref');
+    const args = list(srv?.args ?? [], `${f}.args`).map((a) => str(a, `${f}.args`, { max: 500 }));
+    if (args.length > 30) fail(`${f}.args`, 'at most 30 arguments');
+    return { type, package: spec, args, env: kvMap(srv?.env, `${f}.env`, ENV_NAME_RE, ['PATH', 'HOME']), allowScripts: !!srv?.allowScripts };
+  }
+  const authMode = srv?.auth ?? (t.organizer || t.participant ? 'token' : 'none');
+  if (!['oauth', 'token', 'none'].includes(authMode)) fail(`${f}.auth`, 'must be oauth, token or none');
+  const entry = { type, url: urlOrRef(srv?.url, `${f}.url`), auth: authMode, tokens: authMode === 'token' ? t : { organizer: '', participant: '' },
+    headers: kvMap(srv?.headers, `${f}.headers`, HEADER_NAME_RE, ['host', 'content-length', 'content-type', 'accept', 'authorization', 'mcp-session-id', 'mcp-protocol-version']) };
+  const oc = srv?.oauthClient;
+  if (authMode === 'oauth' && oc && (oc.id || oc.secret)) {
+    entry.oauthClient = { id: str(oc.id, `${f}.oauthClient.id`, { min: 1, max: 300 }).trim(), secret: tokenRef(oc.secret, `${f}.oauthClient.secret`) };
+  }
+  return entry;
+}
+
 /**
- * Validate and normalise a full bot config. Unknown fields are dropped and reported in `warnings`.
+ * Validate and normalise a full agent config. Unknown fields are dropped and reported in `warnings`.
  * Returns { config, warnings }.
  */
-export function validateBotConfig(input) {
+export function validateAgentConfig(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) fail('config', 'must be an object');
   const warnings = [];
   for (const k of Object.keys(input)) {
-    if (!(k in BOT_DEFAULTS) && !['id', 'extraPrompt'].includes(k)) warnings.push(`Ignored unknown field "${k}"`);
+    if (!(k in AGENT_DEFAULTS) && k !== 'id') warnings.push(`Ignored unknown field "${k}"`);
   }
-  const c = { ...structuredClone(BOT_DEFAULTS), ...input };
+  const c = { ...structuredClone(AGENT_DEFAULTS), ...input };
   const out = {};
   out.name = str(c.name, 'name', { min: 1, max: 80 });
   out.description = str(c.description, 'description', { max: 500 });
@@ -106,7 +139,7 @@ export function validateBotConfig(input) {
   out.model = str(c.model || 'auto', 'model', { min: 1, max: 120 });
   out.maxTokens = int(c.maxTokens, 'maxTokens', 64, 8192);
   out.historySize = int(c.historySize, 'historySize', 0, 200);
-  out.prompt = str([c.prompt, input.extraPrompt].filter(Boolean).join('\n\n'), 'prompt', { min: 1, max: 20000 });
+  out.prompt = str(c.prompt, 'prompt', { min: 1, max: 20000 });
   out.triggers = [...new Set(list(c.triggers, 'triggers').map((t) => t.toLowerCase()))];
   if (out.triggers.some((t) => t.length > 40)) fail('triggers', 'each trigger must be at most 40 characters');
   out.respondToMentions = !!c.respondToMentions;
@@ -122,34 +155,7 @@ export function validateBotConfig(input) {
 
   if (typeof c.mcpServers !== 'object' || Array.isArray(c.mcpServers)) fail('mcpServers', 'must be an object');
   out.mcpServers = {};
-  for (const [key, srv] of Object.entries(c.mcpServers || {})) {
-    if (!SERVER_KEY_RE.test(key)) fail(`mcpServers.${key}`, 'name must be lowercase letters, digits or _');
-    const tokens = srv?.tokens || {};
-    const t = {
-      organizer: tokenRef(tokens.organizer ?? srv?.token, `mcpServers.${key}.tokens.organizer`),
-      participant: tokenRef(tokens.participant, `mcpServers.${key}.tokens.participant`),
-    };
-    const f = `mcpServers.${key}`;
-    const type = srv?.type ?? 'remote';
-    if (!['remote', 'local'].includes(type)) fail(`${f}.type`, 'must be remote or local');
-    if (type === 'local') {
-      const spec = str(srv?.package, `${f}.package`, { min: 1, max: 200 }).trim();
-      if (!validPackageSpec(spec)) fail(`${f}.package`, 'must look like name, name@version, @scope/name or github:owner/repo#ref');
-      const args = list(srv?.args ?? [], `${f}.args`).map((a) => str(a, `${f}.args`, { max: 500 }));
-      if (args.length > 30) fail(`${f}.args`, 'at most 30 arguments');
-      out.mcpServers[key] = { type, package: spec, args, env: kvMap(srv?.env, `${f}.env`, ENV_NAME_RE, ['PATH', 'HOME']), allowScripts: !!srv?.allowScripts };
-      continue;
-    }
-    const authMode = srv?.auth ?? (t.organizer || t.participant ? 'token' : 'none');
-    if (!['oauth', 'token', 'none'].includes(authMode)) fail(`${f}.auth`, 'must be oauth, token or none');
-    const entry = { type, url: urlOrRef(srv?.url, `${f}.url`), auth: authMode, tokens: authMode === 'token' ? t : { organizer: '', participant: '' },
-      headers: kvMap(srv?.headers, `${f}.headers`, HEADER_NAME_RE, ['host', 'content-length', 'content-type', 'accept', 'authorization', 'mcp-session-id', 'mcp-protocol-version']) };
-    const oc = srv?.oauthClient;
-    if (authMode === 'oauth' && oc && (oc.id || oc.secret)) {
-      entry.oauthClient = { id: str(oc.id, `${f}.oauthClient.id`, { min: 1, max: 300 }).trim(), secret: tokenRef(oc.secret, `${f}.oauthClient.secret`) };
-    }
-    out.mcpServers[key] = entry;
-  }
+  for (const [key, srv] of Object.entries(c.mcpServers || {})) out.mcpServers[key] = validateServer(key, srv, `mcpServers.${key}`);
 
   const confirm = c.confirm && (c.confirm.preview || c.confirm.tool) ? c.confirm : null;
   if (confirm) {
@@ -194,9 +200,29 @@ export function validateBotConfig(input) {
   });
 
   out.memory = { enabled: c.memory?.enabled !== false };
+  const off = list(c.globalMcp?.disabled, 'globalMcp.disabled');
+  for (const k of off) if (!SERVER_KEY_RE.test(k)) fail('globalMcp.disabled', `"${k}" is not a tool service name`);
+  out.globalMcp = { disabled: [...new Set(off)] };
   out.plugins = [...new Set(list(c.plugins, 'plugins'))];
   for (const p of out.plugins) if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(p)) fail('plugins', `"${p}" is not a valid plugin name`);
   return { config: out, warnings };
+}
+
+/**
+ * A global tool service (035): a tool service definition plus default tool rules per role (tool-name globs such as
+ * "*" or "agenda_*"). The defaults apply in every agent whose role rules have no explicit "<name>:" entries.
+ */
+export function validateGlobalServer(name, input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) fail('config', 'must be an object');
+  const entry = validateServer(name, input, name);
+  const d = input.defaults || {};
+  const defaults = {};
+  for (const role of ['organizer', 'participant']) {
+    const globs = d[role] === undefined ? (role === 'organizer' ? ['*'] : []) : list(d[role], `defaults.${role}`);
+    for (const g of globs) if (!TOOL_GLOB_RE.test(g)) fail(`defaults.${role}`, `"${g}" must be a tool name (globs * ? allowed)`);
+    defaults[role] = [...new Set(globs)];
+  }
+  return { ...entry, defaults };
 }
 
 /** Secret names referenced by a config (${NAME}). */
@@ -207,6 +233,6 @@ export function referencedSecrets(config) {
 }
 
 export function slugify(name) {
-  const s = String(name || 'bot').toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-').slice(0, 40);
-  return BOT_ID_RE.test(s) ? s : `bot-${Date.now().toString(36)}`;
+  const s = String(name || 'agent').toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-').slice(0, 40);
+  return AGENT_ID_RE.test(s) ? s : `agent-${Date.now().toString(36)}`;
 }

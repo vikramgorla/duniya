@@ -1,4 +1,4 @@
-// 011–013: several WhatsApp numbers, 1:1 chats assigned to bots, model per chat, logging levels, server page.
+// 011–013: several WhatsApp numbers, 1:1 chats assigned to agents, model per chat, logging levels, server page.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
@@ -33,7 +33,7 @@ const fakeFactory = ({ number, label }) => {
 };
 const { createChannelRegistry, splitChat, chatKey } = await import('../src/channels/registry.js');
 const reg = createChannelRegistry({ factory: fakeFactory });
-const msg = (o) => ({ channel: 'whatsapp', raw: {}, isGroup: false, chat: '41790000555@s.whatsapp.net', phone: '41790000555', senderJid: 'x', senderName: 'Stranger', mentioned: false, replyToBot: false, quoted: '', msgId: `m${Math.random()}`, ts: Date.now(), ...o });
+const msg = (o) => ({ channel: 'whatsapp', raw: {}, isGroup: false, chat: '41790000555@s.whatsapp.net', phone: '41790000555', senderJid: 'x', senderName: 'Stranger', mentioned: false, replyToAgent: false, quoted: '', msgId: `m${Math.random()}`, ts: Date.now(), ...o });
 
 test('012: chat ids — first number unchanged, others prefixed', () => {
   assert.equal(chatKey('main', 'g1@g.us'), 'g1@g.us');
@@ -53,8 +53,8 @@ test('012: add a second number; messages route to the right session; status list
   const chats = await reg.listChats();
   assert.ok(chats.some((c) => c.id === 'shop#g-shop@g.us' && c.numberLabel === 'Shop'));
 
-  // bind the shop group to the helper bot and talk to it there
-  await t.bots.updateBot('helper', { chats: ['shop#g-shop@g.us'] });
+  // bind the shop group to the helper agent and talk to it there
+  await t.agents.updateAgent('helper', { chats: ['shop#g-shop@g.us'] });
   t.script.push([{ type: 'text', text: 'Hello from the shop number' }]);
   await sessions.shop.handler(msg({ isGroup: true, chat: 'g-shop@g.us', phone: '41790000001', text: '!help hi' }));
   assert.equal(sessions.shop.sent.at(-1).text, 'Hello from the shop number');
@@ -62,22 +62,22 @@ test('012: add a second number; messages route to the right session; status list
   assert.equal(sessions.main.sent.length, 0);
 });
 
-test('013: a 1:1 chat assigned to a bot is answered (even when its DM policy would not); others are not', async () => {
+test('013: a 1:1 chat assigned to an agent is answered (even when its DM policy would not); others are not', async () => {
   const stranger = 'shop#41790000555@s.whatsapp.net';
   t.script.push([{ type: 'text', text: 'should not be used' }]);
   await sessions.shop.handler(msg({ text: 'hello?' }));
-  assert.equal(sessions.shop.sent.length, 1, 'helper bot only answers organizers in DMs');
+  assert.equal(sessions.shop.sent.length, 1, 'helper agent only answers organizers in DMs');
   t.script.length = 0;
-  await t.bots.updateBot('helper', { chats: ['shop#g-shop@g.us', stranger] });
+  await t.agents.updateAgent('helper', { chats: ['shop#g-shop@g.us', stranger] });
   t.script.push([{ type: 'text', text: 'Hi, I can help.' }]);
   await sessions.shop.handler(msg({ text: 'hello again' }));
   assert.equal(sessions.shop.sent.at(-1).text, 'Hi, I can help.');
   assert.equal(sessions.shop.sent.at(-1).jid, '41790000555@s.whatsapp.net');
-  // the person shows up on the Chats page with their number, bound to the bot
+  // the person shows up on the Chats page with their number, bound to the agent
   const chats = (await t.api(owner, 'GET', '/api/chats')).body;
   const row = chats.find((c) => c.id === stranger);
   assert.ok(row, 'seen 1:1 chat listed');
-  assert.equal(row.isGroup, false); assert.equal(row.bot, 'helper'); assert.equal(row.number, 'shop'); assert.equal(row.name, 'Stranger');
+  assert.equal(row.isGroup, false); assert.equal(row.agent, 'helper'); assert.equal(row.number, 'shop'); assert.equal(row.name, 'Stranger');
 });
 
 test('013: model per chat — specific model, provider:auto, back to inherit', async () => {

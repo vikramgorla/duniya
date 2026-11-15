@@ -7,28 +7,28 @@
 The platform MUST connect to WhatsApp as a linked device of a normal WhatsApp account (Baileys or an
 equivalent open-source client) running on infrastructure we control. Paid or commercial WhatsApp
 connectors (WhatsApp Business/Cloud API resellers, hosted bot gateways) MUST NOT be required.
-Deployment guidance MUST tell operators to use a dedicated number, and bots MUST only reply when
+Deployment guidance MUST tell operators to use a dedicated number, and agents MUST only reply when
 addressed and be rate-limited, to keep ban risk low.
 
 *Rationale*: the owners explicitly rejected commercial WhatsApp connectors; unofficial clients carry
 ban risk that conservative behaviour keeps small.
 
-### II. Generic Core, Bots as Plugins
+### II. Generic Core, Agents as Plugins
 
-The deployment is a generic multi-bot platform. Core code (`src/core`, `src/channels`, `src/panel`)
-MUST NOT contain bot-specific names, prompts, tools or business rules. Bots are data: they MUST be
+The deployment is a generic multi-agent platform. Core code (`src/core`, `src/channels`, `src/panel`)
+MUST NOT contain agent-specific names, prompts, tools or business rules. Agents are data: they MUST be
 created, edited, exported and imported from the admin panel and be fully described by a validated
 configuration (instructions, tool services, per-role rules, confirmation, schedules, memory). Templates
-(`templates/`) and optional code plugins (`plugins/<name>/`) are files; no bot may require code changes.
+(`templates/`) and optional code plugins (`plugins/<name>/`) are files; no agent may require code changes.
 Data models MUST carry a tenant identifier so hosted multi-tenancy can be added later. Channels MUST sit
 behind a small interface so channels other than WhatsApp can be added.
 
-*Rationale*: panduga.ch is the first bot, not the product; the platform must host other bots (e.g.
+*Rationale*: panduga.ch is the first agent, not the product; the platform must host other agents (e.g.
 carpool) without forks.
 
 ### III. Least Privilege Enforced in Code
 
-Which tools a sender may use MUST be decided by code from the bot's per-role allowlist and denylist,
+Which tools a sender may use MUST be decided by code from the agent's per-role allowlist and denylist,
 never by prompt instructions alone. A tool that is not allowed for the sender's role MUST NOT be sent
 to the model and MUST be refused if the model calls it anyway. Where a backend supports scoped
 credentials, the least-privileged credential for the role SHOULD be used.
@@ -49,13 +49,13 @@ and expire.
 
 Every routed message, reply, tool call (with input, output summary, duration and outcome),
 confirmation, schedule run, configuration change and error MUST be recorded in the activity log and
-streamed to the admin panel. Operators MUST be able to pause all bots, enable or disable each bot,
+streamed to the admin panel. Operators MUST be able to pause all agents, enable or disable each agent,
 and see channel health from the panel without shell access.
 
 Operators MAY reduce what is recorded (global level, categories, per chat) to keep the log small, but errors,
 confirmations, configuration changes and channel status MUST always be recorded.
 
-*Rationale*: the owners need to see and control what the bots do.
+*Rationale*: the owners need to see and control what the agents do.
 
 ### VI. Free-Tier, Everything as Code
 
@@ -102,7 +102,7 @@ understood does not exist for them.
   requests, and send a restrictive Content-Security-Policy.
 - All text originating from WhatsApp or tools is untrusted: the panel MUST render it as text, never
   HTML, and it MUST NOT be able to change roles, tool permissions or configuration.
-- Bots MUST NOT post personal details (phone numbers, emails, health or payment details) in group
+- Agents MUST NOT post personal details (phone numbers, emails, health or payment details) in group
   chats; such answers belong in direct messages.
 - The service MUST run as an unprivileged system user with systemd hardening (or as a non-root container user).
 - Model access MUST respect provider terms: Anthropic via API keys only (no Claude subscription OAuth);
@@ -125,7 +125,7 @@ never the app's own secrets or settings).
 - Stack: Node.js 22 LTS (ES modules), built-in `node:sqlite`, `node:test`; dependencies limited to
   Baileys, the Anthropic SDK, the MCP SDK, pino and qrcode (other providers via `fetch`). New runtime dependencies need a stated
   reason in the plan.
-- Live operator settings (bot toggles, organizers, chats, schedules, secrets) live in the data
+- Live operator settings (agent toggles, organizers, chats, schedules, secrets) live in the data
   directory and MUST survive code updates; repository files hold defaults only.
 - Releases: merge to `main`, then "Update from GitHub" in the panel. Infrastructure changes run
   `plan` on push and require a manual `apply`.
@@ -139,4 +139,4 @@ principle removed or redefined; MINOR: principle or section added or materially 
 clarification), and reviewed in a pull request. Reviewers verify constitution compliance for every
 change.
 
-**Version**: 1.3.0 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-14
+**Version**: 1.3.1 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-15

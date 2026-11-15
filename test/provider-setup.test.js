@@ -123,19 +123,19 @@ test('OpenRouter preset: one tap, key kept secret, free-only filter, auto picks 
   const m = (await t.api(owner, 'GET', '/api/models')).body;
   assert.equal(m.problem, undefined, m.problem);
   assert.match(m.resolvedDefault, /^openrouter:.+:free$/);
-  await t.bots.updateBot('helper', { model: 'auto' });
+  await t.agents.updateAgent('helper', { model: 'auto' });
   await t.route(t.msg({ chat: 'g2@g.us', text: '!help hello' }));
   assert.match(orr.chatReqs.at(-1).model, /:free$/);
   assert.match(t.sent.at(-1).text, /^Hi from .+:free$/);
 
   // a paid model is refused while free-only is on
-  await t.bots.updateBot('helper', { model: 'openrouter:anthropic/claude-sonnet-5.5' });
+  await t.agents.updateAgent('helper', { model: 'openrouter:anthropic/claude-sonnet-5.5' });
   const before = orr.chatReqs.length;
   await t.route(t.msg({ chat: 'g2@g.us', text: '!help hello again' }));
   assert.equal(orr.chatReqs.length, before, 'no request for a paid model');
   assert.match(t.sent.at(-1).text, /only allows free models/);
   t.store.setSecret('ANTHROPIC_API_KEY', keepKey);
-  await t.bots.updateBot('helper', { model: 'claude-sonnet-5-5' });
+  await t.agents.updateAgent('helper', { model: 'claude-sonnet-5-5' });
 });
 
 test('Test button: sends "Say hi", shows reply and latency; errors are shown, not thrown', async () => {
@@ -181,9 +181,9 @@ test('GitHub Copilot: token checks, models, quota, owner only', async () => {
   assert.equal((await t.api(admin, 'DELETE', '/api/providers/copilot')).status, 403);
 });
 
-test('GitHub Copilot: chat round trip with a tool call through the bot (bridge), then a plain test', async () => {
+test('GitHub Copilot: chat round trip with a tool call through the agent (bridge), then a plain test', async () => {
   cp.script.push([{ tools: [{ name: 'panduga__agenda_list', args: {} }] }, { text: 'Puja is at 10:00 (via Copilot).' }]);
-  await t.bots.updateBot('panduga', { model: 'copilot:claude-sonnet-4.5' });
+  await t.agents.updateAgent('panduga', { model: 'copilot:claude-sonnet-4.5' });
   const sessionsBefore = cp.sessions.length;
   await t.route(t.msg({ text: '!panduga when is puja?' }));
   assert.equal(t.sent.at(-1).text, 'Puja is at 10:00 (via Copilot).');
@@ -218,7 +218,7 @@ test('GitHub Copilot: chat round trip with a tool call through the bot (bridge),
   assert.equal(t.store.getSecret('COPILOT_GITHUB_TOKEN'), '');
   assert.ok(cp.stopped >= 1, 'runtime stopped on disconnect');
   assert.equal((await t.api(owner, 'GET', '/api/providers')).body.find((p) => p.id === 'copilot').connected, false);
-  await t.bots.updateBot('panduga', { model: 'claude-sonnet-5-5' });
+  await t.agents.updateAgent('panduga', { model: 'claude-sonnet-5-5' });
 });
 
 test('Copilot adapter: transcript prompt and tool name mapping', () => {

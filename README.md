@@ -26,8 +26,8 @@
 - **Several WhatsApp numbers, groups and 1:1 chats.** Linked-device login by QR or pairing code, no commercial API.
 - **Any model.** Sign in with ChatGPT, GitHub Copilot, OpenRouter (free models), Anthropic or OpenAI keys,
   Ollama and other compatible endpoints, or *Auto*; per agent and per chat.
-- **Real tools via MCP.** Remote servers with OAuth sign-in or tokens, or local ones from npm/GitHub; per-role allow
-  lists and a `confirm CODE` step for changes. WhatsApp actions too: media, reactions, polls, group admin.
+- **Real tools via MCP.** Remote servers with OAuth sign-in or tokens, or local ones from npm/GitHub; per agent or
+  once for all agents (each agent can opt out); per-role allow lists and a `confirm CODE` step for changes. WhatsApp actions too: media, reactions, polls, group admin.
 - **Manage it from ChatGPT or Claude.** The app is an MCP server with OAuth 2.1, your panel role and confirmations.
 - **Run it without SSH.** Usage and cost reports, activity log with a logging policy, server metrics, OS updates,
   one-click app updates and encrypted backups to GitHub, S3 or a download.

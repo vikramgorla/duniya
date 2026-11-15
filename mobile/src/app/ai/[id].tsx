@@ -1,11 +1,11 @@
-// "Change with AI": describe the change in plain words; the server's AI helper (/api/ai/bot-draft) proposes edits,
+// "Change with AI": describe the change in plain words; the server's AI helper (/api/ai/agent-draft) proposes edits,
 // you see each one, and nothing is saved until you tap Apply.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 import { Body, Button, Card, Field, H2, Label, Mono, Note, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import type { Bot, BotDraft } from '@/lib/types';
+import type { Agent, AgentDraft } from '@/lib/types';
 
 const FIELD: Record<string, string> = { name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', dm: 'Who may message it directly',
   organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', tools: 'Tool rules', confirm: 'Confirmation', schedules: 'Scheduled posts', memory: 'Group memory',
@@ -19,19 +19,19 @@ export default function ChangeWithAI() {
   const [request, setRequest] = useState('');
   const [busy, setBusy] = useState(false);
   const [applying, setApplying] = useState(false);
-  const [draft, setDraft] = useState<BotDraft | null>(null);
+  const [draft, setDraft] = useState<AgentDraft | null>(null);
   const [error, setError] = useState('');
 
   const ask = async () => {
     setBusy(true); setError(''); setDraft(null);
-    try { setDraft(await api!.post<BotDraft>('/api/ai/bot-draft', { botId: id, request, model: 'auto' })); }
+    try { setDraft(await api!.post<AgentDraft>('/api/ai/agent-draft', { agentId: id, request, model: 'auto' })); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
   const apply = async () => {
     if (!draft) return;
     setApplying(true);
     try {
-      await api!.put<Bot>(`/api/bots/${encodeURIComponent(id)}`, Object.fromEntries(draft.changes.map((c) => [c.field, c.after])));
+      await api!.put<Agent>(`/api/agents/${encodeURIComponent(id)}`, Object.fromEntries(draft.changes.map((c) => [c.field, c.after])));
       router.back();
     } catch (e) { Alert.alert('Not saved', (e as Error).message); } finally { setApplying(false); }
   };

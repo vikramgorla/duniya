@@ -39,8 +39,8 @@ const redact = (args) => Object.fromEntries(Object.entries(args || {}).map(([k, 
 
 /** What an assistant may do, in plain words, by panel role (consent page and Settings card). */
 export const ROLE_ABILITIES = {
-  viewer: ['See bots, chats, activity, models, pending changes and server status', 'Nothing can be changed: this account is read-only'],
-  admin: ['See everything in the panel', 'Change bots, chats, models, memory, secrets and pending changes', 'Send test messages to bots and run scheduled posts'],
+  viewer: ['See agents, chats, activity, models, pending changes and server status', 'Nothing can be changed: this account is read-only'],
+  admin: ['See everything in the panel', 'Change agents, chats, models, memory, secrets and pending changes', 'Send test messages to agents and run scheduled posts'],
   owner: ['Everything an admin can do', 'Manage users, backups, updates, WhatsApp numbers and server maintenance'],
 };
 
@@ -172,7 +172,7 @@ code{font-size:13px}
 <p class=muted><b>${esc(chk.client.name)}</b> <span class=small>(returns to <code>${esc(host)}</code>)</span> wants to manage this Duniya app for you.</p>
 <p>It acts as <b>${esc(user.username)}</b> <span class=pill>${esc(user.role)}</span> and can:</p>
 <ul>${abilities.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
-${user.role === 'viewer' ? '' : '<div class=note>Risky actions (deleting a bot, erasing memory, changing secrets or users, removing a WhatsApp number, restoring a backup, updates and restarts) always need a second confirmation step.</div>'}
+${user.role === 'viewer' ? '' : '<div class=note>Risky actions (deleting an agent, erasing memory, changing secrets or users, removing a WhatsApp number, restoring a backup, updates and restarts) always need a second confirmation step.</div>'}
 <p class="small muted">Only approve if you just added this connector yourself. You can disconnect it any time in Settings → Connected AI assistants.</p>
 <form method=post action="/oauth/authorize" class=row>${hidden(p)}<input type=hidden name=csrf value="${csrfFor(sessionToken)}">
 <button class="btn primary" name=action value=approve>Approve</button><button class="btn danger" name=action value=deny>Deny</button></form>` });
@@ -320,7 +320,7 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
     ctx.x = { call: (method, path, b) => invoke(auth.user, method, path, b, { host: req.headers.host }) };
     const server = new Server({ name: 'duniya-admin', title: 'Duniya admin', version: VERSION }, {
       capabilities: { tools: {} },
-      instructions: `You manage a self-hosted WhatsApp bot platform ("Duniya") as panel user ${auth.user.username} (${auth.user.role}). `
+      instructions: `You manage a self-hosted WhatsApp agent platform ("Duniya") as panel user ${auth.user.username} (${auth.user.role}). `
         + 'Use the list/get tools to look before changing anything. Risky tools return a preview and a confirm_code: show the preview to the user and call confirm_action only after they agree.',
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: toolDefs(auth.user) }));

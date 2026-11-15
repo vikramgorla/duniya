@@ -71,40 +71,40 @@ const base = { name: 'More', prompt: 'You help.', model: 'claude-sonnet-5-5', tr
 const localSrv = { type: 'local', package: FIXTURE, args: ['--hello'], env: { GREETING: '${TINY_GREETING}' } };
 
 test('local services: only the owner may add or change them', async () => {
-  const r = await t.api(admin, 'POST', '/api/bots', { id: 'more', config: { ...base, mcpServers: { tiny: localSrv } } });
+  const r = await t.api(admin, 'POST', '/api/agents', { id: 'more', config: { ...base, mcpServers: { tiny: localSrv } } });
   assert.equal(r.status, 403);
   assert.match(r.body.error, /Only the owner/);
-  const ok = await t.api(owner, 'POST', '/api/bots', { id: 'more', config: { ...base, mcpServers: { tiny: localSrv } } });
+  const ok = await t.api(owner, 'POST', '/api/agents', { id: 'more', config: { ...base, mcpServers: { tiny: localSrv } } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
-  // an admin may still edit other parts of the bot without touching the local service
-  const edit = await t.api(admin, 'PUT', '/api/bots/more', { prompt: 'You help a lot.', mcpServers: ok.body.config.mcpServers });
+  // an admin may still edit other parts of the agent without touching the local service
+  const edit = await t.api(admin, 'PUT', '/api/agents/more', { prompt: 'You help a lot.', mcpServers: ok.body.config.mcpServers });
   assert.equal(edit.status, 200, JSON.stringify(edit.body));
-  const change = await t.api(admin, 'PUT', '/api/bots/more', { mcpServers: { tiny: { ...localSrv, args: ['--evil'] } } });
+  const change = await t.api(admin, 'PUT', '/api/agents/more', { mcpServers: { tiny: { ...localSrv, args: ['--evil'] } } });
   assert.equal(change.status, 403);
-  const inst = await t.api(admin, 'POST', '/api/bots/more/local/tiny/install', {});
+  const inst = await t.api(admin, 'POST', '/api/agents/more/local/tiny/install', {});
   assert.equal(inst.status, 403);
 });
 
 test('local services: bad package specs are rejected', async () => {
   for (const pkg of ['--global evil', 'https://evil.example/x.tgz', 'a b', '../x']) {
-    const r = await t.api(owner, 'PUT', '/api/bots/more', { mcpServers: { tiny: { ...localSrv, package: pkg } } });
+    const r = await t.api(owner, 'PUT', '/api/agents/more', { mcpServers: { tiny: { ...localSrv, package: pkg } } });
     assert.equal(r.status, 400, pkg);
   }
 });
 
 test('local services: install, discover, run with a scrubbed environment', async () => {
-  const before = await t.api(owner, 'GET', '/api/bots/more/local');
+  const before = await t.api(owner, 'GET', '/api/agents/more/local');
   assert.equal(before.body[0].installed, null);
-  const inst = await t.api(owner, 'POST', '/api/bots/more/local/tiny/install', {});
+  const inst = await t.api(owner, 'POST', '/api/agents/more/local/tiny/install', {});
   assert.equal(inst.status, 200, JSON.stringify(inst.body));
   assert.equal(inst.body.name, 'tiny-mcp');
   assert.equal(inst.body.version, '1.2.3');
-  assert.equal((await t.api(owner, 'GET', '/api/bots/more/local')).body[0].installed.version, '1.2.3');
-  const d = await t.api(owner, 'POST', '/api/bots/more/discover', { type: 'local', server: 'tiny' });
+  assert.equal((await t.api(owner, 'GET', '/api/agents/more/local')).body[0].installed.version, '1.2.3');
+  const d = await t.api(owner, 'POST', '/api/agents/more/discover', { type: 'local', server: 'tiny' });
   assert.deepEqual(d.body.map((x) => x.name).sort(), ['echo', 'env_report']);
   t.script.push([{ type: 'tool_use', id: 'l1', name: 'tiny__env_report', input: {} }], [{ type: 'text', text: 'done' }]);
   const n = t.claudeReqs.length;
-  await t.api(owner, 'POST', '/api/bots/more/test', { role: 'organizer', text: 'env?' });
+  await t.api(owner, 'POST', '/api/agents/more/test', { role: 'organizer', text: 'env?' });
   const report = JSON.parse(JSON.stringify(t.claudeReqs[n + 1].messages).match(/\{\\"greeting.*?\]\}/)[0].replace(/\\"/g, '"'));
   assert.equal(report.greeting, 'namaste', 'configured env (with secret) passed');
   assert.deepEqual(report.args, ['--hello']);
@@ -112,28 +112,28 @@ test('local services: install, discover, run with a scrubbed environment', async
   // participants only get the tools ticked for them
   t.script.push([{ type: 'text', text: 'hi' }]);
   const m = t.claudeReqs.length;
-  await t.api(owner, 'POST', '/api/bots/more/test', { role: 'participant', text: 'hello' });
+  await t.api(owner, 'POST', '/api/agents/more/test', { role: 'participant', text: 'hello' });
   assert.deepEqual(t.toolNames(m).filter((x) => x.startsWith('tiny__')), ['tiny__echo']);
 });
 
 test('remote services: extra headers are sent (with secrets) and never returned', async () => {
-  const r = await t.api(owner, 'PUT', '/api/bots/more', { mcpServers: { tiny: localSrv, keyed: { url: `${BASE}/keyed`, auth: 'none', headers: { 'X-API-Key': '${KEYED_API_KEY}' } } } });
+  const r = await t.api(owner, 'PUT', '/api/agents/more', { mcpServers: { tiny: localSrv, keyed: { url: `${BASE}/keyed`, auth: 'none', headers: { 'X-API-Key': '${KEYED_API_KEY}' } } } });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.ok(!JSON.stringify(r.body).includes('k-123'));
-  const d = await t.api(owner, 'POST', '/api/bots/more/discover', { url: `${BASE}/keyed`, headers: { 'X-API-Key': '${KEYED_API_KEY}' } });
+  const d = await t.api(owner, 'POST', '/api/agents/more/discover', { url: `${BASE}/keyed`, headers: { 'X-API-Key': '${KEYED_API_KEY}' } });
   assert.deepEqual(d.body.map((x) => x.name), ['ping_me']);
   t.script.push([{ type: 'tool_use', id: 'h1', name: 'keyed__ping_me', input: {} }], [{ type: 'text', text: 'pong!' }]);
-  assert.equal((await t.api(owner, 'POST', '/api/bots/more/test', { role: 'organizer', text: 'ping' })).body.reply, 'pong!');
+  assert.equal((await t.api(owner, 'POST', '/api/agents/more/test', { role: 'organizer', text: 'ping' })).body.reply, 'pong!');
   assert.ok(seen.headers.includes('k-123'));
-  const bad = await t.api(owner, 'PUT', '/api/bots/more', { mcpServers: { keyed: { url: `${BASE}/keyed`, headers: { Authorization: 'x' } } } });
+  const bad = await t.api(owner, 'PUT', '/api/agents/more', { mcpServers: { keyed: { url: `${BASE}/keyed`, headers: { Authorization: 'x' } } } });
   assert.equal(bad.status, 400, 'reserved headers are refused');
 });
 
 test('OAuth with a pre-registered app: no registration, client secret sent to the token endpoint', async () => {
-  const r = await t.api(owner, 'PUT', '/api/bots/more', { mcpServers: { tiny: localSrv,
+  const r = await t.api(owner, 'PUT', '/api/agents/more', { mcpServers: { tiny: localSrv,
     secure: { url: `${BASE}/secure`, auth: 'oauth', oauthClient: { id: 'my-app', secret: '${OWN_CLIENT_SECRET}' } } } });
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  const start = await t.api(owner, 'POST', '/api/bots/more/connections/secure/organizer');
+  const start = await t.api(owner, 'POST', '/api/agents/more/connections/secure/organizer');
   assert.equal(start.status, 200, JSON.stringify(start.body));
   const q = new URL(start.body.authorizeUrl).searchParams;
   assert.equal(q.get('client_id'), 'my-app');
@@ -143,6 +143,6 @@ test('OAuth with a pre-registered app: no registration, client secret sent to th
   assert.equal(cb.status, 200, await cb.text());
   const auth = seen.tokenAuth.at(-1);
   assert.ok(auth === `Basic ${Buffer.from('my-app:s3cret').toString('base64')}` || auth === 'post:my-app:s3cret', auth);
-  const d = await t.api(owner, 'POST', '/api/bots/more/discover', { auth: 'oauth', server: 'secure' });
+  const d = await t.api(owner, 'POST', '/api/agents/more/discover', { auth: 'oauth', server: 'secure' });
   assert.deepEqual(d.body.map((x) => x.name), ['ping_me']);
 });
