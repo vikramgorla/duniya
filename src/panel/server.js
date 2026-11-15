@@ -12,7 +12,7 @@ import {
   listTemplates, templateConfig, exportBot, importBot, listPlugins,
 } from '../core/bots.js';
 import { referencedSecrets } from '../core/schema.js';
-import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages } from '../core/db.js';
+import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages, listNotes } from '../core/db.js';
 import { bus, activity, loggingSettings, resetLoggingCache, LOG_CATEGORIES } from '../core/events.js';
 import { allChatPrefs, setChatPrefs, seenChats, ignoredCounts, enabledChats } from '../core/chat-prefs.js';
 import { runAgent, handleConfirmCommand, applyPending } from '../core/agent.js';
@@ -449,6 +449,11 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     return { summary: summary ?? memoryView(chat).summary };
   });
   route('DELETE', '/api/chats/:chat/memory', async (req, res, body, q, p, user) => { eraseChatMemory(decodeURIComponent(p.chat), user.username); return { ok: true }; });
+  // Shared agent memory (#8): notes an agent keeps across all its chats.
+  route('GET', '/api/bots/:id/memory', async (req, res, body, q, p) => {
+    if (!getBot(p.id)) return [404, { error: 'Not found' }];
+    return { notes: listNotes(`agent:${p.id}`).map((n) => ({ id: n.id, text: n.text, author: n.author, role: n.role, ts: n.ts })) };
+  });
   route('DELETE', '/api/notes/:id', async (req, res, body, q, p, user) => {
     const note = getNote(p.id);
     if (!note) return [404, { error: 'Not found' }];
