@@ -8,8 +8,9 @@
 //    media-queue.js, which bounds how much work can pile up;
 //  - optionalPaused(): true while the app's own memory is above the soft limit (70 % of RAM): background summaries,
 //    on-server engines and image creation wait; WhatsApp and replies keep running. Logged once per episode.
+import { getSetting } from './store.js';
 import os from 'node:os';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { activity } from './events.js';
 
@@ -90,14 +91,25 @@ export function startResourceWatch() {
  * May an on-server engine run? { ok, reason }. `forEnable`: only the RAM size matters (switching it on);
  * otherwise also free memory and memory pressure right now (before each job).
  */
+export const SMALL_MODE_MIN_TOTAL_MB = 900; // a "1 GB" VM reports roughly 950–990 MB
+export const SMALL_MODE_HEADROOM_MB = 150; // free memory kept beyond what the engine itself needs
+/** Owner's opt-in to run on-server speech on a small server (Settings → Photos & voice), with caveats. */
+export const smallServerMode = () => { try { return !!getSetting('media', {})?.local?.smallServer; } catch { return false; } };
 export function localEngineCheck({ forEnable = false, needMb = LOCAL_MIN_FREE_MB } = {}) {
   const s = serverSize();
+  let need = needMb;
   if (s.effectiveMb < LOCAL_MIN_TOTAL_MB) {
-    return { ok: false, code: 'too_small', reason: `This server has ${s.effectiveMb} MB of memory; on-server speech needs at least ${LOCAL_MIN_TOTAL_MB} MB. Use a provider instead (OpenAI or OpenRouter under Models) — that works on any server.` };
+    if (!smallServerMode()) {
+      return { ok: false, code: 'too_small', reason: `This server has ${s.effectiveMb} MB of memory; on-server speech normally needs ${LOCAL_MIN_TOTAL_MB} MB. Use a provider (OpenAI or OpenRouter under Models), or switch on “Small server mode” below to try it anyway (slow, one voice note at a time).` };
+    }
+    if (s.effectiveMb < SMALL_MODE_MIN_TOTAL_MB) {
+      return { ok: false, code: 'too_small', reason: `This server has only ${s.effectiveMb} MB of memory — too little for on-server speech even in small server mode. Use a provider instead.` };
+    }
+    need = Math.max(needMb + SMALL_MODE_HEADROOM_MB, 500); // small server mode: only when there is clearly room right now
   }
-  if (forEnable) return { ok: true };
+  if (forEnable) return { ok: true, small: s.effectiveMb < LOCAL_MIN_TOTAL_MB };
   if (paused || s.pressure) return { ok: false, code: 'pressure', reason: 'Memory is tight right now, so on-server speech is paused.' };
-  if (s.availableMb < needMb) return { ok: false, code: 'low_memory', reason: `Only ${s.availableMb} MB of memory is free right now (needs ${needMb} MB).` };
+  if (s.availableMb < need) return { ok: false, code: 'low_memory', reason: `Only ${s.availableMb} MB of memory is free right now (needs ${need} MB).` };
   return { ok: true };
 }
 /** Big downloads that run their own helper (Copilot SDK): refused on small servers. */
@@ -151,8 +163,9 @@ export function hasCommand(cmd) {
  * memory cap (ulimit -v). Not used for Node children: V8 reserves far more address space than it uses.
  */
 export function lowPriority(cmd, args, { memMb = 0 } = {}) {
-  if (!existsSync('/bin/sh')) return [cmd, args];
-  const cap = memMb ? `ulimit -v ${Math.round(memMb * 1024)} 2>/dev/null; ` : '';
-  const nice = hasCommand('nice') ? 'nice -n 10 ' : '';
-  return ['/bin/sh', ['-c', `${cap}exec ${nice}"$@"`, 'duniya-job', cmd, ...args]];
+  // No shell: `prlimit` caps the address space and `nice` lowers the priority, each exec'ing the next program.
+  let out = [cmd, args];
+  if (hasCommand('nice')) out = ['nice', ['-n', '10', out[0], ...out[1]]];
+  if (memMb && hasCommand('prlimit')) out = ['prlimit', [`--as=${Math.round(memMb * 1024 * 1024)}`, '--', out[0], ...out[1]]];
+  return out;
 }
