@@ -7,16 +7,16 @@ import type { Activity, Agent, Chat, OwnerAssistantInfo, Pending, Status, Stored
 const now = Date.now();
 const min = 60_000;
 const agents: Agent[] = [
-  { id: 'carpool', name: 'Carpool helper', description: 'Plans who drives the kids to school and to football.', enabled: true, needs: [], localTools: [], missingPlugins: [], updatedAt: now - 3 * 86400_000,
+  { id: 'carpool', name: 'Carpool helper', description: 'Plans who drives the kids to school and to football.', enabled: true, needs: [], updatedAt: now - 3 * 86400_000,
     config: { name: 'Carpool helper', description: 'Plans who drives the kids to school and to football.', model: 'auto', enabled: true, triggers: ['!carpool', '@carpool'], dm: 'members',
       prompt: 'You coordinate the school carpool for four families in WhatsApp.\n\n- Keep a weekly plan of who drives when.\n- When someone cannot drive, ask the group who can swap.\n- Be brief and friendly; reply in English or French.',
       mcpServers: { calendar: { url: 'https://calendar.example.com/mcp', auth: 'oauth' } }, tools: { participant: ['calendar:list_*'], organizer: ['calendar:*'], deny: [] },
       organizers: ['41790000001', '41790000003'], chats: ['g2@g.us'], memory: { enabled: true },
       schedules: [{ id: 'monday-plan', at: '07:30', days: 'mon', enabled: true, prompt: 'Post this week’s driving plan.' }] } },
-  { id: 'family', name: 'Family events', description: 'Birthdays, Diwali plans and the summer trip.', enabled: true, needs: [], localTools: [], missingPlugins: [], updatedAt: now - 86400_000,
+  { id: 'family', name: 'Family events', description: 'Birthdays, Diwali plans and the summer trip.', enabled: true, needs: [], updatedAt: now - 86400_000,
     config: { name: 'Family events', description: 'Birthdays, Diwali plans and the summer trip.', model: 'anthropic:auto', enabled: true, triggers: ['!family'], dm: 'organizers',
       prompt: 'You help a big family plan get-togethers. Remember dates, who brings what, and remind people kindly.', tools: { participant: [], organizer: [], deny: [] }, organizers: ['41790000001'], chats: ['g1@g.us'], memory: { enabled: true } } },
-  { id: 'neighbours', name: 'Neighbours', description: 'Building notices, parcels and the shared garden.', enabled: false, needs: [], localTools: [], missingPlugins: [], updatedAt: now - 9 * 86400_000,
+  { id: 'neighbours', name: 'Neighbours', description: 'Building notices, parcels and the shared garden.', enabled: false, needs: [], updatedAt: now - 9 * 86400_000,
     config: { name: 'Neighbours', description: 'Building notices, parcels and the shared garden.', model: 'auto', enabled: false, triggers: ['!house'], dm: 'off', prompt: 'You help neighbours in one building.', tools: { participant: [], organizer: [], deny: [] }, organizers: [], chats: [], memory: { enabled: false } } },
 ];
 const chats: Chat[] = [

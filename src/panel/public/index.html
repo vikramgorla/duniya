@@ -1422,7 +1422,6 @@ async function renderAgents() {
       b.config.memory?.enabled !== false ? h('span', { class: 'pill ok' }, 'memory') : null),
     h('div', { class: 'small muted num' }, h('a', { href: '#usage' }, '30 days: '), usageLine(us?.agent?.[b.id])),
     b.needs.length ? h('div', { class: 'note warn' }, `Needs secrets: ${b.needs.join(', ')}`) : null,
-    b.missingPlugins.length ? h('div', { class: 'note warn' }, `Missing plugins: ${b.missingPlugins.join(', ')}`) : null,
     h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => openAgent(b.id) }, can('admin') ? 'Edit & test' : 'View & test'))));
   const aiCreate = can('admin') ? await aiHelper({ title: [h('span', { class: 'ai-chip' }, 'AI'), 'Create an agent with AI'], applyLabel: 'Create this agent',
     placeholder: 'Describe the agent in your own words, e.g. “An assistant for our family festival group: answers agenda and menu questions from panduga, replies in English or Telugu, posts tomorrow’s agenda every evening at 8.”',
@@ -1546,7 +1545,7 @@ function toolServiceEditor(s, o) {
 }
 
 async function renderAgentEditor(id) {
-  const [b, models, plugins, conns, locals, waTools] = await Promise.all([api('GET', `/api/agents/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', '/api/plugins'), api('GET', `/api/agents/${encodeURIComponent(id)}/connections`).catch(() => []), api('GET', `/api/agents/${encodeURIComponent(id)}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => [])]);
+  const [b, models, conns, locals, waTools] = await Promise.all([api('GET', `/api/agents/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', `/api/agents/${encodeURIComponent(id)}/connections`).catch(() => []), api('GET', `/api/agents/${encodeURIComponent(id)}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => [])]);
   const mediaCaps = await api('GET', '/api/media').catch(() => null);
   const registry = can('admin') ? await api('GET', '/api/tool-services/registry/settings').catch(() => null) : null; // 052: Browse
   const c = structuredClone(b.config);
@@ -1694,7 +1693,6 @@ async function renderAgentEditor(id) {
         h('button', { class: 'btn small danger mut', onclick: () => { scheds.splice(i, 1); drawScheds(); } }, 'Remove')))));
   }
   drawScheds();
-  F.plugins = plugins.map((p) => h('label', { class: 'inline' }, h('input', { type: 'checkbox', value: p.name, checked: (c.plugins || []).includes(p.name) }), p.name));
   F.timezone = h('input', { value: c.timezone || '', placeholder: 'Europe/Zurich (default)' });
   // Photos & voice (043)
   const md = { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', ...(c.media || {}), createImages: { organizer: true, participant: false, ...(c.media?.createImages || {}) } };
@@ -1724,7 +1722,7 @@ async function renderAgentEditor(id) {
       mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, serverConfig(s)])), globalMcp: { disabled: [...globalOff] },
       tools: { participant: splitLines(rulesBox.participant.value), organizer: splitLines(rulesBox.organizer.value), deny: splitLines(rulesBox.deny.value) },
       confirm: F.confirmOn.checked ? { preview: F.cPreview.value.trim(), tool: F.cTool.value.trim(), idField: F.cId.value.trim(), ttlMinutes: Number(F.cTtl.value) } : null,
-      schedules: scheds, plugins: F.plugins.map((l) => l.querySelector('input')).filter((x) => x.checked).map((x) => x.value),
+      schedules: scheds,
       media: md,
     };
     try {
@@ -1841,7 +1839,6 @@ async function renderAgentEditor(id) {
         h('fieldset', {}, h('legend', {}, 'Monthly spending cap'), await capEditor('agent', id, models)),
         h('fieldset', {}, h('legend', {}, 'Scheduled posts'), schedBox, h('button', { class: 'btn small mut', onclick: () => { scheds.push({ id: `s${scheds.length + 1}`, at: '08:00', days: 'daily', prompt: '', chats: 'all', enabled: true }); drawScheds(); } }, '+ Add schedule')),
         h('fieldset', {}, h('legend', {}, 'Advanced'),
-          plugins.length ? field('Plugins', h('div', {}, F.plugins), 'Optional code add-ons installed on this server (in the plugins/ folder) for things settings can\'t do: extra tools, quick commands or custom role rules. “example-dice” is a sample for developers (a dice-rolling tool and a !ping → pong reply); leave it off. For ready-made tools, add a tool service (MCP) instead.') : null,
           field('Timezone', F.timezone), h('div', { class: 'row' }, field('Recent messages in context', F.historySize), field('Max reply tokens', F.maxTokens))),
         h('div', { class: 'row mut' }, h('button', { class: 'btn primary', onclick: save }, 'Save'))),
       h('div', { class: 'card', id: 'test-console', style: 'position:sticky;top:110px;scroll-margin-top:110px' }, h('h2', {}, 'Test console'),
@@ -1857,11 +1854,11 @@ async function renderAgentEditor(id) {
 // ---------- AI helper (016) ----------
 const FIELD_LABEL = { name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', dm: 'Who may message it directly',
   organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', globalMcp: 'Global tool services', tools: 'Tool rules', confirm: 'Confirmation', schedules: 'Scheduled posts', memory: 'Group memory',
-  model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', plugins: 'Plugins', enabled: 'Enabled', media: 'Photos & voice' };
+  model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', enabled: 'Enabled', media: 'Photos & voice' };
 // The editor's sections, in the editor's order: the review groups changes the same way.
 const AI_SECTIONS = [['General', ['name', 'description', 'enabled', 'memory', 'respondToMentions', 'model', 'triggers', 'dm']], ['Instructions', ['prompt']],
   ['People & roles', ['organizers', 'participants']], ['Tool services', ['mcpServers', 'globalMcp', 'tools']], ['Photos & voice', ['media']], ['Changes need confirmation', ['confirm']],
-  ['Scheduled posts', ['schedules']], ['Advanced', ['plugins', 'timezone', 'historySize', 'maxTokens']]];
+  ['Scheduled posts', ['schedules']], ['Advanced', ['timezone', 'historySize', 'maxTokens']]];
 const AI_ORDER = AI_SECTIONS.flatMap(([, f]) => f);
 const sectionOf = (f) => (AI_SECTIONS.find(([, fs]) => fs.includes(f)) || ['Other'])[0];
 const DM_LABEL = { none: 'Nobody', organizers: 'Organizers only', members: 'Members of its groups', anyone: 'Anyone' };
@@ -1895,7 +1892,7 @@ function aiScalar(field, v, ctx) {
 /** List-like fields as [{ k: key, l: readable label, v: value for "changed" checks }]. */
 const AI_LISTS = {
   triggers: (v) => (v || []).map((x) => ({ k: x, l: x })),
-  plugins: (v) => (v || []).map((x) => ({ k: x, l: x })),
+  names: (v) => (v || []).map((x) => ({ k: x, l: x })),
   organizers: (v, c) => (v || []).map((p) => ({ k: String(p).replace(/\D/g, ''), l: personLabel(p, c.names) })),
   participants: (v, c) => (v || []).map((p) => ({ k: String(p).replace(/\D/g, ''), l: personLabel(p, c.names) })),
   mcpServers: (v) => Object.entries(v || {}).map(([k, s]) => ({ k, l: serverLabel(k, s), v: s })),
@@ -1968,7 +1965,7 @@ function changeCard(ch, ctx) {
   } else if (AI_LISTS[ch.field]) {
     const v = listDiffView(AI_LISTS[ch.field](ch.before, ctx), AI_LISTS[ch.field](ch.after, ctx), { describe: ch.field === 'schedules' ? schedChange : null }); body = v.el; head = `${label}: ${v.n}`;
   } else if (ch.field === 'globalMcp') {
-    const v = listDiffView(AI_LISTS.plugins(ch.before?.disabled), AI_LISTS.plugins(ch.after?.disabled), { added: 'Turned off', removed: 'Turned on again' }); body = v.el; head = `${label}: ${v.n.replace('added', 'turned off').replace('removed', 'turned on')}`;
+    const v = listDiffView(AI_LISTS.names(ch.before?.disabled), AI_LISTS.names(ch.after?.disabled), { added: 'Turned off', removed: 'Turned on again' }); body = v.el; head = `${label}: ${v.n.replace('added', 'turned off').replace('removed', 'turned on')}`;
   } else if (ch.field === 'tools') {
     const roles = [['participant', 'Participants may use'], ['organizer', 'Organizers may use'], ['deny', 'Never allowed']];
     const parts = roles.map(([role, t]) => { const f = (v) => (v?.[role] || []).map((x) => ({ k: x, l: ruleLabel(x) })); const a = f(ch.before); const b = f(ch.after);

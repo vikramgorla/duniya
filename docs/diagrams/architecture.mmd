@@ -10,8 +10,6 @@ flowchart TD
   T -- "preview tools" --> CG["Confirm gate:<br/>organizer replies<br/>confirm CODE"]
   M ~~~ MEM
   M ~~~ W
-  DB ~~~ PL
   AG --> MEM["Memory<br/>messages, notes"]
-  AG --> PL["Plugins<br/>optional"]
   AG --> DB[("SQLite<br/>encrypted secrets")]
   P["Panel, app,<br/>admin MCP"] --> DB

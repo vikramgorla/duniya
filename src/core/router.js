@@ -272,21 +272,13 @@ export function createRouter(channel) {
       });
     }
 
-    const role = agent.hooks.role ? (await agent.hooks.role(msg, agent)) || await resolveRole(agent, msg, channel) : await resolveRole(agent, msg, channel);
+    const role = await resolveRole(agent, msg, channel);
     const isConfirm = /^(confirm|cancel)\s+[a-z0-9]{4}$/i.test(lower);
     const addressed = !msg.isGroup
       || (agent.respondToMentions && (msg.mentioned || msg.replyToAgent))
       || !!findTrigger(agent, lower);
     const triggered = addressed || isConfirm;
 
-    // Hooks can observe every routed message and optionally answer without the LLM.
-    if (agent.hooks.onMessage) {
-      const hookReply = await agent.hooks.onMessage({ msg, agent, role, triggered, channel });
-      if (typeof hookReply === 'string' && hookReply) {
-        await deliver(channel, msg, agent, hookReply);
-        return;
-      }
-    }
     if (!triggered) { quiet('not_addressed', agent.id); return; }
     if (rateLimited(`${agent.id}:${msg.phone || msg.senderJid}`)) { quiet('rate_limited', agent.id); return; }
 

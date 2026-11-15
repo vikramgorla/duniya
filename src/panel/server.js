@@ -9,7 +9,7 @@ import {
 } from '../core/store.js';
 import {
   listAgents, getAgent, agentView, createAgent, updateAgent, deleteAgent, bindChat, loadAgents, agentForChat,
-  listTemplates, templateConfig, exportAgent, importAgent, listPlugins,
+  listTemplates, templateConfig, exportAgent, importAgent,
 } from '../core/agents.js';
 import { referencedSecrets } from '../core/schema.js';
 import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages, listNotes } from '../core/db.js';
@@ -223,7 +223,6 @@ export function startPanel({ channel, extend = [] }) {
 
   // ---------- agents ----------
   route('GET', '/api/templates', async () => listTemplates());
-  route('GET', '/api/plugins', async () => listPlugins());
   route('GET', '/api/agents', async () => listAgents().map(agentView));
   route('POST', '/api/agents', async (req, res, body, q, p, user) => {
     const base = body.template ? templateConfig(body.template) : {};
@@ -248,7 +247,7 @@ export function startPanel({ channel, extend = [] }) {
   route('POST', '/api/agents/:id/duplicate', async (req, res, body, q, p, user) => {
     const src = getAgent(p.id);
     if (!src) return [404, { error: 'Not found' }];
-    const { hooks, id, updatedAt, ...config } = src;
+    const { id, updatedAt, ...config } = src;
     guardLocal(user, {}, config);
     const { agent } = await createAgent({ id: body.id, config: { ...config, name: `${config.name} (copy)`, chats: [] }, by: user.username });
     return [201, agentView(agent)];

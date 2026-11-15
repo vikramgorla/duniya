@@ -1,6 +1,13 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.16.0": {
+      "breaking": false,
+      "title": "Code plugins removed",
+      "summary": "The optional code plugins (the plugins/ folder, example-dice) are gone; nobody used them. Agents that still list a plugin keep working: the setting is dropped on the next save. For extra tools, add an MCP tool service.",
+      "data": "unchanged",
+      "docs": "docs/agents.md#tool-services-mcp"
+    },
     "2.10.0": {
       "breaking": false,
       "title": "Confirm codes and provider pauses survive restarts; photos never go to a model that can't see them",

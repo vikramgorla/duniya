@@ -78,7 +78,7 @@ export default function AgentDetail() {
 
       <Card>
         <H2>Tools</H2>
-        {services.length === 0 && !globals.length && !agent.localTools.length ? <Body muted>No tool services: it only talks.</Body> : null}
+        {services.length === 0 && !globals.length ? <Body muted>No tool services: it only talks.</Body> : null}
         {services.map(([name, s]) => (
           <View key={name} style={{ gap: 2 }}>
             <Row><Mono style={{ fontWeight: '600' }}>{name}</Mono><Pill>{s.type === 'local' ? 'on this server' : s.auth === 'oauth' ? 'sign-in' : 'token'}</Pill></Row>
@@ -91,7 +91,6 @@ export default function AgentDetail() {
             <Body small muted>{g.on ? 'Used by this agent' : 'Switched off for this agent (change it in the web panel)'}</Body>
           </View>
         ))}
-        {agent.localTools.length ? <Body small muted>{`Plugin tools: ${agent.localTools.join(', ')}`}</Body> : null}
         <Divider />
         <Rules label="Participants may use" rules={c.tools?.participant} empty="nothing (they can only chat)" />
         <Rules label="Organizers may use" rules={c.tools?.organizer} empty="nothing" />

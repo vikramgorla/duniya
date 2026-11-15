@@ -119,7 +119,7 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 | `src/panel/admin-mcp.js`, `admin-tools.js`, `src/core/admin-oauth.js` | Admin MCP server and its OAuth 2.1 |
 | `bin/duniya.js`, `deploy/duniya` | `duniya` CLI |
 | `install.sh`, `deploy/`, `infra/oci/`, `infra/gcp/`, `Dockerfile` | Installer, root maintenance helper (`deploy/ops/`), OCI stack, GCP script, Docker |
-| `templates/`, `plugins/` | Agent templates (JSON), optional code plugins |
+| `templates/` | Agent templates (JSON) |
 | `mobile/` | Expo app (own `package.json`, not installed on servers) |
 | `test/` | `node:test` e2e tests with fakes (`harness.js`) |
 | `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `ci-checks.mjs`, `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails), `render-diagrams.mjs` (`npm run docs:diagrams`: docs/diagrams/*.mmd → SVG) |

@@ -59,5 +59,4 @@ export function writeJson(file, value, mode = 0o600) {
 }
 
 // Secrets and settings live in the database since 005 (see store.js). Re-exported here for convenience.
-export const PLUGINS_DIR = resolve(ROOT, process.env.PLUGINS_DIR || 'plugins');
 export const TEMPLATES_DIR = resolve(ROOT, process.env.TEMPLATES_DIR || 'templates');

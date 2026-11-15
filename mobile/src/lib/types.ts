@@ -24,13 +24,12 @@ export interface AgentConfig {
   schedules?: { id: string; at: string; days?: string; enabled?: boolean; prompt?: string }[];
   memory?: { enabled?: boolean };
   globalMcp?: { disabled?: string[] };
-  plugins?: string[];
 }
 /** A tool service defined once for all agents (Settings → Tool services in the web panel). */
 export interface GlobalTool { name: string; type: string; on: boolean; replaced: boolean; defaults?: { organizer?: string[]; participant?: string[] } }
 export interface Agent {
   id: string; name: string; description?: string; enabled: boolean; config: AgentConfig; needs: string[];
-  updatedAt?: number; localTools: string[]; missingPlugins: string[]; globalTools?: GlobalTool[];
+  updatedAt?: number; globalTools?: GlobalTool[];
 }
 
 export interface Chat {

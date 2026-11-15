@@ -110,15 +110,6 @@ export async function toolsFor(agent, role) {
     }
   }
 
-  for (const t of agent.hooks?.tools || []) {
-    const fq = `local:${t.name}`;
-    const roles = t.roles || ['organizer', 'participant'];
-    if (!roles.includes(role) || matchesAny(fq, deny)) continue;
-    const name = exposedName('local', t.name);
-    defs.push({ name, description: t.description || '', input_schema: t.input_schema || { type: 'object', properties: {} } });
-    meta.set(name, { kind: 'local', fq, tool: t });
-  }
-
   if (memoryEnabled(agent)) {
     const memAllow = [...allow, ...(MEMORY_DEFAULT_ALLOW[role] || [])];
     for (const t of memoryTools) {

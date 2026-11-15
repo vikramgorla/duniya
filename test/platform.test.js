@@ -65,15 +65,14 @@ test('001/US2: "no idea" style replies are not treated as commands', async () =>
   assert.equal(t.sent.length, 0);
 });
 
-test('001/US3: hook-based agent: local tool + onMessage shortcut', async () => {
-  t.sent.length = 0; t.claudeReqs.length = 0;
-  await t.route(t.msg({ chat: 'g2@g.us', phone: '41790000001', text: '!ping', mentioned: true }));
-  assert.equal(t.sent.at(-1).text, 'pong');
-  assert.equal(t.claudeReqs.length, 0);
-  t.script.push([{ type: 'tool_use', id: 't4', name: 'local__roll_dice', input: { sides: 6 } }], [{ type: 'text', text: 'You rolled it.' }]);
+test('#101: code plugins are gone: an old "plugins" field is dropped quietly, no plugin tools', async () => {
+  t.claudeReqs.length = 0;
+  const { agent, warnings } = await t.agents.updateAgent('helper', { plugins: ['example-dice'] });
+  assert.equal(agent.plugins, undefined);
+  assert.deepEqual(warnings, []);
+  t.script.push([{ type: 'text', text: 'Hi.' }]);
   await t.route(t.msg({ chat: 'g2@g.us', phone: '41790000003', text: '!help roll a die' }));
-  assert.ok(t.toolNames(0).includes('local__roll_dice'));
-  assert.match(JSON.stringify(t.claudeReqs[1].messages.at(-1)), /result/);
+  assert.ok(!t.toolNames(0).some((n) => n.startsWith('local__')));
 });
 
 test('001/US4: DM routing: group member reaches panduga; strangers get nothing', async () => {

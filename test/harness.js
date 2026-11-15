@@ -287,7 +287,7 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
     } });
     await t.agents.createAgent({ id: 'helper', config: {
       name: 'Helper', prompt: 'You help.', model: 'claude-sonnet-5-5', triggers: ['!help'], dm: 'organizers',
-      chats: ['g2@g.us'], organizers: ['41790000001'], plugins: ['example-dice'], ...(bindings.helper || {}),
+      chats: ['g2@g.us'], organizers: ['41790000001'], ...(bindings.helper || {}),
     } });
   }
   // #10: chats are off by default. Tests written before that switch on the chats they use; tests about the

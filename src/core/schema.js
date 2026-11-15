@@ -24,7 +24,6 @@ export const AGENT_DEFAULTS = Object.freeze({
   schedules: [],
   memory: { enabled: true },
   globalMcp: { disabled: [] },
-  plugins: [],
   timezone: '',
   // Photos & voice (043): what the agent does with photos, PDFs and voice notes, and when it answers with voice.
   media: { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', createImages: { organizer: true, participant: false } },
@@ -129,11 +128,14 @@ export function validateServer(key, srv, f = key) {
  * Validate and normalise a full agent config. Unknown fields are dropped and reported in `warnings`.
  * Returns { config, warnings }.
  */
+/** Fields that older versions stored (#101: code plugins were removed): dropped quietly, no warning on every save. */
+const REMOVED_FIELDS = ['plugins'];
+
 export function validateAgentConfig(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) fail('config', 'must be an object');
   const warnings = [];
   for (const k of Object.keys(input)) {
-    if (!(k in AGENT_DEFAULTS) && k !== 'id') warnings.push(`Ignored unknown field "${k}"`);
+    if (!(k in AGENT_DEFAULTS) && k !== 'id' && !REMOVED_FIELDS.includes(k)) warnings.push(`Ignored unknown field "${k}"`);
   }
   const c = { ...structuredClone(AGENT_DEFAULTS), ...input };
   const out = {};
@@ -216,8 +218,6 @@ export function validateAgentConfig(input) {
   out.media = { photos: flag('photos'), documents: flag('documents'), stickers: flag('stickers'), voiceNotes: flag('voiceNotes'), voiceReply,
     createImages: { organizer: md.createImages?.organizer === undefined ? mdef.createImages.organizer : !!md.createImages.organizer,
       participant: md.createImages?.participant === undefined ? mdef.createImages.participant : !!md.createImages.participant } };
-  out.plugins = [...new Set(list(c.plugins, 'plugins'))];
-  for (const p of out.plugins) if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(p)) fail('plugins', `"${p}" is not a valid plugin name`);
   return { config: out, warnings };
 }
 

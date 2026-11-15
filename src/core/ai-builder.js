@@ -3,14 +3,14 @@
 // admin applies it (constitution IV/VIII). Group bindings and local tool services are never changed by the helper.
 import { chat as modelChat } from './providers/index.js';
 import { validateAgentConfig, AGENT_DEFAULTS } from './schema.js';
-import { listTemplates, listPlugins } from './agents.js';
+import { listTemplates } from './agents.js';
 import { organizerConnection, effectiveServers, serverConnection } from './tools.js';
 import { globalServers } from './global-mcp.js';
 import { GLOBAL_SCOPE } from './mcp-oauth.js';
 import { activity } from './events.js';
 
 const EDITABLE = ['name', 'description', 'prompt', 'triggers', 'respondToMentions', 'dm', 'organizers', 'participants',
-  'mcpServers', 'globalMcp', 'tools', 'confirm', 'schedules', 'memory', 'model', 'timezone', 'historySize', 'maxTokens', 'plugins', 'enabled', 'media'];
+  'mcpServers', 'globalMcp', 'tools', 'confirm', 'schedules', 'memory', 'model', 'timezone', 'historySize', 'maxTokens', 'enabled', 'media'];
 
 const TOOL = {
   name: 'propose_agent',
@@ -38,7 +38,7 @@ const GUIDE = `You configure WhatsApp assistant agents on a self-hosted platform
 - confirm: {preview:"server:*_preview", tool:"server:confirm"} when a service uses preview/confirm for changes, else null.
 - schedules: [{id, at:"HH:MM", days:"daily"|"mon,wed,…", prompt, enabled}] — the agent posts the result of prompt to its chats.
 - media: {photos, documents, stickers, voiceNotes: true|false, voiceReply: "never"|"voice"|"always", createImages: {organizer: bool, participant: bool}} — photos & voice (look at photos, read PDFs, listen to voice notes, answer with voice notes, who may ask for pictures).
-- memory: {enabled: true|false}; model: "auto" | "provider:auto" | "provider:model"; timezone (IANA); historySize (recent messages in context, 5–200); maxTokens (reply length); plugins (names); enabled.
+- memory: {enabled: true|false}; model: "auto" | "provider:auto" | "provider:model"; timezone (IANA); historySize (recent messages in context, 5–200); maxTokens (reply length); enabled.
 Rules: change only what the request needs; return complete values for each changed field; keep secrets as \${NAME} references; never add people you were not told about except when the request asks to use group admins; keep instructions in the language the admin writes in unless asked otherwise.`;
 
 async function toolInventory(agent) {
@@ -72,7 +72,6 @@ export async function draftAgent({ agent = null, request, model = 'auto', people
     toolServices: await toolInventory(agent),
     groupMembers: people.slice(0, 200),
     templates: listTemplates().map((t) => ({ id: t.id, name: t.name, description: t.description })),
-    plugins: listPlugins().map((p) => p.name || p),
   };
   const messages = [{ role: 'user', content: `Context (JSON):\n${JSON.stringify(context, null, 1)}\n\nAdmin's request:\n${text}` }];
   let lastError = '';
