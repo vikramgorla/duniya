@@ -114,6 +114,14 @@ It needs the panel reachable over public HTTPS (Caddy or Cloudflare Tunnel). Beh
 client registration, PKCE S256, resource-bound tokens (access 1 h, refresh 30 days with rotation), see
 `specs/017-admin-mcp/`.
 
+## Mobile app (preview)
+
+A native iOS and Android app (React Native with Expo) for owners and admins: status, agents, chats, activity, usage,
+server updates and waiting confirmations. While in preview it runs in **Expo Go**: open **Settings → Mobile app** in
+the panel and follow the three steps (install Expo Go, open the app, scan the connect QR code). The app signs in with
+your panel account through the panel's own OAuth sign-in and can do what your account can do. Developer notes and
+store-build instructions: [`mobile/README.md`](mobile/README.md). The server never installs `mobile/`.
+
 ## How it works
 
 ```
