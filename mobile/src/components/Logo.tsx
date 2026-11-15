@@ -1,24 +1,20 @@
-// The Duniya mark: five people in a circle, each a different colour, around the world (ink dot). Same geometry as
-// logo() in the panel (src/panel/public/index.html).
-import Svg, { Circle, G, Path } from 'react-native-svg';
-import { useTheme } from '@/lib/theme';
+// The Duniya mark: a friendly robot in a chat bubble. Same geometry as docs/site/img/logo.svg and logo() in the
+// panel (src/panel/public/index.html). Fixed colours in both themes: the white fill keeps it readable on dark.
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
-export function Logo({ size = 32, color }: { size?: number; color?: string }) {
-  const t = useTheme();
+const INK = '#101216';
+
+export function Logo({ size = 32 }: { size?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 32 32" accessibilityLabel="Duniya">
-      <Circle cx={16} cy={16} r={3.1} fill={color || t.ink} />
-      {t.people.map((c, i) => {
-        const th = -90 + i * 72; const r = (th * Math.PI) / 180;
-        return (
-          <G key={c}>
-            <Circle cx={16 + 12.2 * Math.cos(r)} cy={16 + 12.2 * Math.sin(r)} r={2.5} fill={c} />
-            <G transform={`translate(${16 + 6.6 * Math.cos(r)} ${16 + 6.6 * Math.sin(r)}) rotate(${th + 90})`}>
-              <Path d="M-3.7 2.2a3.7 3.7 0 0 1 7.4 0z" fill={c} />
-            </G>
-          </G>
-        );
-      })}
+    <Svg width={size} height={size} viewBox="0 0 64 64" accessibilityLabel="Duniya">
+      <Path d="M24.6 52.6A23 23 0 1 0 12.6 42.5L7.6 57.4Z" fill="#fff" stroke="#1ea446" strokeWidth={4} strokeLinejoin="round" />
+      <Rect x={14.5} y={29} width={8} height={12} rx={3.6} fill={INK} />
+      <Rect x={42.5} y={29} width={8} height={12} rx={3.6} fill={INK} />
+      <Circle cx={32.5} cy={15} r={2.5} fill={INK} />
+      <Path d="M32.5 17v6" stroke={INK} strokeWidth={2.4} strokeLinecap="round" />
+      <Rect x={20} y={23} width={25} height={24} rx={11.5} fill="#fff" stroke={INK} strokeWidth={2.4} />
+      <Rect x={22.5} y={30} width={20} height={11} rx={5.5} fill={INK} />
+      <Path d="M25 37a2.6 2.6 0 0 1 5.2 0M34.8 37a2.6 2.6 0 0 1 5.2 0" fill="none" stroke="#c6f432" strokeWidth={1.8} strokeLinecap="round" />
     </Svg>
   );
 }

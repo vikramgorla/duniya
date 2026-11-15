@@ -29,10 +29,24 @@ add or change UI, check it against the principles and the checklist at the end.
 Futuristic but human. Inspired by the friendliness of modern AI assistants, **not** a copy of any of them, and
 deliberately not the generic "AI app" look (no purple-blue gradients everywhere, no glass on every surface, no ✨).
 
-- **Mark:** five people in a circle, each a different colour, around the world (an ink dot) — Duniya, a world of
-  people (`logo()`, favicon). The five "people" colours are only used in the mark and in illustrations:
-  `--people-1` saffron `#ff7a3d`, `--people-2` rose `#f2477e`, `--people-3` teal `#13b3a1`, `--people-4` indigo
-  `#5363ff`, `--people-5` lime `#9bd400`.
+- **Mark:** a friendly robot in a chat bubble — an assistant that lives in your chats. A round speech bubble
+  (thick green `#1ea446` outline, white fill, tail at lower left) holds an ink (`#101216`) robot head: rounded helmet
+  with ear pads, a short antenna with a ball, a dark visor with two smiling lime (`--signal #c6f432`) arc eyes.
+  - **Files:** master `docs/site/img/logo.svg` (64-unit grid, transparent); small variant
+    `docs/site/img/logo-small.svg` for 16–32 px (thicker bubble, solid head without the helmet ring, bigger eyes).
+    The same geometry is in `logo()` (panel), `Logo.tsx` (mobile), the consent pages (`admin-mcp.js`) and the
+    install progress page (`infra/oci/bootstrap.sh`). Mobile PNGs in `mobile/assets` are rendered from the master.
+  - **Colours are fixed** in light and dark mode: the white fill keeps the ink robot readable on dark grounds. Lime
+    eyes on the ink visor read on both.
+  - **Sizes:** small variant at 16–32 px (favicons); master from 30 px up (header 30–32 px, sign-in 76 px, consent
+    page 40 px). App icons: mark at 80 % of the canvas on porcelain (iOS), 60 % on the adaptive-icon foreground.
+  - **Clear space:** at least the bubble outline width × 2 (⅛ of the mark) on every side; never crop the tail.
+  - **Don't:** recolour the bubble or the robot, swap the eyes for another colour, add gradients, shadows or
+    outlines, stretch or rotate it, put it in another shape, place it on busy photos, or redraw it from the old
+    people-circle mark. Green bubble + chat shape is close to WhatsApp's mark: never pair it with WhatsApp's name or
+    logo as if official (Duniya is not affiliated with WhatsApp or Meta).
+  - Illustrations (site hero orbit, chat mock avatars) may still use the five "people" colours: saffron `#ff7a3d`,
+    rose `#f2477e`, teal `#13b3a1`, indigo `#5363ff`, lime `#9bd400`.
 - **Ground:** porcelain `#f2f1ec` with a faint 22 px dot grid (dark: near-black `#0b0c0f`); solid white cards
   (dark `#121419`), hairline borders, a soft shadow; 16 px card radius, 10 px controls.
 - **Ink + one signal:** primary actions and the active tab are **ink** (`#101216`); the single signal colour is

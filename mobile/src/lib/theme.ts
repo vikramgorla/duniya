@@ -2,7 +2,6 @@
 import { Platform, useColorScheme } from 'react-native';
 
 const shared = {
-  people: ['#ff7a3d', '#f2477e', '#5363ff', '#13b3a1', '#9bd400'], // saffron, rose, indigo, teal, lime (logo order)
   signal: '#c6f432',
   radius: 16,
   radiusS: 10,
