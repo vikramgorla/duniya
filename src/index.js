@@ -13,6 +13,9 @@ import { startMetrics } from './core/system.js';
 import { startRuntimeFile } from './core/runtime.js';
 import { startWebAccess } from './core/webaccess.js';
 import { startResourceWatch, serverSize } from './core/resources.js';
+import { createMemberTagHandler } from './core/member-tags.js';
+import { historyPhoneOnline, resumeHistoryRetries } from './core/history-load.js';
+import { markGroupDue } from './core/upkeep.js';
 
 await loadAgents();
 { const s = serverSize(); console.log(`Server: ${s.size} (${s.effectiveMb} MB RAM${s.cgroupLimitMb ? ' container limit' : ''}, ${s.cpus} CPU)`); }
@@ -21,7 +24,10 @@ console.log(`Agents: ${listAgents().map((b) => `${b.id}${b.enabled ? '' : ' (dis
 
 const whatsapp = createChannelRegistry();
 startPanel({ channel: whatsapp, extend: [providerRoutes, backupRoutes, updateRoutes] });
-await whatsapp.start(createRouter(whatsapp), { onHistory: createHistoryHandler(), onJoin: createJoinHandler(whatsapp) });
+const router = createRouter(whatsapp); // sets the history channel before retries resume
+resumeHistoryRetries(); // 057: history loads the phone did not answer retry by themselves, also after a restart
+await whatsapp.start(router, { onHistory: createHistoryHandler(), onJoin: createJoinHandler(whatsapp),
+  onMemberTag: createMemberTagHandler(), onPhoneActive: () => historyPhoneOnline(), onGroupChange: (ev) => markGroupDue(ev.chat) });
 startScheduler(whatsapp);
 startBackupScheduler();
 startUpdateScheduler();

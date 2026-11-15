@@ -19,6 +19,10 @@ db.exec(`
     tool TEXT, chat TEXT, requester TEXT, summary TEXT, expires INTEGER
   );
   CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
+  CREATE TABLE IF NOT EXISTS member_tags (
+    chat TEXT NOT NULL, member TEXT NOT NULL, phone TEXT NOT NULL DEFAULT '', label TEXT NOT NULL DEFAULT '', ts INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (chat, member)
+  );
   CREATE TABLE IF NOT EXISTS chat_memory (
     chat TEXT PRIMARY KEY, summary TEXT, upto_id INTEGER DEFAULT 0, updated_at INTEGER
   );
@@ -141,6 +145,7 @@ export function eraseChat(chat) {
   db.prepare('DELETE FROM wa_polls WHERE chat = ?').run(chat);
   db.prepare('DELETE FROM chat_memory WHERE chat = ?').run(chat);
   db.prepare('DELETE FROM notes WHERE chat = ?').run(chat);
+  db.prepare('DELETE FROM member_tags WHERE chat = ?').run(chat);
 }
 
 // ---- activity log (what the panel shows) ----
@@ -207,7 +212,7 @@ export function listMessages(chat, { before = 0, limit = 50, q = '' } = {}) {
   const args = [chat]; let where = 'chat = ?';
   if (Number(before)) { where += ' AND id < ?'; args.push(Number(before)); }
   if (q) { where += ' AND text LIKE ?'; args.push(`%${String(q).slice(0, 100)}%`); }
-  return db.prepare(`SELECT id, sender, name, text, quoted, from_agent AS fromAgent, addressed, ts FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim)
+  return db.prepare(`SELECT id, sender, sender_jid AS senderJid, name, text, quoted, from_agent AS fromAgent, addressed, ts FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim)
     .map((m) => ({ ...m, fromAgent: !!m.fromAgent, addressed: !!m.addressed }));
 }
 

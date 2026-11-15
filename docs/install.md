@@ -121,7 +121,7 @@ Installer servers. Cloud and Docker: [Oracle](deploy/oci-free-tier.md) · [Googl
 
 Keeps all data, the WhatsApp link and the web address.
 
-1. Panel → **Overview** → **Server** card → **Updates** → **Check now**.
+1. Panel → **Overview** → **Server** card → **Updates** (a server set up with the installer looks for new versions by itself every 10 minutes; **Check now** is optional).
 2. **Update to vX.Y.Z** → confirm. Agents pause for about a minute; the page reloads by itself.
 3. Optional: **Update settings** → *Install automatically* at a time of day, or *Off*.
 

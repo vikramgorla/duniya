@@ -161,10 +161,15 @@ chat's newest message are kept). When you switch a chat **on**, the server asks 
 (default 50; *When a chat is switched on, load its last …* on **Chats**, 0–200) and builds the running summary from
 them. The chat row shows *Loading recent messages from your phone…*, then *Loaded N earlier messages*.
 
-- **Load recent messages** on a chat that is on asks for the messages before the oldest stored one (again for older
-  ones; at most every 30 s). Admin MCP: `load_chat_history`.
 - The phone must be **online** (WhatsApp answers from the phone, not from the server). No answer within a minute →
-  *Your phone didn't send history (keep it online and try again)*.
+  *Waiting for your phone to send recent messages. Will retry automatically…*: the server tries again by itself after
+  2 min, 15 min, 1 h, 6 h and then daily for three days, and right away (within a minute) when your phone shows it is
+  online (the number reconnects, or you write from the phone). It stops once messages arrive or the chat is switched
+  off. Nothing to click.
+- A chat switched on before any of its messages reached the server loads its recent messages by itself after the next
+  message.
+- **Load recent messages** (optional) asks now for the messages before the oldest stored one (again for older ones; at
+  most every 30 s). Admin MCP: `load_chat_history`.
 - The agent is told what it has ("12 stored messages since 3 Nov …", or "none yet") and says so instead of guessing.
 
 > [!NOTE]
@@ -175,6 +180,50 @@ them. The chat row shows *Loading recent messages from your phone…*, then *Loa
 Names synced from the linked phone(s) plus your own entries with notes (**Contacts**). Agents look people up
 (`contacts__find_contact`): participants only see contacts marked **Shared**; organizers see all and can save or
 remove entries.
+
+### Which name is shown
+
+Wherever the panel shows a person (agent page people list, Chats, a group's members, stored messages, Activity, the
+owner assistant, the mobile app), one rule picks the name:
+
+<p align="center"><img src="diagrams/contact-names.svg" alt="Which name is shown: for a hidden id (LID) the number WhatsApp shared is looked up first; then the first known of: the name you set in Duniya, the phone contact name from your address book, the business name, the profile name the person chose, else +number or Unknown (hidden number). Member tags come per group from each message the person sends, tag changes, loaded history and the group member list" width="483"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. If WhatsApp shows the person only by a hidden id (LID), look up the number WhatsApp shared for it (the pair can
+   arrive later; names are matched up then).
+2. Use the first name known: the name you set in Duniya, then the phone contact name (your address book), then a
+   WhatsApp Business name, then the profile name the person chose.
+3. Otherwise show `+number`, or *Unknown (hidden number)* when WhatsApp hides it.
+4. Member tags are kept per group (chats that are on only), from each message the person sends, tag changes, loaded
+   history and the group member list.
+
+</details>
+
+- **Phone contact names refresh by themselves**: after a number connects (once fully, then only what changed) and
+  once a day. **Contacts** shows how many names of each kind are known and when they were last refreshed;
+  **Refresh now** is optional. Admin MCP: `contact_names_status`, `refresh_contact_names`.
+- A profile-name change never replaces the name from your address book (both are kept; the row says which one is shown).
+- People WhatsApp shows only by a hidden id are listed as *Unknown (hidden number)* (or their profile name) until
+  WhatsApp shares the number; roles need a number.
+- **Agents never see your address-book names**: they see the profile name people chose (or what they were called in the
+  chat), so a private label in your phone cannot leak into a group.
+
+### Group member tags
+
+WhatsApp lets group members carry a tag ("Driver", "Treasurer"). For chats that are **on**, Duniya keeps each member's
+tag and shows it next to their name (agent page, group members, stored messages). Agents get it as context about who
+is speaking: *New message from Priya (tag: Driver)*, and in the recent messages.
+
+- A tag shows up as soon as the person writes in the group (WhatsApp sends it with each message), when it changes,
+  from history loaded from your phone, and from the group member list (read when the chat is switched on, after
+  members change and every 12 hours).
+- Removed tags disappear; the newest information wins.
+- Chats that are off: no tags are stored. Erasing a chat's memory erases its tags.
+
+> [!NOTE]
+> WhatsApp has no documented way to ask for every member's tag. Members who have not written since the group was
+> switched on may show no tag until they do (or until the member list carries it).
 
 ## Several WhatsApp numbers and direct messages
 

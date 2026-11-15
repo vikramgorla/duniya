@@ -83,7 +83,7 @@ test('the agent is told what history it has', async () => {
   t.chatPrefs.setChatPrefs('g2@g.us', { enabled: true });
   t.script.push([{ type: 'text', text: 'ok' }]);
   await t.route(t.msg({ chat: 'g2@g.us', msgId: 'ask2', text: '!help what happened before?', phone: '41790000001' }));
-  assert.match(t.userTurn(t.claudeReqs.length - 1), /Stored history of this chat: none yet.*Load recent messages/s);
+  assert.match(t.userTurn(t.claudeReqs.length - 1), /Stored history of this chat: none yet.*load from the linked phone automatically/s);
 });
 
 test('Load recent messages: pages further back, is rate-limited, needs the chat on, and admins only', async () => {
@@ -145,6 +145,59 @@ test('phone offline: no answer → the status says so; a person\'s chat is loade
   await t.api(owner, 'PUT', `/api/chats/${enc('g6@g.us')}/prefs`, { enabled: true });
   assert.equal(t.historyAsks.length, asks);
   await t.api(owner, 'POST', '/api/settings', { historyLoadCount: 50 });
+});
+
+test('057: an unanswered load retries by itself — backoff due times on the shared tick, sooner when the phone is online', async () => {
+  hl.resetHistoryLoads();
+  const E = '41790000003@s.whatsapp.net';
+  t.chatPrefs.setChatPrefs(E, { enabled: true });
+  t.phone.chats[E] = phoneMsgs(E, 4, { prefix: 'e' });
+  await t.onHistory(t.phone.chats[E].slice(-1)); // a key to anchor on
+  t.phone.online = false;
+  await hl.loadChatHistory(E, { reason: 'switch_on' });
+  let s = await settle(E);
+  assert.equal(s.state, 'no_response');
+  assert.ok(s.automatic && s.retryAt > Date.now() + 60000 && s.retryAt < Date.now() + 3 * 60000, 'first retry in about 2 minutes');
+  assert.ok(JSON.parse(t.db.kvGet('historyRetries'))[E], 'the due time survives a restart');
+  assert.equal(await hl.historyRetryTick(), 0, 'not due yet: the tick does nothing');
+  // the tick runs it when due (no timer of its own); still offline → next step of the backoff (15 min)
+  const asks = t.historyAsks.length;
+  assert.equal(await hl.historyRetryTick(Date.now() + 3 * 60000), 1);
+  assert.equal(t.historyAsks.length, asks + 1);
+  s = await settle(E);
+  assert.equal(s.state, 'no_response');
+  assert.ok(s.retryAt > Date.now() + 14 * 60000, 'backoff grows');
+  // the phone comes online (e.g. the owner writes from it): due now, the next tick loads, retries stop
+  t.phone.online = true;
+  hl.historyPhoneOnline();
+  assert.ok((await status(E)).retryAt < Date.now() + 61000, 'due about a minute after the last try, not in 15 minutes');
+  await hl.historyRetryTick(Date.now() + 61000);
+  s = await settle(E);
+  assert.equal(s.state, 'loaded');
+  assert.equal(s.loaded, 3);
+  assert.ok(!s.retryAt);
+  assert.ok(!JSON.parse(t.db.kvGet('historyRetries'))[E]);
+  // a chat switched off drops its retry
+  t.phone.online = false;
+  hl.resetHistoryLoads();
+  t.chatPrefs.setChatPrefs('g7@g.us', { enabled: true });
+  await t.onHistory([t.msg({ chat: 'g7@g.us', msgId: 'k7', ts: Date.now() - 1000, text: 'x' })]);
+  await hl.loadChatHistory('g7@g.us', { reason: 'switch_on' });
+  await settle('g7@g.us');
+  t.chatPrefs.setChatPrefs('g7@g.us', { enabled: false });
+  const n = t.historyAsks.length;
+  assert.equal(await hl.historyRetryTick(Date.now() + 3 * 60000), 0);
+  assert.equal(t.historyAsks.length, n, 'off chats are never asked');
+  t.phone.online = true;
+  // no_anchor: the next message of the chat starts the load by itself
+  hl.resetHistoryLoads();
+  t.chatPrefs.setChatPrefs('g8@g.us', { enabled: true });
+  assert.equal((await hl.loadChatHistory('g8@g.us', { reason: 'switch_on' })).state, 'no_anchor');
+  await t.route(t.msg({ chat: 'g8@g.us', msgId: 'g8-first', text: 'hello' }));
+  const m = t.historyAsks.length;
+  await hl.historyRetryTick();
+  assert.equal(t.historyAsks.length, m + 1);
+  assert.equal(t.historyAsks.at(-1).anchor.msgId, 'g8-first');
 });
 
 test('admin MCP tool load_chat_history; the owner assistant runs it without a confirm code (logged)', async () => {

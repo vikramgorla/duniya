@@ -8,6 +8,7 @@
 // - Its own conversation is stored in `owner_messages` (never in group/agent memory or cross-chat search).
 // - Audit: every question (clipped) and every tool call or action is recorded in Activity (`owner.*`, always on).
 import { db, peekPending, getChatMemory } from './db.js';
+import { chatTitle, personInfo } from './contacts.js';
 import { env, digits } from './config.js';
 import { getSetting, updateSettings, getUser, onUserDeleted, TENANT } from './store.js';
 import { listAgents, agentForChat } from './agents.js';
@@ -142,7 +143,7 @@ export function hideChats(v, hidden) {
 }
 
 async function chatNames() {
-  const names = new Map(seenChats().map((c) => [c.id, c.name || (c.phone ? `+${c.phone}` : '')]));
+  const names = new Map(seenChats().map((c) => [c.id, chatTitle(c)])); // 057: one resolver for people
   try { for (const g of await whatsappChannel()?.listChats?.() || []) names.set(g.id, g.name); } catch { /* offline */ }
   return names;
 }
@@ -157,7 +158,7 @@ function parseSince(v, fallbackMs = 7 * 86400000) {
 }
 const iso = (ts) => (ts ? new Date(ts).toISOString() : null);
 const like = (q) => `%${String(q).replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
-const msgLine = (m, names) => ({ chat: m.chat, chatName: names.get(m.chat) || m.chat, time: iso(m.ts), from: m.from_agent ? 'Assistant' : m.name || (m.sender ? `+${m.sender}` : 'someone'), text: clip(m.text, 400) });
+const msgLine = (m, names) => ({ chat: m.chat, chatName: names.get(m.chat) || m.chat, time: iso(m.ts), from: m.from_agent ? 'Assistant' : personInfo({ phone: m.sender, jid: m.sender_jid, fallbackName: m.name }).label, text: clip(m.text, 400) });
 
 /** Cross-chat read tools (core). role = minimum panel role. */
 const CORE_TOOLS = [

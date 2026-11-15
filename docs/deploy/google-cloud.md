@@ -91,8 +91,8 @@ Enter the **setup code** (with `--admin-password`: sign in as `admin`).
 
 Nothing to do in Google Cloud: the app updates itself and **keeps everything**.
 
-1. Panel → **Overview** → **Server** card → **Updates**.
-2. **Check now** → **Update to vX.Y.Z** → confirm. Agents pause about a minute.
+1. Panel → **Overview** → **Server** card → **Updates** (new versions show up by themselves; **Check now** is optional).
+2. **Update to vX.Y.Z** → confirm. Agents pause about a minute.
 3. Optional: **Update settings** → *Install automatically*.
 
 Or `gcloud compute ssh duniya --zone us-central1-a -- sudo duniya update`. OS: **Server → OS updates &

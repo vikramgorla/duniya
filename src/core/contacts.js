@@ -1,6 +1,15 @@
-// Contacts (issue #11): names synced from the linked WhatsApp phone(s) plus the owner's own entries.
+// Contacts (issue #11, #110): names synced from the linked WhatsApp phone(s) plus the owner's own entries.
 // Agents look contacts up with contacts__find_contact. Participants only ever see contacts marked shared;
 // organizers see all and manage them (owner decision on #11). Synced contacts are never shared by default.
+//
+// 057 (#110): WhatsApp gives three kinds of names and they are kept apart, so a later profile-name update never
+// replaces the name from the owner's address book:
+//   book_name — the owner's phone address book (app-state contact sync, history chats)
+//   biz_name  — a WhatsApp Business verified name
+//   push_name — the profile name the person chose (sent with every message)
+// One resolver (personInfo) decides what the panel shows: own name > address book > business > profile > number.
+// People WhatsApp only identifies by a LID (hidden number) are kept in contact_lids until the LID↔phone mapping
+// arrives; then their names move to the phone's row. A raw LID is never shown as if it were a number.
 import { db } from './db.js';
 import { digits } from './config.js';
 import { activity } from './events.js';
@@ -8,78 +17,176 @@ import { activity } from './events.js';
 const TENANT = 'default';
 db.exec(`
   CREATE TABLE IF NOT EXISTS contacts (
-    tenant_id TEXT NOT NULL, phone TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', wa_name TEXT NOT NULL DEFAULT '',
+    tenant_id TEXT NOT NULL, phone TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', book_name TEXT NOT NULL DEFAULT '',
+    biz_name TEXT NOT NULL DEFAULT '', push_name TEXT NOT NULL DEFAULT '',
     note TEXT NOT NULL DEFAULT '', shared INTEGER NOT NULL DEFAULT 0, own INTEGER NOT NULL DEFAULT 0, updated_at INTEGER,
     PRIMARY KEY (tenant_id, phone)
   );
+  CREATE TABLE IF NOT EXISTS contact_lids (
+    tenant_id TEXT NOT NULL, lid TEXT NOT NULL, phone TEXT NOT NULL DEFAULT '', book_name TEXT NOT NULL DEFAULT '',
+    biz_name TEXT NOT NULL DEFAULT '', push_name TEXT NOT NULL DEFAULT '', updated_at INTEGER,
+    PRIMARY KEY (tenant_id, lid)
+  );
 `);
+// 057 migration: one wa_name column → separate names. We cannot tell which kind an old wa_name was, so it becomes the
+// profile name; the first address-book refresh after the update fills in the book names again.
+{
+  const cols = db.prepare('PRAGMA table_info(contacts)').all().map((c) => c.name);
+  for (const c of ['book_name', 'biz_name', 'push_name']) if (!cols.includes(c)) db.exec(`ALTER TABLE contacts ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`);
+  if (cols.includes('wa_name')) {
+    db.exec("UPDATE contacts SET push_name = wa_name WHERE push_name = '' AND wa_name <> ''");
+    db.exec('ALTER TABLE contacts DROP COLUMN wa_name');
+  }
+}
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
+export const HIDDEN_NUMBER = 'Unknown (hidden number)';
+const synced = (r) => r.book_name || r.biz_name || r.push_name || '';
 const view = (r) => ({
-  phone: r.phone, name: r.name || r.wa_name || `+${r.phone}`, ownName: r.name, whatsappName: r.wa_name, note: r.note,
-  shared: !!r.shared, source: r.own ? (r.wa_name ? 'both' : 'own') : 'whatsapp', updatedAt: r.updated_at,
+  phone: r.phone, name: r.name || synced(r) || `+${r.phone}`, ownName: r.name, whatsappName: synced(r),
+  bookName: r.book_name, businessName: r.biz_name, profileName: r.push_name, note: r.note,
+  shared: !!r.shared, source: r.own ? (synced(r) ? 'both' : 'own') : 'whatsapp', updatedAt: r.updated_at,
 });
 const normPhone = (p) => {
   const d = digits(p);
   if (d.length < 6 || d.length > 15) fail(`"${p}" is not a phone number with country code`);
   return d;
 };
+const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+/** user part of a jid without device: "123:4@lid" → "123@lid". */
+const bareJid = (j) => { const s = String(j || ''); const at = s.indexOf('@'); return at < 0 ? '' : `${s.slice(0, at).split(':')[0]}${s.slice(at)}`; };
+export const isLid = (j) => /@(lid|hosted\.lid)$/.test(String(j || ''));
+const isPn = (j) => /@(s\.whatsapp\.net|c\.us|hosted)$/.test(String(j || ''));
+const pnDigits = (j) => (isPn(j) ? digits(String(j).split('@')[0].split(':')[0]) : '');
 
-/** Contacts from Baileys (contacts.upsert / history): { id, phoneNumber?, name?, notify?, verifiedName? }. */
+const getRow = db.prepare('SELECT * FROM contacts WHERE tenant_id = ? AND phone = ?');
+const getLid = db.prepare('SELECT * FROM contact_lids WHERE tenant_id = ? AND lid = ?');
+const NAME_COLS = { book: 'book_name', biz: 'biz_name', push: 'push_name' };
+const upPhone = Object.fromEntries(Object.entries(NAME_COLS).map(([k, col]) => [k, db.prepare(`INSERT INTO contacts (tenant_id, phone, ${col}, updated_at) VALUES (?, ?, ?, ?)
+  ON CONFLICT (tenant_id, phone) DO UPDATE SET ${col} = excluded.${col}, updated_at = excluded.updated_at WHERE contacts.${col} <> excluded.${col}`)]));
+const upLid = Object.fromEntries(Object.entries(NAME_COLS).map(([k, col]) => [k, db.prepare(`INSERT INTO contact_lids (tenant_id, lid, ${col}, updated_at) VALUES (?, ?, ?, ?)
+  ON CONFLICT (tenant_id, lid) DO UPDATE SET ${col} = excluded.${col}, updated_at = excluded.updated_at WHERE contact_lids.${col} <> excluded.${col}`)]));
+const setLidPhone = db.prepare(`INSERT INTO contact_lids (tenant_id, lid, phone, updated_at) VALUES (?, ?, ?, ?)
+  ON CONFLICT (tenant_id, lid) DO UPDATE SET phone = excluded.phone, updated_at = excluded.updated_at WHERE contact_lids.phone <> excluded.phone`);
+
+/**
+ * Remember that a LID belongs to a phone number (from Baileys' lid-mapping.update, history mappings, contacts with
+ * both, message keys with participantAlt, group metadata). Names that arrived for the LID move to the phone's row.
+ * Returns true when something changed.
+ */
+export function mapLid(lid, phone) {
+  const l = bareJid(lid); const p = digits(String(phone || '').split('@')[0].split(':')[0]);
+  if (!isLid(l) || p.length < 6 || p.length > 15) return false;
+  const changed = setLidPhone.run(TENANT, l, p, Date.now()).changes > 0;
+  const r = getLid.get(TENANT, l);
+  let moved = 0;
+  for (const [k, col] of Object.entries(NAME_COLS)) if (r?.[col]) moved += upPhone[k].run(TENANT, p, r[col], Date.now()).changes;
+  return changed || moved > 0;
+}
+/** Phone digits of a LID when the mapping is known, else ''. */
+export const lidPhone = (lid) => (isLid(lid) ? getLid.get(TENANT, bareJid(lid))?.phone || '' : '');
+
+/**
+ * Contacts from Baileys (contacts.upsert / contacts.update / history): { id, lid?, phoneNumber?, name?, notify?,
+ * verifiedName? }. `name` is the address-book name (app-state contact sync, history chats), `verifiedName` the
+ * business name, `notify` the profile name. Each kind only replaces the same kind. Returns the number of changes.
+ */
 export function syncWhatsAppContacts(list = []) {
-  const up = db.prepare(`INSERT INTO contacts (tenant_id, phone, wa_name, updated_at) VALUES (?, ?, ?, ?)
-    ON CONFLICT (tenant_id, phone) DO UPDATE SET wa_name = excluded.wa_name, updated_at = excluded.updated_at
-    WHERE excluded.wa_name <> '' AND excluded.wa_name <> contacts.wa_name`);
   let n = 0;
-  for (const c of list) {
-    const id = String(c?.id || '');
-    const phone = id.endsWith('@s.whatsapp.net') ? digits(id.split('@')[0].split(':')[0]) : digits(String(c?.phoneNumber || '').split('@')[0]);
-    const name = String(c?.name || c?.verifiedName || c?.notify || '').trim().slice(0, 100);
-    if (phone.length < 6 || !name) continue;
-    n += up.run(TENANT, phone, name, Date.now()).changes;
-  }
+  db.exec('BEGIN');
+  try {
+    for (const c of list) {
+      const id = bareJid(c?.id);
+      const lid = [id, bareJid(c?.lid)].find(isLid) || '';
+      const phone = pnDigits(id) || pnDigits(bareJid(c?.phoneNumber)) || (lid ? lidPhone(lid) : '');
+      if (lid && phone) mapLid(lid, phone);
+      const names = { book: clean(c?.name), biz: clean(c?.verifiedName), push: clean(c?.notify) };
+      for (const [k, v] of Object.entries(names)) {
+        if (!v || /^\+?\d[\d\s]{5,}$/.test(v)) continue; // a "name" that is only a number adds nothing
+        if (phone.length >= 6) n += upPhone[k].run(TENANT, phone, v, Date.now()).changes;
+        else if (lid) n += upLid[k].run(TENANT, lid, v, Date.now()).changes;
+      }
+    }
+    db.exec('COMMIT');
+  } catch (e) { db.exec('ROLLBACK'); throw e; }
   return n;
+}
+/** LIDs with names but no phone yet (the channel asks Baileys for their mapping). */
+export const unmappedLids = (limit = 500) => db.prepare("SELECT lid FROM contact_lids WHERE tenant_id = ? AND phone = '' LIMIT ?").all(TENANT, limit).map((r) => r.lid);
+
+/**
+ * The one resolver for showing a person (057). Give what you know: phone digits, the WhatsApp jid (PN or LID) and a
+ * fallback name (e.g. the profile name seen with a message). Returns { phone, name, label, source, hidden }:
+ * name '' when nothing is known; label is what to show (name, else +number, else "Unknown (hidden number)").
+ * source: own | book | business | profile | seen | ''. Address-book names stay in the panel: agents get profile names.
+ */
+export function personInfo({ phone = '', jid = '', fallbackName = '' } = {}) {
+  const j = bareJid(jid);
+  const p = digits(phone) || pnDigits(j) || lidPhone(j);
+  const r = p ? getRow.get(TENANT, p) : null;
+  const l = isLid(j) ? getLid.get(TENANT, j) : null;
+  const fb = clean(fallbackName);
+  const seen = fb && digits(fb) !== fb.replace(/[\s+]/g, '') ? fb : ''; // a fallback that is only the number is no name
+  const pick = [['own', r?.name], ['book', r?.book_name || l?.book_name], ['business', r?.biz_name || l?.biz_name], ['profile', r?.push_name || l?.push_name], ['seen', seen]]
+    .find(([, v]) => v);
+  const name = pick?.[1] || '';
+  return { phone: p, name, label: name || (p ? `+${p}` : HIDDEN_NUMBER), source: pick?.[0] || '', hidden: !p };
+}
+/** Label for a chat seen by the app (1:1: the person; groups: their subject). `c`: { id, phone, name, isGroup }. */
+export function chatTitle(c) {
+  if (!c) return '';
+  if (c.isGroup) return c.name || c.id;
+  const jid = String(c.id || '').split('#').pop();
+  return personInfo({ phone: c.phone, jid, fallbackName: c.name }).label;
+}
+
+/** Counts for the Contacts page: how many names of each kind, and people WhatsApp shows only by a hidden number. */
+export function contactSummary() {
+  const r = db.prepare(`SELECT COUNT(*) total, SUM(own) own, SUM(book_name <> '') book, SUM(biz_name <> '') business, SUM(push_name <> '') profile
+    FROM contacts WHERE tenant_id = ?`).get(TENANT);
+  const hidden = db.prepare("SELECT COUNT(*) n FROM contact_lids WHERE tenant_id = ? AND phone = ''").get(TENANT).n;
+  return { total: r.total || 0, own: r.own || 0, book: r.book || 0, business: r.business || 0, profile: r.profile || 0, hiddenNumbers: hidden || 0 };
 }
 
 export function listContacts({ q = '', sharedOnly = false, limit = 500 } = {}) {
   const like = `%${String(q).trim().toLowerCase()}%`;
   const d = digits(q);
   return db.prepare(`SELECT * FROM contacts WHERE tenant_id = ? ${sharedOnly ? 'AND shared = 1' : ''}
-      AND (lower(name) LIKE ? OR lower(wa_name) LIKE ? OR lower(note) LIKE ? ${d.length >= 3 ? 'OR phone LIKE ?' : ''})
-      ORDER BY lower(CASE WHEN name <> '' THEN name ELSE wa_name END) LIMIT ?`)
-    .all(...[TENANT, like, like, like, ...(d.length >= 3 ? [`%${d}%`] : []), Math.min(Number(limit) || 500, 2000)]).map(view);
+      AND (lower(name) LIKE ? OR lower(book_name) LIKE ? OR lower(biz_name) LIKE ? OR lower(push_name) LIKE ? OR lower(note) LIKE ? ${d.length >= 3 ? 'OR phone LIKE ?' : ''})
+      ORDER BY lower(COALESCE(NULLIF(name, ''), NULLIF(book_name, ''), NULLIF(biz_name, ''), NULLIF(push_name, ''), phone)) LIMIT ?`)
+    .all(...[TENANT, like, like, like, like, like, ...(d.length >= 3 ? [`%${d}%`] : []), Math.min(Number(limit) || 500, 2000)]).map(view);
 }
 
 export function getContact(phone) {
-  const r = db.prepare('SELECT * FROM contacts WHERE tenant_id = ? AND phone = ?').get(TENANT, digits(phone));
+  const r = getRow.get(TENANT, digits(phone));
   return r ? view(r) : null;
 }
 
 /** Create or change an own contact. Only the given fields change. */
 export function saveContact({ phone, name, note, shared }, by = 'panel') {
   const p = normPhone(phone);
-  const cur = db.prepare('SELECT * FROM contacts WHERE tenant_id = ? AND phone = ?').get(TENANT, p);
+  const cur = getRow.get(TENANT, p);
   const next = {
     name: name !== undefined ? String(name).trim().slice(0, 100) : cur?.name || '',
     note: note !== undefined ? String(note).trim().slice(0, 300) : cur?.note || '',
     shared: shared !== undefined ? (shared ? 1 : 0) : cur?.shared || 0,
   };
-  if (!next.name && !cur?.wa_name) fail('A name is required');
+  if (!next.name && !(cur && synced(cur))) fail('A name is required');
   db.prepare(`INSERT INTO contacts (tenant_id, phone, name, note, shared, own, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)
     ON CONFLICT (tenant_id, phone) DO UPDATE SET name = excluded.name, note = excluded.note, shared = excluded.shared, own = 1, updated_at = excluded.updated_at`)
     .run(TENANT, p, next.name, next.note, next.shared, Date.now());
-  activity('config', { summary: `Contact ${cur ? 'updated' : 'added'}: ${next.name || cur?.wa_name} (+${p})${next.shared ? ', shared' : ''} — ${by}` });
+  activity('config', { summary: `Contact ${cur ? 'updated' : 'added'}: ${next.name || (cur && synced(cur))} (+${p})${next.shared ? ', shared' : ''} — ${by}` });
   return getContact(p);
 }
 
 /** Remove an own contact. A contact synced from WhatsApp keeps its WhatsApp name but loses own fields and sharing. */
 export function removeContact(phone, by = 'panel') {
   const p = digits(phone);
-  const cur = db.prepare('SELECT * FROM contacts WHERE tenant_id = ? AND phone = ?').get(TENANT, p);
+  const cur = getRow.get(TENANT, p);
   if (!cur) return false;
-  if (cur.wa_name) db.prepare("UPDATE contacts SET name = '', note = '', shared = 0, own = 0, updated_at = ? WHERE tenant_id = ? AND phone = ?").run(Date.now(), TENANT, p);
+  if (synced(cur)) db.prepare("UPDATE contacts SET name = '', note = '', shared = 0, own = 0, updated_at = ? WHERE tenant_id = ? AND phone = ?").run(Date.now(), TENANT, p);
   else db.prepare('DELETE FROM contacts WHERE tenant_id = ? AND phone = ?').run(TENANT, p);
-  activity('config', { summary: `Contact removed: ${cur.name || cur.wa_name} (+${p}) — ${by}` });
+  activity('config', { summary: `Contact removed: ${cur.name || synced(cur)} (+${p}) — ${by}` });
   return true;
 }
 

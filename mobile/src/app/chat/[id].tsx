@@ -111,7 +111,7 @@ export default function ChatDetail() {
           ) : msgs.length === 0 ? <Body muted>No stored messages.</Body> : msgs.map((m, i) => (
             <View key={m.id} style={{ gap: 3 }}>
               {i ? <Divider /> : null}
-              <Spread><Label color={m.fromAgent ? t.ok : undefined}>{m.fromAgent ? `agent${m.name ? ` · ${m.name}` : ''}` : m.name || (m.sender ? `+${m.sender}` : 'someone')}</Label><Label>{`${ago(m.ts)} ago`}</Label></Spread>
+              <Spread><Label color={m.fromAgent ? t.ok : undefined}>{m.fromAgent ? `agent${m.name ? ` · ${m.name}` : ''}` : `${m.name || (m.sender ? `+${m.sender}` : 'someone')}${m.tag ? ` (${m.tag})` : ''}`}</Label><Label>{`${ago(m.ts)} ago`}</Label></Spread>
               <Body selectable>{m.text}</Body>
             </View>
           ))}

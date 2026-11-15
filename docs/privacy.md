@@ -42,6 +42,7 @@ context…" (edit under **Settings → Privacy notice**).
 | | |
 |---|---|
 | **Stored messages** | only chats that are on, for memory, with retention limits. Switching a chat on loads its recent messages from your phone ([Agents → Earlier messages](agents.md#earlier-messages-when-a-chat-is-switched-on)). Admins and owners can read them; every look is in the activity log. Erase a chat's memory with one click |
+| **Names and member tags** | phone contact, business and profile names from your linked phone (Contacts; never sent to a model, agents see profile names); group member tags only for chats that are on, erased with the chat's memory ([Agents → Contacts](agents.md#which-name-is-shown)) |
 | **Chats that are off** | the id, time and sender id of the newest message only (no text, no names), to ask the phone for history later |
 | **Activity log** | minimal, normal or verbose, by category and per chat, with retention. Errors, confirmations, configuration changes and channel status are always recorded |
 | **Summaries** | the weekly summary and *Why agents stayed quiet* keep counts only |

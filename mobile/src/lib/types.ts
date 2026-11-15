@@ -52,7 +52,7 @@ export interface OwnerAssistantInfo {
   sendTo: { id: string; label: string; phone: string }[];
   links?: { userId: number; username: string; phone: string; linkedAt: number }[];
 }
-export interface StoredMessage { id: number; ts: number; sender?: string; name?: string; text: string; quoted?: string; fromAgent: boolean; addressed?: boolean }
+export interface StoredMessage { id: number; ts: number; sender?: string; name?: string; tag?: string; text: string; quoted?: string; fromAgent: boolean; addressed?: boolean }
 
 export interface Activity { id: number; ts: number; type: string; agent: string | null; chat: string | null; summary: string }
 

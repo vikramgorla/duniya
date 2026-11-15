@@ -1,6 +1,7 @@
 // Panel routes that explain the app to its owner: why agents stayed silent (#34), the first-run checklist (#36) and
 // the tools a role gets in the test console (#37).
 import { db } from '../../core/db.js';
+import { chatTitle } from '../../core/contacts.js';
 import { listSilences, clearSilences, SILENCE_REASONS } from '../../core/silences.js';
 import { listAgents, getAgent } from '../../core/agents.js';
 import { enabledChats, seenChats } from '../../core/chat-prefs.js';
@@ -40,7 +41,7 @@ export function insightRoutes(route, { channel }) {
   route('GET', '/api/silences', async (req, res, body, q) => {
     const rows = listSilences({ chat: q.get('chat') || '', agent: q.get('agent') || '', reason: q.get('reason') || '', days: q.get('days') || 7, limit: q.get('limit') || 200 });
     // Names as the owner sees them (never ids alone): people from the chats seen, groups from WhatsApp.
-    const seen = new Map(seenChats().map((c) => [c.id, c.name || (c.phone ? `+${c.phone}` : '')]));
+    const seen = new Map(seenChats().map((c) => [c.id, chatTitle(c)]));
     const names = new Map();
     for (const r of rows) {
       if (names.has(r.chat)) continue;

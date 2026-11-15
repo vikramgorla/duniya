@@ -1,0 +1,11 @@
+flowchart TD
+  P["A person in a chat<br/>(number or hidden id)"] --> H{"Hidden id<br/>(LID)?"}
+  H -- "yes" --> M["Look up the number WhatsApp shared<br/>(LID mapping, filled in later too)"]
+  H -- "no" --> N
+  M --> N["Pick the first name known"]
+  N --> O["1. Name you set in Duniya"]
+  O --> B["2. Phone contact name<br/>(your address book)"]
+  B --> Z["3. Business name"]
+  Z --> R["4. Profile name<br/>(chosen by the person)"]
+  R --> X["5. +number, or<br/>Unknown (hidden number)"]
+  T["Member tag (per group, chats on only)"] --> TT["From each message the person sends,<br/>tag changes, loaded history<br/>and the group member list"]

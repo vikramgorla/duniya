@@ -141,7 +141,7 @@ maintenance helper updates itself. A shell is still handy for `sudo duniya docto
 Nothing to do in Oracle: the app updates itself and **keeps everything**.
 
 1. Panel → **Overview** → **Server** card → **Updates**.
-2. **Check now** → *Update available: vX.Y.Z*.
+2. *Update available: vX.Y.Z* shows up by itself (the server checks every 10 minutes; **Check now** is optional).
 3. **Update to vX.Y.Z** → confirm. Agents pause about a minute; the page reloads by itself.
 4. Optional: **Update settings** → *Install automatically* at a time of day.
 

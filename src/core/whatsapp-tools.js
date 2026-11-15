@@ -3,6 +3,7 @@
 // powerful actions (people, group settings, block, delete) are organizer-only whatever the rules say, and are applied
 // immediately (owner decision on issue #2: no confirm code). Every action is logged as `whatsapp.action`.
 import { digits } from './config.js';
+import { tagsInChat, memberTag } from './member-tags.js';
 import {
   logMessage, messageByMsgId, lastAgentMessage, setMessageText, searchMessages, namesInChat, getPoll, latestPoll, recentPolls, pollTally,
 } from './db.js';
@@ -209,8 +210,10 @@ const DEFS = [
       const chat = await targetChat(input, ctx); needGroup(chat);
       const g = await need().groupInfo(chat);
       const names = namesInChat(chat);
+      const tags = tagsInChat(chat); // 057: member tags (chats that are on only); names stay the ones seen in the chat
       const showPhones = ctx.role === 'organizer';
-      const members = g.participants.map((p) => ({ name: names[p.phone] || (showPhones && p.phone ? `+${p.phone}` : 'member'), ...(showPhones && p.phone ? { phone: `+${p.phone}` } : {}), ...(p.admin ? { admin: true } : {}) }));
+      const members = g.participants.map((p) => { const tag = memberTag(chat, { phone: p.phone, jid: p.jid }, tags);
+        return { name: names[p.phone] || (showPhones && p.phone ? `+${p.phone}` : 'member'), ...(tag ? { tag } : {}), ...(showPhones && p.phone ? { phone: `+${p.phone}` } : {}), ...(p.admin ? { admin: true } : {}) }; });
       return { chat, result: { name: g.subject, description: g.description, members: g.size, onlyAdminsSend: g.announcement, onlyAdminsEditInfo: g.locked, joinApproval: g.joinApproval,
         admins: members.filter((m) => m.admin).map((m) => m.name), people: members }, summary: `Group info (${g.size} members)` };
     } },

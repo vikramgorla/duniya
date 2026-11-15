@@ -1,5 +1,7 @@
 import { isChatEnabled, ignoredCounts, noteLatestKeys } from './chat-prefs.js';
-import { storeLoadedBatch, setHistoryChannel } from './history-load.js';
+import { storeLoadedBatch, setHistoryChannel, historyChatActive } from './history-load.js';
+import { personInfo } from './contacts.js';
+import { memberTag } from './member-tags.js';
 import { env } from './config.js';
 import { getSettings } from './store.js';
 import { listAgents, getAgent, agentForChat, roleIn } from './agents.js';
@@ -167,6 +169,8 @@ export function createHistoryHandler() {
 }
 
 const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
+/** 057: how the panel (Activity, why-quiet) names a sender: the one resolver, so known contacts show their name. */
+const whoOf = (msg) => personInfo({ phone: msg.phone, jid: msg.senderJid, fallbackName: msg.senderName }).label;
 
 /**
  * Reactions and poll votes (026): stored for context, never answered. Reactions are kept when they are on an agent's
@@ -180,14 +184,14 @@ function recordEvent(msg) {
     if (!target?.from_agent && !(agent?.enabled && msg.isGroup)) return;
     saveReaction({ chat: msg.chat, msgId: msg.target, sender: who, name: msg.senderName, emoji: msg.emoji, ts: msg.ts });
     activity('whatsapp.reaction', { agent: agent?.id || target?.agent || '', chat: msg.chat,
-      summary: msg.emoji ? `${msg.senderName} reacted ${msg.emoji} to "${clip(target?.text || 'a message', 80)}"` : `${msg.senderName} removed a reaction` });
+      summary: msg.emoji ? `${whoOf(msg)} reacted ${msg.emoji} to "${clip(target?.text || 'a message', 80)}"` : `${whoOf(msg)} removed a reaction` });
     return;
   }
   if (msg.kind === 'poll_vote') {
     const p = savePollVote({ chat: msg.chat, msgId: msg.pollId, voter: who, name: msg.senderName, selected: msg.selected || [], ts: msg.ts });
     if (!p) return;
     activity('whatsapp.vote', { agent: agent?.id || '', chat: msg.chat,
-      summary: `${msg.senderName} voted ${msg.selected?.length ? msg.selected.join(', ') : '(withdrew)'} in "${clip(p.name, 60)}" → ${pollTally(p).map((o) => `${o.name} ${o.votes}`).join(', ')}` });
+      summary: `${whoOf(msg)} voted ${msg.selected?.length ? msg.selected.join(', ') : '(withdrew)'} in "${clip(p.name, 60)}" → ${pollTally(p).map((o) => `${o.name} ${o.votes}`).join(', ')}` });
   }
 }
 
@@ -202,6 +206,7 @@ export function createRouter(channel) {
     // #91: newest message key per chat (metadata only, also while the chat is off) to load history when it goes on.
     if (msg.msgId && (!msg.kind || msg.kind === 'text')) {
       try { noteLatestKeys([{ chat: msg.chat, number: msg.number, isGroup: msg.isGroup, msgId: msg.msgId, fromMe: !!msg.fromMe, participant: msg.isGroup && !msg.fromMe ? msg.senderJid : '', ts: msg.ts }]); } catch { /* best effort */ }
+      try { historyChatActive(msg.chat); } catch { /* best effort */ } // 057: a load that had no anchor starts now
     }
     // Reactions and poll votes: recorded only for chats that are on (#10).
     if (msg.kind && msg.kind !== 'text') { if (isChatEnabled(msg.chat)) recordEvent(msg); return; }
@@ -213,7 +218,7 @@ export function createRouter(channel) {
     const groupAgent = msg.isGroup ? agentForChat(msg.chat) : null;
     // #34: would this message have woken an agent? (Only then is staying silent worth explaining.)
     const wakes = !msg.isGroup || msg.mentioned || msg.replyToAgent || listAgents().some((b) => findTrigger(b, lower));
-    const sender = msg.senderName || (msg.phone ? `+${msg.phone}` : '');
+    const sender = whoOf(msg);
     const quiet = (reason, agentId = groupAgent?.id || '') => silenceReason(reason, { chat: msg.chat, agent: agentId, sender });
 
     // Silent by default (#10): a chat that is off is ignored completely — nothing stored, no model call — except
@@ -293,7 +298,7 @@ export function createRouter(channel) {
         if (ans.text.includes('{group}')) ans.text = fillPlaceholders(ans.text, { group: msg.isGroup ? await channel.chatName?.(msg.chat).catch(() => '') || 'the group' : 'this chat' });
         if (rateLimited(`${agent.id}:${msg.phone || msg.senderJid}`)) { quiet('rate_limited', agent.id); return; }
         countStat('handled', { agent: agent.id });
-        activity('message.in', { agent: agent.id, chat: msg.chat, summary: `${msg.senderName} (${role}): ${stripped || wake}`, detail: { answeredBy: ans.label } });
+        activity('message.in', { agent: agent.id, chat: msg.chat, summary: `${whoOf(msg)} (${role}): ${stripped || wake}`, detail: { answeredBy: ans.label } });
         await deliver(channel, msg, agent, ans.text, { textOnly: true });
         const kind = ans.kind === 'faq' ? 'faq' : 'quick reply';
         recordUsage({ agent: agent.id, chat: msg.chat, provider: 'built-in', model: kind, kind, cost: 0, priced: 'free' });
@@ -393,7 +398,7 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
     countStat('handled', { agent: agent.id });
     activity('message.in', {
       agent: agent.id, chat: msg.chat,
-      summary: `${msg.senderName} (${role}): ${voiceIn ? `🎤 ${text}` : text}`,
+      summary: `${whoOf(msg)} (${role}): ${voiceIn ? `🎤 ${text}` : text}`,
       detail: { phone: msg.phone, isGroup: msg.isGroup, quoted: msg.quoted || undefined, ...(media?.blocks?.length ? { attachments: media.blocks.map((b) => b.type) } : {}) },
     });
 
@@ -402,6 +407,8 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
       await channel.typing?.(msg.chat);
       const ctx = {
         agent, role, chat: msg.chat, senderName: msg.senderName, requester: msg.phone,
+        // 057: the sender's group member tag (chats that are on only); agents get profile names, never address-book names
+        senderTag: msg.isGroup ? memberTag(msg.chat, { phone: msg.phone, jid: msg.senderJid }) : '',
         text, isGroup: msg.isGroup, source: msg.channel, msgRowId: rowId, msgId: msg.msgId, senderJid: msg.senderJid,
         chatName: msg.isGroup ? await channel.chatName?.(msg.chat) : '',
         attachments: media?.blocks || [], mediaNote: media?.note || '',
