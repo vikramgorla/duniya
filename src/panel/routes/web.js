@@ -3,11 +3,20 @@ import {
   webState, checkDomain, preview, addDomain, confirmSwitch, finishSwitch, cancelSwitch, setAccess, confirmAccess, revertAccess, refreshRanges,
 } from '../../core/webaccess.js';
 import { clientIp } from '../http.js';
+import { googleConfig, passwordLoginAllowed } from '../../core/google-signin.js';
+import { CALLBACK_PATH, GOOGLE_CREDENTIALS_URL, panelAddresses } from './google.js';
+
+/** #77: when Google sign-in is set up, a new address must also be registered in Google Cloud: the card says so. */
+function googleInfo(req) {
+  const c = googleConfig();
+  if (!c.clientId || !c.secretSet) return { on: false };
+  return { on: true, enabled: c.enabled, only: !passwordLoginAllowed(), callbackPath: CALLBACK_PATH, consoleUrl: GOOGLE_CREDENTIALS_URL, addresses: panelAddresses(req) };
+}
 
 const OWNER = { role: 'owner' };
 
 export function webRoutes(route) {
-  route('GET', '/api/web', async (req) => webState(req, { clientIp }), OWNER);
+  route('GET', '/api/web', async (req) => ({ ...(await webState(req, { clientIp })), google: googleInfo(req) }), OWNER);
   route('POST', '/api/web/check', async (req, res, body) => checkDomain(body.domain), OWNER);
   route('POST', '/api/web/preview', async (req, res, body) => ({ caddyfile: await preview(body) }), OWNER);
   // Domain change in steps: add next to the current address → confirm from the new address → turn the old one off.

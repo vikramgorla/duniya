@@ -92,7 +92,7 @@ a chat on. [Getting started →](docs/getting-started.md)
 > [Every host, step by step →](docs/install.md#where-is-my-panel-find-the-ip--url)
 
 **Already running?** Update, recreate, remove: [Managing your server](docs/README.md#run-it) ·
-coming from 1.x: [Upgrading](docs/upgrading.md).
+a release needs a step: [Upgrading](docs/upgrading.md).
 
 <p align="center">
   <a href="docs/README.md"><img src="docs/img/btn-guides.svg" alt="Read the guides" height="32"></a>

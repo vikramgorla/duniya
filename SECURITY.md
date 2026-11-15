@@ -10,7 +10,7 @@ patch release.
 
 The latest 2.x release. Self-hosted servers update from the panel (**Overview → Server → Updates**), with
 `sudo duniya update`, or by running the installer again; Docker: `docker compose pull && docker compose up -d`.
-1.x is no longer supported (see [docs/upgrading.md](docs/upgrading.md)).
+See [docs/upgrading.md](docs/upgrading.md).
 
 ## Security model in short
 

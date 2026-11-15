@@ -5,7 +5,8 @@ import {
   googleConfig, googleReady, saveGoogleConfig, removeGoogleConfig, testGoogle, startGoogle, finishGoogle, resolveGoogleUser, linkCurrentUser,
   googleOnlyState, setGoogleOnly, passwordLoginAllowed,
 } from '../../core/google-signin.js';
-import { cookie, clientIp, isHttps, publicBase, setSessionCookie, limiter, resultPage, send } from '../http.js';
+import { current as webCurrent, webSettings } from '../../core/webaccess.js';
+import { cookie, clientIp, isHttps, publicBase, setSessionCookie, limiter, resultPage, send, esc, CSP } from '../http.js';
 
 export { googleReady };
 const OWNER = { role: 'owner' };
@@ -13,9 +14,51 @@ const callbackLimit = limiter(20);
 const startLimit = limiter(20);
 
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
+export const CALLBACK_PATH = '/auth/google/callback';
+export const GOOGLE_CREDENTIALS_URL = 'https://console.cloud.google.com/apis/credentials';
+/** #77: Google wants the origin exactly: scheme://host[:port], never a trailing slash or a path. */
+export const originOf = (base) => new URL(base).origin;
+const HOST_RE = /^(?:[a-z\d](?:[a-z\d-]{0,62}[a-z\d])?(?:\.[a-z\d](?:[a-z\d-]{0,62}[a-z\d])?)*|\[[\da-f:.]+\])(?::\d{1,5})?$/;
+/** The Host the browser used, lower-cased, or '' when it is not a plain host name (never shown or linked as is). */
+export const requestHost = (req) => { const h = String(req.headers.host || '').trim().toLowerCase(); return h.length <= 260 && HOST_RE.test(h) ? h : ''; };
+const bareHost = (h) => String(h || '').replace(/:\d+$/, '');
+
+/**
+ * Every address this panel answers on (main first): its origin and redirect URI as Google needs them. Built from
+ * PUBLIC_URL / the request and the applied web config only, never from anything a visitor sent.
+ */
+export function panelAddresses(req) {
+  const main = googleUrls(req);
+  const out = [{ host: new URL(main.origin).host, origin: main.origin, redirectUri: main.redirectUri, main: true }];
+  let hosts = [];
+  try { const c = webCurrent(); hosts = [c.host, ...c.aliases]; } catch { /* no web config */ }
+  try { // the two-step switch: the new domain counts once it is added (even if the applied config lags behind)
+    const sw = webSettings().switch;
+    if (sw && ['added', 'confirmed'].includes(sw.phase)) hosts.push(sw.newHost, sw.oldHost);
+  } catch { /* no settings */ }
+  for (const h of hosts.filter(Boolean)) {
+    const origin = originOf(`https://${h}`);
+    if (!out.some((a) => a.origin === origin)) out.push({ host: h, origin, redirectUri: `${origin}${CALLBACK_PATH}`, main: false });
+  }
+  return out;
+}
+
+/**
+ * #77: the redirect URI for a sign-in started by this request: the address the person is on when it is one of the
+ * panel's own addresses (main, alias, or the new domain of a two-step switch), so Google returns to the browser that
+ * holds the binding cookie; anything else (unknown or odd Host headers) falls back to the main address (PUBLIC_URL).
+ * Only the Host header is read (as the web server forwards it); X-Forwarded-Host is never trusted here.
+ */
+export function redirectUriFor(req) {
+  const addrs = panelAddresses(req);
+  const here = requestHost(req);
+  const hit = here && (addrs.find((a) => a.host === here) || addrs.find((a) => !a.main && a.host === bareHost(here)));
+  return (hit || addrs[0]).redirectUri;
+}
+
 /** What Google needs registered for this panel, and what would stop it working. */
 export function googleUrls(req) {
-  const base = publicBase(req);
+  const base = publicBase(req).replace(/\/+$/, '');
   const u = new URL(base);
   const host = u.hostname.replace(/^\[|\]$/g, '');
   const local = ['localhost', '127.0.0.1', '::1'].includes(host);
@@ -25,7 +68,8 @@ export function googleUrls(req) {
   } else if (u.protocol !== 'https:' && !local) {
     warnings.push({ kind: 'https', text: 'Google requires https:// for this address. Re-run the installer with --ip-https or --domain, or open the panel through its https address.' });
   }
-  return { origin: base, redirectUri: `${base}/auth/google/callback`, warnings };
+  const path = u.pathname.replace(/\/+$/, '');
+  return { origin: u.origin, redirectUri: `${u.origin}${path}${CALLBACK_PATH}`, warnings };
 }
 
 function bindingCookie(req, value, maxAge) {
@@ -34,12 +78,12 @@ function bindingCookie(req, value, maxAge) {
 
 export function googleRoutes(route) {
   // ---------- owner setup ----------
-  route('GET', '/api/auth/google', async (req) => ({ ...googleConfig(), ready: googleReady(), ...googleUrls(req) }), OWNER);
+  route('GET', '/api/auth/google', async (req) => ({ ...googleConfig(), ready: googleReady(), ...googleUrls(req), addresses: panelAddresses(req) }), OWNER);
   route('PUT', '/api/auth/google', async (req, res, body, q, p, user) => {
     const c = saveGoogleConfig({ clientId: body.clientId, clientSecret: body.clientSecret, enabled: body.enabled });
     activity('config', { summary: `Sign in with Google ${c.enabled ? 'settings saved' : 'turned off'} by ${user.username}` });
     if (!googleReady()) setGoogleOnly(false, { by: user.username, source: 'auto' }); // never leave nobody able to sign in
-    return { ...c, ready: googleReady(), ...googleUrls(req) };
+    return { ...c, ready: googleReady(), ...googleUrls(req), addresses: panelAddresses(req) };
   }, OWNER);
   route('DELETE', '/api/auth/google', async (req, res, body, q, p, user) => {
     removeGoogleConfig();
@@ -101,7 +145,7 @@ export function googleRoutes(route) {
       userId = me.id;
     }
     try {
-      const { url, binding } = await startGoogle({ mode, userId, redirectUri: googleUrls(req).redirectUri });
+      const { url, binding } = await startGoogle({ mode, userId, redirectUri: redirectUriFor(req), startHost: requestHost(req) });
       send(res, 302, '', { location: url, 'set-cookie': bindingCookie(req, binding, 600) });
       return null;
     } catch (e) {
@@ -136,8 +180,90 @@ export function googleRoutes(route) {
       mode = e.mode || mode;
       activity('system', { summary: `Panel sign-in with Google failed from ${ip}: ${e.message}` });
       res.setHeader('set-cookie', clear);
+      const why = addressProblem(req, e, { googleError: q.get('error'), bindingCookie: cookie(req, 'duniya_oidc') });
+      if (why) return addressHelpPage(req, res, { ...why, mode, message: e.message });
       return resultPage(res, { ok: false, status: e.status === 403 ? 403 : 400, title: mode === 'link' ? 'Linking did not complete' : 'Sign-in did not complete', message: e.message, back: mode === 'link' ? '/#settings' : '/' });
     }
   }, { public: true });
 }
 
+
+// ---------- #77: sign-in that came back to another address ----------
+/**
+ * Was this failed callback caused by the panel's addresses rather than by the person? Yes when Google says the redirect
+ * URI is not registered, when the sign-in was started at another address of this panel (Google returns to the
+ * registered one, where the browser-binding cookie of the other address is missing), or when that cookie is missing.
+ * Returns { kind, startHost, thisHost } or null. Hosts are only kept when they are addresses of this panel.
+ */
+export function addressProblem(req, e, { googleError, bindingCookie }) {
+  const known = new Set(panelAddresses(req).map((a) => a.host));
+  const thisHost = requestHost(req);
+  const startHost = e.startHost && known.has(e.startHost) ? e.startHost : known.has(bareHost(e.startHost)) ? bareHost(e.startHost) : '';
+  const here = known.has(thisHost) ? thisHost : known.has(bareHost(thisHost)) ? bareHost(thisHost) : '';
+  if (googleError === 'redirect_uri_mismatch') return { kind: 'mismatch', startHost, thisHost: here };
+  if (e.reason === 'binding' && startHost && here && startHost !== here) return { kind: 'other-address', startHost, thisHost: here };
+  if (e.reason === 'binding' || (e.reason === 'state' && !bindingCookie)) return { kind: 'no-cookie', startHost: '', thisHost: here };
+  return null;
+}
+
+/** The friendly page: what happened, the exact values for Google Cloud (copy buttons), and safe ways on. Text only. */
+export function addressHelpPage(req, res, { kind, startHost, thisHost, mode, message }) {
+  const addrs = panelAddresses(req);
+  const pwOk = passwordLoginAllowed();
+  const link = mode === 'link';
+  const title = kind === 'other-address' ? 'Google sign-in needs the new address' : kind === 'mismatch' ? 'Google does not know this address yet' : 'Sign-in did not complete';
+  const what = kind === 'other-address'
+    ? `You started at https://${startHost}, but Google sent you back to https://${thisHost}. A sign-in can only finish at the address where it started, so it stopped here. Your account is fine: start again at https://${startHost} (this works once that address is registered in Google Cloud, below), or sign in here.`
+    : kind === 'mismatch'
+      ? 'Google refused the panel’s address (redirect_uri_mismatch): it is not registered for this panel’s sign-in client yet.'
+      : `${String(message || '').replace(/\s*Start again from the panel\.$/, '')} Most likely you signed in on another address of this panel (for example the old or the new domain during a domain change) or in another browser or app window. Start again from the panel address you want to use${thisHost ? `, or sign in here at https://${thisHost}` : ''}.`;
+  const row = (v) => `<div class=row><code>${esc(v)}</code><button type=button data-copy="${esc(v)}">Copy</button></div>`;
+  const origins = addrs.map((a) => row(a.origin)).join('');
+  const redirects = addrs.map((a) => row(a.redirectUri)).join('');
+  const actions = [];
+  // links: relative ones, or the start address when it is one of this panel's own addresses (never anything a visitor sent)
+  const startOk = kind === 'other-address' && addrs.some((a) => a.host === startHost);
+  if (link) actions.push('<a class="btn primary" href="/#settings">Back to Settings</a>');
+  else {
+    if (startOk) actions.push(`<a class="btn primary" href="https://${esc(startHost)}/">Start again at https://${esc(startHost)}</a>`);
+    if (thisHost) actions.push(`<a class="btn${startOk ? '' : ' primary'}" href="/auth/google/start">Sign in with Google here</a>`);
+    if (pwOk) actions.push('<a class=btn href="/">Sign in with your password</a>');
+    else if (!thisHost) actions.push('<a class=btn href="/">Back to the sign-in page</a>');
+  }
+  const onlyGoogle = !pwOk && !link
+    ? `<div class="note warn"><b>Only Sign in with Google is allowed on this panel.</b> ${thisHost ? `Sign in at this address (https://${esc(thisHost)}) for now: it is registered, so it works.` : 'Use the panel’s previous address for now.'} Or, on the server, run <code>sudo duniya enable-password-login</code> to turn passwords back on.</div>`
+    : '';
+  const hereNote = thisHost && !link ? `<p class=small>Until then, sign in from <b>https://${esc(thisHost)}</b>: it works now.</p>` : '';
+  const html = `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=color-scheme content="light dark"><title>${esc(title)}</title>
+<style>
+:root{--bg:#f2f1ec;--card:#fff;--ink:#101216;--muted:#5d6068;--line:#e3e1da;--code:#f2f1ec;--warn:#8a5300;--warn-soft:#fbefd9;--info:#2f5fb3;--info-soft:#e7eefb;--btn:#101216;--btn-ink:#fff;--mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0c0f;--card:#121419;--ink:#ece9e2;--muted:#9a98a3;--line:#262a33;--code:#1b1e25;--warn:#f2b553;--warn-soft:#3a2c14;--info:#8db3f5;--info-soft:#18264a;--btn:#c6f432;--btn-ink:#0b1a19}}
+*{box-sizing:border-box}body{font:15px/1.5 "Segoe UI Variable","SF Pro Text",Inter,-apple-system,system-ui,sans-serif;margin:0;background:var(--bg);color:var(--ink)}
+main{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;max-width:640px;margin:24px auto;box-shadow:0 6px 24px -10px rgba(16,18,22,.18)}
+@media (max-width:680px){main{margin:12px;padding:18px}}
+h1{font-size:21px;letter-spacing:-.01em;margin:0 0 8px}h2{font-size:15px;margin:18px 0 6px}p{margin:8px 0}.small{font-size:13px;color:var(--muted)}
+.note{background:var(--info-soft);color:var(--info);border-radius:10px;padding:10px 12px;font-size:14px;margin:12px 0}.note.warn{background:var(--warn-soft);color:var(--warn)}
+ol{padding-left:20px;margin:8px 0}li{margin:6px 0}
+.row{display:flex;gap:6px;align-items:center;margin:6px 0}.row code{flex:1;min-width:0;overflow-wrap:anywhere;background:var(--code);border-radius:10px;padding:8px 10px;font:13px var(--mono)}
+code{font-family:var(--mono)}
+button,.btn{font:inherit;font-size:14px;min-height:40px;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.btn.primary{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+a{color:inherit}
+</style>
+<body><main>
+<h1>${esc(title)}</h1>
+<p>${esc(what)}</p>
+<div class=note><b>Fix it once (owner):</b> add every address of this panel to the Google sign-in client. Until then, Google sign-in only works from the addresses already registered there.</div>
+<ol>
+<li>Open <a href="${GOOGLE_CREDENTIALS_URL}" target=_blank rel="noopener noreferrer">Google Cloud Console → APIs &amp; Services → Credentials ↗</a> and click your OAuth client (Web application).</li>
+<li>Under <b>Authorized JavaScript origins</b>, add each of these (no slash at the end):${origins}</li>
+<li>Under <b>Authorized redirect URIs</b>, add each of these exactly:${redirects}</li>
+<li>Click <b>Save</b>. Google can take a few minutes to apply it; then sign in again.</li>
+</ol>
+${hereNote}${onlyGoogle}
+<div class=actions>${actions.join('')}</div>
+</main>
+<script>document.querySelectorAll('button[data-copy]').forEach(function(b){b.onclick=function(){var v=b.getAttribute('data-copy');var done=function(){b.textContent='Copied ✓';setTimeout(function(){b.textContent='Copy'},1600)};if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(v).then(done,function(){})}else{var t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();try{document.execCommand('copy');done()}catch(e){}t.remove()}}})</script>`;
+  send(res, 400, html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
+  return null;
+}

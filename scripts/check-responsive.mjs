@@ -64,6 +64,14 @@ const STATES = [
   { name: 'pending', hash: 'pending' },
   { name: 'secrets', hash: 'secrets' },
   { name: 'settings', hash: 'settings', wait: 2000, js: 'T.openAll();' },
+  // #77: a new domain was added while Google sign-in is on (callout with the values for Google Cloud)
+  { name: 'settings-web-google', hash: 'settings', wait: 2500, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
+      if (String(u) === '/api/web' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); const old = j.current?.host || 'agents.example.org';
+        return new Response(JSON.stringify({ ...j, switch: { phase: 'added', newHost: 'duniya-panel.example.org', oldHost: old },
+          google: { on: true, enabled: true, only: false, callbackPath: '/auth/google/callback', consoleUrl: 'https://console.cloud.google.com/apis/credentials', addresses: [] } })); }
+      return r; };`, js: 'T.openAll();' },
+  // #77: the page a Google sign-in lands on when it came back to another address (server page, not the panel app)
+  { name: 'google-address-help', path: '/auth/google/callback?state=demo-state' },
 ];
 const PRELUDE = `const T = {
   wait: (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -129,7 +137,7 @@ for (const scheme of opt.schemes.split(',')) {
       if (opt.only && !opt.only.split(',').includes(st.name)) continue;
       const key = `${st.name} @ ${width} ${scheme}`;
       try {
-        await page.goto(`${base}/${st.hash ? `#${st.hash}` : ''}`);
+        await page.goto(st.path ? `${base}${st.path}` : `${base}/${st.hash ? `#${st.hash}` : ''}`);
         if (st.before) await page.evaluate(`(async () => { ${st.before} show(S.tab); })()`);
         await sleep(st.wait || 1500);
         if (st.js) await page.evaluate(`(async () => { ${PRELUDE} ${st.js} })()`);

@@ -7,7 +7,7 @@
 **In 30 seconds**
 - Semver: minor = features, patch = fixes, major = may need a reinstall.
 - Since 2.9.0 the app asks you before a breaking release; older servers: update to 2.9.0 first.
-- 1.x → 2.x: fresh install, no migration.
+- Releases that need a step from you are listed [below](#how-breaking-releases-reach-you).
 
 ## Within 2.x
 
@@ -36,25 +36,13 @@ release (or a new major) and you are asked on the panel and on WhatsApp.
 
 | Version | Breaking | What to do |
 |---|---|---|
+| 2.9.6 | no | Sign in with Google on more than one address (or after a domain change): register every origin and redirect URI shown under **Settings → Sign in with Google** ([how](google-sign-in.md#when-the-panels-address-changes)). |
 | 2.7.0 | no | Voice replies and on-server speech: re-run the installer (adds `ffmpeg`, `bzip2`). |
 | 2.5.0 | no | Re-run the installer (root maintenance helper). Limited access to Cloudflare? Choose it again under **Settings → Web address & access**: not carried over. |
-| 2.0.0 | **yes** | Fresh install; 1.x data, backups and exports cannot be used ([below](#from-1x-to-20)). |
 
 > [!WARNING]
 > Servers older than 2.9.0 don't read `releases.json`: their automatic update may cross a breaking release once.
 > Update them to 2.9.0 first.
-
-## From 1.x to 2.0
-
-2.0 renamed bots to agents everywhere (database tables, settings, API paths such as `/api/agents`, admin MCP tools
-such as `create_agent`, export files `duniya-agent`) and has **no migration**.
-
-1. Install 2.x on a fresh server (or remove the data directory).
-2. Link WhatsApp again.
-3. Set the agents up again: templates and the AI helper make it quick.
-
-> [!CAUTION]
-> A 1.x database, backup or agent export cannot be used with 2.x.
 
 ---
 **Next:** [Backups & updates](backups-and-updates.md) · [Docs index](README.md)

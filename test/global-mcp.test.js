@@ -208,8 +208,8 @@ test('admin MCP tools list, add and remove global services (same routes and role
   await assert.rejects(tool('remove_global_tool_service').preview({ name: 'notes' }, x), /No global tool service/);
 });
 
-test('backups made by Duniya 1.x are refused with a plain message', async () => {
+test('backups from before Duniya 2.0 are refused with a plain message', async () => {
   const { encryptBundle, decryptBundle } = await import('../src/core/backup/bundle.js');
   const old = encryptBundle({ format: 'duniya-backup', version: 1, app: { version: 'v1.14.0' }, files: {} }, 'passphrase-123');
-  assert.throws(() => decryptBundle(old, 'passphrase-123'), /made by Duniya v1\.14\.0 and cannot be restored into Duniya 2/);
+  assert.throws(() => decryptBundle(old, 'passphrase-123'), /made by an old Duniya \(v1\.14\.0\) and cannot be restored into Duniya 2/);
 });

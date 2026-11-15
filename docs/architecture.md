@@ -23,7 +23,7 @@ top.**
 
 | | |
 |---|---|
-| **Sign-in** | Google (owners invite by email; *Only allow Sign in with Google* turns passwords off) or a password |
+| **Sign-in** | [Google](google-sign-in.md) (owners invite by email; *Only allow Sign in with Google* turns passwords off) or a password |
 | **Data** | SQLite in `DATA_DIR`, WhatsApp sessions, local backups; secrets encrypted, files mode 0600 |
 | **Code map** | [AGENTS.md → Architecture map](../AGENTS.md#architecture-map) |
 | **Specs / design** | [`specs/`](../specs) · [DESIGN.md](../DESIGN.md) |

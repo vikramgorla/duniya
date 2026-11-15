@@ -2168,7 +2168,7 @@ function accountKeyForm({ placeholder, submit, button = 'Add account', keyLabel 
 
 /** Sign in with ChatGPT: body = {} (first account), { label } (another account) or { account } (sign in again). */
 function chatgptFlow(body = {}) {
-  const paste = h('input', { placeholder: 'http://127.0.0.1:1455/auth/callback?code=…', autocomplete: 'off', spellcheck: 'false' });
+  const paste = h('input', { placeholder: '127.0.0.1:1455/auth/callback?code=…', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'none', autocorrect: 'off' });
   const err = h('div', { class: 'small', style: 'color:var(--bad)' });
   const open = h('div', { class: 'row' });
   const label = body.label === '' ? h('input', { placeholder: 'Label, e.g. your name', maxlength: 40 }) : null;
@@ -2184,7 +2184,8 @@ function chatgptFlow(body = {}) {
     e.preventDefault(); err.textContent = '';
     const d = await api('POST', '/api/providers/chatgpt/complete', { callbackUrl: paste.value }).catch((x) => { err.textContent = x.message; });
     if (d) { toast(`Connected ${d.email} · ${d.models} models`); modelsCache = null; renderModels(); }
-  } }, h('label', {}, 'Paste the whole address here'), h('div', { class: 'row nowrap' }, paste, h('button', { class: 'btn primary' }, 'Finish')), err);
+  } }, h('label', {}, 'Paste the whole address here'), h('div', { class: 'row nowrap' }, paste, h('button', { class: 'btn primary' }, 'Finish')),
+    h('div', { class: 'small muted' }, 'Fine without http:// (iPad and iPhone copy it that way), with localhost or 127.0.0.1.'), err);
   return { start: h('div', {}, label ? field('Label', label) : null, h('div', { style: 'margin-top:8px' }, start, open)), form };
 }
 
@@ -2320,7 +2321,7 @@ async function renderModels() {
       [h('span', {}, 'Sign in with your ChatGPT account and allow access.'), cue.win('auth.openai.com', h('span', { class: 'muted' }, 'Allow duniya to use your plan?'), cue.hl(cue.btn('Allow', true)))],
       [h('span', {}, 'Your browser then shows “This site can’t be reached”. ', h('b', {}, 'That’s expected'), ', the sign-in worked.'),
         h('div', { class: 'cue', 'aria-hidden': 'true' }, h('div', { class: 'cue-addr' }, cue.hl(h('span', {}, '127.0.0.1:1455/auth/callback?code=ac_…&state=…'))), h('div', { class: 'cue-body' }, h('b', {}, 'This site can’t be reached'), h('span', { class: 'muted' }, '127.0.0.1 refused to connect.')))],
-      [h('span', {}, 'Click the address bar, copy the ', h('b', {}, 'whole address'), ' and paste it below.')],
+      [h('span', {}, 'Click the address bar, copy the ', h('b', {}, 'whole address'), ' and paste it below. It may start with ', h('code', {}, 'localhost'), ' or ', h('code', {}, '127.0.0.1'), ' without ', h('code', {}, 'http://'), ': that’s fine.')],
     ],
     form: cgFlow.form,
     connected: h('div', {}, h('p', { style: 'margin:0' }, `Signed in as ${cg.account || 'your ChatGPT account'}.`),
@@ -3055,6 +3056,7 @@ function googleSetupCard(g) {
   showTest(g.lastTest);
   const runTest = async (btn) => { btn.disabled = true; btn.replaceChildren(h('span', { class: 'spinner' }), ' Testing…'); const r = await tryApi(() => api('POST', '/api/auth/google/test')); btn.disabled = false; btn.textContent = 'Test'; if (r) showTest(r); };
   const step = (cls, title, ...body) => h('li', { class: cls }, h('b', { class: 't' }, title), ...body);
+  const addrs = g.addresses?.length ? g.addresses : [{ origin: g.origin, redirectUri: g.redirectUri }];
   const saved = g.clientId && g.secretSet;
   const steps = h('ol', { class: 'steps' },
     step(saved ? 'done' : 'now', 'Create a Google Cloud project',
@@ -3064,10 +3066,10 @@ function googleSetupCard(g) {
       h('p', { class: 'small muted', style: 'margin:0 0 6px' }, 'Branding: app name “Duniya”, your email as support and contact email → Save. Audience: choose External. “Testing” is fine — signing in with name and email needs no review by Google.'),
       h('div', { class: 'row', style: 'flex-wrap:wrap' }, extLink('https://console.cloud.google.com/auth/branding', 'Open Branding'), extLink('https://console.cloud.google.com/auth/audience', 'Open Audience'))),
     step(saved ? 'done' : '', 'Create the sign-in client',
-      h('p', { class: 'small muted', style: 'margin:0 0 6px' }, 'Application type: Web application. Name: “Duniya panel”. Add these two addresses exactly, then click Create:'),
+      h('p', { class: 'small muted', style: 'margin:0 0 6px' }, addrs.length > 1 ? `Application type: Web application. Name: “Duniya panel”. This panel has ${addrs.length} addresses: add each value exactly, then click Create (or Save):` : 'Application type: Web application. Name: “Duniya panel”. Add these two addresses exactly, then click Create:'),
       g.warnings.map((w) => h('div', { class: 'note warn' }, w.text)),
-      h('div', { class: 'small' }, 'Authorized JavaScript origins'), copyRow(g.origin),
-      h('div', { class: 'small' }, 'Authorized redirect URIs'), copyRow(g.redirectUri),
+      h('div', { class: 'small' }, 'Authorized JavaScript origins ', h('span', { class: 'muted' }, '(no slash at the end)')), addrs.map((a) => copyRow(a.origin)),
+      h('div', { class: 'small' }, 'Authorized redirect URIs'), addrs.map((a) => copyRow(a.redirectUri)),
       extLink('https://console.cloud.google.com/auth/clients/create', 'Open Create client')),
     step(saved ? 'done' : '', 'Paste the Client ID and secret',
       h('p', { class: 'small muted', style: 'margin:0 0 6px' }, 'Google shows the client secret only once, right after you click Create — copy it now (or download the JSON).'),
@@ -3131,15 +3133,33 @@ function webAccessCard(initial) {
       : w.last && ['failed', 'rolled-back'].includes(w.last.state) && Date.now() - (w.last.endedAt || 0) < 86400000 ? h('div', { class: 'note bad' }, h('b', {}, w.last.state === 'rolled-back' ? 'Rolled back. ' : 'Not applied. '), w.last.message, ` (${ago(w.last.endedAt)} ago)`)
         : w.last?.state === 'done' && Date.now() - (w.last.endedAt || 0) < 3600000 ? h('div', { class: 'note ok' }, h('b', {}, '✓ '), w.last.message) : null;
 
+    // ----- #77: Google sign-in must know a new address -----
+    const gs = w.google?.on ? w.google : null;
+    const gVals = (host) => ({ origin: `https://${host}`, redirectUri: `https://${host}${gs.callbackPath}` });
+    const googleBox = (host, phase) => {
+      if (!gs || !host) return null;
+      const v = gVals(host);
+      const old = sw?.oldHost || w.current.host;
+      return h('div', { class: 'note warn' }, h('b', {}, 'Google sign-in: add these in Google Cloud Console → APIs & Services → Credentials → your OAuth client'),
+        h('div', { class: 'small', style: 'margin-top:6px' }, 'Authorized JavaScript origins (no slash at the end)'), copyRow(v.origin),
+        h('div', { class: 'small' }, 'Authorized redirect URIs'), copyRow(v.redirectUri),
+        h('p', { class: 'small', style: 'margin:6px 0' }, phase === 'confirmed'
+          ? `https://${host} is the main address now: until it is added there, Google sign-in from it shows “redirect_uri_mismatch”${sw?.oldHost ? `; https://${sw.oldHost} keeps working while it is on` : ''}${gs.only ? ' (only Google is allowed: run “sudo duniya enable-password-login” on the server if you are locked out)' : ' (passwords still work)'}.`
+          : `Until then, Google sign-in started at https://${host} stops with Google’s “redirect_uri_mismatch” error: sign in from ${old ? `https://${old}` : 'the old address'} meanwhile. Add them before you confirm: after confirming, the new address is the main one.`),
+        extLink(gs.consoleUrl, 'Open Google Cloud credentials'));
+    };
+
     // ----- two-step domain switch -----
     const post = (path, okMsg) => tryApi(async () => { const r = await api('POST', path); await reload(); return r; }, okMsg);
     let switchBox = null;
-    if (sw?.applying) switchBox = h('div', { class: 'note' }, h('span', { class: 'spinner' }), ` ${{ add: `Adding ${sw.newHost}`, confirm: `Making ${sw.newHost} the main address`, finish: `Turning off ${sw.oldHost}`, cancel: 'Going back to the previous address' }[sw.applying]}…`);
+    if (sw?.applying) {
+      switchBox = h('div', { class: 'note' }, h('span', { class: 'spinner' }), ` ${{ add: `Adding ${sw.newHost}`, confirm: `Making ${sw.newHost} the main address`, finish: `Turning off ${sw.oldHost}`, cancel: 'Going back to the previous address' }[sw.applying]}…`);
+    }
     else if (sw?.phase === 'added') {
       const here = w.you.host === sw.newHost;
       switchBox = h('div', { class: 'note info' }, h('b', {}, `Step 2 of 3 · ${sw.newHost} added. `), `Both addresses work now. ${here ? 'You are using the new address, so it works:' : 'Open the panel at the new address and confirm there (that proves it works):'}`,
         h('div', { class: 'row', style: 'margin-top:8px;flex-wrap:wrap' },
-          here ? h('button', { class: 'btn primary', onclick: () => post('/api/web/domain/confirm', 'Confirmed') }, 'Confirm — new address works')
+          here ? h('button', { class: 'btn primary', onclick: () => (!gs || confirm(`Make ${sw.newHost} the main address?\n\nGoogle sign-in: added https://${sw.newHost} in Google Cloud (origin and redirect URI shown below)? If not, Google sign-in from it fails until you do; turning off ${sw.oldHost} later leaves no working address for Google sign-in${gs.only ? ', and only Google is allowed on this panel' : ''}.`)) && post('/api/web/domain/confirm', 'Confirmed') }, 'Confirm — new address works')
             : h('a', { class: 'btn primary', href: `https://${sw.newHost}`, target: '_blank', rel: 'noopener' }, `Open https://${sw.newHost} ↗`),
           h('button', { class: 'btn', onclick: () => confirm(`Remove ${sw.newHost} again? ${sw.oldHost} stays the address.`) && post('/api/web/domain/cancel', 'Cancelled') }, 'Cancel')));
     } else if (sw?.phase === 'confirmed') {
@@ -3148,6 +3168,10 @@ function webAccessCard(initial) {
           h('button', { class: 'btn danger', onclick: () => confirm(`Turn off ${sw.oldHost}?\n\nThe panel stops answering there; visits are forwarded to https://${sw.newHost}.`) && post('/api/web/domain/finish', 'Old address turned off') }, `Turn off ${sw.oldHost}`),
           h('button', { class: 'btn', onclick: () => confirm(`Go back to ${sw.oldHost} as the main address and remove ${sw.newHost}?`) && post('/api/web/domain/cancel', 'Back to the previous address') }, 'Go back')));
     }
+
+    // #77: next to the switch (adding, added, confirming, confirmed): what to register for Google sign-in
+    const gPhase = sw && !['finish', 'cancel'].includes(sw.applying) ? (sw.phase === 'confirmed' || sw.applying === 'confirm' ? 'confirmed' : 'added') : null;
+    const gBox = gPhase ? googleBox(sw.newHost, gPhase) : null;
 
     // ----- access trial (dead-man switch) -----
     let trialBox = null;
@@ -3185,7 +3209,7 @@ function webAccessCard(initial) {
     };
     addBtn.onclick = async () => {
       const d = dom.value.trim().toLowerCase();
-      if (!confirm(`Add https://${d}?\n\nIt is added next to the current address: both work, nothing is switched off. Then you open the panel at the new address and confirm it there.`)) return;
+      if (!confirm(`Add https://${d}?\n\nIt is added next to the current address: both work, nothing is switched off. Then you open the panel at the new address and confirm it there.${gs ? `\n\nGoogle sign-in is set up: add https://${d} (origin) and https://${d}${gs.callbackPath} (redirect URI) to your OAuth client in Google Cloud Console → APIs & Services → Credentials. The panel shows both with copy buttons next.` : ''}`)) return;
       if (await tryApi(() => api('POST', '/api/web/domain', { domain: d }), 'Adding…')) reload();
     };
 
@@ -3240,7 +3264,7 @@ function webAccessCard(initial) {
       h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Web address & access'), h('span', { class: `pill ${w.restricted ? 'info' : ''}` }, accessLabel)),
       h('p', { class: 'small muted' }, 'The address people use to open this panel, its HTTPS certificate, and who may open it at all.'),
       h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {}, ...rows))),
-      statusBox, switchBox, trialBox,
+      statusBox, switchBox, gBox, trialBox,
       av.ok ? [
         h('h3', {}, 'Your own domain'),
         h('p', { class: 'small muted', style: 'margin-top:0' }, `Point a name you own to this server${w.serverIp ? ` (${w.serverIp})` : ''} — directly, or through a proxy/CDN — then check it. HTTPS is automatic either way: a free Let’s Encrypt certificate, and behind a proxy a temporary one until then, so the proxy always talks to this server encrypted. Proxies that talk to the server without encryption (“Flexible”) are not supported.`),
