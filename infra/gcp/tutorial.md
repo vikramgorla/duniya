@@ -84,7 +84,7 @@ HTTPS is automatic and free. If it does not come up within 4 minutes, the previo
 
 * Keep **one** e2-micro per billing account in `us-central1`, `us-west1` or `us-east1`. Other sizes or regions are billed.
 * Set a budget alert (e.g. US$1): [Budgets & alerts](https://console.cloud.google.com/billing/budgets).
-* Updates: the panel updates itself (Settings → Updates). Server commands: `gcloud compute ssh duniya --zone us-central1-a -- sudo duniya help`.
+* Updates: the panel updates itself (Overview → Server → Updates). Server commands: `gcloud compute ssh duniya --zone us-central1-a -- sudo duniya help`.
 
 To remove everything (take a backup in the panel first if you want to keep your agents):
 

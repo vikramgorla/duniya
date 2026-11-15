@@ -19,6 +19,10 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Project rules (this repository)
+
+Follow `AGENTS.md` (working rules and Definition of Done). Fill the template's **Definition of Done plan** table and the constitution IX gate: name the tests, docs pages, website sections and screenshots, admin MCP tools, small-server impact and the version bump for this feature.
+
 ## Pre-Execution Checks
 
 **Check for extension hooks (before planning)**:

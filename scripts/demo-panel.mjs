@@ -57,6 +57,7 @@ async function fakeModels() {
           triggers: ['!run'], dm: 'members', model: 'auto',
           schedules: [{ id: 'sunday-run', at: '18:00', days: 'sat', enabled: true, prompt: 'Post tomorrow’s run: time, meeting point, distance and pace groups.' }],
         } } }]
+        : /Geneva on Friday/.test(d) ? [{ type: 'text', text: 'Friday 21 Nov: Marc drives from Morges station at 07:40 → Geneva, 2 seats left (one is saved for Lea). Want me to add it to the shared calendar?' }]
         : [{ type: 'text', text: 'Hi! The museum trip forms are due Monday 24 Nov 📝 Lea and Marc can drive (3 seats each). Want me to start a poll for the remaining seats?' }];
       return json({ id: 'm', type: 'message', role: 'assistant', model: 'claude-sonnet-5-5', usage: { input_tokens: 1412, output_tokens: 96 }, stop_reason: draft ? 'tool_use' : 'end_turn', content });
     }
@@ -87,7 +88,8 @@ async function fakeToolService() {
 }
 
 /** Start the seeded demo panel. Returns { base, dataDir }. Call once per process (the app's modules are singletons). */
-export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(), 'duniya-demo-')) } = {}) {
+/** `small: true` pretends to run on a 1 GB / 1 CPU VM (the free-tier size), so the small-server guardrails show. */
+export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(), 'duniya-demo-')), small = !!process.env.DEMO_SMALL } = {}) {
   const F = await fakeModels();
   const weatherUrl = await fakeToolService();
   const data = join(dataDir, 'data'); const ops = join(dataDir, 'ops');
@@ -102,6 +104,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     DUNIYA_OPS_WEBCONFIG: join(ROOT, 'deploy/ops/webconfig.mjs'), DUNIYA_PUBLIC_IP: '203.0.113.10', DUNIYA_TLS_PORT: '1', DUNIYA_FAKE_CADDY_LOG: join(ops, 'caddy.log'),
   });
   const imp = (p) => import(pathToFileURL(join(ROOT, p)).href);
+  if (small) (await imp('src/core/resources.js')).setResourceProbe({ totalMb: 958, cgroupLimitMb: null, availableMb: 540, cpus: 1 });
   const store = await imp('src/core/store.js');
   const db = await imp('src/core/db.js');
   const agents = await imp('src/core/agents.js');
@@ -273,7 +276,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   budget.setCap('agent', 'carpool', { cost: 2 });
   budget.setCap('agent', 'school', { cost: 1.5, fallback: 'anthropic:claude-haiku-5-5' });
   budget.setCap('chat', G(4), { tokens: 400000 });
-  store.updateSettings({ alertsTo: '41791234567' });
+  store.updateSettings({ alertsTo: P(1) });
   for (let day = 13; day >= 0; day--) {
     for (const [agent, n] of [['carpool', 6], ['school', 3], ['family', 4], ['football', 2]]) {
       for (let k = 0; k < Math.round(n * (0.5 + rnd())); k++) { stats.countStat('handled', { agent }, now - day * D); stats.countStat('reply', { agent }, now - day * D); }
@@ -302,6 +305,9 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   await new Promise((r) => (panel.listening ? r() : panel.once('listening', r)));
   store.createUser({ username: 'priya', email: 'priya@example.org', role: 'admin', password: 'demo-password-456' });
   store.createUser({ username: 'grandpa-viewer', role: 'viewer', password: 'demo-password-789' });
+  // owner assistant (044): the owner's own phone (fake) is linked, so Settings shows "Linked +41 79 000 00 01"
+  await imp('src/core/owner-assistant.js');
+  db.db.prepare("INSERT OR REPLACE INTO owner_links (tenant_id, user_id, phone, status, code_hash, expires_at, linked_at) SELECT 'default', id, ?, 'linked', NULL, 0, ? FROM users WHERE username = 'admin'").run(P(1), now - 2 * D);
   await wa.start(createRouter(wa), { onHistory: createHistoryHandler() });
   system.startMetrics();
   const noise = () => db.db.prepare("DELETE FROM activity WHERE summary LIKE 'Panel login%' OR summary LIKE 'Owner \"admin\" created%' OR summary LIKE 'Backup passphrase changed%' OR summary LIKE 'User %' OR summary LIKE 'Contact %' OR summary LIKE 'Global tool service%' OR summary LIKE 'Created \"%' OR (type = 'backup.done' AND ts > ?)").run(now - 60000);

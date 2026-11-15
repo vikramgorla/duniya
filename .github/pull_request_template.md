@@ -1,10 +1,41 @@
 ## What and why
-Closes #<issue> · Spec: `specs/NNN-…`
+Closes #<issue> · Spec: `specs/NNN-…` (or "no spec: <reason>")
 
-## How it was checked
-- [ ] `npm test` and `npm run lint` pass locally
-- [ ] Screens checked against DESIGN.md (light/dark, 375 px phone) — if UI changed
-- [ ] Spec Kit artifacts updated (spec, plan, tasks)
+## Definition of Done ([AGENTS.md](../AGENTS.md#definition-of-done))
+Tick each item or write "n/a – reason".
+
+**Tracking**
+- [ ] Issue has labels (type / area / priority / status / spec) and plan + progress comments; done comment follows the merge
+
+**Spec & tests**
+- [ ] Spec Kit artifacts (spec, plan, tasks) match the code
+- [ ] Tests with fakes cover the behaviour
+- [ ] `npm test`, `npm run lint`, `npm run check:panel` pass
+- [ ] UI changed: `npm run check:responsive` passes (375 / 393 / 1440, light + dark) and DESIGN.md checklist met
+
+**Security & privacy**
+- [ ] No secrets; TLS never disabled; no shell with untrusted input; untrusted text rendered as text
+- [ ] CodeQL clean at high / error
+- [ ] Chat allow-list respected; no message contents in logs beyond the logging policy; privacy notice behaviour intact
+- [ ] Permissions enforced in code (role allow lists, confirm gate)
+
+**Small servers**
+- [ ] Impact on a 1 GB / 1 vCPU VM considered (memory, CPU, downloads, queue/timeouts)
+
+**Docs**
+- [ ] `docs/` pages (+ `docs/README.md` index)
+- [ ] `README.md` highlights
+- [ ] Website `docs/site/` (sections/tiles; screenshots/videos retaken with `npm run site:shots` if UI changed)
+- [ ] `mobile/README.md`
+- [ ] Admin MCP tools + `docs/admin-mcp.md`
+- [ ] `DESIGN.md` (visual changes)
+
+**Version & release**
+- [ ] Version bumped in `package.json`, `package-lock.json`, `infra/oci/schema.yaml` (minor feature / patch fix / major breaking)
+- [ ] Opened via REST, not pushed to `main`; squash merge after required checks
 
 ## Risk
-<!-- security impact, migrations, anything a reviewer should look at first -->
+<!-- security impact, data changes, anything a reviewer should look at first -->
+
+## How it was checked
+<!-- commands run, screens looked at -->

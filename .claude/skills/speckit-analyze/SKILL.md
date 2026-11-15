@@ -19,6 +19,10 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Project rules (this repository)
+
+Follow `AGENTS.md` (working rules and Definition of Done). Flag as an issue any tasks.md that lacks the **Phase Final: Definition of Done** or a plan without the Definition of Done plan table.
+
 ## Pre-Execution Checks
 
 **Check for extension hooks (before analysis)**:

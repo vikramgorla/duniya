@@ -295,7 +295,9 @@ test('queue: jobs survive a restart, run in order per chat, ⏳ when waiting, ap
   const order = [];
   queue.registerJobHandler('test-slow', { async run(p) { order.push(p.n); if (p.wait) await gate; } });
   queue.enqueue({ kind: 'test-slow', chat: 'g2@g.us', payload: { n: 'block', wait: true } });
-  await new Promise((r) => setTimeout(r, 30));
+  // wait until the blocking job really runs (a fixed delay was flaky on a busy CI machine)
+  for (let i = 0; i < 200 && !order.includes('block'); i++) await new Promise((r) => setTimeout(r, 10));
+  assert.ok(order.includes('block'), 'blocking job started');
   // a photo turn waits behind it
   t.script.push([{ type: 'text', text: 'Late but here.' }]);
   const m = groupPhoto();
@@ -303,6 +305,9 @@ test('queue: jobs survive a restart, run in order per chat, ⏳ when waiting, ap
   assert.equal(queue.queueStats().queued, 1);
   queue.setQueueTiming({ signalMs: 0, noteMs: 0 });
   await queue.checkSignals();
+  // the background ticker may be sending the same signal concurrently: wait for it to land
+  for (let i = 0; i < 200 && !waCalls('react').some((c) => c.args[1] === '⏳'); i++) await new Promise((r) => setTimeout(r, 10));
+  for (let i = 0; i < 200 && !/I’m on it/.test(lastSent() || ''); i++) await new Promise((r) => setTimeout(r, 10));
   const hourglass = waCalls('react').find((c) => c.args[1] === '⏳');
   assert.equal(hourglass.chat, 'g1@g.us'); assert.equal(hourglass.args[0].msgId, m.msgId);
   assert.match(lastSent(), /I’m on it/);

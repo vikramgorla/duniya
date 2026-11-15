@@ -9,7 +9,7 @@ description: "Task list template for feature implementation"
 
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: Required in this repository (constitution VII): end-to-end tests with fakes (`test/harness.js`, `node:test`); no real WhatsApp, model, MCP, GitHub or S3 calls.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -25,6 +25,7 @@ description: "Task list template for feature implementation"
 - **Web app**: `backend/src/`, `frontend/src/`
 - **Mobile**: `api/src/`, `ios/src/` or `android/src/`
 - Paths shown below assume single project - adjust based on plan.md structure
+- **This repository**: `src/core/`, `src/channels/`, `src/panel/` (UI in `src/panel/public/index.html`), `test/*.test.js`, `docs/`, `docs/site/`, `mobile/` (see the architecture map in `AGENTS.md`)
 
 <!--
   ============================================================================
@@ -35,6 +36,9 @@ description: "Task list template for feature implementation"
   - Feature requirements from plan.md
   - Entities from data-model.md
   - Endpoints from contracts/
+
+  The final phase "Definition of Done" below is NOT a sample: keep it in every generated tasks.md (adapt paths,
+  mark items n/a with a reason). It mirrors the Definition of Done in AGENTS.md.
 
   Tasks MUST be organized by user story so each story can be:
   - Implemented independently
@@ -160,6 +164,26 @@ Examples of foundational tasks (adjust based on your project):
 
 ---
 
+## Phase Final: Definition of Done (REQUIRED, keep in every tasks.md; see AGENTS.md)
+
+**Purpose**: The change is not done until these hold. Mark an item n/a only with a reason.
+
+- [ ] TXXX Issue: labels (type / area / priority / status / `spec: NNN`), plan comment posted, progress comments at milestones
+- [ ] TXXX Spec artifacts (spec.md, plan.md, tasks.md) match the code (`/speckit-analyze`, `/speckit-converge`)
+- [ ] TXXX Tests with fakes in `test/` cover the new behaviour; `npm test`, `npm run lint`, `npm run check:panel` pass
+- [ ] TXXX UI: `npm run check:responsive` passes (375 / 393 / 1440, light + dark); DESIGN.md checklist met
+- [ ] TXXX Security review: no secrets, TLS never disabled, no shell with untrusted input, untrusted text rendered as text, permissions enforced in code; CodeQL clean at high / error
+- [ ] TXXX Privacy review: chat allow-list respected, no message contents in logs beyond the logging policy, privacy notice behaviour intact
+- [ ] TXXX Small-server impact on a 1 GB / 1 vCPU VM considered (memory, CPU, downloads, media queue / timeouts)
+- [ ] TXXX Admin MCP tools in `src/panel/admin-tools.js` for new panel functionality (risky actions confirm)
+- [ ] TXXX Docs: `docs/` topic pages (+ `docs/README.md` index), `README.md` highlights, `mobile/README.md`, `docs/admin-mcp.md`, `DESIGN.md` if visual
+- [ ] TXXX Website: section/tile in `docs/site/index.html`; screenshots/videos retaken with `npm run site:shots` when the UI changed; checked at 375 / 393 / 1440 and dark mode
+- [ ] TXXX Version bump (semver) in `package.json`, `package-lock.json`, `infra/oci/schema.yaml`
+- [ ] TXXX PR via REST with `Closes #N` + spec link + attribution; required checks green; squash merge; never push to `main`
+- [ ] TXXX Issue done comment (what shipped, version, open items) and close with the release
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -169,7 +193,8 @@ Examples of foundational tasks (adjust based on your project):
 - **User Stories (Phase 3+)**: All depend on Foundational phase completion
   - User stories can then proceed in parallel (if staffed)
   - Or sequentially in priority order (P1 → P2 → P3)
-- **Polish (Final Phase)**: Depends on all desired user stories being complete
+- **Polish**: Depends on all desired user stories being complete
+- **Definition of Done (Final Phase)**: Depends on everything above; required before merge
 
 ### User Story Dependencies
 

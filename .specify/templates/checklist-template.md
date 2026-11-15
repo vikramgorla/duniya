@@ -34,6 +34,18 @@
 - [ ] CHK005 Item with specific criteria
 - [ ] CHK006 Final item in this category
 
+## Definition of Done (keep in every checklist; see AGENTS.md)
+
+These items are always added after the generated categories, with the next CHK numbers. They check that the
+requirements and plan cover the steps every change in this repository must complete.
+
+- [ ] CHK### Are tests with fakes specified for every user story (constitution VII)?
+- [ ] CHK### Are security requirements stated (secrets, TLS, untrusted input, permissions enforced in code)?
+- [ ] CHK### Are privacy requirements stated (chat allow-list, message contents in logs, privacy notice)?
+- [ ] CHK### Is the impact on a 1 GB / 1 vCPU server specified (memory, CPU, downloads, degraded behaviour)?
+- [ ] CHK### Are the documentation updates named (docs/, README, website docs/site + screenshots, mobile/README, admin MCP, DESIGN.md)?
+- [ ] CHK### Is the version bump (semver) and the issue/PR flow (labels, comments, Closes #N, no push to main) planned?
+
 ## Notes
 
 - Mark items `[x]` only after review confirms the requirement-quality criterion is satisfied
