@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { env } from './config.js';
 import { addPending, takePending, peekPending, dropPending } from './db.js';
 import { chat as modelChat, effectiveFallback } from './providers/index.js';
@@ -29,7 +30,8 @@ async function runTool(run, m, call, ctx) {
   return { isError: false, text: JSON.stringify({ testConsole: true, notSent: true, note: `Test console: ${fq} was not carried out; in WhatsApp it would run with this input.`, input: call.input }) };
 }
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const newCode = () => Array.from({ length: 4 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
+// Confirm codes guard risky actions, so they come from a cryptographic source.
+const newCode = () => Array.from({ length: 4 }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
 
 function systemPrompt({ agent, role, isGroup, chatName }) {
   const now = new Date().toLocaleString('en-GB', { timeZone: agent.timezone || env.timezone });
