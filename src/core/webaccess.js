@@ -87,16 +87,18 @@ export async function checkDomain(input) {
 export function certInfo(host, { port = Number(process.env.DUNIYA_TLS_PORT || 443), timeout = 4000 } = {}) {
   if (!host) return Promise.resolve({ state: 'none' });
   return new Promise((res) => {
-    const s = tls.connect({ host: '127.0.0.1', port, servername: host, rejectUnauthorized: false, timeout }, () => {
+    // Verified handshake only: a certificate that does not validate for `host` is reported as invalid with the reason.
+    const s = tls.connect({ host: '127.0.0.1', port, servername: host, timeout }, () => {
       const c = s.getPeerCertificate();
       const validTo = c?.valid_to ? Date.parse(c.valid_to) : 0;
-      const out = {
-        state: s.authorized ? 'valid' : 'invalid', issuer: c?.issuer?.O || c?.issuer?.CN || '', validTo,
-        daysLeft: validTo ? Math.floor((validTo - Date.now()) / 86400000) : null, error: s.authorized ? '' : String(s.authorizationError || ''),
-      };
-      s.end(); res(out);
+      s.end();
+      res({ state: 'valid', issuer: c?.issuer?.O || c?.issuer?.CN || '', validTo, daysLeft: validTo ? Math.floor((validTo - Date.now()) / 86400000) : null, error: '' });
     });
-    s.on('error', (e) => res({ state: 'none', error: e.code || e.message }));
+    s.on('error', (e) => {
+      const code = e.code || e.message;
+      const network = ['ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ETIMEDOUT'].includes(e.code);
+      res(network ? { state: 'none', error: code } : { state: 'invalid', issuer: '', validTo: 0, daysLeft: null, error: String(code) });
+    });
     s.on('timeout', () => { s.destroy(); res({ state: 'none', error: 'timeout' }); });
   });
 }

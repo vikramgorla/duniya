@@ -17,6 +17,8 @@ const tty = process.stdout.isTTY && !process.env.NO_COLOR;
 const c = (code) => (s) => (tty ? `\x1b[${code}m${s}\x1b[0m` : String(s));
 const bold = c('1'); const dim = c('2'); const green = c('32'); const yellow = c('33'); const red = c('31');
 const out = (...a) => console.log(...a);
+/** Shows a secret the operator asked for (a made-up password) on the terminal only; never goes to logs. */
+const showSecret = (label, secret) => process.stdout.write(`  ${label}: ${bold(secret)}`);
 class UsageError extends Error {}
 const fail = (msg) => { throw new Error(msg); };
 
@@ -119,7 +121,7 @@ const commands = {
     const u = s.createUser({ username: name, email: typeof f.email === 'string' ? f.email : '', role, password });
     s.activity('system', { summary: `User ${u.username} (${u.role}) added from the server command line` });
     out(green(`✓ Added ${u.username} (${u.role}).`));
-    if (typeof f.password !== 'string') out(`  Password: ${bold(password)}   (give it to them; they can change it under Settings)`);
+    if (typeof f.password !== 'string') { showSecret('Password', password); out('   (give it to them; they can change it under Settings)'); }
     await passwordHint();
   },
 
@@ -136,7 +138,7 @@ const commands = {
     s.updateUser(u.id, { password: pw });
     s.activity('system', { summary: `Password reset for ${u.username} from the server command line (signed out everywhere)` });
     out(green(`✓ New password set for ${u.username}. They were signed out everywhere.`));
-    if (generated) out(`  Password: ${bold(pw)}`);
+    if (generated) { showSecret('Password', pw); out(''); }
     if (u.disabled) out(yellow('  Note: this account is disabled. Enable it in the panel (Settings → Users) to use it.'));
     await passwordHint();
   },

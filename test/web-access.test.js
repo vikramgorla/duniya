@@ -151,12 +151,14 @@ test('031 helper: apply-web-config validates, reloads Caddy, waits for HTTPS, th
   const r = s.run('apply-web-config', { host: 'Agents.Example.org', redirectHosts: ['old.sslip.io'], port: 8080, access: { cloudflareOnly: true } });
   assert.equal(r.status.state, 'done', r.log);
   assert.equal(r.web.state, 'done'); assert.equal(r.web.host, 'agents.example.org'); assert.match(r.web.message, /Live at https:\/\/agents\.example\.org/);
-  assert.match(s.read('etc', 'Caddyfile'), /^agents\.example\.org \{[\s\S]*trusted_proxies|trusted_proxies[\s\S]*agents\.example\.org \{/m);
+  const caddy = s.read('etc', 'Caddyfile');
+  assert.match(caddy, /^agents\.example\.org \{$/m);
+  assert.match(caddy, /trusted_proxies/);
   assert.match(s.read('etc', 'app.env'), /^PUBLIC_URL=https:\/\/agents\.example\.org$/m);
   assert.match(s.read('etc', 'app.env'), /^TRUST_PROXY=cloudflare$/m);
   assert.match(s.read('etc', 'app.env'), /^DUNIYA_EXPOSURE=domain$/m);
   assert.match(s.read('etc', 'install.conf'), /^EXPOSURE='domain'$/m); assert.match(s.read('etc', 'install.conf'), /^DOMAIN='agents\.example\.org'$/m);
-  assert.match(s.read('state', 'Caddyfile.prev'), /old\.sslip\.io/, 'the previous config is kept');
+  assert.ok(s.read('state', 'Caddyfile.prev').includes('old.sslip.io'), 'the previous config is kept');
   assert.equal(s.read('state', 'Caddyfile.last-good'), s.read('etc', 'Caddyfile'));
   assert.equal(JSON.parse(s.read('state', 'web-applied.json')).host, 'Agents.Example.org');
   const calls = s.read('calls');
