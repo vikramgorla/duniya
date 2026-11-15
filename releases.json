@@ -103,6 +103,11 @@
       "actions": [],
       "data": "unchanged",
       "docs": "docs/owner-assistant.md"
+    },
+    "2.11.1": {
+      "breaking": false,
+      "title": "Security alerts handled automatically",
+      "summary": "Reviewed false-positive code-scanning alerts are dismissed automatically from a reviewed list; real findings are fixed in code."
     }
   }
 }
