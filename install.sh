@@ -362,7 +362,18 @@ EOF
   open_web_ports
   # Hand port 80 over from the first-boot progress page (OCI bootstrap) to Caddy only now, when the final config is ready.
   systemctl stop duniya-status-page duniya-status-render 2>/dev/null || true
-  systemctl enable -q caddy && systemctl reload-or-restart caddy
+  # Port 80 must be free before Caddy starts (the progress page may take a moment to let go).
+  for _ in $(seq 1 15); do ss -Hltn 'sport = :80' 2>/dev/null | grep -q . || break; sleep 1; done
+  systemctl enable -q caddy
+  if ! systemctl reload-or-restart caddy; then
+    sleep 3
+    if ! systemctl restart caddy; then
+      warn "Caddy (the web server) did not start. Its last messages:"
+      journalctl -u caddy -n 40 --no-pager -o cat 2>/dev/null | sed 's/^/    /' || true
+      echo "    Listening on ports 80/443:"; ss -Hltnp 'sport = :80 or sport = :443' 2>/dev/null | sed 's/^/    /' || true
+      die "The web server could not start (details above)"
+    fi
+  fi
   systemctl disable -q --now cloudflared 2>/dev/null || true
   if command -v tailscale >/dev/null; then tailscale serve reset >/dev/null 2>&1 || true; fi
 elif [ "$EXPOSURE" = "tunnel" ]; then
