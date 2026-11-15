@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Duniya · WhatsApp agents</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2716%27%20r%3D%273.1%27%20fill%3D%27%23101216%27/%3E%3Ccircle%20cx%3D%2716.00%27%20cy%3D%273.80%27%20r%3D%272.5%27%20fill%3D%27%23ff7a3d%27/%3E%3Cg%20transform%3D%27translate%2816.00%209.40%29%20rotate%280%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%23ff7a3d%27/%3E%3C/g%3E%3Ccircle%20cx%3D%2727.60%27%20cy%3D%2712.23%27%20r%3D%272.5%27%20fill%3D%27%23f2477e%27/%3E%3Cg%20transform%3D%27translate%2822.28%2013.96%29%20rotate%2872%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%23f2477e%27/%3E%3C/g%3E%3Ccircle%20cx%3D%2723.17%27%20cy%3D%2725.87%27%20r%3D%272.5%27%20fill%3D%27%235363ff%27/%3E%3Cg%20transform%3D%27translate%2819.88%2021.34%29%20rotate%28144%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%235363ff%27/%3E%3C/g%3E%3Ccircle%20cx%3D%278.83%27%20cy%3D%2725.87%27%20r%3D%272.5%27%20fill%3D%27%2313b3a1%27/%3E%3Cg%20transform%3D%27translate%2812.12%2021.34%29%20rotate%28216%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%2313b3a1%27/%3E%3C/g%3E%3Ccircle%20cx%3D%274.40%27%20cy%3D%2712.23%27%20r%3D%272.5%27%20fill%3D%27%239bd400%27/%3E%3Cg%20transform%3D%27translate%289.72%2013.96%29%20rotate%28288%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%239bd400%27/%3E%3C/g%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%27http%3A//www.w3.org/2000/svg%27%20viewBox=%270%200%2064%2064%27%3E%3Cpath%20d=%27M23%205H41A17%2017%200%200%201%2058%2022V44L59.5%2059.5L44%2055H23A17%2017%200%200%201%206%2038V22A17%2017%200%200%201%2023%205Z%27%20fill=%27%234d9b00%27%20stroke=%27%234d9b00%27%20stroke-width=%274%27%20stroke-linejoin=%27round%27/%3E%3Cg%20fill=%27%23101216%27%3E%3Crect%20x=%2710.5%27%20y=%2728%27%20width=%2743%27%20height=%2714%27%20rx=%275%27/%3E%3Cpath%20d=%27M32%2021V11%27%20stroke=%27%23101216%27%20stroke-width=%274%27%20stroke-linecap=%27round%27/%3E%3C/g%3E%3Crect%20x=%2716.5%27%20y=%2720%27%20width=%2731%27%20height=%2730%27%20rx=%2714%27%20fill=%27%23fff%27/%3E%3Crect%20x=%2719.5%27%20y=%2728%27%20width=%2725%27%20height=%2714%27%20rx=%277%27%20fill=%27%23101216%27/%3E%3Cpath%20d=%27M22.6%2037.8a3.6%203.6%200%200%201%207.2%200M34.2%2037.8a3.6%203.6%200%200%201%207.2%200%27%20fill=%27none%27%20stroke=%27%23c6f432%27%20stroke-width=%273.2%27%20stroke-linecap=%27round%27/%3E%3C/svg%3E">
 <meta name="theme-color" content="#f2f1ec">
 <style>
   /* Duniya design language — see DESIGN.md. Base tokens; the Aurora layer at the end overrides them. */
@@ -172,6 +172,20 @@
   .cue-select { display: inline-block; border: 1px solid var(--line-2); border-radius: 8px; padding: 2px 8px; background: var(--card); }
   .pasteform { margin-top: 4px; } .pasteform .row > input { min-width: 0; }
   .testout:empty { display: none; } .testout .note { margin-top: 10px; }
+  /* first-run checklist (#36), quiet reasons (#34), test console tools (#37) */
+  .checklist { margin-bottom: 16px; }
+  .checklist-steps { list-style: none; margin: 12px 0 0; padding: 0; }
+  .checklist-steps li { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px dashed var(--line); flex-wrap: wrap; }
+  .checklist-steps li:last-child { border-bottom: 0; }
+  .checklist-steps .ck { flex: none; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font: 600 13px var(--mono); background: var(--bg-2); color: var(--muted); }
+  .checklist-steps li.done .ck { background: var(--ok-soft); color: var(--ok); }
+  .checklist-steps li.next .ck { background: var(--signal); color: var(--signal-ink); }
+  .checklist-steps .ck-body { flex: 1 1 200px; min-width: 0; }
+  .checklist-steps li.done b { color: var(--muted); font-weight: 500; }
+  .quiet { margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toolset { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; }
+  .toolset li { padding: 3px 0; overflow-wrap: anywhere; } .toolset code { font-size: 12px; }
+  @media (max-width: 640px) { .toolset code { font-size: 13px; } }
   .card details { margin-top: 4px; } .card summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 6px 0; }
   .start h2 { margin-top: 4px; }
   .choices { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-top: 12px; }
@@ -186,7 +200,6 @@
     --line: #e2e0d8; --line-2: #cfccc2;
     --signal: #c6f432; --signal-ink: #101216; --signal-deep: #4d6b00; --signal-soft: #eef9cc;
     --accent: #101216; --accent-ink: #ffffff; --accent-soft: #eceae4;
-    --people-1: #ff7a3d; --people-2: #f2477e; --people-3: #13b3a1; --people-4: #5363ff; --people-5: #9bd400;
     --ok: #3f6b00; --ok-soft: #e9f7c4; --warn: #9a4b00; --warn-soft: #ffeedd; --bad: #c42443; --bad-soft: #ffe6ea; --info: #2c4fd6; --info-soft: #e8edff;
     --marigold: #ff7a3d; --marigold-soft: #ffeedd;
     --radius: 16px; --radius-s: 10px;
@@ -267,6 +280,50 @@
   .led b { color: var(--ink); font-weight: 600; letter-spacing: .02em; }
   @media (max-width: 720px) { .console { grid-template-columns: 1fr; } .leds { justify-content: flex-start; } }
   .ai-chip { display: inline-flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .08em; background: var(--signal); color: var(--signal-ink); border-radius: 5px; padding: 2px 6px; margin-right: 8px; vertical-align: 2px; }
+  /* AI helper review (#32): friendly diff — additions lime with +, removals red struck through with −, never colour alone. */
+  :root { --add-bg: #e3f7a8; --add-ink: #2f4d00; --del-bg: #ffe1e6; --del-ink: #a8183a; }
+  @media (prefers-color-scheme: dark) { :root { --add-bg: rgba(198,244,50,.2); --add-ink: #dcff8a; --del-bg: rgba(255,80,110,.18); --del-ink: #ffa3b3; } }
+  .dreview ins, .dnew ins { background: var(--add-bg); color: var(--add-ink); text-decoration: none; border-radius: 3px; box-shadow: inset 0 -1.5px color-mix(in srgb, var(--add-ink) 45%, transparent); }
+  .dreview del { background: var(--del-bg); color: var(--del-ink); text-decoration: line-through; text-decoration-thickness: 1.5px; border-radius: 3px; }
+  .dreview ins::before, .dreview ins::after, .dreview del::before, .dreview del::after { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(100%); white-space: nowrap; }
+  .dreview ins::before { content: " [added: "; } .dreview del::before { content: " [removed: "; } .dreview ins::after, .dreview del::after { content: "] "; }
+  .dsum { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 12px 0 4px; }
+  .dsum b { font-family: var(--font-display); font-size: 16px; font-weight: 650; }
+  .dreview .dcount { font: 600 13px var(--mono); padding: 2px 8px; border-radius: 6px; box-shadow: none; }
+  .dcard { border: 1px solid var(--line); border-radius: var(--radius-s); margin: 10px 0; background: var(--card); min-width: 0; }
+  .card .dcard > summary { padding: 10px 14px; color: var(--ink); font-size: 14px; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+  .dcard > summary b { font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
+  .dbody { padding: 0 14px 12px; min-width: 0; }
+  .dseg { margin: 0 0 8px; }
+  @media (max-width: 640px) { .seg.dseg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; overflow: visible; } .seg.dseg button { white-space: normal; line-height: 1.2; padding: 4px 6px; min-width: 0; } }
+  .dtext { font-size: 14px; line-height: 1.6; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--bg) 45%, var(--card)); padding: 6px 0; overflow-wrap: anywhere; white-space: pre-wrap; min-width: 0; }
+  .dtext.dplain { padding: 8px 12px; }
+  .dl { display: grid; grid-template-columns: 24px minmax(0, 1fr); padding-right: 10px; }
+  .dl > i { font: 600 13px/1.6 var(--mono); font-style: normal; text-align: center; color: var(--muted); user-select: none; }
+  .dl.a { background: color-mix(in srgb, var(--add-bg) 40%, transparent); } .dl.a > i { color: var(--add-ink); }
+  .dl.d { background: color-mix(in srgb, var(--del-bg) 45%, transparent); } .dl.d > i { color: var(--del-ink); }
+  .dl.m > i { color: var(--ink); }
+  .dskip { display: block; width: 100%; margin: 2px 0; padding: 6px 10px; min-height: 34px; border: 0; border-block: 1px dashed var(--line-2); background: var(--bg-2); color: var(--muted); font: 13px var(--mono); cursor: pointer; text-align: center; }
+  .dskip:hover { color: var(--ink); }
+  .dside { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
+  .dside .eyebrow { margin-bottom: 4px; }
+  .dchips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; min-width: 0; }
+  .dgl { font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 2px; }
+  .dreview .dchip, .dchip { display: inline-block; font-size: 13px; padding: 3px 10px; border-radius: 999px; overflow-wrap: anywhere; max-width: 100%; box-shadow: none; }
+  .dchip.n { background: var(--bg-2); color: var(--ink); }
+  .dsent { font-size: 14px; margin: 6px 0; overflow-wrap: anywhere; }
+  .drole + .drole { margin-top: 8px; }
+  .dnew { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 14px; margin: 12px 0; background: var(--card); }
+  .dnew h3 { margin: 6px 0 2px; font-size: 20px; }
+  .drow { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 4px 16px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; overflow-wrap: anywhere; }
+  .dlist { margin: 0; padding-left: 18px; }
+  @media (max-width: 640px) {
+    .drow { grid-template-columns: minmax(0, 1fr); }
+    .dskip { min-height: 40px; }
+    .dgl { font-size: 13px; }
+    .card .dcard > summary { padding: 10px 12px; }
+    .dbody { padding: 0 12px 12px; }
+  }
   /* Tables that turn into cards on phones: each cell shows its column name (data-label). */
   @media (max-width: 640px) {
     table.stack thead { display: none; }
@@ -338,6 +395,7 @@
 <body>
 <div id="app"></div>
 <script src="/qr.js"></script>
+<script src="/diff.js"></script>
 <script>
 'use strict';
 // ---------- DOM helper: untrusted text only ever goes through textContent ----------
@@ -380,17 +438,19 @@ function icon(name) {
   p.setAttribute('stroke-width', '1.7'); p.setAttribute('stroke-linecap', 'round'); p.setAttribute('stroke-linejoin', 'round');
   svg.append(p); return svg;
 }
-/** Brand mark: five people in a circle, each a different colour, around the world (ink dot). Duniya: a world of people. */
+/** Brand mark: a friendly robot in a solid green chat bubble (rounded square, tail at lower right). Fixed colours in
+ * both themes. Same geometry as docs/site/img/logo.svg; see DESIGN.md (Mark, Trademark). */
 function logo() {
   const ns = 'http://www.w3.org/2000/svg'; const el = (t, a) => { const e = document.createElementNS(ns, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); return e; };
-  const svg = el('svg', { viewBox: '0 0 32 32', class: 'logo', 'aria-hidden': 'true' });
-  svg.append(el('circle', { cx: 16, cy: 16, r: 3.1, fill: 'currentColor' }));
-  ['var(--people-1)', 'var(--people-2)', 'var(--people-4)', 'var(--people-3)', 'var(--people-5)'].forEach((c, i) => {
-    const th = -90 + i * 72; const t = (th * Math.PI) / 180;
-    svg.append(el('circle', { cx: 16 + 12.2 * Math.cos(t), cy: 16 + 12.2 * Math.sin(t), r: 2.5, fill: c }));
-    const g = el('g', { transform: `translate(${16 + 6.6 * Math.cos(t)} ${16 + 6.6 * Math.sin(t)}) rotate(${th + 90})` });
-    g.append(el('path', { d: 'M-3.7 2.2a3.7 3.7 0 0 1 7.4 0z', fill: c })); svg.append(g);
-  });
+  const ink = '#101216'; const green = '#4d9b00';
+  const svg = el('svg', { viewBox: '0 0 64 64', class: 'logo', 'aria-hidden': 'true' });
+  svg.append(
+    el('path', { d: 'M23 5H41A17 17 0 0 1 58 22V44L59.5 59.5L44 55H23A17 17 0 0 1 6 38V22A17 17 0 0 1 23 5Z', fill: green, stroke: green, 'stroke-width': 4, 'stroke-linejoin': 'round' }),
+    el('rect', { x: 11.8, y: 28.3, width: 9, height: 13.4, rx: 4, fill: ink }), el('rect', { x: 43.2, y: 28.3, width: 9, height: 13.4, rx: 4, fill: ink }),
+    el('circle', { cx: 32, cy: 12.6, r: 2.8, fill: ink }), el('path', { d: 'M32 14.8v6.7', stroke: ink, 'stroke-width': 2.7, 'stroke-linecap': 'round' }),
+    el('rect', { x: 18, y: 21.5, width: 28, height: 27, rx: 13, fill: '#fff', stroke: ink, 'stroke-width': 2.7 }),
+    el('rect', { x: 20.8, y: 29.4, width: 22.4, height: 12.3, rx: 6.15, fill: ink }),
+    el('path', { d: 'M23.6 37.2a2.9 2.9 0 0 1 5.8 0M34.6 37.2a2.9 2.9 0 0 1 5.8 0', fill: 'none', stroke: '#c6f432', 'stroke-width': 2, 'stroke-linecap': 'round' }));
   return svg;
 }
 function toast(msg) {
@@ -630,6 +690,7 @@ async function renderOverview(soft) {
   const sig = JSON.stringify({ ...rest, channel: { ...rest.channel, since: undefined } });
   if (soft && sig === overviewSig && $('#ov-uptime')) {
     $('#ov-uptime').textContent = ago(Date.now() - uptimeSec * 1000); $('#ov-memory').textContent = `${memoryMb} MB`;
+    if (Date.now() - (S.checklistAt || 0) > 15000) { refreshChecklist(); refreshSilences(); }
     return;
   }
   if (soft && (overviewBusy || $('#main')?.contains(document.activeElement))) return;
@@ -657,7 +718,7 @@ async function renderOverview(soft) {
         n.id !== 'main' && can('owner') ? h('button', { class: 'btn small danger', onclick: () => confirm(`Remove the number “${n.label}”? Its chats keep their memory; agents bound to them stop answering there.`) && tryApi(async () => { await api('DELETE', `/api/whatsapp/numbers/${n.id}`); refreshStatus(); }, 'Removed') }, 'Remove') : null));
   };
   const newLabel = h('input', { placeholder: 'Name, e.g. Shop', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
-  const wa = h('div', { class: 'card' },
+  const wa = h('div', { class: 'card', id: 'ov-whatsapp' },
     h('div', { class: 'row spread' }, h('h2', {}, 'WhatsApp numbers'), h('span', { class: 'pill' }, `${numbers.filter((n) => n.status === 'open').length}/${numbers.length} connected`)),
     numbers.map(numberBlock),
     can('owner') ? h('details', { class: 'mut' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, '+ Add another number'),
@@ -691,10 +752,91 @@ async function renderOverview(soft) {
       led('Chats on', st.enabledChats ? true : null, String(st.enabledChats ?? 0)),
       led('Waiting', st.pending ? null : true, String(st.pending || 0))),
     st.enabledChats === 0 ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
-  $('#main').replaceChildren(hero, h('div', { class: 'grid' }, wa, control, server, recent));
+  const silencesSlot = h('div', { id: 'ov-silences-slot', style: `grid-column:1/-1${S.silences?.length ? '' : ';display:none'}` }, S.silences?.length ? silencesCard(S.silences, refreshSilences) : null);
+  $('#main').replaceChildren(hero, checklistBox(), h('div', { class: 'grid' }, wa, control, server, silencesSlot, recent));
+  refreshSilences();
   if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
 }
+// ---------- first-run checklist (#36) ----------
+const CHECK_ACTION = { provider: 'Connect a provider', whatsapp: 'Link WhatsApp', agent: 'Create an agent', chat: 'Open Chats', reply: 'Open test console' };
+function goTo(href) {
+  return (e) => { // links inside Overview scroll instead of reloading the page
+    if (!href.startsWith('#overview/')) return;
+    e.preventDefault(); document.getElementById(`ov-${href.split('/')[1]}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+}
+function drawChecklist(box, c) {
+  if (!c || c.complete || c.dismissed) return box.replaceChildren();
+  const next = c.steps.find((s) => !s.done);
+  box.replaceChildren(h('div', { class: 'card checklist' },
+    h('div', { class: 'row spread' }, h('div', {}, h('div', { class: 'eyebrow' }, 'Get started'), h('h2', { style: 'margin:2px 0 0' }, `${c.done} of ${c.total} steps done`)),
+      can('admin') ? h('button', { class: 'btn small', title: 'Hide this checklist', onclick: () => tryApi(async () => { S.checklist = await api('PUT', '/api/checklist', { dismissed: true }); drawChecklist(box, S.checklist); }, 'Checklist hidden') }, 'Hide') : null),
+    h('ol', { class: 'checklist-steps' }, c.steps.map((s, i) => h('li', { class: s.done ? 'done' : s === next ? 'next' : '' },
+      h('span', { class: 'ck', 'aria-label': s.done ? 'done' : `step ${i + 1}` }, s.done ? '✓' : String(i + 1)),
+      h('div', { class: 'ck-body' }, h('b', {}, s.title), s.done ? null : h('div', { class: 'small muted' }, s.hint)),
+      s.done ? h('span', { class: 'pill ok' }, 'done') : h('a', { class: `btn small${s === next ? ' primary' : ''}`, href: s.href, onclick: goTo(s.href) }, CHECK_ACTION[s.id] || 'Open'))))));
+}
+function checklistBox() {
+  const box = h('div', { id: 'ov-checklist' });
+  drawChecklist(box, S.checklist);
+  refreshChecklist(box);
+  return box;
+}
+async function refreshChecklist(box = $('#ov-checklist')) {
+  S.checklistAt = Date.now();
+  const c = await api('GET', '/api/checklist').catch(() => null);
+  if (!c || !box) return;
+  if (JSON.stringify(c) === JSON.stringify(S.checklist) && box.childElementCount === (c.complete || c.dismissed ? 0 : 1)) return; // nothing changed: no redraw
+  S.checklist = c; drawChecklist(box, c);
+}
+
+// ---------- why agents stayed silent (#34) ----------
+/** One-click fix for a silence, or null. `after` runs once fixed (the record is cleared). */
+function silenceFix(s, after, { onChats = false } = {}) {
+  if (!can('admin')) return null;
+  const agentHref = (sub = '') => `#agents/${encodeURIComponent(s.agent)}${sub}`;
+  const act = (label, fn, ok) => h('button', { class: 'btn small', onclick: () => tryApi(async () => {
+    await fn(); await api('DELETE', `/api/silences?chat=${encodeURIComponent(s.chat)}&reason=${s.reason}`); refreshStatus(); after?.();
+  }, ok) }, label);
+  const link = (label, href) => h('a', { class: 'btn small', href }, label);
+  switch (s.fix) {
+    case 'chat_on': return act('Switch chat on', () => api('PUT', `/api/chats/${encodeURIComponent(s.chat)}/prefs`, { enabled: true }), 'On — agents may answer here');
+    case 'agent_on': return s.agent ? act(`Switch ${s.agentName || 'agent'} on`, () => api('PUT', `/api/agents/${encodeURIComponent(s.agent)}`, { enabled: true }), 'Agent on') : null;
+    case 'resume': return act('Resume agents', () => api('POST', '/api/settings', { paused: false }), 'Resumed');
+    case 'triggers': return s.agent ? link('Open triggers', agentHref('/triggers')) : null;
+    case 'agent': return s.agent ? link('Who may message it', agentHref('/dm')) : null;
+    case 'assign': return onChats ? null : link('Choose an agent', '#chats');
+    case 'models': return link('Open Models', '#models');
+    case 'usage': return link('Open Usage', '#usage');
+    default: return null;
+  }
+}
+const quietLine = (s) => `Quiet: ${s.label} ×${s.count}`;
+function silencesCard(rows, after) {
+  const top = rows.slice(0, 6);
+  if (!top.length) return null;
+  return h('div', { class: 'card', id: 'ov-silences' },
+    h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Why agents stayed quiet'), h('span', { class: 'pill' }, 'last 7 days')),
+    h('p', { class: 'small muted' }, 'Messages an agent did not answer, and why. Only counts are kept — never the messages.'),
+    h('table', { class: 'stack flat' }, h('tbody', {}, top.map((s) => h('tr', {},
+      h('td', { 'data-label': '' }, h('b', {}, s.chatName || 'Unnamed chat'), s.agentName ? h('span', { class: 'small muted' }, ` · ${s.agentName}`) : null,
+        h('div', { class: `small${s.reason === 'not_addressed' ? ' muted' : ''}`, style: s.reason === 'not_addressed' ? '' : 'color:var(--warn)', title: s.explain }, quietLine(s)),
+        h('div', { class: 'small muted' }, `${s.explain} Last ${ago(s.lastTs)} ago${s.sampleSender ? ` · e.g. ${s.sampleSender}` : ''}`)),
+      h('td', { 'data-label': '', style: 'text-align:right;white-space:nowrap' }, silenceFix(s, after),
+        can('admin') ? h('button', { class: 'btn small mut', title: 'Forget this record', onclick: () => tryApi(async () => { await api('DELETE', `/api/silences?chat=${encodeURIComponent(s.chat)}&reason=${s.reason}${s.agent ? `&agent=${encodeURIComponent(s.agent)}` : ''}`); after?.(); }, 'Cleared') }, 'Clear') : null))))));
+}
+async function refreshSilences() {
+  const slot = $('#ov-silences-slot'); if (!slot) return;
+  const r = await api('GET', '/api/silences?days=7&limit=6').catch(() => null);
+  if (!r) return;
+  const sig = JSON.stringify(r.silences.map((s) => [s.chat, s.agent, s.reason, s.count, s.chatName]));
+  if (sig === S.silencesSig && (slot.childElementCount > 0) === (r.silences.length > 0)) return;
+  S.silences = r.silences; S.silencesSig = sig;
+  slot.replaceChildren(...[silencesCard(r.silences, refreshSilences)].filter(Boolean));
+  slot.style.display = r.silences.length ? '' : 'none';
+}
+
 /**
  * Follow an update to the end, whatever happens to this page: checks every 3 s; notices when the service goes away
  * (restart) and when it answers again, then reloads the page on the new version. Never stops on a failed request;
@@ -890,9 +1032,50 @@ async function renderContacts() {
     add);
 }
 
+// ---------- spending caps (040, #35) ----------
+const CAP_STATE = { ok: ['ok', 'Within cap'], warning: ['warn', '80%+ used'], quiet: ['bad', 'Cap reached — quiet'], fallback: ['warn', 'Cap reached — cheaper model'] };
+const capAmount = (c) => [c.cost ? `${fmtCost(c.spent.cost)} of ${fmtCost(c.cost)}` : '', c.tokens ? `${fmtTok(c.spent.tokens)} of ${fmtTok(c.tokens)} tokens` : ''].filter(Boolean).join(' · ');
+const capResets = (c) => new Date(c.resetsAt).toLocaleDateString([], { month: 'short', day: 'numeric' });
+/** One cap as a progress bar with one state line. */
+function capBar(c, { name = true } = {}) {
+  const [cls, label] = CAP_STATE[c.state] || CAP_STATE.ok;
+  return h('div', { class: 'capbar' },
+    h('div', { class: 'row spread', style: 'gap:6px' }, name ? h('b', {}, c.name || c.id) : h('span', { class: 'small' }, 'This month'), h('span', { class: `pill ${cls}` }, `${Math.round(c.used * 100)}% · ${label}`)),
+    meter(Math.round(c.used * 100)),
+    h('div', { class: 'small muted num' }, `${capAmount(c)} · resets ${capResets(c)}`),
+    c.costUntracked ? h('div', { class: 'small', style: 'color:var(--warn)' }, `${c.spent.unpriced} call(s) have no price, so the cost cap can’t count them. Set the price under Usage → By model, or add a token cap.`) : null);
+}
+/** Editor for the monthly cap of an agent or a chat; saves on its own. */
+async function capEditor(scope, id, models) {
+  const box = h('div', {});
+  const path = `/api/budget/${scope}/${encodeURIComponent(id)}`;
+  const draw = (cap) => {
+    const cost = h('input', { type: 'number', min: 0, step: '0.5', inputmode: 'decimal', value: cap?.cost ?? '', placeholder: 'e.g. 5', 'aria-label': 'Monthly cost cap in USD', disabled: !can('admin') });
+    const tokens = h('input', { type: 'number', min: 1000, step: 1000, inputmode: 'numeric', value: cap?.tokens ?? '', placeholder: 'e.g. 2000000', 'aria-label': 'Monthly token cap', disabled: !can('admin') });
+    const fb = h('select', { 'aria-label': 'At the cap', disabled: !can('admin') }, h('option', { value: '' }, 'Stay quiet until next month'),
+      (models?.models || []).map((m) => h('option', { value: m.ref, selected: cap?.fallback === m.ref }, `Switch to ${m.label}`)),
+      cap?.fallback && !(models?.models || []).some((m) => m.ref === cap.fallback) ? h('option', { value: cap.fallback, selected: true }, `Switch to ${cap.fallback} (not available)`) : null);
+    const save = (body, msg) => tryApi(async () => { const r = await api('PUT', path, body); usageCache = null; draw(r.cap); }, msg);
+    box.replaceChildren(
+      h('p', { class: 'small muted', style: 'margin-top:0' }, scope === 'agent'
+        ? 'Limit what this agent may spend per calendar month. At 80% you get a WhatsApp alert; at 100% it stays quiet (or uses a cheaper model) until the month ends.'
+        : 'Limit what agents may spend in this chat per calendar month. At 80% you get a WhatsApp alert; at 100% the agent stays quiet here (or uses a cheaper model).'),
+      cap ? capBar(cap, { name: false }) : h('p', { class: 'small' }, 'No cap — no limit.'),
+      h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px' },
+        field('Cost per month (USD)', cost, 'Needs model prices'), field('or tokens per month', tokens, 'Works without prices')),
+      field('At the cap', fb),
+      can('admin') ? h('div', { class: 'row', style: 'margin-top:10px;gap:8px' },
+        h('button', { class: 'btn primary', type: 'button', onclick: () => save({ cost: cost.value, tokens: tokens.value, fallback: fb.value }, cost.value || tokens.value ? 'Cap saved' : 'Cap removed') }, 'Save cap'),
+        cap ? h('button', { class: 'btn', type: 'button', onclick: () => save({ cost: '', tokens: '' }, 'Cap removed') }, 'Remove cap') : null) : null);
+  };
+  api('GET', path).then((r) => draw(r.cap)).catch((e) => box.replaceChildren(h('p', { class: 'small muted' }, `Could not load the cap: ${e.message}`)));
+  return box;
+}
+
 async function renderUsage() {
   const [byDay, byAgent, byChat, byProv, byModel, byKind, sum, chats, agents] = await Promise.all(['day', 'agent', 'chat', 'provider', 'model', 'kind']
     .map((g) => api('GET', `/api/usage?period=${usagePeriod}&groupBy=${g}`)).concat([usageSummary(), api('GET', '/api/chats').catch(() => []), api('GET', '/api/agents').catch(() => [])]));
+  const caps = await api('GET', '/api/budget').catch(() => null);
   const t = byDay.total;
   const chatName = Object.fromEntries(chats.map((c) => [c.id, c.name])); const agentName = Object.fromEntries(agents.map((b) => [b.id, b.name]));
   const KIND = { reply: 'Replies', summary: 'Memory summaries', scheduled: 'Scheduled posts', 'ai-helper': 'AI helper', test: 'Tests' };
@@ -923,6 +1106,10 @@ async function renderUsage() {
       tile('Tokens out', fmtTok(t.output), 'what agents wrote'),
       tile('Estimated cost', fmtCost(t.cost), t.unpriced ? `${t.unpriced} call(s) without a price — set prices under “By model”` : t.plan ? `${t.plan} call(s) included in your plans` : 'from the prices below'),
       tile('Model calls', String(t.calls || 0), `${(byKind.rows.find((r) => r.key === 'reply')?.calls) || 0} replies`)),
+    caps ? h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Monthly spending caps'),
+      caps.caps.length ? h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px' }, caps.caps.map((c) => capBar(c)))
+        : h('p', { class: 'small muted' }, 'No caps yet. Set one on an agent’s page (Monthly spending cap) or for a chat under Chats → Spending cap.'),
+      caps.caps.length && !caps.alertsTo ? h('div', { class: 'note warn', style: 'margin-top:10px' }, 'Cap alerts can’t reach you on WhatsApp yet: add your number under Settings → Owner alerts.') : null) : null,
     h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Per day'), days.length ? chart : h('p', { class: 'small muted' }, 'Nothing in this period.')),
     h('div', { class: 'grid', style: 'margin-top:16px;align-items:start' },
       table('By agent', byAgent, (k) => agentName[k] || k || '(no agent)'),
@@ -1296,18 +1483,51 @@ async function renderAgentEditor(id) {
     } catch (e) { toast(e.field ? `${e.field}: ${e.message.replace(/^[^:]+: /, '')}` : e.message); return false; }
   }
 
-  // Test console
+  // Test console — "Test as…" (#37): a role and a chat; shows the tools that role gets. Never sends to WhatsApp.
   const log = h('div', { class: 'chatlog' });
-  const role = h('select', { style: 'max-width:150px' }, h('option', { value: 'participant' }, 'as participant'), h('option', { value: 'organizer' }, 'as organizer'));
+  const role = h('select', { 'aria-label': 'Test as role', onchange: () => { loadTools(); } }, h('option', { value: 'participant' }, 'a participant'), h('option', { value: 'organizer' }, 'an organizer'));
+  const testChat = h('select', { 'aria-label': 'Test in chat', onchange: () => chatHint() }, h('option', { value: 'new' }, 'a new direct chat'));
+  const chatInfo = new Map();
+  const hintBox = h('div', {});
+  const chatHint = () => {
+    const ci = chatInfo.get(testChat.value);
+    hintBox.replaceChildren(ci && !ci.enabled ? h('div', { class: 'note warn' }, `“${ci.name}” is Off in Chats, so in WhatsApp the agent stays silent there. The test still answers, using that chat’s memory.`) : null);
+  };
+  api('GET', '/api/chats').then((all) => {
+    for (const ch of all.filter((x) => (b.config.chats || []).includes(x.id))) {
+      chatInfo.set(ch.id, ch);
+      testChat.append(h('option', { value: ch.id }, `${ch.isGroup ? 'group' : 'chat'}: ${ch.name || ch.id}`));
+    }
+  }).catch(() => {});
+  const toolsBox = h('details', { class: 'small' }, h('summary', { style: 'cursor:pointer' }, 'Tools for this role…'));
+  async function loadTools() {
+    const r0 = role.value;
+    toolsBox.replaceChildren(h('summary', { style: 'cursor:pointer' }, h('span', { class: 'spinner' }), ' Loading tools…'));
+    const r = await api('GET', `/api/agents/${encodeURIComponent(id)}/test-tools?role=${r0}`).catch((x) => ({ error: x.message }));
+    if (role.value !== r0) return; // changed meanwhile
+    const who = r0 === 'organizer' ? 'organizers' : 'participants';
+    toolsBox.replaceChildren(h('summary', { style: 'cursor:pointer' }, r.error ? `Tools for ${who}: could not load` : `Tools ${who} get (${r.count})`),
+      r.error ? h('div', { class: 'note bad' }, r.error) : null,
+      (r.errors || []).map((x) => h('div', { class: 'note warn' }, `A tool service did not answer: ${x}`)),
+      r.services?.length ? r.services.map((sv) => h('div', { style: 'margin-top:8px' }, h('b', {}, sv.name), sv.global ? h('span', { class: 'pill', style: 'margin-left:6px' }, 'global') : null,
+        h('ul', { class: 'toolset' }, sv.tools.map((t) => h('li', {}, h('code', {}, t.name), t.description && t.description !== t.name ? h('span', { class: 'muted' }, ` — ${t.description}`) : null)))))
+        : r.error ? null : h('p', { class: 'muted' }, `No tools: ${who} only get answers from the instructions and memory.`),
+      h('p', { class: 'muted', style: 'margin-bottom:0' }, 'WhatsApp actions are not carried out here: the test shows what the agent would do.'));
+  }
+  loadTools();
   const input = h('input', { placeholder: 'Ask the agent something…' });
   const testForm = h('form', { class: 'row mut', onsubmit: async (e) => {
     e.preventDefault(); const text = input.value.trim(); if (!text) return;
-    log.append(h('div', { class: 'bubble me' }, text)); input.value = '';
+    const as = role.value === 'organizer' ? 'organizer' : 'participant'; const where = testChat.value;
+    log.append(h('div', { class: 'bubble me', title: `as ${as}` }, text)); input.value = '';
     const wait = h('div', { class: 'bubble agent muted' }, '…'); log.append(wait); log.scrollTop = 1e9;
-    try { const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/test`, { text, role: role.value }); wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); if (r.model) wait.title = r.model; }
-    catch (x) { wait.textContent = `Error: ${x.message}`; }
+    try {
+      const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/test`, { text, role: as, chat: where });
+      wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); if (r.model) wait.title = `${r.model} · as ${as}`;
+    } catch (x) { wait.textContent = `Error: ${x.message}`; }
     log.scrollTop = 1e9;
-  } }, role, input, h('button', { class: 'btn' }, 'Send'));
+  } }, input, h('button', { class: 'btn' }, 'Send'));
+  const testAs = h('div', { class: 'row mut' }, h('label', { class: 'small', style: 'flex:0 0 auto;margin:0' }, 'Test as'), role, h('label', { class: 'small', style: 'flex:0 0 auto;margin:0' }, 'in'), testChat);
 
   // Shared memory (#8): notes the agent keeps across all its chats; organizers save them from WhatsApp.
   const sharedMemBox = h('fieldset', {}, h('legend', {}, 'Shared memory'));
@@ -1360,13 +1580,19 @@ async function renderAgentEditor(id) {
           h('label', { class: 'inline' }, F.confirmOn, 'Hold changes until an organizer replies “confirm CODE”'),
           h('div', { class: 'row' }, field('Preview tools', F.cPreview), field('Confirm tool', F.cTool)),
           h('div', { class: 'row' }, field('Confirmation id field', F.cId), field('Valid for (minutes)', F.cTtl))),
+        h('fieldset', {}, h('legend', {}, 'Monthly spending cap'), await capEditor('agent', id, models)),
         h('fieldset', {}, h('legend', {}, 'Scheduled posts'), schedBox, h('button', { class: 'btn small mut', onclick: () => { scheds.push({ id: `s${scheds.length + 1}`, at: '08:00', days: 'daily', prompt: '', chats: 'all', enabled: true }); drawScheds(); } }, '+ Add schedule')),
         h('fieldset', {}, h('legend', {}, 'Advanced'),
           plugins.length ? field('Plugins', h('div', {}, F.plugins)) : null,
           field('Timezone', F.timezone), h('div', { class: 'row' }, field('Recent messages in context', F.historySize), field('Max reply tokens', F.maxTokens))),
         h('div', { class: 'row mut' }, h('button', { class: 'btn primary', onclick: save }, 'Save'))),
       h('div', { class: 'card', id: 'test-console', style: 'position:sticky;top:110px;scroll-margin-top:110px' }, h('h2', {}, 'Test console'),
-        h('p', { class: 'small muted' }, 'Uses real tools and the saved settings; nothing is posted to WhatsApp.'), log, testForm)));
+        h('p', { class: 'small muted' }, 'Uses real tools and the saved settings; nothing is posted to WhatsApp. Pick a role and a chat to see what each person would get.'),
+        testAs, hintBox, toolsBox, log, testForm)));
+  // Deep links: #agents/<id>/test, /triggers, /dm (first-run checklist, quiet reasons)
+  const sub = location.hash.split('/')[2];
+  const target = { test: $('#test-console'), triggers: F.triggers, dm: F.dm }[sub];
+  if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (sub !== 'test') target.focus({ preventScroll: true }); else input.focus({ preventScroll: true }); }
 }
 
 // ---------- chats + memory ----------
@@ -1374,8 +1600,158 @@ async function renderAgentEditor(id) {
 const FIELD_LABEL = { name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', dm: 'Who may message it directly',
   organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', globalMcp: 'Global tool services', tools: 'Tool rules', confirm: 'Confirmation', schedules: 'Scheduled posts', memory: 'Group memory',
   model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', plugins: 'Plugins', enabled: 'Enabled' };
-const showVal = (v) => (v == null || (Array.isArray(v) && !v.length) ? '—' : typeof v === 'string' ? v : Array.isArray(v) && v.every((x) => typeof x === 'string') ? v.join('\n') : JSON.stringify(v, null, 2));
-const withNames = (field, v, names = {}) => (['organizers', 'participants'].includes(field) && Array.isArray(v) ? v.map((p) => (names[p] ? `${names[p]} (+${p})` : `+${p}`)) : v);
+// The editor's sections, in the editor's order: the review groups changes the same way.
+const AI_SECTIONS = [['General', ['name', 'description', 'enabled', 'memory', 'respondToMentions', 'model', 'triggers', 'dm']], ['Instructions', ['prompt']],
+  ['People & roles', ['organizers', 'participants']], ['Tool services', ['mcpServers', 'globalMcp', 'tools']], ['Changes need confirmation', ['confirm']],
+  ['Scheduled posts', ['schedules']], ['Advanced', ['plugins', 'timezone', 'historySize', 'maxTokens']]];
+const AI_ORDER = AI_SECTIONS.flatMap(([, f]) => f);
+const sectionOf = (f) => (AI_SECTIONS.find(([, fs]) => fs.includes(f)) || ['Other'])[0];
+const DM_LABEL = { none: 'Nobody', organizers: 'Organizers only', members: 'Members of its groups', anyone: 'Anyone' };
+const DAY_LABEL = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
+const daysLabel = (d) => (!d || d === 'daily' ? 'every day' : d === 'mon,tue,wed,thu,fri' ? 'weekdays' : d === 'sat,sun' ? 'weekends' : String(d).split(',').map((x) => DAY_LABEL[x.trim()] || x).join(', '));
+const trunc = (s, n) => { const t = String(s || '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+function modelLabel(ref, models) {
+  if (!ref || ref === 'auto') return 'Auto (default model)';
+  const m = (models?.models || []).find((x) => x.ref === ref); if (m) return m.label;
+  const i = String(ref).indexOf(':'); const p = ref.slice(0, i); const id = ref.slice(i + 1);
+  const pm = (models?.models || []).find((x) => x.provider === p); const pl = pm ? pm.label.split(' · ')[0] : p;
+  return id === 'auto' ? `${pl} · Auto` : `${pl} · ${id}`;
+}
+const personLabel = (p, names) => { const d = String(p).replace(/\D/g, ''); return names?.[d] ? `${names[d]} (+${d})` : `+${d}`; };
+const ruleLabel = (r) => { const [srv, tool] = String(r).split(':'); if (!tool) return String(r); if (tool === '*') return `everything in ${srv}`; if (tool === '-') return `nothing from ${srv}`; return `${tool.replace(/\*/g, '…').replace(/_/g, ' ')} (${srv})`; };
+const serverLabel = (k, s) => { let host = ''; try { host = s?.url ? new URL(s.url.replace(/\$\{[^}]+\}/g, 'x')).host : ''; } catch { host = ''; } return host ? `${k} · ${host}` : s?.type === 'local' ? `${k} · on this server` : k; };
+const schedLabel = (s) => `${s.at || '?'} ${daysLabel(s.days)}${s.enabled === false ? ' (paused)' : ''} — ${trunc(s.prompt, 70)}`;
+/** One plain value as a short sentence part ("on", "Organizers only", "Claude Sonnet 5.5"). */
+function aiScalar(field, v, ctx) {
+  if (field === 'model') return modelLabel(v, ctx.models);
+  if (field === 'dm') return DM_LABEL[v] || String(v ?? '—');
+  if (field === 'memory') return v?.enabled === false ? 'off' : 'on';
+  if (field === 'confirm') return v ? `on (preview ${v.preview || '—'}, confirm with ${v.tool || '—'})` : 'off';
+  if (typeof v === 'boolean') return v ? 'on' : 'off';
+  if (v == null || v === '') return '—';
+  return typeof v === 'object' ? JSON.stringify(v) : String(v);
+}
+/** List-like fields as [{ k: key, l: readable label, v: value for "changed" checks }]. */
+const AI_LISTS = {
+  triggers: (v) => (v || []).map((x) => ({ k: x, l: x })),
+  plugins: (v) => (v || []).map((x) => ({ k: x, l: x })),
+  organizers: (v, c) => (v || []).map((p) => ({ k: String(p).replace(/\D/g, ''), l: personLabel(p, c.names) })),
+  participants: (v, c) => (v || []).map((p) => ({ k: String(p).replace(/\D/g, ''), l: personLabel(p, c.names) })),
+  mcpServers: (v) => Object.entries(v || {}).map(([k, s]) => ({ k, l: serverLabel(k, s), v: s })),
+  schedules: (v) => (v || []).map((s) => ({ k: s.id || s.at, l: schedLabel(s), v: s })),
+};
+const segNode = (s) => (s.newline ? null : s.type === 'add' ? h('ins', {}, s.text) : s.type === 'del' ? (s.text.trim() ? h('del', {}, s.text) : null) : s.text);
+function diffLine(segs) {
+  const add = segs.some((s) => s.type === 'add' && s.text.trim()); const del = segs.some((s) => s.type === 'del' && s.text.trim());
+  const mark = add && del ? '±' : add ? '+' : del ? '−' : '';
+  return h('div', { class: `dl${add && !del ? ' a' : ''}${del && !add ? ' d' : ''}${add && del ? ' m' : ''}` }, h('i', { 'aria-hidden': 'true' }, mark), h('span', {}, segs.map(segNode), '​'));
+}
+/** Lines with folded unchanged stretches ("… 12 unchanged lines …", tap to show). keep(seg) filters a side. */
+function diffBlocks(blocks, keep = () => true) {
+  return blocks.map((b) => {
+    const rows = b.lines.map((l) => l.filter(keep)).filter((l, i) => l.length || !b.lines[i].length);
+    if (b.type === 'lines') return rows.map(diffLine);
+    const btn = h('button', { type: 'button', class: 'dskip', onclick: () => btn.replaceWith(...rows.map(diffLine)) }, `… ${plural(rows.length, 'unchanged line')} …`);
+    return btn;
+  });
+}
+/** Inline word diff of a text field with a view switch: Changes only / Side by side / Whole new text. */
+function textDiffView(before, after, { switcher = true } = {}) {
+  const d = DuniyaDiff.diffText(before, after);
+  const blocks = DuniyaDiff.hunks(d.ops, { context: 2 });
+  const body = h('div', {});
+  const views = {
+    changes: () => h('div', { class: 'dtext' }, diffBlocks(blocks)),
+    side: () => h('div', { class: 'dside' },
+      h('div', {}, h('div', { class: 'eyebrow' }, '− Before'), h('div', { class: 'dtext' }, diffBlocks(blocks, (s) => s.type !== 'add'))),
+      h('div', {}, h('div', { class: 'eyebrow' }, '+ After'), h('div', { class: 'dtext' }, diffBlocks(blocks, (s) => s.type !== 'del')))),
+    whole: () => h('div', { class: 'dtext' }, DuniyaDiff.hunks(d.ops.filter((o) => o.type !== 'del'), { context: 1e9 }).flatMap((b) => b.lines.map(diffLine))),
+  };
+  let mode = 'changes';
+  const seg = h('div', { class: 'seg dseg', role: 'group', 'aria-label': 'How to show the changes' }, [['changes', 'Changes only'], ['side', 'Side by side'], ['whole', 'Whole new text']].map(([v, l]) =>
+    h('button', { type: 'button', class: v === mode ? 'on' : '', 'aria-pressed': String(v === mode), onclick: (e) => {
+      mode = v; seg.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b === e.currentTarget); b.setAttribute('aria-pressed', String(b === e.currentTarget)); }); body.replaceChildren(views[mode]());
+    } }, l)));
+  body.replaceChildren(views.changes());
+  const long = /\n/.test(`${before}${after}`) || `${before}${after}`.length > 200;
+  return { el: h('div', {}, switcher && long && before ? seg : null, body), added: d.added, removed: d.removed };
+}
+const chipRow = (title, items, cls) => (items.length ? h('div', { class: 'dchips' }, h('span', { class: 'dgl' }, title),
+  items.map((x) => h(cls === 'add' ? 'ins' : 'del', { class: 'dchip' }, h('span', { 'aria-hidden': 'true' }, cls === 'add' ? '+ ' : '− '), x))) : null);
+function listDiffView(before, after, { added = 'Added', removed = 'Removed', describe = null } = {}) {
+  const r = DuniyaDiff.diffList(before, after, (x) => x.k);
+  const changed = r.kept.filter((x) => { const old = before.find((y) => y.k === x.k); return JSON.stringify(old?.v ?? null) !== JSON.stringify(x.v ?? null); });
+  const same = r.kept.filter((x) => !changed.includes(x));
+  return {
+    el: h('div', {}, chipRow(added, r.added.map((x) => x.l), 'add'), chipRow(removed, r.removed.map((x) => x.l), 'del'),
+      changed.map((x) => { const old = before.find((y) => y.k === x.k); return h('div', { class: 'dsent' }, h('span', { class: 'dgl' }, '± Changed'), describe ? describe(old.v, x.v) : [h('del', {}, old.l), ' → ', h('ins', {}, x.l)]); }),
+      same.length ? h('div', { class: 'small muted' }, `${same.length} unchanged: ${trunc(same.map((x) => x.l).join(', '), 120)}`) : null),
+    n: [r.added.length && `${r.added.length} added`, r.removed.length && `${r.removed.length} removed`, changed.length && `${changed.length} changed`].filter(Boolean).join(', ') || 'reordered',
+  };
+}
+/** What changed in one scheduled post, in short sentences: "“Post today's rides…” · Time: 06:45 → 06:30". */
+function schedChange(a, b) {
+  const parts = [['at', 'Time', (v) => v || '—'], ['days', 'Days', daysLabel], ['enabled', 'Status', (v) => (v === false ? 'paused' : 'on')], ['chats', 'Chats', (v) => (Array.isArray(v) ? v.length : v || 'all')]]
+    .filter(([k]) => JSON.stringify(a?.[k] ?? null) !== JSON.stringify(b?.[k] ?? null))
+    .map(([k, t, f], i) => [i ? ' · ' : '', `${t}: `, h('del', {}, String(f(a?.[k]))), ' → ', h('ins', {}, String(f(b?.[k])))]);
+  return h('span', {}, `“${trunc(b?.prompt, 50)}” `, parts, a?.prompt !== b?.prompt ? h('div', { style: 'margin-top:6px' }, textDiffView(a?.prompt || '', b?.prompt || '', { switcher: false }).el) : null);
+}
+/** One change as a card: a plain label, and the friendliest view for the kind of field. */
+function changeCard(ch, ctx) {
+  const label = FIELD_LABEL[ch.field] || ch.field;
+  let head; let body = null; let added = 0; let removed = 0;
+  if (ch.field === 'prompt' || ch.field === 'description') {
+    const v = textDiffView(ch.before || '', ch.after || '', { switcher: ch.field === 'prompt' });
+    ({ added, removed } = v); body = v.el;
+    head = !ch.before ? `${label} written` : !ch.after ? `${label} removed` : `${label}: ${[added && `${plural(added, 'word')} added`, removed && `${removed} removed`].filter(Boolean).join(', ') || 'spacing changed'}`;
+  } else if (AI_LISTS[ch.field]) {
+    const v = listDiffView(AI_LISTS[ch.field](ch.before, ctx), AI_LISTS[ch.field](ch.after, ctx), { describe: ch.field === 'schedules' ? schedChange : null }); body = v.el; head = `${label}: ${v.n}`;
+  } else if (ch.field === 'globalMcp') {
+    const v = listDiffView(AI_LISTS.plugins(ch.before?.disabled), AI_LISTS.plugins(ch.after?.disabled), { added: 'Turned off', removed: 'Turned on again' }); body = v.el; head = `${label}: ${v.n.replace('added', 'turned off').replace('removed', 'turned on')}`;
+  } else if (ch.field === 'tools') {
+    const roles = [['participant', 'Participants may use'], ['organizer', 'Organizers may use'], ['deny', 'Never allowed']];
+    const parts = roles.map(([role, t]) => { const f = (v) => (v?.[role] || []).map((x) => ({ k: x, l: ruleLabel(x) })); const a = f(ch.before); const b = f(ch.after);
+      return JSON.stringify(a) === JSON.stringify(b) ? null : [t, listDiffView(a, b)]; }).filter(Boolean);
+    body = parts.map(([t, v]) => h('div', { class: 'drole' }, h('div', { class: 'eyebrow' }, t), v.el)); head = `${label}: ${parts.map(([t]) => t.split(' ')[0].toLowerCase()).join(', ')} changed`;
+  } else {
+    head = h('span', {}, `${label}: `, h('del', {}, aiScalar(ch.field, ch.before, ctx)), ' → ', h('ins', {}, aiScalar(ch.field, ch.after, ctx)));
+  }
+  return { added, removed, el: h('details', { class: 'dcard', open: true },
+    h('summary', {}, h('span', { class: 'eyebrow' }, sectionOf(ch.field)), h('b', {}, head)), body ? h('div', { class: 'dbody' }, body) : null) };
+}
+/** Review of proposed edits: "3 changes · 2 sections · +40 words −12 words", then one card per change. */
+function changesReview(r, ctx) {
+  const changes = [...r.changes].sort((a, b) => AI_ORDER.indexOf(a.field) - AI_ORDER.indexOf(b.field));
+  const cards = changes.map((ch) => changeCard(ch, ctx));
+  const words = cards.reduce((s, c) => ({ a: s.a + c.added, d: s.d + c.removed }), { a: 0, d: 0 });
+  const sections = new Set(changes.map((c) => sectionOf(c.field))).size;
+  return h('div', { class: 'dreview' },
+    h('div', { class: 'dsum' }, h('b', {}, `${plural(changes.length, 'change')} · ${plural(sections, 'section')}`),
+      words.a ? h('ins', { class: 'dcount' }, `+${plural(words.a, 'word')}`) : null, words.d ? h('del', { class: 'dcount' }, `−${plural(words.d, 'word')}`) : null),
+    cards.map((c) => c.el));
+}
+/** A clean summary of a brand-new agent (create with AI): what it is, then only what differs from the defaults. */
+function newAgentReview(r, ctx) {
+  const p = r.proposed || {};
+  const rows = [...r.changes].filter((c) => !['name', 'description'].includes(c.field)).sort((a, b) => AI_ORDER.indexOf(a.field) - AI_ORDER.indexOf(b.field)).map((ch) => {
+    let v;
+    if (ch.field === 'prompt') {
+      const lines = String(ch.after || '').split('\n'); const box = h('div', { class: 'dtext dplain' }, lines.slice(0, 10).join('\n'));
+      v = h('div', {}, box, lines.length > 10 ? h('button', { type: 'button', class: 'dskip', onclick: (e) => { box.textContent = ch.after; e.currentTarget.remove(); } }, `Show all ${lines.length} lines`) : null);
+    } else if (AI_LISTS[ch.field]) {
+      const items = AI_LISTS[ch.field](ch.after, ctx);
+      v = ch.field === 'schedules' ? h('ul', { class: 'dlist' }, items.map((x) => h('li', {}, x.l))) : h('div', { class: 'dchips' }, items.length ? items.map((x) => h('span', { class: 'dchip n' }, x.l)) : h('span', { class: 'muted' }, 'none'));
+    } else if (ch.field === 'tools') {
+      v = h('div', {}, [['participant', 'Participants'], ['organizer', 'Organizers'], ['deny', 'Never']].filter(([k]) => ch.after?.[k]?.length).map(([k, t]) => h('div', { class: 'dchips' }, h('span', { class: 'dgl' }, t), ch.after[k].map((x) => h('span', { class: 'dchip n' }, ruleLabel(x))))));
+    } else if (ch.field === 'globalMcp') v = `Turned off: ${(ch.after?.disabled || []).join(', ') || 'none'}`;
+    else v = aiScalar(ch.field, ch.after, ctx);
+    return h('div', { class: 'drow' }, h('div', { class: 'eyebrow' }, FIELD_LABEL[ch.field] || ch.field), h('div', {}, v));
+  });
+  return h('div', { class: 'dnew' }, h('div', { class: 'eyebrow' }, h('span', { class: 'ai-chip' }, 'NEW'), ' New agent'),
+    h('h3', {}, p.name || 'New agent'), p.description ? h('p', { class: 'muted', style: 'margin:0 0 6px' }, p.description) : null,
+    rows, h('p', { class: 'small muted' }, 'Everything else uses the defaults; you can change any of it in the editor afterwards.'));
+}
 /** "Describe it → AI drafts → review the changes → apply". onApply(result) does the saving. */
 async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply }) {
   const models = await loadModels().catch(() => ({ models: [] }));
@@ -1386,15 +1762,11 @@ async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply 
     go.disabled = true; out.replaceChildren(h('p', { class: 'muted small' }, h('span', { class: 'spinner' }), ' Thinking… this can take up to a minute.'));
     try {
       const r = await api('POST', '/api/ai/agent-draft', { agentId, request: ask.value, model: model.value });
+      const ctx = { names: r.names || {}, models };
       out.replaceChildren(
-        h('div', { class: 'note ok' }, h('b', {}, 'Draft ready · '), r.summary || `${r.changes.length} change(s)`),
+        h('div', { class: 'note ok' }, h('b', {}, 'Draft ready · '), r.summary || plural(r.changes.length, 'change')),
         r.questions?.length ? h('div', { class: 'note' }, h('b', {}, 'The AI asks: '), r.questions.join(' ')) : null,
-        r.changes.length ? r.changes.map((ch) => h('details', { open: ch.field === 'prompt' || r.changes.length <= 3, style: 'margin:8px 0' },
-          h('summary', { style: 'cursor:pointer' }, h('b', {}, FIELD_LABEL[ch.field] || ch.field), h('span', { class: 'small muted' }, ' — changed')),
-          h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:6px' },
-            h('div', {}, h('div', { class: 'eyebrow' }, 'Before'), h('pre', { style: 'background:var(--bg-2);color:var(--ink)' }, showVal(withNames(ch.field, ch.before, r.names)))),
-            h('div', {}, h('div', { class: 'eyebrow', style: 'color:var(--accent)' }, 'After'), h('pre', { style: 'background:var(--accent-soft);color:var(--ink)' }, showVal(withNames(ch.field, ch.after, r.names)))))))
-          : h('p', { class: 'muted small' }, 'No changes were needed.'),
+        !r.changes.length ? h('p', { class: 'muted small' }, 'No changes were needed.') : agentId ? changesReview(r, ctx) : newAgentReview(r, ctx),
         h('p', { class: 'small muted' }, `Drafted with ${r.model}. Nothing is saved until you apply.`),
         h('div', { class: 'row' }, r.changes.length ? h('button', { class: 'btn primary', onclick: () => onApply(r) }, applyLabel) : null,
           h('button', { class: 'btn', onclick: () => out.replaceChildren() }, 'Discard')));
@@ -1408,7 +1780,11 @@ async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply 
 let chatsFilter = 'all';
 async function renderChats() {
   $('#main').replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading chats…')));
-  const [chats, agents, models, us] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/agents'), loadModels().catch(() => ({ models: [] })), usageSummary()]);
+  const [chats, agents, models, us, bud, quiet] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/agents'), loadModels().catch(() => ({ models: [] })), usageSummary(), api('GET', '/api/budget').catch(() => null), api('GET', '/api/silences?days=7').catch(() => ({ silences: [] }))]);
+  const capOf = new Map((bud?.caps || []).filter((x) => x.scope === 'chat').map((x) => [x.id, x]));
+  const openCap = async (c) => { memBox.replaceChildren(h('div', { class: 'card', style: 'margin-top:14px' }, h('h2', {}, `Spending cap · ${c.name || c.id}`), await capEditor('chat', c.id, models))); memBox.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  const quietBy = new Map(); // #34: why agents stayed quiet, per chat (most frequent first)
+  for (const q of quiet.silences) { if (!quietBy.has(q.chat)) quietBy.set(q.chat, []); quietBy.get(q.chat).push(q); }
   const memBox = h('div', {});
   const multi = new Set(chats.map((c) => c.number)).size > 1;
   const savePrefs = (c, patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, patch)); }, 'Saved');
@@ -1422,7 +1798,12 @@ async function renderChats() {
           h('div', { class: 'small muted' }, c.isGroup ? `${c.size || 0} members` : c.phone ? `+${c.phone}` : '', c.lastAt ? ` · last message ${ago(c.lastAt)} ago` : ''),
           us?.chat?.[c.id] ? h('div', { class: 'small muted num' }, `30 days: ${usageLine(us.chat[c.id])}`) : null,
           !c.enabled ? h('div', { class: 'small', style: 'color:var(--warn)' }, `Off — ignored${c.ignored ? ` (${c.ignored} message${c.ignored > 1 ? 's' : ''} since restart)` : ''}`) : null,
-          h('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory')),
+          capOf.get(c.id) ? h('div', { class: 'small num', style: `color:var(--${capOf.get(c.id).state === 'ok' ? 'muted' : 'warn'})` }, `Cap: ${Math.round(capOf.get(c.id).used * 100)}% used · ${capAmount(capOf.get(c.id))}`) : null,
+          (quietBy.get(c.id) || []).slice(0, 2).map((q) => h('div', { class: 'quiet' }, h('span', { class: `small${q.reason === 'not_addressed' ? ' muted' : ''}`, style: q.reason === 'not_addressed' ? '' : 'color:var(--warn)', title: `${q.explain} Last ${ago(q.lastTs)} ago.` }, quietLine(q)),
+            silenceFix(q, () => renderChats(), { onChats: true }))),
+          h('div', { class: 'row', style: 'gap:6px;margin-top:6px' },
+            h('button', { class: 'btn small', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory'),
+            h('button', { class: 'btn small', onclick: () => openCap(c) }, 'Spending cap'))),
         h('td', { style: 'min-width:170px', 'data-label': 'Agent' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, agent: e.target.value || null }); c.agent = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
           h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),
         h('td', { style: 'min-width:200px', 'data-label': 'Model' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) })),
@@ -1975,7 +2356,7 @@ async function renderSecrets() {
 
 // ---------- settings ----------
 async function renderSettings() {
-  const [agents, lg, ai, sess, mob] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null), api('GET', '/api/mobile').catch(() => null)]);
+  const [agents, lg, ai, sess, mob, alerts] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null), api('GET', '/api/mobile').catch(() => null), api('GET', '/api/alerts').catch(() => null)]);
   if (sess?.user) { S.user = sess.user; S.google = !!sess.google; }
   const me = S.user;
   const tools = await toolServicesCard().catch((e) => h('div', { class: 'card' }, h('h2', {}, 'Tool services for all agents'), h('p', { class: 'small muted' }, `Could not load: ${e.message}`)));
@@ -1989,6 +2370,7 @@ async function renderSettings() {
     h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default agent for DMs without a trigger'),
       h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmAgent: e.target.value }), 'Saved') },
         h('option', { value: '' }, '— first agent that accepts the sender —'), agents.map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmAgent === b.id }, b.name)))),
+    alerts ? ownerAlertsCard(alerts) : null,
     mob ? mobileCard(mob) : null,
     ai ? assistantsCard(ai) : null,
     lg ? loggingCard(lg) : null,
@@ -2001,6 +2383,38 @@ async function renderSettings() {
   }
   cards.unshift(tools); // Tool services for all agents (035) first: they affect every agent
   $('#main').replaceChildren(h('div', { class: 'grid' }, cards));
+}
+
+// ---------- Settings → Owner alerts (040/041): where cap alerts and the weekly summary go ----------
+const DAY_NAMES = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+function ownerAlertsCard(a) {
+  const own = can('owner');
+  const w = a.weekly;
+  const num = h('input', { type: 'tel', inputmode: 'tel', value: a.alertsTo ? `+${a.alertsTo}` : '', placeholder: '+41 79 123 45 67', 'aria-label': 'Alerts go to', disabled: !own });
+  const day = h('select', { 'aria-label': 'Day', disabled: !own }, Object.entries(DAY_NAMES).map(([v, l]) => h('option', { value: v, selected: w.day === v }, l)));
+  const at = h('input', { type: 'time', value: w.at, 'aria-label': 'Time', disabled: !own });
+  const on = w.enabled === null ? true : w.enabled;
+  const out = h('div', {});
+  const state = !a.alertsTo ? h('div', { class: 'note warn' }, 'No number yet: spending-cap alerts and the weekly summary are only written to Activity. Add the number that should get them.')
+    : w.active ? h('div', { class: 'note ok' }, `✓ Alerts go to +${a.alertsTo}. Weekly summary every ${DAY_NAMES[w.day]} at ${w.at}${w.last ? ` · last sent ${ago(w.last)} ago` : ''}.`)
+      : h('div', { class: 'note' }, `Alerts go to +${a.alertsTo}. Weekly summary is off.`);
+  const save = (body, msg) => tryApi(async () => { await api('PUT', '/api/alerts', body); renderSettings(); }, msg);
+  return h('div', { class: 'card' }, h('h2', {}, 'Owner alerts on WhatsApp'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'The agents’ WhatsApp number messages you here when a spending cap reaches 80% or 100%, and once a week with a short summary: messages handled, replies, cost, ignored chats and anything waiting for you. Never message contents.'),
+    state,
+    field('Alerts go to', h('div', { class: 'row nowrap', style: 'gap:8px' }, num, own ? h('button', { class: 'btn', type: 'button', onclick: () => save({ alertsTo: num.value }, num.value ? 'Number saved' : 'Number removed') }, 'Save') : null),
+      'Your own WhatsApp number with country code. Use a different number than the agents’ one.'),
+    h('div', { class: 'row', style: 'margin-top:12px;gap:10px' }, h('label', { class: 'inline' }, toggle(on, (v) => save({ weekly: { enabled: v } }, v ? 'Weekly summary on' : 'Weekly summary off'), !own), 'Weekly summary')),
+    h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px' }, field('Day', day), field('Time (server time)', at)),
+    own ? h('div', { class: 'row', style: 'margin-top:10px;gap:8px' },
+      h('button', { class: 'btn', type: 'button', onclick: () => save({ weekly: { day: day.value, at: at.value } }, 'Schedule saved') }, 'Save schedule'),
+      h('button', { class: 'btn primary', type: 'button', onclick: async (e) => {
+        const b = e.currentTarget; b.disabled = true;
+        const r = await tryApi(() => api('POST', '/api/alerts/weekly/send'));
+        b.disabled = false;
+        if (r) { toast(r.sent ? `Sent to +${a.alertsTo}` : `Not sent: ${r.reason}`); out.replaceChildren(h('label', {}, r.sent ? 'Sent just now:' : 'Preview (not sent):'), h('pre', { class: 'small' }, r.text)); }
+      } }, 'Send now')) : h('p', { class: 'small muted' }, 'Only the owner can change these.'),
+    out);
 }
 
 // ---------- Settings → Tool services (035): MCP servers every agent can use ----------

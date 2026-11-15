@@ -242,6 +242,16 @@ Admin panel (localhost:8080 behind Caddy / Cloudflare Tunnel / SSH) · SQLite ·
   rules for that service, the service's defaults apply (`server:-` = none). OAuth sign-ins are per service (shared by
   all agents); local (npm/GitHub) services are owner-only. Admin MCP tools: `list_global_tool_services`,
   `add_global_tool_service`, `remove_global_tool_service`.
+- **Spending caps** (040, #35): monthly caps per agent (agent page) and per chat (**Chats → Spending cap**), by cost in
+  USD (counts only priced calls: your prices, provider-published prices, plans and free models) and/or by tokens. At 80%
+  the owner gets one WhatsApp alert; at 100% the agent stays quiet in that scope (or switches to a cheaper model you
+  chose) until the month ends (server timezone). Bars on **Usage**. Admin MCP tools: `get_spending_caps`,
+  `set_spending_cap`.
+- **Owner alerts and weekly summary** (041, #38): under **Settings → Owner alerts on WhatsApp** the owner enters their
+  number. Cap alerts go there, and a weekly summary (on by default once a number is set; day and time configurable):
+  messages handled, replies and cost per agent this week vs last, ignored chats, pending confirmations, update available,
+  backup failures — counts only, never message contents. **Send now** sends it at once. Admin MCP tools:
+  `get_owner_alerts`, `set_owner_alerts`, `preview_weekly_summary`, `send_weekly_summary`.
 - **Plugins** (`plugins/<name>/index.js`) add local tools or commands for advanced cases; see `plugins/example-dice`.
 - **Agent templates** (`templates/`): New agent, School friends, Family, Car pooling, Office colleagues, Event planning,
   Neighbours. Agents themselves are data in the app (export/import as JSON).

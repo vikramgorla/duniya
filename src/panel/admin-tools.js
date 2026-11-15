@@ -98,10 +98,25 @@ export const TOOLS = [
     run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/schedules/${enc(a.schedule_id)}/run`) },
   { name: 'test_agent', calls: [['POST', '/api/agents/x/test']],
     description: 'Send a test message to an agent, like the panel\'s test console, and get its reply. Nothing is posted to WhatsApp. "as" picks the sender\'s role (organizer or participant).',
-    input: { agent_id: str('Agent id'), text: str('Message text'), as: { type: 'string', enum: ['organizer', 'participant'], description: 'Sender role (default participant)' } }, required: ['agent_id', 'text'],
-    run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/test`, { text: a.text, role: ROLE_TEXT[a.as] || 'participant' }) },
+    input: { agent_id: str('Agent id'), text: str('Message text'), as: { type: 'string', enum: ['organizer', 'participant'], description: 'Sender role (default participant)' },
+      chat: str('Test as if in this chat of the agent (its memory, group or direct, model); omit for a new direct chat') }, required: ['agent_id', 'text'],
+    run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/test`, { text: a.text, role: ROLE_TEXT[a.as] || 'participant', chat: a.chat || 'new' }) },
+  { name: 'list_agent_tools', readOnly: true, calls: [['GET', '/api/agents/x/test-tools']],
+    description: 'The tools an agent can use for a role (organizer or participant), grouped by tool service — what the test console shows under "Test as…".',
+    input: { agent_id: str('Agent id'), as: { type: 'string', enum: ['organizer', 'participant'], description: 'Role (default participant)' } }, required: ['agent_id'],
+    run: (a, x) => x.call('GET', `/api/agents/${enc(a.agent_id)}/test-tools?role=${ROLE_TEXT[a.as] || 'participant'}`) },
 
   // ---------- chats & memory ----------
+  { name: 'list_silences', readOnly: true, calls: [['GET', '/api/silences']],
+    description: 'Why agents stayed silent, per chat, agent and reason (chat off, not mentioned, no agent, agent off, paused, direct messages off, sender not allowed, rate limit, model error, empty answer, budget cap), with a count, last time and a sample sender. Never message text. Most frequent first.',
+    input: { chat: str('Only this chat id (optional)'), agent_id: str('Only this agent (optional)'), reason: str('Only this reason key (optional)'), days: int('Look back this many days (default 7)', { minimum: 1, maximum: 400 }) },
+    run: async (a, x) => {
+      const q = new URLSearchParams({ days: String(a.days || 7) });
+      if (a.chat) q.set('chat', a.chat);
+      if (a.agent_id) q.set('agent', a.agent_id);
+      if (a.reason) q.set('reason', a.reason);
+      return (await x.call('GET', `/api/silences?${q}`)).silences.map((r) => ({ chat: r.chat, agent: r.agent || undefined, reason: r.reason, label: r.label, explain: r.explain, count: r.count, last: iso(r.lastTs), sampleSender: r.sampleSender || undefined }));
+    } },
   { name: 'list_chats', readOnly: true, calls: [['GET', '/api/chats']], description: 'WhatsApp groups and 1:1 chats the numbers know, with their agent, model and logging settings.', input: {},
     run: (a, x) => x.call('GET', '/api/chats') },
   { name: 'assign_chat', calls: [['POST', '/api/chats/bind']], description: 'Choose which agent answers in a chat. Empty agent_id removes the agent from the chat.',
@@ -123,6 +138,38 @@ export const TOOLS = [
     description: 'Set the price of a model in USD per million tokens (input and output) so usage shows costs. Empty values remove the price.',
     input: { model: str('provider:model'), input_per_million: { type: 'number' }, output_per_million: { type: 'number' } }, required: ['model'],
     run: (a, x) => x.call('PUT', '/api/usage/prices', { model: a.model, input: a.input_per_million, output: a.output_per_million }) },
+  // ---------- spending caps (040) and owner alerts (041) ----------
+  { name: 'get_spending_caps', readOnly: true, calls: [['GET', '/api/budget']],
+    description: 'Monthly spending caps per agent and per chat with this month\'s spend (USD where prices are known, tokens otherwise), how full each cap is and its state: ok, warning (80%+), quiet (100%: the agent stays quiet there) or fallback (100%: a cheaper model is used).',
+    input: {},
+    run: (a, x) => x.call('GET', '/api/budget') },
+  { name: 'set_spending_cap', calls: [['PUT', '/api/budget/agent/x']],
+    description: 'Set a monthly cap for an agent or a chat: cost_usd (needs model prices) and/or tokens (works without prices). At 80% the owner gets a WhatsApp alert; at 100% the agent stays quiet in that scope, or uses fallback_model if given. Leave both cost_usd and tokens empty to remove the cap.',
+    input: { scope: { type: 'string', enum: ['agent', 'chat'], description: 'agent or chat' }, id: str('Agent id or chat id'), cost_usd: { type: 'number', description: 'Monthly cost cap in USD (optional)' },
+      tokens: int('Monthly token cap (optional, at least 1000)'), fallback_model: str('Cheaper model (provider:model) to use at 100% instead of staying quiet (optional)') }, required: ['scope', 'id'],
+    run: (a, x) => x.call('PUT', `/api/budget/${enc(a.scope)}/${enc(a.id)}`, { cost: a.cost_usd ?? null, tokens: a.tokens ?? null, fallback: a.fallback_model || '' }) },
+  { name: 'get_owner_alerts', readOnly: true, calls: [['GET', '/api/alerts']],
+    description: 'Where owner alerts go on WhatsApp (alertsTo) and the weekly summary settings (day, time, whether it is active).',
+    input: {},
+    run: (a, x) => x.call('GET', '/api/alerts') },
+  { name: 'set_owner_alerts', calls: [['PUT', '/api/alerts']],
+    description: 'Owner only. Set the WhatsApp number owner alerts and the weekly summary go to (with country code; empty = none), and the weekly summary: enabled, day (mon…sun), at (HH:MM, server time).',
+    input: { alerts_to: str('Phone number with country code (optional)'), weekly_enabled: bool('Weekly summary on or off (optional)'), weekly_day: { type: 'string', enum: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] }, weekly_at: str('HH:MM (optional)') },
+    run: (a, x) => {
+      const weekly = {};
+      if (a.weekly_enabled !== undefined) weekly.enabled = a.weekly_enabled;
+      if (a.weekly_day) weekly.day = a.weekly_day;
+      if (a.weekly_at) weekly.at = a.weekly_at;
+      return x.call('PUT', '/api/alerts', { ...(a.alerts_to !== undefined ? { alertsTo: a.alerts_to } : {}), ...(Object.keys(weekly).length ? { weekly } : {}) });
+    } },
+  { name: 'preview_weekly_summary', readOnly: true, calls: [['GET', '/api/alerts/weekly/preview']],
+    description: 'The weekly summary text as it would be sent now (counts and costs only, no message contents).',
+    input: {},
+    run: async (a, x) => (await x.call('GET', '/api/alerts/weekly/preview')).text },
+  { name: 'send_weekly_summary', calls: [['POST', '/api/alerts/weekly/send']],
+    description: 'Owner only. Send the weekly summary to the owner\'s WhatsApp now.',
+    input: {},
+    run: (a, x) => x.call('POST', '/api/alerts/weekly/send') },
   { name: 'list_contacts', readOnly: true, calls: [['GET', '/api/contacts']], description: 'Contacts (WhatsApp names synced from the phone + own entries). Shared ones can be looked up by participants through agents.',
     input: { query: str('Name, note or number to filter by (optional)'), shared_only: { type: 'boolean' } },
     run: (a, x) => x.call('GET', `/api/contacts?q=${enc(a.query || '')}${a.shared_only ? '&shared=1' : ''}`) },
