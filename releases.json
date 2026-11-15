@@ -42,6 +42,14 @@
       "data": "not-migrated",
       "docs": "docs/upgrading.md#from-1x-to-20"
     },
+    "2.9.2": {
+      "breaking": false,
+      "title": "Visual guides",
+      "summary": "The README and every guide now start with a one-line promise, the one thing to do next and a 30-second summary, with screenshots, diagrams and a host comparison. Nothing to do on your server.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/README.md"
+    },
     "2.9.1": {
       "breaking": false,
       "title": "Clearer first install",

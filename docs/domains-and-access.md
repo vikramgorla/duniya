@@ -1,48 +1,82 @@
 # Domains, proxies, tunnels and access
 
-How the panel is reached is chosen at install time (`--domain`, `--ip-https`, `--cloudflare-token`,
-`--tailscale-authkey`, `--local-only`, see [Install](install.md)) and can be changed later in the panel.
+**Put the panel on your own domain, behind any proxy or CDN, with automatic HTTPS and a switch that never locks you
+out.**
 
-*Settings → Web address & access* (owner). Applied by the root maintenance helper with strict validation (re-run the
-installer once on older servers). If HTTPS does not come up within 4 minutes, the previous settings come back by
-themselves; the check always runs on the server itself (127.0.0.1 with the domain as SNI), never through public DNS.
+**Do it:** panel → **Settings → Web address & access** (owner).
 
-**Does the domain lead here?** **Check** looks at DNS only as a hint (*points straight here*, *behind a proxy/CDN
-(looks like …)*, *other*, *missing*). What decides is a one-time proof: the panel serves a random token at
-`/.well-known/duniya-check/<token>` and fetches it through the public domain. So a domain behind any proxy or CDN works,
-whatever its DNS says.
+**In 30 seconds**
+- Set at [install](install.md), changeable here. HTTPS is automatic in every mode.
+- A new address runs **next to** the old one until you confirm it. Nothing switches on a timer.
+- Limit access to your proxy/CDN and/or your IPs. Locked out: `sudo duniya open-access`.
 
-**HTTPS is automatic in every mode:**
+![Web address & access card](site/img/card-web-access.webp)
+
+## Change the address (two steps)
+
+1. Enter the domain → **Check** → **Add this domain**. It is served next to the current address.
+2. Open the panel **at the new address** → **Confirm — new address works**. It becomes the main address; the old one
+   keeps working.
+3. When nobody needs the old address: **Turn off** (it then only forwards).
+
+```mermaid
+flowchart LR
+  A["Add this domain"] --> B{"HTTPS up<br/>within 4 min?"}
+  B -- no --> R["Previous settings<br/>come back"]
+  B -- yes --> C["Both addresses work"]
+  C --> D["Open new address →<br/>Confirm — new address works"]
+  D --> E["New is main,<br/>old still works"]
+  E --> F["Turn off old<br/>(forwards only)"]
+```
+
+> [!NOTE]
+> **Confirm** is accepted only from a request that really arrived through the new domain. The HTTPS check runs on
+> the server itself (127.0.0.1 with the domain as SNI), never through public DNS. Changes are applied by the root
+> maintenance helper (older servers: re-run the installer once).
+
+## Does the domain lead here?
+
+DNS is only a hint (*points straight here*, *behind a proxy/CDN*, *other*, *missing*). What decides: the panel
+serves a random token at `/.well-known/duniya-check/<token>` and fetches it through the domain, so any proxy works.
+
+## HTTPS
 
 | The domain… | Certificate on this server | Proxy SSL/TLS mode |
 |---|---|---|
-| points straight here (no proxy) | Let's Encrypt (HTTP-01 / TLS-ALPN) | – |
-| goes through a proxy/CDN (any provider) | Let's Encrypt through the proxy (HTTP-01); until it is issued, a temporary certificate from the web server's own CA (2-hour certificates, Let's Encrypt is retried about every 80 minutes) | **Full** at once, **Full (strict)** once the card says the real certificate is issued |
+| points straight here | Let's Encrypt (HTTP-01 / TLS-ALPN) | – |
+| goes through a proxy/CDN | Let's Encrypt through the proxy (HTTP-01); until then a temporary certificate from the web server's own CA (2-hour certificates, Let's Encrypt retried about every 80 minutes) | **Full** at once, **Full (strict)** once the card says the real certificate is issued |
 
-The panel is served over HTTPS only; port 80 only answers certificate challenges, the reachability token and
-redirects. A proxy that talks to this server **without encryption** is never supported: it is detected (the token
-arrives over plain HTTP although the visitor used HTTPS, or a redirect loop) and shown as a blocking error. If Let's
-Encrypt keeps failing behind a proxy, the card shows the web server's reason and the fix (typically a firewall/bot rule
-blocking `/.well-known/acme-challenge/`: add a rule that skips security checks for that path, and turn off
-"under attack" style challenges for it). Let's Encrypt follows redirects to HTTPS, so a proxy's "always use HTTPS"
-setting is fine.
+> [!WARNING]
+> A proxy that talks to this server **without encryption** is never supported. It is detected (the token arrives
+> over plain HTTP although the visitor used HTTPS, or a redirect loop) and shown as a blocking error.
 
-**Changing the address is two-step and never cuts you off:** *Add this domain* serves it **next to** the current
-address. Open the panel at the new address and click **Confirm — new address works** (accepted only from a request
-that really arrived through the new domain); it becomes the main address while the old one keeps working. When nobody
-needs the old address any more, **Turn off** it (it then only forwards). Nothing switches off on a timer.
+> [!TIP]
+> Let's Encrypt failing behind a proxy? The card shows the reason. Usually a firewall/bot rule blocks
+> `/.well-known/acme-challenge/`: add a rule that skips security checks for that path and turn off "under attack"
+> challenges for it. A proxy's "always use HTTPS" is fine (Let's Encrypt follows redirects). Port 80 only answers
+> certificate challenges, the token and redirects.
 
-**Who can open the panel:** everyone; **only a proxy/CDN** — its published address list, refreshed daily (Amazon
-CloudFront, Bunny CDN, Cloudflare, Fastly, Gcore) or your own proxy's ranges — so nobody can bypass it via the server's
-IP; and/or **your own list** of IPs/ranges (your current IP is kept by default). The visitor's real address is read
-from the provider's header behind trusted proxies only (Cloudflare: `CF-Connecting-IP`; others: `X-Forwarded-For`
-read right to left, which needs Caddy 2.8+ when combined with your own list). Stricter rules are a **trial**: confirm
-them from the panel (through the new rules) within 10 minutes, or the previous rules come back by themselves; a
-warning comes first if the rules would block the request you are making. Locked out anyway: `sudo duniya open-access`.
+## Who can open the panel
 
-**No open ports at all:** install with a tunnel instead — Cloudflare Tunnel (`--cloudflare-token`) or Tailscale
-(`--tailscale-authkey`; Tailscale Funnel can make it public). Other tunnels (frp, ngrok, Pangolin, zrok, …) work with
+| Choice | Effect |
+|---|---|
+| Everyone | default |
+| Only a proxy/CDN | its published ranges, refreshed daily (Amazon CloudFront, Bunny CDN, Cloudflare, Fastly, Gcore) or your proxy's ranges: nobody bypasses it via the server's IP |
+| Your own list | IPs/ranges; your current IP is kept by default |
+
+The visitor's real address is read from the provider's header behind trusted proxies only (Cloudflare:
+`CF-Connecting-IP`; others: `X-Forwarded-For` read right to left, which needs Caddy 2.8+ combined with your own list).
+
+> [!IMPORTANT]
+> Stricter rules are a **trial**: confirm them from the panel (through the new rules) within 10 minutes, or the
+> previous rules come back. You are warned first if the rules would block your own request.
+
+## No open ports at all
+
+Install with a tunnel: [Cloudflare Tunnel](deploy/cloudflare-tunnel.md) (`--cloudflare-token`) or Tailscale
+(`--tailscale-authkey`; Funnel can make it public). Other tunnels (frp, ngrok, Pangolin, zrok, …) work with
 `--local-only` pointed at `http://127.0.0.1:8080`.
 
 ---
+**Next:** [Cloudflare Tunnel](deploy/cloudflare-tunnel.md) · [Admin MCP](admin-mcp.md) (needs public HTTPS) ·
 [Docs index](README.md)

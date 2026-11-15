@@ -52,6 +52,8 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
       actions, and `docs/admin-mcp.md` mentions them.
 - [ ] `DESIGN.md` updated when the visual language changed.
 - [ ] No outdated wording left behind (search for the old name/behaviour across `docs/`, `README.md`, `docs/site/`).
+- [ ] Doc pages keep the page template (promise, primary action, *In 30 seconds*, steps, callouts, **Next:**) and
+      `node scripts/check-doc-links.mjs` passes (relative links and anchors; also part of `ci-checks.mjs`).
 
 **Version & release**
 - [ ] Version bumped in `package.json`, `package-lock.json` (both `version` fields) and `infra/oci/schema.yaml`
@@ -110,7 +112,7 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 | `templates/`, `plugins/` | Agent templates (JSON), optional code plugins |
 | `mobile/` | Expo app (own `package.json`, not installed on servers) |
 | `test/` | `node:test` e2e tests with fakes (`harness.js`) |
-| `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs` |
+| `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `ci-checks.mjs`, `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails) |
 | `docs/` | Reference docs (`docs/README.md` index), deploy guides, the website `docs/site/` |
 | `specs/`, `.specify/` | Spec Kit: one folder per feature; constitution and templates |
 

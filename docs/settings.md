@@ -1,7 +1,11 @@
 # Optional settings (environment)
 
-Most settings live in the panel and in the data directory. These environment variables are for the service itself
-(the installer writes them to `/etc/duniya/app.env`; Docker reads `.env`).
+**Environment variables for the service itself; almost everything else is in the panel.**
+
+**Where:** installer servers `/etc/duniya/app.env` (then `sudo duniya restart`) · Docker `.env`.
+
+> [!TIP]
+> You rarely need these: the installer sets `PUBLIC_URL`, and the panel covers models, agents, access and backups.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -19,4 +23,4 @@ Most settings live in the panel and in the data directory. These environment var
 | `BACKUP_UPLOAD_MAX_MB` | 200 | Largest backup file accepted by "Restore from a file" |
 
 ---
-[Docs index](README.md)
+**Next:** [Admin MCP](admin-mcp.md) (`PUBLIC_URL`, `TRUST_PROXY`) · [Small servers](small-servers.md) · [Docs index](README.md)

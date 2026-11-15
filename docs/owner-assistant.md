@@ -1,36 +1,62 @@
 # Owner assistant, alerts and weekly summary
 
-## Owner assistant and the Ask box
+**Ask about all your chats from your own WhatsApp or the Ask box: recaps, who said what, why a group is quiet.**
 
-- **Owner assistant** (044, #50): a built-in assistant (not an agent) for panel users. **Settings → Owner assistant →
-  Link my WhatsApp** shows a one-time message (`link CODE`, valid 10 minutes); send it from your phone to any agent
-  number, then confirm "Linked +41…" in the panel. From then on your direct messages to an agent number go to the owner
-  assistant ("what did the families decide this week?", "why is the carpool group quiet?", "turn off the helper agent"),
-  unless they start with an agent's trigger (`!family …` still reaches that agent; so does `confirm CODE` for a change
-  an agent prepared). It never answers in groups or anyone who is not linked. Tools: the admin MCP tools with your
-  panel role (viewers read-only and without message contents; tools that take keys or passwords stay in the panel) plus
-  `list_visible_chats`, `search_messages` (who said what) and `chat_recap`. Every change needs `confirm CODE` in
-  WhatsApp (or **Confirm** in the panel). It sees only chats that are on; chats marked **Private to members** (Chats)
-  are invisible to it and the **Ask** box on Overview (same assistant, also in the mobile app). Its conversation is
-  stored separately, never in chat memory. Every question and action is in Activity (`owner.*`, always recorded). Model:
-  the default model with fallback, or one chosen in the same card. Admin MCP tools: `get_owner_assistant`,
-  `set_chat_private`.
+**Do it:** panel → **Settings → Owner assistant → Link my WhatsApp**.
 
-![Owner assistant settings](site/img/card-owner-assistant.webp)
+**In 30 seconds**
+- Built in (not an agent): your DMs to any agent number, the **Ask** box, the mobile app.
+- Sees only chats that are on and not **Private to members**; never answers in groups.
+- Changes need `confirm CODE`. Alerts and a weekly summary (counts only) go to your WhatsApp.
 
 ![Ask box on Overview](site/img/card-ask.webp)
 
+## Owner assistant and the Ask box
+
+1. **Settings → Owner assistant → Link my WhatsApp** shows a one-time message `link CODE` (valid 10 minutes).
+2. Send it from your phone to any agent number.
+3. Confirm "Linked +41…" in the panel.
+4. Message an agent number: "what did the families decide this week?", "why is the carpool group quiet?", "turn off
+   the helper agent".
+
+```mermaid
+flowchart LR
+  DM["Your DM to an<br/>agent number"] --> Q{"Starts with an agent<br/>trigger or confirm CODE?"}
+  Q -- yes --> AG["That agent"]
+  Q -- no --> OA["Owner assistant<br/>(your panel role)"]
+  OA -- "change" --> C["confirm CODE"]
+```
+
+| | |
+|---|---|
+| **Tools** | the admin MCP tools with your panel role (viewers read-only, without message contents; tools that take keys or passwords stay in the panel), plus `list_visible_chats`, `search_messages`, `chat_recap` |
+| **Model** | the default model with fallback, or one chosen in the same card |
+| **Storage** | its conversation is stored separately, never in chat memory |
+| **Audit** | every question and action is in Activity (`owner.*`, always recorded) |
+| **Admin MCP** | `get_owner_assistant`, `set_chat_private` |
+
+> [!NOTE]
+> It never answers in groups or anyone who is not linked. `!family …` still reaches that agent, and so does
+> `confirm CODE` for a change an agent prepared.
+
+![Owner assistant settings](site/img/card-owner-assistant.webp)
+
 ## Owner alerts and weekly summary
 
-- **Owner alerts and weekly summary** (041, #38): under **Settings → Owner alerts on WhatsApp** the owner enters their
-  number. Cap alerts go there, and a weekly summary (on by default once a number is set; day and time configurable):
-  messages handled, replies and cost per agent this week vs last, ignored chats, pending confirmations, update available,
-  backup failures — counts only, never message contents. **Send now** sends it at once. Admin MCP tools:
-  `get_owner_alerts`, `set_owner_alerts`, `preview_weekly_summary`, `send_weekly_summary`.
-- **Breaking releases** (045, #57): when a release needs your decision, the alert number gets the release notes, and
-  every owner linked to the owner assistant also gets a code: `confirm ABCD` makes a backup, updates and restarts, and
-  the assistant reports the result after the restart; `cancel ABCD` reminds you in 7 days. Only owners can confirm.
-  See [Backups and updates](backups-and-updates.md#updates).
+**Settings → Owner alerts on WhatsApp**: enter your number.
+
+- **Cap alerts** go there ([spending caps](spending.md)).
+- **Weekly summary** (on by default once a number is set; day and time configurable): messages handled, replies and
+  cost per agent this week vs last, ignored chats, pending confirmations, update available, backup failures. **Send
+  now** sends it at once.
+- Admin MCP: `get_owner_alerts`, `set_owner_alerts`, `preview_weekly_summary`, `send_weekly_summary`.
+
+> [!IMPORTANT]
+> Counts only, never message contents.
+
+**Breaking releases** (045): the alert number gets the release notes, and every owner linked to the owner assistant
+gets a code: `confirm ABCD` backs up, updates, restarts and reports the result; `cancel ABCD` reminds you in 7 days.
+Only owners can confirm. [Backups and updates](backups-and-updates.md#updates)
 
 ---
-[Docs index](README.md)
+**Next:** [Admin MCP](admin-mcp.md) · [Privacy](privacy.md) · [Docs index](README.md)
