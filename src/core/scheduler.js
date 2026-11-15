@@ -5,6 +5,7 @@ import { listAgents } from './agents.js';
 import { runAgent } from './runner.js';
 import { kvGet, kvSet, logMessage } from './db.js';
 import { activity } from './events.js';
+import { weeklyTick } from './weekly.js';
 
 const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
@@ -51,6 +52,7 @@ export async function runSchedule(agent, sched, channel, { force = false } = {})
 
 export function startScheduler(channel) {
   setInterval(async () => {
+    try { await weeklyTick(); } catch (e) { activity('error', { summary: `Weekly summary failed: ${e.message}` }); } // 041: owner summary, even while paused
     if (getSettings().paused) return;
     for (const agent of listAgents()) {
       if (!agent.enabled) continue;

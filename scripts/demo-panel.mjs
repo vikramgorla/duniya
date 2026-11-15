@@ -234,6 +234,11 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   ];
   for (const [ago, type, agent, chat, summary] of acts) db.insertActivity({ ts: now - ago, type, agent, chat, summary });
 
+  // why agents stayed quiet (#34): counters per chat + agent + reason
+  const { silenceReason } = await imp('src/core/silences.js');
+  const quiet = [[G(3), 'carpool', 'not_addressed', 14, 'Marc'], [G(5), '', 'chat_off', 3, 'Nadia'], [G(1), 'school', 'rate_limited', 1, 'Anu'], [`${P(10)}@s.whatsapp.net`, 'family', 'role_not_allowed', 2, 'Nadia']];
+  for (const [chat, agent, reason, n, sender] of quiet) for (let i = 0; i < n; i++) silenceReason(reason, { chat, agent, sender });
+
   // 30 days of usage
   const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0); const todaySpan = now - startOfToday.getTime();
   const ins = db.db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kind, input, output, cost, priced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
@@ -255,6 +260,18 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     }
   }
   store.updateSettings({ modelPrices: { 'anthropic:claude-haiku-5-5': { in: 1, out: 5 }, 'anthropic:claude-sonnet-5-5': { in: 3, out: 15 } } });
+  // spending caps (040), owner alerts and weekly counters (041)
+  const budget = await imp('src/core/budget.js'); const stats = await imp('src/core/stats.js');
+  budget.setCap('agent', 'carpool', { cost: 2 });
+  budget.setCap('agent', 'school', { cost: 1.5, fallback: 'anthropic:claude-haiku-5-5' });
+  budget.setCap('chat', G(4), { tokens: 400000 });
+  store.updateSettings({ alertsTo: '41791234567' });
+  for (let day = 13; day >= 0; day--) {
+    for (const [agent, n] of [['carpool', 6], ['school', 3], ['family', 4], ['football', 2]]) {
+      for (let k = 0; k < Math.round(n * (0.5 + rnd())); k++) { stats.countStat('handled', { agent }, now - day * D); stats.countStat('reply', { agent }, now - day * D); }
+    }
+    for (let k = 0; k < 5; k++) stats.countStat('ignored', { chat: G(6 + (k % 2)) }, now - day * D);
+  }
 
   // backups (local only), update status, server metrics history
   backup.setPassphrase('demo passphrase for screenshots');

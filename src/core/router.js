@@ -7,6 +7,10 @@ import { logMessage, messageByMsgId, saveReaction, savePollVote, pollTally } fro
 import { activity } from './events.js';
 import { maybeSummarize } from './memory.js';
 import { setWhatsAppChannel } from './whatsapp-tools.js';
+import { countStat } from './stats.js';
+import { silenceReason } from './silences.js';
+
+export { silenceReason }; // #34: other modules (usage caps) report why an agent stayed silent, e.g. silenceReason('budget', …)
 
 const rate = new Map();
 function rateLimited(key) {
@@ -74,6 +78,19 @@ async function agentForDm(msg, channel, { openOnly = false } = {}) {
   return null;
 }
 
+/** Why no agent took a direct message (#34): the agent it would have gone to, and the reason. */
+function dmSilence(msg) {
+  const assigned = agentForChat(msg.chat);
+  if (assigned) return { agent: assigned.id, reason: assigned.enabled ? 'role_not_allowed' : 'agent_disabled' };
+  const all = listAgents();
+  const enabled = all.filter((b) => b.enabled);
+  if (!enabled.length) return { agent: all[0]?.id || '', reason: all.length ? 'agent_disabled' : 'no_agent' };
+  const lower = msg.text.trim().toLowerCase();
+  const numberDefault = (getSettings().whatsappNumbers || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
+  const c = enabled.find((b) => startsWithTrigger(b, lower)) || [getAgent(numberDefault), getAgent(getSettings().defaultDmAgent)].find((b) => b?.enabled) || enabled[0];
+  return { agent: c.id, reason: c.dm === 'none' ? 'dm_not_allowed' : 'role_not_allowed' };
+}
+
 const summarizeLater = (chat, agent) => { maybeSummarize(chat, agent).catch(() => {}); };
 
 /** Store WhatsApp history batches (link/reconnect sync). Never replies. Group chats only. */
@@ -131,6 +148,10 @@ export function createRouter(channel) {
     const wake = msg.caption || msg.text;
     const lower = wake.trim().toLowerCase();
     const groupAgent = msg.isGroup ? agentForChat(msg.chat) : null;
+    // #34: would this message have woken an agent? (Only then is staying silent worth explaining.)
+    const wakes = !msg.isGroup || msg.mentioned || msg.replyToAgent || listAgents().some((b) => startsWithTrigger(b, lower));
+    const sender = msg.senderName || (msg.phone ? `+${msg.phone}` : '');
+    const quiet = (reason, agentId = groupAgent?.id || '') => silenceReason(reason, { chat: msg.chat, agent: agentId, sender });
 
     // Silent by default (#10): a chat that is off is ignored completely — nothing stored, no model call — except
     // organizers' admin helpers below, and direct messages to an agent explicitly set to answer anyone.
@@ -140,6 +161,8 @@ export function createRouter(channel) {
       const open = !msg.isGroup && !helper ? await agentForDm(msg, channel, { openOnly: true }) : null;
       if (!helper && !open) {
         ignoredCounts.set(msg.chat, (ignoredCounts.get(msg.chat) || 0) + 1);
+        countStat('ignored', { chat: msg.chat }); // weekly summary (041): counts only
+        if (wakes) quiet('chat_off', groupAgent?.id || agentForChat(msg.chat)?.id || '');
         return;
       }
       openAgent = open;
@@ -159,7 +182,7 @@ export function createRouter(channel) {
       });
       summarizeLater(msg.chat, groupAgent);
     }
-    if (getSettings().paused) return;
+    if (getSettings().paused) { if (wakes) quiet('paused'); return; }
 
     // Admin helpers for organizers of any agent
     if (isAnyOrganizer(msg.phone)) {
@@ -175,7 +198,13 @@ export function createRouter(channel) {
     }
 
     const agent = msg.isGroup ? groupAgent : openAgent || await agentForDm(msg, channel);
-    if (!agent || !agent.enabled) return;
+    if (!agent || !agent.enabled) {
+      if (msg.isGroup) {
+        if (!groupAgent) { if (wakes) quiet('no_agent', ''); }
+        else if (msg.mentioned || msg.replyToAgent || startsWithTrigger(groupAgent, lower)) quiet('agent_disabled');
+      } else { const d = dmSilence(msg); quiet(d.reason, d.agent); }
+      return;
+    }
     if (!msg.isGroup) {
       rowId = logMessage({
         channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: msg.msgId, sender: msg.phone,
@@ -198,15 +227,13 @@ export function createRouter(channel) {
         return;
       }
     }
-    if (!triggered) return;
-    if (rateLimited(`${agent.id}:${msg.phone || msg.senderJid}`)) {
-      activity('system', { agent: agent.id, chat: msg.chat, summary: `Rate limited ${msg.senderName}` });
-      return;
-    }
+    if (!triggered) { quiet('not_addressed', agent.id); return; }
+    if (rateLimited(`${agent.id}:${msg.phone || msg.senderJid}`)) { quiet('rate_limited', agent.id); return; }
 
     const text = msg.caption ? `${msg.text.replace(/:.*$/s, ']')} ${stripTriggers(agent, msg.caption)}`.trim() : stripTriggers(agent, msg.text);
     let out = await handleConfirmCommand({ agent, text, role, chat: msg.chat });
     if (out === undefined && !addressed) return; // looked like "cancel ABCD" but isn't ours
+    countStat('handled', { agent: agent.id });
     activity('message.in', {
       agent: agent.id, chat: msg.chat,
       summary: `${msg.senderName} (${role}): ${text}`,
@@ -225,13 +252,17 @@ export function createRouter(channel) {
         out = await runAgent(ctx);
       } catch (e) {
         activity('error', { agent: agent.id, chat: msg.chat, summary: `Agent failed: ${e.message}` });
+        quiet('model_error', agent.id);
         out = 'Sorry, I hit an error. Please try again in a minute.';
       }
+      if (ctx.modelError) quiet('model_error', agent.id);
+      else if (!out) quiet('no_reply', agent.id);
     }
     if (out) await reply(out);
 
     async function reply(text) {
       const sent = await channel.send(msg.chat, text, { quoted: msg.raw });
+      countStat('reply', { agent: agent.id });
       logMessage({
         channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent',
         name: 'Assistant', text, fromAgent: true,
