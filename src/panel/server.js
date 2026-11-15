@@ -27,7 +27,7 @@ import { organizerConnection, oauthClientOf } from '../core/tools.js';
 import { draftAgent } from '../core/ai-builder.js';
 import { setWhatsAppChannel, whatsappToolCatalog, isGroupChat } from '../core/whatsapp-tools.js';
 import { usageReport, listPrices, setPrice, PLAN_PROVIDERS } from '../core/usage.js';
-import { installPackage, installedInfo } from '../core/mcp-local.js';
+import { installPackage, installedInfo, localServiceCheck } from '../core/mcp-local.js';
 import { snapshot as sysSnapshot, metricsHistory, osUpdates, osUpdatesCached, rebootStatus, logs as sysLogs, opsStatus, requestOp } from '../core/system.js';
 
 // Local tool services run third-party code on this server: only owners may add or change them.
@@ -308,7 +308,7 @@ export function startPanel({ channel, extend = [] }) {
     if (!agent) return [404, { error: 'Not found' }];
     return Object.entries(agent.mcpServers || {}).filter(([, v]) => v.type === 'local').map(([server, v]) => {
       const i = installedInfo(v.package, v.allowScripts);
-      return { server, package: v.package, installed: i ? { name: i.name, version: i.version, at: i.at } : null };
+      return { server, package: v.package, blocked: localServiceCheck().reason || null, installed: i ? { name: i.name, version: i.version, at: i.at } : null };
     });
   });
   route('POST', '/api/agents/:id/local/:server/install', async (req, res, body, q, p, user) => {
@@ -735,7 +735,7 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
       if (Array.isArray(out) && typeof out[0] === 'number' && out.length === 2) return send(res, out[0], out[1]);
       return send(res, 200, out ?? { ok: true });
     } catch (e) {
-      if (!res.headersSent) send(res, e.status || 400, { error: e.message, field: e.field, needsConfirm: e.needsConfirm, warnings: e.warnings, check: e.check });
+      if (!res.headersSent) send(res, e.status || 400, { error: e.message, code: e.code, field: e.field, needsConfirm: e.needsConfirm, warnings: e.warnings, check: e.check });
     }
   });
   server.listen(env.panelPort, env.panelHost, () => {

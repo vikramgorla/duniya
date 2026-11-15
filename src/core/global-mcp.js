@@ -6,6 +6,7 @@ import { db } from './db.js';
 import { TENANT } from './store.js';
 import { validateGlobalServer } from './schema.js';
 import { activity } from './events.js';
+import { guardLocalSmall } from './mcp-local.js';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS global_mcp (
@@ -39,8 +40,9 @@ export const listGlobalRows = () => [...(cache || load())].map(([name, r]) => ({
 /** Add or replace a global tool service. Returns { config, created }. */
 export function saveGlobalServer(name, input, by = '') {
   const config = validateGlobalServer(String(name || ''), input);
-  const now = Date.now();
   const prev = getGlobalServer(name);
+  guardLocalSmall(prev ? { [name]: prev } : {}, { [name]: config }); // 055: no new local services on small servers
+  const now = Date.now();
   if (prev) {
     db.prepare('UPDATE global_mcp SET config = ?, updated_at = ?, updated_by = ? WHERE tenant_id = ? AND name = ?').run(JSON.stringify(config), now, by, TENANT, name);
   } else {

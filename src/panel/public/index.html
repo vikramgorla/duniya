@@ -1036,6 +1036,8 @@ const meter = (p) => h('div', { class: `meter ${p >= 85 ? 'hot' : ''}` }, h('i',
 let serverTimer = null; let opsTimer = null; let logUnit = 'whatsapp-agent-duniya'; let lastSys = null;
 // Small servers (043): one line about what this server can take, and the media queue when something waits.
 const SIZE_LABEL = { small: 'Small server', medium: 'Medium server', large: 'Large server' };
+/** 055: small servers do not run local (on-server) tool services. */
+const smallServer = () => S.status?.server?.size === 'small';
 function serverSizeNote(s, q) {
   if (!s) return null;
   const ram = s.effectiveMb >= 1024 ? `${(s.effectiveMb / 1024).toFixed(s.effectiveMb % 1024 ? 1 : 0)} GB` : `${s.effectiveMb} MB`;
@@ -1043,7 +1045,7 @@ function serverSizeNote(s, q) {
   return h('div', { class: `note ${s.pressure ? 'warn' : s.size === 'small' ? 'info' : ''}`, style: 'margin-top:10px' },
     h('b', {}, `${SIZE_LABEL[s.size]}: `), `${ram} memory${s.cgroupLimitMb ? ' (container limit)' : ''}, ${s.cpus} CPU${s.cpus > 1 ? 's' : ''}, ${s.availableMb} MB free. `,
     s.pressure ? `The app uses ${s.rssMb} MB — above ${s.softLimitMb} MB, so summaries, on-server speech and picture creation are paused until memory frees up. Replies continue.`
-      : s.size === 'small' ? 'Photos and voice notes are handled one at a time, on-server speech engines and the Copilot helper are not available, and at most 2 local tool services run at once. Providers (OpenAI, OpenRouter) handle photos and voice fine.'
+      : s.size === 'small' ? 'Photos and voice notes are handled one at a time, on-server speech engines and the Copilot helper are not available, and local tool services are not run (use hosted ones). Providers (OpenAI, OpenRouter) handle photos and voice fine.'
         : 'Everything is available.',
     waiting);
 }
@@ -1505,7 +1507,7 @@ function toolServiceEditor(s, o) {
     ? h('div', { style: 'margin-top:8px' }, h('div', { class: 'small muted' }, 'Sign in on the service for each role. You will come back here when done.'), connRow('organizer'), connRow('participant'))
     : s.auth === 'token' ? h('div', {}, field('Organizer credential (secret reference)', org), field('Participant credential (optional; least privilege)', part)) : null;
   const typeSel = h('select', { style: 'max-width:230px;min-width:180px', 'aria-label': 'Kind of tool service', disabled: !o.isOwner && s.type === 'local', onchange: (e) => { s.type = e.target.value; o.redraw(); } },
-    [['remote', 'Remote (URL)'], ['local', 'Local (npm or GitHub package)']].map(([v, l]) => h('option', { value: v, selected: s.type === v }, l)));
+    [['remote', 'Remote (URL)'], ['local', smallServer() ? 'Local (not on small servers)' : 'Local (npm or GitHub package)']].map(([v, l]) => h('option', { value: v, selected: s.type === v, disabled: v === 'local' && smallServer() && s.type !== 'local' }, l)));
   const ta = (prop, ph, rows = 2) => h('textarea', { value: s[prop], placeholder: ph, style: `min-height:${rows * 22 + 16}px`, oninput: (e) => (s[prop] = e.target.value) });
   const redirectUri = `${location.origin}/oauth/mcp/callback`;
   const advanced = h('details', { style: 'margin-top:8px' }, h('summary', { class: 'small muted' }, 'Advanced'),
@@ -1530,17 +1532,21 @@ function toolServiceEditor(s, o) {
       if (r) { o.locals.splice(0, o.locals.length, ...(await api('GET', `${o.base}/local`))); o.redraw(); toast(`Installed ${r.name}@${r.version}`); }
     };
     const pkg = h('input', { value: s.pkg, placeholder: '@scope/server@1.2.3 or github:owner/repo#tag', disabled: !o.isOwner, oninput: (e) => (s.pkg = e.target.value.trim()) });
+    // 055: small servers do not run local tool services; saved ones stay in the config but are not started.
+    const blocked = st?.blocked || (smallServer() ? 'This is a small server: local tool services are not run here, because each one is an extra Node.js process. Use a hosted tool service (one with a web address) instead.' : '');
     return h('fieldset', {}, legend,
       h('div', { class: 'row' }, key, typeSel),
+      blocked ? h('div', { class: 'note warn', id: 'local-blocked', style: 'margin-top:8px' }, h('b', {}, savedLocal ? 'Not started on this server. ' : 'Not available on this server. '), blocked,
+        savedLocal ? ' It stays saved and starts again on a bigger server; remove it here if you no longer need it.' : '') : null,
       h('div', { class: 'note warn', style: 'margin-top:8px' }, 'A local tool service runs that package’s code on this server, with the same access as the app (including its data). Only add packages you trust, and pin a version.'),
       field('Package', pkg),
       h('div', { class: 'row' }, field('Arguments (one per line)', ta('args', '--read-only', 2)), field('Environment (NAME=value; values may use ${SECRET})', ta('env', 'API_KEY=${MY_KEY}', 2))),
       h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.allowScripts, disabled: !o.isOwner, onchange: (e) => (s.allowScripts = e.target.checked) }), 'Allow install scripts (needed by some GitHub packages that build themselves)'),
       h('div', { class: 'row', style: 'align-items:center;margin-top:8px' },
         st?.installed ? h('span', { class: 'pill ok' }, `Installed ${st.installed.name}@${st.installed.version}`) : h('span', { class: 'pill' }, savedLocal ? 'Not installed yet (installs on first use)' : 'Save to install'),
-        o.isOwner ? h('button', { class: 'btn small', onclick: () => install(false) }, st?.installed ? 'Reinstall' : 'Install') : h('span', { class: 'small muted' }, 'Only the owner can install or change local tool services'),
-        o.isOwner && st?.installed ? h('button', { class: 'btn small', onclick: () => install(true) }, 'Update (fresh install)') : null),
-      h('div', { class: 'row', style: 'margin-top:8px' }, discoverButton({ type: 'local', server: s.key }),
+        o.isOwner ? h('button', { class: 'btn small', disabled: !!blocked, onclick: () => install(false) }, st?.installed ? 'Reinstall' : 'Install') : h('span', { class: 'small muted' }, 'Only the owner can install or change local tool services'),
+        o.isOwner && st?.installed && !blocked ? h('button', { class: 'btn small', onclick: () => install(true) }, 'Update (fresh install)') : null),
+      h('div', { class: 'row', style: 'margin-top:8px' }, blocked ? null : discoverButton({ type: 'local', server: s.key }),
         h('button', { class: 'btn small danger mut', disabled: !o.isOwner, onclick: o.remove }, 'Remove')),
       o.extra || null, grid);
   }

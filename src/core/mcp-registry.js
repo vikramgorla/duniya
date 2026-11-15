@@ -8,8 +8,7 @@
 // cached briefly in memory (small, bounded). Registry text is data: the panel renders it as text, links only http(s).
 import { getSetting, updateSettings, getSecret } from './store.js';
 import { SERVER_KEY_RE, RESERVED_SERVER_KEYS } from './schema.js';
-import { validPackageSpec } from './mcp-local.js';
-import { serverSize } from './resources.js';
+import { validPackageSpec, localServiceCheck } from './mcp-local.js';
 
 export const REGISTRY_DEFAULT = 'https://registry.modelcontextprotocol.io';
 const TIMEOUT_MS = 8000;
@@ -280,14 +279,8 @@ export function addFields(entry, kind, key) {
   return out;
 }
 
-/** May a local package from the registry be installed on this server? Small servers (1 GB / 1 CPU) say no. */
-export function localRegistryCheck() {
-  const s = serverSize();
-  if (s.size === 'small') {
-    return { ok: false, reason: `This is a small server (${s.effectiveMb} MB memory, ${s.cpus} CPU): local tool services from the registry are not installed here, because each one is an extra Node.js process. Choose a hosted one (marked Hosted), or use a server with at least 2 GB and 2 CPUs.` };
-  }
-  return { ok: true };
-}
+/** May a local package from the registry be added here? The same rule as every other path (055). */
+export const localRegistryCheck = localServiceCheck;
 
 /**
  * Build the tool-service config for `entry` run as `kind` ('remote' | 'local') under the name `key`.

@@ -9,6 +9,7 @@ import {
 import { activity } from './events.js';
 import { deleteAgentConnections } from './mcp-oauth.js';
 import { globalServers } from './global-mcp.js';
+import { guardLocalSmall } from './mcp-local.js';
 
 let agents = new Map();
 function toRuntime(row) {
@@ -47,6 +48,7 @@ function releaseChats(chats, exceptId, by) {
 
 export async function createAgent({ id, config, by = '' }) {
   const { config: clean, warnings } = validateAgentConfig(config);
+  guardLocalSmall({}, clean.mcpServers); // 055: no new local tool services on small servers (every path ends here)
   let agentId = id ? String(id).toLowerCase() : slugify(clean.name);
   if (!AGENT_ID_RE.test(agentId)) throw new ValidationError('id', 'must be 2–41 lowercase letters, digits or -');
   if (getAgentRow(agentId)) {
@@ -64,6 +66,7 @@ export async function updateAgent(id, patch, by = '') {
   const row = getAgentRow(id);
   if (!row) throw Object.assign(new Error(`Unknown agent ${id}`), { status: 404 });
   const { config: clean, warnings } = validateAgentConfig({ ...row.config, ...patch });
+  guardLocalSmall(row.config.mcpServers, clean.mcpServers);
   if (patch.chats) releaseChats(clean.chats, id, by);
   saveAgentRow(id, clean, by);
   activity('agent.updated', { agent: id, summary: `Updated ${Object.keys(patch).join(', ')}${by ? ` by ${by}` : ''}`, detail: { warnings } });

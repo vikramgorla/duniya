@@ -8,6 +8,7 @@ import { resolve, join, dirname } from 'node:path';
 import { DATA_DIR } from './config.js';
 import { sha256 } from './crypto.js';
 import { activity } from './events.js';
+import { serverSize } from './resources.js';
 
 export const LOCAL_ROOT = resolve(DATA_DIR, 'mcp-local');
 const NPM_SPEC_RE = /^(@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*(@[A-Za-z0-9._^~<>=*|+ -]{1,60})?$/;
@@ -24,6 +25,36 @@ export function validPackageSpec(spec) {
 // Network settings an operator may need (proxy, extra CA certificates, npm registry); never the app's own secrets.
 const NET_ENV = /^(https?_proxy|no_proxy|all_proxy|HTTPS?_PROXY|NO_PROXY|ALL_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|npm_config_(registry|cafile|proxy|https_proxy|noproxy|strict_ssl))$/;
 export const netEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => NET_ENV.test(k)));
+
+// ---------- small servers (055) ----------
+/**
+ * May local tool services run on this server? The one rule for every path (agent and global tool services, import,
+ * duplicate, admin MCP, owner assistant, MCP Registry, install buttons, and starting one): small servers (1 GB /
+ * 1 CPU, serverSize()) say no, because each local service is an extra Node.js process.
+ */
+export function localServiceCheck() {
+  const s = serverSize();
+  if (s.size === 'small') {
+    return { ok: false, code: 'small_server', reason: `This is a small server (${s.effectiveMb} MB memory, ${s.cpus} CPU): local tool services are not run here, because each one is an extra Node.js process. Use a hosted tool service (one with a web address) instead, or a server with at least 2 GB and 2 CPUs.` };
+  }
+  return { ok: true };
+}
+const localSig = (srv) => JSON.stringify([String(srv?.package || '').trim(), srv?.args || [], srv?.env || {}, !!srv?.allowScripts]);
+/**
+ * Local services in `after` that are new or changed compared with `before` ({ name: config } maps). Unchanged ones
+ * are not counted, so other edits of an agent that already has a local service keep working on a small server.
+ */
+export function addedLocalServices(before = {}, after = {}) {
+  return Object.entries(after || {}).filter(([k, v]) => v?.type === 'local'
+    && !(before?.[k]?.type === 'local' && localSig(before[k]) === localSig(v))).map(([k]) => k);
+}
+/** Throws 400 { code: 'small_server' } when `after` adds or changes a local service on a small server. */
+export function guardLocalSmall(before, after) {
+  const added = addedLocalServices(before, after);
+  if (!added.length) return;
+  const c = localServiceCheck();
+  if (!c.ok) throw Object.assign(new Error(c.reason), { status: 400, code: c.code, field: `mcpServers.${added[0]}` });
+}
 
 const dirFor = (spec, allowScripts) => join(LOCAL_ROOT, sha256(`${spec}\n${allowScripts ? 1 : 0}`).slice(0, 16));
 const infoFile = (dir) => join(dir, 'duniya-install.json');
@@ -46,6 +77,8 @@ const inflight = new Map();
 
 /** Install (or reinstall with fresh=true) a package; returns { name, version, bin }. */
 export function installPackage(spec, { allowScripts = false, fresh = false, by = '' } = {}) {
+  const small = localServiceCheck();
+  if (!small.ok) throw Object.assign(new Error(small.reason), { status: 400, code: small.code });
   if (!validPackageSpec(spec)) throw Object.assign(new Error('Package must look like name, name@version, @scope/name or github:owner/repo#ref'), { status: 400 });
   const dir = dirFor(spec, allowScripts);
   if (inflight.has(dir)) return inflight.get(dir);
