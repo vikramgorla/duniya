@@ -158,7 +158,7 @@ test('031 helper: apply-web-config validates, reloads Caddy, waits for HTTPS, th
   assert.match(s.read('etc', 'app.env'), /^TRUST_PROXY=cloudflare$/m);
   assert.match(s.read('etc', 'app.env'), /^DUNIYA_EXPOSURE=domain$/m);
   assert.match(s.read('etc', 'install.conf'), /^EXPOSURE='domain'$/m); assert.match(s.read('etc', 'install.conf'), /^DOMAIN='agents\.example\.org'$/m);
-  assert.ok(s.read('state', 'Caddyfile.prev').includes('old.sslip.io'), 'the previous config is kept');
+  assert.match(s.read('state', 'Caddyfile.prev'), /^(?:http:\/\/)?old\.sslip\.io\b/m, 'the previous config is kept');
   assert.equal(s.read('state', 'Caddyfile.last-good'), s.read('etc', 'Caddyfile'));
   assert.equal(JSON.parse(s.read('state', 'web-applied.json')).host, 'Agents.Example.org');
   const calls = s.read('calls');
