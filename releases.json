@@ -121,6 +121,11 @@
       "actions": [],
       "data": "unchanged",
       "docs": "docs/owner-assistant.md#owner-assistant-and-the-ask-box"
+    },
+    "2.12.1": {
+      "breaking": false,
+      "title": "Switching a chat on loads its recent messages from your phone",
+      "summary": "Chats that are off still store no messages (only the id and time of the newest one). When you switch a chat on, its recent messages (50 by default) are loaded from your phone and summarised, so the agent starts with context; keep the phone online. Chats → “Load recent messages” asks again or goes further back. Agents now say plainly what history they have."
     }
   }
 }

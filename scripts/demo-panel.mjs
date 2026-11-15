@@ -160,12 +160,20 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
       { id: G(9), name: 'Coaches', size: 5, members: [3, 11].map((i) => member(i)) },
     ],
   };
+  const histories = {};
   const factory = ({ number }) => {
     const list = GROUPS[number] || [];
     const find = (jid) => list.find((g) => g.id === jid);
     return {
       id: 'whatsapp',
-      async start() {},
+      async start(h, { onHistory } = {}) { histories[number] = onHistory; },
+      // #91: "Load recent messages": groups answer with a few earlier messages; Family's phone never answers
+      async fetchHistory(jid, count, anchor) {
+        if (jid === G(2)) return 'demo';
+        setTimeout(() => histories[number]?.(Array.from({ length: 12 }, (_, i) => ({ channel: 'whatsapp', chat: jid, isGroup: true, msgId: `old${i}`, ts: anchor.ts - (12 - i) * 41 * MIN,
+          phone: P(1 + (i % 4)), senderJid: `${P(1 + (i % 4))}@s.whatsapp.net`, senderName: ['Anu', 'Marc', 'Léa', 'Ravi'][i % 4], fromMe: false, kind: 'text', text: jid === G(3) ? `Earlier ride plan ${i + 1}` : `Earlier message ${i + 1}`, quoted: '' })), { onDemand: true, chats: [jid] }), 1200);
+        return 'demo';
+      },
       async status() { return { status: 'open', me: `${number === 'main' ? P(99) : P(98)}:1@s.whatsapp.net`, since: now - 3 * D - 4 * H }; },
       async listChats() { return list.map(({ id, name, size }) => ({ id, name, size })); },
       async chatName(jid) { return find(jid)?.name || ''; },
@@ -332,6 +340,10 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   await imp('src/core/owner-assistant.js');
   db.db.prepare("INSERT OR REPLACE INTO owner_links (tenant_id, user_id, phone, status, code_hash, expires_at, linked_at) SELECT 'default', id, ?, 'linked', NULL, 0, ? FROM users WHERE username = 'admin'").run(P(1), now - 2 * D);
   await wa.start(createRouter(wa), { onHistory: createHistoryHandler() });
+  // #91: Chats shows "Loaded 12 earlier messages" (rides) and "Loading recent messages from your phone…" (Family)
+  prefs.noteLatestKeys([2, 5, 6, 7].map((n) => ({ chat: G(n), isGroup: true, msgId: `last-${n}`, participant: `${P(n)}@s.whatsapp.net`, ts: now - n * H })));
+  const phoneHistory = await imp('src/core/history-load.js');
+  for (const c of [G(3), G(2)]) await phoneHistory.loadChatHistory(c, { by: 'admin', reason: 'switch_on' });
   system.startMetrics();
   const noise = () => db.db.prepare("DELETE FROM activity WHERE summary LIKE 'Panel login%' OR summary LIKE 'Owner \"admin\" created%' OR summary LIKE 'Backup passphrase changed%' OR summary LIKE 'User %' OR summary LIKE 'Contact %' OR summary LIKE 'Global tool service%' OR summary LIKE 'Created \"%' OR (type = 'backup.done' AND ts > ?)").run(now - 60000);
   noise(); setInterval(noise, 300).unref();

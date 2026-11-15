@@ -7,7 +7,7 @@ import { getChatPrefs } from './chat-prefs.js';
 
 /** The model for a chat: the chat's own choice (auto, provider:auto or provider:model) or the agent's. */
 export const chatModel = (agent, chat) => { const m = getChatPrefs(chat).model; return m && m !== 'inherit' ? m : agent.model; };
-import { buildContext } from './memory.js';
+import { buildContext, historyNote } from './memory.js';
 import { activity } from './events.js';
 import { toolsFor, matchesAny, organizerConnection } from './tools.js';
 import { checkBudget } from './budget.js';
@@ -105,12 +105,15 @@ export async function runAgent(ctx) {
   for (const err of meta.get('__errors') || []) activity('error', { agent: agent.id, chat, summary: err });
 
   const memory = buildContext({ agent, chat: ctx.contextChat || chat, excludeId: ctx.msgRowId || 0 });
+  // #91: say exactly what history is stored (WhatsApp turns, and panel tests that use a real chat's memory). In the
+  // user turn, not the system prompt, so the system prompt stays the same between turns.
+  const historyLine = ctx.source === 'whatsapp' || ctx.contextChat ? historyNote(ctx.contextChat || chat, { excludeId: ctx.contextChat ? 0 : ctx.msgRowId || 0, tz: agent.timezone || env.timezone }) : '';
   // Photos & voice (043): photos / PDFs go as image / document blocks to a model that can see them (or the vision
   // fallback model); otherwise a note asks the model to say kindly that it can't look at them.
   const plan = await planAttachments(model, ctx.attachments || []);
   model = plan.model;
   const notes = [ctx.mediaNote, plan.note].filter(Boolean).join('\n');
-  const turnText = `${memory ? `${memory}\n\n` : ''}New message from ${senderName} (${role}):\n${text}${notes ? `\n${notes}` : ''}`;
+  const turnText = `${memory ? `${memory}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}New message from ${senderName} (${role}):\n${text}${notes ? `\n${notes}` : ''}`;
   const messages = [{
     role: 'user',
     content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText,

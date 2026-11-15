@@ -6,6 +6,7 @@
 // one text piece per word. `t.claudeStreamFail` / `f.streamFail` queue mid-stream failures { after: n pieces, network }
 // (socket dropped) or { after, error: { type, message } } (an SSE error event); `f.refuseStream` answers streamed
 // requests with 400 (servers without streaming). Streamed requests are counted in t.claudeStreams / f.streams.
+// Phone history (#91): `t.phone` and `t.historyAsks` fake the linked phone answering fetchHistory (see below).
 import http from 'node:http';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -224,6 +225,21 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
     profile: wa('profile', (chat, who) => ({ jid: `${String(who).replace(/\D/g, '')}@s.whatsapp.net`, phone: String(who).replace(/\D/g, ''), about: 'Hey there', pictureUrl: 'https://pps.whatsapp.net/x.jpg' })),
     block: wa('block', { jid: 'x' }), unblock: wa('unblock', { jid: 'x' }),
   });
+  // #91: the linked phone's history. t.phone.chats[chat] = messages the phone has (t.msg()-like, any order);
+  // fetchHistory(chat, count, anchor) is recorded in t.historyAsks and, when t.phone.online, answers a little later
+  // with up to `count` messages older than the anchor as an on-demand history batch (like 'messaging-history.set'
+  // with syncType ON_DEMAND). Offline: no answer (the app times out).
+  t.phone = { online: true, chats: {}, delay: 20 };
+  t.historyAsks = [];
+  t.channel.fetchHistory = async (chat, count, anchor) => {
+    t.historyAsks.push({ chat, count, anchor });
+    if (!t.phone.online) return 'req-id';
+    const all = [...(t.phone.chats[chat] || [])].sort((a, b) => a.ts - b.ts);
+    const i = all.findIndex((m) => m.msgId === anchor.msgId);
+    const older = (i >= 0 ? all.slice(0, i) : all.filter((m) => m.ts < anchor.ts)).slice(-count);
+    setTimeout(() => t.onHistory(older, { onDemand: true, chats: [chat] }), t.phone.delay);
+    return 'req-id';
+  };
   // Photos & voice (043): inbound media messages. t.mediaMsg({ type: 'image'|'audio'|'sticker'|'document', buffer, ... })
   // builds a message like the WhatsApp channel's (mediaInfo, mediaRef, fetchMedia); downloads are counted in t.downloads.
   t.mediaStore = new Map(); t.downloads = [];

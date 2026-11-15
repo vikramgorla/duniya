@@ -58,6 +58,36 @@ export function logMessage({ channel = 'whatsapp', chat, agent = '', msgId = nul
   if (Math.random() < 0.02) pruneMessages(chat);
   return r.changes ? Number(r.lastInsertRowid) : 0;
 }
+/**
+ * #91: store messages that are OLDER than everything stored for the chat (history the phone sent on demand). They get
+ * row ids below every existing row (ids may go negative), so "recent" (by id) and summary boundaries stay right.
+ * `rows`: logMessage-style objects. Returns the stored rows ({ id, ts }), oldest first; duplicates are skipped.
+ */
+const insMsgWithId = db.prepare(`INSERT OR IGNORE INTO messages
+  (id, channel, chat, agent, msg_id, sender, name, text, quoted, addressed, from_agent, ts, sender_jid)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+export function insertEarlierMessages(chat, rows) {
+  const fresh = rows.filter((m) => !m.msgId || !messageByMsgId(chat, m.msgId)).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  if (!fresh.length) return [];
+  const out = [];
+  db.exec('BEGIN');
+  try {
+    const min = db.prepare('SELECT MIN(id) AS m FROM messages').get().m;
+    let id = Math.min(Number(min ?? 0), 0) - fresh.length - 1; // never 0 (0 means "no row" elsewhere)
+    for (const m of fresh) {
+      id++;
+      const r = insMsgWithId.run(id, m.channel || 'whatsapp', chat, m.agent || '', m.msgId || null, m.sender || '', m.name || '', String(m.text ?? ''),
+        String(m.quoted || '').slice(0, 500), m.addressed ? 1 : 0, m.fromAgent ? 1 : 0, m.ts || Date.now(), m.senderJid || '');
+      if (r.changes) out.push({ id, ts: m.ts });
+    }
+    db.exec('COMMIT');
+  } catch (e) { db.exec('ROLLBACK'); throw e; }
+  return out;
+}
+/** #91: the oldest stored message of a chat that has a WhatsApp id (anchor for loading earlier messages). */
+export const oldestStoredMessage = (chat) => db.prepare('SELECT * FROM messages WHERE chat = ? AND msg_id IS NOT NULL ORDER BY id LIMIT 1').get(chat) || null;
+/** #91: how much of a chat is stored: { count, since } (since = time of the oldest stored message). */
+export const storedSpan = (chat) => { const r = db.prepare('SELECT COUNT(*) AS n, MIN(ts) AS since FROM messages WHERE chat = ?').get(chat); return { count: r.n, since: r.since || null }; };
 export function pruneMessages(chat) {
   if (chat) pruneCap.run(chat, chat, env.memory.maxMessagesPerChat);
   pruneAge.run(Date.now() - env.memory.retentionDays * 86400000);
