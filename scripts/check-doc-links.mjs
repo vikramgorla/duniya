@@ -15,6 +15,13 @@ function stripCode(md) {
   return md.replace(/^(\s*)(```|~~~)[\s\S]*?^\1\2\s*$/gm, '').replace(/`[^`\n]*`/g, '');
 }
 
+/** Remove HTML tags until none are left, then any stray angle brackets (slugs never keep them). */
+function stripTags(t) {
+  let prev;
+  do { prev = t; t = t.replace(/<[^<>]*>/g, ''); } while (t !== prev);
+  return t.replace(/[<>]/g, '');
+}
+
 /** GitHub heading slugs (with -1, -2 for duplicates) plus explicit id="…" / name="…" anchors. */
 export function anchorsOf(md) {
   const seen = new Map();
@@ -22,7 +29,7 @@ export function anchorsOf(md) {
   for (const line of stripCode(md).split('\n')) {
     const h = line.match(/^#{1,6}\s+(.*?)\s*#*\s*$/);
     if (!h) continue;
-    const text = h[1].replace(/<[^>]+>/g, '').replace(/[<>]/g, '') // slugs never keep < or >.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_~]/g, (c) => (c === '_' ? '_' : ''));
+    const text = stripTags(h[1]).replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_~]/g, (c) => (c === '_' ? '_' : ''));
     const base = text.toLowerCase().trim().replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
     const n = seen.get(base) ?? 0;
     seen.set(base, n + 1);
