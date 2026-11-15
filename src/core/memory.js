@@ -1,7 +1,7 @@
 // Group memory (feature 004): stored messages, rolling summary, notes, memory tools.
 import { env } from './config.js';
 import {
-  history, messagesAfter, getChatMemory, setChatMemory, addNote, listNotes, deleteNote,
+  history, messagesAfter, getChatMemory, setChatMemory, addNote, listNotes, deleteNote, getNote, updateNote, searchNotes,
   searchMessages, messageCount, eraseChat, recentReactions, recentPolls, pollTally,
 } from './db.js';
 import { chat as modelChat } from './providers/index.js';
@@ -32,6 +32,10 @@ export function buildContext({ bot, chat, excludeId = 0 }) {
   if (memoryEnabled(bot)) {
     const mem = getChatMemory(chat);
     if (mem?.summary) parts.push(`<group_memory updated="${stamp(mem.updated_at, tz)}">\n${mem.summary.trim()}\n</group_memory>`);
+    const shared = bot?.id ? listNotes(agentScope(bot), env.memory.notesInContext) : [];
+    if (shared.length) {
+      parts.push(`<agent_memory note="shared by this agent across all its chats">\n${shared.map((n) => `- [#${n.id}, ${new Date(n.ts).toISOString().slice(0, 10)}] ${clip(n.text, 500)}`).join('\n')}\n</agent_memory>`);
+    }
     const notes = listNotes(chat, env.memory.notesInContext);
     if (notes.length) {
       parts.push(`<notes>\n${notes.map((n) => `- [#${n.id}, ${n.role || 'note'} ${n.author || ''}, ${new Date(n.ts).toISOString().slice(0, 10)}] ${clip(n.text, 500)}`).join('\n')}\n</notes>`);
@@ -125,41 +129,81 @@ export function eraseChatMemory(chat, by = 'panel') {
 }
 
 // ---------- memory tools (exposed as memory__<name>) ----------
+// Two scopes (#8): `chat` notes belong to one chat; `agent` notes are shared by the agent across all its chats.
+// Only organizers write shared notes, so people in one chat cannot plant instructions or facts for another chat.
+export const agentScope = (bot) => `agent:${bot.id}`;
 export const MEMORY_DEFAULT_ALLOW = {
   organizer: ['memory:*'],
-  participant: ['memory:remember', 'memory:list_notes', 'memory:search_history'],
+  participant: ['memory:remember', 'memory:list_notes', 'memory:find_notes', 'memory:search_history'],
 };
+const noteOut = (n, bot) => ({
+  id: n.id, scope: n.chat === agentScope(bot) ? 'agent' : 'chat', text: n.text, author: n.author, date: new Date(n.ts).toISOString().slice(0, 10),
+});
+/** A note this chat may touch: one of its own, or one of the agent's shared notes. */
+function ownNote(id, ctx) {
+  const n = getNote(id);
+  if (!n || (n.chat !== ctx.chat && n.chat !== agentScope(ctx.bot))) throw new Error(`No note #${id} here`);
+  return n;
+}
+const scopeSchema = { type: 'string', enum: ['chat', 'agent'], description: 'chat (default) = only this chat; agent = shared with all chats of this agent (organizers only)' };
 
 export const memoryTools = [
   {
     name: 'remember',
-    description: 'Save a note about this chat for the future (a fact, decision, preference or reminder someone asked you to remember). Keep it short and self-contained.',
-    input_schema: { type: 'object', properties: { text: { type: 'string', minLength: 1, maxLength: 500 } }, required: ['text'] },
+    description: 'Save a note for the future (a fact, decision, preference or reminder someone asked you to remember). Keep it short and self-contained. Use scope "agent" only when an organizer wants it known in all chats of this agent.',
+    input_schema: { type: 'object', properties: { text: { type: 'string', minLength: 1, maxLength: 500 }, scope: scopeSchema }, required: ['text'] },
     roles: ['organizer', 'participant'],
-    async run({ text }, ctx) {
+    async run({ text, scope }, ctx) {
       if (!String(text || '').trim()) throw new Error('text is required');
-      const id = addNote({ chat: ctx.chat, bot: ctx.bot.id, text: String(text).trim(), author: ctx.senderName, role: ctx.role });
-      activity('memory.note.added', { bot: ctx.bot.id, chat: ctx.chat, summary: `#${id} by ${ctx.senderName}: ${clip(text, 200)}` });
-      return { saved: id };
+      const shared = scope === 'agent';
+      if (shared && ctx.role !== 'organizer') throw new Error('Only organizers can save notes shared across chats');
+      const chat = shared ? agentScope(ctx.bot) : ctx.chat;
+      const id = addNote({ chat, bot: ctx.bot.id, text: String(text).trim(), author: ctx.senderName, role: ctx.role });
+      activity('memory.note.added', { bot: ctx.bot.id, chat: ctx.chat, summary: `#${id}${shared ? ' (shared)' : ''} by ${ctx.senderName}: ${clip(text, 200)}` });
+      return { saved: id, scope: shared ? 'agent' : 'chat' };
     },
   },
   {
     name: 'list_notes',
-    description: 'List the notes saved for this chat.',
+    description: 'List the saved notes: this chat\'s notes and the notes this agent shares across its chats.',
     input_schema: { type: 'object', properties: {} },
     roles: ['organizer', 'participant'],
     async run(_input, ctx) {
-      return listNotes(ctx.chat).map((n) => ({ id: n.id, text: n.text, author: n.author, role: n.role, date: new Date(n.ts).toISOString().slice(0, 10) }));
+      return [...listNotes(agentScope(ctx.bot)), ...listNotes(ctx.chat)].map((n) => noteOut(n, ctx.bot));
+    },
+  },
+  {
+    name: 'find_notes',
+    description: 'Find saved notes (this chat and shared) containing a word or phrase, e.g. "what did we save about the car?".',
+    input_schema: { type: 'object', properties: { query: { type: 'string', minLength: 2, maxLength: 100 } }, required: ['query'] },
+    roles: ['organizer', 'participant'],
+    async run({ query }, ctx) {
+      if (String(query || '').trim().length < 2) throw new Error('query too short');
+      return searchNotes([ctx.chat, agentScope(ctx.bot)], String(query).trim()).map((n) => noteOut(n, ctx.bot));
+    },
+  },
+  {
+    name: 'update_note',
+    description: 'Replace the text of a saved note by its id (organizers only), e.g. when a saved fact changed.',
+    input_schema: { type: 'object', properties: { id: { type: 'integer' }, text: { type: 'string', minLength: 1, maxLength: 500 } }, required: ['id', 'text'] },
+    roles: ['organizer'],
+    async run({ id, text }, ctx) {
+      if (!String(text || '').trim()) throw new Error('text is required');
+      const n = ownNote(id, ctx);
+      updateNote(n.id, n.chat, String(text).trim());
+      activity('memory.note.added', { bot: ctx.bot.id, chat: ctx.chat, summary: `#${n.id} updated by ${ctx.senderName}: ${clip(text, 200)}` });
+      return { updated: n.id };
     },
   },
   {
     name: 'forget',
-    description: 'Delete a saved note of this chat by its id (organizers only).',
+    description: 'Delete a saved note (this chat or shared) by its id (organizers only).',
     input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
     roles: ['organizer'],
     async run({ id }, ctx) {
-      const deleted = deleteNote(id, ctx.chat);
-      if (deleted) activity('memory.note.removed', { bot: ctx.bot.id, chat: ctx.chat, summary: `#${id} by ${ctx.senderName}` });
+      const n = ownNote(id, ctx);
+      const deleted = deleteNote(n.id, n.chat);
+      if (deleted) activity('memory.note.removed', { bot: ctx.bot.id, chat: ctx.chat, summary: `#${n.id} by ${ctx.senderName}` });
       return { deleted };
     },
   },
