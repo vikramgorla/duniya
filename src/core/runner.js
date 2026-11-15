@@ -8,6 +8,8 @@ export const chatModel = (agent, chat) => { const m = getChatPrefs(chat).model; 
 import { buildContext } from './memory.js';
 import { activity } from './events.js';
 import { toolsFor, matchesAny, organizerConnection } from './tools.js';
+import { checkBudget } from './budget.js';
+import { countStat } from './stats.js';
 
 const MAX_TOOL_ROUNDS = 8;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -63,6 +65,19 @@ export function extractConfirmId(text, field = 'confirm_id') {
  */
 export async function runAgent(ctx) {
   const { agent, role, chat, senderName, text, isGroup } = ctx;
+  // Spending caps (040): checked before the first model call of a turn (a turn that started finishes). Panel tests
+  // are never held back, so the owner can still try the agent.
+  let model = chatModel(agent, chat);
+  if (ctx.source !== 'panel') {
+    const budget = await checkBudget(agent, chat, { names: { chat: ctx.chatName } });
+    if (budget.action === 'quiet') {
+      ctx.silenceReason = 'budget';
+      countStat('budget', { agent: agent.id, chat });
+      activity('system', { agent: agent.id, chat, summary: `Stayed quiet: monthly ${budget.status.scope === 'agent' ? 'agent' : 'chat'} spending cap reached`, detail: { silenceReason: 'budget', scope: budget.status.scope } });
+      return null;
+    }
+    if (budget.action === 'fallback') model = budget.model;
+  }
   const { defs, run, meta } = await toolsFor(agent, role);
   for (const err of meta.get('__errors') || []) activity('error', { agent: agent.id, chat, summary: err });
 
@@ -80,7 +95,7 @@ export async function runAgent(ctx) {
     let res;
     try {
       res = await modelChat({
-        model: chatModel(agent, chat), purpose: 'agent', maxTokens: agent.maxTokens, usage: { agent: agent.id, chat, kind: ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : 'reply' },
+        model, purpose: 'agent', maxTokens: agent.maxTokens, usage: { agent: agent.id, chat, kind: ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : 'reply' },
         system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName }), tools: defs, messages,
       });
     } catch (e) {

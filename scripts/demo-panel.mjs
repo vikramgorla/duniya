@@ -238,6 +238,18 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     }
   }
   store.updateSettings({ modelPrices: { 'anthropic:claude-haiku-5-5': { in: 1, out: 5 }, 'anthropic:claude-sonnet-5-5': { in: 3, out: 15 } } });
+  // spending caps (040), owner alerts and weekly counters (041)
+  const budget = await imp('src/core/budget.js'); const stats = await imp('src/core/stats.js');
+  budget.setCap('agent', 'carpool', { cost: 2 });
+  budget.setCap('agent', 'school', { cost: 1.5, fallback: 'anthropic:claude-haiku-5-5' });
+  budget.setCap('chat', G(4), { tokens: 400000 });
+  store.updateSettings({ alertsTo: '41791234567' });
+  for (let day = 13; day >= 0; day--) {
+    for (const [agent, n] of [['carpool', 6], ['school', 3], ['family', 4], ['football', 2]]) {
+      for (let k = 0; k < Math.round(n * (0.5 + rnd())); k++) { stats.countStat('handled', { agent }, now - day * D); stats.countStat('reply', { agent }, now - day * D); }
+    }
+    for (let k = 0; k < 5; k++) stats.countStat('ignored', { chat: G(6 + (k % 2)) }, now - day * D);
+  }
 
   // backups (local only), update status, server metrics history
   backup.setPassphrase('demo passphrase for screenshots');

@@ -7,6 +7,7 @@ import { logMessage, messageByMsgId, saveReaction, savePollVote, pollTally } fro
 import { activity } from './events.js';
 import { maybeSummarize } from './memory.js';
 import { setWhatsAppChannel } from './whatsapp-tools.js';
+import { countStat } from './stats.js';
 
 const rate = new Map();
 function rateLimited(key) {
@@ -140,6 +141,7 @@ export function createRouter(channel) {
       const open = !msg.isGroup && !helper ? await agentForDm(msg, channel, { openOnly: true }) : null;
       if (!helper && !open) {
         ignoredCounts.set(msg.chat, (ignoredCounts.get(msg.chat) || 0) + 1);
+        countStat('ignored', { chat: msg.chat }); // weekly summary (041): counts only
         return;
       }
       openAgent = open;
@@ -207,6 +209,7 @@ export function createRouter(channel) {
     const text = msg.caption ? `${msg.text.replace(/:.*$/s, ']')} ${stripTriggers(agent, msg.caption)}`.trim() : stripTriggers(agent, msg.text);
     let out = await handleConfirmCommand({ agent, text, role, chat: msg.chat });
     if (out === undefined && !addressed) return; // looked like "cancel ABCD" but isn't ours
+    countStat('handled', { agent: agent.id });
     activity('message.in', {
       agent: agent.id, chat: msg.chat,
       summary: `${msg.senderName} (${role}): ${text}`,
@@ -232,6 +235,7 @@ export function createRouter(channel) {
 
     async function reply(text) {
       const sent = await channel.send(msg.chat, text, { quoted: msg.raw });
+      countStat('reply', { agent: agent.id });
       logMessage({
         channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent',
         name: 'Assistant', text, fromAgent: true,

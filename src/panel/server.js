@@ -47,6 +47,7 @@ import { validateAccess } from '../core/admin-oauth.js';
 import { baseUrl, minuteLimiter } from './http-util.js';
 import { mobileRoutes } from './routes/mobile.js';
 import { toolServiceRoutes } from './routes/tool-services.js';
+import { ownerAlertRoutes } from './routes/owner-alerts.js';
 import { globalServers } from '../core/global-mcp.js';
 import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES, GLOBAL_SCOPE } from '../core/mcp-oauth.js';
 
@@ -572,6 +573,9 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
 
   // ---------- global tool services (035): Settings → Tool services ----------
   toolServiceRoutes(route);
+
+  // ---------- spending caps (040) and owner alerts / weekly summary (041) ----------
+  ownerAlertRoutes(route, { channel });
 
   // ---------- mobile app (027): Settings → Mobile app ----------
   mobileRoutes(route);
