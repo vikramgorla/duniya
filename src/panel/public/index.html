@@ -119,6 +119,9 @@
   .steps > li:not(:last-child)::after { content: ""; position: absolute; left: 13.5px; top: 32px; bottom: 4px; width: 1px; background: var(--line); }
   .steps b.t { display: block; font-family: var(--font-display); font-size: 15px; margin-bottom: 2px; }
   .wa-settings { display: grid; gap: 10px; }
+  .wa-tools { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 18px; }
+  .wa-tools li { padding: 10px 0; border-bottom: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
+  .wa-tick { min-height: 36px; }
   .wa-setting { display: flex; align-items: flex-start; gap: 10px; min-height: 36px; font-size: 14px; }
   .wa-members { list-style: none; padding: 0; margin: 8px 0 0; }
   .wa-members li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); min-width: 0; }
@@ -948,13 +951,12 @@ async function renderBotEditor(id) {
   }
   function drawWa() {
     if (!waTools.length) return waBox.replaceChildren();
-    waBox.replaceChildren(h('div', { class: 'tablewrap', style: 'overflow-x:auto' }, h('table', {},
-      h('thead', {}, h('tr', {}, h('th', {}, 'Action'), h('th', { class: 'c' }, 'Participants'), h('th', { class: 'c' }, 'Organizers'))),
-      h('tbody', {}, waTools.map((t) => h('tr', {},
-        h('td', {}, h('b', {}, t.name.replace(/_/g, ' ')), t.organizerOnly ? h('span', { class: 'pill warn', style: 'margin-left:6px' }, 'organizers only') : null,
-          h('div', { class: 'small muted' }, t.description)),
-        h('td', { class: 'c' }, h('input', { type: 'checkbox', 'aria-label': `${t.name} for participants`, checked: !t.organizerOnly && waOn('participant', t), disabled: t.organizerOnly, onchange: (e) => setWa('participant', t.name, e.target.checked) })),
-        h('td', { class: 'c' }, h('input', { type: 'checkbox', 'aria-label': `${t.name} for organizers`, checked: waOn('organizer', t), onchange: (e) => setWa('organizer', t.name, e.target.checked) }))))))));
+    const tick = (role, t) => h('label', { class: 'inline wa-tick' }, h('input', { type: 'checkbox', checked: (role === 'organizer' || !t.organizerOnly) && waOn(role, t),
+      disabled: role === 'participant' && t.organizerOnly, onchange: (e) => setWa(role, t.name, e.target.checked) }), ROLE_LABEL[role]);
+    waBox.replaceChildren(h('ul', { class: 'wa-tools' }, waTools.map((t) => h('li', {},
+      h('div', {}, h('b', {}, t.name.replace(/_/g, ' ')), t.organizerOnly ? h('span', { class: 'pill warn', style: 'margin-left:6px' }, 'organizers only') : null),
+      h('div', { class: 'small muted' }, t.description),
+      h('div', { class: 'row', style: 'gap:4px;margin-top:4px' }, tick('participant', t), tick('organizer', t))))));
   }
   drawWa();
   const srvList = h('div', {});
@@ -1153,7 +1155,7 @@ async function renderBotEditor(id) {
             field('Participant rules', rulesBox.participant), field('Organizer rules', rulesBox.organizer), field('Never allowed', rulesBox.deny))),
         waTools.length ? h('fieldset', {}, h('legend', {}, 'WhatsApp actions'),
           h('p', { class: 'small muted', style: 'margin-top:0' }, 'What the bot may do in WhatsApp besides answering: send pictures and files, react, post polls, manage the group. Actions marked “organizers only” happen right away when an organizer asks — no confirm code — so give the bot’s number group-admin rights only where you want that. Every action is recorded in Activity.'),
-          waBox) : null,
+          h('details', {}, h('summary', { class: 'small', style: 'cursor:pointer;min-height:36px' }, `Choose actions per role (${waTools.length})`), waBox)) : null,
         h('fieldset', {}, h('legend', {}, 'Changes need confirmation'),
           h('label', { class: 'inline' }, F.confirmOn, 'Hold changes until an organizer replies “confirm CODE”'),
           h('div', { class: 'row' }, field('Preview tools', F.cPreview), field('Confirm tool', F.cTool)),
