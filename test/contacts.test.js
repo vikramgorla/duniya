@@ -6,7 +6,7 @@ import { setup } from './harness.js';
 const t = await setup();
 const c = await import('../src/core/contacts.js');
 const tool = (n) => c.contactsTools.find((x) => x.name === n);
-const bot = { id: 'b' };
+const agent = { id: 'b' };
 after(() => t.close());
 
 test('WhatsApp sync stores names but never shares them', () => {
@@ -20,8 +20,8 @@ test('WhatsApp sync stores names but never shares them', () => {
 });
 
 test('participants find only shared contacts; organizers find all and manage', async () => {
-  const org = { bot, role: 'organizer', senderName: 'Org' };
-  const pat = { bot, role: 'participant', senderName: 'Pat' };
+  const org = { agent, role: 'organizer', senderName: 'Org' };
+  const pat = { agent, role: 'participant', senderName: 'Pat' };
   assert.match(await tool('find_contact').run({ query: 'anu' }, pat), /No matching contact/);
   assert.equal((await tool('find_contact').run({ query: 'anu' }, org))[0].phone, '+41790000101');
   await tool('save_contact').run({ phone: '+41 79 000 01 01', name: 'Anu', note: 'Drives Tuesdays', shared: true }, org);

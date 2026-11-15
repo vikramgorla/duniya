@@ -22,7 +22,7 @@ export function numberState(n: Pick<WaNumber, 'status'>): string {
 export function headline(st: Status): { text: string; tone: Tone } {
   const numbers = numbersOf(st);
   const open = numbers.filter((n) => n.status === 'open').length;
-  const live = st.bots.filter((b) => b.enabled).length;
+  const live = st.agents.filter((b) => b.enabled).length;
   if (st.settings.paused) return { text: 'All agents are paused', tone: 'warn' };
   if (open === numbers.length && live > 0) return { text: st.pending ? 'Running · changes are waiting for you' : 'Everything is running', tone: st.pending ? 'warn' : 'ok' };
   if (open < numbers.length) return { text: numbers.length > 1 ? 'A WhatsApp number needs attention' : 'WhatsApp needs attention', tone: 'bad' };

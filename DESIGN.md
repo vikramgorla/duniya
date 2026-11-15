@@ -17,7 +17,7 @@ add or change UI, check it against the principles and the checklist at the end.
 4. **Calm by default, detail on demand.** Primary actions are visible; advanced options live in `<details>`
    ("Advanced", "More", "Update settings"). Logs and raw output are collapsible.
 5. **Safe by design.** Destructive or disruptive actions are red outline buttons and always confirm in plain words
-   with the consequence ("Bots are offline for 1–2 minutes"). Owner-only actions are hidden or explained for others.
+   with the consequence ("Agents are offline for 1–2 minutes"). Owner-only actions are hidden or explained for others.
 6. **Stable screens.** Nothing flickers: periodic refreshes update values in place and only redraw when something
    visible changed; inputs being typed in are never replaced.
 7. **Works on a phone and an iPad.** Touch targets ≥ 36 px, horizontal scrolling only inside tab bars and tables,
@@ -40,7 +40,7 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
 - **Instrument details:** labels, pills, table headers and numbers in monospace (uppercase, wide tracking for
   labels); stats in large mono figures; LED dots with a glow for live state.
 - **Status console:** Overview opens with one sentence about the state ("Everything is running", "A WhatsApp
-  number needs attention") and LEDs for WhatsApp, Bots and Waiting changes.
+  number needs attention") and LEDs for WhatsApp, Agents and Waiting changes.
 - **States:** ok = deep lime, warn = amber, bad = crimson, info = indigo — soft tinted backgrounds with a left rule
   for notes.
 - **Type:** Segoe UI Variable / SF Pro / Inter for text and headings (tight tracking); SF Mono / Cascadia /

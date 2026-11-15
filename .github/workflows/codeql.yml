@@ -19,5 +19,9 @@ jobs:
       - uses: github/codeql-action/init@v3
         with:
           languages: javascript-typescript
+          # Tests use fakes and local files on purpose; scan the shipped code.
+          config: |
+            paths-ignore:
+              - test
           queries: security-and-quality
       - uses: github/codeql-action/analyze@v3

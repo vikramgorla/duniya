@@ -4,7 +4,7 @@
 // immediately (owner decision on issue #2: no confirm code). Every action is logged as `whatsapp.action`.
 import { digits } from './config.js';
 import {
-  logMessage, messageByMsgId, lastBotMessage, setMessageText, searchMessages, namesInChat, getPoll, latestPoll, recentPolls, pollTally,
+  logMessage, messageByMsgId, lastAgentMessage, setMessageText, searchMessages, namesInChat, getPoll, latestPoll, recentPolls, pollTally,
 } from './db.js';
 import { activity } from './events.js';
 
@@ -29,28 +29,28 @@ export const WHATSAPP_DEFAULT_ALLOW = {
  * Rules for whatsapp tools of a role: the role's explicit `whatsapp:` rules when it has any (the editor writes them,
  * `whatsapp:-` = none), otherwise the defaults above.
  */
-export function whatsappRules(bot, role) {
-  const explicit = (bot.tools?.[role] || []).filter((r) => r.startsWith('whatsapp:'));
+export function whatsappRules(agent, role) {
+  const explicit = (agent.tools?.[role] || []).filter((r) => r.startsWith('whatsapp:'));
   return explicit.length ? explicit : WHATSAPP_DEFAULT_ALLOW[role] || [];
 }
 
 // ---------- shared helpers ----------
 function need() { if (!channel) fail('WhatsApp is not available here', 503); return channel; }
 
-/** The chat to act on: the current one, or another chat (id or group name) bound to the same bot. */
+/** The chat to act on: the current one, or another chat (id or group name) bound to the same agent. */
 async function targetChat(input, ctx) {
   const want = String(input.chat || '').trim();
   if (!want || want === ctx.chat) {
     if (!isWhatsAppChat(ctx.chat)) fail('There is no WhatsApp chat here; name the group (chat) to act on');
     return ctx.chat;
   }
-  const bound = ctx.bot.chats || [];
+  const bound = ctx.agent.chats || [];
   if (bound.includes(want)) return want;
   for (const c of bound) {
     const name = await channel?.chatName?.(c).catch(() => '');
     if (name && name.toLowerCase() === want.toLowerCase()) return c;
   }
-  return fail('I can only act in this chat or in other chats this bot is in');
+  return fail('I can only act in this chat or in other chats this agent is in');
 }
 const needGroup = (chat) => { if (!isGroupChat(chat)) fail('This only works in a WhatsApp group'); };
 
@@ -69,14 +69,14 @@ function findMessage(chat, message, fallback) {
     row = fallback();
     if (!row) fail('Which message? Give its id or a few words of it');
   }
-  return { msgId: row.msg_id, fromMe: !!row.from_bot, participant: row.sender_jid || '', text: row.text || '', row };
+  return { msgId: row.msg_id, fromMe: !!row.from_agent, participant: row.sender_jid || '', text: row.text || '', row };
 }
 const current = (chat, ctx) => () => (ctx.msgId ? messageByMsgId(chat, ctx.msgId) || (chat === ctx.chat
-  ? { msg_id: ctx.msgId, from_bot: 0, sender_jid: ctx.senderJid || '', text: ctx.text || '' } : null) : null);
+  ? { msg_id: ctx.msgId, from_agent: 0, sender_jid: ctx.senderJid || '', text: ctx.text || '' } : null) : null);
 
-/** The bot's own sends are stored like its replies (context, edit/delete later). */
+/** The agent's own sends are stored like its replies (context, edit/delete later). */
 function remember(ctx, chat, msgId, text) {
-  logMessage({ chat, bot: ctx.bot.id, msgId: msgId || null, sender: 'bot', name: 'Assistant', text, fromBot: true });
+  logMessage({ chat, agent: ctx.agent.id, msgId: msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
 }
 function people(input) {
   const list = Array.isArray(input.people) ? input.people : String(input.people || '').split(/[,\n]/);
@@ -95,7 +95,7 @@ async function participantsAction(input, ctx, action) {
 }
 
 const str = (description, extra = {}) => ({ type: 'string', description, ...extra });
-const CHAT = str('Optional: another chat this bot is in (group name or chat id). Default: the current chat.');
+const CHAT = str('Optional: another chat this agent is in (group name or chat id). Default: the current chat.');
 const MESSAGE = (dflt) => str(`Optional: the message, as its id or a few words of it. Default: ${dflt}.`);
 const PEOPLE = { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 20, description: 'Phone numbers with country code, e.g. "+41 79 123 45 67"' };
 
@@ -154,7 +154,7 @@ const DEFS = [
       const chat = await targetChat(input, ctx);
       const ref = findMessage(chat, input.message, current(chat, ctx));
       const r = await need().send(chat, String(input.text), { quote: ref });
-      logMessage({ chat, bot: ctx.bot.id, msgId: r?.msgId || null, sender: 'bot', name: 'Assistant', text: String(input.text), quoted: ref.text, fromBot: true });
+      logMessage({ chat, agent: ctx.agent.id, msgId: r?.msgId || null, sender: 'agent', name: 'Assistant', text: String(input.text), quoted: ref.text, fromAgent: true });
       return { chat, result: { sent: true, msgId: r?.msgId || null }, summary: `Replied to "${clip(ref.text, 60)}": ${clip(input.text, 120)}` };
     } },
   { name: 'edit_message', roles: ['organizer', 'participant'],
@@ -162,7 +162,7 @@ const DEFS = [
     input_schema: { type: 'object', properties: { text: str('New text', { maxLength: 4000 }), message: MESSAGE('your last message'), chat: CHAT }, required: ['text'] },
     async run(input, ctx) {
       const chat = await targetChat(input, ctx);
-      const ref = findMessage(chat, input.message, () => lastBotMessage(chat));
+      const ref = findMessage(chat, input.message, () => lastAgentMessage(chat));
       if (!ref.fromMe) fail('Only messages the assistant sent can be edited');
       await need().editMessage(chat, ref.msgId, String(input.text));
       setMessageText(chat, ref.msgId, String(input.text));
@@ -173,7 +173,7 @@ const DEFS = [
     input_schema: { type: 'object', properties: { message: MESSAGE('your last message'), chat: CHAT } },
     async run(input, ctx) {
       const chat = await targetChat(input, ctx);
-      const ref = findMessage(chat, input.message, () => lastBotMessage(chat));
+      const ref = findMessage(chat, input.message, () => lastAgentMessage(chat));
       if (!ref.fromMe) needGroup(chat);
       await need().deleteMessage(chat, ref);
       setMessageText(chat, ref.msgId, '[deleted]');
@@ -290,8 +290,8 @@ const DEFS = [
     input_schema: { type: 'object', properties: { person: str('Phone number with country code') }, required: ['person'] },
     async run(input, ctx) {
       const d = digits(input.person);
-      if ((ctx.bot.organizers || []).includes(d)) fail('Organizers of this bot cannot be blocked');
-      const chat = isWhatsAppChat(ctx.chat) ? ctx.chat : (ctx.bot.chats || [])[0];
+      if ((ctx.agent.organizers || []).includes(d)) fail('Organizers of this agent cannot be blocked');
+      const chat = isWhatsAppChat(ctx.chat) ? ctx.chat : (ctx.agent.chats || [])[0];
       if (!chat) fail('No WhatsApp number to act on');
       await need().block(chat, input.person);
       return { chat, result: { blocked: true }, summary: `Blocked +${d}` };
@@ -299,7 +299,7 @@ const DEFS = [
   { name: 'unblock', roles: ['organizer'], description: 'Unblock a phone number on this WhatsApp number.',
     input_schema: { type: 'object', properties: { person: str('Phone number with country code') }, required: ['person'] },
     async run(input, ctx) {
-      const chat = isWhatsAppChat(ctx.chat) ? ctx.chat : (ctx.bot.chats || [])[0];
+      const chat = isWhatsAppChat(ctx.chat) ? ctx.chat : (ctx.agent.chats || [])[0];
       if (!chat) fail('No WhatsApp number to act on');
       await need().unblock(chat, input.person);
       return { chat, result: { unblocked: true }, summary: `Unblocked +${digits(input.person)}` };
@@ -320,17 +320,17 @@ export const whatsappTools = DEFS.map((d) => ({
     if (!d.roles.includes(ctx.role)) fail('Only organizers can do this');
     try {
       const out = await d.run(input || {}, ctx);
-      activity('whatsapp.action', { bot: ctx.bot.id, chat: out.chat, summary: `${d.name} by ${ctx.senderName || 'someone'} (${ctx.role}): ${out.summary}`,
+      activity('whatsapp.action', { agent: ctx.agent.id, chat: out.chat, summary: `${d.name} by ${ctx.senderName || 'someone'} (${ctx.role}): ${out.summary}`,
         detail: { tool: d.name, input: scrubInput(input), role: ctx.role, by: ctx.senderName || '', from: ctx.chat } });
       return out.result;
     } catch (e) {
-      activity('whatsapp.action', { bot: ctx.bot.id, chat: ctx.chat, summary: `${d.name} by ${ctx.senderName || 'someone'} (${ctx.role}) failed: ${e.message}`,
+      activity('whatsapp.action', { agent: ctx.agent.id, chat: ctx.chat, summary: `${d.name} by ${ctx.senderName || 'someone'} (${ctx.role}) failed: ${e.message}`,
         detail: { tool: d.name, input: scrubInput(input), role: ctx.role, error: e.message } });
       throw e;
     }
   },
 }));
 export const WHATSAPP_TOOL_NAMES = whatsappTools.map((t) => t.name);
-/** For the bot editor: name, description, which roles may have it and the participant default. */
+/** For the agent editor: name, description, which roles may have it and the participant default. */
 export const whatsappToolCatalog = () => whatsappTools.map((t) => ({ name: t.name, description: t.description, organizerOnly: !t.roles.includes('participant'),
   participantDefault: WHATSAPP_PARTICIPANT_DEFAULT.includes(t.name) }));

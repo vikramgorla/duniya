@@ -100,7 +100,7 @@
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; z-index: 20; max-width: 90vw; box-shadow: var(--shadow); }
   .chatlog { display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow: auto; margin: 10px 0; }
   .bubble { padding: 9px 12px; border-radius: 16px; max-width: 85%; white-space: pre-wrap; word-break: break-word; }
-  .bubble.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; } .bubble.bot { align-self: flex-start; background: var(--bg-2); border-bottom-left-radius: 4px; }
+  .bubble.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; } .bubble.agent { align-self: flex-start; background: var(--bg-2); border-bottom-left-radius: 4px; }
   .hide { display: none !important; }
   .code { font-family: var(--mono); font-size: 22px; letter-spacing: 3px; font-weight: 600; }
   .readonly .mut { display: none !important; }
@@ -301,7 +301,7 @@ const $ = (s) => document.querySelector(s);
 const ICONS = {
   overview: 'M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z',
   activity: 'M3 12h4l2.5-6 4 12 2.5-6H21',
-  bots: 'M8 8V6.5a4 4 0 0 1 8 0V8M5 10a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3zM9.5 14h.01M14.5 14h.01',
+  agents: 'M8 8V6.5a4 4 0 0 1 8 0V8M5 10a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3zM9.5 14h.01M14.5 14h.01',
   chats: 'M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9zM9 9.5h6M9 12.5h4',
   models: 'M12 3.5l1.8 4.7 4.7 1.8-4.7 1.8L12 16.5l-1.8-4.7L5.5 10l4.7-1.8zM18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z',
   usage: 'M5 19V10M10 19V5M15 19v-7M20 19v-4M3 19.5h18',
@@ -346,7 +346,7 @@ const tryApi = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toa
 const ago = (ts) => { const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s / 60)}m` : s < 86400 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`; };
 const time = (ts) => (ts ? new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
-const TYPE_CLASS = { 'message.in': 'info', 'message.out': 'ok', 'tool.call': '', 'tool.error': 'bad', error: 'bad', 'confirm.created': 'warn', 'confirm.applied': 'ok', 'confirm.cancelled': 'warn', 'channel.status': 'info', 'schedule.run': 'info', 'bot.updated': '', 'bot.created': 'ok', 'bot.deleted': 'warn', system: '', 'memory.summary': 'info', 'memory.history': '', 'memory.note.added': 'ok', 'memory.note.removed': 'warn', 'memory.erased': 'bad', 'model.usage': '', 'backup.done': 'ok', 'backup.restore': 'warn', 'backup.settings': '', 'mcp.call': 'info', 'mcp.register': '' };
+const TYPE_CLASS = { 'message.in': 'info', 'message.out': 'ok', 'tool.call': '', 'tool.error': 'bad', error: 'bad', 'confirm.created': 'warn', 'confirm.applied': 'ok', 'confirm.cancelled': 'warn', 'channel.status': 'info', 'schedule.run': 'info', 'agent.updated': '', 'agent.created': 'ok', 'agent.deleted': 'warn', system: '', 'memory.summary': 'info', 'memory.history': '', 'memory.note.added': 'ok', 'memory.note.removed': 'warn', 'memory.erased': 'bad', 'model.usage': '', 'backup.done': 'ok', 'backup.restore': 'warn', 'backup.settings': '', 'mcp.call': 'info', 'mcp.register': '' };
 function toggle(checked, onchange, disabled) { return h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked, disabled: disabled || !can('admin'), onchange: (e) => onchange(e.target.checked) }), h('span')); }
 // replaceChildren/append would print null/false as text; drop them everywhere.
 for (const fn of ['replaceChildren', 'append']) {
@@ -405,10 +405,10 @@ async function waitForRestart(statusEl) {
 const meterEl = () => { const i = h('i', { style: 'width:0%' }); const m = h('div', { class: 'meter' }, i); m.set = (f) => (i.style.width = `${Math.round(f * 100)}%`); return m; };
 
 // ---------- state ----------
-const S = { tab: 'overview', user: null, status: null, feed: [], feedBot: '', es: null, editing: null };
+const S = { tab: 'overview', user: null, status: null, feed: [], feedAgent: '', es: null, editing: null };
 const RANK = { viewer: 1, admin: 2, owner: 3 };
 const can = (role) => S.user && RANK[S.user.role] >= RANK[role];
-const TABS = () => [['overview', 'Overview'], ['activity', 'Activity'], ['bots', 'Bots'], ['chats', 'Chats'], ['contacts', 'Contacts'], ['models', 'Models'],
+const TABS = () => [['overview', 'Overview'], ['activity', 'Activity'], ['agents', 'Agents'], ['chats', 'Chats'], ['contacts', 'Contacts'], ['models', 'Models'],
   ['server', 'Server'], ['usage', 'Usage'], can('owner') && ['backups', 'Backups'], ['pending', 'Pending'], ['secrets', 'Secrets'], ['settings', 'Settings']].filter(Boolean);
 
 // ---------- login & first-run setup ----------
@@ -481,7 +481,7 @@ function renderSetup(app, brand) {
         } catch (x) { err.textContent = x.message; go.disabled = false; prog.classList.add('hide'); }
       } }, 'Upload and restore');
       box.replaceChildren(
-        h('p', { class: 'small muted' }, 'Bring everything over from your old server: bots, users, settings, secrets, chat memory and the WhatsApp link.'),
+        h('p', { class: 'small muted' }, 'Bring everything over from your old server: agents, users, settings, secrets, chat memory and the WhatsApp link.'),
         h('ol', { class: 'small', style: 'padding-left:18px;margin:6px 0' }, h('li', {}, 'On the old server: Backups → “Back up now & download”.'), h('li', {}, 'Here: choose that file and type the backup passphrase.'), h('li', {}, 'This server restarts; sign in with your usual account.')),
         h('div', { class: 'filepick', style: 'margin-top:10px' }, file), field('Backup passphrase', pass, 'The passphrase you set under Backups on the old server. Without it the file cannot be opened.'),
         go, prog,
@@ -515,7 +515,7 @@ async function refreshStatus() {
   try { S.status = await api('GET', '/api/status'); } catch { return; }
   const st = S.status.channel.status;
   const dot = $('#wa-dot'); if (dot) dot.className = `dot ${st === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(st) ? 'warn' : 'bad'}`;
-  const sub = $('#brand-sub'); if (sub) sub.textContent = S.status.settings.paused ? 'paused' : `${S.status.bots.filter((b) => b.enabled).length} bots live`;
+  const sub = $('#brand-sub'); if (sub) sub.textContent = S.status.settings.paused ? 'paused' : `${S.status.agents.filter((b) => b.enabled).length} agents live`;
   if (S.tab === 'overview') renderOverview(true);
 }
 function show(tab) {
@@ -526,7 +526,8 @@ function show(tab) {
   const seq = (S.renderSeq = (S.renderSeq || 0) + 1);
   const main = $('#main');
   const slow = setTimeout(() => { if (S.renderSeq === seq) main?.classList.add('loading'); }, 120);
-  const r = { overview: renderOverview, server: renderServer, usage: renderUsage, activity: renderActivity, bots: renderBots, chats: renderChats, contacts: renderContacts, models: renderModels, backups: renderBackups, pending: renderPending, secrets: renderSecrets, settings: renderSettings }[tab];
+  const RENDER = { overview: renderOverview, server: renderServer, usage: renderUsage, activity: renderActivity, agents: renderAgents, chats: renderChats, contacts: renderContacts, models: renderModels, backups: renderBackups, pending: renderPending, secrets: renderSecrets, settings: renderSettings };
+  const r = Object.hasOwn(RENDER, tab) ? RENDER[tab] : null;
   Promise.resolve(r?.()).catch((e) => toast(e.message)).finally(() => {
     clearTimeout(slow);
     if (S.renderSeq === seq) { main?.classList.remove('loading'); S.renderDone = seq; return; }
@@ -540,7 +541,7 @@ function connectEvents() {
   S.es.onmessage = (e) => {
     const a = JSON.parse(e.data);
     S.feed.unshift(a); S.feed.length = Math.min(S.feed.length, 500);
-    if (S.tab === 'activity' && (!S.feedBot || a.bot === S.feedBot)) $('#feed')?.prepend(feedItem(a));
+    if (S.tab === 'activity' && (!S.feedAgent || a.agent === S.feedAgent)) $('#feed')?.prepend(feedItem(a));
     if (S.tab === 'overview') { const r = $('#recent'); if (r) { r.prepend(feedItem(a)); while (r.children.length > 8) r.lastChild.remove(); } }
     if (a.type === 'channel.status') refreshStatus();
   };
@@ -567,8 +568,8 @@ async function renderOverview(soft) {
   const numberBlock = (n) => {
     const body = { number: n.id };
     const phone = h('input', { placeholder: 'This number, e.g. 41791234567', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
-    const dmSel = h('select', { disabled: !can('admin'), style: 'max-width:260px', onchange: (e) => tryApi(() => api('PUT', `/api/whatsapp/numbers/${n.id}`, { dmBot: e.target.value }), 'Saved') },
-      h('option', { value: '' }, 'Default (Settings)'), st.bots.map((b) => h('option', { value: b.id, selected: n.dmBot === b.id }, b.name)));
+    const dmSel = h('select', { disabled: !can('admin'), style: 'max-width:260px', onchange: (e) => tryApi(() => api('PUT', `/api/whatsapp/numbers/${n.id}`, { dmAgent: e.target.value }), 'Saved') },
+      h('option', { value: '' }, 'Default (Settings)'), st.agents.map((b) => h('option', { value: b.id, selected: n.dmAgent === b.id }, b.name)));
     return h('div', { class: 'number-card' },
       h('div', { class: 'row spread' }, h('div', {}, h('b', {}, n.label), n.status === 'open' ? h('span', { class: 'muted small num' }, `  +${(n.me || '').split(':')[0].split('@')[0]}`) : null), pillFor(n)),
       n.status === 'open' ? h('div', { class: 'small muted' }, `Connected since ${time(n.since)}`) : null,
@@ -581,21 +582,21 @@ async function renderOverview(soft) {
       h('div', { class: 'row mut', style: 'margin-top:10px' },
         h('button', { class: 'btn small', onclick: () => tryApi(() => api('POST', '/api/whatsapp/restart', body), 'Reconnecting…') }, 'Reconnect'),
         h('button', { class: 'btn small danger', onclick: () => confirm(`Unlink ${n.label}? You will need to scan a new QR.`) && tryApi(() => api('POST', '/api/whatsapp/logout', body), 'Unlinked') }, 'Unlink'),
-        n.id !== 'main' && can('owner') ? h('button', { class: 'btn small danger', onclick: () => confirm(`Remove the number “${n.label}”? Its chats keep their memory; bots bound to them stop answering there.`) && tryApi(async () => { await api('DELETE', `/api/whatsapp/numbers/${n.id}`); refreshStatus(); }, 'Removed') }, 'Remove') : null));
+        n.id !== 'main' && can('owner') ? h('button', { class: 'btn small danger', onclick: () => confirm(`Remove the number “${n.label}”? Its chats keep their memory; agents bound to them stop answering there.`) && tryApi(async () => { await api('DELETE', `/api/whatsapp/numbers/${n.id}`); refreshStatus(); }, 'Removed') }, 'Remove') : null));
   };
   const newLabel = h('input', { placeholder: 'Name, e.g. Shop', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
   const wa = h('div', { class: 'card' },
     h('div', { class: 'row spread' }, h('h2', {}, 'WhatsApp numbers'), h('span', { class: 'pill' }, `${numbers.filter((n) => n.status === 'open').length}/${numbers.length} connected`)),
     numbers.map(numberBlock),
     can('owner') ? h('details', { class: 'mut' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, '+ Add another number'),
-      h('p', { class: 'small muted' }, 'Each number is linked as its own device. Use a dedicated number for bots.'),
+      h('p', { class: 'small muted' }, 'Each number is linked as its own device. Use a dedicated number for agents.'),
       h('div', { class: 'row' }, newLabel, h('button', { class: 'btn primary', onclick: () => tryApi(async () => { await api('POST', '/api/whatsapp/numbers', { label: newLabel.value }); overviewBusy = false; await refreshStatus(); renderOverview(); }, 'Added — scan its QR') }, 'Add number'))) : null);
   const control = h('div', { class: 'card' }, h('h2', {}, 'Control'),
-    h('div', { class: 'row spread nowrap' }, h('div', {}, h('b', {}, 'Pause all bots'), h('div', { class: 'small muted' }, 'Stops all replies and scheduled posts')),
+    h('div', { class: 'row spread nowrap' }, h('div', {}, h('b', {}, 'Pause all agents'), h('div', { class: 'small muted' }, 'Stops all replies and scheduled posts')),
       toggle(st.settings.paused, (v) => tryApi(async () => { await api('POST', '/api/settings', { paused: v }); refreshStatus(); }, v ? 'Paused' : 'Resumed'))),
-    h('table', { style: 'margin-top:10px' }, h('tbody', {}, st.bots.length ? st.bots.map((b) => h('tr', {},
+    h('table', { style: 'margin-top:10px' }, h('tbody', {}, st.agents.length ? st.agents.map((b) => h('tr', {},
       h('td', {}, h('b', {}, b.name), h('div', { class: 'small muted' }, `${b.chats} chat(s)`)),
-      h('td', { style: 'text-align:right' }, toggle(b.enabled, (v) => tryApi(async () => { await api('PUT', `/api/bots/${b.id}`, { enabled: v }); refreshStatus(); }, `${b.name} ${v ? 'on' : 'off'}`))))) : h('tr', {}, h('td', { class: 'muted' }, 'No bots yet — create one under Bots.')))),
+      h('td', { style: 'text-align:right' }, toggle(b.enabled, (v) => tryApi(async () => { await api('PUT', `/api/agents/${b.id}`, { enabled: v }); refreshStatus(); }, `${b.name} ${v ? 'on' : 'off'}`))))) : h('tr', {}, h('td', { class: 'muted' }, 'No agents yet — create one under Agents.')))),
     st.pending ? h('p', {}, h('span', { class: 'pill warn' }, `${st.pending} pending confirmation(s)`)) : null);
   const reusedUpdates = soft && $('#updates-box')?.childElementCount ? $('#updates-box') : null;
   const server = h('div', { class: 'card' }, h('h2', {}, 'Server'),
@@ -606,15 +607,15 @@ async function renderOverview(soft) {
     h('ul', { class: 'feed', id: 'recent' }, S.feed.slice(0, 8).map(feedItem)));
   const hr = new Date().getHours();
   const hello = hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
-  const live = st.bots.filter((b) => b.enabled).length; const open = numbers.filter((n) => n.status === 'open').length;
+  const live = st.agents.filter((b) => b.enabled).length; const open = numbers.filter((n) => n.status === 'open').length;
   const allGood = !st.settings.paused && open === numbers.length && live > 0;
   const led = (label, ok, value) => h('div', { class: 'led' }, h('span', { class: `dot ${ok === true ? 'ok' : ok === false ? 'bad' : 'warn'}` }), label, h('b', {}, value));
   const hero = h('div', { class: 'card console' },
     h('div', {}, h('div', { class: 'eyebrow' }, `${hello} · ${S.user.username}`),
-      h('h2', {}, st.settings.paused ? 'All bots are paused' : st.enabledChats === 0 ? 'No chat is switched on — agents stay silent' : allGood ? 'Everything is running' : open < numbers.length ? 'A WhatsApp number needs attention' : live ? 'Running, with something to check' : 'No bot is switched on yet')),
+      h('h2', {}, st.settings.paused ? 'All agents are paused' : st.enabledChats === 0 ? 'No chat is switched on — agents stay silent' : allGood ? 'Everything is running' : open < numbers.length ? 'A WhatsApp number needs attention' : live ? 'Running, with something to check' : 'No agent is switched on yet')),
     h('div', { class: 'leds' },
       led('WhatsApp', open === numbers.length ? true : open ? null : false, `${open}/${numbers.length}`),
-      led('Bots', st.settings.paused ? false : live ? true : null, st.settings.paused ? 'paused' : `${live} live`),
+      led('Agents', st.settings.paused ? false : live ? true : null, st.settings.paused ? 'paused' : `${live} live`),
       led('Chats on', st.enabledChats ? true : null, String(st.enabledChats ?? 0)),
       led('Waiting', st.pending ? null : true, String(st.pending || 0))),
     st.enabledChats === 0 ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
@@ -670,7 +671,7 @@ async function renderUpdates(box, note = '') {
       : h('div', { class: 'note ok' }, h('b', {}, `✓ Up to date: ${st.current}`), h('span', { class: 'muted' }, ` · checked ${ago(st.checkedAt)} ago`));
   const last = lr ? h('p', { class: 'small muted' }, lr.ok ? `Last update: ${lr.from ? `${lr.from} → ` : ''}${lr.target} on ${time(lr.at)}` : `Last update failed on ${time(lr.at)}; the previous version kept running.`) : null;
   const updateBtn = st.available && !u.running && u.install !== 'docker' ? h('button', { class: 'btn primary', onclick: async (e) => {
-    if (!confirm(`Install ${st.latest} and restart? The bots pause for about a minute.`)) return;
+    if (!confirm(`Install ${st.latest} and restart? The agents pause for about a minute.`)) return;
     e.target.disabled = true;
     const r = await tryApi(() => api('POST', '/api/updates/apply'));
     if (r) { S.updateFrom = st.current; renderUpdates(box); }
@@ -746,7 +747,7 @@ async function renderServer() {
         run ? h('div', { class: 'note' }, h('span', { class: 'spinner' }), h('b', {}, ` ${ops.actions[run.action] || run.action}…`), ` started ${ago(run.startedAt)} ago`) : null,
         h('div', { class: 'row', style: 'margin-top:8px' },
           act('os-update', 'Install OS updates', 'primary', 'Install all OS package updates now? The server stays online; a restart may be needed afterwards.'),
-          act('reboot', 'Restart server', 'danger', 'Restart the whole server now? Bots are offline for 1–2 minutes.')),
+          act('reboot', 'Restart server', 'danger', 'Restart the whole server now? Agents are offline for 1–2 minutes.')),
         h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'More'),
           h('div', { class: 'row', style: 'margin-top:8px' }, act('os-cleanup', 'Remove unused packages'), act('restart-web', 'Restart web server'), act('restart-tunnel', 'Restart tunnel'))),
         ops.status && !run ? h('p', { class: 'small muted' }, `Last: ${ops.actions[ops.status.action] || ops.status.action} — ${ops.status.state === 'done' ? 'done' : 'failed'} ${time(ops.status.endedAt)}`) : null,
@@ -773,7 +774,7 @@ const fmtTok = (n) => (!n ? '0' : n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 :
 const fmtCost = (c) => (c == null ? '—' : c === 0 ? '$0' : c < 0.01 ? '<$0.01' : `$${c < 10 ? c.toFixed(2) : Math.round(c)}`);
 const usageLine = (u) => (u ? `${fmtTok(u.input + u.output)} tokens · ${u.unpriced && !u.cost ? 'price not set' : fmtCost(u.cost)}${u.unpriced && u.cost ? '+' : ''}` : 'no use yet');
 let usageCache = null;
-/** Last-30-days usage per bot, chat, provider and model (cached 60 s) for inline badges. */
+/** Last-30-days usage per agent, chat, provider and model (cached 60 s) for inline badges. */
 async function usageSummary() {
   if (usageCache && Date.now() - usageCache.at < 60000) return usageCache.v;
   const v = await api('GET', '/api/usage/summary?period=30d').catch(() => null);
@@ -818,10 +819,10 @@ async function renderContacts() {
 }
 
 async function renderUsage() {
-  const [byDay, byBot, byChat, byProv, byModel, byKind, sum, chats, bots] = await Promise.all(['day', 'bot', 'chat', 'provider', 'model', 'kind']
-    .map((g) => api('GET', `/api/usage?period=${usagePeriod}&groupBy=${g}`)).concat([usageSummary(), api('GET', '/api/chats').catch(() => []), api('GET', '/api/bots').catch(() => [])]));
+  const [byDay, byAgent, byChat, byProv, byModel, byKind, sum, chats, agents] = await Promise.all(['day', 'agent', 'chat', 'provider', 'model', 'kind']
+    .map((g) => api('GET', `/api/usage?period=${usagePeriod}&groupBy=${g}`)).concat([usageSummary(), api('GET', '/api/chats').catch(() => []), api('GET', '/api/agents').catch(() => [])]));
   const t = byDay.total;
-  const chatName = Object.fromEntries(chats.map((c) => [c.id, c.name])); const botName = Object.fromEntries(bots.map((b) => [b.id, b.name]));
+  const chatName = Object.fromEntries(chats.map((c) => [c.id, c.name])); const agentName = Object.fromEntries(agents.map((b) => [b.id, b.name]));
   const KIND = { reply: 'Replies', summary: 'Memory summaries', scheduled: 'Scheduled posts', 'ai-helper': 'AI helper', test: 'Tests' };
   const seg = h('div', { class: 'seg' }, [['1d', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['90d', '90 days'], ['all', 'All']].map(([v, l]) => h('button', { class: usagePeriod === v ? 'on' : '', onclick: () => { usagePeriod = v; renderUsage(); } }, l)));
   const tile = (eyebrow, stat, sub) => h('div', { class: 'card' }, h('div', { class: 'eyebrow' }, eyebrow), h('div', { class: 'stat' }, stat), sub ? h('div', { class: 'small muted' }, sub) : null);
@@ -846,13 +847,13 @@ async function renderUsage() {
   $('#main').replaceChildren(
     h('div', { class: 'card console' }, h('div', {}, h('div', { class: 'eyebrow' }, 'Usage & cost'), h('h2', {}, `${fmtTok(t.input + t.output)} tokens · ${t.unpriced === t.calls && t.calls ? 'price not set' : fmtCost(t.cost)}`)), seg),
     h('div', { class: 'tiles' },
-      tile('Tokens in', fmtTok(t.input), 'what bots read: instructions, chat context, tool results'),
-      tile('Tokens out', fmtTok(t.output), 'what bots wrote'),
+      tile('Tokens in', fmtTok(t.input), 'what agents read: instructions, chat context, tool results'),
+      tile('Tokens out', fmtTok(t.output), 'what agents wrote'),
       tile('Estimated cost', fmtCost(t.cost), t.unpriced ? `${t.unpriced} call(s) without a price — set prices under “By model”` : t.plan ? `${t.plan} call(s) included in your plans` : 'from the prices below'),
       tile('Model calls', String(t.calls || 0), `${(byKind.rows.find((r) => r.key === 'reply')?.calls) || 0} replies`)),
     h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Per day'), days.length ? chart : h('p', { class: 'small muted' }, 'Nothing in this period.')),
     h('div', { class: 'grid', style: 'margin-top:16px;align-items:start' },
-      table('By bot', byBot, (k) => botName[k] || k || '(no bot)'),
+      table('By agent', byAgent, (k) => agentName[k] || k || '(no agent)'),
       table('By chat', byChat, (k) => chatName[k] || (k ? k.replace(/@.*/, '') : '(no chat)')),
       table('By provider', byProv, (k) => k),
       table('By kind', byKind, (k) => KIND[k] || k)),
@@ -864,82 +865,195 @@ async function renderUsage() {
 function feedItem(a) {
   const detail = h('pre', { class: 'hide' }, a.detail ? JSON.stringify(a.detail, null, 2) : '(no details)');
   const li = h('li', { onclick: () => detail.classList.toggle('hide') },
-    h('div', { class: 'meta' }, h('span', { class: `pill ${TYPE_CLASS[a.type] ?? ''}` }, a.type), a.bot ? h('span', {}, a.bot) : null,
+    h('div', { class: 'meta' }, h('span', { class: `pill ${TYPE_CLASS[a.type] ?? ''}` }, a.type), a.agent ? h('span', {}, a.agent) : null,
       a.chat ? h('span', { title: a.chat }, a.chat.split('@')[0].slice(-8)) : null, h('span', { style: 'margin-left:auto' }, time(a.ts))),
     h('div', { class: 'sum' }, a.summary), detail);
   if (a.id) li.dataset.id = a.id;
   return li;
 }
 async function renderActivity() {
-  const bots = await api('GET', '/api/bots');
-  const sel = h('select', { style: 'max-width:220px', onchange: async (e) => { S.feedBot = e.target.value; await load(); } },
-    h('option', { value: '' }, 'All bots'), bots.map((b) => h('option', { value: b.id, selected: S.feedBot === b.id }, b.name)));
+  const agents = await api('GET', '/api/agents');
+  const sel = h('select', { style: 'max-width:220px', onchange: async (e) => { S.feedAgent = e.target.value; await load(); } },
+    h('option', { value: '' }, 'All agents'), agents.map((b) => h('option', { value: b.id, selected: S.feedAgent === b.id }, b.name)));
   const list = h('ul', { class: 'feed', id: 'feed' });
-  const more = h('button', { class: 'btn', onclick: async () => { const last = list.lastChild?.dataset?.id; (await api('GET', `/api/activity?limit=200&bot=${encodeURIComponent(S.feedBot)}&before=${last || 0}`)).forEach((r) => list.append(feedItem(r))); } }, 'Load older');
+  const more = h('button', { class: 'btn', onclick: async () => { const last = list.lastChild?.dataset?.id; (await api('GET', `/api/activity?limit=200&agent=${encodeURIComponent(S.feedAgent)}&before=${last || 0}`)).forEach((r) => list.append(feedItem(r))); } }, 'Load older');
   $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'Live activity'), sel),
     h('p', { class: 'small muted' }, 'Messages, tool calls, confirmations, models used and errors — newest first. Tap an entry for details.'), list, h('div', { style: 'margin-top:10px' }, more)));
-  async function load() { list.replaceChildren(...(await api('GET', `/api/activity?limit=200&bot=${encodeURIComponent(S.feedBot)}`)).map(feedItem)); }
+  async function load() { list.replaceChildren(...(await api('GET', `/api/activity?limit=200&agent=${encodeURIComponent(S.feedAgent)}`)).map(feedItem)); }
   await load();
 }
 
-// ---------- bots ----------
+// ---------- agents ----------
 let modelsCache = null;
 const loadModels = async (refresh) => (modelsCache = !refresh && modelsCache ? modelsCache : await api('GET', `/api/models${refresh ? '?refresh=1' : ''}`));
 /** Model picker: Auto (any provider), "<provider> · Auto", or a specific model, grouped by provider.
- *  withInherit adds "Same as the bot" (per chat). */
+ *  withInherit adds "Same as the agent" (per chat). */
 function modelSelect(models, value, { withInherit = false, autoLabel = 'Auto (best connected model)', ...attrs } = {}) {
   const groups = new Map();
   for (const m of models.models) { if (!groups.has(m.provider)) groups.set(m.provider, []); groups.get(m.provider).push(m); }
   const known = new Set(['inherit', 'auto', ...models.models.map((m) => m.ref), ...[...groups.keys()].map((p) => `${p}:auto`)]);
   return h('select', attrs,
-    withInherit ? h('option', { value: 'inherit', selected: value === 'inherit' }, 'Same as the bot') : null,
+    withInherit ? h('option', { value: 'inherit', selected: value === 'inherit' }, 'Same as the agent') : null,
     h('option', { value: 'auto', selected: value === 'auto' }, autoLabel),
     [...groups].map(([prov, list]) => h('optgroup', { label: list[0].label.split(' · ')[0] },
       h('option', { value: `${prov}:auto`, selected: value === `${prov}:auto` }, `${list[0].label.split(' · ')[0]} · Auto`),
       list.map((m) => h('option', { value: m.ref, selected: value === m.ref }, m.label.split(' · ').slice(1).join(' · ') || m.ref)))),
     value && !known.has(value) ? h('option', { value, selected: true }, `${value} (not available)`) : null);
 }
-async function renderBots() {
+async function renderAgents() {
   const route = location.hash.split('/');
-  if (route[1]) return renderBotEditor(decodeURIComponent(route[1]));
-  const [bots, templates, us] = await Promise.all([api('GET', '/api/bots'), api('GET', '/api/templates'), usageSummary()]);
+  if (route[1]) return renderAgentEditor(decodeURIComponent(route[1]));
+  const [agents, templates, us] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/templates'), usageSummary()]);
   const tpl = h('select', {}, templates.map((t) => h('option', { value: t.id }, t.name)));
-  const name = h('input', { placeholder: 'Bot name' });
+  const name = h('input', { placeholder: 'Agent name' });
   const fileIn = h('input', { type: 'file', accept: '.json,application/json', class: 'hide', onchange: async () => {
     const f = fileIn.files[0]; if (!f) return;
-    const r = await tryApi(async () => api('POST', '/api/bots/import', JSON.parse(await f.text())), 'Imported');
-    if (r) openBot(r.id);
+    const r = await tryApi(async () => api('POST', '/api/agents/import', JSON.parse(await f.text())), 'Imported');
+    if (r) openAgent(r.id);
   } });
-  const create = h('div', { class: 'card mut', style: 'margin-bottom:14px' }, h('h2', {}, 'New bot'),
+  const create = h('div', { class: 'card mut', style: 'margin-bottom:14px' }, h('h2', {}, 'New agent'),
     h('div', { class: 'row' }, tpl, name, h('button', { class: 'btn primary', onclick: async () => {
       const base = templates.find((t) => t.id === tpl.value);
-      const r = await tryApi(() => api('POST', '/api/bots', { template: tpl.value, config: name.value.trim() ? { name: name.value.trim() } : {} }), `Created from “${base?.name}”`);
-      if (r) openBot(r.id);
+      const r = await tryApi(() => api('POST', '/api/agents', { template: tpl.value, config: name.value.trim() ? { name: name.value.trim() } : {} }), `Created from “${base?.name}”`);
+      if (r) openAgent(r.id);
     } }, 'Create'), h('button', { class: 'btn', onclick: () => fileIn.click() }, 'Import…'), fileIn),
     h('div', { class: 'small muted', style: 'margin-top:6px' }, templates.find((t) => t.id === tpl.value)?.description || ''));
   tpl.onchange = () => { create.lastChild.textContent = templates.find((t) => t.id === tpl.value)?.description || ''; };
-  const cards = bots.map((b) => h('div', { class: 'card' },
+  const cards = agents.map((b) => h('div', { class: 'card' },
     h('div', { class: 'row spread nowrap', style: 'align-items:flex-start' }, h('div', { style: 'flex:1;min-width:0' }, h('h2', { style: 'margin:0' }, b.name), h('div', { class: 'small muted' }, b.description || b.id)),
-      toggle(b.enabled, (v) => tryApi(() => api('PUT', `/api/bots/${b.id}`, { enabled: v }), `${b.name} ${v ? 'on' : 'off'}`))),
+      toggle(b.enabled, (v) => tryApi(() => api('PUT', `/api/agents/${b.id}`, { enabled: v }), `${b.name} ${v ? 'on' : 'off'}`))),
     h('div', { class: 'row small', style: 'margin:10px 0' },
       h('span', { class: 'pill info' }, b.config.model === 'auto' ? 'model: auto' : b.config.model),
       h('span', { class: 'pill' }, `${b.config.chats.length} chat(s)`), h('span', { class: 'pill' }, `${b.config.organizers.length} organizer(s)`),
       Object.keys(b.config.mcpServers || {}).map((k) => h('span', { class: 'pill' }, `tools: ${k}`)),
+      (b.globalTools || []).filter((g) => g.on).map((g) => h('span', { class: 'pill' }, `tools: ${g.name} (global)`)),
       b.config.confirm ? h('span', { class: 'pill warn' }, 'changes need confirm') : null,
       b.config.memory?.enabled !== false ? h('span', { class: 'pill ok' }, 'memory') : null),
-    h('div', { class: 'small muted num' }, h('a', { href: '#usage' }, '30 days: '), usageLine(us?.bot?.[b.id])),
+    h('div', { class: 'small muted num' }, h('a', { href: '#usage' }, '30 days: '), usageLine(us?.agent?.[b.id])),
     b.needs.length ? h('div', { class: 'note warn' }, `Needs secrets: ${b.needs.join(', ')}`) : null,
     b.missingPlugins.length ? h('div', { class: 'note warn' }, `Missing plugins: ${b.missingPlugins.join(', ')}`) : null,
-    h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => openBot(b.id) }, can('admin') ? 'Edit & test' : 'View & test'))));
-  const aiCreate = can('admin') ? await aiHelper({ title: [h('span', { class: 'ai-chip' }, 'AI'), 'Create a bot with AI'], applyLabel: 'Create this bot',
-    placeholder: 'Describe the bot in your own words, e.g. “An assistant for our family festival group: answers agenda and menu questions from panduga, replies in English or Telugu, posts tomorrow’s agenda every evening at 8.”',
-    onApply: async (r) => { const res = await tryApi(() => api('POST', '/api/bots', { config: r.proposed }), 'Bot created'); if (res) openBot(res.id); } }) : null;
-  $('#main').replaceChildren(aiCreate, create, bots.length ? h('div', { class: 'grid' }, cards) : h('p', { class: 'muted' }, 'No bots yet.'));
+    h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => openAgent(b.id) }, can('admin') ? 'Edit & test' : 'View & test'))));
+  const aiCreate = can('admin') ? await aiHelper({ title: [h('span', { class: 'ai-chip' }, 'AI'), 'Create an agent with AI'], applyLabel: 'Create this agent',
+    placeholder: 'Describe the agent in your own words, e.g. “An assistant for our family festival group: answers agenda and menu questions from panduga, replies in English or Telugu, posts tomorrow’s agenda every evening at 8.”',
+    onApply: async (r) => { const res = await tryApi(() => api('POST', '/api/agents', { config: r.proposed }), 'Agent created'); if (res) openAgent(res.id); } }) : null;
+  $('#main').replaceChildren(aiCreate, create, agents.length ? h('div', { class: 'grid' }, cards) : h('p', { class: 'muted' }, 'No agents yet.'));
 }
-function openBot(id) { location.hash = `bots/${encodeURIComponent(id)}`; }
+function openAgent(id) { location.hash = `agents/${encodeURIComponent(id)}`; }
 
-async function renderBotEditor(id) {
-  const [b, models, plugins, conns, locals, waTools] = await Promise.all([api('GET', `/api/bots/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', '/api/plugins'), api('GET', `/api/bots/${encodeURIComponent(id)}/connections`).catch(() => []), api('GET', `/api/bots/${encodeURIComponent(id)}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => [])]);
+// ---------- tool service editor: an agent's own services and Settings → Tool services (035) share it ----------
+const globRe = (p) => new RegExp(`^${p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
+const kvLines = (o, sep) => Object.entries(o || {}).map(([k, v]) => `${k}${sep}${v}`).join('\n');
+const parseKv = (text, sep) => Object.fromEntries(splitLines(text).map((l) => { const i = l.indexOf(sep); return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : [l.trim(), '']; }));
+const ROLE_LABEL = { organizer: 'Organizers', participant: 'Participants' };
+/** Editable state of one tool service (saved* remember what the server has, for Connect / Install). */
+const serverState = (key, sv) => markSaved({ key, type: sv.type || 'remote', url: sv.url || '', auth: sv.auth || (key ? 'token' : 'oauth'),
+  org: sv.tokens?.organizer || '', part: sv.tokens?.participant || '', headers: kvLines(sv.headers, ': '), oauthId: sv.oauthClient?.id || '', oauthSecret: sv.oauthClient?.secret || '',
+  pkg: sv.package || '', args: (sv.args || []).join('\n'), env: kvLines(sv.env, '='), allowScripts: !!sv.allowScripts,
+  defaults: { organizer: [...(sv.defaults?.organizer || ['*'])], participant: [...(sv.defaults?.participant || [])] } });
+function markSaved(s) { s.savedUrl = s.url; s.savedAuth = s.auth; s.savedType = s.type; s.savedPkg = s.pkg; s.isNew = !s.key; return s; }
+const serverConfig = (s) => (s.type === 'local'
+  ? { type: 'local', package: s.pkg, args: splitLines(s.args), env: parseKv(s.env, '='), allowScripts: s.allowScripts }
+  : { type: 'remote', url: s.url, auth: s.auth, tokens: s.auth === 'token' ? { organizer: s.org, participant: s.part } : {}, headers: parseKv(s.headers, ':'),
+    ...(s.auth === 'oauth' && s.oauthId ? { oauthClient: { id: s.oauthId, secret: s.oauthSecret } } : {}) });
+/** Tools of a service with a tick per role. rules: { has(role, tool), write(role, tools ticked, all tools) }. */
+function toolGrid(box, tools, rules) {
+  const on = { participant: new Set(tools.filter((t) => rules.has('participant', t.name)).map((t) => t.name)), organizer: new Set(tools.filter((t) => rules.has('organizer', t.name)).map((t) => t.name)) };
+  const set = (role, name, v) => { if (v) on[role].add(name); else on[role].delete(name); rules.write(role, tools.filter((t) => on[role].has(t.name)).map((t) => t.name), tools); };
+  box.replaceChildren(h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, `${tools.length} tools`), h('th', { class: 'c' }, 'Participants'), h('th', { class: 'c' }, 'Organizers'))),
+    h('tbody', {}, tools.map((t) => h('tr', {}, h('td', {}, h('b', {}, t.name), h('div', { class: 'small muted' }, t.description)),
+      ...['participant', 'organizer'].map((role) => h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: on[role].has(t.name), disabled: !can('admin'), onchange: (e) => set(role, t.name, e.target.checked) }))))))));
+}
+/**
+ * One tool service as a fieldset. o: { base (API prefix with /probe, /discover, /connections, /local), conns, locals,
+ * isOwner, save() → saved?, saveHint, rules (see toolGrid), redraw(), remove(), keyLocked, extra (elements after the form) }.
+ */
+function toolServiceEditor(s, o) {
+  const enc = encodeURIComponent;
+  const key = h('input', { value: s.key, placeholder: 'name (e.g. panduga)', disabled: !!o.keyLocked, oninput: (e) => (s.key = e.target.value.trim()) });
+  const url = h('input', { value: s.url, placeholder: 'https://…/mcp or ${SECRET_NAME}', oninput: (e) => (s.url = e.target.value.trim()) });
+  const org = h('input', { value: s.org, placeholder: '${ORGANIZER_TOKEN_SECRET}', oninput: (e) => (s.org = e.target.value.trim()) });
+  const part = h('input', { value: s.part, placeholder: '${PARTICIPANT_TOKEN_SECRET} (optional)', oninput: (e) => (s.part = e.target.value.trim()) });
+  const grid = h('div', {});
+  const authSel = h('select', { onchange: (e) => { s.auth = e.target.value; o.redraw(); } },
+    [['oauth', 'Sign in (OAuth)'], ['token', 'Token (secret)'], ['none', 'No credentials']].map(([v, l]) => h('option', { value: v, selected: s.auth === v }, l)));
+  const savedSame = s.savedAuth === 'oauth' && s.auth === 'oauth' && s.savedUrl === s.url && s.key && !s.isNew;
+  const connRow = (role) => {
+    const cn = o.conns.find((x) => x.server === s.key && x.role === role && x.url === s.url);
+    const status = !savedSame ? h('span', { class: 'small muted' }, o.saveHint)
+      : !cn ? h('span', { class: 'pill', style: 'white-space:normal' }, role === 'participant' ? 'Not connected (uses the organizer sign-in, participant tools only)' : 'Not connected')
+        : cn.status === 'connected' ? h('span', { class: 'pill ok' }, `Connected${cn.connectedBy ? ` by ${cn.connectedBy}` : ''} · ${time(cn.connectedAt)}`)
+          : h('span', { class: 'pill warn' }, 'Reconnect needed');
+    const connect = async () => {
+      if (!savedSame && !(await o.save())) return;
+      const r = await tryApi(() => api('POST', `${o.base}/connections/${enc(s.key)}/${role}`));
+      if (r?.authorizeUrl) location.href = r.authorizeUrl;
+    };
+    return h('div', { class: 'row', style: 'align-items:center;margin-top:6px' }, h('b', { style: 'min-width:110px' }, ROLE_LABEL[role]), status,
+      can('admin') ? h('button', { class: 'btn small', onclick: connect }, cn ? 'Reconnect' : 'Connect') : null,
+      cn && can('admin') ? h('button', { class: 'btn small danger mut', onclick: async () => { if (await tryApi(() => api('DELETE', `${o.base}/connections/${enc(s.key)}/${role}`), 'Signed out')) { o.conns.splice(o.conns.indexOf(cn), 1); o.redraw(); } } }, 'Disconnect') : null);
+  };
+  const check = h('button', { class: 'btn small', onclick: async () => {
+    const r = await tryApi(() => api('POST', `${o.base}/probe`, { url: s.url }));
+    if (!r) return;
+    const moved = r.url !== s.url && !s.url.startsWith('${');
+    if (moved) s.url = r.url;
+    s.auth = r.auth;
+    o.redraw();
+    toast(`${r.auth === 'oauth' ? `Uses sign-in (OAuth)${r.name ? `: ${r.name}` : ''}` : r.auth === 'none' ? 'Open, no credentials needed' : 'Needs a token'}${moved ? ' · URL updated to the final address' : ''}`);
+  } }, 'Check');
+  const creds = s.auth === 'oauth'
+    ? h('div', { style: 'margin-top:8px' }, h('div', { class: 'small muted' }, 'Sign in on the service for each role. You will come back here when done.'), connRow('organizer'), connRow('participant'))
+    : s.auth === 'token' ? h('div', {}, field('Organizer credential (secret reference)', org), field('Participant credential (optional; least privilege)', part)) : null;
+  const typeSel = h('select', { style: 'max-width:230px', disabled: !o.isOwner && s.type === 'local', onchange: (e) => { s.type = e.target.value; o.redraw(); } },
+    [['remote', 'Remote (URL)'], ['local', 'Local (npm or GitHub package)']].map(([v, l]) => h('option', { value: v, selected: s.type === v }, l)));
+  const ta = (prop, ph, rows = 2) => h('textarea', { value: s[prop], placeholder: ph, style: `min-height:${rows * 22 + 16}px`, oninput: (e) => (s[prop] = e.target.value) });
+  const redirectUri = `${location.origin}/oauth/mcp/callback`;
+  const advanced = h('details', { style: 'margin-top:8px' }, h('summary', { class: 'small muted' }, 'Advanced'),
+    field('Extra headers (one per line, Name: value; values may use ${SECRET})', ta('headers', 'X-API-Key: ${MY_API_KEY}')),
+    s.auth === 'oauth' ? h('div', {},
+      h('div', { class: 'small muted', style: 'margin-top:8px' }, 'Own OAuth app: only if the service does not let apps register themselves. Register this redirect URL with the service:'),
+      h('div', { class: 'row', style: 'align-items:center' }, h('code', { class: 'small' }, redirectUri), h('button', { class: 'btn small', onclick: () => { navigator.clipboard?.writeText(redirectUri); toast('Copied'); } }, 'Copy')),
+      h('div', { class: 'row' }, h('input', { value: s.oauthId, placeholder: 'Client ID', oninput: (e) => (s.oauthId = e.target.value.trim()) }),
+        h('input', { value: s.oauthSecret, placeholder: 'Client secret as ${SECRET} (optional)', oninput: (e) => (s.oauthSecret = e.target.value.trim()) }))) : null);
+  const discoverButton = (reqBody) => h('button', { class: 'btn small', onclick: async () => {
+    const tools = await tryApi(() => api('POST', `${o.base}/discover`, reqBody));
+    if (tools) toolGrid(grid, tools, o.rules);
+  } }, 'Discover tools');
+  const legend = h('legend', {}, s.key || 'new tool service');
+  if (s.type === 'local') {
+    const st = o.locals.find((x) => x.server === s.key && x.package === s.pkg);
+    const savedLocal = s.savedType === 'local' && s.savedPkg === s.pkg && s.key && !s.isNew;
+    const install = async (fresh) => {
+      if (!savedLocal && !(await o.save())) return;
+      toast('Installing… this can take a minute');
+      const r = await tryApi(() => api('POST', `${o.base}/local/${enc(s.key)}/install`, { fresh }));
+      if (r) { o.locals.splice(0, o.locals.length, ...(await api('GET', `${o.base}/local`))); o.redraw(); toast(`Installed ${r.name}@${r.version}`); }
+    };
+    const pkg = h('input', { value: s.pkg, placeholder: '@scope/server@1.2.3 or github:owner/repo#tag', disabled: !o.isOwner, oninput: (e) => (s.pkg = e.target.value.trim()) });
+    return h('fieldset', {}, legend,
+      h('div', { class: 'row' }, key, typeSel),
+      h('div', { class: 'note warn', style: 'margin-top:8px' }, 'A local tool service runs that package’s code on this server, with the same access as the app (including its data). Only add packages you trust, and pin a version.'),
+      field('Package', pkg),
+      h('div', { class: 'row' }, field('Arguments (one per line)', ta('args', '--read-only', 2)), field('Environment (NAME=value; values may use ${SECRET})', ta('env', 'API_KEY=${MY_KEY}', 2))),
+      h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.allowScripts, disabled: !o.isOwner, onchange: (e) => (s.allowScripts = e.target.checked) }), 'Allow install scripts (needed by some GitHub packages that build themselves)'),
+      h('div', { class: 'row', style: 'align-items:center;margin-top:8px' },
+        st?.installed ? h('span', { class: 'pill ok' }, `Installed ${st.installed.name}@${st.installed.version}`) : h('span', { class: 'pill' }, savedLocal ? 'Not installed yet (installs on first use)' : 'Save to install'),
+        o.isOwner ? h('button', { class: 'btn small', onclick: () => install(false) }, st?.installed ? 'Reinstall' : 'Install') : h('span', { class: 'small muted' }, 'Only the owner can install or change local tool services'),
+        o.isOwner && st?.installed ? h('button', { class: 'btn small', onclick: () => install(true) }, 'Update (fresh install)') : null),
+      h('div', { class: 'row', style: 'margin-top:8px' }, discoverButton({ type: 'local', server: s.key }),
+        h('button', { class: 'btn small danger mut', disabled: !o.isOwner, onclick: o.remove }, 'Remove')),
+      o.extra || null, grid);
+  }
+  return h('fieldset', {}, legend,
+    h('div', { class: 'row' }, key, typeSel), h('div', { class: 'row', style: 'margin-top:6px' }, url, check), field('Authentication', authSel), creds, advanced,
+    h('div', { class: 'row', style: 'margin-top:8px' },
+      discoverButton(s.auth === 'oauth' ? { auth: 'oauth', server: s.key } : { url: s.url, token: s.auth === 'token' ? s.org : '', headers: parseKv(s.headers, ':'), server: s.key }),
+      can('admin') ? h('button', { class: 'btn small danger mut', onclick: o.remove }, 'Remove') : null),
+    o.extra || null, grid);
+}
+
+async function renderAgentEditor(id) {
+  const [b, models, plugins, conns, locals, waTools] = await Promise.all([api('GET', `/api/agents/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', '/api/plugins'), api('GET', `/api/agents/${encodeURIComponent(id)}/connections`).catch(() => []), api('GET', `/api/agents/${encodeURIComponent(id)}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => [])]);
   const c = structuredClone(b.config);
   const F = {};
   const inp = (key, attrs = {}) => (F[key] = h('input', { value: c[key] ?? '', ...attrs }));
@@ -952,7 +1066,7 @@ async function renderBotEditor(id) {
   F.triggers = h('input', { value: (c.triggers || []).join(', ') });
   F.organizers = h('textarea', { value: lines(c.organizers), style: 'min-height:60px' });
   F.participants = h('textarea', { value: lines(c.participants), style: 'min-height:50px' });
-  // People & roles (015): members of the bot's groups, tap a role. Organizers not in these groups stay in the text box.
+  // People & roles (015): members of the agent's groups, tap a role. Organizers not in these groups stay in the text box.
   const orgSet = new Set(c.organizers || []);
   const peopleBox = h('div', {}, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading group members…'));
   const groupPhones = new Set();
@@ -961,7 +1075,7 @@ async function renderBotEditor(id) {
     for (const p of [...orgSet]) if (!groupPhones.has(p)) orgSet.delete(p);
     for (const l of splitLines(F.organizers.value)) { const d = l.replace(/\D/g, ''); if (d) orgSet.add(d); }
   });
-  api('GET', `/api/bots/${encodeURIComponent(id)}/people`).then((pp) => {
+  api('GET', `/api/agents/${encodeURIComponent(id)}/people`).then((pp) => {
     if (pp.suggested) for (const g of pp.groups) for (const m of g.members) if (m.suggested) orgSet.add(m.phone);
     for (const g of pp.groups) for (const m of g.members) if (m.phone) groupPhones.add(m.phone);
     syncOthers();
@@ -974,7 +1088,7 @@ async function renderBotEditor(id) {
     };
     const dirty = h('div', { class: 'note warn hide' }, 'Roles changed — click Save at the bottom to apply.');
     peopleBox.replaceChildren(
-      pp.suggested && pp.groups.some((g) => g.members.some((m) => m.suggested)) ? h('div', { class: 'note' }, 'No roles saved yet, so the group admins (ticked) are this bot’s organizers. Change anyone you like and Save to set roles yourself.') : null,
+      pp.suggested && pp.groups.some((g) => g.members.some((m) => m.suggested)) ? h('div', { class: 'note' }, 'No roles saved yet, so the group admins (ticked) are this agent’s organizers. Change anyone you like and Save to set roles yourself.') : null,
       dirty,
       pp.groups.length ? pp.groups.map((g) => h('div', { class: 'number-card' },
         h('div', { class: 'row spread' }, h('b', {}, g.name), h('span', { class: 'pill' }, `${g.members.length} members`)),
@@ -982,19 +1096,14 @@ async function renderBotEditor(id) {
         h('table', {}, h('tbody', {}, g.members.map((m) => h('tr', {},
           h('td', {}, h('b', {}, m.name || (m.phone ? `+${m.phone}` : 'Unknown member')), m.admin ? h('span', { class: 'pill info', style: 'margin-left:6px' }, 'group admin') : null,
             h('div', { class: 'small muted' }, m.phone && m.name ? `+${m.phone}` : '')),
-          h('td', { style: 'text-align:right' }, roleSeg(m)))))))) : h('p', { class: 'small muted' }, 'Bind this bot to a group on the Chats page to pick people from its members.'));
+          h('td', { style: 'text-align:right' }, roleSeg(m)))))))) : h('p', { class: 'small muted' }, 'Bind this agent to a group on the Chats page to pick people from its members.'));
   }).catch((e) => peopleBox.replaceChildren(h('p', { class: 'small muted' }, `Could not load members: ${e.message}`)));
-  // Tool services
-  const kvLines = (o, sep) => Object.entries(o || {}).map(([k, v]) => `${k}${sep}${v}`).join('\n');
-  const parseKv = (text, sep) => Object.fromEntries(splitLines(text).map((l) => { const i = l.indexOf(sep); return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : [l.trim(), '']; }));
-  const servers = Object.entries(c.mcpServers || {}).map(([key, s]) => ({ key, type: s.type || 'remote', url: s.url || '', auth: s.auth || 'token', savedUrl: s.url, savedAuth: s.auth, savedType: s.type || 'remote', savedPkg: s.package,
-    org: s.tokens?.organizer || '', part: s.tokens?.participant || '', headers: kvLines(s.headers, ': '), oauthId: s.oauthClient?.id || '', oauthSecret: s.oauthClient?.secret || '',
-    pkg: s.package || '', args: (s.args || []).join('\n'), env: kvLines(s.env, '='), allowScripts: !!s.allowScripts }));
+  // Tool services: the agent's own, and the global ones (035) it uses unless switched off here.
+  const servers = Object.entries(c.mcpServers || {}).map(([key, sv]) => serverState(key, sv));
   const isOwner = S.user?.role === 'owner';
-  const ROLE_LABEL = { organizer: 'Organizers', participant: 'Participants' };
   const rules = { participant: [...(c.tools?.participant || [])], organizer: [...(c.tools?.organizer || [])], deny: [...(c.tools?.deny || [])] };
   const rulesBox = { participant: h('textarea', { value: lines(rules.participant), style: 'min-height:60px' }), organizer: h('textarea', { value: lines(rules.organizer), style: 'min-height:60px' }), deny: h('textarea', { value: lines(rules.deny), style: 'min-height:40px' }) };
-  const glob = (p) => new RegExp(`^${p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
+  const glob = globRe;
   const allowed = (role, fq) => splitLines(rulesBox[role].value).some((r) => glob(r).test(fq));
   // WhatsApp actions (026): a tick per role. No whatsapp: rule for a role = the defaults; ticking writes explicit rules
   // (whatsapp:- = none). Organizer-only actions cannot be given to participants (enforced on the server too).
@@ -1021,107 +1130,52 @@ async function renderBotEditor(id) {
       h('div', { class: 'row', style: 'gap:4px;margin-top:4px' }, tick('participant', t), tick('organizer', t))))));
   }
   drawWa();
+  const agentBase = `/api/agents/${encodeURIComponent(id)}`;
+  /** Ticks in "Discover tools" write this agent's rules: key:* or key:tool lines. */
+  const writeRules = (key, role, names, tools, explicitNone = false) => {
+    const keep = splitLines(rulesBox[role].value).filter((r) => !r.startsWith(`${key}:`));
+    const mine = names.length === tools.length ? [`${key}:*`] : !names.length && explicitNone ? [`${key}:-`] : names.map((n) => `${key}:${n}`);
+    rulesBox[role].value = [...keep, ...mine].join('\n');
+  };
+  const agentRules = (s) => ({ has: (role, name) => allowed(role, `${s.key}:${name}`), write: (role, names, tools) => writeRules(s.key, role, names, tools) });
   const srvList = h('div', {});
   function drawServers() {
-    srvList.replaceChildren(...servers.map((s, i) => {
-      const key = h('input', { value: s.key, placeholder: 'name (e.g. panduga)', oninput: (e) => (s.key = e.target.value.trim()) });
-      const url = h('input', { value: s.url, placeholder: 'https://…/mcp or ${SECRET_NAME}', oninput: (e) => (s.url = e.target.value.trim()) });
-      const org = h('input', { value: s.org, placeholder: '${ORGANIZER_TOKEN_SECRET}', oninput: (e) => (s.org = e.target.value.trim()) });
-      const part = h('input', { value: s.part, placeholder: '${PARTICIPANT_TOKEN_SECRET} (optional)', oninput: (e) => (s.part = e.target.value.trim()) });
-      const grid = h('div', {});
-      const authSel = h('select', { onchange: (e) => { s.auth = e.target.value; drawServers(); } },
-        [['oauth', 'Sign in (OAuth)'], ['token', 'Token (secret)'], ['none', 'No credentials']].map(([v, l]) => h('option', { value: v, selected: s.auth === v }, l)));
-      const savedSame = s.savedAuth === 'oauth' && s.auth === 'oauth' && s.savedUrl === s.url && s.key;
-      const connRow = (role) => {
-        const cn = conns.find((x) => x.server === s.key && x.role === role && x.url === s.url);
-        const status = !savedSame ? h('span', { class: 'small muted' }, 'Save the bot to connect')
-          : !cn ? h('span', { class: 'pill' }, role === 'participant' ? 'Not connected (uses the organizer sign-in, participant tools only)' : 'Not connected')
-            : cn.status === 'connected' ? h('span', { class: 'pill ok' }, `Connected${cn.connectedBy ? ` by ${cn.connectedBy}` : ''} · ${time(cn.connectedAt)}`)
-              : h('span', { class: 'pill warn' }, 'Reconnect needed');
-        const connect = async () => {
-          if (!savedSame && !(await save())) return;
-          const r = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/connections/${encodeURIComponent(s.key)}/${role}`));
-          if (r?.authorizeUrl) location.href = r.authorizeUrl;
-        };
-        return h('div', { class: 'row', style: 'align-items:center;margin-top:6px' }, h('b', { style: 'min-width:110px' }, ROLE_LABEL[role]), status,
-          h('button', { class: 'btn small', onclick: connect }, cn ? 'Reconnect' : 'Connect'),
-          cn ? h('button', { class: 'btn small danger mut', onclick: async () => { if (await tryApi(() => api('DELETE', `/api/bots/${encodeURIComponent(id)}/connections/${encodeURIComponent(s.key)}/${role}`), 'Signed out')) { conns.splice(conns.indexOf(cn), 1); drawServers(); } } }, 'Disconnect') : null);
-      };
-      const check = h('button', { class: 'btn small', onclick: async () => {
-        const r = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/probe`, { url: s.url }));
-        if (!r) return;
-        const moved = r.url !== s.url && !s.url.startsWith('${');
-        if (moved) s.url = r.url;
-        s.auth = r.auth;
-        drawServers();
-        toast(`${r.auth === 'oauth' ? `Uses sign-in (OAuth)${r.name ? `: ${r.name}` : ''}` : r.auth === 'none' ? 'Open, no credentials needed' : 'Needs a token'}${moved ? ' · URL updated to the final address' : ''}`);
-      } }, 'Check');
-      const creds = s.auth === 'oauth'
-        ? h('div', { style: 'margin-top:8px' }, h('div', { class: 'small muted' }, 'Sign in on the service for each role. You will come back here when done.'), connRow('organizer'), connRow('participant'))
-        : s.auth === 'token' ? h('div', {}, field('Organizer credential (secret reference)', org), field('Participant credential (optional; least privilege)', part)) : null;
-      const typeSel = h('select', { style: 'max-width:230px', onchange: (e) => { s.type = e.target.value; drawServers(); } },
-        [['remote', 'Remote (URL)'], ['local', 'Local (npm or GitHub package)']].map(([v, l]) => h('option', { value: v, selected: s.type === v }, l)));
-      const ta = (prop, ph, rows = 2) => h('textarea', { value: s[prop], placeholder: ph, style: `min-height:${rows * 22 + 16}px`, oninput: (e) => (s[prop] = e.target.value) });
-      const redirectUri = `${location.origin}/oauth/mcp/callback`;
-      const advanced = h('details', { style: 'margin-top:8px' }, h('summary', { class: 'small muted' }, 'Advanced'),
-        field('Extra headers (one per line, Name: value; values may use ${SECRET})', ta('headers', 'X-API-Key: ${MY_API_KEY}')),
-        s.auth === 'oauth' ? h('div', {},
-          h('div', { class: 'small muted', style: 'margin-top:8px' }, 'Own OAuth app: only if the service does not let apps register themselves. Register this redirect URL with the service:'),
-          h('div', { class: 'row', style: 'align-items:center' }, h('code', { class: 'small' }, redirectUri), h('button', { class: 'btn small', onclick: () => { navigator.clipboard?.writeText(redirectUri); toast('Copied'); } }, 'Copy')),
-          h('div', { class: 'row' }, h('input', { value: s.oauthId, placeholder: 'Client ID', oninput: (e) => (s.oauthId = e.target.value.trim()) }),
-            h('input', { value: s.oauthSecret, placeholder: 'Client secret as ${SECRET} (optional)', oninput: (e) => (s.oauthSecret = e.target.value.trim()) }))) : null);
-      if (s.type === 'local') {
-        const st = locals.find((x) => x.server === s.key && x.package === s.pkg);
-        const savedLocal = s.savedType === 'local' && s.savedPkg === s.pkg && s.key;
-        const install = async (fresh) => {
-          if (!savedLocal && !(await save())) return;
-          toast('Installing… this can take a minute');
-          const r = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/local/${encodeURIComponent(s.key)}/install`, { fresh }));
-          if (r) { locals.splice(0, locals.length, ...(await api('GET', `/api/bots/${encodeURIComponent(id)}/local`))); drawServers(); toast(`Installed ${r.name}@${r.version}`); }
-        };
-        const pkg = h('input', { value: s.pkg, placeholder: '@scope/server@1.2.3 or github:owner/repo#tag', disabled: !isOwner, oninput: (e) => (s.pkg = e.target.value.trim()) });
-        return h('fieldset', {}, h('legend', {}, s.key || 'new tool service'),
-          h('div', { class: 'row' }, key, typeSel),
-          h('div', { class: 'note warn', style: 'margin-top:8px' }, 'A local tool service runs that package’s code on this server, with the same access as the app (including its data). Only add packages you trust, and pin a version.'),
-          field('Package', pkg),
-          h('div', { class: 'row' }, field('Arguments (one per line)', ta('args', '--read-only', 2)), field('Environment (NAME=value; values may use ${SECRET})', ta('env', 'API_KEY=${MY_KEY}', 2))),
-          h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.allowScripts, disabled: !isOwner, onchange: (e) => (s.allowScripts = e.target.checked) }), 'Allow install scripts (needed by some GitHub packages that build themselves)'),
-          h('div', { class: 'row', style: 'align-items:center;margin-top:8px' },
-            st?.installed ? h('span', { class: 'pill ok' }, `Installed ${st.installed.name}@${st.installed.version}`) : h('span', { class: 'pill' }, savedLocal ? 'Not installed yet (installs on first use)' : 'Save to install'),
-            isOwner ? h('button', { class: 'btn small', onclick: () => install(false) }, st?.installed ? 'Reinstall' : 'Install') : h('span', { class: 'small muted' }, 'Only the owner can install or change local tool services'),
-            isOwner && st?.installed ? h('button', { class: 'btn small', onclick: () => install(true) }, 'Update (fresh install)') : null),
-          h('div', { class: 'row', style: 'margin-top:8px' }, discoverButton({ type: 'local', server: s.key }),
-            h('button', { class: 'btn small danger mut', disabled: !isOwner, onclick: () => { servers.splice(i, 1); drawServers(); } }, 'Remove')),
-          grid);
-      }
-      return h('fieldset', {}, h('legend', {}, s.key || 'new tool service'),
-        h('div', { class: 'row' }, key, typeSel), h('div', { class: 'row', style: 'margin-top:6px' }, url, check), field('Authentication', authSel), creds, advanced,
-        h('div', { class: 'row', style: 'margin-top:8px' },
-          discoverButton(s.auth === 'oauth' ? { auth: 'oauth', server: s.key } : { url: s.url, token: s.auth === 'token' ? s.org : '', headers: parseKv(s.headers, ':') }),
-          h('button', { class: 'btn small danger mut', onclick: () => { servers.splice(i, 1); drawServers(); } }, 'Remove')),
-        grid);
-      function discoverButton(reqBody) {
-        return h('button', { class: 'btn small', onclick: async () => {
-            const tools = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/discover`, reqBody));
-            if (!tools) return;
-            const fq = (t) => `${s.key}:${t.name}`;
-            const set = (role, name, on) => {
-              const cur = splitLines(rulesBox[role].value).filter((r) => r !== `${s.key}:*`);
-              const keep = cur.filter((r) => !r.startsWith(`${s.key}:`));
-              const mine = tools.filter((t) => (t.name === name ? on : allowedNow[role].has(t.name))).map((t) => t.name);
-              allowedNow[role] = new Set(mine);
-              const out = mine.length === tools.length ? [`${s.key}:*`] : mine.map((n) => `${s.key}:${n}`);
-              rulesBox[role].value = [...keep, ...out].join('\n');
-            };
-            const allowedNow = { participant: new Set(tools.filter((t) => allowed('participant', fq(t))).map((t) => t.name)), organizer: new Set(tools.filter((t) => allowed('organizer', fq(t))).map((t) => t.name)) };
-            grid.replaceChildren(h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, `${tools.length} tools`), h('th', { class: 'c' }, 'Participants'), h('th', { class: 'c' }, 'Organizers'))),
-              h('tbody', {}, tools.map((t) => h('tr', {}, h('td', {}, h('b', {}, t.name), h('div', { class: 'small muted' }, t.description)),
-                ...['participant', 'organizer'].map((role) => h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: allowedNow[role].has(t.name), onchange: (e) => set(role, t.name, e.target.checked) }))))))));
-          } }, 'Discover tools');
-      }
-    }));
+    srvList.replaceChildren(...servers.map((s, i) => toolServiceEditor(s, {
+      base: agentBase, conns, locals, isOwner, save, saveHint: 'Save the agent to connect', rules: agentRules(s), redraw: drawServers,
+      remove: () => { servers.splice(i, 1); drawServers(); },
+    })));
   }
   drawServers();
+  // Global tool services (035): on/off per agent; explicit rules of this agent win over the service's defaults.
+  const globalOff = new Set(c.globalMcp?.disabled || []);
+  const globalBox = h('div', {});
+  const explicitFor = (key, role) => splitLines(rulesBox[role].value).filter((r) => r.startsWith(`${key}:`));
+  function drawGlobals() {
+    if (!b.globalTools?.length) return globalBox.replaceChildren(h('p', { class: 'small muted', style: 'margin:0' }, 'No global tool services yet. Add services every agent can use under ', h('a', { href: '#settings' }, 'Settings → Tool services'), '.'));
+    globalBox.replaceChildren(...b.globalTools.map((g) => {
+      const grid = h('div', {});
+      const replaced = servers.some((sv) => sv.key === g.name);
+      const custom = ['organizer', 'participant'].some((role) => explicitFor(g.name, role).length);
+      const rules = {
+        has: (role, name) => { const ex = explicitFor(g.name, role); return ex.length ? ex.some((r) => glob(r).test(`${g.name}:${name}`)) : (g.defaults?.[role] || []).some((x) => glob(x).test(name)); },
+        write: (role, names, tools) => writeRules(g.name, role, names, tools, true), // none = "<name>:-", so the defaults no longer apply
+      };
+      const sum = (role) => { const d = g.defaults?.[role] || []; return !d.length ? 'none' : d.includes('*') ? 'all tools' : d.join(', '); };
+      return h('div', { class: 'number-card' },
+        h('div', { class: 'row spread nowrap' }, h('div', {}, h('b', {}, g.name), h('span', { class: 'pill', style: 'margin-left:6px' }, g.type === 'local' ? 'local' : 'remote')),
+          replaced ? h('span', { class: 'pill warn' }, 'replaced by this agent’s own service')
+            : h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: !globalOff.has(g.name), disabled: !can('admin'), onchange: (e) => { if (e.target.checked) globalOff.delete(g.name); else globalOff.add(g.name); drawGlobals(); } }), 'Use in this agent')),
+        h('div', { class: 'small muted', style: 'margin-top:4px' }, custom ? 'This agent has its own tool choices for this service (Advanced: tool rules).' : `Global defaults: organizers ${sum('organizer')}; participants ${sum('participant')}.`),
+        !replaced && !globalOff.has(g.name) ? h('div', { class: 'row', style: 'margin-top:6px' },
+          h('button', { class: 'btn small', onclick: async () => {
+            const tools = await tryApi(() => api('POST', '/api/tool-services/discover', { server: g.name }));
+            if (tools) toolGrid(grid, tools, rules);
+          } }, 'Choose tools for this agent'),
+          custom ? h('button', { class: 'btn small mut', onclick: () => { for (const role of ['organizer', 'participant']) rulesBox[role].value = splitLines(rulesBox[role].value).filter((r) => !r.startsWith(`${g.name}:`)).join('\n'); drawGlobals(); } }, 'Use the global defaults') : null) : null,
+        grid);
+    }));
+  }
+  drawGlobals();
   // Confirmation
   F.confirmOn = h('input', { type: 'checkbox', checked: !!c.confirm });
   F.cPreview = h('input', { value: c.confirm?.preview || '', placeholder: 'panduga:*_preview' });
@@ -1140,7 +1194,7 @@ async function renderBotEditor(id) {
         h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.enabled !== false, onchange: (e) => (s.enabled = e.target.checked) }), 'on')),
       h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', value: s.prompt || '', placeholder: 'What to post, e.g. a short summary of today’s agenda', oninput: (e) => (s.prompt = e.target.value) }),
       h('div', { class: 'row', style: 'margin-top:6px' },
-        h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('POST', `/api/bots/${encodeURIComponent(id)}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${r.length} chat(s)` : 'No chats bound'); }) }, 'Run now'),
+        h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${r.length} chat(s)` : 'No chats bound'); }) }, 'Run now'),
         h('button', { class: 'btn small danger mut', onclick: () => { scheds.splice(i, 1); drawScheds(); } }, 'Remove')))));
   }
   drawScheds();
@@ -1155,18 +1209,15 @@ async function renderBotEditor(id) {
       triggers: splitLines(F.triggers.value), respondToMentions: F.respondToMentions.checked, dm: F.dm.value,
       organizers: [...orgSet], participants: splitLines(F.participants.value), timezone: F.timezone.value.trim(),
       historySize: Number(F.historySize.value), maxTokens: Number(F.maxTokens.value), memory: { enabled: F.memory.checked },
-      mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, s.type === 'local'
-        ? { type: 'local', package: s.pkg, args: splitLines(s.args), env: parseKv(s.env, '='), allowScripts: s.allowScripts }
-        : { type: 'remote', url: s.url, auth: s.auth, tokens: s.auth === 'token' ? { organizer: s.org, participant: s.part } : {}, headers: parseKv(s.headers, ':'),
-          ...(s.auth === 'oauth' && s.oauthId ? { oauthClient: { id: s.oauthId, secret: s.oauthSecret } } : {}) }])),
+      mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, serverConfig(s)])), globalMcp: { disabled: [...globalOff] },
       tools: { participant: splitLines(rulesBox.participant.value), organizer: splitLines(rulesBox.organizer.value), deny: splitLines(rulesBox.deny.value) },
       confirm: F.confirmOn.checked ? { preview: F.cPreview.value.trim(), tool: F.cTool.value.trim(), idField: F.cId.value.trim(), ttlMinutes: Number(F.cTtl.value) } : null,
       schedules: scheds, plugins: F.plugins.map((l) => l.querySelector('input')).filter((x) => x.checked).map((x) => x.value),
     };
     try {
-      const r = await api('PUT', `/api/bots/${encodeURIComponent(id)}`, config);
+      const r = await api('PUT', `/api/agents/${encodeURIComponent(id)}`, config);
       toast(r.warnings?.length ? `Saved — ${r.warnings.join('; ')}` : 'Saved');
-      for (const sv of servers) { sv.savedUrl = sv.url; sv.savedAuth = sv.auth; sv.savedType = sv.type; sv.savedPkg = sv.pkg; }
+      for (const sv of servers) markSaved(sv);
       return true;
     } catch (e) { toast(e.field ? `${e.field}: ${e.message.replace(/^[^:]+: /, '')}` : e.message); return false; }
   }
@@ -1174,36 +1225,36 @@ async function renderBotEditor(id) {
   // Test console
   const log = h('div', { class: 'chatlog' });
   const role = h('select', { style: 'max-width:150px' }, h('option', { value: 'participant' }, 'as participant'), h('option', { value: 'organizer' }, 'as organizer'));
-  const input = h('input', { placeholder: 'Ask the bot something…' });
+  const input = h('input', { placeholder: 'Ask the agent something…' });
   const testForm = h('form', { class: 'row mut', onsubmit: async (e) => {
     e.preventDefault(); const text = input.value.trim(); if (!text) return;
     log.append(h('div', { class: 'bubble me' }, text)); input.value = '';
-    const wait = h('div', { class: 'bubble bot muted' }, '…'); log.append(wait); log.scrollTop = 1e9;
-    try { const r = await api('POST', `/api/bots/${encodeURIComponent(id)}/test`, { text, role: role.value }); wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); if (r.model) wait.title = r.model; }
+    const wait = h('div', { class: 'bubble agent muted' }, '…'); log.append(wait); log.scrollTop = 1e9;
+    try { const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/test`, { text, role: role.value }); wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); if (r.model) wait.title = r.model; }
     catch (x) { wait.textContent = `Error: ${x.message}`; }
     log.scrollTop = 1e9;
   } }, role, input, h('button', { class: 'btn' }, 'Send'));
 
-  // Shared memory (#8): notes the bot keeps across all its chats; organizers save them from WhatsApp.
+  // Shared memory (#8): notes the agent keeps across all its chats; organizers save them from WhatsApp.
   const sharedMemBox = h('fieldset', {}, h('legend', {}, 'Shared memory'));
   const loadSharedMem = async () => {
-    const { notes } = await api('GET', `/api/bots/${encodeURIComponent(id)}/memory`).catch(() => ({ notes: [] }));
+    const { notes } = await api('GET', `/api/agents/${encodeURIComponent(id)}/memory`).catch(() => ({ notes: [] }));
     sharedMemBox.replaceChildren(h('legend', {}, `Shared memory (${notes.length})`),
-      h('p', { class: 'small muted', style: 'margin-top:0' }, 'Notes this bot knows in every chat. Organizers add them in WhatsApp, e.g. “remember for all groups: the pickup point is the north gate”. Notes of a single chat are under Chats.'),
+      h('p', { class: 'small muted', style: 'margin-top:0' }, 'Notes this agent knows in every chat. Organizers add them in WhatsApp, e.g. “remember for all groups: the pickup point is the north gate”. Notes of a single chat are under Chats.'),
       notes.length ? h('ul', { class: 'small' }, notes.map((n) => h('li', { style: 'margin:6px 0' }, n.text, h('span', { class: 'muted' }, ` — ${n.author || '?'}, ${time(n.ts)} `),
         can('admin') ? h('button', { class: 'btn small mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/notes/${n.id}`); loadSharedMem(); }, 'Note deleted') }, 'Delete') : null))) : h('p', { class: 'small muted' }, 'No shared notes yet.'));
   };
   loadSharedMem();
   $('#main').replaceChildren(
-    h('div', { class: 'row spread', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: () => { location.hash = 'bots'; } }, '← All bots'),
+    h('div', { class: 'row spread', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: () => { location.hash = 'agents'; } }, '← All agents'),
       h('div', { class: 'row' },
-        h('a', { class: 'btn', href: `/api/bots/${encodeURIComponent(id)}/export`, download: `${id}.bot.json` }, 'Export'),
-        h('button', { class: 'btn mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/bots/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openBot(r.id); } }, 'Duplicate'),
-        h('button', { class: 'btn danger mut', onclick: async () => { if (confirm(`Delete “${c.name}”? Its group bindings are removed; chat memory stays until erased.`) && await tryApi(() => api('DELETE', `/api/bots/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'bots'; } } }, 'Delete'),
+        h('a', { class: 'btn', href: `/api/agents/${encodeURIComponent(id)}/export`, download: `${id}.agent.json` }, 'Export'),
+        h('button', { class: 'btn mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/agents/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openAgent(r.id); } }, 'Duplicate'),
+        h('button', { class: 'btn danger mut', onclick: async () => { if (confirm(`Delete “${c.name}”? Its group bindings are removed; chat memory stays until erased.`) && await tryApi(() => api('DELETE', `/api/agents/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'agents'; } } }, 'Delete'),
         h('button', { class: 'btn primary mut', onclick: save }, 'Save'))),
-    can('admin') ? await aiHelper({ botId: id, title: [h('span', { class: 'ai-chip' }, 'AI'), 'Change this bot with AI'], applyLabel: 'Apply & save',
+    can('admin') ? await aiHelper({ agentId: id, title: [h('span', { class: 'ai-chip' }, 'AI'), 'Change this agent with AI'], applyLabel: 'Apply & save',
       placeholder: 'What should change? e.g. “Make the replies shorter and friendlier”, “Let participants also see the shopping list”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',
-      onApply: async (r) => { const patch = Object.fromEntries(r.changes.map((ch) => [ch.field, ch.after])); if (await tryApi(() => api('PUT', `/api/bots/${encodeURIComponent(id)}`, patch), 'Saved')) renderBotEditor(id); } }) : null,
+      onApply: async (r) => { const patch = Object.fromEntries(r.changes.map((ch) => [ch.field, ch.after])); if (await tryApi(() => api('PUT', `/api/agents/${encodeURIComponent(id)}`, patch), 'Saved')) renderAgentEditor(id); } }) : null,
     h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(340px,1fr));align-items:start' },
       h('div', { class: 'card' },
         b.needs.length ? h('div', { class: 'note warn' }, `Set these under Secrets: ${b.needs.join(', ')}`) : null,
@@ -1211,23 +1262,24 @@ async function renderBotEditor(id) {
           field('Name', inp('name')), field('Description', inp('description')),
           h('div', { class: 'row', style: 'margin-top:8px' }, h('label', { class: 'inline' }, F.enabled, 'Enabled'), h('label', { class: 'inline' }, F.memory, 'Group memory'), h('label', { class: 'inline' }, F.respondToMentions, 'Reply when @mentioned')),
           field('Model', modelSel, models.problem || 'Auto uses the default model set under Models.'),
-          field('Triggers', F.triggers, 'Group messages starting with one of these wake the bot, e.g. !panduga'),
+          field('Triggers', F.triggers, 'Group messages starting with one of these wake the agent, e.g. !panduga'),
           field('Who may message it directly', F.dm)),
         h('fieldset', {}, h('legend', {}, 'Instructions'), F.prompt),
         sharedMemBox,
         h('fieldset', {}, h('legend', {}, 'People & roles'),
-          h('p', { class: 'small muted', style: 'margin-top:0' }, 'Organizers can use organizer tools and confirm changes. Everyone else in the bot’s groups is a participant.'),
+          h('p', { class: 'small muted', style: 'margin-top:0' }, 'Organizers can use organizer tools and confirm changes. Everyone else in the agent’s groups is a participant.'),
           peopleBox,
           h('details', { style: 'margin-top:8px' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'People outside these groups'),
             field('More organizers (phone numbers with country code, one per line)', F.organizers),
-            field('Extra participants allowed to message the bot directly', F.participants))),
+            field('Extra participants allowed to message the agent directly', F.participants))),
         h('fieldset', {}, h('legend', {}, 'Tool services (MCP)'),
           h('p', { class: 'small muted', style: 'margin-top:0' }, 'Enter the service URL and click Check: services that support sign-in (OAuth) get a Connect button; others use a token stored under Secrets, like ${MY_TOKEN}. Then discover tools and tick what each role may use.'),
-          srvList, h('button', { class: 'btn small mut', onclick: () => { servers.push({ key: '', url: '', auth: 'oauth', org: '', part: '' }); drawServers(); } }, '+ Add tool service'),
+          srvList, h('button', { class: 'btn small mut', onclick: () => { servers.push(serverState('', {})); drawServers(); } }, '+ Add tool service'),
+          h('h3', { style: 'margin:14px 0 6px' }, 'Global tool services'), globalBox,
           h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted' }, 'Advanced: tool rules'),
             field('Participant rules', rulesBox.participant), field('Organizer rules', rulesBox.organizer), field('Never allowed', rulesBox.deny))),
         waTools.length ? h('fieldset', {}, h('legend', {}, 'WhatsApp actions'),
-          h('p', { class: 'small muted', style: 'margin-top:0' }, 'What the bot may do in WhatsApp besides answering: send pictures and files, react, post polls, manage the group. Actions marked “organizers only” happen right away when an organizer asks — no confirm code — so give the bot’s number group-admin rights only where you want that. Every action is recorded in Activity.'),
+          h('p', { class: 'small muted', style: 'margin-top:0' }, 'What the agent may do in WhatsApp besides answering: send pictures and files, react, post polls, manage the group. Actions marked “organizers only” happen right away when an organizer asks — no confirm code — so give the agent’s number group-admin rights only where you want that. Every action is recorded in Activity.'),
           h('details', {}, h('summary', { class: 'small', style: 'cursor:pointer;min-height:36px' }, `Choose actions per role (${waTools.length})`), waBox)) : null,
         h('fieldset', {}, h('legend', {}, 'Changes need confirmation'),
           h('label', { class: 'inline' }, F.confirmOn, 'Hold changes until an organizer replies “confirm CODE”'),
@@ -1245,12 +1297,12 @@ async function renderBotEditor(id) {
 // ---------- chats + memory ----------
 // ---------- AI helper (016) ----------
 const FIELD_LABEL = { name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', dm: 'Who may message it directly',
-  organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', tools: 'Tool rules', confirm: 'Confirmation', schedules: 'Scheduled posts', memory: 'Group memory',
+  organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', globalMcp: 'Global tool services', tools: 'Tool rules', confirm: 'Confirmation', schedules: 'Scheduled posts', memory: 'Group memory',
   model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', plugins: 'Plugins', enabled: 'Enabled' };
 const showVal = (v) => (v == null || (Array.isArray(v) && !v.length) ? '—' : typeof v === 'string' ? v : Array.isArray(v) && v.every((x) => typeof x === 'string') ? v.join('\n') : JSON.stringify(v, null, 2));
 const withNames = (field, v, names = {}) => (['organizers', 'participants'].includes(field) && Array.isArray(v) ? v.map((p) => (names[p] ? `${names[p]} (+${p})` : `+${p}`)) : v);
 /** "Describe it → AI drafts → review the changes → apply". onApply(result) does the saving. */
-async function aiHelper({ botId = '', title, placeholder, applyLabel, onApply }) {
+async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply }) {
   const models = await loadModels().catch(() => ({ models: [] }));
   const ask = h('textarea', { class: 'prose', style: 'min-height:90px', placeholder });
   const model = modelSelect(models, 'auto', { autoLabel: `Default model${models.resolvedDefault ? ` (${models.resolvedDefault})` : ''}` });
@@ -1258,7 +1310,7 @@ async function aiHelper({ botId = '', title, placeholder, applyLabel, onApply })
   const go = h('button', { class: 'btn primary', onclick: async () => {
     go.disabled = true; out.replaceChildren(h('p', { class: 'muted small' }, h('span', { class: 'spinner' }), ' Thinking… this can take up to a minute.'));
     try {
-      const r = await api('POST', '/api/ai/bot-draft', { botId, request: ask.value, model: model.value });
+      const r = await api('POST', '/api/ai/agent-draft', { agentId, request: ask.value, model: model.value });
       out.replaceChildren(
         h('div', { class: 'note ok' }, h('b', {}, 'Draft ready · '), r.summary || `${r.changes.length} change(s)`),
         r.questions?.length ? h('div', { class: 'note' }, h('b', {}, 'The AI asks: '), r.questions.join(' ')) : null,
@@ -1281,14 +1333,14 @@ async function aiHelper({ botId = '', title, placeholder, applyLabel, onApply })
 let chatsFilter = 'all';
 async function renderChats() {
   $('#main').replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading chats…')));
-  const [chats, bots, models, us] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/bots'), loadModels().catch(() => ({ models: [] })), usageSummary()]);
+  const [chats, agents, models, us] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/agents'), loadModels().catch(() => ({ models: [] })), usageSummary()]);
   const memBox = h('div', {});
   const multi = new Set(chats.map((c) => c.number)).size > 1;
   const savePrefs = (c, patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, patch)); }, 'Saved');
   const list = h('div', {});
   const draw = () => {
     const shown = chats.filter((c) => chatsFilter === 'all' || (chatsFilter === 'groups' ? c.isGroup : !c.isGroup));
-    list.replaceChildren(shown.length ? h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'On'), h('th', {}, 'Chat'), h('th', {}, 'Bot'), h('th', {}, 'Model'), h('th', {}, 'Activity log'))),
+    list.replaceChildren(shown.length ? h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'On'), h('th', {}, 'Chat'), h('th', {}, 'Agent'), h('th', {}, 'Model'), h('th', {}, 'Activity log'))),
       h('tbody', {}, shown.map((c) => h('tr', { style: c.enabled ? '' : 'opacity:.78' },
         h('td', { style: 'width:52px' }, toggle(c.enabled, (v) => tryApi(async () => { await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, { enabled: v }); c.enabled = v; c.ignored = 0; draw(); }, v ? 'On — agents may answer here' : 'Off — agents ignore this chat'), !can('admin'))),
         h('td', {}, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, c.name || c.id), h('span', { class: `pill ${c.isGroup ? 'info' : ''}` }, c.isGroup ? 'group' : 'person'), multi ? h('span', { class: 'pill' }, c.numberLabel) : null),
@@ -1296,11 +1348,11 @@ async function renderChats() {
           us?.chat?.[c.id] ? h('div', { class: 'small muted num' }, `30 days: ${usageLine(us.chat[c.id])}`) : null,
           !c.enabled ? h('div', { class: 'small', style: 'color:var(--warn)' }, `Off — ignored${c.ignored ? ` (${c.ignored} message${c.ignored > 1 ? 's' : ''} since restart)` : ''}`) : null,
           h('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory')),
-        h('td', { style: 'min-width:170px' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, bot: e.target.value || null }); c.bot = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
-          h('option', { value: '' }, c.isGroup ? '— no bot —' : '— default for direct messages —'), bots.map((b) => h('option', { value: b.id, selected: c.bot === b.id }, b.name)))),
+        h('td', { style: 'min-width:170px' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, agent: e.target.value || null }); c.agent = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
+          h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),
         h('td', { style: 'min-width:200px' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) })),
         h('td', { style: 'min-width:130px' }, h('select', { disabled: !can('admin'), onchange: (e) => savePrefs(c, { logging: e.target.value }) },
-          [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message a bot number.' : 'No chats yet (or WhatsApp is not connected).'));
+          [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message an agent number.' : 'No chats yet (or WhatsApp is not connected).'));
   };
   const seg = h('div', { class: 'seg' }, [['all', 'All'], ['groups', 'Groups'], ['people', 'People']].map(([v, l]) => h('button', { class: chatsFilter === v ? 'on' : '', onclick: (e) => { chatsFilter = v; seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === e.target)); draw(); } }, l)));
   draw();
@@ -1341,7 +1393,7 @@ function whatsappCard(c) {
     body.replaceChildren(
       h('div', { class: 'row', style: 'gap:6px;margin:6px 0 10px' }, h('span', { class: 'pill' }, `${g.size} members`), h('span', { class: 'pill info' }, `${admins} admin${admins === 1 ? '' : 's'}`)),
       meAdmin,
-      h('p', { class: 'small muted', style: 'margin-top:0' }, 'Changes here happen in WhatsApp right away and are recorded in Activity. The bot’s number must be a group admin for most of them.'),
+      h('p', { class: 'small muted', style: 'margin-top:0' }, 'Changes here happen in WhatsApp right away and are recorded in Activity. The agent’s number must be a group admin for most of them.'),
       field('Group name', h('div', { class: 'row nowrap' }, subject, h('button', { class: 'btn small', onclick: async () => { if (await put({ subject: subject.value }, 'Group renamed')) g.subject = subject.value; } }, 'Save'))),
       field('Description', desc),
       h('div', { class: 'row', style: 'margin:6px 0 12px' }, h('button', { class: 'btn small', onclick: () => put({ description: desc.value }, 'Description saved') }, 'Save description')),
@@ -1368,8 +1420,8 @@ function messagesCard(c) {
   const q = h('input', { placeholder: 'Search the stored messages', style: 'max-width:320px' });
   let oldest = 0; let rows = [];
   const more = h('button', { class: 'btn small', onclick: () => load(true) }, 'Load older');
-  const bubble = (m) => h('div', { class: `bubble ${m.fromBot ? 'me' : 'bot'}` },
-    h('div', { class: 'small', style: 'opacity:.75;margin-bottom:2px' }, m.fromBot ? 'Bot' : (m.name || (m.sender ? `+${m.sender}` : 'someone')), ` · ${time(m.ts)}`, m.addressed ? ' · to the bot' : ''),
+  const bubble = (m) => h('div', { class: `bubble ${m.fromAgent ? 'me' : 'agent'}` },
+    h('div', { class: 'small', style: 'opacity:.75;margin-bottom:2px' }, m.fromAgent ? 'Agent' : (m.name || (m.sender ? `+${m.sender}` : 'someone')), ` · ${time(m.ts)}`, m.addressed ? ' · to the agent' : ''),
     m.quoted ? h('div', { class: 'small', style: 'opacity:.75;border-left:2px solid currentColor;padding-left:6px;margin:2px 0 4px' }, m.quoted) : null, m.text);
   async function load(older) {
     const page = await tryApi(() => api('GET', `/api/chats/${enc}/messages?limit=50${older && oldest ? `&before=${oldest}` : ''}${q.value.trim() ? `&q=${encodeURIComponent(q.value.trim())}` : ''}`));
@@ -1382,7 +1434,7 @@ function messagesCard(c) {
   }
   const card = h('div', { class: 'card', style: 'margin-top:16px' },
     h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, `Messages · ${c.name}`), h('form', { class: 'row nowrap', style: 'flex:0 1 420px', onsubmit: (e) => { e.preventDefault(); load(false); } }, q, h('button', { class: 'btn small' }, 'Search'))),
-    h('p', { class: 'small muted' }, 'Messages the bots have stored for context (groups always; direct chats only when a bot answered). Only admins and owners can read them, and each look is recorded in the activity log.'),
+    h('p', { class: 'small muted' }, 'Messages the agents have stored for context (groups always; direct chats only when an agent answered). Only admins and owners can read them, and each look is recorded in the activity log.'),
     h('div', { style: 'text-align:center' }, more), log);
   load(false);
   return card;
@@ -1483,9 +1535,9 @@ async function renderModels() {
   // Start here
   const start = anyOn
     ? h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Models'), h('span', { class: 'pill ok' }, `${provs.filter((p) => p.connected).length} connected`)),
-      h('p', { class: 'small muted', style: 'margin:6px 0 0' }, models.resolvedDefault ? `Bots on Auto use ${models.resolvedDefault} right now. You can connect more providers below and pick per bot.` : models.problem || ''))
-    : h('div', { class: 'card start' }, h('div', { class: 'eyebrow' }, 'Start here'), h('h2', {}, 'Connect a model so your bots can answer'),
-      h('p', { class: 'small muted', style: 'margin-top:-6px' }, 'Pick one to begin. You can add more later and choose per bot.'),
+      h('p', { class: 'small muted', style: 'margin:6px 0 0' }, models.resolvedDefault ? `Agents on Auto use ${models.resolvedDefault} right now. You can connect more providers below and pick per agent.` : models.problem || ''))
+    : h('div', { class: 'card start' }, h('div', { class: 'eyebrow' }, 'Start here'), h('h2', {}, 'Connect a model so your agents can answer'),
+      h('p', { class: 'small muted', style: 'margin-top:-6px' }, 'Pick one to begin. You can add more later and choose per agent.'),
       h('div', { class: 'choices' },
         h('button', { class: 'choice', onclick: go('openrouter') }, h('b', {}, 'Free to start'), h('span', {}, 'OpenRouter free models. No card needed, about 50 messages a day.')),
         h('button', { class: 'choice', onclick: go('anthropic') }, h('b', {}, 'Best answers'), h('span', {}, 'Anthropic (Claude) or OpenAI API key. Pay per use.')),
@@ -1508,7 +1560,7 @@ async function renderModels() {
     connected: h('div', {}, h('div', { class: 'row spread' }, freeToggle, ext(LINKS.openrouterFree, 'See free models')),
       h('p', { class: 'small muted', style: 'margin:4px 0 0' }, or?.freeOnly ? 'Only models ending in “:free” are listed and used, so nothing is charged. Auto picks one of them.' : 'All OpenRouter models are listed. Paid models use your OpenRouter credit.')),
     extra: [replaceKey(keyForm({ placeholder: 'sk-or-v1-…', button: 'Save', submit: (key) => api('POST', '/api/providers/openrouter', { key }) })),
-      h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove OpenRouter? Bots using OpenRouter models switch to Auto.') && tryApi(async () => { await api('DELETE', '/api/providers/compatible/openrouter'); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')],
+      h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove OpenRouter? Agents using OpenRouter models switch to Auto.') && tryApi(async () => { await api('DELETE', '/api/providers/compatible/openrouter'); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')],
   });
 
   // Anthropic
@@ -1523,7 +1575,7 @@ async function renderModels() {
     form: keyForm({ placeholder: 'sk-ant-…', submit: saveSecretKey('ANTHROPIC_API_KEY') }),
     connected: h('p', { class: 'small muted', style: 'margin:0' }, 'Claude Pro/Max subscriptions can’t be used here; this uses your API key.'),
     extra: [replaceKey(keyForm({ placeholder: 'sk-ant-…', button: 'Save', submit: saveSecretKey('ANTHROPIC_API_KEY') })),
-      h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove the Anthropic key? Bots using Claude stop answering until another model is chosen.') && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'ANTHROPIC_API_KEY', value: '' }); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')],
+      h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove the Anthropic key? Agents using Claude stop answering until another model is chosen.') && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'ANTHROPIC_API_KEY', value: '' }); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')],
   });
 
   // OpenAI
@@ -1537,7 +1589,7 @@ async function renderModels() {
     ],
     form: keyForm({ placeholder: 'sk-…', submit: saveSecretKey('OPENAI_API_KEY') }),
     extra: [replaceKey(keyForm({ placeholder: 'sk-…', button: 'Save', submit: saveSecretKey('OPENAI_API_KEY') })),
-      h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove the OpenAI key? Bots using OpenAI models stop answering until another model is chosen.') && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'OPENAI_API_KEY', value: '' }); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')],
+      h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove the OpenAI key? Agents using OpenAI models stop answering until another model is chosen.') && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'OPENAI_API_KEY', value: '' }); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')],
   });
 
   // ChatGPT plan (sign-in logic unchanged; clearer steps)
@@ -1569,7 +1621,7 @@ async function renderModels() {
     ],
     form: cgForm,
     connected: h('p', { style: 'margin:0' }, `Signed in as ${cg.account || 'your ChatGPT account'}.`),
-    extra: can('owner') ? disconnect('ChatGPT', '/api/providers/chatgpt', 'Bots using ChatGPT models stop answering until another model is chosen.') : null,
+    extra: can('owner') ? disconnect('ChatGPT', '/api/providers/chatgpt', 'Agents using ChatGPT models stop answering until another model is chosen.') : null,
   });
 
   // GitHub Copilot (official SDK)
@@ -1592,7 +1644,7 @@ async function renderModels() {
       h('p', { class: 'small muted' }, 'If GitHub refuses the token, open it on GitHub and switch “Copilot requests” to the other access level (Read-only ↔ Read and write), then try again. The first connection downloads GitHub’s official Copilot helper to this server (about 400 MB of disk, about 60 MB of memory while in use); nothing is downloaded if you never connect Copilot.')),
     connected: h('div', {}, h('p', { style: 'margin:0 0 6px' }, `Signed in as ${co?.account || 'your GitHub account'}.`), quotaView),
     extra: can('owner') ? [replaceKey(keyForm({ placeholder: 'github_pat_…', button: 'Save', submit: (token) => api('POST', '/api/providers/copilot', { token }) })),
-      disconnect('GitHub Copilot', '/api/providers/copilot', 'Bots using Copilot models stop answering until another model is chosen.')] : null,
+      disconnect('GitHub Copilot', '/api/providers/copilot', 'Agents using Copilot models stop answering until another model is chosen.')] : null,
   });
 
   // Other OpenAI-compatible endpoints (advanced)
@@ -1604,7 +1656,7 @@ async function renderModels() {
     compat.map((p) => { const t = p.connected ? testBox(p.id) : null; return h('div', { class: 'number-card' },
       h('div', { class: 'row spread' }, h('div', {}, h('b', {}, p.name), h('div', { class: 'small muted' }, p.baseUrl)), h('span', { class: `pill ${p.connected ? 'ok' : 'bad'}` }, p.connected ? `✓ ${p.models} models` : 'Needs attention')),
       p.error ? h('div', { class: 'note bad' }, p.error) : null,
-      h('div', { class: 'row', style: 'margin-top:8px' }, t?.btn, h('button', { class: 'btn small danger mut', onclick: () => confirm(`Remove ${p.name}? Bots using its models switch to Auto.`) && tryApi(async () => { await api('DELETE', `/api/providers/compatible/${p.id}`); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')), t?.out); }),
+      h('div', { class: 'row', style: 'margin-top:8px' }, t?.btn, h('button', { class: 'btn small danger mut', onclick: () => confirm(`Remove ${p.name}? Agents using its models switch to Auto.`) && tryApi(async () => { await api('DELETE', `/api/providers/compatible/${p.id}`); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')), t?.out); }),
     h('details', { class: 'mut' }, h('summary', {}, 'Add an endpoint'),
       h('form', { onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('POST', '/api/providers/compatible', { id: cid.value.trim(), name: cname.value.trim(), baseUrl: curl.value.trim(), key: ckey.value }), 'Saved')) { modelsCache = null; renderModels(); } } },
         h('div', { class: 'row', style: 'margin-top:8px' }, cid, cname), h('div', { class: 'row', style: 'margin-top:6px' }, curl, ckey), h('button', { class: 'btn', style: 'margin-top:8px' }, 'Add endpoint'))));
@@ -1614,7 +1666,7 @@ async function renderModels() {
   const bg = modelSelect(models, models.backgroundModel, { autoLabel: `Auto${models.resolvedBackground ? ` (now ${models.resolvedBackground})` : ''}` });
   const defaults = h('div', { class: 'card' }, h('h2', {}, 'Default models'),
     anyOn ? null : h('p', { class: 'small muted' }, 'Connect a provider above first.'),
-    field('Default model (bots on Auto)', def, models.resolvedDefault ? `Auto currently means ${models.resolvedDefault}` : ''),
+    field('Default model (agents on Auto)', def, models.resolvedDefault ? `Auto currently means ${models.resolvedDefault}` : ''),
     field('Background model (memory summaries)', bg, models.resolvedBackground ? `Auto currently means ${models.resolvedBackground}` : ''),
     h('div', { class: 'row', style: 'margin-top:12px' },
       h('button', { class: 'btn primary mut', onclick: () => tryApi(async () => { await api('POST', '/api/models/defaults', { defaultModel: def.value, backgroundModel: bg.value }); modelsCache = null; renderModels(); }, 'Saved') }, 'Save'),
@@ -1649,7 +1701,7 @@ async function renderBackups() {
   const runDl = busyBtn('Back up now & download', '', async (r) => { if (r.results.local === 'ok') downloadFile(`/api/backups/download/${r.file}`, r.file); });
 
   const scheduleCard = h('div', { class: 'card' }, h('h2', {}, 'Schedule'),
-    h('p', { class: 'small muted' }, 'Backups include bots, users, settings, secrets, chat memory and (optionally) the WhatsApp link. They are encrypted with your passphrase before leaving the server — without it they cannot be restored, so write it down somewhere safe (not on this server).'),
+    h('p', { class: 'small muted' }, 'Backups include agents, users, settings, secrets, chat memory and (optionally) the WhatsApp link. They are encrypted with your passphrase before leaving the server — without it they cannot be restored, so write it down somewhere safe (not on this server).'),
     field('Passphrase', h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/backups/passphrase', { passphrase: pass.value }), 'Passphrase saved')) renderBackups(); } }, pass, h('button', { class: 'btn' }, 'Save'))),
     h('div', { class: 'row', style: 'margin-top:10px' }, h('label', { class: 'inline' }, en, 'Scheduled backups'), h('label', { class: 'inline' }, wa, 'Include WhatsApp link')),
     h('div', { class: 'row' }, sched, at, wd, h('span', { class: 'small muted' }, 'keep'), keep),
@@ -1668,7 +1720,7 @@ async function renderBackups() {
         h('li', {}, 'Click “Back up now & download” and keep the file.'),
         h('li', {}, 'Install Duniya on the new server (installer or the OCI stack).'),
         h('li', {}, 'On its first screen choose “Restore a backup”, upload the file and type the backup passphrase. You need the passphrase there — the new server cannot open the file without it.'),
-        h('li', {}, 'Once the new server shows your bots, turn the old one off.'))));
+        h('li', {}, 'Once the new server shows your agents, turn the old one off.'))));
 
   // S3
   const se = h('input', { value: s.s3.endpoint, placeholder: 'https://<account>.r2.cloudflarestorage.com' });
@@ -1781,7 +1833,7 @@ function restoreCard(b, s) {
   if (!modes.some(([v]) => v === restoreMode)) restoreMode = 'local';
   const seg = h('div', { class: 'seg', style: 'margin-bottom:8px;flex-wrap:wrap' }, modes.map(([v, l]) => h('button', { class: v === restoreMode ? 'on' : '', onclick: (e) => { restoreMode = v; seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); err.textContent = ''; draw(); } }, l)));
   const rpass = h('input', { type: 'password', placeholder: 'Backup passphrase', autocomplete: 'off' });
-  const confirmText = (what) => `Restore ${what}? Bots, users, settings, secrets, memory and the WhatsApp link are replaced by the backup and the server restarts (1–2 minutes). The current data is kept aside on the server.`;
+  const confirmText = (what) => `Restore ${what}? Agents, users, settings, secrets, memory and the WhatsApp link are replaced by the backup and the server restarts (1–2 minutes). The current data is kept aside on the server.`;
   function draw() {
     if (restoreMode === 'upload') {
       const file = h('input', { type: 'file', accept: '.dbk,application/octet-stream' });
@@ -1818,7 +1870,7 @@ function restoreCard(b, s) {
   }
   draw();
   return h('div', { class: 'card' }, h('h2', {}, 'Restore'),
-    h('div', { class: 'note warn' }, 'Restoring replaces bots, users, settings, secrets, memory and the WhatsApp link with the backup, then restarts. The current data is kept aside on the server.'),
+    h('div', { class: 'note warn' }, 'Restoring replaces agents, users, settings, secrets, memory and the WhatsApp link with the backup, then restarts. The current data is kept aside on the server.'),
     seg, box, err);
 }
 
@@ -1828,7 +1880,7 @@ async function renderPending() {
   $('#main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Pending confirmations'),
     h('p', { class: 'small muted' }, 'Changes an organizer asked for, waiting for “confirm CODE”. You can apply or cancel them here too.'),
     rows.length ? h('table', {}, h('tbody', {}, rows.map((p) => h('tr', {},
-      h('td', {}, h('b', {}, p.code), h('div', { class: 'small muted' }, `${p.bot} · ${p.tool} · expires in ${Math.max(0, Math.round((p.expires - Date.now()) / 60000))} min`), h('pre', {}, p.summary)),
+      h('td', {}, h('b', {}, p.code), h('div', { class: 'small muted' }, `${p.agent} · ${p.tool} · expires in ${Math.max(0, Math.round((p.expires - Date.now()) / 60000))} min`), h('pre', {}, p.summary)),
       h('td', { style: 'white-space:nowrap' }, h('button', { class: 'btn primary mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/pending/${p.code}/apply`)); if (r) toast(r.result); renderPending(); } }, 'Apply'), ' ',
         h('button', { class: 'btn mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/pending/${p.code}`); renderPending(); }) }, 'Cancel')))))) : h('p', { class: 'muted' }, 'Nothing pending.')));
 }
@@ -1838,9 +1890,9 @@ async function renderSecrets() {
   const rows = await api('GET', '/api/secrets');
   const name = h('input', { placeholder: 'NAME_LIKE_THIS' }); const val = h('input', { type: 'password', placeholder: 'value' });
   $('#main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Secrets'),
-    h('p', { class: 'small muted' }, 'API keys and tokens, stored encrypted on the server and never shown again. Bots reference them as ${NAME}. Save an empty value to remove.'),
+    h('p', { class: 'small muted' }, 'API keys and tokens, stored encrypted on the server and never shown again. Agents reference them as ${NAME}. Save an empty value to remove.'),
     h('table', {}, h('tbody', {}, rows.map((n) => { const v = h('input', { type: 'password', placeholder: 'new value' });
-      return h('tr', {}, h('td', {}, h('code', {}, n.name), n.usedByBots ? h('div', { class: 'small muted' }, 'used by a bot') : null),
+      return h('tr', {}, h('td', {}, h('code', {}, n.name), n.usedByAgents ? h('div', { class: 'small muted' }, 'used by an agent') : null),
         h('td', {}, h('span', { class: `pill ${n.set ? 'ok' : 'bad'}` }, n.set ? 'set' : 'missing')),
         h('td', {}, h('form', { class: 'row mut', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name: n.name, value: v.value }), v.value ? 'Saved' : 'Removed')) renderSecrets(); } }, v, h('button', { class: 'btn' }, 'Save')))); }))),
     h('div', { class: 'mut' }, h('label', {}, 'Add a secret'), h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name: name.value.trim(), value: val.value }), 'Saved')) renderSecrets(); } }, name, val, h('button', { class: 'btn primary' }, 'Add')))));
@@ -1848,9 +1900,10 @@ async function renderSecrets() {
 
 // ---------- settings ----------
 async function renderSettings() {
-  const [bots, lg, ai, sess, mob] = await Promise.all([api('GET', '/api/bots'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null), api('GET', '/api/mobile').catch(() => null)]);
+  const [agents, lg, ai, sess, mob] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null), api('GET', '/api/mobile').catch(() => null)]);
   if (sess?.user) { S.user = sess.user; S.google = !!sess.google; }
   const me = S.user;
+  const tools = await toolServicesCard().catch((e) => h('div', { class: 'card' }, h('h2', {}, 'Tool services for all agents'), h('p', { class: 'small muted' }, `Could not load: ${e.message}`)));
   const cur = h('input', { type: 'password', placeholder: 'current', autocomplete: 'current-password' });
   const next = h('input', { type: 'password', placeholder: 'new (12+ characters)', autocomplete: 'new-password' });
   const cards = [
@@ -1858,20 +1911,71 @@ async function renderSettings() {
       me.hasPassword ? [cur, h('div', { style: 'height:8px' })] : h('p', { class: 'small muted', style: 'margin-top:0' }, 'You sign in with Google. A password is a fallback for when Google sign-in is off.'), next,
       h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => tryApi(async () => { await api('POST', '/api/password', { current: cur.value, next: next.value }); cur.value = next.value = ''; renderSettings(); }, me.hasPassword ? 'Password changed' : 'Password added') }, me.hasPassword ? 'Change password' : 'Add password')),
     S.google || me.google ? myGoogleCard(me) : null,
-    h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default bot for DMs without a trigger'),
-      h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmBot: e.target.value }), 'Saved') },
-        h('option', { value: '' }, '— first bot that accepts the sender —'), bots.map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmBot === b.id }, b.name)))),
+    h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default agent for DMs without a trigger'),
+      h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmAgent: e.target.value }), 'Saved') },
+        h('option', { value: '' }, '— first agent that accepts the sender —'), agents.map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmAgent === b.id }, b.name)))),
     mob ? mobileCard(mob) : null,
     ai ? assistantsCard(ai) : null,
     lg ? loggingCard(lg) : null,
-    h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any bot can send:'),
+    h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any agent can send:'),
       h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups'))),
   ];
   if (can('owner')) {
     const [users, inv, gcfg, signin, web] = await Promise.all([api('GET', '/api/users'), api('GET', '/api/invites'), api('GET', '/api/auth/google'), api('GET', '/api/auth/signin').catch(() => null), api('GET', '/api/web').catch(() => null)]);
     cards.unshift(usersCard(users, inv, signin), signin ? signinCard(signin) : null, googleSetupCard(gcfg), web ? webAccessCard(web) : null);
   }
+  cards.unshift(tools); // Tool services for all agents (035) first: they affect every agent
   $('#main').replaceChildren(h('div', { class: 'grid' }, cards));
+}
+
+// ---------- Settings → Tool services (035): MCP servers every agent can use ----------
+async function toolServicesCard() {
+  const [list, conns, locals] = await Promise.all([api('GET', '/api/tool-services'), api('GET', '/api/tool-services/connections').catch(() => []), api('GET', '/api/tool-services/local').catch(() => [])]);
+  const isOwner = S.user?.role === 'owner';
+  const items = list.map((g) => ({ s: serverState(g.name, g.config), g }));
+  const box = h('div', {});
+  const card = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Tool services for all agents'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Connect a tool service once and every agent can use it. Each agent can switch a service off (Agents → the agent → Tool services), and its role rules decide which tools organizers and participants get. The ticks below are the defaults for agents without their own choice.'),
+    box);
+  const defaultsRules = (s) => ({
+    has: (role, name) => (s.defaults[role] || []).some((x) => globRe(x).test(name)),
+    write: (role, names, tools) => { s.defaults[role] = names.length === tools.length ? ['*'] : names; },
+  });
+  const sum = (s, role) => { const d = s.defaults[role] || []; return !d.length ? 'none' : d.includes('*') ? 'all tools' : d.join(', '); };
+  async function saveOne(it) {
+    if (!it.s.key) { toast('Give the tool service a name first'); return false; }
+    try {
+      const r = await api('PUT', `/api/tool-services/${encodeURIComponent(it.s.key)}`, { ...serverConfig(it.s), defaults: it.s.defaults });
+      it.g = r; markSaved(it.s); toast(`Saved ${it.s.key}`); draw(); return true;
+    } catch (e) { toast(e.field ? `${e.field}: ${e.message.replace(/^[^:]+: /, '')}` : e.message); return false; }
+  }
+  async function removeOne(it) {
+    if (it.s.isNew) { items.splice(items.indexOf(it), 1); return draw(); }
+    const n = it.g?.agents?.using?.length || 0;
+    if (!confirm(`Remove ${it.s.key} from all agents? ${n} agent${n === 1 ? '' : 's'} lose its tools right away and its sign-ins are deleted.`)) return;
+    if (await tryApi(() => api('DELETE', `/api/tool-services/${encodeURIComponent(it.s.key)}`), 'Removed')) { items.splice(items.indexOf(it), 1); draw(); }
+  }
+  function draw() {
+    box.replaceChildren(
+      items.length ? null : h('p', { class: 'small muted' }, 'No tool services for all agents yet.'),
+      ...items.map((it) => {
+        const g = it.g;
+        const status = g ? h('div', { class: 'row small', style: 'margin:6px 0' },
+          h('span', { class: 'pill ok' }, `used by ${g.agents.using.length} agent${g.agents.using.length === 1 ? '' : 's'}`),
+          g.agents.optedOut.length ? h('span', { class: 'pill' }, `switched off in ${g.agents.optedOut.join(', ')}`) : null,
+          g.agents.replacedBy.length ? h('span', { class: 'pill warn' }, `replaced by own service in ${g.agents.replacedBy.join(', ')}`) : null,
+          g.needs?.length ? h('span', { class: 'pill warn' }, `set under Secrets: ${g.needs.join(', ')}`) : null) : null;
+        const canEdit = can('admin') && (isOwner || it.s.savedType !== 'local');
+        const extra = h('div', {}, status,
+          h('div', { class: 'small muted' }, `Defaults: organizers ${sum(it.s, 'organizer')}; participants ${sum(it.s, 'participant')}. Discover tools to change them.`),
+          canEdit ? h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn small primary', onclick: () => saveOne(it) }, it.s.isNew ? 'Add for all agents' : 'Save')) : null);
+        return toolServiceEditor(it.s, { base: '/api/tool-services', conns, locals, isOwner, save: () => saveOne(it), saveHint: 'Save to connect', rules: defaultsRules(it.s),
+          redraw: draw, remove: () => removeOne(it), keyLocked: !it.s.isNew, extra });
+      }),
+      can('admin') ? h('button', { class: 'btn small mut', style: 'margin-top:8px', onclick: () => { items.push({ s: serverState('', {}), g: null }); draw(); } }, '+ Add tool service for all agents') : null);
+  }
+  draw();
+  return card;
 }
 
 // ---------- Connected AI assistants (017) ----------
@@ -1888,13 +1992,13 @@ function assistantsCard(a) {
   const revoke = (g) => confirm(`Disconnect ${g.clientName}${g.userId !== a.you ? ` (${g.username})` : ''}? It stops working right away. You can connect it again later.`)
     && tryApi(async () => { await api('DELETE', `/api/assistants/${g.userId}/${encodeURIComponent(g.clientId)}`); renderSettings(); }, 'Disconnected');
   return h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Connected AI assistants'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Manage this app by chatting with ChatGPT or Claude: “which bots are on?”, “turn off the carpool bot”, “what happened in the Panduga group today?”. The assistant signs in as you and can do what your account can do.'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Manage this app by chatting with ChatGPT or Claude: “which agents are on?”, “turn off the carpool agent”, “what happened in the Panduga group today?”. The assistant signs in as you and can do what your account can do.'),
     a.https ? null : h('div', { class: 'note warn' }, 'This address only works on this network. ChatGPT and Claude need the public https address of this app: set up internet access first (Caddy or Cloudflare, see the install guide), then open the panel at that address and come back here.'),
     h('label', {}, 'Address to paste in your assistant'), h('div', { class: 'row nowrap' }, url, copyButton(a.mcpUrl)),
     steps('ChatGPT', ['In ChatGPT open Settings → Apps & Connectors → Advanced settings and turn on Developer mode.', 'Go back to Apps & Connectors and click Create. Name it “Duniya”, paste the address above as the MCP server URL, choose OAuth, and click Create.', 'A Duniya page opens: sign in if asked, check what it may do, and click Approve.', 'In a new chat, turn on the Duniya connector (+ → Developer mode) and ask away.']),
     steps('Claude', ['In Claude open Settings → Connectors and click Add custom connector.', 'Name it “Duniya”, paste the address above as the remote MCP server URL, and click Add.', 'Click Connect. A Duniya page opens: sign in if asked, check what it may do, and click Approve.']),
     h('div', { class: 'note' }, h('b', {}, `With your ${S.user.role} account an assistant can: `), a.abilities.join('. '), '. ',
-      S.user.role === 'viewer' ? '' : 'Risky actions (deleting a bot, erasing memory, changing secrets or users, restoring a backup, updates, restarts) always ask for a second confirmation.'),
+      S.user.role === 'viewer' ? '' : 'Risky actions (deleting an agent, erasing memory, changing secrets or users, restoring a backup, updates, restarts) always ask for a second confirmation.'),
     h('h3', {}, 'Connected'),
     a.grants.length ? h('table', {}, h('tbody', {}, a.grants.map((g) => h('tr', {},
       h('td', {}, h('b', {}, g.clientName), g.redirectHost ? h('div', { class: 'small muted' }, g.redirectHost) : null),
@@ -1988,7 +2092,7 @@ function usersCard(users, inv, signin) {
   const mail = (i) => `mailto:${encodeURIComponent(i.email)}?subject=${encodeURIComponent('Your invite to the Duniya admin panel')}&body=${encodeURIComponent(inviteMessage(i, inv.panelUrl))}`;
   const days = (ts) => Math.max(0, Math.ceil((ts - Date.now()) / 86400000));
   return h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Users'),
-    h('p', { class: 'small muted' }, 'Owners manage everything incl. users, backups and updates. Admins manage bots, chats, models and memory. Viewers can only look.'),
+    h('p', { class: 'small muted' }, 'Owners manage everything incl. users, backups and updates. Admins manage agents, chats, models and memory. Viewers can only look.'),
     h('div', { style: 'overflow-x:auto' }, h('table', {}, h('tbody', {}, users.map((u) => h('tr', {},
       h('td', {}, h('b', {}, u.username), ' ', u.google ? h('span', { class: 'pill info', title: 'Signs in with Google' }, gLogo(), 'Google') : null,
         h('div', { class: 'small muted' }, [u.email, !u.hasPassword ? 'no password' : ''].filter(Boolean).join(' · '))),

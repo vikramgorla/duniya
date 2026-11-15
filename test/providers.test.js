@@ -98,8 +98,8 @@ test('US1: OpenAI-compatible providers: models listed, bad key isolated', async 
   assert.ok(!JSON.stringify(await t.api(owner, 'GET', '/api/secrets')).includes('"k"'));
 });
 
-test('US2: a bot on a Chat Completions model uses tools and the confirm gate', async () => {
-  await t.bots.updateBot('panduga', { model: 'ollama:gpt-x' });
+test('US2: an agent on a Chat Completions model uses tools and the confirm gate', async () => {
+  await t.agents.updateAgent('panduga', { model: 'ollama:gpt-x' });
   oa.chatScript.push(
     { choices: [{ message: { content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'panduga__room_assign_preview', arguments: '{"family":"Rao"}' } }] }, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 10, completion_tokens: 5 } },
     { choices: [{ message: { content: 'Preview ready.' }, finish_reason: 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 3 } },
@@ -130,7 +130,7 @@ test('US2: auto resolution, defaults and background model', async () => {
   await t.api(owner, 'POST', '/api/models/defaults', { defaultModel: 'ollama:gpt-x-mini' });
   m = (await t.api(owner, 'GET', '/api/models')).body;
   assert.equal(m.resolvedDefault, 'ollama:gpt-x-mini');
-  await t.bots.updateBot('panduga', { model: 'auto' });
+  await t.agents.updateAgent('panduga', { model: 'auto' });
   oa.chatScript.push({ choices: [{ message: { content: 'via auto' }, finish_reason: 'stop' }] });
   await t.route(t.msg({ text: '!panduga hi' }));
   assert.equal(oa.chatReqs.at(-1).model, 'gpt-x-mini');
@@ -189,7 +189,7 @@ test('US3: Sign in with ChatGPT — connect, list plan models, tool call over Re
   assert.equal(onlyChatgpt.resolvedDefault, 'chatgpt:gpt-6.1-sol');
   t.store.setSecret('ANTHROPIC_API_KEY', keepKey); t.store.updateSettings({ providers: compat });
 
-  await t.bots.updateBot('panduga', { model: 'chatgpt:gpt-6.1-sol' });
+  await t.agents.updateAgent('panduga', { model: 'chatgpt:gpt-6.1-sol' });
   oa.respScript.push(
     [{ type: 'function_call', call_id: 'fc_1', name: 'panduga__agenda_list', arguments: '{}' }],
     [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Puja at 10:00 (via ChatGPT).' }] }],
@@ -216,5 +216,5 @@ test('US3: Sign in with ChatGPT — connect, list plan models, tool call over Re
   await t.api(owner, 'DELETE', '/api/providers/chatgpt');
   assert.equal(au.revoked.at(-1).token, 'r2');
   assert.equal(t.store.getSecret('CHATGPT_CREDENTIALS'), '');
-  await t.bots.updateBot('panduga', { model: 'claude-sonnet-5-5' });
+  await t.agents.updateAgent('panduga', { model: 'claude-sonnet-5-5' });
 });

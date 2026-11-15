@@ -3,7 +3,7 @@ import { insertActivity, pruneActivity } from './db.js';
 import { getChatPrefs } from './chat-prefs.js';
 import { getSetting } from './store.js';
 
-/** Process-wide event bus. Everything the bot does is recorded here and streamed to the panel. */
+/** Process-wide event bus. Everything the agent does is recorded here and streamed to the panel. */
 export const bus = new EventEmitter();
 bus.setMaxListeners(50);
 
@@ -16,7 +16,7 @@ const trim = (v, n = 4000) => {
 /**
  * Record an activity entry.
  * type: message.in | message.out | tool.call | tool.error | confirm.created | confirm.applied |
- *       confirm.cancelled | channel.status | bot.updated | schedule.run | error | system
+ *       confirm.cancelled | channel.status | agent.updated | schedule.run | error | system
  */
 // ---------- what gets logged (011) ----------
 export const LOG_CATEGORIES = {
@@ -37,7 +37,7 @@ export function categoryOf(type) {
   if (type.startsWith('memory.')) return 'memory';
   if (type.startsWith('schedule.')) return 'schedules';
   if (type === 'channel.status') return 'channel';
-  if (type.startsWith('bot.') || type === 'config' || type === 'backup.settings') return 'config';
+  if (type.startsWith('agent.') || type === 'config' || type === 'backup.settings') return 'config';
   if (type.startsWith('backup.')) return 'backups';
   if (type.startsWith('mcp.')) return 'mcp';
   if (type === 'whatsapp.action') return 'whatsapp';
@@ -71,12 +71,15 @@ export function logPolicy(type, chat) {
   return level === 'verbose' ? 4000 : 1000;
 }
 
-export function activity(type, { bot, chat, summary, detail } = {}) {
-  const entry = { ts: Date.now(), type, bot: bot || '', chat: chat || '', summary: String(summary ?? '').slice(0, 500) };
+/** Console lines stay one line, whatever the summary contains (no forged log lines). */
+const oneLine = (s) => String(s).replace(/[\r\n\u2028\u2029]+/g, ' ');
+
+export function activity(type, { agent, chat, summary, detail } = {}) {
+  const entry = { ts: Date.now(), type, agent: agent || '', chat: chat || '', summary: String(summary ?? '').slice(0, 500) };
   let max = 4000;
   try { max = logPolicy(type, entry.chat); } catch { /* keep */ }
   if (max === null) {
-    if (type === 'error') console.error(`[${bot || 'core'}] ${entry.summary}`);
+    if (type === 'error') console.error(`[${oneLine(agent || 'core')}] ${oneLine(entry.summary)}`);
     return null;
   }
   if (detail !== undefined) entry.detail = trim(detail, max);
@@ -85,6 +88,6 @@ export function activity(type, { bot, chat, summary, detail } = {}) {
     if (Math.random() < 0.02) { const c = loggingSettings(); pruneActivity({ days: c.retentionDays, max: c.maxEntries }); }
   } catch (e) { console.error('activity insert failed', e.message); }
   bus.emit('activity', entry);
-  if (type === 'error') console.error(`[${bot || 'core'}] ${entry.summary}`);
+  if (type === 'error') console.error(`[${oneLine(agent || 'core')}] ${oneLine(entry.summary)}`);
   return entry;
 }

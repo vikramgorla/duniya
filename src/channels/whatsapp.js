@@ -229,11 +229,11 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
       || c?.documentMessage?.contextInfo || c?.audioMessage?.contextInfo || c?.stickerMessage?.contextInfo || c?.locationMessage?.contextInfo;
     const quotedMsg = ctx?.quotedMessage ? normalizeMessageContent(ctx.quotedMessage) : null;
     const quoted = quotedMsg ? (textOf(quotedMsg) || describe(quotedMsg)).slice(0, 500) : '';
-    const botIds = [sock.user?.id, sock.user?.lid].filter(Boolean).map(jidNormalizedUser);
+    const selfIds = [sock.user?.id, sock.user?.lid].filter(Boolean).map(jidNormalizedUser);
     return {
       ...base, kind: 'text', text, quoted, media: !!describe(c), caption: describe(c) ? textOf(c) : '',
-      mentioned: (ctx?.mentionedJid || []).some((j) => botIds.includes(jidNormalizedUser(j))),
-      replyToBot: !!ctx?.participant && botIds.includes(jidNormalizedUser(ctx.participant)),
+      mentioned: (ctx?.mentionedJid || []).some((j) => selfIds.includes(jidNormalizedUser(j))),
+      replyToAgent: !!ctx?.participant && selfIds.includes(jidNormalizedUser(ctx.participant)),
     };
   }
 

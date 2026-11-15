@@ -5,7 +5,7 @@
 This puts your own Duniya server (WhatsApp agents + admin panel) on Google Cloud's **Always Free** tier:
 
 * one **e2-micro** VM (2 shared vCPUs, 1 GB memory) in `us-central1`, `us-west1` or `us-east1`,
-* a **30 GB standard** disk, and **1 GB** of outgoing traffic a month (plenty for WhatsApp bots),
+* a **30 GB standard** disk, and **1 GB** of outgoing traffic a month (plenty for WhatsApp agents),
 * automatic HTTPS at `https://<your-ip>.sslip.io`, no domain needed. You can add your own domain later.
 
 Google needs a billing account (a card) even for free resources. Only the public IPv4 address may be billed
@@ -45,9 +45,9 @@ Options: `--region us-west1` or `--region us-east1`, `--name`, `--admin-password
 When the script prints **Ready**, open the address it shows (`https://<ip>.sslip.io`).
 
 1. Enter the **setup code** from the script's output and choose your owner username and password.
-2. **Overview**: link the bot's WhatsApp number (QR code or pairing code). Use a dedicated number.
+2. **Overview**: link the agent's WhatsApp number (QR code or pairing code). Use a dedicated number.
 3. **Models**: connect a model provider (OpenRouter has free models).
-4. **Bots → New bot**: start from a template.
+4. **Agents → New agent**: start from a template.
 
 Lost the setup code? Run:
 
@@ -69,7 +69,7 @@ the previous address automatically.
 * Set a budget alert (e.g. US$1): [Budgets & alerts](https://console.cloud.google.com/billing/budgets).
 * Updates: the panel updates itself (Settings → Updates). Server commands: `gcloud compute ssh duniya --zone us-central1-a -- sudo duniya help`.
 
-To remove everything (take a backup in the panel first if you want to keep your bots):
+To remove everything (take a backup in the panel first if you want to keep your agents):
 
 ```bash
 gcloud compute instances delete duniya --zone us-central1-a && gcloud compute firewall-rules delete duniya-web

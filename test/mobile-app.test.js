@@ -116,14 +116,14 @@ test('bearer access acts as the approving user with the same role gates as the s
   const o = (await appSignIn(owner)).tokens.access_token;
   const st = await (await bearer(v, 'GET', '/api/status')).json();
   assert.equal(st.user.username, 'mob-viewer');
-  assert.ok(Array.isArray(st.bots));
+  assert.ok(Array.isArray(st.agents));
   // viewer: reads, no writes; admin: writes, not owner routes; owner: everything
-  assert.equal((await bearer(v, 'GET', '/api/bots')).status, 200);
-  assert.equal((await bearer(v, 'PUT', '/api/bots/helper', { enabled: false })).status, 403);
+  assert.equal((await bearer(v, 'GET', '/api/agents')).status, 200);
+  assert.equal((await bearer(v, 'PUT', '/api/agents/helper', { enabled: false })).status, 403);
   assert.equal((await bearer(v, 'GET', '/api/chats/g1%40g.us/messages')).status, 403);
-  assert.equal((await bearer(a, 'PUT', '/api/bots/helper', { enabled: false })).status, 200);
-  assert.equal(t.bots.getBot('helper').enabled, false);
-  assert.equal((await bearer(a, 'PUT', '/api/bots/helper', { enabled: true })).status, 200);
+  assert.equal((await bearer(a, 'PUT', '/api/agents/helper', { enabled: false })).status, 200);
+  assert.equal(t.agents.getAgent('helper').enabled, false);
+  assert.equal((await bearer(a, 'PUT', '/api/agents/helper', { enabled: true })).status, 200);
   assert.equal((await bearer(a, 'GET', '/api/chats/g1%40g.us/messages')).status, 200);
   assert.equal((await bearer(a, 'GET', '/api/users')).status, 403);
   assert.equal((await bearer(a, 'GET', '/api/updates')).status, 403);
@@ -136,7 +136,7 @@ test('bearer access acts as the approving user with the same role gates as the s
   assert.equal((await bearer(o, 'POST', '/api/password', { current: 'x', next: 'y' })).status, 403);
   // a role change applies to the next call
   await t.api(owner, 'PUT', `/api/users/${admin.id}`, { role: 'viewer' });
-  assert.equal((await bearer(a, 'PUT', '/api/bots/helper', { enabled: true })).status, 403);
+  assert.equal((await bearer(a, 'PUT', '/api/agents/helper', { enabled: true })).status, 403);
   // a disabled user's token stops working
   await t.api(owner, 'PUT', `/api/users/${viewer.id}`, { disabled: true });
   assert.equal((await bearer(v, 'GET', '/api/status')).status, 401);

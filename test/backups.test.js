@@ -174,7 +174,7 @@ test('US4: restore — wrong passphrase refused; round trip into a fresh data di
   const manifest = applyPendingRestore(fresh);
   assert.ok(manifest.files.includes('duniya.sqlite'));
   const db = new DatabaseSync(join(fresh, 'duniya.sqlite'));
-  assert.ok(db.prepare("SELECT id FROM bots WHERE id = 'panduga'").get());
+  assert.ok(db.prepare("SELECT id FROM agents WHERE id = 'panduga'").get());
   assert.ok(db.prepare("SELECT 1 FROM users WHERE username = 'admin'").get());
   const enc = db.prepare("SELECT value_enc FROM secrets WHERE name = 'PANDUGA_TOKEN_ORGANIZER'").get().value_enc;
   const { decrypt } = await import('../src/core/crypto.js');

@@ -9,10 +9,10 @@ t.store.createUser({ username: 'vic', role: 'viewer', password: 'viewer password
 const viewer = await t.login('vic', 'viewer password 123');
 after(() => t.close());
 
-test('023: every model call is recorded per bot, chat, provider, model and kind; costs only from known prices', async () => {
+test('023: every model call is recorded per agent, chat, provider, model and kind; costs only from known prices', async () => {
   t.script.push([{ type: 'text', text: 'hello' }]);
   await t.route(t.msg({ text: '!panduga hi' }));
-  let r = (await t.api(owner, 'GET', '/api/usage?groupBy=bot&period=1d')).body;
+  let r = (await t.api(owner, 'GET', '/api/usage?groupBy=agent&period=1d')).body;
   const pd = r.rows.find((x) => x.key === 'panduga');
   assert.ok(pd && pd.calls >= 1 && pd.input >= 3 && pd.output >= 2);
   assert.equal(pd.cost, null, 'no price set → no invented cost');
@@ -28,7 +28,7 @@ test('023: every model call is recorded per bot, chat, provider, model and kind;
   const kinds = (await t.api(owner, 'GET', '/api/usage?groupBy=kind&period=all')).body.rows.map((x) => x.key);
   assert.ok(kinds.includes('reply'));
   const sum = (await t.api(viewer, 'GET', '/api/usage/summary')).body;
-  assert.ok(sum.bot.panduga && sum.provider.anthropic && sum.model['anthropic:claude-sonnet-5-5']);
+  assert.ok(sum.agent.panduga && sum.provider.anthropic && sum.model['anthropic:claude-sonnet-5-5']);
   assert.equal((await t.api(viewer, 'PUT', '/api/usage/prices', { model: 'anthropic:x', input: 1, output: 1 })).status, 403);
   assert.equal((await t.api(owner, 'GET', '/api/usage?groupBy=nope')).status, 400);
 });
@@ -53,7 +53,7 @@ test('024: admins can read stored messages (search, paging); viewers cannot; eac
   const found = await t.api(owner, 'GET', `/api/chats/${encodeURIComponent('g1@g.us')}/messages?q=number%201`);
   assert.deepEqual(found.body.map((m) => m.text), ['message number 1 about lunch']);
   assert.ok(found.body.some((m) => m.name === 'Anu'));
-  assert.ok(r.body.length && (await t.api(owner, 'GET', `/api/chats/${encodeURIComponent('g1@g.us')}/messages`)).body.some((m) => m.fromBot), 'bot replies are included');
+  assert.ok(r.body.length && (await t.api(owner, 'GET', `/api/chats/${encodeURIComponent('g1@g.us')}/messages`)).body.some((m) => m.fromAgent), 'agent replies are included');
   assert.equal((await t.api(viewer, 'GET', `/api/chats/${encodeURIComponent('g1@g.us')}/messages`)).status, 403);
   assert.ok(t.db.listActivity({ limit: 50 }).some((a) => /Stored messages viewed by admin/.test(a.summary)));
 });

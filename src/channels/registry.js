@@ -104,7 +104,7 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
       const numbers = [];
       for (const n of numbersSetting()) {
         const ch = sessions.get(n.id);
-        numbers.push({ id: n.id, label: n.label, dmBot: n.dmBot || '', ...(ch ? await ch.status() : { status: 'stopped' }) });
+        numbers.push({ id: n.id, label: n.label, dmAgent: n.dmAgent || '', ...(ch ? await ch.status() : { status: 'stopped' }) });
       }
       return { ...(numbers[0] || { status: 'stopped' }), numbers };
     },

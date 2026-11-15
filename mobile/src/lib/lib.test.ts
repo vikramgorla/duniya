@@ -45,13 +45,13 @@ test('formatting helpers', () => {
 
 const status = (o: Partial<Status> = {}): Status => ({
   user: { id: 1, username: 'a', email: '', role: 'owner' }, channel: { id: 'main', label: 'Main', status: 'open' },
-  settings: {}, version: 'v1', uptimeSec: 1, memoryMb: 1, node: 'v22', bots: [{ id: 'b', name: 'B', enabled: true, chats: 1 }], pending: 0, ...o,
+  settings: {}, version: 'v1', uptimeSec: 1, memoryMb: 1, node: 'v22', agents: [{ id: 'b', name: 'B', enabled: true, chats: 1 }], pending: 0, ...o,
 });
 test('status console headline follows the panel rules', () => {
   assert.deepEqual(headline(status()), { text: 'Everything is running', tone: 'ok' });
   assert.equal(headline(status({ settings: { paused: true } })).text, 'All agents are paused');
   assert.equal(headline(status({ channel: { id: 'main', label: 'Main', status: 'close' } })).tone, 'bad');
-  assert.equal(headline(status({ bots: [] })).text, 'No agent is switched on yet');
+  assert.equal(headline(status({ agents: [] })).text, 'No agent is switched on yet');
   assert.equal(headline(status({ pending: 2 })).tone, 'warn');
   assert.equal(numberTone({ status: 'qr' }), 'warn');
 });
@@ -88,16 +88,16 @@ test('client: Bearer header, refresh once on 401 (shared), sign out when the ref
     return tok === 'Bearer a1' ? res(401, { error: 'expired' }) : res(200, { ok: true, url });
   };
   const api = createClient({ getSession: () => session, saveTokens: (t) => { session = { ...session, ...t }; }, onSignedOut: (r) => { signedOut = r; }, fetchFn, now: () => now });
-  const [x, y] = await Promise.all([api.get<{ ok: boolean }>('/api/status'), api.get('/api/bots')]);
+  const [x, y] = await Promise.all([api.get<{ ok: boolean }>('/api/status'), api.get('/api/agents')]);
   assert.equal(x.ok, true);
   assert.ok(y);
   assert.equal(refreshes, 1, 'one refresh for concurrent 401s');
   assert.equal(session.refreshToken, 'r2');
   // proactive refresh when the token is about to expire
   now = session.expiresAt - 10_000;
-  await api.put('/api/bots/x', { enabled: false });
+  await api.put('/api/agents/x', { enabled: false });
   assert.equal(refreshes, 2);
-  assert.ok(calls.at(-1)!.startsWith('PUT https://s/api/bots/x Bearer a3'));
+  assert.ok(calls.at(-1)!.startsWith('PUT https://s/api/agents/x Bearer a3'));
   // refresh refused: signed out
   refuse = true; session = { ...session, accessToken: 'a1', expiresAt: now + 3600_000 };
   await assert.rejects(api.get('/api/status'), (e: ApiError) => e.status === 401);
@@ -107,7 +107,7 @@ test('client: Bearer header, refresh once on 401 (shared), sign out when the ref
 test('client: errors carry the server message; offline is status 0', async () => {
   const session: Session = { server: 'https://s', accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 3600_000 };
   const api = createClient({ getSession: () => session, saveTokens: () => {}, onSignedOut: () => {}, fetchFn: async () => res(403, { error: 'Read-only account' }) });
-  await assert.rejects(api.put('/api/bots/x', {}), (e: ApiError) => e.status === 403 && e.message === 'Read-only account');
+  await assert.rejects(api.put('/api/agents/x', {}), (e: ApiError) => e.status === 403 && e.message === 'Read-only account');
   const off = createClient({ getSession: () => session, saveTokens: () => {}, onSignedOut: () => {}, fetchFn: async () => { throw new Error('x'); } });
   await assert.rejects(off.get('/api/status'), (e: ApiError) => e.status === 0);
   const t = await exchangeCode('https://s', { code: 'c', codeVerifier: 'v', redirectUri: 'duniya://oauth' }, async (_u, init: any) => {

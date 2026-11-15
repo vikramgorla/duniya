@@ -3,7 +3,7 @@ import { Alert, View } from 'react-native';
 import { Body, Button, Card, Empty, H2, Label, Loading, Mono, Note, Row, Screen, Spread } from '@/components/ui';
 import { can, useAuth } from '@/lib/auth';
 import { chatLabel } from '@/lib/format';
-import type { Bot, Chat, Pending as P } from '@/lib/types';
+import type { Agent, Chat, Pending as P } from '@/lib/types';
 import { useData } from '@/lib/useData';
 
 const left = (ts: number) => { const m = Math.max(0, Math.round((ts - Date.now()) / 60000)); return m < 1 ? 'expires now' : `${m} min left`; };
@@ -12,7 +12,7 @@ export default function Pending() {
   const { api, user } = useAuth();
   const admin = can(user, 'admin');
   const list = useData<P[]>('pending', (a) => a.get('/api/pending'), { interval: 10_000 });
-  const bots = useData<Bot[]>('bots', (a) => a.get('/api/bots'));
+  const agents = useData<Agent[]>('agents', (a) => a.get('/api/agents'));
   const chats = useData<Chat[]>('chats', (a) => a.get('/api/chats'));
   const drop = (code: string) => list.setData(list.data?.filter((x) => x.code !== code));
   const approve = (p: P) => Alert.alert('Apply this change?', p.summary, [
@@ -35,7 +35,7 @@ export default function Pending() {
           <Spread><Mono style={{ fontWeight: '700' }}>{p.code}</Mono><Label>{left(p.expires)}</Label></Spread>
           <H2>{p.summary}</H2>
           <View style={{ gap: 2 }}>
-            <Label>{`${bots.data?.find((b) => b.id === p.bot)?.name || p.bot} · ${chatLabel(p.chat, chats.data?.find((c) => c.id === p.chat)?.name)}`}</Label>
+            <Label>{`${agents.data?.find((b) => b.id === p.agent)?.name || p.agent} · ${chatLabel(p.chat, chats.data?.find((c) => c.id === p.chat)?.name)}`}</Label>
             <Body small muted>{`Asked by ${p.requester} · ${p.tool}`}</Body>
           </View>
           {admin ? <Row><Button kind="primary" title="Apply" onPress={() => approve(p)} style={{ flex: 1 }} /><Button kind="danger" title="Cancel" onPress={() => cancel(p)} style={{ flex: 1 }} /></Row> : null}

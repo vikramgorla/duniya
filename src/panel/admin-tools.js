@@ -20,8 +20,8 @@ export function scrub(v) {
 }
 const iso = (ts) => (ts ? new Date(ts).toISOString() : null);
 
-async function botName(x, id) {
-  const b = await x.call('GET', `/api/bots/${enc(id)}`);
+async function agentName(x, id) {
+  const b = await x.call('GET', `/api/agents/${enc(id)}`);
   return `"${b.name}" (${b.id})`;
 }
 async function chatName(x, chat) {
@@ -37,76 +37,76 @@ async function numbers(x) {
 export const TOOLS = [
   // ---------- overview & activity ----------
   { name: 'get_overview', readOnly: true, calls: [['GET', '/api/status']],
-    description: 'Overview of the app: version, uptime, memory, whether bots are paused, WhatsApp connection per number, bots, and how many changes wait for confirmation.',
+    description: 'Overview of the app: version, uptime, memory, whether agents are paused, WhatsApp connection per number, agents, and how many changes wait for confirmation.',
     input: {},
     run: async (a, x) => {
       const s = await x.call('GET', '/api/status');
       return { you: { username: s.user.username, role: s.user.role }, version: s.version, uptimeSec: s.uptimeSec, memoryMb: s.memoryMb, node: s.node,
-        botsPaused: !!s.settings?.paused, whatsapp: (s.channel?.numbers || [s.channel]).map((n) => ({ id: n.id, label: n.label, status: n.status, me: n.me })),
-        bots: s.bots, pendingConfirmations: s.pending };
+        agentsPaused: !!s.settings?.paused, whatsapp: (s.channel?.numbers || [s.channel]).map((n) => ({ id: n.id, label: n.label, status: n.status, me: n.me })),
+        agents: s.agents, pendingConfirmations: s.pending };
     } },
   { name: 'list_activity', readOnly: true, calls: [['GET', '/api/activity']],
-    description: 'Recent activity log entries (newest first): messages, replies, tool calls, confirmations, configuration changes, errors. Filter by bot or chat.',
-    input: { bot_id: str('Only this bot (optional)'), chat: str('Only this chat id (optional)'), limit: int('How many (default 50, max 200)', { minimum: 1, maximum: 200 }),
+    description: 'Recent activity log entries (newest first): messages, replies, tool calls, confirmations, configuration changes, errors. Filter by agent or chat.',
+    input: { agent_id: str('Only this agent (optional)'), chat: str('Only this chat id (optional)'), limit: int('How many (default 50, max 200)', { minimum: 1, maximum: 200 }),
       before_id: int('Only entries older than this id (for paging)'), include_details: bool('Include the detail payload of each entry (bigger)') },
     run: async (a, x) => {
       const q = new URLSearchParams({ limit: String(Math.min(Number(a.limit) || 50, 200)) });
-      if (a.bot_id) q.set('bot', a.bot_id);
+      if (a.agent_id) q.set('agent', a.agent_id);
       if (a.chat) q.set('chat', a.chat);
       if (a.before_id) q.set('before', String(a.before_id));
-      return (await x.call('GET', `/api/activity?${q}`)).map((r) => ({ id: r.id, time: iso(r.ts), type: r.type, bot: r.bot || undefined, chat: r.chat || undefined, summary: r.summary, ...(a.include_details && r.detail ? { detail: r.detail } : {}) }));
+      return (await x.call('GET', `/api/activity?${q}`)).map((r) => ({ id: r.id, time: iso(r.ts), type: r.type, agent: r.agent || undefined, chat: r.chat || undefined, summary: r.summary, ...(a.include_details && r.detail ? { detail: r.detail } : {}) }));
     } },
 
-  // ---------- bots ----------
-  { name: 'list_bots', readOnly: true, calls: [['GET', '/api/bots']], description: 'All bots with their settings (enabled, chats, triggers, model, tool services, schedules).', input: {},
-    run: (a, x) => x.call('GET', '/api/bots') },
-  { name: 'get_bot', readOnly: true, calls: [['GET', '/api/bots/x']], description: 'One bot with its full configuration.', input: { bot_id: str('Bot id') }, required: ['bot_id'],
-    run: (a, x) => x.call('GET', `/api/bots/${enc(a.bot_id)}`) },
-  { name: 'list_templates', readOnly: true, calls: [['GET', '/api/templates']], description: 'Bot templates that create_bot can start from.', input: {},
+  // ---------- agents ----------
+  { name: 'list_agents', readOnly: true, calls: [['GET', '/api/agents']], description: 'All agents with their settings (enabled, chats, triggers, model, tool services, schedules).', input: {},
+    run: (a, x) => x.call('GET', '/api/agents') },
+  { name: 'get_agent', readOnly: true, calls: [['GET', '/api/agents/x']], description: 'One agent with its full configuration.', input: { agent_id: str('Agent id') }, required: ['agent_id'],
+    run: (a, x) => x.call('GET', `/api/agents/${enc(a.agent_id)}`) },
+  { name: 'list_templates', readOnly: true, calls: [['GET', '/api/templates']], description: 'Agent templates that create_agent can start from.', input: {},
     run: (a, x) => x.call('GET', '/api/templates') },
-  { name: 'create_bot', calls: [['POST', '/api/bots']],
-    description: 'Create a bot, from a template (see list_templates) and/or a configuration object (same fields as get_bot returns: name, prompt, model, triggers, chats, organizers, tools, schedules, memory, …).',
-    input: { id: str('New bot id (lowercase letters, digits, -). Optional: derived from the name'), template: str('Template id (optional)'), config: obj('Configuration fields (optional, override the template)') },
-    run: (a, x) => x.call('POST', '/api/bots', { id: a.id, template: a.template, config: a.config || {} }) },
-  { name: 'update_bot', calls: [['PUT', '/api/bots/x']],
-    description: 'Change fields of a bot (only the fields given change), e.g. { "prompt": "…", "triggers": ["!help"], "model": "auto" }. Returns the bot and any warnings.',
-    input: { bot_id: str('Bot id'), changes: obj('Fields to change') }, required: ['bot_id', 'changes'],
-    run: (a, x) => x.call('PUT', `/api/bots/${enc(a.bot_id)}`, a.changes || {}) },
-  { name: 'get_bot_people', readOnly: true, calls: [['GET', '/api/bots/x/people']],
-    description: 'Members of the bot\'s WhatsApp groups (name, number, group admin) with their role for this bot (organizer or participant). To change roles, update_bot with "organizers" (phone numbers).',
-    input: { bot_id: str('Bot id') }, required: ['bot_id'],
-    run: (a, x) => x.call('GET', `/api/bots/${enc(a.bot_id)}/people`) },
-  { name: 'draft_bot_with_ai', calls: [['POST', '/api/ai/bot-draft']],
-    description: 'Ask the app\'s AI helper to draft a new bot (no bot_id) or changes to a bot from a plain-language request. Returns a summary, the changed fields (before/after) and the full proposed config. Nothing is saved: apply with create_bot (config = proposed) or update_bot (changes = the changed fields).',
-    input: { bot_id: str('Bot to change (omit to draft a new bot)'), request: str('What you want, in plain words'), model: str('Model to use: "auto" (default) or provider:model') }, required: ['request'],
-    run: (a, x) => x.call('POST', '/api/ai/bot-draft', { botId: a.bot_id, request: a.request, model: a.model || 'auto' }) },
-  { name: 'set_bot_enabled', calls: [['PUT', '/api/bots/x']], description: 'Turn a bot on or off. A disabled bot does not answer anywhere.',
-    input: { bot_id: str('Bot id'), enabled: bool('true = on, false = off') }, required: ['bot_id', 'enabled'],
-    run: (a, x) => x.call('PUT', `/api/bots/${enc(a.bot_id)}`, { enabled: !!a.enabled }) },
-  { name: 'duplicate_bot', calls: [['POST', '/api/bots/x/duplicate']], description: 'Copy a bot (without its chats). The copy is named "<name> (copy)".',
-    input: { bot_id: str('Bot to copy'), new_id: str('Id for the copy (optional)') }, required: ['bot_id'],
-    run: (a, x) => x.call('POST', `/api/bots/${enc(a.bot_id)}/duplicate`, { id: a.new_id }) },
-  { name: 'export_bot', readOnly: true, calls: [['GET', '/api/bots/x/export']], description: 'Export a bot as a JSON document (names of the secrets it needs, never their values).',
-    input: { bot_id: str('Bot id') }, required: ['bot_id'],
-    run: (a, x) => x.call('GET', `/api/bots/${enc(a.bot_id)}/export`) },
-  { name: 'delete_bot', risky: true, calls: [['DELETE', '/api/bots/x']], description: 'Delete a bot. Needs confirm_action.',
-    input: { bot_id: str('Bot id') }, required: ['bot_id'],
-    preview: async (a, x) => `Delete the bot ${await botName(x, a.bot_id)}. Its chats stop getting replies and its settings are gone (export it first to keep a copy). This cannot be undone.`,
-    run: (a, x) => x.call('DELETE', `/api/bots/${enc(a.bot_id)}`) },
-  { name: 'run_schedule_now', calls: [['POST', '/api/bots/x/schedules/y/run']], description: 'Run one of a bot\'s scheduled posts now (it posts to the chat as it would on schedule).',
-    input: { bot_id: str('Bot id'), schedule_id: str('Schedule id (see get_bot → schedules)') }, required: ['bot_id', 'schedule_id'],
-    run: (a, x) => x.call('POST', `/api/bots/${enc(a.bot_id)}/schedules/${enc(a.schedule_id)}/run`) },
-  { name: 'test_bot', calls: [['POST', '/api/bots/x/test']],
-    description: 'Send a test message to a bot, like the panel\'s test console, and get its reply. Nothing is posted to WhatsApp. "as" picks the sender\'s role (organizer or participant).',
-    input: { bot_id: str('Bot id'), text: str('Message text'), as: { type: 'string', enum: ['organizer', 'participant'], description: 'Sender role (default participant)' } }, required: ['bot_id', 'text'],
-    run: (a, x) => x.call('POST', `/api/bots/${enc(a.bot_id)}/test`, { text: a.text, role: ROLE_TEXT[a.as] || 'participant' }) },
+  { name: 'create_agent', calls: [['POST', '/api/agents']],
+    description: 'Create an agent, from a template (see list_templates) and/or a configuration object (same fields as get_agent returns: name, prompt, model, triggers, chats, organizers, tools, schedules, memory, …).',
+    input: { id: str('New agent id (lowercase letters, digits, -). Optional: derived from the name'), template: str('Template id (optional)'), config: obj('Configuration fields (optional, override the template)') },
+    run: (a, x) => x.call('POST', '/api/agents', { id: a.id, template: a.template, config: a.config || {} }) },
+  { name: 'update_agent', calls: [['PUT', '/api/agents/x']],
+    description: 'Change fields of an agent (only the fields given change), e.g. { "prompt": "…", "triggers": ["!help"], "model": "auto" }. Returns the agent and any warnings.',
+    input: { agent_id: str('Agent id'), changes: obj('Fields to change') }, required: ['agent_id', 'changes'],
+    run: (a, x) => x.call('PUT', `/api/agents/${enc(a.agent_id)}`, a.changes || {}) },
+  { name: 'get_agent_people', readOnly: true, calls: [['GET', '/api/agents/x/people']],
+    description: 'Members of the agent\'s WhatsApp groups (name, number, group admin) with their role for this agent (organizer or participant). To change roles, update_agent with "organizers" (phone numbers).',
+    input: { agent_id: str('Agent id') }, required: ['agent_id'],
+    run: (a, x) => x.call('GET', `/api/agents/${enc(a.agent_id)}/people`) },
+  { name: 'draft_agent_with_ai', calls: [['POST', '/api/ai/agent-draft']],
+    description: 'Ask the app\'s AI helper to draft a new agent (no agent_id) or changes to an agent from a plain-language request. Returns a summary, the changed fields (before/after) and the full proposed config. Nothing is saved: apply with create_agent (config = proposed) or update_agent (changes = the changed fields).',
+    input: { agent_id: str('Agent to change (omit to draft a new agent)'), request: str('What you want, in plain words'), model: str('Model to use: "auto" (default) or provider:model') }, required: ['request'],
+    run: (a, x) => x.call('POST', '/api/ai/agent-draft', { agentId: a.agent_id, request: a.request, model: a.model || 'auto' }) },
+  { name: 'set_agent_enabled', calls: [['PUT', '/api/agents/x']], description: 'Turn an agent on or off. A disabled agent does not answer anywhere.',
+    input: { agent_id: str('Agent id'), enabled: bool('true = on, false = off') }, required: ['agent_id', 'enabled'],
+    run: (a, x) => x.call('PUT', `/api/agents/${enc(a.agent_id)}`, { enabled: !!a.enabled }) },
+  { name: 'duplicate_agent', calls: [['POST', '/api/agents/x/duplicate']], description: 'Copy an agent (without its chats). The copy is named "<name> (copy)".',
+    input: { agent_id: str('Agent to copy'), new_id: str('Id for the copy (optional)') }, required: ['agent_id'],
+    run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/duplicate`, { id: a.new_id }) },
+  { name: 'export_agent', readOnly: true, calls: [['GET', '/api/agents/x/export']], description: 'Export an agent as a JSON document (names of the secrets it needs, never their values).',
+    input: { agent_id: str('Agent id') }, required: ['agent_id'],
+    run: (a, x) => x.call('GET', `/api/agents/${enc(a.agent_id)}/export`) },
+  { name: 'delete_agent', risky: true, calls: [['DELETE', '/api/agents/x']], description: 'Delete an agent. Needs confirm_action.',
+    input: { agent_id: str('Agent id') }, required: ['agent_id'],
+    preview: async (a, x) => `Delete the agent ${await agentName(x, a.agent_id)}. Its chats stop getting replies and its settings are gone (export it first to keep a copy). This cannot be undone.`,
+    run: (a, x) => x.call('DELETE', `/api/agents/${enc(a.agent_id)}`) },
+  { name: 'run_schedule_now', calls: [['POST', '/api/agents/x/schedules/y/run']], description: 'Run one of an agent\'s scheduled posts now (it posts to the chat as it would on schedule).',
+    input: { agent_id: str('Agent id'), schedule_id: str('Schedule id (see get_agent → schedules)') }, required: ['agent_id', 'schedule_id'],
+    run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/schedules/${enc(a.schedule_id)}/run`) },
+  { name: 'test_agent', calls: [['POST', '/api/agents/x/test']],
+    description: 'Send a test message to an agent, like the panel\'s test console, and get its reply. Nothing is posted to WhatsApp. "as" picks the sender\'s role (organizer or participant).',
+    input: { agent_id: str('Agent id'), text: str('Message text'), as: { type: 'string', enum: ['organizer', 'participant'], description: 'Sender role (default participant)' } }, required: ['agent_id', 'text'],
+    run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/test`, { text: a.text, role: ROLE_TEXT[a.as] || 'participant' }) },
 
   // ---------- chats & memory ----------
-  { name: 'list_chats', readOnly: true, calls: [['GET', '/api/chats']], description: 'WhatsApp groups and 1:1 chats the numbers know, with their bot, model and logging settings.', input: {},
+  { name: 'list_chats', readOnly: true, calls: [['GET', '/api/chats']], description: 'WhatsApp groups and 1:1 chats the numbers know, with their agent, model and logging settings.', input: {},
     run: (a, x) => x.call('GET', '/api/chats') },
-  { name: 'assign_chat', calls: [['POST', '/api/chats/bind']], description: 'Choose which bot answers in a chat. Empty bot_id removes the bot from the chat.',
-    input: { chat: str('Chat id (see list_chats)'), bot_id: str('Bot id, or empty to unassign') }, required: ['chat'],
-    run: (a, x) => x.call('POST', '/api/chats/bind', { chat: a.chat, bot: a.bot_id || null }) },
+  { name: 'assign_chat', calls: [['POST', '/api/chats/bind']], description: 'Choose which agent answers in a chat. Empty agent_id removes the agent from the chat.',
+    input: { chat: str('Chat id (see list_chats)'), agent_id: str('Agent id, or empty to unassign') }, required: ['chat'],
+    run: (a, x) => x.call('POST', '/api/chats/bind', { chat: a.chat, agent: a.agent_id || null }) },
   { name: 'set_chat_settings', calls: [['PUT', '/api/chats/x/prefs']],
     description: 'Per-chat model and activity logging. model: inherit | auto | provider:auto | provider:model. logging: inherit | off | minimal | normal | verbose.',
     input: { chat: str('Chat id'), model: str('Model (optional)'), logging: { type: 'string', enum: ['inherit', 'off', 'minimal', 'normal', 'verbose'], description: 'Logging level (optional)' } }, required: ['chat'],
@@ -116,9 +116,9 @@ export const TOOLS = [
     input: { chat: str('Chat id'), search: str('Only messages containing this text (optional)'), limit: int('How many (default 30, max 200)', { minimum: 1, maximum: 200 }), before_id: int('Only older than this message id') }, required: ['chat'],
     run: (a, x) => x.call('GET', `/api/chats/${enc(a.chat)}/messages?limit=${Math.min(Number(a.limit) || 30, 200)}${a.before_id ? `&before=${a.before_id}` : ''}${a.search ? `&q=${enc(a.search)}` : ''}`) },
   { name: 'get_usage', readOnly: true, calls: [['GET', '/api/usage']],
-    description: 'Tokens and estimated cost of model calls, grouped by bot, chat, provider, model, kind (reply, summary, scheduled, ai-helper, test) or day. period: 1d, 7d, 30d (default), 90d, all. Costs only where a price is set or published; ChatGPT plan / Copilot calls are "included".',
-    input: { group_by: str('bot | chat | provider | model | kind | day'), period: str('1d | 7d | 30d | 90d | all'), bot_id: str('Only this bot (optional)'), chat: str('Only this chat (optional)') },
-    run: (a, x) => x.call('GET', `/api/usage?groupBy=${enc(a.group_by || 'bot')}&period=${enc(a.period || '30d')}${a.bot_id ? `&bot=${enc(a.bot_id)}` : ''}${a.chat ? `&chat=${enc(a.chat)}` : ''}`) },
+    description: 'Tokens and estimated cost of model calls, grouped by agent, chat, provider, model, kind (reply, summary, scheduled, ai-helper, test) or day. period: 1d, 7d, 30d (default), 90d, all. Costs only where a price is set or published; ChatGPT plan / Copilot calls are "included".',
+    input: { group_by: str('agent | chat | provider | model | kind | day'), period: str('1d | 7d | 30d | 90d | all'), agent_id: str('Only this agent (optional)'), chat: str('Only this chat (optional)') },
+    run: (a, x) => x.call('GET', `/api/usage?groupBy=${enc(a.group_by || 'agent')}&period=${enc(a.period || '30d')}${a.agent_id ? `&agent=${enc(a.agent_id)}` : ''}${a.chat ? `&chat=${enc(a.chat)}` : ''}`) },
   { name: 'set_model_price', calls: [['PUT', '/api/usage/prices']],
     description: 'Set the price of a model in USD per million tokens (input and output) so usage shows costs. Empty values remove the price.',
     input: { model: str('provider:model'), input_per_million: { type: 'number' }, output_per_million: { type: 'number' } }, required: ['model'],
@@ -132,18 +132,18 @@ export const TOOLS = [
   { name: 'remove_contact', calls: [['DELETE', '/api/contacts/x']], description: 'Remove an own contact (a WhatsApp-synced name stays, unshared).',
     input: { phone: str('Phone with country code') }, required: ['phone'],
     run: (a, x) => x.call('DELETE', `/api/contacts/${enc(a.phone)}`) },
-  { name: 'get_agent_memory', readOnly: true, calls: [['GET', '/api/bots/x/memory']], description: 'Notes a bot shares across all its chats (shared memory). Delete one with delete_note.',
-    input: { bot_id: str('Bot id') }, required: ['bot_id'],
-    run: (a, x) => x.call('GET', `/api/bots/${enc(a.bot_id)}/memory`) },
-  { name: 'get_chat_memory', readOnly: true, calls: [['GET', '/api/chats/x/memory']], description: 'What a bot remembers about a chat: running summary, notes and message counts.',
+  { name: 'get_agent_memory', readOnly: true, calls: [['GET', '/api/agents/x/memory']], description: 'Notes an agent shares across all its chats (shared memory). Delete one with delete_note.',
+    input: { agent_id: str('Agent id') }, required: ['agent_id'],
+    run: (a, x) => x.call('GET', `/api/agents/${enc(a.agent_id)}/memory`) },
+  { name: 'get_chat_memory', readOnly: true, calls: [['GET', '/api/chats/x/memory']], description: 'What an agent remembers about a chat: running summary, notes and message counts.',
     input: { chat: str('Chat id') }, required: ['chat'],
     run: (a, x) => x.call('GET', `/api/chats/${enc(a.chat)}/memory`) },
   { name: 'rebuild_chat_summary', calls: [['POST', '/api/chats/x/memory/summarize']], description: 'Rebuild the running summary of a chat now.',
     input: { chat: str('Chat id') }, required: ['chat'],
     run: (a, x) => x.call('POST', `/api/chats/${enc(a.chat)}/memory/summarize`) },
-  { name: 'erase_chat_memory', risky: true, calls: [['DELETE', '/api/chats/x/memory']], description: 'Erase everything the bots remember about a chat (history, summary, notes). Needs confirm_action.',
+  { name: 'erase_chat_memory', risky: true, calls: [['DELETE', '/api/chats/x/memory']], description: 'Erase everything the agents remember about a chat (history, summary, notes). Needs confirm_action.',
     input: { chat: str('Chat id') }, required: ['chat'],
-    preview: async (a, x) => `Erase the memory of chat ${await chatName(x, a.chat)}: stored messages, summary and notes. The bot forgets the conversation. This cannot be undone.`,
+    preview: async (a, x) => `Erase the memory of chat ${await chatName(x, a.chat)}: stored messages, summary and notes. The agent forgets the conversation. This cannot be undone.`,
     run: (a, x) => x.call('DELETE', `/api/chats/${enc(a.chat)}/memory`) },
 
   // ---------- WhatsApp groups (026) ----------
@@ -152,7 +152,7 @@ export const TOOLS = [
     input: { chat: str('Group chat id (see list_chats)') }, required: ['chat'],
     run: (a, x) => x.call('GET', `/api/chats/${enc(a.chat)}/whatsapp`) },
   { name: 'get_group_invite_link', readOnly: true, calls: [['GET', '/api/chats/x/whatsapp/invite']],
-    description: 'The invite link of a WhatsApp group (the bot\'s number must be a group admin). Each look is recorded.',
+    description: 'The invite link of a WhatsApp group (the agent\'s number must be a group admin). Each look is recorded.',
     input: { chat: str('Group chat id') }, required: ['chat'],
     run: (a, x) => x.call('GET', `/api/chats/${enc(a.chat)}/whatsapp/invite`) },
   { name: 'reset_group_invite_link', risky: true, calls: [['POST', '/api/chats/x/whatsapp/invite/revoke']],
@@ -161,7 +161,7 @@ export const TOOLS = [
     preview: async (a, x) => `Reset the invite link of ${await chatName(x, a.chat)}. Anyone holding the old link can no longer join with it; share the new link instead.`,
     run: (a, x) => x.call('POST', `/api/chats/${enc(a.chat)}/whatsapp/invite/revoke`) },
   { name: 'update_group', calls: [['PUT', '/api/chats/x/whatsapp']],
-    description: 'Change a WhatsApp group: name, description, only_admins_send, only_admins_edit_info, join_approval. Give only what changes. The bot\'s number must be a group admin.',
+    description: 'Change a WhatsApp group: name, description, only_admins_send, only_admins_edit_info, join_approval. Give only what changes. The agent\'s number must be a group admin.',
     input: { chat: str('Group chat id'), name: str('New group name (optional)'), description: str('New description (optional, empty clears)'),
       only_admins_send: bool('Only admins can send messages (optional)'), only_admins_edit_info: bool('Only admins can edit name/picture/description (optional)'),
       join_approval: bool('Admins approve new members (optional)') }, required: ['chat'],
@@ -175,7 +175,7 @@ export const TOOLS = [
     description: 'Send a tiny test prompt through a connected provider (anthropic, openai, chatgpt, copilot, openrouter or another endpoint id) and return the reply and response time.',
     input: { provider: str('Provider id') }, required: ['provider'],
     run: (a, x) => x.call('POST', `/api/providers/${enc(a.provider)}/test`, {}) },
-  { name: 'set_default_models', calls: [['POST', '/api/models/defaults']], description: 'Set the default model for bots and/or the background model (summaries). Values: "auto" or provider:model.',
+  { name: 'set_default_models', calls: [['POST', '/api/models/defaults']], description: 'Set the default model for agents and/or the background model (summaries). Values: "auto" or provider:model.',
     input: { default_model: str('Default model (optional)'), background_model: str('Background model (optional)') },
     run: (a, x) => {
       const b = {};
@@ -183,6 +183,31 @@ export const TOOLS = [
       if (a.background_model !== undefined) b.backgroundModel = a.background_model;
       return x.call('POST', '/api/models/defaults', b);
     } },
+
+  // ---------- global tool services (035) ----------
+  { name: 'list_global_tool_services', readOnly: true, calls: [['GET', '/api/tool-services']],
+    description: 'Tool services (MCP servers) defined once for all agents: their settings (secret names, never values), default tools per role, and which agents use them, switched them off (opted out) or replace them with their own service of the same name.',
+    input: {},
+    run: (a, x) => x.call('GET', '/api/tool-services') },
+  { name: 'add_global_tool_service', risky: true, calls: [['PUT', '/api/tool-services/x']],
+    description: 'Add (or replace) a tool service available to every agent. config: remote { url, auth: "none" | "token" | "oauth", tokens: { organizer, participant } as ${SECRET} references, headers } or local { type: "local", package, args, env, allowScripts } (local: owner only). defaults: tool-name globs per role used where an agent has no explicit "<name>:" rules, e.g. { "organizer": ["*"], "participant": ["agenda_*"] } (default: organizers all, participants none). OAuth services still need Connect in the panel (Settings → Tool services). An agent opts out with update_agent { "globalMcp": { "disabled": ["<name>"] } }. Needs confirm_action.',
+    input: { name: str('Service name (lowercase letters, digits, _)'), config: obj('Service settings, optionally with "defaults"') }, required: ['name', 'config'],
+    preview: async (a, x) => {
+      const cur = (await x.call('GET', '/api/tool-services')).find((g) => g.name === a.name);
+      const c = a.config || {};
+      const what = c.type === 'local' ? `the local package ${c.package} (runs on this server)` : `${c.url || '(no url)'} (${c.auth || (c.tokens ? 'token' : 'no credentials')})`;
+      const n = (await x.call('GET', '/api/agents')).filter((g) => !(g.config.globalMcp?.disabled || []).includes(a.name) && !g.config.mcpServers?.[a.name]).length;
+      return `${cur ? 'Replace' : 'Add'} the global tool service ${a.name}: ${what}. It becomes available to ${n} agent${n === 1 ? '' : 's'}, with their role rules (or its defaults) deciding which tools each role gets.`;
+    },
+    run: (a, x) => x.call('PUT', `/api/tool-services/${enc(a.name)}`, a.config || {}) },
+  { name: 'remove_global_tool_service', risky: true, calls: [['DELETE', '/api/tool-services/x']], description: 'Remove a global tool service from all agents (and its sign-ins). Needs confirm_action.',
+    input: { name: str('Service name') }, required: ['name'],
+    preview: async (a, x) => {
+      const cur = (await x.call('GET', '/api/tool-services')).find((g) => g.name === a.name);
+      if (!cur) throw Object.assign(new Error(`No global tool service named ${a.name}`), { status: 404 });
+      return `Remove the global tool service ${a.name}. ${cur.agents.using.length} agent${cur.agents.using.length === 1 ? '' : 's'} (${cur.agents.using.join(', ') || 'none'}) lose its tools right away; its sign-ins are deleted.`;
+    },
+    run: (a, x) => x.call('DELETE', `/api/tool-services/${enc(a.name)}`) },
 
   // ---------- secrets ----------
   { name: 'list_secrets', readOnly: true, calls: [['GET', '/api/secrets']], description: 'Names of stored secrets (API keys, tokens) and whether each is set. Values are never shown.', input: {},
@@ -193,7 +218,7 @@ export const TOOLS = [
     preview: async (a, x) => {
       if (!a.value) throw Object.assign(new Error('value is empty; use remove_secret to remove a secret'), { status: 400 });
       const cur = (await x.call('GET', '/api/secrets')).find((s) => s.name === a.name);
-      return `${cur?.set ? 'Replace' : 'Set'} the secret ${a.name}${cur?.usedByBots ? ' (used by a bot)' : ''}. Bots using it pick up the new value right away.`;
+      return `${cur?.set ? 'Replace' : 'Set'} the secret ${a.name}${cur?.usedByAgents ? ' (used by an agent)' : ''}. Agents using it pick up the new value right away.`;
     },
     run: (a, x) => x.call('PUT', '/api/secrets', { name: a.name, value: a.value }) },
   { name: 'remove_secret', risky: true, calls: [['PUT', '/api/secrets']], description: 'Remove a stored secret. Needs confirm_action.',
@@ -201,20 +226,20 @@ export const TOOLS = [
     preview: async (a, x) => {
       const cur = (await x.call('GET', '/api/secrets')).find((s) => s.name === a.name);
       if (!cur) throw Object.assign(new Error(`No secret named ${a.name}`), { status: 404 });
-      return `Remove the secret ${a.name}.${cur.usedByBots ? ' A bot uses it: that bot\'s tool service or model stops working until it is set again.' : ''}`;
+      return `Remove the secret ${a.name}.${cur.usedByAgents ? ' An agent uses it: that agent\'s tool service or model stops working until it is set again.' : ''}`;
     },
     run: (a, x) => x.call('PUT', '/api/secrets', { name: a.name, value: '' }) },
 
   // ---------- pending confirmations ----------
-  { name: 'list_pending_confirmations', readOnly: true, calls: [['GET', '/api/pending']], description: 'Changes that bots prepared and that wait for a human to confirm in WhatsApp or the panel.', input: {},
+  { name: 'list_pending_confirmations', readOnly: true, calls: [['GET', '/api/pending']], description: 'Changes that agents prepared and that wait for a human to confirm in WhatsApp or the panel.', input: {},
     run: async (a, x) => (await x.call('GET', '/api/pending')).map((p) => ({ ...p, expires: iso(p.expires) })) },
   { name: 'cancel_pending_confirmation', calls: [['DELETE', '/api/pending/x']], description: 'Cancel a waiting change so it can no longer be confirmed.',
     input: { code: str('Its code (see list_pending_confirmations)') }, required: ['code'],
     run: (a, x) => x.call('DELETE', `/api/pending/${enc(a.code)}`) },
 
   // ---------- settings ----------
-  { name: 'set_bots_paused', calls: [['POST', '/api/settings']], description: 'Pause (true) or resume (false) all bots at once.',
-    input: { paused: bool('true = pause all bots') }, required: ['paused'],
+  { name: 'set_agents_paused', calls: [['POST', '/api/settings']], description: 'Pause (true) or resume (false) all agents at once.',
+    input: { paused: bool('true = pause all agents') }, required: ['paused'],
     run: async (a, x) => ({ paused: !!(await x.call('POST', '/api/settings', { paused: !!a.paused })).paused }) },
   { name: 'get_logging_settings', readOnly: true, calls: [['GET', '/api/logging']], description: 'What the activity log records: level, categories, retention.', input: {},
     run: (a, x) => x.call('GET', '/api/logging') },
@@ -233,7 +258,7 @@ export const TOOLS = [
     preview: async (a, x) => {
       const st = await x.call('POST', '/api/updates/check');
       if (!st.available) throw Object.assign(new Error(`Already up to date (${st.current || 'current version'})`), { status: 400 });
-      return `Update from ${st.current} to ${st.target || st.latest}. The app restarts: bots are offline for 1–2 minutes.`;
+      return `Update from ${st.current} to ${st.target || st.latest}. The app restarts: agents are offline for 1–2 minutes.`;
     },
     run: (a, x) => x.call('POST', '/api/updates/apply') },
 
@@ -252,13 +277,13 @@ export const TOOLS = [
       const ops = await x.call('GET', '/api/system/ops');
       const label = ops.actions?.[a.action];
       if (!label) throw Object.assign(new Error('Unknown action'), { status: 400 });
-      const effect = { reboot: 'The whole server restarts: bots and the panel are offline for a few minutes.', 'os-update': 'Takes a few minutes; services may restart.',
+      const effect = { reboot: 'The whole server restarts: agents and the panel are offline for a few minutes.', 'os-update': 'Takes a few minutes; services may restart.',
         'restart-web': 'The panel and AI-assistant access are unreachable for a few seconds.', 'restart-tunnel': 'The panel and AI-assistant access are unreachable for a few seconds.' }[a.action] || '';
       return `${label}. ${effect}`.trim();
     },
     run: (a, x) => x.call('POST', '/api/system/ops', { action: a.action }) },
   { name: 'restart_app', risky: true, calls: [['POST', '/api/system/restart']], description: 'Restart the app. Needs confirm_action.', input: {},
-    preview: async () => 'Restart the app. Bots are offline for about a minute and this connection drops briefly.',
+    preview: async () => 'Restart the app. Agents are offline for about a minute and this connection drops briefly.',
     run: (a, x) => x.call('POST', '/api/system/restart') },
 
   // ---------- backups ----------
@@ -273,7 +298,7 @@ export const TOOLS = [
     description: 'Restore a backup (replaces all current data) and restart. Needs the backup passphrase and confirm_action.',
     input: { source: { type: 'string', enum: ['local', 'github', 's3'], description: 'Where the backup is' }, file: str('Backup file name (see list_backups)'), passphrase: str('Backup passphrase') },
     required: ['source', 'file', 'passphrase'],
-    preview: async (a) => `Restore backup ${a.file} from ${a.source}. Everything now on the server (bots, chats, memory, settings, users) is replaced by the backup, then the app restarts (bots offline 1–2 minutes).`,
+    preview: async (a) => `Restore backup ${a.file} from ${a.source}. Everything now on the server (agents, chats, memory, settings, users) is replaced by the backup, then the app restarts (agents offline 1–2 minutes).`,
     run: (a, x) => x.call('POST', '/api/backups/restore', { source: a.source, file: a.file, passphrase: a.passphrase }) },
 
   // ---------- users ----------
@@ -298,7 +323,7 @@ export const TOOLS = [
 
   // ---------- WhatsApp numbers ----------
   { name: 'list_whatsapp_numbers', readOnly: true, calls: [['GET', '/api/status']], description: 'WhatsApp numbers and their connection state. Linking a number (QR code / pairing) is done in the panel.', input: {},
-    run: async (a, x) => (await numbers(x)).map((n) => ({ id: n.id, label: n.label, status: n.status, me: n.me, dmBot: n.dmBot || '' })) },
+    run: async (a, x) => (await numbers(x)).map((n) => ({ id: n.id, label: n.label, status: n.status, me: n.me, dmAgent: n.dmAgent || '' })) },
   { name: 'add_whatsapp_number', calls: [['POST', '/api/whatsapp/numbers']],
     description: 'Add another WhatsApp number. Afterwards, open the panel (Overview) on a computer to link it with the phone (QR code).',
     input: { label: str('Name shown in the panel, e.g. "Carpool phone"'), id: str('Short id (optional, lowercase letters, digits, -)') }, required: ['label'],

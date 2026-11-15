@@ -27,8 +27,6 @@ mkdirSync(DATA_DIR, { recursive: true });
 // The command line tool (029) never applies it: the running service would still hold the old database.
 if (process.env.DUNIYA_CLI !== '1') applyPendingRestore(DATA_DIR);
 
-export const BOTS_DIR = resolve(ROOT, process.env.BOTS_DIR || 'bots');
-
 export const env = {
   panelHost: process.env.PANEL_HOST || '127.0.0.1',
   panelPort: Number(process.env.PANEL_PORT || 8080),

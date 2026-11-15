@@ -4,18 +4,18 @@ export type Role = 'viewer' | 'admin' | 'owner';
 export interface User { id: number; username: string; email: string; role: Role }
 
 export interface WaNumber {
-  id: string; label: string; status: string; me?: string | null; since?: number; lastError?: string | null; dmBot?: string;
+  id: string; label: string; status: string; me?: string | null; since?: number; lastError?: string | null; dmAgent?: string;
 }
 export interface Status {
   user: User;
   channel: WaNumber & { numbers?: WaNumber[] };
-  settings: { paused?: boolean; defaultDmBot?: string };
+  settings: { paused?: boolean; defaultDmAgent?: string };
   version: string; uptimeSec: number; memoryMb: number; node: string;
-  bots: { id: string; name: string; enabled: boolean; chats: number }[];
+  agents: { id: string; name: string; enabled: boolean; chats: number }[];
   pending: number;
 }
 
-export interface BotConfig {
+export interface AgentConfig {
   name: string; description?: string; prompt?: string; model?: string; enabled?: boolean;
   triggers?: string[]; dm?: string; respondToMentions?: boolean;
   mcpServers?: Record<string, { type?: string; url?: string; auth?: string; package?: string }>;
@@ -23,25 +23,28 @@ export interface BotConfig {
   organizers?: string[]; participants?: string[]; chats?: string[];
   schedules?: { id: string; at: string; days?: string; enabled?: boolean; prompt?: string }[];
   memory?: { enabled?: boolean };
+  globalMcp?: { disabled?: string[] };
   plugins?: string[];
 }
-export interface Bot {
-  id: string; name: string; description?: string; enabled: boolean; config: BotConfig; needs: string[];
-  updatedAt?: number; localTools: string[]; missingPlugins: string[];
+/** A tool service defined once for all agents (Settings → Tool services in the web panel). */
+export interface GlobalTool { name: string; type: string; on: boolean; replaced: boolean; defaults?: { organizer?: string[]; participant?: string[] } }
+export interface Agent {
+  id: string; name: string; description?: string; enabled: boolean; config: AgentConfig; needs: string[];
+  updatedAt?: number; localTools: string[]; missingPlugins: string[]; globalTools?: GlobalTool[];
 }
 
 export interface Chat {
   id: string; name: string; size?: number; isGroup: boolean; number: string; numberLabel: string;
-  bot: string; model: string; logging: string; phone?: string; lastAt?: number;
+  agent: string; model: string; logging: string; phone?: string; lastAt?: number;
 }
-export interface StoredMessage { id: number; ts: number; sender?: string; name?: string; text: string; quoted?: string; fromBot: boolean; addressed?: boolean }
+export interface StoredMessage { id: number; ts: number; sender?: string; name?: string; text: string; quoted?: string; fromAgent: boolean; addressed?: boolean }
 
-export interface Activity { id: number; ts: number; type: string; bot: string | null; chat: string | null; summary: string }
+export interface Activity { id: number; ts: number; type: string; agent: string | null; chat: string | null; summary: string }
 
 export interface UsageRow { key: string; calls: number; input: number; output: number; cost: number | null; unpriced: number; plan: number }
 export interface UsageReport { from: number; to: number; groupBy: string; total: UsageRow; rows: UsageRow[] }
 
-export interface Pending { code: string; bot: string; tool: string; chat: string; requester: string; summary: string; expires: number }
+export interface Pending { code: string; agent: string; tool: string; chat: string; requester: string; summary: string; expires: number }
 
 export interface SystemSnapshot {
   host: string; os: string; uptimeSec: number; cpus: number; load: number[]; cpu: number | null;
@@ -59,7 +62,7 @@ export interface UpdateInfo {
 
 export interface ModelList { models: { ref: string; provider: string; label: string }[]; defaultModel: string; resolvedDefault?: string; problem?: string }
 
-export interface BotDraft {
+export interface AgentDraft {
   summary: string; questions: string[]; changes: { field: string; before: unknown; after: unknown }[];
-  proposed: BotConfig; warnings?: string[]; model: string;
+  proposed: AgentConfig; warnings?: string[]; model: string;
 }

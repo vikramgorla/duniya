@@ -83,7 +83,7 @@ export function providerRoutes(route) {
   route('GET', '/api/models', async (req, res, body, q) => {
     const s = getSettings();
     const out = { models: await allModels({ refresh: q.get('refresh') === '1' }), defaultModel: s.defaultModel || 'auto', backgroundModel: s.backgroundModel || 'auto' };
-    try { out.resolvedDefault = resolveModel('auto', 'bot').ref; } catch (e) { out.problem = e.message; }
+    try { out.resolvedDefault = resolveModel('auto', 'agent').ref; } catch (e) { out.problem = e.message; }
     try { out.resolvedBackground = resolveModel('auto', 'background').ref; } catch { /* same problem */ }
     return out;
   });

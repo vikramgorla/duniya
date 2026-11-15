@@ -1,8 +1,8 @@
 import { isChatEnabled } from './chat-prefs.js';
 import { env } from './config.js';
 import { getSettings } from './store.js';
-import { listBots } from './bots.js';
-import { runAgent } from './agent.js';
+import { listAgents } from './agents.js';
+import { runAgent } from './runner.js';
 import { kvGet, kvSet, logMessage } from './db.js';
 import { activity } from './events.js';
 
@@ -20,30 +20,30 @@ function nowParts(tz) {
 const dayMatches = (days, day) => !days || days === 'daily' || days.split(',').map((d) => d.trim().toLowerCase()).includes(day);
 
 /** Run one schedule now. Returns [{chat, reply}] */
-export async function runSchedule(bot, sched, channel, { force = false } = {}) {
-  const chats = sched.chats === 'all' ? bot.chats : sched.chats;
+export async function runSchedule(agent, sched, channel, { force = false } = {}) {
+  const chats = sched.chats === 'all' ? agent.chats : sched.chats;
   const results = [];
-  const { date } = nowParts(bot.timezone || env.timezone);
+  const { date } = nowParts(agent.timezone || env.timezone);
   for (const chat of chats) {
     if (!isChatEnabled(chat)) continue; // #10: never post into chats that are off
-    const key = `sched:${bot.id}:${sched.id}:${chat}:${date}`;
+    const key = `sched:${agent.id}:${sched.id}:${chat}:${date}`;
     if (!force && kvGet(key)) continue;
     kvSet(key, '1');
     try {
       const reply = await runAgent({
-        bot, role: 'participant', chat, senderName: 'scheduler', requester: 'scheduler',
+        agent, role: 'participant', chat, senderName: 'scheduler', requester: 'scheduler',
         text: `${sched.prompt}\n(If there is nothing worth posting, reply with exactly: SKIP)`,
         isGroup: chat.endsWith('@g.us'), source: 'schedule',
       });
       const skip = !reply || reply.trim() === 'SKIP';
       if (!skip) {
         const sent = await channel.send(chat, reply);
-        logMessage({ chat, bot: bot.id, msgId: sent?.msgId || null, sender: 'bot', name: 'Assistant', text: reply, fromBot: true });
+        logMessage({ chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text: reply, fromAgent: true });
       }
-      activity('schedule.run', { bot: bot.id, chat, summary: `${sched.id}: ${skip ? 'skipped' : 'posted'}`, detail: { reply } });
+      activity('schedule.run', { agent: agent.id, chat, summary: `${sched.id}: ${skip ? 'skipped' : 'posted'}`, detail: { reply } });
       results.push({ chat, reply: skip ? null : reply });
     } catch (e) {
-      activity('error', { bot: bot.id, chat, summary: `Schedule ${sched.id} failed: ${e.message}` });
+      activity('error', { agent: agent.id, chat, summary: `Schedule ${sched.id} failed: ${e.message}` });
     }
   }
   return results;
@@ -52,12 +52,12 @@ export async function runSchedule(bot, sched, channel, { force = false } = {}) {
 export function startScheduler(channel) {
   setInterval(async () => {
     if (getSettings().paused) return;
-    for (const bot of listBots()) {
-      if (!bot.enabled) continue;
-      const { hhmm, day } = nowParts(bot.timezone || env.timezone);
-      for (const s of bot.schedules || []) {
+    for (const agent of listAgents()) {
+      if (!agent.enabled) continue;
+      const { hhmm, day } = nowParts(agent.timezone || env.timezone);
+      for (const s of agent.schedules || []) {
         if (s.enabled === false || s.at !== hhmm || !dayMatches(s.days, day)) continue;
-        await runSchedule(bot, s, channel);
+        await runSchedule(agent, s, channel);
       }
     }
   }, 30 * 1000).unref();

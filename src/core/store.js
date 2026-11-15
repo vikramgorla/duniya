@@ -1,4 +1,4 @@
-// Persistent app data (005): tenants, users, sessions, bots, secrets (encrypted), settings.
+// Persistent app data (005): tenants, users, sessions, agents, secrets (encrypted), settings.
 import { db } from './db.js';
 import { encrypt, decrypt, hashPassword, verifyPassword, sha256, newToken } from './crypto.js';
 
@@ -8,12 +8,12 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, name TEXT, created_at INTEGER);
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL, username TEXT NOT NULL, email TEXT, role TEXT NOT NULL,
-    pw_salt TEXT, pw_hash TEXT, disabled INTEGER DEFAULT 0, created_at INTEGER, UNIQUE(tenant_id, username)
+    pw_salt TEXT, pw_hash TEXT, disabled INTEGER DEFAULT 0, created_at INTEGER, google_sub TEXT, UNIQUE(tenant_id, username)
   );
   CREATE TABLE IF NOT EXISTS sessions (
     token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, expires_at INTEGER, created_at INTEGER, ip TEXT
   );
-  CREATE TABLE IF NOT EXISTS bots (
+  CREATE TABLE IF NOT EXISTS agents (
     id TEXT NOT NULL, tenant_id TEXT NOT NULL, name TEXT, enabled INTEGER, config TEXT NOT NULL,
     created_at INTEGER, updated_at INTEGER, created_by TEXT, PRIMARY KEY (tenant_id, id)
   );
@@ -25,7 +25,6 @@ db.exec(`
   );
 `);
 // 019: Google sign-in. google_sub is Google's stable account id; invites let an email sign in with Google once.
-if (!db.prepare("SELECT 1 FROM pragma_table_info('users') WHERE name = 'google_sub'").get()) db.exec('ALTER TABLE users ADD COLUMN google_sub TEXT');
 db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users (tenant_id, google_sub) WHERE google_sub IS NOT NULL;
   CREATE TABLE IF NOT EXISTS invites (
@@ -77,7 +76,7 @@ export function interpolate(value) {
 }
 
 // ---------- settings ----------
-const SETTINGS_DEFAULTS = { paused: false, defaultDmBot: '' };
+const SETTINGS_DEFAULTS = { paused: false, defaultDmAgent: '' };
 export function getSettings() {
   const out = { ...SETTINGS_DEFAULTS };
   for (const r of db.prepare('SELECT key, value FROM settings WHERE tenant_id = ?').all(TENANT)) {
@@ -263,20 +262,20 @@ export const deleteSessionsFor = (userId, exceptToken) => (exceptToken
   : db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId));
 db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
 
-// ---------- bots ----------
-const parseBot = (r) => r && ({ id: r.id, config: JSON.parse(r.config), createdAt: r.created_at, updatedAt: r.updated_at, createdBy: r.created_by });
-export const listBotRows = () => db.prepare('SELECT * FROM bots WHERE tenant_id = ? ORDER BY name').all(TENANT).map(parseBot);
-export const getBotRow = (id) => parseBot(db.prepare('SELECT * FROM bots WHERE tenant_id = ? AND id = ?').get(TENANT, id));
-export const countBots = () => db.prepare('SELECT COUNT(*) AS n FROM bots WHERE tenant_id = ?').get(TENANT).n;
-export function saveBotRow(id, config, by = '') {
+// ---------- agents ----------
+const parseAgent = (r) => r && ({ id: r.id, config: JSON.parse(r.config), createdAt: r.created_at, updatedAt: r.updated_at, createdBy: r.created_by });
+export const listAgentRows = () => db.prepare('SELECT * FROM agents WHERE tenant_id = ? ORDER BY name').all(TENANT).map(parseAgent);
+export const getAgentRow = (id) => parseAgent(db.prepare('SELECT * FROM agents WHERE tenant_id = ? AND id = ?').get(TENANT, id));
+export const countAgents = () => db.prepare('SELECT COUNT(*) AS n FROM agents WHERE tenant_id = ?').get(TENANT).n;
+export function saveAgentRow(id, config, by = '') {
   const now = Date.now();
-  const exists = db.prepare('SELECT 1 FROM bots WHERE tenant_id = ? AND id = ?').get(TENANT, id);
+  const exists = db.prepare('SELECT 1 FROM agents WHERE tenant_id = ? AND id = ?').get(TENANT, id);
   if (exists) {
-    db.prepare('UPDATE bots SET name = ?, enabled = ?, config = ?, updated_at = ? WHERE tenant_id = ? AND id = ?')
+    db.prepare('UPDATE agents SET name = ?, enabled = ?, config = ?, updated_at = ? WHERE tenant_id = ? AND id = ?')
       .run(config.name, config.enabled ? 1 : 0, JSON.stringify(config), now, TENANT, id);
   } else {
-    db.prepare('INSERT INTO bots (id, tenant_id, name, enabled, config, created_at, updated_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    db.prepare('INSERT INTO agents (id, tenant_id, name, enabled, config, created_at, updated_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(id, TENANT, config.name, config.enabled ? 1 : 0, JSON.stringify(config), now, now, by);
   }
 }
-export const deleteBotRow = (id) => db.prepare('DELETE FROM bots WHERE tenant_id = ? AND id = ?').run(TENANT, id).changes > 0;
+export const deleteAgentRow = (id) => db.prepare('DELETE FROM agents WHERE tenant_id = ? AND id = ?').run(TENANT, id).changes > 0;

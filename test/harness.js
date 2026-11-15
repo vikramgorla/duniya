@@ -7,7 +7,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
-export async function setup({ bindings = {}, env = {}, legacy = null, extend = null, beforeImport = null, chatsOn = true } = {}) {
+export async function setup({ bindings = {}, env = {}, seed = true, extend = null, beforeImport = null, chatsOn = true } = {}) {
   const t = {
     mcpCalls: [], claudeReqs: [], summaryReqs: [], script: [], sent: [],
     summaryText: 'Decisions: take the 9:10 train. Rao family arrives Saturday.', summaryFail: false,
@@ -88,37 +88,36 @@ export async function setup({ bindings = {}, env = {}, legacy = null, extend = n
   });
   t.msg = (o) => ({
     channel: 'whatsapp', raw: {}, isGroup: true, chat: 'g1@g.us', phone: '41790000002', senderJid: 'x', senderName: 'Anu',
-    mentioned: false, replyToBot: false, quoted: '', msgId: `in-${++seq}`, ts: Date.now(), ...o,
+    mentioned: false, replyToAgent: false, quoted: '', msgId: `in-${++seq}`, ts: Date.now(), ...o,
   });
 
   const tmp = mkdtempSync(join(tmpdir(), 'duniya-'));
   t.tmp = tmp;
-  if (legacy) legacy(tmp, t); // lets a test lay out pre-005 files before startup
   Object.assign(process.env, {
-    DATA_DIR: join(tmp, 'data'), BOTS_DIR: join(tmp, 'legacy-bots'), ANTHROPIC_BASE_URL: `http://127.0.0.1:${t.claudeHttp.address().port}`,
+    DATA_DIR: join(tmp, 'data'), ANTHROPIC_BASE_URL: `http://127.0.0.1:${t.claudeHttp.address().port}`,
     ADMIN_PASSWORD: 'correct horse battery', PANEL_PORT: '0', ...env,
   });
   if (beforeImport) await beforeImport(t);
   t.store = await import('../src/core/store.js');
-  t.bots = await import('../src/core/bots.js');
+  t.agents = await import('../src/core/agents.js');
   t.router = await import('../src/core/router.js');
-  t.agent = await import('../src/core/agent.js');
+  t.runner = await import('../src/core/runner.js');
   t.config = await import('../src/core/config.js');
   t.memory = await import('../src/core/memory.js');
   t.db = await import('../src/core/db.js');
   t.events = await import('../src/core/events.js');
-  await t.bots.loadBots();
-  if (!legacy) {
+  await t.agents.loadAgents();
+  if (seed) {
     t.store.setSecret('ANTHROPIC_API_KEY', 'test');
     t.store.setSecret('PANDUGA_MCP_URL', `http://127.0.0.1:${t.mcpHttp.address().port}/mcp`);
     t.store.setSecret('PANDUGA_TOKEN_ORGANIZER', 'org');
-    await t.bots.createBot({ id: 'panduga', config: {
-      ...JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures/panduga-bot.json'), 'utf8')), name: 'Panduga', model: 'claude-sonnet-5-5',
+    await t.agents.createAgent({ id: 'panduga', config: {
+      ...JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures/panduga-agent.json'), 'utf8')), name: 'Panduga', model: 'claude-sonnet-5-5',
       // token-based service (OAuth sign-in has its own test, mcp-oauth.test.js)
       mcpServers: { panduga: { url: '${PANDUGA_MCP_URL}', tokens: { organizer: '${PANDUGA_TOKEN_ORGANIZER}', participant: '${PANDUGA_TOKEN_MEMBER}' } } },
       chats: ['g1@g.us'], organizers: ['+41 79 000 00 01'], ...(bindings.panduga || {}),
     } });
-    await t.bots.createBot({ id: 'helper', config: {
+    await t.agents.createAgent({ id: 'helper', config: {
       name: 'Helper', prompt: 'You help.', model: 'claude-sonnet-5-5', triggers: ['!help'], dm: 'organizers',
       chats: ['g2@g.us'], organizers: ['41790000001'], plugins: ['example-dice'], ...(bindings.helper || {}),
     } });

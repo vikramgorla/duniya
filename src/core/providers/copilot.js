@@ -248,7 +248,7 @@ class Conversation {
   }
   armAbandon() {
     clearTimeout(this.abandonTimer);
-    this.abandonTimer = setTimeout(() => this.abandon('No answer from the bot'), ABANDONED_MS);
+    this.abandonTimer = setTimeout(() => this.abandon('No answer from the agent'), ABANDONED_MS);
     this.abandonTimer.unref?.();
   }
   abandon(reason) {

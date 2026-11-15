@@ -3,8 +3,8 @@ import { addPending, takePending, peekPending, dropPending } from './db.js';
 import { chat as modelChat } from './providers/index.js';
 import { getChatPrefs } from './chat-prefs.js';
 
-/** The model for a chat: the chat's own choice (auto, provider:auto or provider:model) or the bot's. */
-export const chatModel = (bot, chat) => { const m = getChatPrefs(chat).model; return m && m !== 'inherit' ? m : bot.model; };
+/** The model for a chat: the chat's own choice (auto, provider:auto or provider:model) or the agent's. */
+export const chatModel = (agent, chat) => { const m = getChatPrefs(chat).model; return m && m !== 'inherit' ? m : agent.model; };
 import { buildContext } from './memory.js';
 import { activity } from './events.js';
 import { toolsFor, matchesAny, organizerConnection } from './tools.js';
@@ -13,24 +13,23 @@ const MAX_TOOL_ROUNDS = 8;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from({ length: 4 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
 
-function systemPrompt({ bot, role, isGroup, chatName }) {
-  const now = new Date().toLocaleString('en-GB', { timeZone: bot.timezone || env.timezone });
+function systemPrompt({ agent, role, isGroup, chatName }) {
+  const now = new Date().toLocaleString('en-GB', { timeZone: agent.timezone || env.timezone });
   const roleText = role === 'organizer'
-    ? (bot.confirm
+    ? (agent.confirm
       ? 'They are an organizer: they may request changes. Make changes only through the matching preview tool, then summarise the preview clearly. The system adds a confirm code; never claim a change is done before it is confirmed.'
       : 'They are an organizer.')
     : 'They are a participant: they can ask questions. If they want something changed, say an organizer needs to do it.';
   return [
-    bot.prompt.trim(),
-    `Current time: ${now} (${bot.timezone || env.timezone}). Chat type: ${isGroup ? 'WhatsApp group (shared, keep personal details out)' : 'WhatsApp direct message'}${chatName ? ` named "${chatName}"` : ''}.`,
+    agent.prompt.trim(),
+    `Current time: ${now} (${agent.timezone || env.timezone}). Chat type: ${isGroup ? 'WhatsApp group (shared, keep personal details out)' : 'WhatsApp direct message'}${chatName ? ` named "${chatName}"` : ''}.`,
     'You see the recent conversation of this chat, a running summary of older discussion and saved notes. Use them to stay aware of what people have said and decided. When someone asks you to remember something, save it with the memory tool. If something older is not in your context, search the chat history before saying you do not know.',
     roleText,
     'Write for WhatsApp: short plain text, *bold* sparingly, simple "-" lists, no markdown headings or tables.',
-    bot.extraPrompt?.trim() || '',
   ].filter(Boolean).join('\n\n');
 }
 
-/** Errors the bot should explain instead of a generic failure. */
+/** Errors the agent should explain instead of a generic failure. */
 export function friendlyModelError(e) {
   const code = e?.code || '';
   if (code === 'subscription_sharing_usage_limit_exceeded' || code === 'subscription_sharing_usage_unavailable') {
@@ -59,15 +58,15 @@ export function extractConfirmId(text, field = 'confirm_id') {
 }
 
 /**
- * One agent turn for a bot. Returns reply text or null.
- * ctx: { bot, role, chat, senderName, requester, text, isGroup, source: 'whatsapp'|'panel'|'schedule' }
+ * One agent turn for an agent. Returns reply text or null.
+ * ctx: { agent, role, chat, senderName, requester, text, isGroup, source: 'whatsapp'|'panel'|'schedule' }
  */
 export async function runAgent(ctx) {
-  const { bot, role, chat, senderName, text, isGroup } = ctx;
-  const { defs, run, meta } = await toolsFor(bot, role);
-  for (const err of meta.get('__errors') || []) activity('error', { bot: bot.id, chat, summary: err });
+  const { agent, role, chat, senderName, text, isGroup } = ctx;
+  const { defs, run, meta } = await toolsFor(agent, role);
+  for (const err of meta.get('__errors') || []) activity('error', { agent: agent.id, chat, summary: err });
 
-  const memory = buildContext({ bot, chat, excludeId: ctx.msgRowId || 0 });
+  const memory = buildContext({ agent, chat, excludeId: ctx.msgRowId || 0 });
   const messages = [{
     role: 'user',
     content: `${memory ? `${memory}\n\n` : ''}New message from ${senderName} (${role}):\n${text}`,
@@ -81,13 +80,13 @@ export async function runAgent(ctx) {
     let res;
     try {
       res = await modelChat({
-        model: chatModel(bot, chat), purpose: 'bot', maxTokens: bot.maxTokens, usage: { bot: bot.id, chat, kind: ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : 'reply' },
-        system: systemPrompt({ bot, role, isGroup, chatName: ctx.chatName }), tools: defs, messages,
+        model: chatModel(agent, chat), purpose: 'agent', maxTokens: agent.maxTokens, usage: { agent: agent.id, chat, kind: ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : 'reply' },
+        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName }), tools: defs, messages,
       });
     } catch (e) {
       const friendly = friendlyModelError(e);
       if (!friendly) throw e;
-      activity('error', { bot: bot.id, chat, summary: `Model error: ${e.message}`, detail: { code: e.code } });
+      activity('error', { agent: agent.id, chat, summary: `Model error: ${e.message}`, detail: { code: e.code } });
       return friendly;
     }
     ctx.model = res.model;
@@ -105,24 +104,24 @@ export async function runAgent(ctx) {
       const out = await run(call.name, call.input, { ...ctx, toolName: call.name });
       let content = String(out.text ?? '').slice(0, 12000);
       activity(out.isError ? 'tool.error' : 'tool.call', {
-        bot: bot.id, chat,
+        agent: agent.id, chat,
         summary: `${m?.fq || call.name} (${Date.now() - started} ms)${out.isError ? ' failed' : ''}`,
         detail: { input: call.input, output: content.slice(0, 2000), role },
       });
 
-      if (!out.isError && m?.kind === 'mcp' && bot.confirm && matchesAny(m.fq, [bot.confirm.preview])) {
-        const confirmId = extractConfirmId(out.text, bot.confirm.idField || 'confirm_id');
+      if (!out.isError && m?.kind === 'mcp' && agent.confirm && matchesAny(m.fq, [agent.confirm.preview])) {
+        const confirmId = extractConfirmId(out.text, agent.confirm.idField || 'confirm_id');
         if (confirmId) {
           const code = newCode();
-          const [server, confirmTool] = bot.confirm.tool.split(':');
+          const [server, confirmTool] = agent.confirm.tool.split(':');
           addPending({
-            code, bot: bot.id, server, confirmTool, confirmId, tool: m.fq, chat,
+            code, agent: agent.id, server, confirmTool, confirmId, tool: m.fq, chat,
             requester: ctx.requester, summary: content.slice(0, 500),
-            expires: Date.now() + (bot.confirm.ttlMinutes || 9) * 60000,
+            expires: Date.now() + (agent.confirm.ttlMinutes || 9) * 60000,
           });
           codes.push(code);
           content = content.split(confirmId).join('[held for organizer confirmation]');
-          activity('confirm.created', { bot: bot.id, chat, summary: `${code}: ${m.fq}`, detail: { input: call.input } });
+          activity('confirm.created', { agent: agent.id, chat, summary: `${code}: ${m.fq}`, detail: { input: call.input } });
         }
       }
       results.push({ type: 'tool_result', tool_use_id: call.id, is_error: out.isError, content });
@@ -131,37 +130,37 @@ export async function runAgent(ctx) {
   }
 
   for (const code of codes) {
-    reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${bot.confirm.ttlMinutes || 9} min).`;
+    reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm.ttlMinutes || 9} min).`;
   }
   ctx.usage = usage;
-  activity('model.usage', { bot: bot.id, chat, summary: `${ctx.model || bot.model}: ${usage.input} in / ${usage.output} out` });
+  activity('model.usage', { agent: agent.id, chat, summary: `${ctx.model || agent.model}: ${usage.input} in / ${usage.output} out` });
   return reply.trim() || null;
 }
 
 /** "confirm ABCD" / "cancel ABCD". Returns reply text, or undefined when it isn't for us. */
-export async function handleConfirmCommand({ bot, text, role, chat }) {
+export async function handleConfirmCommand({ agent, text, role, chat }) {
   const m = String(text).trim().match(/^(confirm|cancel)\s+([A-Z0-9]{4})$/i);
   if (!m) return undefined;
   const code = m[2].toUpperCase();
   const p = peekPending(code);
-  if (!p || p.bot !== bot.id) return undefined;
+  if (!p || p.agent !== agent.id) return undefined;
   if (role !== 'organizer') return 'Only organizers can confirm or cancel changes.';
   if (p.chat !== chat) return `Change ${code} belongs to another chat; confirm it there.`;
   if (/^cancel$/i.test(m[1])) {
     dropPending(code);
-    activity('confirm.cancelled', { bot: bot.id, chat, summary: code });
+    activity('confirm.cancelled', { agent: agent.id, chat, summary: code });
     return `Cancelled ${code}.`;
   }
   const row = takePending(code);
   if (!row) return `Change ${code} has expired — ask me again.`;
-  return applyPending(bot, row);
+  return applyPending(agent, row);
 }
 
-export async function applyPending(bot, row) {
-  const conn = organizerConnection(bot, row.server);
-  const out = await conn.call(row.confirm_tool, { [bot.confirm.idField || 'confirm_id']: row.confirm_id });
+export async function applyPending(agent, row) {
+  const conn = organizerConnection(agent, row.server);
+  const out = await conn.call(row.confirm_tool, { [agent.confirm.idField || 'confirm_id']: row.confirm_id });
   activity(out.isError ? 'tool.error' : 'confirm.applied', {
-    bot: bot.id, chat: row.chat, summary: `${row.code}: ${row.tool}${out.isError ? ' failed' : ''}`, detail: { output: out.text.slice(0, 1000) },
+    agent: agent.id, chat: row.chat, summary: `${row.code}: ${row.tool}${out.isError ? ' failed' : ''}`, detail: { output: out.text.slice(0, 1000) },
   });
   return out.isError ? `Could not apply ${row.code}: ${out.text.slice(0, 300)}` : `Done (${row.code}). ${out.text.slice(0, 300)}`;
 }
