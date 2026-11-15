@@ -9,6 +9,10 @@ import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprot
 import { setup } from './harness.js';
 
 const as = { valid: new Set(), refreshes: 0, refuseRefresh: false, bearers: [], registered: [], challenge: '', codes: new Map(), tokenReqs: [] };
+// Fake tokens contain '-', which never occurs in the base64 ciphertext, so "not in the stored blob" checks cannot
+// match by chance (#73: 'at1' appeared inside random base64 about once in a few hundred runs).
+const AT = (n) => `fake-access-${n}-token`;
+const RT = 'fake-refresh-1-token';
 const b64url = (buf) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 let BASE = '';
 
@@ -35,13 +39,13 @@ const fake = http.createServer(async (req, res) => {
       const c = as.codes.get(f.get('code'));
       if (!c || b64url(createHash('sha256').update(f.get('code_verifier') || '').digest()) !== c.challenge || f.get('redirect_uri') !== c.redirect) return json(400, { error: 'invalid_grant' });
       as.codes.delete(f.get('code'));
-      as.valid.add('at1');
-      return json(200, { access_token: 'at1', token_type: 'Bearer', expires_in: 3600, refresh_token: 'rt1', scope: 'panduga offline_access' });
+      as.valid.add(AT(1));
+      return json(200, { access_token: AT(1), token_type: 'Bearer', expires_in: 3600, refresh_token: RT, scope: 'panduga offline_access' });
     }
     if (f.get('grant_type') === 'refresh_token') {
-      if (as.refuseRefresh || f.get('refresh_token') !== 'rt1') return json(400, { error: 'invalid_grant' });
-      as.refreshes++; const at = `at${as.refreshes + 1}`; as.valid.add(at);
-      return json(200, { access_token: at, token_type: 'Bearer', expires_in: 3600, refresh_token: 'rt1' });
+      if (as.refuseRefresh || f.get('refresh_token') !== RT) return json(400, { error: 'invalid_grant' });
+      as.refreshes++; const at = AT(as.refreshes + 1); as.valid.add(at);
+      return json(200, { access_token: at, token_type: 'Bearer', expires_in: 3600, refresh_token: RT });
     }
     return json(400, { error: 'unsupported_grant_type' });
   }
@@ -64,6 +68,7 @@ BASE = `http://127.0.0.1:${fake.address().port}`;
 
 const t = await setup({ env: { RATE_LIMIT_PER_MIN: '100' } });
 const cookie = await t.login();
+const { decrypt } = await import('../src/core/crypto.js');
 after(() => { fake.close(); t.close(); });
 
 await t.agents.createAgent({ id: 'oauthagent', config: {
@@ -125,17 +130,19 @@ test('US1: callback completes the sign-in; state is single-use; tokens never exp
   assert.equal(conns.body.length, 1);
   assert.equal(conns.body[0].status, 'connected');
   assert.equal(conns.body[0].connectedBy, 'admin');
-  assert.ok(!JSON.stringify(conns.body).includes('at1') && !JSON.stringify(conns.body).includes('rt1'));
+  assert.ok(!JSON.stringify(conns.body).includes(AT(1)) && !JSON.stringify(conns.body).includes(RT));
   const enc = t.db.db.prepare('SELECT data_enc FROM mcp_oauth').get().data_enc;
-  assert.ok(!enc.includes('at1') && !enc.includes('rt1'), 'stored encrypted');
+  assert.match(enc, /^v1:/, 'stored encrypted');
+  assert.ok(!enc.includes(AT(1)) && !enc.includes(RT), 'stored encrypted');
+  assert.equal(JSON.parse(decrypt(enc)).tokens.access_token, AT(1), 'and decrypts to the real tokens');
   const exp = await t.api(cookie, 'GET', '/api/agents/oauthagent/export');
-  assert.ok(!JSON.stringify(exp.body).includes('at1'));
+  assert.ok(!JSON.stringify(exp.body).includes(AT(1)));
 });
 
 test('US1/US3: discover and use tools; participants fall back to the organizer sign-in with participant tools only', async () => {
   const d = await t.api(cookie, 'POST', '/api/agents/oauthagent/discover', { auth: 'oauth', server: 'svc' });
   assert.deepEqual(d.body.map((x) => x.name).sort(), ['agenda_list', 'room_assign_preview', 'whoami']);
-  assert.equal(as.bearers.at(-1), 'at1');
+  assert.equal(as.bearers.at(-1), AT(1));
   t.script.push([{ type: 'tool_use', id: 'tu1', name: 'svc__agenda_list', input: {} }], [{ type: 'text', text: 'Puja at 10' }]);
   const n = t.claudeReqs.length;
   const r = await t.api(cookie, 'POST', '/api/agents/oauthagent/test', { role: 'participant', text: 'agenda?' });
@@ -144,14 +151,14 @@ test('US1/US3: discover and use tools; participants fall back to the organizer s
 });
 
 test('US2: an expired access token is refreshed automatically', async () => {
-  as.valid.delete('at1');
+  as.valid.delete(AT(1));
   t.script.push([{ type: 'tool_use', id: 'tu2', name: 'svc__whoami', input: {} }], [{ type: 'text', text: 'You are the organizer' }]);
   const r = await t.api(cookie, 'POST', '/api/agents/oauthagent/test', { role: 'organizer', text: 'who am I?' });
   assert.equal(r.body.reply, 'You are the organizer');
   assert.equal(as.refreshes, 1);
-  assert.equal(as.bearers.at(-1), 'at2');
+  assert.equal(as.bearers.at(-1), AT(2));
   const enc = t.db.db.prepare('SELECT data_enc FROM mcp_oauth').get().data_enc;
-  assert.ok(!enc.includes('at2'));
+  assert.ok(!enc.includes(AT(2)));
 });
 
 test('US2: a refused refresh marks the connection "reconnect" and the agent says so', async () => {
