@@ -128,3 +128,10 @@ tile/section to `docs/site/index.html`.
 
 Harness-specific files only add to this one: `CLAUDE.md` (Claude Code), `.github/copilot-instructions.md` (Copilot).
 Spec Kit skills live in `.claude/skills/speckit-*` and use the templates in `.specify/templates/`.
+
+## Spec Kit templates
+
+Our Definition of Done is baked into `.specify/templates/{plan,tasks,checklist}-template.md`. The same files are copied
+to `.specify/templates/overrides/`, which Spec Kit reads first, so a Spec Kit upgrade cannot silently drop these steps.
+When you change a template, change both copies.
+
