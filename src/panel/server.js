@@ -49,6 +49,8 @@ import { baseUrl, minuteLimiter } from './http-util.js';
 import { mobileRoutes } from './routes/mobile.js';
 import { toolServiceRoutes } from './routes/tool-services.js';
 import { ownerAlertRoutes } from './routes/owner-alerts.js';
+import { directChatRoutes } from './routes/direct-chats.js';
+import { listDirectChats, isChatAlias } from '../core/direct-chats.js';
 import { mediaRoutes } from './routes/media.js';
 import { serverSize } from '../core/resources.js';
 import { queueStats } from '../core/media-queue.js';
@@ -407,6 +409,15 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
     // 1:1 chats the numbers have seen (name and number only) and any bound chat we can't see right now
     const people = seenChats({ groups: false }).filter((c) => !known.has(c.id)).map((c) => ({ id: c.id, name: c.name || `+${c.phone}`, phone: c.phone, number: c.number, isGroup: false, lastAt: c.lastAt }));
     for (const c of people) known.add(c.id);
+    // 049: direct chats prepared before the person wrote ("Waiting for the first message"); LID aliases are not listed.
+    const prepared = listDirectChats();
+    const waiting = new Map(prepared.map((d) => [d.chat, d]));
+    for (const c of people) if (waiting.has(c.id)) Object.assign(c, { prepared: true, waiting: waiting.get(c.id).waiting, introAt: waiting.get(c.id).introAt });
+    for (const d of prepared.filter((x) => !known.has(x.chat))) {
+      people.push({ id: d.chat, name: d.name, phone: d.phone, number: d.number, isGroup: false, lastAt: d.firstAt, prepared: true, waiting: d.waiting, onWhatsApp: d.onWhatsApp, introAt: d.introAt });
+      known.add(d.chat);
+    }
+    for (let i = people.length - 1; i >= 0; i--) if (isChatAlias(people[i].id)) people.splice(i, 1);
     const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: '(not a member / offline)', size: 0, isGroup: !/@(s\.whatsapp\.net|lid)$/.test(id) }));
     return [...groups, ...people, ...missing].map((c) => {
       const number = c.number || (c.id.includes('#') ? c.id.split('#')[0] : 'main');
@@ -619,6 +630,7 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
 
   // ---------- spending caps (040) and owner alerts / weekly summary (041) ----------
   ownerAlertRoutes(route, { channel });
+  directChatRoutes(route, { channel }); // prepared direct chats + intro (049)
   mediaRoutes(route); // photos & voice (043)
 
   // ---------- mobile app (027): Settings → Mobile app ----------

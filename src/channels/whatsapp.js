@@ -422,6 +422,13 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     },
     async setProfileName(name) { await ready().updateProfileName(String(name).slice(0, 25)); return { ok: true }; },
     async setProfileStatus(text) { await ready().updateProfileStatus(String(text).slice(0, 139)); return { ok: true }; },
+    /** 049: { exists, jid, lid } for a phone number (lid: '' when WhatsApp has not shared it). */
+    async lookupNumber(who) {
+      const s = ready(); const jid = toJid(who);
+      const [r] = (await s.onWhatsApp(jid)) || [];
+      const lid = await s.signalRepository?.lidMapping?.getLIDForPN?.(jid).catch(() => null);
+      return { jid, exists: !!r?.exists, lid: lid ? jidNormalizedUser(lid) : '' };
+    },
     async block(who) { const jid = toJid(who); await ready().updateBlockStatus(jid, 'block'); return { jid }; },
     async unblock(who) { const jid = toJid(who); await ready().updateBlockStatus(jid, 'unblock'); return { jid }; },
 

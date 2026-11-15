@@ -245,6 +245,25 @@ test('risky tools need confirm_action with a single-use code bound to the user',
 });
 
 let viewer;
+test('049: prepare_direct_chat runs directly; with send_intro (and send_chat_intro) it needs confirm_action', async () => {
+  const c = await mcpClient(ownerSession.tokens.access_token);
+  const plain = await c.callTool({ name: 'prepare_direct_chat', arguments: { phone: '+41 79 000 08 01', agent_id: 'panduga' } });
+  assert.ok(!plain.isError, text(plain));
+  assert.equal(JSON.parse(text(plain)).chat, '41790000801@s.whatsapp.net');
+  const sent = t.sent.length;
+  const held = await c.callTool({ name: 'prepare_direct_chat', arguments: { phone: '+41 79 000 08 02', agent_id: 'panduga', send_intro: true } });
+  assert.equal(held.structuredContent?.status, 'needs_confirmation', text(held));
+  assert.equal(t.sent.length, sent, 'nothing sent before confirmation');
+  const later = await c.callTool({ name: 'send_chat_intro', arguments: { chat: '41790000801@s.whatsapp.net', text: 'Hello from Panduga' } });
+  assert.match(text(later), /Send this message from Panduga .*"Hello from Panduga"/);
+  assert.equal(t.sent.length, sent);
+  const ok = await c.callTool({ name: 'confirm_action', arguments: { confirm_code: held.structuredContent.confirm_code } });
+  assert.ok(!ok.isError, text(ok));
+  assert.equal(t.sent.at(-1).chat, '41790000802@s.whatsapp.net');
+  await c.callTool({ name: 'confirm_action', arguments: { confirm_code: later.structuredContent.confirm_code } });
+  assert.equal(t.sent.at(-1).text, 'Hello from Panduga');
+});
+
 test('a viewer\'s assistant sees read tools only and cannot write or confirm', async () => {
   const u = await t.api(owner, 'POST', '/api/users', { username: 'vera', role: 'viewer', password: 'viewer password 1' });
   assert.equal(u.status, 200);

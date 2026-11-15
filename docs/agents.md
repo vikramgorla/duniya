@@ -125,5 +125,26 @@ remove entries.
   person can be assigned an agent on **Chats**.
 - Chats on the first number keep their WhatsApp id; others are `<number>#<jid>`.
 
+### Set up a direct chat before the person writes
+
+1. **Chats → + Add a direct chat** (or **Contacts → Set up chat** on a person's row).
+2. Enter the number with country code (`+41 79 123 45 67`) or pick a contact; pick the WhatsApp number if you have
+   several.
+3. Choose the agent, **On** and, if you like, **Private to members**, then **Set up chat**. Model, logging, fallback and
+   spending cap are on the same row afterwards.
+
+The chat shows **Waiting for the first message** until the person writes; that message goes straight to the agent
+with these settings. WhatsApp sometimes delivers a person's messages from a private id (`…@lid`) instead of their
+number: the app matches it to the prepared chat by phone (or by the id WhatsApp shared when the number was checked)
+and keeps using the one chat, so replies, memory and settings stay together.
+
+> [!NOTE]
+> A number that does not seem to be on WhatsApp gets a warning but can still be set up. Nothing is sent to the
+> person. **Send intro…** on the row lets the agent write first: you see the exact text (and the privacy line, the
+> first time) and it goes out only when you press **Send intro now**. A chat that is off never gets one.
+
+Owner assistant and admin MCP: `prepare_direct_chat` (with `send_intro` it needs a confirmation) and
+`send_chat_intro` (always confirmed).
+
 ---
 **Next:** [Models](models.md) · [Owner assistant](owner-assistant.md) · [Privacy](privacy.md) · [Docs index](README.md)

@@ -268,7 +268,7 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
     const missing = (tool.required || []).filter((k) => args[k] === undefined || args[k] === null || args[k] === '');
     if (missing.length) return fail(`Missing: ${missing.join(', ')}`);
     try {
-      if (tool.risky) {
+      if (typeof tool.risky === 'function' ? tool.risky(args) : tool.risky) { // 049: some tools are risky only with some arguments
         const preview = await tool.preview(args, ctx.x);
         const code = createConfirm({ userId: user.id, clientId: client.clientId, tool: name, args, preview });
         activity('confirm.created', { summary: `${preview} — asked by ${user.username} via ${client.name}, waiting for confirm_action (${code})`.slice(0, 480) });

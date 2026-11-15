@@ -6,6 +6,7 @@ import { DATA_DIR } from '../core/config.js';
 import { getSetting, updateSettings } from '../core/store.js';
 import { activity } from '../core/events.js';
 import { noteChat } from '../core/chat-prefs.js';
+import { resolveDirectChat } from '../core/direct-chats.js';
 import { createWhatsAppChannel } from './whatsapp.js';
 
 export const MAIN = 'main';
@@ -40,7 +41,7 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
     if (!handler) return ch;
     const wrap = wrapMsg(n);
     await ch.start(async (m) => {
-      const msg = wrap(m);
+      const msg = resolveDirectChat(wrap(m)); // 049: a prepared person's LID chat is noted under the prepared chat
       try { noteChat({ chat: msg.chat, number: n.id, isGroup: msg.isGroup, name: msg.isGroup ? '' : msg.senderName, phone: msg.isGroup ? '' : msg.phone }); } catch { /* best effort */ }
       return handler(msg);
     }, { onHistory: async (msgs, meta = {}) => historyHandler?.(msgs.map(wrap), { ...meta, // #91: keys and chats in app chat ids
@@ -109,6 +110,8 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
       }
       return { ...(numbers[0] || { status: 'stopped' }), numbers };
     },
+    /** 049: is this phone on WhatsApp (and its LID, when WhatsApp shares it)? { exists, jid, lid } or null when unknown. */
+    async lookupNumber(number, phone) { const ch = byNumber(number); return ch.lookupNumber ? ch.lookupNumber(phone) : null; },
     pair: (phone, number) => byNumber(number).pair(phone),
     logout: (number) => byNumber(number).logout(),
     restart: (number) => byNumber(number).restart(),

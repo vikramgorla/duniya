@@ -29,7 +29,8 @@ context…" (edit under **Settings → Privacy notice**).
 - Posted again after the group was off only if the text changed or after 90 days.
 - Switching on also loads the group's recent messages from your phone, so "stored" covers those earlier messages too.
 - Per-group opt-out on **Chats** (recorded).
-- Direct messages get a line in the agent's first reply, once per person (can be switched off).
+- Direct messages get a line in the agent's first reply, once per person (can be switched off). An intro the agent
+  sends to a [prepared direct chat](agents.md#set-up-a-direct-chat-before-the-person-writes) carries it too.
 - Admin MCP: `get_privacy_notice`, `set_privacy_notice`, `set_chat_privacy_notice`.
 
 ![Privacy notice settings](site/img/card-privacy.webp)

@@ -144,6 +144,34 @@ export const TOOLS = [
     description: 'How many earlier messages are loaded from the phone when a chat is switched on (0 = none, max 200, default 50).',
     input: { count: int('Messages (0–200)', { minimum: 0, maximum: 200 }) }, required: ['count'],
     run: async (a, x) => ({ historyLoadCount: (await x.call('POST', '/api/settings', { historyLoadCount: a.count })).historyLoadCount }) },
+  // ---------- prepared direct chats (049, #92) ----------
+  { name: 'prepare_direct_chat', calls: [['POST', '/api/direct-chats'], ['POST', '/api/chats/x/intro/preview'], ['POST', '/api/chats/x/intro']],
+    risky: (a) => !!a.send_intro, // sending a message to the person needs confirm_action
+    description: 'Set up a direct (1:1) chat with a person BEFORE they have written: assign an agent, switch the chat on or off, mark it private to members, and optionally set model, logging and a monthly spending cap. Use the person\'s phone number with country code (find it with list_contacts). Their first message then goes to this agent with these settings, whichever form WhatsApp uses. The chat is switched on when an agent is given, unless enabled is false. Nothing is sent to the person unless send_intro is true: then the agent also sends a short first message (or intro_text), which needs confirm_action.',
+    input: { phone: str('Phone number with country code, e.g. +41 79 123 45 67'), number: str('Which of your WhatsApp numbers (id, default "main"; see get_overview)'), agent_id: str('Agent to answer this person (optional)'),
+      enabled: bool('Chat on (default: on when an agent is given)'), private: bool('Private to members: hidden from the owner assistant and the Ask box (optional)'),
+      model: str('Model for this chat: inherit | auto | provider:model (optional)'), logging: { type: 'string', enum: ['inherit', 'off', 'minimal', 'normal', 'verbose'], description: 'Logging level (optional)' },
+      cap_cost_usd: { type: 'number', description: 'Monthly cost cap for this chat in USD (optional)' }, cap_tokens: int('Monthly token cap for this chat (optional, at least 1000)'),
+      send_intro: bool('Also let the agent send a first message now (needs confirm_action)'), intro_text: str('Text of that first message (optional)') }, required: ['phone'],
+    preview: async (a) => `Set up a direct chat with ${a.phone}${a.number && a.number !== 'main' ? ` on number ${a.number}` : ''}${a.agent_id ? `, answered by agent ${a.agent_id}` : ''}${a.enabled === false ? ', switched off' : a.agent_id || a.enabled ? ', switched on' : ''}${a.private ? ', private to members' : ''}. ${a.send_intro ? `Then ${a.agent_id || 'its agent'} sends them: "${a.intro_text || 'a short intro'}".` : 'Nothing is sent to them.'}`,
+    run: async (a, x) => {
+      const chat = await x.call('POST', '/api/direct-chats', { phone: a.phone, number: a.number, agent: a.agent_id, enabled: a.enabled, private: a.private, model: a.model, logging: a.logging,
+        ...(a.cap_cost_usd != null || a.cap_tokens != null ? { cap: { cost: a.cap_cost_usd ?? null, tokens: a.cap_tokens ?? null } } : {}) });
+      if (!a.send_intro) return chat;
+      const p = await x.call('POST', `/api/chats/${enc(chat.chat)}/intro/preview`, { text: a.intro_text });
+      return { ...chat, intro: await x.call('POST', `/api/chats/${enc(chat.chat)}/intro`, { token: p.token }) };
+    } },
+  { name: 'send_chat_intro', risky: true, calls: [['POST', '/api/chats/x/intro/preview'], ['POST', '/api/chats/x/intro']],
+    description: 'Let the chat\'s agent send a first message (greeting / intro) to a direct chat, e.g. one set up with prepare_direct_chat. The chat must be on with an enabled agent. Without text a short intro by the agent is used. Needs confirm_action; the preview shows the exact text.',
+    input: { chat: str('Direct chat id (see list_chats or prepare_direct_chat)'), text: str('Intro text (optional)') }, required: ['chat'],
+    preview: async (a, x) => {
+      const p = await x.call('POST', `/api/chats/${enc(a.chat)}/intro/preview`, { text: a.text });
+      return `Send this message from ${p.agentName} to ${p.to} on WhatsApp: "${p.text}"${p.notice ? ' (with the privacy line, first time)' : ''}`;
+    },
+    run: async (a, x) => {
+      const p = await x.call('POST', `/api/chats/${enc(a.chat)}/intro/preview`, { text: a.text });
+      return x.call('POST', `/api/chats/${enc(a.chat)}/intro`, { token: p.token });
+    } },
   // ---------- owner assistant and privacy (044) ----------
   { name: 'get_owner_assistant', readOnly: true, calls: [['GET', '/api/owner-assistant']],
     description: 'The built-in owner assistant: its model, whether your WhatsApp number is linked (status none, code, pending or linked, and the number), and for owners every linked panel user. Linking itself is done in the panel (Settings → Owner assistant).',

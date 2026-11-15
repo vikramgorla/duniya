@@ -39,6 +39,7 @@
 | **Audit** | every question and action is in Activity (`owner.*`, always recorded) |
 | **API** | `POST /api/owner/ask` (whole answer) or `POST /api/owner/ask/stream` (newline-delimited JSON: `step`, `delta`, `restarted`, `text`, `done`, `error`; see below) |
 | **Admin MCP** | `get_owner_assistant`, `set_chat_private` |
+| **People who never wrote** | "assign Mochi to Vedika" works in one go: it looks up the contact and prepares the direct chat (`prepare_direct_chat`, see [Agents](agents.md#set-up-a-direct-chat-before-the-person-writes)); you confirm once. Add "and say hi" to let the agent write first in the same confirmation |
 
 <details>
 <summary>Streamed answers: the events</summary>

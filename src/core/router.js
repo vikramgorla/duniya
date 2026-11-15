@@ -12,6 +12,7 @@ import { countStat } from './stats.js';
 import { silenceReason } from './silences.js';
 import { handleOwnerMessage } from './owner-assistant.js';
 import { dmNoticeOnce } from './privacy-notice.js';
+import { resolveDirectChat } from './direct-chats.js';
 import { inboundKind, prepareInbound, wantsVoice, speak, createImage } from './media-ai.js';
 import { enqueue, registerJobHandler, setQueueChannel, startQueue } from './media-queue.js';
 import { readFileSync, rmSync } from 'node:fs';
@@ -192,7 +193,9 @@ export function createRouter(channel) {
   setWhatsAppChannel(channel);
   setHistoryChannel(channel);
   registerMediaHandlers(channel);
-  return async function onMessage(msg) {
+  return async function onMessage(incoming) {
+    // 049 (#92): a direct message from a prepared person may arrive from their LID; use the prepared chat id.
+    const msg = resolveDirectChat(incoming);
     // #91: newest message key per chat (metadata only, also while the chat is off) to load history when it goes on.
     if (msg.msgId && (!msg.kind || msg.kind === 'text')) {
       try { noteLatestKeys([{ chat: msg.chat, number: msg.number, isGroup: msg.isGroup, msgId: msg.msgId, fromMe: !!msg.fromMe, participant: msg.isGroup && !msg.fromMe ? msg.senderJid : '', ts: msg.ts }]); } catch { /* best effort */ }
