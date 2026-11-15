@@ -157,6 +157,7 @@ ARGS=(--yes --repo "$REPO_URL" --branch "${BRANCH:-main}" --update-mode "${UPDAT
 case "${EXPOSURE:-ip}" in
   domain) ARGS+=(--domain "$DOMAIN") ;;
   tunnel) ARGS+=(--cloudflare-token "$CF_TUNNEL_TOKEN") ;;
+  tailscale) ARGS+=(--tailscale-authkey "$TS_AUTHKEY") ;;
   local) ARGS+=(--local-only) ;;
   *) ARGS+=(--ip-https) ;;
 esac

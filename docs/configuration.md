@@ -27,7 +27,8 @@ It asks how the panel should be reached. Or say it up front:
 | `--domain agents.example.com` | `https://agents.example.com` (automatic certificate) | 80, 443 |
 | `--ip-https` | `https://<your-ip>.sslip.io` (automatic certificate, no domain needed) | 80, 443 |
 | `--cloudflare-token <token>` | your Cloudflare Tunnel hostname ([guide](deploy/cloudflare-tunnel.md)) | none |
-| `--local-only` | `ssh -L 8080:127.0.0.1:8080 you@server` → `http://localhost:8080` | none |
+| `--tailscale-authkey <tskey-…>` | `https://<machine>.<tailnet>.ts.net`, only for devices in your tailnet (turn on MagicDNS and HTTPS Certificates in the Tailscale admin console; Tailscale Funnel can make it public) | none |
+| `--local-only` | `ssh -L 8080:127.0.0.1:8080 you@server` → `http://localhost:8080`, or any tunnel of your own (e.g. frp, ngrok, Pangolin, zrok) pointed at `http://127.0.0.1:8080` | none |
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash -s -- --ip-https --yes
@@ -72,7 +73,7 @@ Two providers give you a server that stays free (checked November 2026, sources 
 | Provider | Free server | Button |
 |---|---|---|
 | **Oracle Cloud** (Always Free) | 1 GB AMD VM, or Arm up to 2 OCPU / 12 GB; 200 GB disk; 10 TB traffic | [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip) |
-| **Google Cloud** (Always Free) | one e2-micro (1 GB) in us-central1 / us-west1 / us-east1; 30 GB disk; 1 GB traffic. The public IPv4 may cost ~US$3.65/month | [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fwhatsapp-agent-duniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md) |
+| **Google Cloud** (Always Free) | one e2-micro (1 GB) in us-central1 / us-west1 / us-east1; 30 GB disk; 1 GB traffic; Google's free-tier guide says its external IP is not charged (static IPs, more VMs and Cloud NAT are) | [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fwhatsapp-agent-duniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md) |
 
 Both need a card for sign-up. AWS and Azure only offer 6–12 month trials, Hetzner has no free tier, Fly.io/Render
 are not always-on VMs, and "lifetime free VPS" sites such as GratisVPS are not trustworthy (see the research).
@@ -85,15 +86,65 @@ Click **Open in Cloud Shell**, confirm, and follow the tutorial on the right: ch
 setup code it prints. Your own domain: *Settings → Web address & access* in the panel.
 Without the button: `git clone` this repository in any shell with `gcloud`, then `bash infra/gcp/deploy.sh --help`.
 
+How the panel is reached (`--exposure`):
+
+| Mode | Panel | Firewall | Cost |
+|---|---|---|---|
+| `public` (default) | `https://<ip>.sslip.io`, later your domain | tcp 80, 443 (rule `duniya-web`) | free |
+| `cloudflare --cloudflare-token …` | your Cloudflare Tunnel hostname | no rule for 80/443 | free |
+| `tailscale --tailscale-authkey …` | `https://<vm>.<tailnet>.ts.net` (your devices only) | no rule for 80/443 | free |
+| add `--no-external-ip` (tunnel modes only) | same | no external IP at all; outbound through Cloud NAT | **billed**: ~US$0.0014/h gateway + US$0.005/h NAT IP + US$0.045/GiB ≈ US$4.70/month + traffic |
+
+The VM needs outbound internet (WhatsApp, AI providers). Its ephemeral external IP does that for free — Google's
+free-tier guide states the free tier does not charge for an external IP address — so keep it unless you really want
+no public address. A reserved (static) IP, an IP on a second VM, or Cloud NAT is billed
+([VPC pricing](https://cloud.google.com/vpc/pricing), [Cloud NAT pricing](https://cloud.google.com/nat/pricing)).
+Google's default network still allows SSH (port 22) unless you remove the `default-allow-ssh` rule.
+
 Oracle Cloud details (managing the stack, logs, removal) are in the section above.
 
-## Your own domain and IP allow-list
+## Your own domain, proxies/CDNs and access
 
-*Settings → Web address & access* (owner): enter a domain, **Check DNS** shows the record to create, **Use this
-domain** gets the certificate — if HTTPS does not come up within 4 minutes the previous address comes back by itself.
-**Who can open the panel**: everyone, **Only Cloudflare** (Cloudflare's published IP ranges, refreshed daily; the real
-visitor address is used behind the proxy), or your own list of IPs/ranges (your current IP is always kept). Applied by
-the root maintenance helper with strict validation; needs the installer (re-run it once on older servers).
+*Settings → Web address & access* (owner). Applied by the root maintenance helper with strict validation (re-run the
+installer once on older servers). If HTTPS does not come up within 4 minutes, the previous settings come back by
+themselves; the check always runs on the server itself (127.0.0.1 with the domain as SNI), never through public DNS.
+
+**Does the domain lead here?** **Check** looks at DNS only as a hint (*points straight here*, *behind a proxy/CDN
+(looks like …)*, *other*, *missing*). What decides is a one-time proof: the panel serves a random token at
+`/.well-known/duniya-check/<token>` and fetches it through the public domain. So a domain behind any proxy or CDN works,
+whatever its DNS says.
+
+**HTTPS is automatic in every mode:**
+
+| The domain… | Certificate on this server | Proxy SSL/TLS mode |
+|---|---|---|
+| points straight here (no proxy) | Let's Encrypt (HTTP-01 / TLS-ALPN) | – |
+| goes through a proxy/CDN (any provider) | Let's Encrypt through the proxy (HTTP-01); until it is issued, a temporary certificate from the web server's own CA (2-hour certificates, Let's Encrypt is retried about every 80 minutes) | **Full** at once, **Full (strict)** once the card says the real certificate is issued |
+
+The panel is served over HTTPS only; port 80 only answers certificate challenges, the reachability token and
+redirects. A proxy that talks to this server **without encryption** is never supported: it is detected (the token
+arrives over plain HTTP although the visitor used HTTPS, or a redirect loop) and shown as a blocking error. If Let's
+Encrypt keeps failing behind a proxy, the card shows the web server's reason and the fix (typically a firewall/bot rule
+blocking `/.well-known/acme-challenge/`: add a rule that skips security checks for that path, and turn off
+"under attack" style challenges for it). Let's Encrypt follows redirects to HTTPS, so a proxy's "always use HTTPS"
+setting is fine.
+
+**Changing the address is two-step and never cuts you off:** *Add this domain* serves it **next to** the current
+address. Open the panel at the new address and click **Confirm — new address works** (accepted only from a request
+that really arrived through the new domain); it becomes the main address while the old one keeps working. When nobody
+needs the old address any more, **Turn off** it (it then only forwards). Nothing switches off on a timer.
+
+**Who can open the panel:** everyone; **only a proxy/CDN** — its published address list, refreshed daily (Amazon
+CloudFront, Bunny CDN, Cloudflare, Fastly, Gcore) or your own proxy's ranges — so nobody can bypass it via the server's
+IP; and/or **your own list** of IPs/ranges (your current IP is kept by default). The visitor's real address is read
+from the provider's header behind trusted proxies only (Cloudflare: `CF-Connecting-IP`; others: `X-Forwarded-For`
+read right to left, which needs Caddy 2.8+ when combined with your own list). Stricter rules are a **trial**: confirm
+them from the panel (through the new rules) within 10 minutes, or the previous rules come back by themselves; a
+warning comes first if the rules would block the request you are making. Locked out anyway: `sudo duniya open-access`.
+
+**No open ports at all:** install with a tunnel instead — Cloudflare Tunnel (`--cloudflare-token`) or Tailscale
+(`--tailscale-authkey`; Tailscale Funnel can make it public). Other tunnels (frp, ngrok, Pangolin, zrok, …) work with
+`--local-only` pointed at `http://127.0.0.1:8080`.
 
 ## Command line (`duniya`)
 

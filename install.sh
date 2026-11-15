@@ -8,7 +8,10 @@
 #   --domain NAME            https://NAME with an automatic certificate (DNS A/AAAA must point to this server)
 #   --ip-https               https://<ip>.sslip.io with an automatic certificate (no domain needed)
 #   --cloudflare-token TOK   Cloudflare Tunnel, no inbound ports (set the hostname → http://localhost:8080 in Cloudflare)
-#   --local-only             only on 127.0.0.1:8080 (reach it with: ssh -L 8080:127.0.0.1:8080 user@server)
+#   --tailscale-authkey KEY  Tailscale, no inbound ports: https://<machine>.<tailnet>.ts.net for your tailnet's devices
+#                            (needs MagicDNS + HTTPS certificates on in the Tailscale admin console; key is not stored)
+#   --local-only             only on 127.0.0.1:8080 (reach it with: ssh -L 8080:127.0.0.1:8080 user@server, or any
+#                            tunnel of your own pointed at http://127.0.0.1:8080)
 # Other:
 #   --admin-password PW      create owner "admin" with this password (otherwise a one-time setup code is printed)
 #   --repo URL               git repository (default: https://github.com/vikramgorla/whatsapp-agent-duniya.git)
@@ -24,6 +27,7 @@ BRANCH="main"
 EXPOSURE=""
 DOMAIN=""
 CF_TOKEN=""
+TS_AUTHKEY=""
 ADMIN_PASSWORD=""
 GIT_TOKEN=""
 UPDATE_MODE="notify"
@@ -38,7 +42,7 @@ PORT=8080
 say()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; exit "${2:-1}"; }
-usage() { sed -n '2,24p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//' || true; }
+usage() { sed -n '2,27p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//' || true; }
 
 # Re-runs reuse previous choices
 if [ -f "$CONF_DIR/install.conf" ]; then
@@ -51,6 +55,7 @@ while [ $# -gt 0 ]; do
     --domain) EXPOSURE=domain; DOMAIN="${2:?}"; shift ;;
     --ip-https) EXPOSURE=ip ;;
     --cloudflare-token) EXPOSURE=tunnel; CF_TOKEN="${2:?}"; shift ;;
+    --tailscale-authkey) EXPOSURE=tailscale; TS_AUTHKEY="${2:?}"; shift ;;
     --local-only) EXPOSURE=local ;;
     --admin-password) ADMIN_PASSWORD="${2:?}"; shift ;;
     --repo) REPO="${2:?}"; shift ;;
@@ -66,6 +71,8 @@ while [ $# -gt 0 ]; do
 done
 
 case "$UPDATE_MODE" in off|notify|auto) ;; *) die "--update-mode must be off, notify or auto" ;; esac
+case "$EXPOSURE" in ''|domain|ip|tunnel|tailscale|local) ;; *) die "Unknown exposure: $EXPOSURE" ;; esac
+if [ -n "$TS_AUTHKEY" ] && ! [[ "$TS_AUTHKEY" =~ ^tskey-[A-Za-z0-9_-]+$ ]]; then die "--tailscale-authkey: that does not look like a Tailscale auth key (tskey-…)"; fi
 
 # ---------- environment checks ----------
 if [ "$DRY_RUN" -eq 0 ] && [ "$(id -u)" -ne 0 ]; then die "Run as root (sudo bash install.sh …)"; fi
@@ -96,12 +103,14 @@ How should the admin panel be reached?
   1) My own domain with HTTPS        (opens ports 80/443)
   2) This server's IP with HTTPS     (https://<ip>.sslip.io, opens ports 80/443)
   3) Cloudflare Tunnel               (no open ports; needs a tunnel token)
-  4) Only locally / SSH tunnel       (most private)
+  4) Tailscale                       (no open ports; only your devices; needs an auth key)
+  5) Only locally / SSH tunnel       (most private)
 EOF
-    case "$(ask 'Choose 1-4' 2)" in
+    case "$(ask 'Choose 1-5' 2)" in
       1) EXPOSURE=domain; DOMAIN="$(ask 'Domain (DNS must point to this server)' '')"; [ -n "$DOMAIN" ] || die "A domain is required" ;;
       2) EXPOSURE=ip ;;
       3) EXPOSURE=tunnel; CF_TOKEN="$(ask 'Cloudflare tunnel token' '')"; [ -n "$CF_TOKEN" ] || die "A tunnel token is required" ;;
+      4) EXPOSURE=tailscale; TS_AUTHKEY="$(ask 'Tailscale auth key (tskey-auth-…)' '')" ;;
       *) EXPOSURE=local ;;
     esac
   fi
@@ -176,10 +185,9 @@ install -d -m 750 -o root -g "$APP_USER" "$CONF_DIR"
 OLD_PW=""
 [ -f "$CONF_DIR/app.env" ] && OLD_PW="$(grep -E '^ADMIN_PASSWORD=' "$CONF_DIR/app.env" | cut -d= -f2- || true)"
 TRUST_PROXY=0
-case "$EXPOSURE" in domain|ip|tunnel) TRUST_PROXY=1 ;; esac
-# Web address & access (031): keep "Only Cloudflare" from the panel across re-runs
+case "$EXPOSURE" in domain|ip|tunnel|tailscale) TRUST_PROXY=1 ;; esac
+# Web address & access (031/036): the panel's settings, kept across re-runs
 WEB_APPLIED=/var/lib/duniya-ops/web-applied.json
-if [ "$TRUST_PROXY" = 1 ] && [ -f "$WEB_APPLIED" ] && grep -q '"cloudflareOnly":true' "$WEB_APPLIED"; then TRUST_PROXY=cloudflare; fi
 umask 027
 cat > "$CONF_DIR/app.env" <<EOF
 NODE_ENV=production
@@ -324,38 +332,28 @@ EOF
     fi
   fi
   install -d -m 0755 /etc/caddy
-  # Visiting the server's bare IP (e.g. the install-progress address http://<ip>/) forwards to the real panel
-  # address; https on a bare IP can't have a certificate, so Caddy's default redirect would end in an error.
+  # The Caddyfile always comes from webconfig.mjs (same as the panel's apply): panel over HTTPS only, port 80 for
+  # certificates, redirects and the domain reachability check. Visiting the bare IP forwards to the panel address.
+  # The panel's settings (031/036: extra addresses, proxies, access rules) are kept for the address chosen now.
   SERVER_IP="$(public_ip || true)"
-  cat > /etc/caddy/Caddyfile <<EOF
-$HOSTNAME_PUBLIC {
-	encode gzip
-	reverse_proxy 127.0.0.1:$PORT
-}
-EOF
-  if [ -n "$SERVER_IP" ] && [ "$SERVER_IP" != "$HOSTNAME_PUBLIC" ]; then
-    cat >> /etc/caddy/Caddyfile <<EOF
-
-http://$SERVER_IP {
-	redir https://$HOSTNAME_PUBLIC{uri} 302
-}
-EOF
+  CVER="$(caddy version 2>/dev/null | awk '{print $1}' | tr -cd 'v0-9.')"
+  WEB_REQ="$(mktemp)"
+  if [ -f "$WEB_APPLIED" ]; then cp "$WEB_APPLIED" "$WEB_REQ"; else printf '{"host":"%s","port":%s,"access":{}}\n' "$HOSTNAME_PUBLIC" "$PORT" > "$WEB_REQ"; fi
+  render_caddy() { (cd / && node /usr/local/lib/duniya-ops/webconfig.mjs render "$1" --out /etc/caddy/Caddyfile.duniya --host "$HOSTNAME_PUBLIC" --server-ip "$SERVER_IP" --caddy-version "${CVER:-2.6.0}" >/dev/null) \
+      && caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile.duniya >/dev/null 2>&1; }
+  if render_caddy "$WEB_REQ"; then
+    if [ -f "$WEB_APPLIED" ]; then say "Kept the web settings from the panel (Settings → Web address & access)"; fi
+  else
+    if [ -f "$WEB_APPLIED" ]; then warn "Could not keep the panel's web settings; the panel is open to everyone at $PUBLIC_URL. Apply them again in Settings → Web address & access."; fi
+    printf '{"host":"%s","port":%s,"access":{}}\n' "$HOSTNAME_PUBLIC" "$PORT" > "$WEB_REQ"
+    render_caddy "$WEB_REQ" || die "Could not create the web server configuration for $HOSTNAME_PUBLIC"
   fi
-  # Keep the IP allow-list set in the panel (031), for the address chosen now.
-  if [ -f "$WEB_APPLIED" ]; then
-    CVER="$(caddy version 2>/dev/null | awk '{print $1}' | tr -cd 'v0-9.')"
-    if (cd / && node /usr/local/lib/duniya-ops/webconfig.mjs render "$WEB_APPLIED" --out /etc/caddy/Caddyfile.duniya --host "$HOSTNAME_PUBLIC" --server-ip "$SERVER_IP" --caddy-version "${CVER:-2.6.0}" >/dev/null) \
-      && caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile.duniya >/dev/null 2>&1; then
-      mv -f /etc/caddy/Caddyfile.duniya /etc/caddy/Caddyfile
-      say "Kept the access settings from the panel (Settings → Web address & access)"
-    else
-      rm -f /etc/caddy/Caddyfile.duniya
-      warn "Could not keep the panel's access settings; the panel is open to everyone. Apply them again in Settings → Web address & access."
-    fi
-  fi
+  mv -f /etc/caddy/Caddyfile.duniya /etc/caddy/Caddyfile
+  rm -f "$WEB_REQ"
   open_web_ports
   systemctl enable -q caddy && systemctl reload-or-restart caddy
   systemctl disable -q --now cloudflared 2>/dev/null || true
+  if command -v tailscale >/dev/null; then tailscale serve reset >/dev/null 2>&1 || true; fi
 elif [ "$EXPOSURE" = "tunnel" ]; then
   if ! command -v cloudflared >/dev/null; then
     say "Installing cloudflared"
@@ -367,6 +365,29 @@ elif [ "$EXPOSURE" = "tunnel" ]; then
   systemctl is-enabled -q cloudflared 2>/dev/null || cloudflared service install "$CF_TOKEN" >/dev/null 2>&1
   systemctl restart cloudflared || true
   systemctl disable -q --now caddy 2>/dev/null || true
+elif [ "$EXPOSURE" = "tailscale" ]; then
+  # Tailscale (033): outbound only, no inbound ports. The panel is served by `tailscale serve` over HTTPS at the
+  # machine's tailnet name (certificate from Tailscale); only devices in the tailnet can reach it.
+  if ! command -v tailscale >/dev/null; then
+    say "Installing Tailscale"
+    curl -fsSL https://tailscale.com/install.sh | sh >/dev/null
+  fi
+  systemctl enable -q --now tailscaled
+  if ! tailscale status >/dev/null 2>&1; then
+    [ -n "$TS_AUTHKEY" ] || die "Tailscale is not signed in: re-run with --tailscale-authkey tskey-… (create one at https://login.tailscale.com/admin/settings/keys)"
+    tailscale up --auth-key="$TS_AUTHKEY" --hostname="$(hostname -s | tr -cd 'a-z0-9-' | cut -c1-40)" || die "tailscale up failed (is the auth key valid and unused?)"
+  fi
+  if ! timeout 60 tailscale serve --bg --https=443 "http://127.0.0.1:$PORT" >/dev/null 2>&1; then
+    warn "tailscale serve did not start: turn on MagicDNS and HTTPS Certificates (Tailscale admin console → DNS), then run: sudo tailscale serve --bg --https=443 http://127.0.0.1:$PORT"
+  fi
+  TS_NAME="$(tailscale status --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",(d)=>{s+=d}).on("end",()=>{try{process.stdout.write(String(JSON.parse(s).Self.DNSName||"").replace(/\.$/,""))}catch{}})')"
+  if [[ "$TS_NAME" =~ ^[a-z0-9.-]+$ ]]; then
+    PUBLIC_URL="https://$TS_NAME"
+    sed -i "s|^PUBLIC_URL=.*|PUBLIC_URL=$PUBLIC_URL|" "$CONF_DIR/app.env"
+    systemctl restart whatsapp-agent-duniya
+  fi
+  systemctl disable -q --now caddy 2>/dev/null || true
+  systemctl disable -q --now cloudflared 2>/dev/null || true
 else
   systemctl disable -q --now caddy 2>/dev/null || true
   systemctl disable -q --now cloudflared 2>/dev/null || true
@@ -388,6 +409,7 @@ say "Installed."
 case "$EXPOSURE" in
   domain|ip) echo "  Admin panel: $PUBLIC_URL   (the certificate can take a minute on first visit)" ;;
   tunnel) echo "  Admin panel: your Cloudflare Tunnel hostname (public hostname → http://localhost:$PORT)" ;;
+  tailscale) echo "  Admin panel: ${PUBLIC_URL:-https://<this machine>.<your tailnet>.ts.net}   (from devices in your tailnet)" ;;
   local) echo "  Admin panel: ssh -L $PORT:127.0.0.1:$PORT <user>@<this server>, then open http://localhost:$PORT" ;;
 esac
 if [ -n "$CODE" ]; then echo "  Setup code:  $CODE   (enter it in the panel to create the owner account)"
