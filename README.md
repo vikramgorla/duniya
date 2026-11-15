@@ -40,7 +40,7 @@
 <td valign="top"><a href="docs/spending.md"><img src="docs/img/thumb-usage.webp" alt="Usage page with costs per agent" width="100%"></a><br><b>Spending caps</b><br>Monthly caps, 80 % alert, weekly summary.</td>
 </tr>
 <tr>
-<td valign="top"><a href="docs/agents.md#tool-services-mcp"><img src="docs/img/thumb-mcp.webp" alt="Adding an MCP tool service" width="100%"></a><br><b>Real tools via MCP</b><br>Per-role allow lists, confirm step for changes.</td>
+<td valign="top"><a href="docs/agents.md#tool-services-mcp"><img src="docs/img/thumb-mcp.webp" alt="Adding an MCP tool service" width="100%"></a><br><b>Real tools via MCP</b><br>Browse the MCP Registry and add in one click; per-role allow lists, confirm step for changes.</td>
 <td valign="top"><a href="docs/agents.md#whatsapp-actions"><img src="docs/img/thumb-wa-group.webp" alt="WhatsApp group settings card" width="100%"></a><br><b>WhatsApp powers</b><br>Media, polls, reactions, group admin per role.</td>
 <td valign="top"><a href="docs/getting-started.md#why-didnt-it-answer"><img src="docs/img/thumb-quiet.webp" alt="Why agents stayed quiet, with fixes" width="100%"></a><br><b>"Why didn't it answer?"</b><br>Reasons per chat, one-click fixes.</td>
 </tr>

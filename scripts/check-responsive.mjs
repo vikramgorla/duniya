@@ -30,6 +30,14 @@ const UPDATE_DECISION = `const f0 = window.fetch; window.fetch = async (u, o) =>
     return new Response(JSON.stringify({ ...j, status: { ...j.status, available: true, latest: 'v3.0.0', target: 'v3.0.0', breaking: true, steps, safeTarget: 'v2.10.0', decisionVersion: '3.0.0' },
       decision: { version: 'v3.0.0', target: 'v3.0.0', current: j.status?.current || 'v2.9.0', steps, safeTarget: 'v2.10.0', notifiedAt: Date.now() - 3600000, snoozedUntil: null, dismissed: false, show: true, backup: true, docker: false } })); }
   return r; };`;
+// 052: the Add answer of Browse tool services, without changing the demo data (states run several times).
+const REGISTRY_ADDED = `const f1 = window.fetch; window.fetch = async (u, o) => {
+  if (String(u) === '/api/tool-services/registry/add') return new Response(JSON.stringify({ key: 'forecast', kind: 'remote', target: 'all', registry: { name: 'io.github.example-weather/forecast-mcp', version: '1.4.0' },
+    secretsStored: [], warnings: [], confirmGate: null, discovery: { status: 'ok', tools: [
+      { name: 'forecast', description: 'Weather forecast for a place and day (temperature, rain, wind).', risky: false, organizer: true, participant: false },
+      { name: 'alerts', description: 'Official weather warnings for a region.', risky: false, organizer: true, participant: false },
+      { name: 'set_alert', description: 'Send a message when a warning starts.', risky: true, organizer: true, participant: false }] } }), { status: 201, headers: { 'content-type': 'application/json' } });
+  return f1(u, o); };`;
 // js runs in the page after the screen loaded; T.* helpers are defined in PRELUDE.
 const STATES = [
   { name: 'login', hash: '', js: "await fetch('/api/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); await renderLogin();", relogin: true },
@@ -53,6 +61,10 @@ const STATES = [
   { name: 'agent-editor-empty', hash: 'agents/neighbours', wait: 2500, js: 'T.openAll();' },
   { name: 'overview-ask-streaming', hash: 'overview', js: "S.ask = { q: 'What did the families decide?', busy: true, reply: 'Let me look at the carpool and the class chats first.', confirms: [], steps: [{ step: 'thinking' }, { step: 'tool', tool: 'list_visible_chats', ok: true }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'thinking' }, { step: 'tool', tool: 'search_messages', ok: false }] }; show(S.tab); await T.wait(600); S.ask.busy = false;" },
   { name: 'overview-ask-restarted', hash: 'overview', js: "S.ask = { q: 'Who is driving on Friday?', busy: true, restarted: true, reply: '', confirms: [], steps: [{ step: 'thinking' }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'thinking' }] }; show(S.tab); await T.wait(600); S.ask.busy = false;" },
+  // 052: Browse tool services — the search sheet, the Add form with a key, and the result with its tools
+  { name: 'registry-browse', hash: 'agents/carpool', wait: 2500, js: "await T.click('Browse tool services', 'button', 1500);" },
+  { name: 'registry-add', hash: 'agents/carpool', wait: 2500, js: "await T.click('Browse tool services', 'button', 1500); [...document.querySelectorAll('.reg-card')].find((c) => c.textContent.includes('Recipe box')).querySelector('button').click(); await T.until('dialog form input[type=password]'); await T.wait(300);" },
+  { name: 'registry-added', hash: 'settings', wait: 2000, before: REGISTRY_ADDED, js: "await T.click('Browse tool services', 'button', 1500); [...document.querySelectorAll('.reg-card')].find((c) => c.textContent.includes('Weather forecasts')).querySelector('button').click(); await T.until('dialog form'); await T.click('Add to all agents', 'button', 1200);" },
   { name: 'chats', hash: 'chats' },
   { name: 'chats-fallback', hash: 'chats', js: "[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);" },
   { name: 'chats-add-dm', hash: 'chats', js: "[...document.querySelectorAll('button')].find((b) => b.textContent.includes('Add a direct chat'))?.click(); await T.wait(300); const i = document.querySelector('input[inputmode=tel]'); if (i) { i.value = '+41 79 000 00 30'; i.dispatchEvent(new Event('change')); } await T.wait(600);" },

@@ -59,6 +59,37 @@ word (*Changes only*, *Side by side*, *Whole new text*). Skip any part; nothing 
 2. **Connect** to sign in (OAuth, your own OAuth app), or use a token or custom headers.
 3. **Discover tools** → tick what participants and organizers may use → save.
 
+Or skip the URL hunting: **Browse tool services** (below).
+
+### Browse tool services (MCP Registry)
+
+**Find a service in the official [MCP Registry](https://registry.modelcontextprotocol.io) and add it in one step.**
+
+1. Agent page → Tool services → **Browse tool services** (or **Settings → Tool services** for all agents).
+2. Search by name. Each card shows the publisher, **Hosted** or **Local (npm)**, the keys it needs, a trust hint and a
+   link to its source code.
+3. **Add** → fill in what it asks for (keys are stored as secrets and never shown again) → the tools are listed with
+   **organizers on, participants off**; tools that change things are marked. A service that previews changes
+   (`*_preview` + `confirm`) gets the agent's confirm step.
+4. Sign-in services (OAuth) get a **Connect** button; local packages an **Install and list tools** button.
+
+| Badge | Meaning |
+|---|---|
+| Verified publisher | The publisher signed in to the registry with that GitHub account (`io.github.<owner>/…`) or proved the domain (`com.example/…`) |
+| Source linked | The entry links its source code |
+| Check before adding | No source code for a hosted service, source under another account, or deprecated |
+| Not supported here | PyPI, Docker (OCI), NuGet and MCPB packages and SSE-only hosts: this app runs only streamable-HTTP hosts and npm packages over stdio |
+
+> [!WARNING]
+> **Local packages run code on this server.** Only the owner can add them, and they are refused on small servers
+> (1 GB / 1 CPU): choose a hosted one there. A trust hint says who published an entry, not that the code is safe.
+
+> [!NOTE]
+> **Settings → Tool services → MCP Registry** (owner): switch browsing off, or point it at a private registry with the
+> same API (https). The panel only talks to that registry host, sends no credentials, and caches answers for 5
+> minutes. Admin MCP and the owner assistant: `search_mcp_registry`, `add_tool_service_from_registry` (confirm
+> required; keys are set with `set_secret` or in the panel, never passed to the tool).
+
 Local services from npm or GitHub are owner-only (scrubbed environment, install scripts off unless allowed).
 
 **Global tool services** (035): define once under **Settings → Tool services** for every agent.
@@ -73,8 +104,8 @@ Local services from npm or GitHub are owner-only (scrubbed environment, install 
 > **Plugins** (`plugins/<name>/index.js`) are Duniya-specific code add-ons for advanced cases (local tools, quick
 > commands, custom role rules); `example-dice` is a developer sample (a dice tool and `!ping` → `pong`), so leave it off.
 > Plugins are not a cross-app standard and there is no plugin marketplace. The standard way to give agents ready-made
-> tools is **MCP**: add a tool service (Agents → Tool services, or Settings → Tool services for all agents) from the
-> thousands of servers listed in the official MCP Registry (registry.modelcontextprotocol.io).
+> tools is **MCP**: add a tool service (Agents → Tool services, or Settings → Tool services for all agents), e.g. with
+> [Browse tool services](#browse-tool-services-mcp-registry) from the official MCP Registry.
 
 ## WhatsApp actions
 

@@ -55,6 +55,8 @@ Max age: `MEDIA_JOB_MAX_AGE_MIN` (15). [Settings](settings.md)
   resume.
 - **Copilot** helper (~400 MB download): refused below 2 GB. **Local tool services** over the limit: the least
   recently used one stops until needed.
+- **Browse tool services** (MCP Registry): adding a **local** package is refused on small servers (each one is an extra
+  Node.js process); hosted services can be added as usual.
 
 > [!TIP]
 > Try it locally: `DEMO_SMALL=1 node scripts/demo-panel.mjs` pretends to be a 1 GB / 1 CPU server.
