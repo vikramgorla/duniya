@@ -24,7 +24,8 @@ if (existsSync(bootEnvFile)) {
 export const DATA_DIR = resolve(ROOT, process.env.DATA_DIR || 'data');
 mkdirSync(DATA_DIR, { recursive: true });
 // A restore staged from the panel (007) is applied here, before anything opens the database.
-applyPendingRestore(DATA_DIR);
+// The command line tool (029) never applies it: the running service would still hold the old database.
+if (process.env.DUNIYA_CLI !== '1') applyPendingRestore(DATA_DIR);
 
 export const BOTS_DIR = resolve(ROOT, process.env.BOTS_DIR || 'bots');
 
@@ -34,7 +35,7 @@ export const env = {
   adminPassword: process.env.ADMIN_PASSWORD || '',
   timezone: process.env.TZ_DEFAULT || 'Europe/Zurich',
   rateLimitPerMin: Number(process.env.RATE_LIMIT_PER_MIN || 6),
-  trustProxy: ['1', 'true', 'yes'].includes(String(process.env.TRUST_PROXY || '').toLowerCase()),
+  trustProxy: ['1', 'true', 'yes', 'cloudflare'].includes(String(process.env.TRUST_PROXY || '').toLowerCase()),
   memory: {
     summarizeBatch: Number(process.env.MEMORY_SUMMARIZE_BATCH || 40),
     retentionDays: Number(process.env.MEMORY_RETENTION_DAYS || 90),

@@ -1,0 +1,51 @@
+#!/bin/bash
+# `duniya` command for installer servers (029), installed to /usr/local/bin/duniya by install.sh.
+# Runs bin/duniya.js as the app user with the app's environment, so files in the data directory keep the right
+# owner. Things that need root (restarting the service, reading its log, finishing an update) happen here.
+set -uo pipefail
+APP_DIR="${DUNIYA_APP_DIR:-/opt/whatsapp-agent-duniya}"
+ENV_FILE="${DUNIYA_ENV_FILE:-/etc/duniya/app.env}"
+APP_USER="${DUNIYA_APP_USER:-duniya}"
+SERVICE=whatsapp-agent-duniya
+
+if [ "$(id -u)" -ne 0 ]; then
+  if command -v sudo >/dev/null; then exec sudo "$0" "$@"; fi
+  echo "Run this as root: sudo duniya $*" >&2; exit 1
+fi
+[ -f "$APP_DIR/bin/duniya.js" ] || { echo "Duniya is not installed in $APP_DIR (or is too old for this command: re-run the installer)." >&2; exit 1; }
+
+run_app() { # run bin/duniya.js as the app user with only the app's environment
+  local envs=() line
+  if [ -r "$ENV_FILE" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && envs+=("$line")
+    done < "$ENV_FILE"
+  fi
+  local base=(env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/var/lib/duniya LANG="${LANG:-C.UTF-8}" TERM="${TERM:-dumb}" "${envs[@]}" DUNIYA_WRAPPER=1
+    node --disable-warning=ExperimentalWarning "$APP_DIR/bin/duniya.js" "$@")
+  cd "$APP_DIR" || return 1
+  if command -v runuser >/dev/null; then runuser -u "$APP_USER" -- "${base[@]}"; else sudo -u "$APP_USER" -- "${base[@]}"; fi
+}
+
+case "${1:-}" in
+  restart)
+    echo "Restarting $SERVICE (bots are offline for a few seconds)…"
+    systemctl restart "$SERVICE" && sleep 2 && systemctl is-active -q "$SERVICE" && echo "✓ Restarted." || { echo "✗ The service did not come back. See: duniya logs" >&2; exit 1; }
+    ;;
+  logs)
+    shift
+    args=(-u "$SERVICE" -n 200 --no-pager -o short-iso)
+    for a in "$@"; do case "$a" in -f|--follow) args+=(-f) ;; esac; done
+    exec journalctl "${args[@]}"
+    ;;
+  update)
+    if [[ " $* " == *" --check "* ]]; then run_app "$@"; exit $?; fi
+    run_app "$@"; rc=$?
+    case $rc in
+      0) systemctl restart "$SERVICE" && echo "✓ Restarted on the new version." ;;
+      3) exit 0 ;; # already up to date
+      *) exit $rc ;;
+    esac
+    ;;
+  *) run_app "$@"; exit $? ;;
+esac

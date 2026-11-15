@@ -5,19 +5,20 @@ import { execFile } from 'node:child_process';
 import { env, ROOT, DATA_DIR } from '../core/config.js';
 import {
   listSecrets, setSecret, getSettings, updateSettings, interpolate, countUsers, createUser, listUsers, updateUser,
-  deleteUser, authenticate, sessionUser, deleteSession,
+  deleteUser, authenticate, sessionUser, deleteSession, getUser,
 } from '../core/store.js';
 import {
   listBots, getBot, botView, createBot, updateBot, deleteBot, bindChat, loadBots, botForChat,
   listTemplates, templateConfig, exportBot, importBot, listPlugins,
 } from '../core/bots.js';
 import { referencedSecrets } from '../core/schema.js';
-import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages } from '../core/db.js';
+import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages, listNotes } from '../core/db.js';
 import { bus, activity, loggingSettings, resetLoggingCache, LOG_CATEGORIES } from '../core/events.js';
 import { allChatPrefs, setChatPrefs, seenChats, ignoredCounts, enabledChats } from '../core/chat-prefs.js';
 import { runAgent, handleConfirmCommand, applyPending } from '../core/agent.js';
 import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool, mcpConnection } from '../core/mcp.js';
+import { listContacts, saveContact, removeContact, getContact } from '../core/contacts.js';
 import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
 import { humanCode } from '../core/crypto.js';
 import { organizerConnection, oauthClientOf } from '../core/tools.js';
@@ -39,7 +40,12 @@ import {
   CSP, clientIp, isHttps, cookie, send, setSessionCookie, limiter, uploadAllowed, setSetupCode, checkSetupCode,
 } from './http.js';
 import { googleRoutes, googleReady } from './routes/google.js';
+import { webRoutes } from './routes/web.js';
+import { passwordLoginAllowed } from '../core/google-signin.js';
 import { createAdminMcp } from './admin-mcp.js';
+import { validateAccess } from '../core/admin-oauth.js';
+import { baseUrl, minuteLimiter } from './http-util.js';
+import { mobileRoutes } from './routes/mobile.js';
 import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES } from '../core/mcp-oauth.js';
 
 const PUBLIC = resolve(import.meta.dirname, 'public');
@@ -77,22 +83,39 @@ const gitVersion = () => new Promise((r) => execFile('git', ['log', '-1', '--for
 const loginLimit = limiter(5);
 const rateLimitLogin = (ip) => loginLimit(ip);
 
+// ---------- who is calling: session cookie (panel) or OAuth bearer token (mobile app, 027) ----------
+// A bearer token must be one issued for this server's /api resource (not the admin MCP's /mcp); it acts as the panel
+// user who approved it, with that user's current role. When an Authorization header is sent, only the token counts.
+const bearerOf = (req) => (/^Bearer\s+(\S+)\s*$/i.exec(String(req.headers.authorization || '')) || [])[1];
+const bearerLimit = minuteLimiter(300);
+export function requestUser(req) {
+  const token = bearerOf(req);
+  if (token) {
+    const a = validateAccess(token, `${baseUrl(req)}/api`);
+    const user = a && getUser(a.user.id);
+    return user ? { user, via: 'bearer', client: a.client, tokenHash: a.tokenHash } : { invalid: true, via: 'bearer' };
+  }
+  const user = sessionUser(cookie(req, 'duniya_session'));
+  return user ? { user, via: 'session' } : { via: 'none' };
+}
+
 export function startPanel({ channel, extend = [] }) {
   bootstrapAuth();
   setWhatsAppChannel(channel);
   const routes = [];
   /** opts.role: minimum role (default: viewer for GET, admin otherwise). opts.public: no auth. */
   /** opts.raw: the handler reads the (binary) request body itself; see uploadAllowed() for the CSRF guard. */
+  /** opts.bearer: false = panel session only (not the mobile app's token); raw uploads are always session only. */
   const route = (method, pattern, handler, opts = {}) => routes.push({
-    method, handler, public: !!opts.public, raw: !!opts.raw,
+    method, handler, public: !!opts.public, raw: !!opts.raw, bearer: opts.bearer !== false && !opts.raw,
     role: opts.role || (method === 'GET' ? 'viewer' : 'admin'),
     re: new RegExp(`^${pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)')}$`),
   });
 
   // ---------- session / setup ----------
   route('GET', '/api/session', async (req) => {
-    const user = sessionUser(cookie(req, 'duniya_session'));
-    return { authed: !!user, user, needsSetup: countUsers() === 0, google: googleReady() };
+    const { user = null } = requestUser(req);
+    return { authed: !!user, user, needsSetup: countUsers() === 0, google: googleReady(), passwordLogin: passwordLoginAllowed() };
   }, { public: true });
   route('POST', '/api/setup', async (req, res, body) => {
     if (countUsers() > 0) return [409, { error: 'Already set up' }];
@@ -107,6 +130,7 @@ export function startPanel({ channel, extend = [] }) {
   route('POST', '/api/login', async (req, res, body) => {
     const ip = clientIp(req);
     if (rateLimitLogin(ip)) return [429, { error: 'Too many attempts, wait a minute' }];
+    if (!passwordLoginAllowed()) { activity('system', { summary: `Password sign-in refused for "${body.username || 'admin'}" from ${ip} (only Google allowed)` }); return [403, { error: 'Password sign-in is switched off. Use Sign in with Google.' }]; }
     const user = authenticate(body.username || 'admin', String(body.password || ''));
     if (!user) { activity('system', { summary: `Panel login failed for "${body.username || 'admin'}" from ${ip}` }); return [401, { error: 'Wrong username or password' }]; }
     setSessionCookie(req, res, user.id);
@@ -124,14 +148,16 @@ export function startPanel({ channel, extend = [] }) {
     updateUser(user.id, { password: String(body.next || '') });
     activity('system', { summary: `Password changed: ${user.username}` });
     return { ok: true };
-  }, { role: 'viewer' });
+  }, { role: 'viewer', bearer: false });
 
   // ---------- Sign in with Google, invites (019) ----------
   googleRoutes(route);
+  webRoutes(route); // web address & access (031)
 
   // ---------- users (owner) ----------
   route('GET', '/api/users', async () => listUsers(), { role: 'owner' });
   route('POST', '/api/users', async (req, res, body, q, p, user) => {
+    if (!passwordLoginAllowed()) return [400, { error: 'Password sign-in is switched off: invite this person with Google instead (Users → Invite).' }];
     const u = createUser(body); activity('system', { summary: `User ${u.username} (${u.role}) added by ${user.username}` }); return u;
   }, { role: 'owner' });
   route('PUT', '/api/users/:id', async (req, res, body, q, p, user) => {
@@ -449,6 +475,20 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     return { summary: summary ?? memoryView(chat).summary };
   });
   route('DELETE', '/api/chats/:chat/memory', async (req, res, body, q, p, user) => { eraseChatMemory(decodeURIComponent(p.chat), user.username); return { ok: true }; });
+  // ---------- contacts (#11) ----------
+  route('GET', '/api/contacts', async (req, res, body, q) => listContacts({ q: q.get('q') || '', sharedOnly: q.get('shared') === '1' }));
+  route('PUT', '/api/contacts/:phone', async (req, res, body, q, p, user) => saveContact({ ...body, phone: decodeURIComponent(p.phone) }, user.username));
+  route('DELETE', '/api/contacts/:phone', async (req, res, body, q, p, user) => {
+    if (!getContact(decodeURIComponent(p.phone))) return [404, { error: 'Not found' }];
+    removeContact(decodeURIComponent(p.phone), user.username);
+    return { ok: true };
+  });
+
+  // Shared agent memory (#8): notes an agent keeps across all its chats.
+  route('GET', '/api/bots/:id/memory', async (req, res, body, q, p) => {
+    if (!getBot(p.id)) return [404, { error: 'Not found' }];
+    return { notes: listNotes(`agent:${p.id}`).map((n) => ({ id: n.id, text: n.text, author: n.author, role: n.role, ts: n.ts })) };
+  });
   route('DELETE', '/api/notes/:id', async (req, res, body, q, p, user) => {
     const note = getNote(p.id);
     if (!note) return [404, { error: 'Not found' }];
@@ -527,6 +567,9 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
   // ---------- system ----------
   route('POST', '/api/system/restart', async () => { setTimeout(() => process.exit(0), 300); return { ok: true }; }, { role: 'owner' });
 
+  // ---------- mobile app (027): Settings → Mobile app ----------
+  mobileRoutes(route);
+
   // Other features (providers, backups, updates) add their routes with the same role gates.
   for (const fn of [].concat(extend)) fn(route, { channel });
 
@@ -572,12 +615,22 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
         return send(res, 200, readFileSync(resolve(PUBLIC, 'index.html')), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
       }
       if (url.pathname === '/healthz') return send(res, 200, 'ok');
+      if (req.method === 'GET' && url.pathname === '/qr.js') {
+        return send(res, 200, readFileSync(resolve(PUBLIC, 'qr.js')), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=3600' });
+      }
       if (await adminMcp.handle(req, res, url)) return;
       const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));
       if (!r) return send(res, 404, { error: 'Not found' });
       let user = null;
       if (!r.public) {
-        user = sessionUser(cookie(req, 'duniya_session'));
+        const who = requestUser(req);
+        if (who.via === 'bearer') {
+          const meta = `${baseUrl(req)}/.well-known/oauth-protected-resource/api`;
+          if (who.invalid) return send(res, 401, { error: 'Sign in again (the app\'s access expired or was revoked)' }, { 'www-authenticate': `Bearer resource_metadata="${meta}", error="invalid_token"`, 'cache-control': 'no-store' });
+          if (!r.bearer) return send(res, 403, { error: 'Do this in the web panel' });
+          if (bearerLimit(who.tokenHash)) return send(res, 429, { error: 'Too many requests, wait a moment' }, { 'retry-after': '20' });
+        }
+        user = who.user;
         if (!user) return send(res, 401, { error: 'Login required' });
         if (ROLE_RANK[user.role] < ROLE_RANK[r.role]) {
           return send(res, 403, { error: user.role === 'viewer' ? 'Read-only account' : `Requires ${r.role} role` });
@@ -594,7 +647,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
       if (Array.isArray(out) && typeof out[0] === 'number' && out.length === 2) return send(res, out[0], out[1]);
       return send(res, 200, out ?? { ok: true });
     } catch (e) {
-      if (!res.headersSent) send(res, e.status || 400, { error: e.message, field: e.field });
+      if (!res.headersSent) send(res, e.status || 400, { error: e.message, field: e.field, needsConfirm: e.needsConfirm, warnings: e.warnings, check: e.check });
     }
   });
   server.listen(env.panelPort, env.panelHost, () => {

@@ -3,6 +3,7 @@ import { activity } from '../../core/events.js';
 import { sessionUser, listInvites, createInvite, renewInvite, revokeInvite, unlinkGoogle } from '../../core/store.js';
 import {
   googleConfig, googleReady, saveGoogleConfig, removeGoogleConfig, testGoogle, startGoogle, finishGoogle, resolveGoogleUser, linkCurrentUser,
+  googleOnlyState, setGoogleOnly, passwordLoginAllowed,
 } from '../../core/google-signin.js';
 import { cookie, clientIp, isHttps, publicBase, setSessionCookie, limiter, resultPage, send } from '../http.js';
 
@@ -37,22 +38,34 @@ export function googleRoutes(route) {
   route('PUT', '/api/auth/google', async (req, res, body, q, p, user) => {
     const c = saveGoogleConfig({ clientId: body.clientId, clientSecret: body.clientSecret, enabled: body.enabled });
     activity('config', { summary: `Sign in with Google ${c.enabled ? 'settings saved' : 'turned off'} by ${user.username}` });
+    if (!googleReady()) setGoogleOnly(false, { by: user.username, source: 'auto' }); // never leave nobody able to sign in
     return { ...c, ready: googleReady(), ...googleUrls(req) };
   }, OWNER);
   route('DELETE', '/api/auth/google', async (req, res, body, q, p, user) => {
     removeGoogleConfig();
     activity('config', { summary: `Sign in with Google removed by ${user.username}` });
+    setGoogleOnly(false, { by: user.username, source: 'auto' });
     return { ok: true };
   }, OWNER);
   route('POST', '/api/auth/google/test', async (req) => testGoogle(googleUrls(req).redirectUri), OWNER);
 
+  // ---------- only Google (028) ----------
+  route('GET', '/api/auth/signin', async (req, res, body, q, p, user) => googleOnlyState(user), OWNER);
+  route('PUT', '/api/auth/signin', async (req, res, body, q, p, user) => {
+    setGoogleOnly(!!body.googleOnly, { user, source: 'panel' });
+    return googleOnlyState(user);
+  }, OWNER);
+
   // ---------- linking ----------
+  const NO_UNLINK = 'Only Sign in with Google is allowed (Settings → Sign-in): unlinking would lock this account out. Switch password sign-in back on first.';
   route('DELETE', '/api/me/google', async (req, res, body, q, p, user) => {
+    if (!passwordLoginAllowed()) return [400, { error: NO_UNLINK }];
     const u = unlinkGoogle(user.id);
     activity('config', { summary: `${user.username} unlinked their Google account` });
     return u;
   }, { role: 'viewer' });
   route('DELETE', '/api/users/:id/google', async (req, res, body, q, p, user) => {
+    if (!passwordLoginAllowed()) return [400, { error: NO_UNLINK }];
     const u = unlinkGoogle(p.id);
     activity('config', { summary: `Google unlinked from ${u.username} by ${user.username}` });
     return u;

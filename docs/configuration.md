@@ -64,6 +64,61 @@ Prefer infrastructure-as-code from your own fork? [deploy/terraform-github-actio
 
 Runs comfortably on a 1 GB VM (~180 MB RAM).
 
+## Deploy on a free cloud VM
+
+Two providers give you a server that stays free (checked November 2026, sources in
+[specs/030-free-vms/research.md](../specs/030-free-vms/research.md)). Both buttons create the VM and run the same installer.
+
+| Provider | Free server | Button |
+|---|---|---|
+| **Oracle Cloud** (Always Free) | 1 GB AMD VM, or Arm up to 2 OCPU / 12 GB; 200 GB disk; 10 TB traffic | [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip) |
+| **Google Cloud** (Always Free) | one e2-micro (1 GB) in us-central1 / us-west1 / us-east1; 30 GB disk; 1 GB traffic. The public IPv4 may cost ~US$3.65/month | [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fwhatsapp-agent-duniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md) |
+
+Both need a card for sign-up. AWS and Azure only offer 6–12 month trials, Hetzner has no free tier, Fly.io/Render
+are not always-on VMs, and "lifetime free VPS" sites such as GratisVPS are not trustworthy (see the research).
+Any other Ubuntu/Debian VM works with the one-command installer above.
+
+### Google Cloud (Always Free e2-micro)
+
+Click **Open in Cloud Shell**, confirm, and follow the tutorial on the right: choose a project with billing, run
+`bash infra/gcp/deploy.sh`, wait ~15 minutes (live progress at `http://<ip>/`), then open `https://<ip>.sslip.io` with the
+setup code it prints. Your own domain: *Settings → Web address & access* in the panel.
+Without the button: `git clone` this repository in any shell with `gcloud`, then `bash infra/gcp/deploy.sh --help`.
+
+Oracle Cloud details (managing the stack, logs, removal) are in the section above.
+
+## Your own domain and IP allow-list
+
+*Settings → Web address & access* (owner): enter a domain, **Check DNS** shows the record to create, **Use this
+domain** gets the certificate — if HTTPS does not come up within 4 minutes the previous address comes back by itself.
+**Who can open the panel**: everyone, **Only Cloudflare** (Cloudflare's published IP ranges, refreshed daily; the real
+visitor address is used behind the proxy), or your own list of IPs/ranges (your current IP is always kept). Applied by
+the root maintenance helper with strict validation; needs the installer (re-run it once on older servers).
+
+## Command line (`duniya`)
+
+On an installer server, `sudo duniya <command>` (Docker: `docker compose exec app duniya <command>`). Safe while the
+service runs.
+
+| Command | What it does |
+|---|---|
+| `reset-password <user> [--password PW]` | new password (asks, or makes one up and prints it); signs the account out everywhere |
+| `create-user <name> --role admin\|viewer\|owner`, `list-users`, `set-role`, `remove-user` | manage panel accounts |
+| `enable-password-login` | switch passwords back on if "Only allow Sign in with Google" locked you out |
+| `show-setup-code` | the one-time code that creates the first owner |
+| `status` | version, uptime, WhatsApp numbers, bots, last backup |
+| `doctor` | checks DNS, HTTPS, ports, disk, memory, swap and prints fixes |
+| `backup-now`, `restart`, `logs [-f]`, `update [--check]` | maintenance |
+| `open-access` | remove the IP allow-list if it locked you out of the panel |
+
+## Mobile app (preview)
+
+A native iOS and Android app (React Native with Expo) for owners and admins: status, agents, chats, activity, usage,
+server updates and waiting confirmations. While in preview it runs in **Expo Go**: open **Settings → Mobile app** in
+the panel and follow the three steps (install Expo Go, open the app, scan the connect QR code). The app signs in with
+your panel account through the panel's own OAuth sign-in and can do what your account can do. Developer notes and
+store-build instructions: [`mobile/README.md`](../mobile/README.md). The server never installs `mobile/`.
+
 ## First steps in the panel
 
 1. **Setup**: enter the setup code, choose your username and password.

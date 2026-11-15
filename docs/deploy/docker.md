@@ -15,3 +15,5 @@ cp .env.example .env
 - Setup code: `docker compose logs app | grep -i 'setup code'`, or set `ADMIN_PASSWORD` in `.env`.
 - Update: `docker compose pull && docker compose up -d` (the panel's in-place updater is for installer setups).
 - Images: `ghcr.io/vikramgorla/whatsapp-agent-duniya:<version>` for amd64 and arm64, published on each release.
+- Command line: `docker compose exec app duniya help` (reset a password, list users, status, backup now, …). For the
+  setup code: `docker compose exec app duniya show-setup-code`.

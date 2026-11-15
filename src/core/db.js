@@ -5,6 +5,7 @@ import { DATA_DIR, env } from './config.js';
 export const db = new DatabaseSync(resolve(DATA_DIR, 'duniya.sqlite'));
 db.exec(`
   PRAGMA journal_mode = WAL;
+  PRAGMA busy_timeout = 5000;
   CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY, channel TEXT, chat TEXT, bot TEXT, sender TEXT, name TEXT,
     text TEXT, from_bot INTEGER DEFAULT 0, ts INTEGER
@@ -96,6 +97,18 @@ export const getNote = (id) => db.prepare('SELECT * FROM notes WHERE id = ?').ge
 export const deleteNote = (id, chat) => (chat
   ? db.prepare('DELETE FROM notes WHERE id = ? AND chat = ?').run(Number(id), chat)
   : db.prepare('DELETE FROM notes WHERE id = ?').run(Number(id))).changes > 0;
+
+export function updateNote(id, chat, text) {
+  return db.prepare('UPDATE notes SET text = ?, ts = ? WHERE id = ? AND chat = ?').run(String(text).slice(0, 500), Date.now(), Number(id), chat).changes > 0;
+}
+/** Notes of several scopes (chat ids or `agent:<id>`) whose text contains the query, newest first. */
+export function searchNotes(chats, query, limit = 20) {
+  if (!chats.length) return [];
+  const q = `%${String(query).replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  return db.prepare(`SELECT * FROM notes WHERE chat IN (${chats.map(() => '?').join(',')}) AND text LIKE ? ESCAPE '\\' ORDER BY id DESC LIMIT ?`)
+    .all(...chats, q, Math.min(Number(limit) || 20, 50));
+}
+export const deleteAgentNotes = (bot) => db.prepare('DELETE FROM notes WHERE chat = ?').run(`agent:${bot}`).changes;
 
 export function eraseChat(chat) {
   db.prepare('DELETE FROM messages WHERE chat = ?').run(chat);

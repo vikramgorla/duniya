@@ -31,7 +31,11 @@
 - **Manage it from ChatGPT or Claude.** The app is an MCP server with OAuth 2.1, your panel role and confirmations.
 - **Run it without SSH.** Usage and cost reports, activity log with a logging policy, server metrics, OS updates,
   one-click app updates and encrypted backups to GitHub, S3 or a download.
-- **Free to host.** One click on Oracle Cloud Always Free; about 180 MB of RAM.
+- **Contacts and memory.** Address-book names from the phone plus your own list (you decide what participants may
+  look up); notes per chat and shared across an agent's chats.
+- **Secure by default.** Google-only sign-in, your own domain with an IP allow-list (e.g. only Cloudflare), a
+  `duniya` command line for recovery, and a native iOS/Android app (preview, Expo Go).
+- **Free to host.** One click on Oracle Cloud or Google Cloud free tiers; about 180 MB of RAM.
 
 ## Quick start
 
@@ -41,6 +45,13 @@
 
 Pick your home region, click **Apply**, and open `http://<server-ip>/` to follow the install.
 Walkthrough: [docs/deploy/oci-free-tier.md](docs/deploy/oci-free-tier.md).
+
+**Google Cloud (free e2-micro, one click)**
+
+[![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fwhatsapp-agent-duniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md)
+
+Follow the tutorial on the right (the public IPv4 may cost about US$3.65/month). Why only these two:
+[free VM research](specs/030-free-vms/research.md).
 
 **Any Ubuntu/Debian server (x86_64 or arm64)**
 
@@ -55,7 +66,7 @@ setting are in [docs/configuration.md](docs/configuration.md).
 ## Learn more
 
 - [Website with screenshots and short videos](https://vikramgorla.github.io/whatsapp-agent-duniya/)
-- [Reference: install options, first steps, AI assistants, architecture, settings](docs/configuration.md)
+- [Reference: install options, free VMs, domain & allow-list, `duniya` CLI, mobile app, AI assistants, architecture, settings](docs/configuration.md)
 - Deploy guides: [Oracle Cloud](docs/deploy/oci-free-tier.md) · [Docker](docs/deploy/docker.md) ·
   [Cloudflare Tunnel](docs/deploy/cloudflare-tunnel.md) · [Terraform + GitHub Actions](docs/deploy/terraform-github-actions.md)
 - Feature specs: [`specs/`](specs) · design language: [DESIGN.md](DESIGN.md)
