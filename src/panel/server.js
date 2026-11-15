@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { env, ROOT, DATA_DIR } from '../core/config.js';
@@ -77,9 +77,10 @@ export function bootstrapAuth() {
       console.error(`ADMIN_PASSWORD not usable (${e.message}); falling back to a setup code`);
     }
   }
-  const setupCode = existsSync(SETUP_FILE) ? readFileSync(SETUP_FILE, 'utf8').trim() : humanCode(10);
+  // Create the code file only if it does not exist yet ('wx'), then read whatever is there (no check-then-write race).
+  try { writeFileSync(SETUP_FILE, humanCode(10), { mode: 0o600, flag: 'wx' }); } catch (e) { if (e.code !== 'EEXIST') throw e; }
+  const setupCode = readFileSync(SETUP_FILE, 'utf8').trim();
   setSetupCode(setupCode);
-  writeFileSync(SETUP_FILE, setupCode, { mode: 0o600 });
   console.log(`\n  First-run setup code: ${setupCode}\n  Open the admin panel and enter it to create the owner account.\n`);
 }
 
@@ -340,7 +341,7 @@ export function startPanel({ channel, extend = [] }) {
 <div style="background:#fff;border:1px solid #e3e8e5;border-radius:16px;padding:28px;max-width:440px;text-align:center">
 <div style="font-size:40px">${ok ? '✅' : '⚠️'}</div><h2 style="margin:8px 0">${ok ? 'Connected' : 'Sign-in did not complete'}</h2>
 <p style="color:#5b6a63">${esc(msg)}</p><p><a href="${esc(back)}" id=b style="color:#128c7e;font-weight:600">Back to the panel</a></p></div>
-${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})},1200)</script>` : ''}`;
+${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
     send(res, ok ? 200 : 400, html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP });
     return null;
   }, { public: true });

@@ -78,9 +78,13 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
   merge_method=squash`.
 - **Branches:** `<type>/<issue>-<slug>`, e.g. `feat/10-silent-by-default`, `docs/54-refresh-dod`. Never push to `main`
   (the ruleset blocks it; don't try to work around it).
-- **Labels:** `type:` bug, feature, improvement, security, docs, chore, dependencies · `area:` whatsapp, agents,
-  panel, mobile, models, tools-mcp, memory, security, infra, install, backups, cli, docs, build · `priority:` high,
-  medium, low · `status:` triage, in progress, blocked, needs info · `spec: NNN`.
+- **Labels** (exact names, with a space after the colon — GitHub creates a new label if you mistype one):
+  `type: bug|feature|improvement|security|docs|chore|dependencies|epic` · `area: whatsapp|agents|panel|mobile|models|
+  tools-mcp|memory|security|infra|install|backups|cli|docs|build` · `priority: high|medium|low` · `status: triage|in
+  progress|blocked|needs info` · `spec: NNN`. Check with `gh api repos/{o}/{r}/labels` before creating issues.
+- **Security alerts:** the `Security alerts (automatic)` issue mirrors open code-scanning alerts on `main` (workflow
+  `security-alerts.yml`), so agents without access to the Security tab still see them. Check it (and Dependabot alerts:
+  `gh api repos/{o}/{r}/dependabot/alerts?state=open`) at the start of every work session and fix high ones first.
 - **Spec Kit:** `/speckit-specify` → `/speckit-clarify` (if ambiguous) → `/speckit-plan` → `/speckit-tasks` →
   `/speckit-analyze` → `/speckit-implement` → `/speckit-converge`. The templates in `.specify/templates/` end every
   task list with the Definition-of-Done tasks above; keep them.
