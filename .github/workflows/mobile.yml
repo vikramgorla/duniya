@@ -3,9 +3,9 @@ name: Mobile app
 on:
   push:
     branches: [main]
-    paths: ['mobile/**', '.github/workflows/mobile.yml']
+    paths: ['mobile/**', 'src/panel/public/diff.js', '.github/workflows/mobile.yml'] # diff.js: the app's diff.ts is compared with it
   pull_request:
-    paths: ['mobile/**', '.github/workflows/mobile.yml']
+    paths: ['mobile/**', 'src/panel/public/diff.js', '.github/workflows/mobile.yml'] # diff.js: the app's diff.ts is compared with it
 
 permissions:
   contents: read

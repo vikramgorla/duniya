@@ -122,12 +122,19 @@ export const TOOLS = [
   { name: 'assign_chat', calls: [['POST', '/api/chats/bind']], description: 'Choose which agent answers in a chat. Empty agent_id removes the agent from the chat.',
     input: { chat: str('Chat id (see list_chats)'), agent_id: str('Agent id, or empty to unassign') }, required: ['chat'],
     run: (a, x) => x.call('POST', '/api/chats/bind', { chat: a.chat, agent: a.agent_id || null }) },
-  { name: 'set_chat_settings', calls: [['PUT', '/api/chats/x/prefs']],
-    description: 'Per-chat model, model fallback and activity logging. model: inherit | auto | provider:auto | provider:model. fallback_mode: inherit | on | off (use other models when this one fails with a limit, outage or expired sign-in); fallback_chain: models to try in order (empty = the Models setting). logging: inherit | off | minimal | normal | verbose.',
+  { name: 'set_chat_settings', calls: [['PUT', '/api/chats/x/prefs'], ['GET', '/api/chats']],
+    description: 'Per-chat model, model fallback and activity logging (the panel\'s Chats page: Model, Fallback…, Logging). model: inherit | auto | provider:auto | provider:model. fallback_mode: inherit | on | off (use other models when this one fails with a limit, outage or expired sign-in); fallback_chain: models to try in order (empty list = the agent\'s or the Models setting). Giving only one of fallback_mode / fallback_chain keeps the other as it is. logging: inherit | off | minimal | normal | verbose.',
     input: { chat: str('Chat id'), model: str('Model (optional)'), logging: { type: 'string', enum: ['inherit', 'off', 'minimal', 'normal', 'verbose'], description: 'Logging level (optional)' },
       fallback_mode: { type: 'string', enum: ['inherit', 'on', 'off'], description: 'Model fallback for this chat (optional)' }, fallback_chain: { type: 'array', items: { type: 'string' }, description: 'provider:model or provider:auto, in order (optional)' } }, required: ['chat'],
-    run: (a, x) => x.call('PUT', `/api/chats/${enc(a.chat)}/prefs`, { model: a.model, logging: a.logging,
-      ...(a.fallback_mode !== undefined || a.fallback_chain !== undefined ? { fallback: { mode: a.fallback_mode || 'inherit', chain: a.fallback_chain || [] } } : {}) }) },
+    run: async (a, x) => {
+      let fallback;
+      if (a.fallback_mode !== undefined || a.fallback_chain !== undefined) { // #65: a partial change keeps the rest, as in the panel editor
+        const cur = a.fallback_mode === undefined || a.fallback_chain === undefined
+          ? ((await x.call('GET', '/api/chats')) || []).find((c) => c.id === a.chat)?.fallback || { mode: 'inherit', chain: [] } : {};
+        fallback = { mode: a.fallback_mode ?? cur.mode ?? 'inherit', chain: a.fallback_chain ?? cur.chain ?? [] };
+      }
+      return x.call('PUT', `/api/chats/${enc(a.chat)}/prefs`, { model: a.model, logging: a.logging, ...(fallback ? { fallback } : {}) });
+    } },
   // ---------- owner assistant and privacy (044) ----------
   { name: 'get_owner_assistant', readOnly: true, calls: [['GET', '/api/owner-assistant']],
     description: 'The built-in owner assistant: its model, whether your WhatsApp number is linked (status none, code, pending or linked, and the number), and for owners every linked panel user. Linking itself is done in the panel (Settings → Owner assistant).',

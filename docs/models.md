@@ -42,6 +42,10 @@
 
 - **Models → When a model fails** sets the chain. Default: any other connected provider's *Auto*. Per agent and per
   chat: inherit / switch / don't switch, or an own chain.
+- **Per chat:** Chats → the chat's **Fallback…** button (under its model) opens the same editor as the agent editor:
+  *As the agent*, *Switch to another model* or *Don't switch*, and optionally an own ordered list of models
+  (↑ to reorder, ✕ to remove, at most 10). The line under the model shows what is set, e.g.
+  "If unavailable: switch model: OpenAI · Auto → Anthropic · Auto".
 - A failing account is paused (1 min, doubling to 30 min; usage limits until the provider's reset time), shown as
   "Paused until 14:20 — usage limit reached". Pauses and "reconnect" marks survive a restart or update.
 - Photo turns only fall back to models that can see images (then the vision fallback model).
@@ -54,8 +58,11 @@
 
 ![When a model fails](site/img/card-fallback.webp)
 
+![Chats → Fallback… for one chat: switch to another model, with an own list of two models in order](site/img/card-chat-fallback.webp)
+
 Admin MCP: `list_model_accounts`, `get_model_fallback`, `set_model_fallback`, `set_account_strategy`,
-`retry_model_account`.
+`retry_model_account`; per chat `set_chat_settings` (`fallback_mode`, `fallback_chain`; giving only one keeps the
+other, like the panel editor).
 
 ## Photos & voice
 

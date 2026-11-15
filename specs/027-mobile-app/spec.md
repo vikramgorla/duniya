@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-15
 
-**Status**: Implemented (preview via Expo Go; store builds later)
+**Status**: Implemented (preview via Expo Go; store builds later); friendly AI diff and owner-assistant parity (#63, v2.11.0)
 
 **Input**: Owner: "A native app for owners/admins to run Duniya from the phone." Decisions (issue #3): React Native
 with Expo, one codebase for iOS and Android; distribution through Expo Go first (QR code), store builds later. Sign-in
@@ -51,12 +51,29 @@ disabled with a reason.
 
 **Agents**: list with on/off switch; detail with on/off, basics (name, description, instructions, triggers) editable
 by admins, tool services and per-role tool rules, organizers, direct-message policy, memory and scheduled posts
-(read-only), and **Change with AI** (describe a change; `/api/ai/bot-draft` proposes it; every change is shown before
+(read-only), and **Change with AI** (describe a change; `/api/ai/agent-draft` proposes it; every change is shown before
 **Apply**). **Chats**: filters (all, groups, direct, with agent, without), search, detail to assign an agent or none
 (off), set the chat's model, and (admins) read the last 50 stored messages — each look is recorded in Activity.
 
 **Acceptance**: viewers can read but every control that changes something is disabled and says why; the server's
 403 is shown if the role changed meanwhile.
+
+### User Story 6 - Friendly AI review and owner-assistant parity (Priority: P2, #63, v2.11.0)
+
+**Change with AI** shows the same review as the panel (#32): "3 changes · 2 sections · +6 words", one card per change
+in the editor's order with its section; instructions and description as an inline word diff (additions lime with
+"+", removals red and struck through with "−", never colour alone; screen readers hear "added" / "removed"), long
+instructions with **Changes / Before / After** and folded unchanged lines ("… 12 unchanged lines …", tap to show);
+lists (triggers, organizers, participants, tool services, plugins, scheduled posts) as added / removed chips and
+"before → after" for changed items; tool rules per role; plain values as "before → after".
+
+Owner-assistant parity with the panel: the Ask box streams (#66); a chat shows **If the model is unavailable** (as the
+agent / switch / don't switch; the ordered list stays in the panel), **Private to members** and **Privacy notice**;
+More → **Owner assistant** shows the link (unlink), the model (admins) and linked people (owners). Linking starts in
+the web panel because its code is only handed to a panel session.
+
+**Acceptance**: `src/lib/diff.ts` gives the same results as `src/panel/public/diff.js` on the same input (tested);
+viewers see the chat settings read-only.
 
 ### User Story 4 - Activity, usage, server, waiting changes (Priority: P2)
 
@@ -107,6 +124,9 @@ the app revokes the refresh token; the panel lists signed-in phones under Settin
   the screens of User Stories 1–5, pull-to-refresh, offline banner, light and dark mode, the Constellation design and
   the people-circle logo.
 - **FR-008**: `mobile/` MUST NOT be installed by the server (`npm ci` at the root, Docker image, install.sh).
+- **FR-010** (#63): `mobile/src/lib/diff.ts` (port of the panel's diff), `ai-review.ts` (field labels, sections,
+  headlines), `components/Diff.tsx` (text, list, role and scalar views); chat prefs `fallback.mode`, `private`,
+  `noticeOff`; screen `owner.tsx` over `/api/owner-assistant` (no new server routes).
 - **FR-009**: CI MUST typecheck, lint and unit-test the app (`.github/workflows/mobile.yml`); `eas.json` MUST be
   prepared for development, preview and production builds.
 

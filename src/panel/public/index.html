@@ -106,6 +106,9 @@
   .hide { display: none !important; }
   .chainlist { margin: 6px 0 8px; padding-left: 22px; } .chainlist li { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
   .chainlist .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; } .acct { margin-top: 8px; } .acct .row { flex-wrap: wrap; }
+  .chainlist .btn { min-width: 40px; justify-content: center; }
+  .asksteps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 2px; } .asksteps .pill { overflow-wrap: anywhere; }
+  .askpartial { opacity: .78; }
   .code { font-family: var(--mono); font-size: 22px; letter-spacing: 3px; font-weight: 600; }
   .readonly .mut { display: none !important; }
   .meter { height: 8px; border-radius: 999px; background: var(--bg-2); overflow: hidden; margin: 8px 0 4px; }
@@ -474,6 +477,27 @@ async function api(method, path, body) {
   if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { field: data.field, data, status: res.status });
   return data;
 }
+/** POST answered with newline-delimited JSON events (#66 Ask box). onEvent gets 'step' / 'text'; returns the 'done' event. */
+async function apiStream(path, body, onEvent) {
+  const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/x-ndjson' }, body: JSON.stringify(body ?? {}) });
+  if (res.status === 401) { renderLogin(); throw new Error('Please sign in'); }
+  if (!res.ok) { const data = await res.json().catch(() => ({})); throw Object.assign(new Error(data.error || res.statusText), { status: res.status }); }
+  let done = null; let buf = '';
+  const take = (line) => {
+    if (!line.trim()) return;
+    let e; try { e = JSON.parse(line); } catch { return; }
+    if (e.type === 'error') throw Object.assign(new Error(e.error), { status: e.status });
+    if (e.type === 'done') done = e; else if (e.type !== 'ping') onEvent(e);
+  };
+  const feed = (chunk) => { buf += chunk; let i; while ((i = buf.indexOf('\n')) >= 0) { take(buf.slice(0, i)); buf = buf.slice(i + 1); } };
+  if (res.body?.getReader) {
+    const reader = res.body.getReader(); const dec = new TextDecoder();
+    for (;;) { const { value, done: end } = await reader.read(); if (end) break; feed(dec.decode(value, { stream: true })); }
+    feed(`${dec.decode()}\n`);
+  } else feed(`${await res.text()}\n`); // no readable body: everything at the end
+  if (!done) throw new Error('The answer was cut off. Please ask again.');
+  return done;
+}
 const tryApi = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message); return undefined; } };
 const ago = (ts) => { const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s / 60)}m` : s < 86400 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`; };
 const time = (ts) => (ts ? new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
@@ -701,7 +725,7 @@ async function renderOverview(soft) {
     if (Date.now() - (S.checklistAt || 0) > 15000) { refreshChecklist(); refreshSilences(); }
     return;
   }
-  if (soft && (overviewBusy || $('#main')?.contains(document.activeElement))) return;
+  if (soft && (overviewBusy || S.ask?.busy || $('#main')?.contains(document.activeElement))) return; // #66: never redraw under a streaming answer
   overviewSig = sig;
   const c = st.channel;
   const numbers = c.numbers || [{ id: 'main', label: 'Main', ...c }];
@@ -1279,11 +1303,11 @@ function chainEditor(models, initial, { emptyText = 'Any other connected provide
   return { el: box, value: () => [...chain] };
 }
 /** Agent / chat override: inherit | on | off, plus an own chain. Returns { el, value() }. */
-function fallbackPicker(models, override, { what = 'agent' } = {}) {
+function fallbackPicker(models, override, { what = 'agent', inheritLabel = '' } = {}) {
   const o = override || { mode: 'inherit', chain: [] };
   const fb = models.fallback || { enabled: true, chain: [] };
-  const mode = h('select', { disabled: !can('admin') },
-    h('option', { value: 'inherit', selected: o.mode === 'inherit' }, `Use the Models setting (${fb.enabled ? 'switch' : 'don’t switch'})`),
+  const mode = h('select', { disabled: !can('admin'), 'aria-label': 'When the model is unavailable' },
+    h('option', { value: 'inherit', selected: o.mode === 'inherit' }, inheritLabel || `Use the Models setting (${fb.enabled ? 'switch' : 'don’t switch'})`),
     h('option', { value: 'on', selected: o.mode === 'on' }, 'Switch to another model'),
     h('option', { value: 'off', selected: o.mode === 'off' }, 'Don’t switch: stay on the chosen model'));
   const own = h('input', { type: 'checkbox', checked: !!o.chain?.length, disabled: !can('admin') });
@@ -1294,6 +1318,23 @@ function fallbackPicker(models, override, { what = 'agent' } = {}) {
   const sync = () => ownRow.classList.toggle('hide', mode.value === 'off');
   mode.onchange = sync; sync();
   return { el: h('div', {}, mode, ownRow, chainBox), value: () => ({ mode: mode.value, chain: own.checked && mode.value !== 'off' ? chain.value() : [] }) };
+}
+/** One line for a chat's fallback override (#65): "If unavailable: switch to A → B". */
+function chatFallbackLine(fb, models) {
+  const o = fb || { mode: 'inherit', chain: [] };
+  if (o.mode === 'off') return 'If unavailable: don’t switch';
+  const chain = o.chain?.length ? `: ${o.chain.map((r) => modelLabel(r, models)).join(' → ')}` : '';
+  return o.mode === 'on' ? `If unavailable: switch model${chain}` : `If unavailable: as the agent${chain ? ` (own list${chain})` : ''}`;
+}
+/** Chats → model fallback for one chat (#65): the same picker as the agent editor; saved with the chat's settings. */
+function chatFallbackEditor(c, models, { onSaved, onClose }) {
+  const pick = fallbackPicker(models, c.fallback, { what: 'chat', inheritLabel: 'As the agent' });
+  return h('div', { class: 'card', id: 'chat-fallback', style: 'margin-top:14px' }, h('h2', {}, `Model fallback · ${c.name || c.id}`),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'When this chat’s model hits a limit, an outage or an expired sign-in, Duniya can answer with another model. Refused requests never switch, and tools are never run twice.'),
+    pick.el,
+    h('div', { class: 'row', style: 'margin-top:12px' },
+      can('admin') ? h('button', { class: 'btn primary', onclick: () => onSaved(pick.value()) }, 'Save') : null,
+      h('button', { class: 'btn', onclick: onClose }, 'Close')));
 }
 
 async function renderAgents() {
@@ -1948,8 +1989,15 @@ async function renderChats() {
   const quietBy = new Map(); // #34: why agents stayed quiet, per chat (most frequent first)
   for (const q of quiet.silences) { if (!quietBy.has(q.chat)) quietBy.set(q.chat, []); quietBy.get(q.chat).push(q); }
   const memBox = h('div', {});
+  const openFallback = (c) => {
+    memBox.replaceChildren(chatFallbackEditor(c, models, {
+      onClose: () => memBox.replaceChildren(),
+      onSaved: async (fallback) => { const ok = await savePrefs(c, { fallback }); if (ok !== undefined) { memBox.replaceChildren(); draw(); } },
+    }));
+    memBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const multi = new Set(chats.map((c) => c.number)).size > 1;
-  const savePrefs = (c, patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, patch)); }, 'Saved');
+  const savePrefs = (c, patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, patch)); return true; }, 'Saved');
   const list = h('div', {});
   const draw = () => {
     const shown = chats.filter((c) => chatsFilter === 'all' || (chatsFilter === 'groups' ? c.isGroup : !c.isGroup));
@@ -1975,9 +2023,9 @@ async function renderChats() {
         h('td', { style: 'min-width:170px', 'data-label': 'Agent' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, agent: e.target.value || null }); c.agent = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
           h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),
         h('td', { style: 'min-width:200px', 'data-label': 'Model' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) }),
-          // 042: per-chat fallback (the chain can be set through the AI assistant / API)
-          h('select', { style: 'margin-top:6px', 'aria-label': 'When the model is unavailable', disabled: !can('admin'), onchange: (e) => { c.fallback = { ...(c.fallback || {}), mode: e.target.value }; savePrefs(c, { fallback: c.fallback }); } },
-            [['inherit', 'If unavailable: as the agent'], ['on', 'If unavailable: switch model'], ['off', 'If unavailable: don’t switch']].map(([v, l]) => h('option', { value: v, selected: (c.fallback?.mode || 'inherit') === v }, l)))),
+          // 042 / #65: per-chat fallback, edited in a card below (same picker and chain editor as agents)
+          h('div', { class: 'small muted', style: 'margin-top:6px;overflow-wrap:anywhere' }, chatFallbackLine(c.fallback, models)),
+          h('button', { class: 'btn small', style: 'margin-top:4px', 'aria-label': `Model fallback for ${c.name || c.id}`, onclick: () => openFallback(c) }, can('admin') ? 'Fallback…' : 'Fallback')),
         h('td', { style: 'min-width:130px', 'data-label': 'Logging' }, h('select', { disabled: !can('admin'), onchange: (e) => savePrefs(c, { logging: e.target.value }) },
           [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message an agent number.' : 'No chats yet (or WhatsApp is not connected).'));
   };
@@ -2728,39 +2776,63 @@ function privacyNoticeCard(n) {
     can('admin') ? h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => save({ text: text.value, dmText: dmText.value }, 'Notice saved') }, 'Save texts') : null);
 }
 
-// ---------- Overview → Ask (044): the owner assistant in the panel ----------
+// ---------- Overview → Ask (044, streaming #66): the owner assistant in the panel ----------
+const toolWords = (name) => String(name || '').replace(/^(get|list)_/, '').replace(/_/g, ' ');
+/** Compact progress: "Thinking…", then one small chip per tool (✓ looked up, ⏸ change held, ✕ failed). */
+function askSteps(a) {
+  const tools = a.steps.filter((x) => x.step !== 'thinking');
+  const rounds = a.steps.filter((x) => x.step === 'thinking').length;
+  if (!a.busy && !tools.length) return null;
+  const chip = (x) => h('span', { class: `pill ${x.step === 'held' ? 'warn' : x.ok ? '' : 'bad'}`, title: x.tool },
+    h('span', { 'aria-hidden': 'true' }, x.step === 'held' ? '⏸ ' : x.ok ? '✓ ' : '✕ '), x.step === 'held' ? `change held: ${toolWords(x.tool)}` : `${toolWords(x.tool)}${x.ok ? '' : ' failed'}`);
+  return h('div', { class: 'asksteps small muted' },
+    a.busy ? h('span', {}, h('span', { class: 'spinner' }), tools.length ? ` Step ${rounds}…` : ' Looking through your chats…') : h('span', {}, `${plural(tools.length, 'step')}:`),
+    tools.slice(-8).map(chip), tools.length > 8 ? h('span', {}, `+${tools.length - 8} earlier`) : null);
+}
 function askCard() {
-  const a = S.ask || (S.ask = { q: '', reply: '', confirms: [], busy: false });
+  const a = S.ask || (S.ask = { q: '', reply: '', confirms: [], busy: false, steps: [] });
+  a.steps ||= [];
   const q = h('textarea', { placeholder: 'Ask about your chats, e.g. “What did the families decide this week?”', 'aria-label': 'Ask the owner assistant', style: 'min-height:56px', maxlength: 4000,
     oninput: (e) => { a.q = e.target.value; }, onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
   q.value = a.q;
-  const out = h('div', { 'aria-live': 'polite' });
-  const draw = () => out.replaceChildren(
-    a.busy ? h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Looking through your chats…') : null,
-    a.reply ? h('div', { class: 'note', style: 'white-space:pre-wrap;overflow-wrap:anywhere' }, a.reply) : null,
-    ...a.confirms.map((c) => h('div', { class: 'note warn' }, h('div', {}, c.preview),
-      h('div', { class: 'row', style: 'gap:8px;margin-top:8px' },
-        h('button', { class: 'btn primary small', onclick: () => decide(c, false) }, 'Confirm'),
-        h('button', { class: 'btn small', onclick: () => decide(c, true) }, 'Cancel')))));
+  const out = h('div', { 'aria-live': 'polite', 'aria-busy': String(!!a.busy) });
+  const btn = h('button', { class: 'btn primary', onclick: () => send() }, 'Ask');
+  const draw = () => {
+    btn.disabled = a.busy; out.setAttribute('aria-busy', String(!!a.busy));
+    out.replaceChildren(
+      askSteps(a),
+      a.reply ? h('div', { class: `note${a.busy ? ' askpartial' : ''}`, style: 'white-space:pre-wrap;overflow-wrap:anywhere' }, a.reply) : null,
+      ...a.confirms.map((c) => h('div', { class: 'note warn' }, h('div', {}, c.preview),
+        h('div', { class: 'row', style: 'gap:8px;margin-top:8px' },
+          h('button', { class: 'btn primary small', onclick: () => decide(c, false) }, 'Confirm'),
+          h('button', { class: 'btn small', onclick: () => decide(c, true) }, 'Cancel')))));
+  };
+  a.redraw = draw; // the newest card draws (Overview may be rebuilt while an answer streams in)
   async function decide(c, cancel) {
     const r = await tryApi(() => api('POST', '/api/owner/ask/confirm', { code: c.code, cancel }));
     a.confirms = a.confirms.filter((x) => x !== c);
     if (r) { a.reply = `${a.reply}\n\n${r.reply}`.trim(); toast(cancel ? 'Cancelled' : 'Done'); }
-    draw();
+    a.redraw();
   }
   async function send() {
     if (!a.q.trim() || a.busy) return;
-    a.busy = true; a.confirms = []; a.reply = ''; draw();
-    const r = await tryApi(() => api('POST', '/api/owner/ask', { question: a.q }));
+    a.busy = true; a.confirms = []; a.reply = ''; a.steps = []; a.redraw();
+    try {
+      const r = await apiStream('/api/owner/ask/stream', { question: a.q }, (e) => {
+        if (e.type === 'step') a.steps.push(e);
+        else if (e.type === 'text') a.reply = e.text;
+        a.redraw();
+      });
+      a.reply = r.reply; a.confirms = r.confirms || []; a.q = ''; q.value = '';
+    } catch (e) { toast(e.message); }
     a.busy = false;
-    if (r) { a.reply = r.reply; a.confirms = r.confirms || []; a.q = ''; q.value = ''; }
-    draw();
+    a.redraw();
   }
   q.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send(); });
   draw();
   return h('div', { class: 'card', id: 'ov-ask', style: 'grid-column:1/-1' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Ask'), h('span', { class: 'pill' }, S.user.role)),
-    h('p', { class: 'small muted' }, 'The owner assistant looks across the chats that are on (not those private to members). Changes need your Confirm.'),
-    q, h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn primary', onclick: send }, 'Ask')), out);
+    h('p', { class: 'small muted' }, 'The owner assistant looks across the chats that are on (not those private to members). You see each step as it works; changes need your Confirm.'),
+    q, h('div', { class: 'row', style: 'margin-top:8px' }, btn), out);
 }
 
 // ---------- Settings → Photos & voice (043): fallback model, pictures, voice, on-server speech engines ----------

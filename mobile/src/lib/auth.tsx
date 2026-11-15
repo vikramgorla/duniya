@@ -7,6 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
+import { fetch as expoFetch } from 'expo/fetch';
 import { createClient, discover, exchangeCode, revoke, ApiError, SCOPE, type ApiClient, type Session, type Tokens } from './api-core';
 import { demoApi } from './demo';
 import { normalizeServer } from './server-url';
@@ -27,6 +28,8 @@ const store = {
   del: (k: string) => (Platform.OS === 'web' ? Promise.resolve() : SecureStore.deleteItemAsync(k)),
 };
 const fetchFn = (url: string, init?: RequestInit) => fetch(url, init);
+// expo/fetch exposes a readable response body, so streamed answers (#66) arrive as they are written.
+const streamFetchFn = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => expoFetch(url, init);
 // The signed-in session (one per app). Kept outside React so the API client always reads the latest tokens.
 const holder: { current: Session | null } = { current: null };
 async function saveTokens(t: Tokens) {
@@ -85,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       saveTokens,
       onSignedOut: (r) => { signOut(r); },
       fetchFn,
+      streamFetchFn,
     });
   }, [demo, state, signOut]);
 

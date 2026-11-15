@@ -5,7 +5,9 @@
 **Do it:** panel → **Settings → Mobile app** → follow the three steps.
 
 **In 30 seconds**
-- Owners and admins: status, **Ask**, agents, chats, activity, usage, updates, confirmations.
+- Owners and admins: status, **Ask** (the answer streams in step by step, as in the panel), agents (with
+  **Change with AI** and the same friendly diff as the panel), chats (model, fallback, private to members, privacy
+  notice), the owner assistant link, activity, usage, updates, confirmations.
 - Preview: runs in **Expo Go**; signs in with your panel account (the panel's OAuth).
 
 1. Install **Expo Go**.

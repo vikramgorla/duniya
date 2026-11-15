@@ -20,4 +20,14 @@
 ## Follow-ups (not in this release)
 
 - A confirmed "send a message to a group" tool (deliberately not added: replies never leave the owner's chat).
-- Streaming answers in the Ask box.
+- ~~Streaming answers in the Ask box~~ — done per step in v2.11.0 (#66); token-by-token text stays a follow-up.
+
+## #66 — streaming Ask box (v2.11.0)
+
+- [X] T011 `ask()` `onEvent` (steps with tool names only, text per round)
+- [X] T012 Route `POST /api/owner/ask/stream` (NDJSON, ping, done / error)
+- [X] T013 Panel Ask card: `apiStream()`, step chips, partial text, Confirm unchanged; responsive state
+  `overview-ask-streaming`; `card-ask` / overview shots retaken with steps
+- [X] T014 App Ask card: `ApiClient.stream()` with `expo/fetch`, steps and partial text; demo stream
+- [X] T015 Tests `test/ask-stream.test.js`, `mobile/src/lib/ask-stream.test.ts`; docs `docs/owner-assistant.md`,
+  `docs/mobile-app.md`, `mobile/README.md`

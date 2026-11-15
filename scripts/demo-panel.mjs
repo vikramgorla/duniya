@@ -190,6 +190,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   // chats: on/off (silent by default), direct chats seen
   for (const c of [G(1), G(2), G(3), G(4), `club#${G(8)}`, `${P(4)}@s.whatsapp.net`]) prefs.setChatPrefs(c, { enabled: true });
   prefs.setChatPrefs(G(3), { logging: 'verbose' }); prefs.setChatPrefs(G(2), { logging: 'minimal' });
+  prefs.setChatPrefs(G(3), { fallback: { mode: 'on', chain: ['chatgpt:auto', 'anthropic:claude-haiku-5-5'] } }); // #65: own chain
   prefs.ignoredCounts.set(G(5), 37); prefs.ignoredCounts.set(G(6), 12); prefs.ignoredCounts.set(G(7), 5);
   const seen = db.db.prepare('INSERT INTO chats_seen (tenant_id, chat, number, is_group, name, phone, last_at) VALUES (?, ?, ?, 0, ?, ?, ?)');
   for (const [i, name] of [[4, 'Sophie'], [7, 'Priya'], [10, 'Nadia']]) seen.run('default', `${P(i)}@s.whatsapp.net`, 'main', name, P(i), now - i * H);

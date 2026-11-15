@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-15
 
-**Status**: Implemented (v2.8.0)
+**Status**: Implemented (v2.8.0); streaming Ask box (#66) and mobile parity (#63) in v2.11.0
 
 **Input**: Owner-approved design (#50): a built-in owner assistant that answers only the owner's (and other linked
 panel users') direct chat with an agent number, never groups; an Ask box on Overview; linking from the panel; only
@@ -59,8 +59,25 @@ to apply, or *cancel ABCD* (valid 10 min)". Nothing changes until the same user 
 
 ### User Story 4 - Ask box on Overview (Priority: P2)
 
-Overview starts with an **Ask** card (phone-friendly, no streaming): the same assistant and tools with the signed-in
+Overview starts with an **Ask** card (phone-friendly): the same assistant and tools with the signed-in
 user's role. Held changes show **Confirm / Cancel** buttons. The mobile app's Overview has the same card.
+
+### User Story 8 - The Ask box streams (Priority: P3, #66, v2.11.0)
+
+The owner asks a question that needs four tool calls. Instead of a spinner for 20 seconds, the Ask box shows each
+step as it happens and the assistant's text after each model round.
+
+**Acceptance Scenarios**:
+
+1. **Given** a question, **Then** the panel (and the mobile app) shows "Looking through your chats…", then one small
+   chip per tool: ✓ name (looked up), ⏸ change held: name, ✕ name failed — never colour alone, and tool names only
+   (no arguments, results or message contents).
+2. Text the assistant writes before a tool call shows dimmed while the turn goes on; the final answer replaces it.
+3. Held changes still need **Confirm** / **Cancel**; nothing changes before that. Roles and the chat scope are the
+   same as `POST /api/owner/ask`; the conversation is remembered the same way.
+4. When the stream cannot be read chunk by chunk (old browser, a runtime without a readable body), the whole answer
+   still arrives at the end from the same response.
+5. Token-by-token text is out of scope: providers answer per call today (follow-up issue).
 
 ### User Story 5 - Data scope and privacy (Priority: P1)
 
@@ -107,8 +124,14 @@ notice**).
 - **FR-007** Ask box API `POST /api/owner/ask`, `POST /api/owner/ask/confirm`, `GET /api/owner/ask/history`.
 - **FR-008** Privacy notice rules above; settings `privacyNotice { enabled, text, dmFirstReply, dmText }`.
 - **FR-009** Audit entries `owner.*` always recorded.
+- **FR-010** (#66) `POST /api/owner/ask/stream`: same checks, then `application/x-ndjson` events `step` (`thinking` |
+  `tool` | `held`, tool name, ok), `text` (`text`, `final`), `ping` (15 s), and `done` (`reply`, `confirms`) or
+  `error` (`error`, `status`). `ask()` takes an optional `onEvent`. Panel `apiStream()`; app `ApiClient.stream()` with
+  `expo/fetch`.
 
 ## Success Criteria
 
 - Tests with fakes cover: linking and expiry, non-linked numbers ignored, groups never answered, trigger passthrough,
   private chats excluded, role-based tool sets, confirmation for changes, Ask box API, privacy notice rules.
+- `test/ask-stream.test.js` covers the event order, held changes with Confirm, failed tools, model errors, roles,
+  CSRF and sign-in; `mobile/src/lib/ask-stream.test.ts` the app's NDJSON reader and client.

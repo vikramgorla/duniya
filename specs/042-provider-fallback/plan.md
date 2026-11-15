@@ -26,6 +26,13 @@
 - Panel routes `src/panel/routes/providers.js`; admin tools; `index.html` (`chainEditor`, `fallbackPicker`,
   `accountsBox`, `healthNote`, `chatgptFlow`); demo data shows a second ChatGPT account and a paused OpenRouter.
 
+### #65 (v2.11.0): per-chat chain editor
+
+- Panel only (`index.html`): `fallbackPicker(models, override, { what, inheritLabel })`, `chatFallbackLine()`,
+  `chatFallbackEditor()`; the card opens in the Chats page's detail box (like the spending cap), so it stacks on phones.
+- `admin-tools.js` `set_chat_settings`: merges a partial `fallback_mode` / `fallback_chain` with the stored override.
+- No core or API change: `PUT /api/chats/:chat/prefs` already validates `{ mode, chain }` (`cleanOverride`).
+
 ## Constitution Check
 
 - II generic core: no agent-specific logic. III/IV: tool permissions and confirmations unchanged; tools never re-run.

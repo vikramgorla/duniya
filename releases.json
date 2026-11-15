@@ -95,6 +95,14 @@
       "breaking": false,
       "title": "Security fixes",
       "summary": "Fixed CodeQL findings: linear-time bearer token parsing, race-free creation of the master key and setup code, and result pages that redirect without inline scripts."
+    },
+    "2.11.0": {
+      "breaking": false,
+      "title": "Streaming Ask box, per-chat fallback editor, friendlier mobile app",
+      "summary": "The Ask box (panel and mobile app) shows each step and the assistant's text as it works. Chats → Fallback… edits a chat's own ordered list of models. The mobile app shows AI-proposed changes as a word-level diff and has the chat privacy settings and the owner assistant link.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/owner-assistant.md"
     }
   }
 }

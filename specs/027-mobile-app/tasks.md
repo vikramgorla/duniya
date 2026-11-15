@@ -28,6 +28,17 @@
 - [X] T021 `.github/workflows/mobile.yml`: typecheck, lint, unit tests, config check
 - [X] T022 `tsc --noEmit`, `expo lint`, `npm test` clean; screenshots (light/dark, phone/iPad, panel card) in `screenshots/`
 
+## #63 — friendly AI diff and owner-assistant parity (v2.11.0)
+
+- [X] T026 `src/lib/diff.ts` port of `diff.js`; `src/lib/diff.test.ts` compares with the web module (text, hunks,
+  long texts, lists, keys) and covers the review model
+- [X] T027 `src/lib/ai-review.ts` + `components/Diff.tsx`; `ai/[id].tsx` shows the review; theme `addBg/addInk/delBg/delInk`
+- [X] T028 Chat screen: fallback mode, Private to members, Privacy notice; `owner.tsx` (link, unlink, model, linked
+  people) under More; demo data for all of it
+- [X] T029 Ask box streaming (#66, `ApiClient.stream`, `expo/fetch`)
+- [X] T030 `typecheck`, `lint`, `npm test` clean; screenshots `app-ai-diff-{light,dark}.jpg`, `app-ask-streaming.jpg`;
+  `mobile/README.md`, `docs/mobile-app.md`
+
 ## Open
 
 - [ ] T023 Sign-in on a real iPhone and Android phone in Expo Go (confirm `exp://…/--/oauth` return through the system browser)

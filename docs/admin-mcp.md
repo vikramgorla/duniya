@@ -55,7 +55,7 @@ rotation). Spec: [`specs/017-admin-mcp/`](../specs/017-admin-mcp/spec.md).
 |---|---|
 | Overview | status, activity |
 | Agents | create, update, draft with AI, test, export, enable |
-| Chats | assign, settings, private, privacy notice, stored messages |
+| Chats | assign, settings (model, fallback mode and chain, logging), private, privacy notice, stored messages |
 | Money | usage, prices, spending caps, owner alerts, weekly summary |
 | People & memory | contacts, memory, WhatsApp groups, WhatsApp numbers, users |
 | Models | models, accounts, fallback, photos & voice |

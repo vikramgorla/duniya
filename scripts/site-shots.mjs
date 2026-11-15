@@ -42,7 +42,8 @@ const PRELUDE = `const T = {
 
 // The owner assistant's answer in the Ask box (demo data; the fake model is not asked).
 const ASK = `S.ask = { q: '', busy: false, reply: 'This week in your chats:\\n• Morges ↔ Geneva rides: Marc drives Fridays at 07:40 (2 seats left); Sophie gets a lift back with Mia on Thursday.\\n• Class 4B parents: museum trip forms are due Monday 24 Nov; Lea can drive 3 children.\\n• Family ❤️: Diwali dinner Saturday 19:00 at Ravi & Priya’s.\\nThe Book club and Rue du Midi neighbours chats are off, so I can’t see them.',
-  confirms: [{ code: 'H4M9', preview: 'Turn off the agent “Office colleagues” (1 chat). It stops answering until you switch it on again.' }] };`;
+  confirms: [{ code: 'H4M9', preview: 'Turn off the agent “Office colleagues” (1 chat). It stops answering until you switch it on again.' }],
+  steps: [{ step: 'thinking' }, { step: 'tool', tool: 'list_visible_chats', ok: true }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'tool', tool: 'search_messages', ok: true }, { step: 'held', tool: 'set_agent_enabled', ok: true }] };`;
 const CHECKLIST = "drawChecklist(document.querySelector('#ov-checklist'), { done: 3, total: 5, complete: false, dismissed: false, steps: [['provider', 'Connect an AI model provider', true, '#models', 'OpenRouter, ChatGPT, Copilot, Anthropic…'], ['whatsapp', 'Link a WhatsApp number', true, '#overview/whatsapp', 'Scan the QR code with a spare number.'], ['agent', 'Create an agent', true, '#agents', 'Start from a template or describe it.'], ['chat', 'Switch a chat on', false, '#chats', 'Every chat starts Off. Switch on the groups and people your agent should answer.'], ['reply', 'Get a first reply', false, '#agents', 'Write the trigger in the group, or try the test console.']].map(([id, title, done, href, hint]) => ({ id, title, done, href, hint })) });";
 const AI_DIFF = "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies, make Lea an organizer, weather before rides'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); document.querySelector('.dskip')?.click(); await T.wait(400);";
 const TEST_AS = "const sel = document.querySelector('select[aria-label=\"Test as role\"]'); sel.value = 'organizer'; sel.dispatchEvent(new Event('change')); await T.wait(1200); const i = document.querySelector('#test-console input[placeholder^=\"Ask the\"]'); if (i) { i.value = 'Who drives to Geneva on Friday?'; await T.click('Send', 'button', 1800); }";
@@ -69,6 +70,7 @@ const CARDS = [
   ['card-caps', 'usage', '', 'box:Monthly spending caps', 1100],
   ['card-photos-voice', 'models', '', 'box:Photos & voice', 1100],
   ['card-fallback', 'models', 'T.openAll(document.querySelector("#fallback"));', '#fallback', 1100],
+  ['card-chat-fallback', 'chats', "[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);", '#chat-fallback', 600],
   ['card-owner-assistant', 'settings', 'T.openAll(T.box("Owner assistant"));', 'box:Owner assistant', 900],
   ['card-privacy', 'settings', '', 'box:Privacy notice', 900],
   ['card-web-access', 'settings', '', 'box:Web address & access', 900],

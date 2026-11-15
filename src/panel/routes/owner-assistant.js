@@ -25,6 +25,22 @@ export function ownerAssistantRoutes(route, { channel }) {
 
   // Ask box (Overview, mobile app): same assistant and tools, with the panel user's role. Changes need the Confirm button.
   route('POST', '/api/owner/ask', async (req, res, body, q, p, user) => ask({ user, text: body.question, source: 'panel', surface: 'panel' }), { role: 'viewer' });
+  // #66: the same question, answered as a stream of newline-delimited JSON events (fetch + ReadableStream in the panel,
+  // expo/fetch in the app): { type: 'step' | 'text' | 'done' | 'error' | 'ping', … }. POST + JSON keeps the CSRF guard;
+  // application/x-ndjson is not compressed by the bundled Caddy config, so events are flushed as they come.
+  route('POST', '/api/owner/ask/stream', async (req, res, body, q, p, user) => {
+    if (!String(body.question || '').trim()) return [400, { error: 'Ask a question' }];
+    res.writeHead(200, { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no', 'x-content-type-options': 'nosniff' });
+    const write = (e) => { if (!res.writableEnded && !res.destroyed) res.write(`${JSON.stringify(e)}\n`); };
+    const ping = setInterval(() => write({ type: 'ping' }), 15000);
+    try {
+      const out = await ask({ user, text: body.question, source: 'panel', surface: 'panel', onEvent: write });
+      write({ type: 'done', reply: out.reply, confirms: out.confirms });
+    } catch (e) {
+      write({ type: 'error', error: e.message || 'Something went wrong', status: e.status || 400 });
+    } finally { clearInterval(ping); res.end(); }
+    return null;
+  }, { role: 'viewer' });
   route('POST', '/api/owner/ask/confirm', async (req, res, body, q, p, user) => {
     const out = await resolveConfirm({ user, code: body.code, cancel: !!body.cancel, surface: 'panel' });
     if (out === undefined) return [404, { error: 'This code is unknown or expired (10 minutes). Ask again.' }];

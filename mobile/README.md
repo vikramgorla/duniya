@@ -5,9 +5,11 @@ icon is the store-safe Duniya logo (no third-party marks). Everything the app do
 the signed-in user's role, so new server features appear here only when a screen is added for them.
 
 Native iOS and Android app for owners and admins of a Duniya server: status console with the **Ask** box (the owner
-assistant: questions about your chats, changes with Confirm), agents (on/off, edit basics, "Change with AI"), chats
-(assign agent, model, stored messages), activity, usage, server health and updates, and changes waiting for
-confirmation. One codebase: React Native with [Expo](https://expo.dev) (SDK 58, TypeScript,
+assistant: questions about your chats, changes with Confirm; the answer streams in step by step through
+`expo/fetch`), agents (on/off, edit basics, "Change with AI" with the same friendly diff as the panel: word-level
+changes, Changes / Before / After, added and removed chips), chats (assign agent, model, what happens when the model
+is unavailable, private to members, privacy notice, stored messages), the owner assistant (your WhatsApp link, its
+model, linked people), activity, usage, server health and updates, and changes waiting for confirmation. One codebase: React Native with [Expo](https://expo.dev) (SDK 58, TypeScript,
 expo-router). Spec: [`specs/027-mobile-app`](../specs/027-mobile-app/spec.md).
 
 This folder is **not** part of the server install: it has its own `package.json`, the server's `npm ci` never sees
@@ -69,7 +71,10 @@ npm run export:web    # web build with demo data (used for screenshots only; the
 
 - Routes live in `src/app/` (expo-router); building blocks in `src/components/ui.tsx` follow `DESIGN.md`
   (Constellation: porcelain/ink, one lime signal, mono labels, LEDs). Logo: `src/components/Logo.tsx`.
-- API client: `src/lib/api-core.ts` (pure, tested) and `src/lib/auth.tsx` (secure storage, sign-in).
+- API client: `src/lib/api-core.ts` (pure, tested; `stream()` reads newline-delimited JSON for the Ask box) and
+  `src/lib/auth.tsx` (secure storage, sign-in; `expo/fetch` for streamed answers).
+- AI review diff: `src/lib/diff.ts` is a port of the panel's `src/panel/public/diff.js`; `src/lib/diff.test.ts`
+  compares both, so change them together. Labels and headlines: `src/lib/ai-review.ts`; views: `src/components/Diff.tsx`.
 - Add native libraries only with `npx expo install` and only ones included in Expo Go, or Expo Go stops working.
 - Changing the app? Update this README and the panel's **Settings → Mobile app** text if the steps change, and follow
   the Definition of Done in [AGENTS.md](../AGENTS.md). CI runs typecheck, lint and tests (`.github/workflows/mobile.yml`).

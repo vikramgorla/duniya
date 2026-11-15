@@ -19,6 +19,8 @@ export default function More() {
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         <ListRow title="Waiting for you" subtitle="Changes agents prepared that need a yes" left={<Icon name="pending" color={t.ink} />} right={n ? <Pill tone="warn">{String(n)}</Pill> : undefined} onPress={() => router.push('/pending')} />
         <Divider />
+        <ListRow title="Owner assistant" subtitle="Your WhatsApp link, its model, who is linked" left={<Icon name="ai" color={t.ink} />} onPress={() => router.push('/owner')} />
+        <Divider />
         <ListRow title="Usage" subtitle="Messages, tokens and cost by agent and model" left={<Icon name="usage" color={t.ink} />} onPress={() => router.push('/usage')} />
         <Divider />
         <ListRow title="Server" subtitle="Health, memory, disk and updates" left={<Icon name="server" color={t.ink} />} onPress={() => router.push('/server')} />
