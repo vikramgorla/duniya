@@ -526,7 +526,8 @@ function show(tab) {
   const seq = (S.renderSeq = (S.renderSeq || 0) + 1);
   const main = $('#main');
   const slow = setTimeout(() => { if (S.renderSeq === seq) main?.classList.add('loading'); }, 120);
-  const r = { overview: renderOverview, server: renderServer, usage: renderUsage, activity: renderActivity, agents: renderAgents, chats: renderChats, contacts: renderContacts, models: renderModels, backups: renderBackups, pending: renderPending, secrets: renderSecrets, settings: renderSettings }[tab];
+  const RENDER = { overview: renderOverview, server: renderServer, usage: renderUsage, activity: renderActivity, agents: renderAgents, chats: renderChats, contacts: renderContacts, models: renderModels, backups: renderBackups, pending: renderPending, secrets: renderSecrets, settings: renderSettings };
+  const r = Object.hasOwn(RENDER, tab) ? RENDER[tab] : null;
   Promise.resolve(r?.()).catch((e) => toast(e.message)).finally(() => {
     clearTimeout(slow);
     if (S.renderSeq === seq) { main?.classList.remove('loading'); S.renderDone = seq; return; }

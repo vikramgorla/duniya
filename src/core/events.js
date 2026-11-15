@@ -71,12 +71,15 @@ export function logPolicy(type, chat) {
   return level === 'verbose' ? 4000 : 1000;
 }
 
+/** Console lines stay one line, whatever the summary contains (no forged log lines). */
+const oneLine = (s) => String(s).replace(/[\r\n\u2028\u2029]+/g, ' ');
+
 export function activity(type, { agent, chat, summary, detail } = {}) {
   const entry = { ts: Date.now(), type, agent: agent || '', chat: chat || '', summary: String(summary ?? '').slice(0, 500) };
   let max = 4000;
   try { max = logPolicy(type, entry.chat); } catch { /* keep */ }
   if (max === null) {
-    if (type === 'error') console.error(`[${agent || 'core'}] ${entry.summary}`);
+    if (type === 'error') console.error(`[${oneLine(agent || 'core')}] ${oneLine(entry.summary)}`);
     return null;
   }
   if (detail !== undefined) entry.detail = trim(detail, max);
@@ -85,6 +88,6 @@ export function activity(type, { agent, chat, summary, detail } = {}) {
     if (Math.random() < 0.02) { const c = loggingSettings(); pruneActivity({ days: c.retentionDays, max: c.maxEntries }); }
   } catch (e) { console.error('activity insert failed', e.message); }
   bus.emit('activity', entry);
-  if (type === 'error') console.error(`[${agent || 'core'}] ${entry.summary}`);
+  if (type === 'error') console.error(`[${oneLine(agent || 'core')}] ${oneLine(entry.summary)}`);
   return entry;
 }
