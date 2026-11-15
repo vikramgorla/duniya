@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process';
 import { env, ROOT, DATA_DIR } from '../core/config.js';
 import {
   listSecrets, setSecret, getSettings, updateSettings, interpolate, countUsers, createUser, listUsers, updateUser,
-  deleteUser, authenticate, createSession, sessionUser, deleteSession,
+  deleteUser, authenticate, sessionUser, deleteSession,
 } from '../core/store.js';
 import {
   listBots, getBot, botView, createBot, updateBot, deleteBot, bindChat, loadBots, botForChat,
@@ -14,7 +14,7 @@ import {
 import { referencedSecrets } from '../core/schema.js';
 import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages } from '../core/db.js';
 import { bus, activity, loggingSettings, resetLoggingCache, LOG_CATEGORIES } from '../core/events.js';
-import { allChatPrefs, setChatPrefs, seenChats } from '../core/chat-prefs.js';
+import { allChatPrefs, setChatPrefs, seenChats, ignoredCounts, enabledChats } from '../core/chat-prefs.js';
 import { runAgent, handleConfirmCommand, applyPending } from '../core/agent.js';
 import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool, mcpConnection } from '../core/mcp.js';
@@ -35,7 +35,7 @@ function guardLocal(user, before, after) {
   }
 }
 import {
-  CSP, clientIp, isHttps, cookie, send, setSessionCookie, limiter, resultPage, uploadAllowed, setSetupCode, checkSetupCode,
+  CSP, clientIp, isHttps, cookie, send, setSessionCookie, limiter, uploadAllowed, setSetupCode, checkSetupCode,
 } from './http.js';
 import { googleRoutes, googleReady } from './routes/google.js';
 import { createAdminMcp } from './admin-mcp.js';
@@ -141,7 +141,7 @@ export function startPanel({ channel, extend = [] }) {
 
   // ---------- overview ----------
   route('GET', '/api/status', async (req, res, body, q, p, user) => ({
-    user,
+    user, enabledChats: enabledChats().length,
     channel: await channel.status(),
     settings: getSettings(),
     version: await gitVersion(),
@@ -359,13 +359,15 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: '(not a member / offline)', size: 0, isGroup: !/@(s\.whatsapp\.net|lid)$/.test(id) }));
     return [...groups, ...people, ...missing].map((c) => {
       const number = c.number || (c.id.includes('#') ? c.id.split('#')[0] : 'main');
-      return { ...c, number, numberLabel: numbers.get(number) || number, bot: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit' };
+      return { ...c, number, numberLabel: numbers.get(number) || number, bot: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit',
+        enabled: !!prefs[c.id]?.enabled, ignored: ignoredCounts.get(c.id) || 0 };
     });
   });
   route('PUT', '/api/chats/:chat/prefs', async (req, res, body, q, p, user) => {
     const chat = decodeURIComponent(p.chat);
-    const out = setChatPrefs(chat, { model: body.model, logging: body.logging });
-    activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging} (${user.username})` });
+    const out = setChatPrefs(chat, { model: body.model, logging: body.logging, enabled: body.enabled });
+    if (body.enabled !== undefined) { ignoredCounts.delete(chat); activity('config', { chat, summary: `Chat switched ${out.enabled ? 'ON — agents may answer here' : 'OFF — agents ignore it'} (${user.username})` }); }
+    else activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging} (${user.username})` });
     return out;
   });
   // ---------- activity logging settings (011) ----------

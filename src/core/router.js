@@ -1,3 +1,4 @@
+import { isChatEnabled, ignoredCounts } from './chat-prefs.js';
 import { env } from './config.js';
 import { getSettings } from './store.js';
 import { listBots, getBot, botForChat, roleIn } from './bots.js';
@@ -43,10 +44,16 @@ export async function resolveRole(bot, msg, channel) {
 }
 
 /** Pick the bot for a direct message, or null. */
-async function botForDm(msg, channel) {
+async function botForDm(msg, channel, { openOnly = false } = {}) {
   // A 1:1 chat an admin assigned to a bot (Chats page) always goes to that bot.
   const assigned = botForChat(msg.chat);
-  if (assigned) return assigned.enabled ? assigned : null;
+  if (assigned) return assigned.enabled && (!openOnly || assigned.dm === 'anyone') ? assigned : null;
+  if (openOnly) { // chat is off: only an agent that explicitly answers anyone may take it
+    const open = listBots().filter((b) => b.enabled && b.dm === 'anyone');
+    const lower = msg.text.trim().toLowerCase();
+    const numberDefault = (getSettings().whatsappNumbers || []).find((n) => n.id === (msg.number || 'main'))?.dmBot;
+    return open.find((b) => startsWithTrigger(b, lower)) || open.find((b) => b.id === numberDefault) || open.find((b) => b.id === getSettings().defaultDmBot) || open[0] || null;
+  }
   const lower = msg.text.trim().toLowerCase();
   const enabled = listBots().filter((b) => b.enabled);
   const byTrigger = enabled.find((b) => startsWithTrigger(b, lower));
@@ -75,6 +82,7 @@ export function createHistoryHandler() {
     let stored = 0;
     for (const m of msgs) {
       if (!m.isGroup) continue; // never store private chats from history
+      if (!isChatEnabled(m.chat)) continue; // nor groups that are switched off (#10)
       const bot = botForChat(m.chat);
       const id = logMessage({
         channel: m.channel, chat: m.chat, bot: bot?.id || '', msgId: m.msgId, sender: m.phone, name: m.senderName,
@@ -92,6 +100,24 @@ export function createRouter(channel) {
   return async function onMessage(msg) {
     const lower = msg.text.trim().toLowerCase();
     const groupBot = msg.isGroup ? botForChat(msg.chat) : null;
+
+    // Silent by default (#10): a chat that is off is ignored completely — nothing stored, no model call — except
+    // organizers' admin helpers below, and direct messages to an agent explicitly set to answer anyone.
+    let openBot = null;
+    if (!isChatEnabled(msg.chat)) {
+      const helper = isAnyOrganizer(msg.phone) && ((msg.isGroup && lower === '!groupid') || (!msg.isGroup && lower === '!groups'));
+      const open = !msg.isGroup && !helper ? await botForDm(msg, channel, { openOnly: true }) : null;
+      if (!helper && !open) {
+        ignoredCounts.set(msg.chat, (ignoredCounts.get(msg.chat) || 0) + 1);
+        return;
+      }
+      openBot = open;
+      if (helper) { // organizer helper in a chat that is off: answer it, store nothing
+        if (msg.isGroup) await channel.send(msg.chat, `Group id: ${msg.chat}`, { quoted: msg.raw });
+        else await channel.send(msg.chat, (await channel.listChats()).map((g) => `${g.name} (${g.size})\n${g.id}`).join('\n\n') || 'No groups.');
+        return;
+      }
+    }
 
     // Groups: remember everything said (bound or not, paused or not) so bots have context.
     let rowId = 0;
@@ -117,7 +143,7 @@ export function createRouter(channel) {
       }
     }
 
-    const bot = msg.isGroup ? groupBot : await botForDm(msg, channel);
+    const bot = msg.isGroup ? groupBot : openBot || await botForDm(msg, channel);
     if (!bot || !bot.enabled) return;
     if (!msg.isGroup) {
       rowId = logMessage({

@@ -7,7 +7,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
-export async function setup({ bindings = {}, env = {}, legacy = null, extend = null, beforeImport = null } = {}) {
+export async function setup({ bindings = {}, env = {}, legacy = null, extend = null, beforeImport = null, chatsOn = true } = {}) {
   const t = {
     mcpCalls: [], claudeReqs: [], summaryReqs: [], script: [], sent: [],
     summaryText: 'Decisions: take the 9:10 train. Rao family arrives Saturday.', summaryFail: false,
@@ -103,6 +103,13 @@ export async function setup({ bindings = {}, env = {}, legacy = null, extend = n
       name: 'Helper', prompt: 'You help.', model: 'claude-sonnet-5-5', triggers: ['!help'], dm: 'organizers',
       chats: ['g2@g.us'], organizers: ['41790000001'], plugins: ['example-dice'], ...(bindings.helper || {}),
     } });
+  }
+  // #10: chats are off by default. Tests written before that switch on the chats they use; tests about the
+  // allow-list switch chats off explicitly (or pass { chatsOn: false }).
+  t.chatPrefs = await import('../src/core/chat-prefs.js');
+  if (chatsOn !== false) {
+    for (const c of [...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `g${n}@g.us`), 'shop#g-shop@g.us', 'shop#41790000555@s.whatsapp.net',
+      ...[1, 2, 3, 4, 5, 9].map((n) => `4179000000${n}@s.whatsapp.net`)]) t.chatPrefs.setChatPrefs(c, { enabled: true });
   }
   t.route = t.router.createRouter(t.channel);
   t.onHistory = t.router.createHistoryHandler();

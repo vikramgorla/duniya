@@ -299,6 +299,7 @@ export async function chat({ model, system, messages, tools = [] }) {
     toolNames.set(safe, t.name);
     return { name: safe, description: t.description || '', parameters: t.input_schema || { type: 'object', properties: {} }, skipPermission: true, defer: 'never' };
   });
+  // eslint-disable-next-line prefer-const -- assigned after the session exists; used by the tool handlers above
   let c;
   const session = await cl.createSession({
     model,
