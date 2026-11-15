@@ -217,6 +217,11 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   ];
   for (const [ago, type, agent, chat, summary] of acts) db.insertActivity({ ts: now - ago, type, agent, chat, summary });
 
+  // why agents stayed quiet (#34): counters per chat + agent + reason
+  const { silenceReason } = await imp('src/core/silences.js');
+  const quiet = [[G(3), 'carpool', 'not_addressed', 14, 'Marc'], [G(5), '', 'chat_off', 3, 'Nadia'], [G(1), 'school', 'rate_limited', 1, 'Anu'], [`${P(10)}@s.whatsapp.net`, 'family', 'role_not_allowed', 2, 'Nadia']];
+  for (const [chat, agent, reason, n, sender] of quiet) for (let i = 0; i < n; i++) silenceReason(reason, { chat, agent, sender });
+
   // 30 days of usage
   const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0); const todaySpan = now - startOfToday.getTime();
   const ins = db.db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kind, input, output, cost, priced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
