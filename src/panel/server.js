@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process';
 import { env, ROOT, DATA_DIR } from '../core/config.js';
 import {
   listSecrets, setSecret, getSettings, updateSettings, interpolate, countUsers, createUser, listUsers, updateUser,
-  deleteUser, authenticate, createSession, sessionUser, deleteSession,
+  deleteUser, authenticate, createSession, sessionUser, deleteSession, getUser,
 } from '../core/store.js';
 import {
   listBots, getBot, botView, createBot, updateBot, deleteBot, bindChat, loadBots, botForChat,
@@ -39,6 +39,9 @@ import {
 } from './http.js';
 import { googleRoutes, googleReady } from './routes/google.js';
 import { createAdminMcp } from './admin-mcp.js';
+import { validateAccess } from '../core/admin-oauth.js';
+import { baseUrl, minuteLimiter } from './http-util.js';
+import { mobileRoutes } from './routes/mobile.js';
 import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES } from '../core/mcp-oauth.js';
 
 const PUBLIC = resolve(import.meta.dirname, 'public');
@@ -76,20 +79,37 @@ const gitVersion = () => new Promise((r) => execFile('git', ['log', '-1', '--for
 const loginLimit = limiter(5);
 const rateLimitLogin = (ip) => loginLimit(ip);
 
+// ---------- who is calling: session cookie (panel) or OAuth bearer token (mobile app, 027) ----------
+// A bearer token must be one issued for this server's /api resource (not the admin MCP's /mcp); it acts as the panel
+// user who approved it, with that user's current role. When an Authorization header is sent, only the token counts.
+const bearerOf = (req) => (/^Bearer\s+(\S+)\s*$/i.exec(String(req.headers.authorization || '')) || [])[1];
+const bearerLimit = minuteLimiter(300);
+export function requestUser(req) {
+  const token = bearerOf(req);
+  if (token) {
+    const a = validateAccess(token, `${baseUrl(req)}/api`);
+    const user = a && getUser(a.user.id);
+    return user ? { user, via: 'bearer', client: a.client, tokenHash: a.tokenHash } : { invalid: true, via: 'bearer' };
+  }
+  const user = sessionUser(cookie(req, 'duniya_session'));
+  return user ? { user, via: 'session' } : { via: 'none' };
+}
+
 export function startPanel({ channel, extend = [] }) {
   bootstrapAuth();
   const routes = [];
   /** opts.role: minimum role (default: viewer for GET, admin otherwise). opts.public: no auth. */
   /** opts.raw: the handler reads the (binary) request body itself; see uploadAllowed() for the CSRF guard. */
+  /** opts.bearer: false = panel session only (not the mobile app's token); raw uploads are always session only. */
   const route = (method, pattern, handler, opts = {}) => routes.push({
-    method, handler, public: !!opts.public, raw: !!opts.raw,
+    method, handler, public: !!opts.public, raw: !!opts.raw, bearer: opts.bearer !== false && !opts.raw,
     role: opts.role || (method === 'GET' ? 'viewer' : 'admin'),
     re: new RegExp(`^${pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)')}$`),
   });
 
   // ---------- session / setup ----------
   route('GET', '/api/session', async (req) => {
-    const user = sessionUser(cookie(req, 'duniya_session'));
+    const { user = null } = requestUser(req);
     return { authed: !!user, user, needsSetup: countUsers() === 0, google: googleReady() };
   }, { public: true });
   route('POST', '/api/setup', async (req, res, body) => {
@@ -122,7 +142,7 @@ export function startPanel({ channel, extend = [] }) {
     updateUser(user.id, { password: String(body.next || '') });
     activity('system', { summary: `Password changed: ${user.username}` });
     return { ok: true };
-  }, { role: 'viewer' });
+  }, { role: 'viewer', bearer: false });
 
   // ---------- Sign in with Google, invites (019) ----------
   googleRoutes(route);
@@ -476,6 +496,9 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
   // ---------- system ----------
   route('POST', '/api/system/restart', async () => { setTimeout(() => process.exit(0), 300); return { ok: true }; }, { role: 'owner' });
 
+  // ---------- mobile app (027): Settings → Mobile app ----------
+  mobileRoutes(route);
+
   // Other features (providers, backups, updates) add their routes with the same role gates.
   for (const fn of [].concat(extend)) fn(route, { channel });
 
@@ -521,12 +544,22 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
         return send(res, 200, readFileSync(resolve(PUBLIC, 'index.html')), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
       }
       if (url.pathname === '/healthz') return send(res, 200, 'ok');
+      if (req.method === 'GET' && url.pathname === '/qr.js') {
+        return send(res, 200, readFileSync(resolve(PUBLIC, 'qr.js')), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=3600' });
+      }
       if (await adminMcp.handle(req, res, url)) return;
       const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));
       if (!r) return send(res, 404, { error: 'Not found' });
       let user = null;
       if (!r.public) {
-        user = sessionUser(cookie(req, 'duniya_session'));
+        const who = requestUser(req);
+        if (who.via === 'bearer') {
+          const meta = `${baseUrl(req)}/.well-known/oauth-protected-resource/api`;
+          if (who.invalid) return send(res, 401, { error: 'Sign in again (the app\'s access expired or was revoked)' }, { 'www-authenticate': `Bearer resource_metadata="${meta}", error="invalid_token"`, 'cache-control': 'no-store' });
+          if (!r.bearer) return send(res, 403, { error: 'Do this in the web panel' });
+          if (bearerLimit(who.tokenHash)) return send(res, 429, { error: 'Too many requests, wait a moment' }, { 'retry-after': '20' });
+        }
+        user = who.user;
         if (!user) return send(res, 401, { error: 'Login required' });
         if (ROLE_RANK[user.role] < ROLE_RANK[r.role]) {
           return send(res, 403, { error: user.role === 'viewer' ? 'Read-only account' : `Requires ${r.role} role` });

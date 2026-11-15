@@ -7,7 +7,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/index.js",
-    "test": "node --test --test-concurrency=1 --disable-warning=ExperimentalWarning test/*.test.js"
+    "test": "node --test --test-concurrency=1 --disable-warning=ExperimentalWarning test/*.test.js",
+    "mobile": "npm --prefix mobile install --no-audit --no-fund && npm --prefix mobile start"
   },
   "engines": {
     "node": ">=22.13"
