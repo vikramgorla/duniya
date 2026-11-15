@@ -155,6 +155,15 @@ test('US3: Sign in with ChatGPT — validation failures are rejected', async () 
   au.noPlan = false; u = await start(); au.badNonce = true;
   assert.match((await t.api(owner, 'POST', '/api/providers/chatgpt/complete', { callbackUrl: cb(u) })).body.error, /nonce/);
   au.badNonce = false;
+  // #77: forgiving paste, same state check: an iPad-style address (no http://) with a wrong state is still refused
+  assert.match((await t.api(owner, 'POST', '/api/providers/chatgpt/complete', { callbackUrl: 'localhost:1455/auth/callback?code=good-code&state=tampered' })).body.error, /unknown or expired/);
+  u = await start();
+  // pasting something without a code does not use up the sign-in
+  assert.match((await t.api(owner, 'POST', '/api/providers/chatgpt/complete', { callbackUrl: 'hello' })).body.error, /with or without http:\/\//);
+  assert.match((await t.api(owner, 'POST', '/api/providers/chatgpt/complete', { callbackUrl: `127.0.0.1:1455/auth/callback?state=${u.searchParams.get('state')}` })).body.error, /no authorization code/);
+  au.badNonce = true;
+  assert.match((await t.api(owner, 'POST', '/api/providers/chatgpt/complete', { callbackUrl: cb(u) })).body.error, /nonce/, 'state still pending after the bad pastes');
+  au.badNonce = false;
   const viewer = await (async () => { await t.api(owner, 'POST', '/api/users', { username: 'adm', role: 'admin', password: 'admin-password-12' }); return t.login('adm', 'admin-password-12'); })();
   assert.equal((await t.api(viewer, 'POST', '/api/providers/chatgpt/start')).status, 403, 'owner only');
 });
@@ -172,7 +181,7 @@ test('US3: Sign in with ChatGPT — connect, list plan models, tool call over Re
   assert.equal(qp.resource, 'https://api.openai.com/v1');
   assert.equal(qp.code_challenge_method, 'S256');
   au.challenge = qp.code_challenge; au.nonce = qp.nonce; au.expiresIn = 60; // expires soon → refresh on first use
-  const done = await t.api(owner, 'POST', '/api/providers/chatgpt/complete', { callbackUrl: `http://127.0.0.1:1455/auth/callback?code=good-code&state=${qp.state}&client_id=oaiapp_123` });
+  const done = await t.api(owner, 'POST', '/api/providers/chatgpt/complete', { callbackUrl: ` "localhost:1455/auth/callback?code=good-code&state=${qp.state}&client_id=oaiapp_123"\n` }); // #77: as iPad Safari copies it
   assert.equal(done.status, 200, JSON.stringify(done.body));
   assert.equal(done.body.email, 'vik@example.com');
   assert.equal(done.body.models, 1, 'hidden models filtered');
@@ -219,4 +228,20 @@ test('US3: Sign in with ChatGPT — connect, list plan models, tool call over Re
   assert.equal(au.revoked.at(-1).token, 'r2');
   assert.equal(t.store.getSecret('CHATGPT_CREDENTIALS'), '');
   await t.agents.updateAgent('panduga', { model: 'claude-sonnet-5-5' });
+});
+
+test('#77: the pasted ChatGPT sign-in address is read forgivingly', async () => {
+  const { parseCallback } = await import('../src/core/providers/chatgpt.js');
+  const want = (x) => { const q = parseCallback(x); return q ? `${q.get('code')}|${q.get('state')}` : null; };
+  const q = 'code=ac_1&state=S-1_x';
+  for (const x of [
+    `http://127.0.0.1:1455/auth/callback?${q}`, `localhost:1455/auth/callback?${q}`, `127.0.0.1:1455/auth/callback?${q}`,
+    `127.0.0.1:8123/auth/callback?${q}`, `[::1]:1455/auth/callback?${q}`, `HTTP://LOCALHOST:1455/auth/callback?${q}`,
+    `  "http://localhost:1455/auth/callback?${q}"\n`, `'localhost:1455/auth/callback?${q}'`, `<localhost:1455/auth/callback?code=ac_1&amp;state=S-1_x>`,
+    q, `?${q}`, `&${q}`, 'http://localhost:1455/auth/call\nback?code=ac_1\n&state=S-1_x',
+    encodeURIComponent(`http://localhost:1455/auth/callback?${q}`),
+    `https://link.example/redirect?u=${encodeURIComponent(`http://localhost:1455/auth/callback?${q}`)}`,
+  ]) assert.equal(want(x), 'ac_1|S-1_x', JSON.stringify(x));
+  for (const x of ['', '   ', 'hello', 'https://auth.openai.com/api/accounts/authorize', 'localhost:1455/auth/callback', null, undefined]) assert.equal(want(x), null, JSON.stringify(x));
+  assert.equal(parseCallback('localhost:1455/auth/callback?error=access_denied&state=S').get('error'), 'access_denied');
 });

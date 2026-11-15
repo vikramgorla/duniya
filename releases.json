@@ -36,11 +36,11 @@
       "summary": "2.0 renamed bots to agents everywhere: database tables, settings, API paths (/api/agents), admin MCP tool names (create_agent) and export files (duniya-agent). There is no migration: a 1.x database, a 1.x backup or a 1.x agent export cannot be used.",
       "actions": [
         "Reinstall from scratch on a fresh server (or remove the data directory) and link WhatsApp again.",
-        "Set your agents up again (templates and the AI helper make this quick); 1.x backups and exports cannot be restored.",
+        "Set your agents up again (templates and the AI helper make this quick).",
         "Update scripts and AI assistants that call /api/bots or bot tool names to the agent names."
       ],
       "data": "not-migrated",
-      "docs": "docs/upgrading.md#from-1x-to-20"
+      "docs": "docs/upgrading.md"
     },
     "2.9.2": {
       "breaking": false,
@@ -69,6 +69,16 @@
       "breaking": false,
       "title": "Install fix: web server could not read its config",
       "summary": "Fresh installs failed at 'Setting up HTTPS' because the web server's config file was written unreadable for the web server (installer umask 027). Fixed; redeploy to pick it up."
+    },
+    "2.9.6": {
+      "breaking": false,
+      "title": "Sign-in fixes: Google on every panel address, ChatGPT paste on iPad",
+      "summary": "Sign in with Google now returns to the panel address you started on, so it works on a new domain or alias once that address is registered in Google Cloud. The panel lists the exact origins (no slash at the end) and redirect URIs for every address, shows them while you change the domain, and explains a sign-in that came back to another address. The Sign in with ChatGPT paste also accepts the address without http:// (as iPad Safari copies it).",
+      "actions": [
+        "Using Sign in with Google with more than one panel address (or changing the domain)? Add every origin and redirect URI shown under Settings → Sign in with Google to your OAuth client in Google Cloud Console → APIs & Services → Credentials."
+      ],
+      "data": "unchanged",
+      "docs": "docs/google-sign-in.md"
     }
   }
 }

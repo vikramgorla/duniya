@@ -74,14 +74,48 @@ async function tokenRequest(form) {
 }
 const scopesOf = (t) => (Array.isArray(t.scopes) ? t.scopes : String(t.scope || '').split(/[\s+]+/)).filter(Boolean);
 
+const PASTE_HELP = 'Paste the address from the page that says “This site can’t be reached” (it contains code= and state=; with or without http://)';
+const SIGNIN_KEYS = ['code', 'state', 'error'];
+const hasSignInKeys = (q) => SIGNIN_KEYS.some((k) => q.has(k));
+
+/**
+ * #77: the pasted loopback address, read forgivingly. Accepts it with or without http:// (iPad Safari copies it
+ * without), localhost / 127.0.0.1 / [::1] on any port, surrounded by spaces, quotes or line breaks, wrapped over several
+ * lines, only the query string ("code=…&state=…" or "?code=…"), percent-encoded once, or inside another address
+ * (…?url=http%3A%2F%2Flocalhost…). Returns the URLSearchParams, or null when it holds no sign-in answer.
+ * Only parses: the state is still checked against the pending sign-ins by the caller.
+ */
+export function parseCallback(input, depth = 0) {
+  let s = String(input ?? '').slice(0, 8192);
+  s = s.replace(/\s+/g, ''); // spaces, tabs, line breaks (wrapped lines)
+  for (let i = 0; i < 3; i++) s = s.replace(/^[\s"'`<«“‘(]+|[\s"'`>»”’).,;]+$/gu, '');
+  s = s.replace(/&amp;/gi, '&');
+  if (!s) return null;
+  if (!/[?&=]/.test(s) && /%(3F|26|3D)/i.test(s)) { try { s = decodeURIComponent(s); } catch { return null; } } // encoded once
+  let q;
+  if (/^[?&#]/.test(s) || /^[\w.-]+=/.test(s)) q = new URLSearchParams(s.replace(/^[?&#]+/, ''));
+  else {
+    const withScheme = /^[a-z][a-z\d+.-]*:\/\//i.test(s) ? s : `http://${s.replace(/^\/+/, '')}`;
+    let url;
+    try { url = new URL(withScheme); } catch { return null; }
+    q = url.searchParams;
+    if (!hasSignInKeys(q) && url.hash) q = new URLSearchParams(url.hash.slice(1));
+  }
+  if (hasSignInKeys(q)) return q;
+  if (depth < 2) { // wrapped inside another address (a redirect or link-preview service)
+    for (const v of q.values()) if (/(code|state|error)(=|%3D)/i.test(v)) { const inner = parseCallback(v, depth + 1); if (inner) return inner; }
+  }
+  return null;
+}
+
 /** Step 2: the owner pastes the address their browser ended on. */
 export async function completeSignIn(callbackUrl) {
-  let url;
-  try { url = new URL(String(callbackUrl).trim()); } catch { throw Object.assign(new Error('Paste the full address from the browser (starting with http://127.0.0.1)'), { status: 400 }); }
-  const q = url.searchParams;
+  const q = parseCallback(callbackUrl);
+  if (!q) throw Object.assign(new Error(PASTE_HELP), { status: 400 });
   if (q.get('error')) {
     throw Object.assign(new Error(q.get('error') === 'access_denied' ? 'Sign-in was cancelled or plan usage was declined' : `OpenAI returned ${q.get('error')}`), { status: 400 });
   }
+  if (!q.get('code')) throw Object.assign(new Error(`The address has no authorization code. ${PASTE_HELP}.`), { status: 400 });
   const p = pending.get(q.get('state') || '');
   if (!p) throw Object.assign(new Error('This sign-in link is unknown or expired. Start again.'), { status: 400 });
   pending.delete(q.get('state'));
@@ -90,7 +124,6 @@ export async function completeSignIn(callbackUrl) {
   if (!p.registering && issued && issued !== p.clientId) throw Object.assign(new Error('Unexpected client id in the response'), { status: 400 });
   const clientId = p.registering ? issued : p.clientId;
   const code = q.get('code');
-  if (!code) throw Object.assign(new Error('The address has no authorization code'), { status: 400 });
 
   const tok = await tokenRequest({
     grant_type: 'authorization_code', client_id: clientId, code, code_verifier: p.verifier,

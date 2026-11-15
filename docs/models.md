@@ -17,6 +17,11 @@
 | ChatGPT Plus/Pro | *Sign in with ChatGPT* (OpenAI's official flow, preview) |
 | GitHub Copilot | your allowance via the official Copilot SDK (downloaded only if you connect it; needs 2 GB) |
 
+> [!TIP]
+> **Sign in with ChatGPT** ends on a page that says *This site can't be reached*: that's expected. Copy the whole
+> address and paste it into the panel. It's fine without `http://` (iPad and iPhone Safari copy it that way), with
+> `localhost` or `127.0.0.1`, or only the part from `code=`.
+
 > [!NOTE]
 > Claude **subscriptions** (Pro/Max) can't be used by third-party apps under Anthropic's terms, so Claude needs an
 > API key.

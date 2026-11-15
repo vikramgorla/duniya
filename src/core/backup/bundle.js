@@ -9,7 +9,7 @@ import { db } from '../db.js';
 import { keyFromPassphrase } from '../crypto.js';
 
 const MAGIC = 'DUNIYA1\n';
-// 2 = Duniya 2.0 data (bots renamed to agents, #7). Older backups use the 1.x tables and cannot be restored.
+// 2 = Duniya 2.0 data (bots renamed to agents, #7). Older bundles cannot be restored.
 export const BUNDLE_VERSION = 2;
 const KDF = { kdf: 'scrypt', N: 32768, r: 8, p: 1 };
 
@@ -63,7 +63,7 @@ export function decryptBundle(buf, passphrase) {
   const bundle = JSON.parse(gunzipSync(plain).toString());
   if (bundle.format !== 'duniya-backup') throw Object.assign(new Error('Unsupported backup format'), { status: 400 });
   if (!(bundle.version >= BUNDLE_VERSION)) {
-    throw Object.assign(new Error(`This backup was made by Duniya ${bundle.app?.version || '1.x'} and cannot be restored into Duniya 2 (bots became agents). Set the agents up again, or restore it on a 1.x server.`), { status: 400 });
+    throw Object.assign(new Error(`This backup was made by an old Duniya${bundle.app?.version ? ` (${bundle.app.version})` : ''} and cannot be restored into Duniya 2.`), { status: 400 });
   }
   return bundle;
 }

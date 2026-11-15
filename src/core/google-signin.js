@@ -1,6 +1,6 @@
 // Sign in with Google for the admin panel (019): OpenID Connect authorization code flow with PKCE (S256), state,
 // nonce and a browser-binding cookie; the ID token is verified (RS256, Google's JWKS from discovery).
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { getSecret, setSecret, getSetting, updateSettings, findUserByGoogleSub, findUsersByEmail, linkGoogle, acceptInvite, getUser, listUsers } from './store.js';
 import { activity } from './events.js';
 import { oidcDiscovery, verifyIdToken } from './providers/jwt.js';
@@ -109,7 +109,7 @@ function finishTest(ok, checks) {
 }
 
 /** Start a sign-in. mode 'login' (from the login page) or 'link' (a signed-in user links their Google account). */
-export async function startGoogle({ mode = 'login', userId = null, redirectUri }) {
+export async function startGoogle({ mode = 'login', userId = null, redirectUri, startHost = '' }) {
   if (!googleReady()) throw fail('Sign in with Google is not set up');
   const disc = await oidcDiscovery(ISSUER());
   const now = Date.now();
@@ -117,7 +117,7 @@ export async function startGoogle({ mode = 'login', userId = null, redirectUri }
   if (pending.size > 500) pending.delete(pending.keys().next().value);
   const state = b64url(randomBytes(24)); const nonce = b64url(randomBytes(24)); const verifier = b64url(randomBytes(32));
   const binding = b64url(randomBytes(24)); // also set as a short-lived cookie: the callback must come back to this browser
-  pending.set(state, { mode, userId, verifier, nonce, binding: sha256(binding), redirectUri, expires: now + PENDING_TTL });
+  pending.set(state, { mode, userId, verifier, nonce, binding: sha256(binding), redirectUri, startHost, expires: now + PENDING_TTL });
   const u = new URL(disc.authorization_endpoint);
   for (const [k, v] of Object.entries({
     response_type: 'code', client_id: googleConfig().clientId, redirect_uri: redirectUri, scope: 'openid email profile',
@@ -127,13 +127,22 @@ export async function startGoogle({ mode = 'login', userId = null, redirectUri }
   return { url: u.toString(), binding };
 }
 
+/** Constant-time comparison of two hex digests (the browser binding cookie vs. the one stored at start). */
+function sameSecret(a, b) {
+  const x = Buffer.from(String(a)); const y = Buffer.from(String(b));
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
 /** Finish: validate state + binding, exchange the code (with the PKCE verifier), verify the ID token. */
 export async function finishGoogle({ state, code, error, binding }) {
   const p = pending.get(String(state || ''));
   if (p) pending.delete(state); // single use
-  if (!p || p.expires < Date.now()) throw fail('This sign-in link expired or was already used. Start again from the panel.');
-  if (!binding || sha256(binding) !== p.binding) throw fail('This sign-in was started in another browser. Start again from the panel.');
-  if (error) throw Object.assign(fail(error === 'access_denied' ? 'You cancelled the Google sign-in.' : `Google said: ${error}`), { mode: p.mode });
+  if (!p || p.expires < Date.now()) throw Object.assign(fail('This sign-in link expired or was already used. Start again from the panel.'), { reason: 'state' });
+  // #77: `startHost` lets the callback explain a sign-in started at another address of this panel (e.g. a new domain)
+  if (!sameSecret(sha256(String(binding || '')), p.binding)) {
+    throw Object.assign(fail('This sign-in was started in another browser or at another address of this panel (most likely you signed in on the other address). Start again from the panel.'), { reason: 'binding', mode: p.mode, startHost: p.startHost || '' });
+  }
+  if (error) throw Object.assign(fail(error === 'access_denied' ? 'You cancelled the Google sign-in.' : `Google said: ${error}`), { mode: p.mode, reason: 'google', startHost: p.startHost || '' });
   if (!code) throw fail('Google did not send a sign-in code.');
   const disc = await oidcDiscovery(ISSUER());
   const c = googleConfig();

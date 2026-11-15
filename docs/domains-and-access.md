@@ -32,6 +32,13 @@ out.**
 
 </details>
 
+> [!IMPORTANT]
+> **Google sign-in on?** Add the new address to your OAuth client in Google Cloud Console → **APIs & Services →
+> Credentials** before you confirm: Authorized JavaScript origin `https://new.example.org` (no slash at the end) and
+> Authorized redirect URI `https://new.example.org/auth/google/callback`. The card shows both with copy buttons.
+> Until then, Google sign-in from the new address stops with *redirect_uri_mismatch* (the old address keeps working
+> until you turn it off). [Details →](google-sign-in.md#when-the-panels-address-changes)
+
 > [!NOTE]
 > **Confirm** is accepted only from a request that really arrived through the new domain. The HTTPS check runs on
 > the server itself (127.0.0.1 with the domain as SNI), never through public DNS. Changes are applied by the root
@@ -81,5 +88,5 @@ Install with a tunnel: [Cloudflare Tunnel](deploy/cloudflare-tunnel.md) (`--clou
 `--local-only` pointed at `http://127.0.0.1:8080`.
 
 ---
-**Next:** [Cloudflare Tunnel](deploy/cloudflare-tunnel.md) · [Admin MCP](admin-mcp.md) (needs public HTTPS) ·
+**Next:** [Cloudflare Tunnel](deploy/cloudflare-tunnel.md) · [Sign in with Google](google-sign-in.md) · [Admin MCP](admin-mcp.md) (needs public HTTPS) ·
 [Docs index](README.md)

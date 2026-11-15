@@ -14,7 +14,7 @@ Find your goal, click the guide. Each page opens with a 30-second summary and th
 | <img src="img/thumb-overview.webp" alt="" width="120"> | **[Install](install.md)** | you want Duniya on a server: choose a host, one command or one button |
 | <img src="img/thumb-checklist.webp" alt="" width="120"> | **[Getting started](getting-started.md)** | the panel is open and you want a first agent answering in a group |
 | `FIND` | **[Where is my panel?](install.md#where-is-my-panel-find-the-ip--url)** | the install finished and you can't find the address or setup code |
-| `2.x` | **[Upgrading](upgrading.md)** | a release needs a step from you, or you come from 1.x |
+| `2.x` | **[Upgrading](upgrading.md)** | a release needs a step from you |
 
 ## Run it
 
@@ -66,6 +66,7 @@ The panel's **Server** page has a **Hosting help** card that links to the right 
 | | Guide | Use this when… |
 |---|---|---|
 | <img src="img/thumb-privacy.webp" alt="" width="120"> | **[Privacy](privacy.md)** | you want to know what is stored, who sees it, and what groups are told |
+| `GOOGLE` | **[Sign in with Google](google-sign-in.md)** | people should sign in with Google, or you change the domain while it is on |
 | `SECURITY` | **[Security policy](../SECURITY.md)** | you found a vulnerability |
 
 > [!WARNING]
