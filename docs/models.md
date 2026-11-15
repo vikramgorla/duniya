@@ -43,7 +43,7 @@
 - **Models → When a model fails** sets the chain. Default: any other connected provider's *Auto*. Per agent and per
   chat: inherit / switch / don't switch, or an own chain.
 - A failing account is paused (1 min, doubling to 30 min; usage limits until the provider's reset time), shown as
-  "Paused until 14:20 — usage limit reached".
+  "Paused until 14:20 — usage limit reached". Pauses and "reconnect" marks survive a restart or update.
 - The owner gets a WhatsApp alert after 15 minutes or when no provider can answer.
 - Several accounts per provider with a label (model refs `openai-work:gpt-…`), used *in order* (failover) or
   *spread* (least recently used).

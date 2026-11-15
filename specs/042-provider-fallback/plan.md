@@ -12,7 +12,7 @@
   breaker checks, classification, last-resort pass for transient pauses, usage with account + reason).
 - `src/core/providers/errors.js` — `classify(e)`, `retryAfterMs(e)` (Retry-After header, body reset fields, "try again
   in 20s").
-- `src/core/providers/breaker.js` — in-memory states, `canTry/isPaused/release/recordFailure/recordSuccess/reset`,
+- `src/core/providers/breaker.js` — states in memory, mirrored to `ttl_state` via `src/core/ttl-store.js` (#64; `loadStored()` at start), `canTry/isPaused/release/recordFailure/recordSuccess/reset`,
   status text, alerts via `owner-alerts.js`, `noteSwitch` deduplication; injectable clock for tests.
 - `src/core/providers/fallback-config.js` — `cleanChain/cleanOverride` without provider imports (used by `schema.js`
   and `chat-prefs.js`).
@@ -30,7 +30,7 @@
 
 - II generic core: no agent-specific logic. III/IV: tool permissions and confirmations unchanged; tools never re-run.
 - V: pauses, recoveries, switches and all-failed are recorded in Activity (system category, always visible at minimal).
-- VI: no new dependencies; in-memory breaker; two small columns. VIII: plain-language states, one status per account,
+- VI: no new dependencies; breaker mirrored to SQLite (#64); two small columns. VIII: plain-language states, one status per account,
   "Try again now", terms note; responsive check passes at 375 / 1440, light and dark.
 - Security: account credentials are secrets, never returned; Anthropic via API keys only; ChatGPT via the official
   sign-in flow; the panel tells owners to use their own accounts and check the provider's terms.

@@ -2,8 +2,10 @@
 // to 30 minutes, or until the provider's Retry-After / reset time for quota and rate limits. While paused the account
 // is skipped; after the pause one call probes it (others keep skipping) and success closes the breaker. An expired or
 // rejected sign-in marks the account "needs reconnect" until its credentials change.
-// State lives in memory: a restart simply probes every account again.
+// State is kept in memory and mirrored to SQLite (#64), so a restart keeps pauses, back-off and "needs reconnect";
+// only the in-flight probe flag is not stored (after a restart the next call probes).
 import { activity } from '../events.js';
+import { putTtl, deleteTtl, clearTtl, listTtl } from '../ttl-store.js';
 import { sendOwnerAlert } from '../owner-alerts.js';
 import { env } from '../config.js';
 import { REASON_TEXT } from './errors.js';
@@ -15,10 +17,24 @@ export const ALERT_AFTER_MS = 15 * 60000;
 const ALL_FAILED_ALERT_MS = 60 * 60000;
 
 const states = new Map(); // accountId -> { failures, since, until, reason, message, needsReconnect, probing, alerted, name }
+const KIND = 'breaker';
+const KEEP_MS = 24 * 3600000; // after the pause ends the failure count (back-off) is kept this long
+const RECONNECT_KEEP_MS = 30 * 24 * 3600000; // "needs reconnect" lasts until the credentials change (reset)
 let clock = () => Date.now();
 /** Tests: replace the clock. Pass null to restore. */
 export function setClock(fn) { clock = fn || (() => Date.now()); }
 export const now = () => clock();
+
+function save(id, s) {
+  const { probing, ...stored } = s;
+  try { putTtl(KIND, id, stored, (s.needsReconnect ? now() + RECONNECT_KEEP_MS : Math.max(s.until, now()) + KEEP_MS)); } catch { /* memory still works */ }
+}
+/** (Re)load stored states, as at startup. Tests call it to simulate a restart. */
+export function loadStored() {
+  states.clear();
+  try { for (const r of listTtl(KIND, now())) states.set(r.key, { ...r.data, probing: false }); } catch { /* no table yet */ }
+}
+loadStored();
 
 const hhmm = (ts) => new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: env.timezone });
 
@@ -76,6 +92,7 @@ export function recordFailure(id, cls, { name = id, message = '' } = {}) {
   const first = !states.has(id);
   s.until = t + ms;
   states.set(id, s);
+  save(id, s);
   if (first || s.failures === 2) { // one entry when it pauses (and one when the first probe fails), not one per probe
     activity('model.provider', { summary: `${name}: ${describe(s)}`, detail: { account: id, reason: s.reason, until: s.until, error: s.message } });
   }
@@ -87,16 +104,20 @@ export function recordSuccess(id, { name = id } = {}) {
   const s = states.get(id);
   if (!s) return;
   states.delete(id);
+  deleteTtl(KIND, id);
   activity('model.provider', { summary: `${name} is answering again (was paused ${Math.max(1, Math.round((now() - s.since) / 60000))} min: ${REASON_TEXT[s.reason] || s.reason})`, detail: { account: id, recovered: true } });
   if (s.alerted) sendOwnerAlert(`Duniya: ${name} is answering again.`, { kind: 'provider' }).catch(() => {});
 }
 
 /** Forget an account's state (credentials changed, account removed). */
-export function reset(id) { if (id) states.delete(id); else states.clear(); }
+export function reset(id) {
+  if (id) { states.delete(id); deleteTtl(KIND, id); } else { states.clear(); clearTtl(KIND); }
+}
 
 function maybeAlert(id, s, name) {
   if (s.alerted || now() - s.since < ALERT_AFTER_MS) return;
   s.alerted = true;
+  if (states.get(id) === s) save(id, s); // one alert per outage, also across a restart
   const text = s.needsReconnect
     ? `Duniya: ${name} needs to be reconnected (sign-in expired or key rejected). Open Models in the panel and reconnect it. Other connected providers answer meanwhile.`
     : `Duniya: ${name} has been failing for ${Math.round((now() - s.since) / 60000)} minutes (${REASON_TEXT[s.reason] || s.reason}). ${s.until > now() ? `It is paused until ${hhmm(s.until)}; ` : ''}other connected providers answer meanwhile. See Models in the panel.`;

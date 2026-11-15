@@ -12,3 +12,5 @@
   demo data
 - [X] T010 Tests `test/fallback.test.js` (failing fake providers in `test/harness.js`); existing tests adjusted where a
   failure now falls back; docs; version 2.5.0
+- [X] T011 (#64) Breaker states stored in `ttl_state` with expiry (pause end + 24 h; reconnect 30 days or until reset);
+  `loadStored()`; `test/restart-state.test.js` restarts in a new process
