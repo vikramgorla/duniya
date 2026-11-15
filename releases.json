@@ -90,6 +90,11 @@
       "breaking": false,
       "title": "Security housekeeping",
       "summary": "Mobile app tooling uses a patched minimatch; console log lines can no longer be split by message text."
+    },
+    "2.9.8": {
+      "breaking": false,
+      "title": "Security fixes",
+      "summary": "Fixed CodeQL findings: linear-time bearer token parsing, race-free creation of the master key and setup code, and result pages that redirect without inline scripts."
     }
   }
 }
