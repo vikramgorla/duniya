@@ -165,7 +165,13 @@ case "${EXPOSURE:-ip}" in
 esac
 [ -n "${ADMIN_PASSWORD:-}" ] && ARGS+=(--admin-password "$ADMIN_PASSWORD")
 [ -n "${GIT_TOKEN:-}" ] && ARGS+=(--git-token "$GIT_TOKEN")
-bash "$SRC/install.sh" "${ARGS[@]}"
+if ! bash "$SRC/install.sh" "${ARGS[@]}"; then
+  # Bring the progress page back (the installer hands port 80 to Caddy near the end) so the error is visible.
+  echo "whatsapp-agent-duniya install FAILED (see the lines above)"
+  systemctl stop caddy 2>/dev/null || true
+  systemctl start duniya-status-render duniya-status-page 2>/dev/null || true
+  exit 1
+fi
 systemctl stop duniya-status-render 2>/dev/null || true
 rm -f /etc/duniya/bootstrap.env
 echo "== done: $(date -u +%FT%TZ)"
