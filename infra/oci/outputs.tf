@@ -14,6 +14,17 @@ output "install_progress_url" {
   value       = local.panel_url != "" ? "http://${oci_core_instance.app.public_ip}/" : "n/a"
 }
 
+# Plain text copies of the two links: easy to copy on a phone or iPad (copy button), where links and the job log are not.
+output "panel_address" {
+  description = "Admin panel address as text"
+  value       = local.panel_url != "" ? local.panel_url : "see How to get in"
+}
+
+output "install_progress_address" {
+  description = "Install progress address as text (after the install it forwards to the panel)"
+  value       = local.panel_url != "" ? "http://${oci_core_instance.app.public_ip}/" : "n/a"
+}
+
 output "panel_access" {
   value = (var.exposure == "ip" ? "Open the install progress link; when it finishes, open the panel link and sign in as 'admin'."
     : var.exposure == "domain" ? "Point the DNS A record of ${var.domain} to ${oci_core_instance.app.public_ip}, then open the panel link."

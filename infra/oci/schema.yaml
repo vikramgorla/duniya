@@ -1,7 +1,7 @@
 title: "WhatsApp agents (whatsapp-agent-duniya)"
 description: "Self-hosted WhatsApp agents with an admin panel, on an Always Free VM."
 schemaVersion: 1.1.0
-version: "2.8.2"
+version: "2.8.3"
 locale: "en"
 
 variableGroups:
@@ -98,21 +98,31 @@ variables:
 primaryOutputButton: panel_url
 
 outputGroups:
-  - title: "Open"
-    outputs: [panel_url, install_progress_url, panel_access]
+  - title: "Open your panel"
+    outputs: [install_progress_url, panel_url, panel_access]
+  - title: "Copy"
+    outputs: [panel_address, install_progress_address, public_ip]
   - title: "Details"
-    outputs: [public_ip, instance_id, manage_stack_url, logs_url]
+    outputs: [instance_id, manage_stack_url, logs_url]
 
 outputs:
   panel_url:
     type: link
     title: "Admin panel"
-    displayText: "Open the admin panel"
+    displayText: "Open the panel"
     visible: true
   install_progress_url:
     type: link
     title: "Install progress"
     displayText: "Watch the install"
+    visible: true
+  panel_address:
+    type: copyableString
+    title: "Panel address"
+    visible: true
+  install_progress_address:
+    type: copyableString
+    title: "Install progress address"
     visible: true
   panel_access:
     type: string

@@ -24,7 +24,7 @@ client registration, PKCE S256, resource-bound tokens (access 1 h, refresh 30 da
 87 tools cover the panel: overview and activity; agents (create, update, draft with AI, test, export, enable);
 chats (assign, settings, private, privacy notice, stored messages); usage, prices, spending caps, owner alerts and the
 weekly summary; contacts; memory; WhatsApp groups; models, accounts and fallback; global tool services; secrets;
-confirmations; logging; updates, server metrics, OS maintenance and restart; backups; users; WhatsApp numbers; photos &
+confirmations; logging; updates, server metrics (with where the server is hosted), OS maintenance and restart; backups; users; WhatsApp numbers; photos &
 voice. The list is in `src/panel/admin-tools.js`; when a feature adds panel functionality it adds the matching tool
 there (see [AGENTS.md](../AGENTS.md)). The [owner assistant](owner-assistant.md) uses the same tools from WhatsApp.
 

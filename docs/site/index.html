@@ -332,7 +332,7 @@
         <span class="label">Server</span>
         <h3>Health and one-click updates.</h3>
         <p>CPU, memory, disk and network with six-hour sparklines, logs, OS updates and restart. App updates install from the panel and survive a reload.</p>
-        <a class="shot" href="img/server-desktop.webp"><img src="img/server-desktop.webp" width="1440" height="900" loading="lazy" alt="Server page: CPU, memory, disk, swap and network tiles, a small-server note, and OS updates."></a>
+        <a class="shot" href="img/server-desktop.webp"><img src="img/server-desktop.webp" width="1440" height="900" loading="lazy" alt="Server page: CPU, memory, disk, swap and network tiles, a small-server note, OS updates, and Hosting help linking to the Oracle Cloud guide."></a>
       </div>
       <div class="tile span-3">
         <span class="label">Backups</span>
@@ -443,6 +443,23 @@
         </table>
         <p class="also"><a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/deploy/docker.md">Docker Compose →</a><a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/deploy/cloudflare-tunnel.md">Cloudflare Tunnel →</a><a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/README.md">All docs →</a></p>
       </div>
+    </div>
+    <div class="panel manage" id="where">
+      <span class="label">Just deployed</span>
+      <h3>Where is my panel?</h3>
+      <ul>
+        <li><b>Oracle Cloud:</b> when the job says <i>Succeeded</i>, <b>reload the page</b>, then <b>Application information</b> (or <b>Outputs</b>): <b>Watch the install</b> and <b>Open the panel</b>, with copy buttons for the address and IP. Also at the end of the job <b>Logs</b> (<code>panel_url = "https://…"</code>) or under <b>Compute → Instances → Public IP address</b>.</li>
+        <li><b>Google Cloud:</b> the end of the Cloud Shell output, or <b>Compute Engine → VM instances → External IP</b>.</li>
+        <li><b>Own server:</b> the installer's last lines; later <code>sudo duniya status</code>. <b>Docker:</b> <code>http://localhost:8080</code>.</li>
+      </ul>
+      <p>Open <code>http://&lt;server-ip&gt;/</code>: a live progress page that opens your panel at <code>https://&lt;ip-with-dashes&gt;.sslip.io</code> by itself.</p>
+      <p class="also"><a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/install.md#where-is-my-panel-find-the-ip--url">Step by step for every host →</a></p>
+    </div>
+    <div class="panel manage" id="manage">
+      <span class="label">Already running</span>
+      <h3>Managing your server</h3>
+      <p>App updates are one click in the panel (Overview → Server → Updates) and keep everything. For the rest (updating the Oracle stack, recreating a server and restoring a backup, removing it without leftovers, finding the IP, logs and serial console) there is a step-by-step guide per host with the exact console menus. The panel's <b>Server</b> page links to the one for your server.</p>
+      <p class="also"><a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/deploy/oci-free-tier.md">Oracle Cloud →</a><a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/deploy/google-cloud.md">Google Cloud →</a><a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/install.md#managing-your-server">Own server →</a><a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/deploy/docker.md">Docker →</a></p>
     </div>
   </div>
 </section>

@@ -937,15 +937,37 @@ function serverSizeNote(s, q) {
         : 'Everything is available.',
     waiting);
 }
+// Hosting help (#56): open the step-by-step guide for where this server runs (update, recreate, remove, console help).
+const DOCS = 'https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/';
+const HOST_GUIDES = {
+  oci: ['Oracle Cloud', 'deploy/oci-free-tier.md', 'Update the stack (new zip → Plan → Apply), recreate, remove (Destroy, then Delete), find the IP and console history, out-of-capacity and LimitExceeded.'],
+  gcp: ['Google Cloud', 'deploy/google-cloud.md', 'Recreate or remove the VM, firewall rule and IPs, serial console, SSH, resize, what keeps the IP.'],
+  server: ['Your own server', 'install.md#managing-your-server', 'Update, change the address, move to a new server, remove, where the logs are.'],
+  docker: ['Docker', 'deploy/docker.md', 'Update (pull + up), recreate, remove, logs and the setup code.'],
+};
+function hostingCard(hosting) {
+  const p = hosting?.provider;
+  const link = (key, primary) => { const [name, path, what] = HOST_GUIDES[key];
+    return h('div', { class: 'list-row' }, h('div', { class: 'grow' }, h('b', {}, name), h('div', { class: 'small muted' }, what)),
+      h('a', { class: `btn small${primary ? ' primary' : ''}`, href: DOCS + path, target: '_blank', rel: 'noopener' }, 'Open guide')); };
+  const known = HOST_GUIDES[p];
+  return h('div', { class: 'card', id: 'hosting-help' }, h('h2', {}, 'Hosting help'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, known ? `This server runs on ${known[0]}. Step-by-step guide with the exact console menus:` : 'Step-by-step guides with the exact console menus. Pick where this server runs:'),
+    known ? link(p, true) : [link('oci'), link('gcp'), link('server'), link('docker')],
+    h('p', { class: 'small muted' }, 'App updates never need the cloud console: use Updates on the Overview page. Back up before you recreate or remove a server.'),
+    known ? h('details', {}, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Other hosts'), Object.keys(HOST_GUIDES).filter((k) => k !== p).map((k) => link(k))) : null);
+}
 async function renderServer() {
   clearInterval(serverTimer); clearTimeout(opsTimer);
   const tilesBox = h('div', { class: 'tiles' }); const infoBox = h('div', { class: 'card' }); const opsBox = h('div', { class: 'card' }); const logBox = h('div', { class: 'card', style: 'margin-top:16px' });
+  const hostBox = h('div', { style: 'display:grid' });
   opsBox.append(h('h2', {}, 'OS updates & maintenance'), h('p', { class: 'muted small' }, h('span', { class: 'spinner' }), ' Checking for OS updates…'));
-  $('#main').replaceChildren(tilesBox, h('div', { class: 'grid', style: 'margin-top:16px' }, infoBox, opsBox), can('admin') ? logBox : null);
+  $('#main').replaceChildren(tilesBox, h('div', { class: 'grid', style: 'margin-top:16px' }, infoBox, opsBox, hostBox), can('admin') ? logBox : null);
   async function tiles() {
     if (S.tab !== 'server') return clearInterval(serverTimer);
     const [x, hist] = await Promise.all([api('GET', '/api/system'), api('GET', '/api/system/history')]).catch(() => [null, []]);
     if (!x) return;
+    if (!hostBox.childElementCount) hostBox.append(hostingCard(x.hosting));
     const m = x.memory; const d = x.disks[0];
     const tile = (eyebrow, stat, sub, extra) => h('div', { class: 'card' }, h('div', { class: 'eyebrow' }, eyebrow), stat, sub ? h('div', { class: 'small muted' }, sub) : null, extra);
     tilesBox.replaceChildren(
