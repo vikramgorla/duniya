@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-agent-duniya",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "private": true,
   "description": "Self-hosted WhatsApp agent platform: many Claude-powered agents on one number, MCP tools, admin panel.",
   "type": "module",
@@ -24,8 +24,8 @@
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.5",
-    "eslint": "^9.39.5",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
     "globals": "^17.14.0"
   }
 }
