@@ -20,6 +20,22 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint (ESLint)
+        run: npm run lint
+      - name: Panel script parses
+        run: npm run check:panel
+      - name: Dependency audit (production, high+)
+        run: npm audit --omit=dev --audit-level=high
+
   scripts-and-infra:
     runs-on: ubuntu-latest
     steps:

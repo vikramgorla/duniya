@@ -79,7 +79,7 @@ export function parseCidr(input) {
 export const isIp = (s) => !!(v4bytes(String(s || '')) || v6bytes(String(s || '')));
 /** Is `ip` inside one of `cidrs`? (IPv4-mapped IPv6 addresses count as IPv4.) */
 export function ipInRanges(ip, cidrs) {
-  let addr = String(ip || '').replace(/^::ffff:(?=\d+\.)/i, '');
+  const addr = String(ip || '').replace(/^::ffff:(?=\d+\.)/i, '');
   const b = v4bytes(addr) || v6bytes(addr);
   if (!b) return false;
   return cidrs.some((c) => {

@@ -1,0 +1,11 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    labels: ["type: dependencies", "area: build"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    labels: ["type: dependencies", "area: build"]

@@ -51,6 +51,7 @@ export function validRedirectUri(u) {
   if (url.hash || url.username || url.password) return false;
   return url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK.has(url.hostname));
 }
+// eslint-disable-next-line no-control-regex -- strip control characters on purpose
 const clean = (s, n) => String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, n);
 const clientRow = (id) => db.prepare('SELECT * FROM admin_oauth_clients WHERE client_id = ? AND tenant_id = ?').get(String(id || ''), TENANT);
 export function getClient(id) {

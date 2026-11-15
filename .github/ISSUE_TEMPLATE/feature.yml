@@ -1,0 +1,7 @@
+name: Feature / improvement
+description: A new capability or a change to an existing one
+labels: ["type: feature", "status: triage"]
+body:
+  - type: textarea
+    attributes: { label: What should be possible, description: "Who needs it and why; what 'done' looks like" }
+    validations: { required: true }

@@ -1,3 +1,4 @@
+import { kvGet, kvSet } from './core/db.js';
 import { loadBots, listBots } from './core/bots.js';
 import { createChannelRegistry } from './channels/registry.js';
 import { createRouter, createHistoryHandler } from './core/router.js';
@@ -25,6 +26,8 @@ startUpdateScheduler();
 startMetrics();
 startRuntimeFile(whatsapp);
 startWebAccess();
+// #10 silent by default: chats are off until switched on; tell the owner once after the update.
+if (!kvGet('allowlist:notice')) { kvSet('allowlist:notice', String(Date.now())); activity('config', { summary: 'Security update: every chat is now OFF until you switch it on (Chats page). Agents ignore chats that are off — nothing is stored or sent to a model.' }); }
 activity('system', { summary: 'Started' });
 
 process.on('unhandledRejection', (e) => activity('error', { summary: `Unhandled: ${e?.message || e}` }));

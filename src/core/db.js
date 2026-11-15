@@ -30,26 +30,36 @@ db.exec(`
 
 // ---- migrations (004-group-memory) ----
 const cols = new Set(db.prepare('PRAGMA table_info(messages)').all().map((c) => c.name));
-for (const [col, type] of [['msg_id', 'TEXT'], ['quoted', 'TEXT'], ['addressed', 'INTEGER DEFAULT 0']]) {
+for (const [col, type] of [['msg_id', 'TEXT'], ['quoted', 'TEXT'], ['addressed', 'INTEGER DEFAULT 0'], ['sender_jid', 'TEXT']]) {
   if (!cols.has(col)) db.exec(`ALTER TABLE messages ADD COLUMN ${col} ${type}`);
 }
 db.exec(`
   CREATE INDEX IF NOT EXISTS messages_chat ON messages(chat, id);
   CREATE UNIQUE INDEX IF NOT EXISTS messages_chat_msgid ON messages(chat, msg_id) WHERE msg_id IS NOT NULL;
+  -- 026: reactions and polls (WhatsApp features)
+  CREATE TABLE IF NOT EXISTS wa_reactions (
+    chat TEXT, msg_id TEXT, sender TEXT, name TEXT, emoji TEXT, ts INTEGER, PRIMARY KEY (chat, msg_id, sender)
+  );
+  CREATE INDEX IF NOT EXISTS wa_reactions_chat ON wa_reactions(chat, ts);
+  CREATE TABLE IF NOT EXISTS wa_polls (
+    chat TEXT, msg_id TEXT, name TEXT, options TEXT, selectable INTEGER, creator TEXT, message TEXT, votes TEXT, ts INTEGER,
+    PRIMARY KEY (chat, msg_id)
+  );
+  CREATE INDEX IF NOT EXISTS wa_polls_chat ON wa_polls(chat, ts);
 `);
 
 // ---- chat history ----
 const insMsg = db.prepare(`INSERT OR IGNORE INTO messages
-  (channel, chat, bot, msg_id, sender, name, text, quoted, addressed, from_bot, ts)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  (channel, chat, bot, msg_id, sender, name, text, quoted, addressed, from_bot, ts, sender_jid)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 const recent = db.prepare('SELECT * FROM (SELECT * FROM messages WHERE chat = ? ORDER BY id DESC LIMIT ?) ORDER BY id');
 const pruneCap = db.prepare('DELETE FROM messages WHERE chat = ? AND id <= (SELECT id FROM messages WHERE chat = ? ORDER BY id DESC LIMIT 1 OFFSET ?)');
 const pruneAge = db.prepare('DELETE FROM messages WHERE ts < ?');
 
 /** Store a message once (dedup by chat + msgId). Returns the row id, or 0 if it was a duplicate. */
-export function logMessage({ channel = 'whatsapp', chat, bot = '', msgId = null, sender = '', name = '', text, quoted = '', addressed = false, fromBot = false, ts = Date.now() }) {
+export function logMessage({ channel = 'whatsapp', chat, bot = '', msgId = null, sender = '', name = '', text, quoted = '', addressed = false, fromBot = false, ts = Date.now(), senderJid = '' }) {
   const r = insMsg.run(channel, chat, bot, msgId, sender, name, String(text ?? ''), String(quoted || '').slice(0, 500),
-    addressed ? 1 : 0, fromBot ? 1 : 0, ts);
+    addressed ? 1 : 0, fromBot ? 1 : 0, ts, senderJid || '');
   if (Math.random() < 0.02) pruneMessages(chat);
   return r.changes ? Number(r.lastInsertRowid) : 0;
 }
@@ -88,8 +98,22 @@ export const deleteNote = (id, chat) => (chat
   ? db.prepare('DELETE FROM notes WHERE id = ? AND chat = ?').run(Number(id), chat)
   : db.prepare('DELETE FROM notes WHERE id = ?').run(Number(id))).changes > 0;
 
+export function updateNote(id, chat, text) {
+  return db.prepare('UPDATE notes SET text = ?, ts = ? WHERE id = ? AND chat = ?').run(String(text).slice(0, 500), Date.now(), Number(id), chat).changes > 0;
+}
+/** Notes of several scopes (chat ids or `agent:<id>`) whose text contains the query, newest first. */
+export function searchNotes(chats, query, limit = 20) {
+  if (!chats.length) return [];
+  const q = `%${String(query).replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  return db.prepare(`SELECT * FROM notes WHERE chat IN (${chats.map(() => '?').join(',')}) AND text LIKE ? ESCAPE '\\' ORDER BY id DESC LIMIT ?`)
+    .all(...chats, q, Math.min(Number(limit) || 20, 50));
+}
+export const deleteAgentNotes = (bot) => db.prepare('DELETE FROM notes WHERE chat = ?').run(`agent:${bot}`).changes;
+
 export function eraseChat(chat) {
   db.prepare('DELETE FROM messages WHERE chat = ?').run(chat);
+  db.prepare('DELETE FROM wa_reactions WHERE chat = ?').run(chat);
+  db.prepare('DELETE FROM wa_polls WHERE chat = ?').run(chat);
   db.prepare('DELETE FROM chat_memory WHERE chat = ?').run(chat);
   db.prepare('DELETE FROM notes WHERE chat = ?').run(chat);
 }
@@ -160,4 +184,52 @@ export function listMessages(chat, { before = 0, limit = 50, q = '' } = {}) {
   if (q) { where += ' AND text LIKE ?'; args.push(`%${String(q).slice(0, 100)}%`); }
   return db.prepare(`SELECT id, sender, name, text, quoted, from_bot AS fromBot, addressed, ts FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim)
     .map((m) => ({ ...m, fromBot: !!m.fromBot, addressed: !!m.addressed }));
+}
+
+// ---- WhatsApp reactions and polls (026) ----
+export const messageByMsgId = (chat, msgId) => db.prepare('SELECT * FROM messages WHERE chat = ? AND msg_id = ?').get(chat, String(msgId)) || null;
+/** Latest stored message of a chat sent by the bot (for "edit/delete my last message"). */
+export const lastBotMessage = (chat) => db.prepare('SELECT * FROM messages WHERE chat = ? AND from_bot = 1 AND msg_id IS NOT NULL ORDER BY id DESC LIMIT 1').get(chat) || null;
+export function setMessageText(chat, msgId, text) {
+  db.prepare('UPDATE messages SET text = ? WHERE chat = ? AND msg_id = ?').run(String(text), chat, String(msgId));
+}
+/** Store a reaction; an empty emoji removes the sender's reaction. */
+export function saveReaction({ chat, msgId, sender, name = '', emoji = '', ts = Date.now() }) {
+  if (!emoji) { db.prepare('DELETE FROM wa_reactions WHERE chat = ? AND msg_id = ? AND sender = ?').run(chat, String(msgId), sender); return; }
+  db.prepare('INSERT OR REPLACE INTO wa_reactions (chat, msg_id, sender, name, emoji, ts) VALUES (?, ?, ?, ?, ?, ?)').run(chat, String(msgId), sender, name, emoji, ts);
+  db.prepare('DELETE FROM wa_reactions WHERE chat = ? AND ts < (SELECT ts FROM wa_reactions WHERE chat = ? ORDER BY ts DESC LIMIT 1 OFFSET 500)').run(chat, chat);
+}
+export const recentReactions = (chat, limit = 15) => db.prepare(`SELECT r.*, m.text AS target_text, m.from_bot AS target_from_bot FROM wa_reactions r
+  LEFT JOIN messages m ON m.chat = r.chat AND m.msg_id = r.msg_id WHERE r.chat = ? ORDER BY r.ts DESC LIMIT ?`).all(chat, limit).reverse();
+
+const pollRow = (r) => (r ? { ...r, options: JSON.parse(r.options || '[]'), votes: JSON.parse(r.votes || '{}') } : null);
+/** Keep a poll's creation message (BufferJSON text) so votes can be decrypted later. */
+export function savePoll({ chat, msgId, name, options, selectable = 1, creator = '', message = '', ts = Date.now() }) {
+  db.prepare(`INSERT INTO wa_polls (chat, msg_id, name, options, selectable, creator, message, votes, ts) VALUES (?, ?, ?, ?, ?, ?, ?, '{}', ?)
+    ON CONFLICT(chat, msg_id) DO UPDATE SET name = excluded.name, options = excluded.options, selectable = excluded.selectable, creator = excluded.creator, message = excluded.message`)
+    .run(chat, String(msgId), String(name || ''), JSON.stringify(options || []), Number(selectable) || 0, creator, message, ts);
+}
+export const getPoll = (chat, msgId) => pollRow(db.prepare('SELECT * FROM wa_polls WHERE chat = ? AND msg_id = ?').get(chat, String(msgId)));
+export const latestPoll = (chat) => pollRow(db.prepare('SELECT * FROM wa_polls WHERE chat = ? ORDER BY ts DESC LIMIT 1').get(chat));
+export const recentPolls = (chat, limit = 3) => db.prepare('SELECT * FROM wa_polls WHERE chat = ? ORDER BY ts DESC LIMIT ?').all(chat, limit).map(pollRow).reverse();
+/** A voter's latest choice replaces their earlier one (empty list = vote withdrawn). */
+export function savePollVote({ chat, msgId, voter, name = '', selected = [], ts = Date.now() }) {
+  const p = getPoll(chat, msgId);
+  if (!p) return null;
+  const votes = p.votes;
+  if (selected.length) votes[voter] = { name, options: selected, ts }; else delete votes[voter];
+  db.prepare('UPDATE wa_polls SET votes = ? WHERE chat = ? AND msg_id = ?').run(JSON.stringify(votes), chat, String(msgId));
+  return { ...p, votes };
+}
+/** Option counts of a poll: [{ name, votes, voters: [names] }]. */
+export function pollTally(p) {
+  const counts = p.options.map((o) => ({ name: o, votes: 0, voters: [] }));
+  for (const v of Object.values(p.votes || {})) {
+    for (const o of v.options || []) {
+      let c = counts.find((x) => x.name === o);
+      if (!c) { c = { name: o, votes: 0, voters: [] }; counts.push(c); }
+      c.votes++; c.voters.push(v.name || 'someone');
+    }
+  }
+  return counts;
 }

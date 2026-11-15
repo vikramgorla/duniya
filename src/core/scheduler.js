@@ -1,3 +1,4 @@
+import { isChatEnabled } from './chat-prefs.js';
 import { env } from './config.js';
 import { getSettings } from './store.js';
 import { listBots } from './bots.js';
@@ -24,6 +25,7 @@ export async function runSchedule(bot, sched, channel, { force = false } = {}) {
   const results = [];
   const { date } = nowParts(bot.timezone || env.timezone);
   for (const chat of chats) {
+    if (!isChatEnabled(chat)) continue; // #10: never post into chats that are off
     const key = `sched:${bot.id}:${sched.id}:${chat}:${date}`;
     if (!force && kvGet(key)) continue;
     kvSet(key, '1');
