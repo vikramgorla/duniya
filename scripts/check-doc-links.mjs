@@ -22,7 +22,7 @@ export function anchorsOf(md) {
   for (const line of stripCode(md).split('\n')) {
     const h = line.match(/^#{1,6}\s+(.*?)\s*#*\s*$/);
     if (!h) continue;
-    const text = h[1].replace(/<[^>]+>/g, '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_~]/g, (c) => (c === '_' ? '_' : ''));
+    const text = h[1].replace(/<[^>]+>/g, '').replace(/[<>]/g, '') // slugs never keep < or >.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_~]/g, (c) => (c === '_' ? '_' : ''));
     const base = text.toLowerCase().trim().replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
     const n = seen.get(base) ?? 0;
     seen.set(base, n + 1);
