@@ -9,6 +9,8 @@ import { maybeSummarize } from './memory.js';
 import { setWhatsAppChannel } from './whatsapp-tools.js';
 import { countStat } from './stats.js';
 import { silenceReason } from './silences.js';
+import { handleOwnerMessage } from './owner-assistant.js';
+import { dmNoticeOnce } from './privacy-notice.js';
 
 export { silenceReason }; // #34: other modules (usage caps) report why an agent stayed silent, e.g. silenceReason('budget', …)
 
@@ -144,6 +146,8 @@ export function createRouter(channel) {
   return async function onMessage(msg) {
     // Reactions and poll votes: recorded only for chats that are on (#10).
     if (msg.kind && msg.kind !== 'text') { if (isChatEnabled(msg.chat)) recordEvent(msg); return; }
+    // Owner assistant (044): link codes and linked panel users' direct messages (unless they start with an agent trigger).
+    if (!msg.isGroup && await handleOwnerMessage(msg, channel)) return;
     // A media caption can address the agent ("!panduga what is this?"); the stored text is the placeholder.
     const wake = msg.caption || msg.text;
     const lower = wake.trim().toLowerCase();
@@ -261,6 +265,7 @@ export function createRouter(channel) {
     if (out) await reply(out);
 
     async function reply(text) {
+      if (!msg.isGroup) { const notice = dmNoticeOnce(msg.phone || msg.chat); if (notice) text = `${text}\n\n_${notice}_`; } // 044: once per person
       const sent = await channel.send(msg.chat, text, { quoted: msg.raw });
       countStat('reply', { agent: agent.id });
       logMessage({

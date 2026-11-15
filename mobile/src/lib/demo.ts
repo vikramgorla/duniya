@@ -97,6 +97,7 @@ async function route(method: string, path: string, body: any): Promise<unknown> 
   if ((m = /^\/api\/pending\/([^/]+)(\/apply)?$/.exec(p))) { pending = pending.filter((x) => x.code !== m![1]); return m[2] ? { result: 'Applied (demo)' } : { ok: true }; }
   if (method === 'POST' && p === '/api/updates/apply') { updateRunning = { target: 'v1.9.1', startedAt: Date.now() }; setTimeout(() => { updateRunning = null; }, 8000); return { started: true, running: updateRunning }; }
   if (method === 'POST' && p === '/api/updates/check') return { current: 'v1.9.0', latest: 'v1.9.1', available: true };
+  if (method === 'POST' && p === '/api/owner/ask') return { reply: 'Demo: the families agreed to take the 9:10 train on Saturday; the carpool group was quiet for 3 days.', confirms: [] };
   if (method === 'POST' && p === '/api/ai/agent-draft') {
     const b = agents.find((x) => x.id === body.agentId);
     const after = `${b?.config.prompt || ''}\n- ${String(body.request || '').trim()}`;
