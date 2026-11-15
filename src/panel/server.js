@@ -41,6 +41,7 @@ import {
 } from './http.js';
 import { googleRoutes, googleReady } from './routes/google.js';
 import { webRoutes } from './routes/web.js';
+import { domainCheckResponse } from '../core/webaccess.js';
 import { passwordLoginAllowed } from '../core/google-signin.js';
 import { createAdminMcp } from './admin-mcp.js';
 import { validateAccess } from '../core/admin-oauth.js';
@@ -621,6 +622,11 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
         return send(res, 200, readFileSync(resolve(PUBLIC, 'index.html')), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
       }
       if (url.pathname === '/healthz') return send(res, 200, 'ok');
+      // 036: domain reachability proof + Caddy's on-demand TLS "ask" (public, answers only one-time tokens).
+      if (req.method === 'GET' && url.pathname.startsWith('/.well-known/duniya-check')) {
+        const r = domainCheckResponse(url, req);
+        return send(res, r.status, r.body, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+      }
       if (req.method === 'GET' && url.pathname === '/qr.js') {
         return send(res, 200, readFileSync(resolve(PUBLIC, 'qr.js')), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=3600' });
       }

@@ -8,9 +8,9 @@ This puts your own Duniya server (WhatsApp agents + admin panel) on Google Cloud
 * a **30 GB standard** disk, and **1 GB** of outgoing traffic a month (plenty for WhatsApp agents),
 * automatic HTTPS at `https://<your-ip>.sslip.io`, no domain needed. You can add your own domain later.
 
-Google needs a billing account (a card) even for free resources. Only the public IPv4 address may be billed
-(about US$0.005 an hour, so about US$3.65 a month). The last step shows how to set a budget alert so nothing
-surprises you.
+Google needs a billing account (a card) even for free resources. Google's free-tier guide says the free tier does
+not charge for an external IP address, so the VM's (ephemeral) public IP is covered. A reserved static IP, a second
+VM or Cloud NAT would be billed. The last step shows how to set a budget alert so nothing surprises you.
 
 Click **Start**.
 
@@ -40,6 +40,22 @@ While it works, open the **progress page** it prints (`http://<ip>/`) to watch t
 Options: `--region us-west1` or `--region us-east1`, `--name`, `--admin-password '…'` (instead of a setup code),
 `--domain agents.example.com` (prints the DNS record to create). `--help` lists everything.
 
+**No open ports?** Reach the panel through a tunnel instead of ports 80/443 (no firewall rule is created):
+
+```bash
+bash infra/gcp/deploy.sh --project <walkthrough-project-id/> --exposure tailscale --tailscale-authkey tskey-auth-…
+bash infra/gcp/deploy.sh --project <walkthrough-project-id/> --exposure cloudflare --cloudflare-token eyJ…
+```
+
+* **Tailscale**: create an auth key at [Tailscale → Settings → Keys](https://login.tailscale.com/admin/settings/keys) and
+  turn on MagicDNS and HTTPS Certificates (Tailscale admin console → DNS). The panel is
+  `https://duniya.<your-tailnet>.ts.net`, only for devices in your tailnet.
+* **Cloudflare Tunnel**: Cloudflare → Zero Trust → Networks → Tunnels → Create a tunnel → Cloudflared, copy the token;
+  afterwards add a public hostname → `http://localhost:8080`.
+
+The VM keeps its free ephemeral IP for outgoing traffic (WhatsApp, AI providers). `--no-external-ip` removes it and
+adds Cloud NAT so the VM can still go out — that is **not free** (about US$4.70 a month plus traffic).
+
 ## Open your panel
 
 When the script prints **Ready**, open the address it shows (`https://<ip>.sslip.io`).
@@ -57,11 +73,12 @@ gcloud compute ssh duniya --zone us-central1-a -- sudo duniya show-setup-code
 
 ## Your own domain (optional)
 
-1. At your DNS provider, create an **A record**: your name (e.g. `agents.example.com`) → the VM's IP.
-2. In the panel: **Settings → Web address & access**, enter the name, **Check DNS**, then **Use this domain**.
+1. At your DNS provider, create an **A record**: your name (e.g. `agents.example.com`) → the VM's IP (directly, or
+   through a proxy/CDN — both work).
+2. In the panel: **Settings → Web address & access**, enter the name, **Check**, then **Add this domain**.
+3. Open the panel at the new address and click **Confirm — new address works**. Later you can turn the old address off.
 
-The certificate is free and renews by itself. If HTTPS does not come up within 4 minutes, the panel goes back to
-the previous address automatically.
+HTTPS is automatic and free. If it does not come up within 4 minutes, the previous settings come back by themselves.
 
 ## Stay free
 
@@ -73,6 +90,8 @@ To remove everything (take a backup in the panel first if you want to keep your 
 
 ```bash
 gcloud compute instances delete duniya --zone us-central1-a && gcloud compute firewall-rules delete duniya-web
+# only if you used --no-external-ip (Cloud NAT keeps billing until removed):
+gcloud compute routers delete duniya-router --region us-central1
 ```
 
 <walkthrough-conclusion-trophy></walkthrough-conclusion-trophy>

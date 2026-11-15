@@ -63,8 +63,9 @@ Every supported deployment path (one-command installer, Docker, OCI Resource Man
 GitHub Actions) MUST be declared in this repository and use the same installer logic. The service MUST
 run on a 1 GB VM (e.g. OCI Always Free `VM.Standard.E2.1.Micro`): under 400 MB RSS in normal operation and
 no native build toolchains. The app MUST bind to localhost; inbound exposure is the operator's explicit
-choice (direct HTTPS on 80/443 via a local proxy, Cloudflare Tunnel, or none), and no other ports are opened.
-OCI and Cloudflare are examples, not requirements. Code updates MUST be possible in place (panel or
+choice (direct HTTPS on 80/443 via a local proxy, an outbound tunnel such as Cloudflare Tunnel or Tailscale, or none),
+and no other ports are opened. The panel is never served over plain HTTP, and a proxy in front MUST connect to the
+server encrypted. OCI, Cloudflare and Tailscale are examples, not requirements; provider lists are neutral. Code updates MUST be possible in place (panel or
 installer) without rebuilding infrastructure, and MUST keep all data.
 
 *Rationale*: zero hosting cost, no hand-configured servers, minimal attack surface.
@@ -139,4 +140,4 @@ principle removed or redefined; MINOR: principle or section added or materially 
 clarification), and reviewed in a pull request. Reviewers verify constitution compliance for every
 change.
 
-**Version**: 1.3.1 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-15
+**Version**: 1.3.2 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-15

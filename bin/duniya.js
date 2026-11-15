@@ -281,15 +281,17 @@ const commands = {
     if (!pub) warn('No public address: the panel is only reachable on this machine', kind === 'docker' ? 'Set DOMAIN and use the https profile (docs/deploy/docker.md)' : 'Re-run the installer with --ip-https or --domain NAME');
     else {
       const host = new URL(pub).hostname;
-      const { publicIp, isCloudflareIp } = await import('../src/core/webaccess.js');
+      const { publicIp, providerOf, PROVIDERS } = await import('../src/core/webaccess.js');
       const ip = await publicIp().catch(() => '');
       let addrs = [];
       try { addrs = [...await dns.resolve4(host).catch(() => []), ...await dns.resolve6(host).catch(() => [])]; } catch { /* none */ }
-      if (!addrs.length) bad(`${host} does not resolve`, `Create a DNS record: A ${host} → ${ip || 'this server\'s public IP'}`);
+      const prov = addrs.length ? providerOf(addrs[0]) : null;
+      if (process.env.DUNIYA_EXPOSURE === 'tailscale') ok(`${host} (Tailscale: only reachable inside your tailnet)`);
+      else if (!addrs.length) bad(`${host} does not resolve`, `Create a DNS record: A ${host} → ${ip || 'this server\'s public IP'}`);
       else if (ip && addrs.includes(ip)) ok(`${host} points to this server (${ip})`);
-      else if (addrs.every((a) => isCloudflareIp(a))) ok(`${host} goes through Cloudflare`);
       else if (process.env.DUNIYA_EXPOSURE === 'tunnel') ok(`${host} resolves (Cloudflare Tunnel)`);
-      else warn(`${host} points to ${addrs.join(', ')}${ip ? `, but this server is ${ip}` : ''}`, `Change the DNS record: A ${host} → ${ip || 'this server\'s public IP'}`);
+      else if (prov) ok(`${host} is behind a proxy/CDN (looks like ${PROVIDERS[prov].name})`);
+      else warn(`${host} points to ${addrs.join(', ')}${ip ? `, but this server is ${ip}` : ''}`, `If it goes through a proxy/CDN that is fine (the HTTPS check below tells); otherwise change the DNS record: A ${host} → ${ip || 'this server\'s public IP'}`);
       try {
         const r = await fetch(`${pub.replace(/\/+$/, '')}/healthz`, { signal: AbortSignal.timeout(10000) });
         r.ok ? ok(`HTTPS works: ${pub}`) : warn(`${pub} answered ${r.status}`, 'Check the web server: sudo duniya logs, and Server → Logs → Web server');

@@ -2241,98 +2241,173 @@ function googleSetupCard(g) {
       : [steps, result]);
 }
 
-/** 031: custom domain, certificate state and IP allow-list ("Only Cloudflare", own list), applied by the root helper. */
+/** 031 + 036: web addresses (safe two-step switch), HTTPS state per address (direct or behind a proxy/CDN), and who may
+ *  open the panel (proxy/CDN address list, own list) as a trial that is undone unless confirmed. Root helper applies. */
 function webAccessCard(initial) {
   const card = h('div', { class: 'card', style: 'grid-column:1/-1' });
-  let timer = null;
+  let timer = null; let tick = null;
+  const reload = async () => { if (!card.isConnected) return; try { draw(await api('GET', '/api/web')); } catch {} };
   const draw = (w) => {
-    clearTimeout(timer);
-    const av = w.availability; const cert = w.cert || {};
-    const applied = w.applied; const restricted = w.restricted;
-    const accessLabel = !applied ? 'open to everyone' : applied.cloudflareOnly ? (applied.allow.length ? `Cloudflare + ${applied.allow.length} addresses` : 'only Cloudflare') : applied.allow.length ? `allow-list · ${applied.allow.length}` : 'open to everyone';
-    const certLine = cert.state === 'valid' ? h('span', {}, '✓ Certificate valid', cert.issuer ? ` · ${cert.issuer}` : '', cert.daysLeft != null ? ` · ${cert.daysLeft} days left (renews automatically)` : '')
-      : cert.state === 'invalid' ? h('span', { style: 'color:var(--bad)' }, `✗ Certificate problem${cert.error ? `: ${cert.error}` : ''}`)
-        : h('span', { class: 'muted' }, w.current.host ? 'No certificate found on this server' : 'No public address yet');
-    const statusBox = w.pending ? h('div', { class: 'note' }, h('span', { class: 'spinner' }), h('b', {}, w.pending === 'waiting' ? ` Getting the HTTPS certificate for ${w.last?.host || 'the new address'}…` : ' Applying the new settings…'),
-      w.last?.startedAt ? ` started ${ago(w.last.startedAt)} ago. ` : ' ', 'If HTTPS does not come up within 4 minutes, the previous address comes back by itself.')
+    clearTimeout(timer); clearInterval(tick);
+    const av = w.availability; const busy = !!w.pending;
+    const sw = w.switch; const trial = w.trial;
+    const prov = (id) => w.providers.find((p) => p.id === id);
+    const accessLabel = !w.applied || !w.restricted ? 'open to everyone'
+      : [w.applied.proxy ? `only ${prov(w.applied.proxy)?.name || w.applied.proxy}` : '', w.applied.allow.length ? `${w.applied.allow.length} own addresses` : ''].filter(Boolean).join(' + ');
+
+    // ----- addresses and their HTTPS state -----
+    const httpsLine = (x) => {
+      const c = x.cert || {};
+      if (x.health?.flexible) return h('div', { class: 'note bad', style: 'margin:4px 0 0' }, h('b', {}, 'Unencrypted proxy. '), x.health.error);
+      if (c.state === 'valid') return h('span', {}, `✓ ${c.issuer || 'Valid'} certificate`, c.daysLeft != null ? ` · ${c.daysLeft} days left (renews by itself)` : '', x.proxied ? h('span', { class: 'muted' }, ' · behind a proxy: you can set its SSL/TLS mode to “Full (strict)”') : '');
+      if (c.state === 'temporary') {
+        return h('div', {}, h('span', {}, '🔒 Encrypted to the proxy with a temporary certificate — set the proxy’s SSL/TLS mode to “Full”. A real certificate is requested automatically (retried about every 80 minutes); then “Full (strict)” works.'),
+          x.acme ? h('div', { class: 'note warn', style: 'margin:6px 0 0' }, h('b', {}, 'Why the real certificate is not there yet: '), x.acme.fix, h('div', { class: 'small muted', style: 'margin-top:4px;word-break:break-word' }, `Web server: ${x.acme.error}${x.acme.at ? ` (${ago(x.acme.at)} ago)` : ''}`)) : null);
+      }
+      if (c.state === 'invalid') return h('span', { style: 'color:var(--bad)' }, `✗ Certificate problem${c.error ? `: ${c.error}` : ''}`);
+      return h('span', { class: 'muted' }, 'No certificate yet (getting one can take a minute)');
+    };
+    const role = (x) => (x.main ? 'main' : sw?.newHost === x.host ? 'new' : sw?.oldHost === x.host ? 'old' : 'also');
+    const rows = w.hosts.map((x) => h('tr', {}, h('td', { class: 'muted small' }, role(x) === 'main' ? 'Address' : role(x) === 'new' ? 'New address' : 'Also'),
+      h('td', {}, h('a', { href: `https://${x.host}`, target: '_blank', rel: 'noopener', style: 'word-break:break-all' }, `https://${x.host}`), x.proxied ? h('span', { class: 'pill info', style: 'margin-left:6px' }, 'behind a proxy') : null,
+        h('div', { class: 'small', style: 'margin-top:2px' }, httpsLine(x)))));
+    if (!w.hosts.length) rows.push(h('tr', {}, h('td', { class: 'muted small' }, 'Address'), h('td', {}, h('span', { class: 'muted' }, 'none (only on the server)'))));
+    if (w.redirectHosts?.length) rows.push(h('tr', {}, h('td', { class: 'muted small' }, 'Forwarding'), h('td', { class: 'small' }, w.redirectHosts.join(', '), h('span', { class: 'muted' }, ' → main address'))));
+    rows.push(h('tr', {}, h('td', { class: 'muted small' }, 'Access'), h('td', {}, w.restricted ? `Restricted: ${accessLabel}` : 'Open to everyone')));
+    rows.push(h('tr', {}, h('td', { class: 'muted small' }, 'You'), h('td', {}, `${w.you.ip || 'unknown'}${w.you.via ? ` · through ${w.you.via}` : ''}`)));
+
+    const statusBox = busy ? h('div', { class: 'note' }, h('span', { class: 'spinner' }), h('b', {}, w.pending === 'waiting' ? ` ${w.last?.message || 'Starting HTTPS'}…` : ' Applying the new settings…'),
+      w.last?.startedAt ? ` started ${ago(w.last.startedAt)} ago. ` : ' ', 'If HTTPS does not come up within 4 minutes, the previous settings come back by themselves.')
       : w.last && ['failed', 'rolled-back'].includes(w.last.state) && Date.now() - (w.last.endedAt || 0) < 86400000 ? h('div', { class: 'note bad' }, h('b', {}, w.last.state === 'rolled-back' ? 'Rolled back. ' : 'Not applied. '), w.last.message, ` (${ago(w.last.endedAt)} ago)`)
         : w.last?.state === 'done' && Date.now() - (w.last.endedAt || 0) < 3600000 ? h('div', { class: 'note ok' }, h('b', {}, '✓ '), w.last.message) : null;
 
-    // ----- domain -----
-    const dom = h('input', { placeholder: 'agents.example.com', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'none', value: w.current.host && !/\.sslip\.io$/.test(w.current.host) ? w.current.host : '' });
+    // ----- two-step domain switch -----
+    const post = (path, okMsg) => tryApi(async () => { const r = await api('POST', path); await reload(); return r; }, okMsg);
+    let switchBox = null;
+    if (sw?.applying) switchBox = h('div', { class: 'note' }, h('span', { class: 'spinner' }), ` ${{ add: `Adding ${sw.newHost}`, confirm: `Making ${sw.newHost} the main address`, finish: `Turning off ${sw.oldHost}`, cancel: 'Going back to the previous address' }[sw.applying]}…`);
+    else if (sw?.phase === 'added') {
+      const here = w.you.host === sw.newHost;
+      switchBox = h('div', { class: 'note info' }, h('b', {}, `Step 2 of 3 · ${sw.newHost} added. `), `Both addresses work now. ${here ? 'You are using the new address, so it works:' : 'Open the panel at the new address and confirm there (that proves it works):'}`,
+        h('div', { class: 'row', style: 'margin-top:8px;flex-wrap:wrap' },
+          here ? h('button', { class: 'btn primary', onclick: () => post('/api/web/domain/confirm', 'Confirmed') }, 'Confirm — new address works')
+            : h('a', { class: 'btn primary', href: `https://${sw.newHost}`, target: '_blank', rel: 'noopener' }, `Open https://${sw.newHost} ↗`),
+          h('button', { class: 'btn', onclick: () => confirm(`Remove ${sw.newHost} again? ${sw.oldHost} stays the address.`) && post('/api/web/domain/cancel', 'Cancelled') }, 'Cancel')));
+    } else if (sw?.phase === 'confirmed') {
+      switchBox = h('div', { class: 'note ok' }, h('b', {}, `Step 3 of 3 · ${sw.newHost} is the main address. `), `${sw.oldHost} still works too. When nobody needs it any more (bookmarks, Google sign-in, AI assistants updated), turn it off: it then only forwards to the new address.`,
+        h('div', { class: 'row', style: 'margin-top:8px;flex-wrap:wrap' },
+          h('button', { class: 'btn danger', onclick: () => confirm(`Turn off ${sw.oldHost}?\n\nThe panel stops answering there; visits are forwarded to https://${sw.newHost}.`) && post('/api/web/domain/finish', 'Old address turned off') }, `Turn off ${sw.oldHost}`),
+          h('button', { class: 'btn', onclick: () => confirm(`Go back to ${sw.oldHost} as the main address and remove ${sw.newHost}?`) && post('/api/web/domain/cancel', 'Back to the previous address') }, 'Go back')));
+    }
+
+    // ----- access trial (dead-man switch) -----
+    let trialBox = null;
+    if (trial) {
+      const left = h('b', {});
+      const until = trial.secondsLeft != null ? Date.now() + trial.secondsLeft * 1000 : null;
+      const upd = () => { if (!until) return; const s = Math.max(0, Math.round((until - Date.now()) / 1000)); left.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; if (!s) { clearInterval(tick); setTimeout(reload, 3000); } };
+      trialBox = until ? h('div', { class: 'note warn' }, h('b', {}, 'Trying the new access rules. '), 'If you can read this after reloading the page through the public address, they work. Confirm within ', left, ' or they are undone automatically.',
+        h('div', { class: 'row', style: 'margin-top:8px;flex-wrap:wrap' },
+          h('button', { class: 'btn primary', disabled: !w.you.throughWebServer, onclick: () => post('/api/web/access/confirm', 'Kept') }, 'Confirm — I can still open the panel'),
+          h('button', { class: 'btn', onclick: () => post('/api/web/access/undo', 'Undone') }, 'Undo now')),
+        w.you.throughWebServer ? null : h('div', { class: 'small', style: 'margin-top:6px' }, 'Confirm from the public address of the panel, not through an SSH tunnel.'))
+        : h('div', { class: 'note' }, h('span', { class: 'spinner' }), ' Applying the new access rules…');
+      if (until) { upd(); tick = setInterval(upd, 1000); }
+    } else if (w.lastRevert && Date.now() - w.lastRevert.at < 3600000) {
+      trialBox = h('div', { class: 'note warn' }, h('b', {}, 'Access rules undone. '), `The last change was not confirmed in time (or was undone), so the previous rules are back (${ago(w.lastRevert.at)} ago).`);
+    }
+
+    // ----- add a domain -----
+    const dom = h('input', { placeholder: 'agents.example.com', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'none' });
     const dnsBox = h('div', {});
-    const useBtn = h('button', { class: 'btn primary', disabled: true }, 'Use this domain');
+    const addBtn = h('button', { class: 'btn primary', disabled: true }, 'Add this domain');
     const showCheck = (r) => {
-      useBtn.disabled = !r.ok || r.domain === w.current.host;
-      dnsBox.replaceChildren(h('div', { class: `note ${r.ok ? 'ok' : 'warn'}`, style: 'margin-top:8px' }, r.ok ? h('b', {}, '✓ ') : null, r.text),
-        r.ok ? null : h('div', { class: 'tscroll', style: 'margin-top:6px' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Type'), h('th', {}, 'Name'), h('th', {}, 'Value'))),
+      addBtn.disabled = !r.ok || !!sw || busy;
+      dnsBox.replaceChildren(h('div', { class: `note ${r.ok ? 'ok' : r.state === 'flexible' ? 'bad' : 'warn'}`, style: 'margin-top:8px' }, r.ok ? h('b', {}, '✓ ') : null, r.text),
+        r.ok || r.state === 'flexible' ? null : h('div', { class: 'tscroll', style: 'margin-top:6px' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Type'), h('th', {}, 'Name'), h('th', {}, 'Value'))),
           h('tbody', {}, h('tr', {}, h('td', {}, h('code', {}, r.record.type)), h('td', {}, h('code', {}, r.record.name), ' ', copyBtn(r.record.name)), h('td', {}, h('code', {}, r.record.value), ' ', r.serverIp ? copyBtn(r.record.value) : null))))),
-        r.ok ? null : h('p', { class: 'small muted' }, 'At your DNS provider (e.g. Cloudflare, your registrar): add the record, keep the TTL on automatic, wait a minute, then check again. Using Cloudflare: “DNS only” (grey cloud) until the certificate works.'));
+        r.ok || r.state === 'flexible' ? null : h('p', { class: 'small muted' }, 'At your DNS provider: add the record (or, with a proxy/CDN, point its origin to this server’s address), wait a minute, then check again.'));
     };
     const check = async (btn) => {
       btn.disabled = true; btn.replaceChildren(h('span', { class: 'spinner' }), ' Checking…');
       const r = await tryApi(() => api('POST', '/api/web/check', { domain: dom.value }));
-      btn.disabled = false; btn.textContent = 'Check DNS';
+      btn.disabled = false; btn.textContent = 'Check';
       if (r) showCheck(r);
     };
-    useBtn.onclick = async () => {
+    addBtn.onclick = async () => {
       const d = dom.value.trim().toLowerCase();
-      if (!confirm(`Move the panel to https://${d}?\n\nThe web server gets a certificate for it (about a minute). If HTTPS does not come up within 4 minutes, the current address comes back automatically. The old address keeps forwarding to the new one.\n\nAfter the move, update the addresses in Google sign-in and AI assistants if you use them.`)) return;
-      await applyNow({ domain: d });
+      if (!confirm(`Add https://${d}?\n\nIt is added next to the current address: both work, nothing is switched off. Then you open the panel at the new address and confirm it there.`)) return;
+      if (await tryApi(() => api('POST', '/api/web/domain', { domain: d }), 'Adding…')) reload();
     };
 
-    // ----- access -----
-    const st = { mode: w.settings.cloudflareOnly ? 'cloudflare' : w.settings.allow.length ? 'list' : 'open' };
+    // ----- who can open the panel -----
+    const st = { mode: w.settings.proxy ? 'proxy' : w.settings.allow.length ? 'list' : 'open' };
+    const provSel = h('select', { style: 'max-width:320px' }, w.providers.slice().sort((a, b) => (a.id === 'custom') - (b.id === 'custom') || a.name.localeCompare(b.name))
+      .map((p) => h('option', { value: p.id, selected: (w.settings.proxy || '') === p.id }, p.id === 'custom' ? 'Other proxy (my own ranges)' : p.name)));
+    const custom = h('textarea', { rows: 3, placeholder: '198.51.100.0/24\n2001:db8::/32', spellcheck: 'false' }); custom.value = (w.settings.customRanges || []).join('\n');
+    const provInfo = h('div', { class: 'small muted', style: 'margin-top:6px' });
+    const placeProv = () => {
+      const p = prov(provSel.value);
+      custom.parentNode?.classList.toggle('hide', provSel.value !== 'custom');
+      provInfo.replaceChildren(p.published ? `${p.name} publishes its addresses: ${p.ranges ? `${p.ranges} ranges${p.updatedAt ? `, updated ${ago(p.updatedAt)} ago` : ' (built in)'}` : 'not downloaded yet'}; refreshed daily. ` : 'Only your proxy’s addresses may connect. ',
+        p.published ? h('button', { class: 'btn small', type: 'button', onclick: () => tryApi(async () => { await api('POST', '/api/web/ranges/refresh', { provider: p.id }); await reload(); }, 'List updated') }, 'Update list') : null);
+    };
+    provSel.onchange = placeProv;
     const list = h('textarea', { rows: 4, placeholder: '203.0.113.7\n198.51.100.0/24\n2001:db8::/32', spellcheck: 'false' }); list.value = w.settings.allow.join('\n');
     const mine = h('input', { type: 'checkbox', checked: w.settings.alwaysAllowMine !== false });
     const listBox = h('div', {}, field('Allowed addresses (one per line: an IP or a range like 203.0.113.0/24)', list),
       h('label', { class: 'inline', style: 'margin-top:6px' }, mine, `Always allow my current address (${w.you.ip || 'unknown'})`));
-    const cfExtra = h('details', {}, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Also limit to my own addresses (advanced)'));
+    const proxyBox = h('div', {}, field('Proxy / CDN in front of this server', provSel), h('div', {}, field('Its address ranges (one per line)', custom)), provInfo);
+    const extra = h('details', {}, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Also limit to my own addresses (advanced)'));
     const modeHint = h('p', { class: 'small muted', style: 'margin:6px 0' });
     const HINT = {
-      open: 'Anyone who knows the address can see the sign-in page (passwords and Google still protect it).',
-      cloudflare: `Only Cloudflare’s servers may connect, so visitors must come through your Cloudflare-proxied domain (orange cloud). Cloudflare’s address list (${w.cloudflare.ranges} ranges${w.cloudflare.updatedAt ? `, updated ${ago(w.cloudflare.updatedAt)} ago` : ''}) is refreshed daily.`,
+      open: 'Anyone who knows the address can see the sign-in page (passwords and Google sign-in still protect it).',
+      proxy: 'Only your proxy/CDN may connect, so nobody can bypass it by using this server’s IP address. Visitors must use the proxied domain.',
       list: 'Only the addresses below may open the panel. Good for a fixed office or home connection.',
     };
-    const placeList = () => { modeHint.textContent = HINT[st.mode]; if (st.mode === 'list') modeHint.after(listBox); else if (st.mode === 'cloudflare') { cfExtra.append(listBox); } else listBox.remove(); cfExtra.classList.toggle('hide', st.mode !== 'cloudflare'); };
-    const seg = h('div', { class: 'seg' }, [['open', 'Everyone'], ['cloudflare', 'Only Cloudflare'], ['list', 'Only my list']].map(([v, l]) => h('button', { type: 'button', class: st.mode === v ? 'on' : '',
-      onclick: (e) => { st.mode = v; seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); placeList(); } }, l)));
-    const accessBody = () => ({ cloudflareOnly: st.mode === 'cloudflare', allow: st.mode === 'list' || (st.mode === 'cloudflare' && cfExtra.open) ? splitLines(list.value) : [], alwaysAllowMine: mine.checked });
-    const pre = h('pre', { style: 'max-height:320px' });
-    const applyNow = async (extra, confirmLockout = false) => {
+    const modeBody = h('div', {});
+    const placeMode = () => {
+      modeHint.textContent = HINT[st.mode];
+      if (st.mode === 'proxy') { extra.replaceChildren(extra.firstChild, listBox); modeBody.replaceChildren(proxyBox, extra); placeProv(); } else if (st.mode === 'list') modeBody.replaceChildren(listBox); else modeBody.replaceChildren();
+    };
+    const seg = h('div', { class: 'seg' }, [['open', 'Everyone'], ['proxy', 'Only a proxy / CDN'], ['list', 'Only my list']].map(([v, l]) => h('button', { type: 'button', class: st.mode === v ? 'on' : '',
+      onclick: (e) => { st.mode = v; seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); placeMode(); } }, l)));
+    const accessBody = () => ({
+      proxy: st.mode === 'proxy' ? provSel.value : null, customRanges: splitLines(custom.value),
+      allow: st.mode === 'list' || (st.mode === 'proxy' && extra.open) ? splitLines(list.value) : [], alwaysAllowMine: mine.checked,
+    });
+    const applyAccess = async (confirmLockout = false) => {
       try {
-        await api('PUT', '/api/web', { ...accessBody(), ...extra, confirmLockout });
-        toast('Applying…'); draw(await api('GET', '/api/web'));
+        const r = await api('PUT', '/api/web/access', { ...accessBody(), confirmLockout });
+        toast(r.trial ? 'Trying the new rules: confirm them within 10 minutes' : 'Applying…'); reload();
       } catch (e) {
-        if (e.data?.needsConfirm && confirm(`${e.message}\n\nIf you get locked out, run on the server: sudo duniya open-access\n\nApply anyway?`)) return applyNow(extra, true);
+        if (e.data?.needsConfirm && confirm(`${e.message}\n\nThe change is a trial: if you do not confirm it within 10 minutes it is undone automatically. Locked out for longer? On the server run: sudo duniya open-access\n\nApply anyway?`)) return applyAccess(true);
         if (!e.data?.needsConfirm) toast(e.message);
       }
     };
-    const busy = !!w.pending;
+    const pre = h('pre', { style: 'max-height:320px' });
+
     card.replaceChildren(
-      h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Web address & access'), h('span', { class: `pill ${restricted ? 'info' : ''}` }, accessLabel)),
-      h('p', { class: 'small muted' }, 'Choose the address people use to open this panel, and who may open it at all.'),
-      h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {},
-        h('tr', {}, h('td', { class: 'muted small' }, 'Address'), h('td', {}, w.current.url ? h('a', { href: w.current.url, target: '_blank', rel: 'noopener' }, w.current.url) : h('span', { class: 'muted' }, 'none (only on the server)'))),
-        h('tr', {}, h('td', { class: 'muted small' }, 'HTTPS'), h('td', {}, certLine)),
-        h('tr', {}, h('td', { class: 'muted small' }, 'Access'), h('td', {}, restricted ? `Restricted: ${accessLabel}` : 'Open to everyone')),
-        h('tr', {}, h('td', { class: 'muted small' }, 'You'), h('td', {}, `${w.you.ip || 'unknown'}${w.you.viaCloudflare ? ' · through Cloudflare' : ''}`))))),
-      statusBox,
+      h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Web address & access'), h('span', { class: `pill ${w.restricted ? 'info' : ''}` }, accessLabel)),
+      h('p', { class: 'small muted' }, 'The address people use to open this panel, its HTTPS certificate, and who may open it at all.'),
+      h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {}, ...rows))),
+      statusBox, switchBox, trialBox,
       av.ok ? [
         h('h3', {}, 'Your own domain'),
-        h('p', { class: 'small muted', style: 'margin-top:0' }, `Point a name you own to this server${w.serverIp ? ` (${w.serverIp})` : ''}, check it, then switch. The certificate is free and renews by itself.`),
-        h('div', { class: 'row' }, dom, h('button', { class: 'btn', disabled: busy, onclick: (e) => check(e.currentTarget) }, 'Check DNS'), useBtn), dnsBox,
+        h('p', { class: 'small muted', style: 'margin-top:0' }, `Point a name you own to this server${w.serverIp ? ` (${w.serverIp})` : ''} — directly, or through a proxy/CDN — then check it. HTTPS is automatic either way: a free Let’s Encrypt certificate, and behind a proxy a temporary one until then, so the proxy always talks to this server encrypted. Proxies that talk to the server without encryption (“Flexible”) are not supported.`),
+        h('div', { class: 'row' }, dom, h('button', { class: 'btn', disabled: busy, onclick: (e) => check(e.currentTarget) }, 'Check'), addBtn), dnsBox,
         h('h3', {}, 'Who can open the panel'),
-        h('div', { style: 'overflow-x:auto' }, seg), modeHint, cfExtra,
-        h('div', { class: 'row', style: 'margin-top:10px' },
-          h('button', { class: 'btn primary', disabled: busy, onclick: () => applyNow({}) }, 'Apply access'),
-          st.mode === 'cloudflare' || w.settings.cloudflareOnly ? h('button', { class: 'btn small', onclick: () => tryApi(async () => { await api('POST', '/api/web/cloudflare/refresh'); draw(await api('GET', '/api/web')); }, 'Cloudflare list updated') }, 'Refresh Cloudflare list') : null),
+        h('div', { style: 'overflow-x:auto' }, seg), modeHint, modeBody,
+        h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn primary', disabled: busy || !!trial, onclick: () => applyAccess() }, 'Apply access')),
+        h('p', { class: 'small muted' }, 'Stricter rules are tried first: you confirm them from the panel within 10 minutes, otherwise the previous rules come back by themselves.'),
         h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Show the web server configuration this creates'),
-          h('button', { class: 'btn small', style: 'margin:8px 0', onclick: async () => { const r = await tryApi(() => api('POST', '/api/web/preview', { ...accessBody(), domain: dom.value.trim() || undefined })); if (r) pre.textContent = r.caddyfile; } }, 'Preview'), pre),
+          h('button', { class: 'btn small', style: 'margin:8px 0', onclick: async () => { const r = await tryApi(() => api('POST', '/api/web/preview', accessBody())); if (r) pre.textContent = r.caddyfile; } }, 'Preview'), pre),
+        h('details', { style: 'margin-top:6px' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Without open ports'),
+          h('p', { class: 'small muted' }, 'Re-run the installer with a tunnel instead of ports 80/443: ', h('code', {}, '--cloudflare-token'), ' (Cloudflare Tunnel) or ', h('code', {}, '--tailscale-authkey'),
+            ' (Tailscale: only your devices; Tailscale Funnel can make it public). Other tunnels such as frp, ngrok, Pangolin or zrok work too: install with ', h('code', {}, '--local-only'), ' and point them at http://127.0.0.1:8080.')),
         h('p', { class: 'small muted', style: 'margin-bottom:0' }, 'Locked out? On the server run ', h('code', {}, 'sudo duniya open-access'), ' to allow everyone again.'),
       ] : h('div', { class: 'note', style: 'margin-top:10px' }, av.text));
-    if (av.ok) { placeList(); if (busy) card.querySelectorAll('input,textarea,.seg button').forEach((x) => { x.disabled = true; }); }
-    if (w.pending) timer = setTimeout(async () => { if (!card.isConnected) return; try { draw(await api('GET', '/api/web')); } catch {} }, 4000);
+    if (av.ok) { placeMode(); if (busy) card.querySelectorAll('input,textarea,select,.seg button').forEach((x) => { x.disabled = true; }); }
+    if (w.pending || sw?.applying || (trial && !trial.until)) timer = setTimeout(reload, 4000);
   };
   draw(initial);
   return card;

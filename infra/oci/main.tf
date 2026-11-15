@@ -12,6 +12,7 @@ locals {
     EXPOSURE        = var.exposure
     DOMAIN          = var.domain
     CF_TUNNEL_TOKEN = var.cf_tunnel_token
+    TS_AUTHKEY      = var.tailscale_authkey
     ADMIN_PASSWORD  = var.admin_password
     UPDATE_MODE     = var.update_mode
   } : "${k}='${replace(v, "'", "'\\''")}'"])
