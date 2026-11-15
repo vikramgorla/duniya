@@ -165,7 +165,7 @@ function fetchOnce(url) {
     const to = routes[`${u.protocol}//${u.hostname}`] || (u.protocol === 'http:' ? routes[u.hostname] : null);
     if (!to) return Promise.resolve({ error: 'ECONNREFUSED' });
     const [h, p] = to.split(':');
-    Object.assign(opts, { headers: { ...opts.headers, host: u.host }, servername: u.hostname, rejectUnauthorized: false });
+    Object.assign(opts, { headers: { ...opts.headers, host: u.host }, servername: u.hostname, ...(process.env.DUNIYA_FAKE_CA ? { ca: readFileSync(process.env.DUNIYA_FAKE_CA) } : {}) });
     target = `${u.protocol}//${h}:${p}${u.pathname}`;
   }
   return new Promise((res) => {
@@ -258,14 +258,16 @@ export function certInfo(host, { port = Number(process.env.DUNIYA_TLS_PORT || 44
       const code = e.code || e.message;
       const network = ['ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ETIMEDOUT'].includes(e.code);
       if (network) return res({ state: 'none', error: code });
-      // Caddy's internal fallback (036): encrypted, but only a proxy in "Full" mode accepts it.
-      const u = tls.connect({ host: '127.0.0.1', port, servername: host, timeout, rejectUnauthorized: false }, () => {
+      // Caddy's internal fallback (036): encrypted, but only a proxy in "Full" mode accepts it. Verified against
+      // Caddy's own local root (the root helper exports its public certificate), never with validation switched off.
+      let caddyRoot = null;
+      try { caddyRoot = readFileSync(process.env.DUNIYA_CADDY_ROOT || `${OPS_STATE_DIR}/caddy-local-root.crt`); } catch { /* not exported (yet) */ }
+      if (!caddyRoot) return res({ state: 'invalid', issuer: '', validTo: 0, daysLeft: null, error: String(code) });
+      const u = tls.connect({ host: '127.0.0.1', port, servername: host, timeout, ca: caddyRoot }, () => {
         const c = u.getPeerCertificate();
         u.end();
-        const issuer = c?.issuer?.CN || c?.issuer?.O || '';
         const validTo = c?.valid_to ? Date.parse(c.valid_to) : 0;
-        if (/Caddy Local Authority/i.test(issuer)) res({ state: 'temporary', issuer, validTo, daysLeft: null, error: String(code) });
-        else res({ state: 'invalid', issuer, validTo: 0, daysLeft: null, error: String(code) });
+        res({ state: 'temporary', issuer: c?.issuer?.CN || c?.issuer?.O || 'Caddy Local Authority', validTo, daysLeft: null, error: String(code) });
       });
       u.on('error', () => res({ state: 'invalid', issuer: '', validTo: 0, daysLeft: null, error: String(code) }));
       u.on('timeout', () => { u.destroy(); res({ state: 'invalid', issuer: '', validTo: 0, daysLeft: null, error: String(code) }); });

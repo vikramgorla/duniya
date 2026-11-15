@@ -230,7 +230,8 @@ before(async () => {
   const panelPort = t.panel.address().port;
   try {
     const kd = mkdtempSync(join(tmpdir(), 'tls-'));
-    execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', join(kd, 'k'), '-out', join(kd, 'c'), '-days', '1', '-subj', '/CN=flex.example.org'], { stdio: 'pipe' });
+    execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', join(kd, 'k'), '-out', join(kd, 'c'), '-days', '1', '-subj', '/CN=flex.example.org', '-addext', 'subjectAltName=DNS:flex.example.org'], { stdio: 'pipe' });
+    process.env.DUNIYA_FAKE_CA = join(kd, 'c'); // the fake proxy's certificate is trusted explicitly (no unverified TLS)
     const https = await import('node:https');
     fakeTls = https.createServer({ key: readFileSync(join(kd, 'k')), cert: readFileSync(join(kd, 'c')) }, (req, res) => {
       const up = http.request({ host: '127.0.0.1', port: panelPort, path: req.url, headers: { ...req.headers, 'x-duniya-origin-scheme': 'http' } }, (r) => { res.writeHead(r.statusCode, r.headers); r.pipe(res); });

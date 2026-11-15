@@ -105,6 +105,9 @@ apply_web_config() {
   fi
   cp -f "$CADDYFILE" "$STATE_DIR/Caddyfile.last-good"
   install -m 0644 "$work/request.json" "$STATE_DIR/web-applied.json"
+  # Public root of Caddy's internal CA, so the app can verify the temporary certificate without disabling validation.
+  root_crt=/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt
+  if [ -f "$root_crt" ]; then install -m 0644 "$root_crt" "$STATE_DIR/caddy-local-root.crt"; fi
   set_kv "$APP_ENV" PUBLIC_URL "$public_url"
   set_kv "$APP_ENV" TRUST_PROXY "$trust"
   set_kv "$APP_ENV" DUNIYA_EXPOSURE "$exposure"
