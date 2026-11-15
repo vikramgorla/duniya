@@ -23,8 +23,11 @@ message). The agent answers about the photo.
    and the history keeps only `[image: caption]` — no photo bytes in the database.
 2. **Given** a model that cannot see images, **Then** the vision fallback model (Settings) is used, or the agent says
    kindly that it can't look at photos and answers the text.
-3. PDFs are read the same way; stickers only when the agent allows them.
-4. Photos in chats that are off, or not addressed to the agent, are never downloaded.
+3. **Given** a photo turn whose model fails and fallback moves on (042), **Then** models that cannot see images
+   (e.g. GitHub Copilot) are skipped and the vision fallback model is tried after the chain; when none can answer,
+   the turn is asked again without the photo and the agent says kindly it can't look at it (#67).
+4. PDFs are read the same way; stickers only when the agent allows them.
+5. Photos in chats that are off, or not addressed to the agent, are never downloaded.
 5. Media larger than the limit is refused by WhatsApp's declared size before any download.
 
 ### User Story 2 - The agent listens to a voice note (Priority: P1)
@@ -92,7 +95,8 @@ the text is kept in the history. Replies with a confirm code or a link stay text
   `input_image` / `input_file`).
 - **FR-003** Photo bytes never stored in the database; temp files removed (15 min max).
 - **FR-004** Every media provider call recorded in usage with kind `transcribe`, `image`, `speech`.
-- **FR-005** Provider core changes additive only (adapter methods, no change to fallback logic).
+- **FR-005** Provider core changes additive only (adapter methods). Fallback gets two optional call options for photo
+  turns (#67): `accept` (skip candidates that cannot see images) and `lastResort` (the vision fallback model).
 - **FR-006** Logging policy applies (`media` category), errors always recorded.
 
 ## Success Criteria

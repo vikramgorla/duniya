@@ -11,3 +11,5 @@
 - [X] T009 Panel: Models card, agent section, Settings card, Server note; routes; admin MCP tools
 - [X] T010 Installer + Dockerfile: ffmpeg, bzip2
 - [X] T011 Tests `test/media-ai.test.js` (harness: media fakes); docs/configuration.md; version 2.7.0
+- [X] T012 (#67) Photo turns: `chat({ accept, lastResort })` skips image-incapable candidates, vision fallback last,
+  retry without the photo + kind note; test in `test/media-ai.test.js`

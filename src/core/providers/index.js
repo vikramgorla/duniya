@@ -409,13 +409,19 @@ const describeFailures = (failures) => failures.map((f) => `${f.name} (${f.pause
  * Fallback happens per model call: the caller's conversation (incl. tool results) is sent unchanged to the next
  * candidate, so tools that already ran never run again. Only retryable errors move on (see errors.js).
  * opts: fallback ({ enabled, chain }), turn ({ ref } shared by the calls of one agent turn), direct (one account, no
- * fallback, ignores pauses — the Test button).
+ * fallback, ignores pauses — the Test button), accept (async ref → bool: candidates it refuses are skipped, e.g. models
+ * that cannot see the photo of this turn, #67; they are listed in err.skipped when nothing answered), lastResort
+ * (refs tried after the chain when fallback is on, e.g. the vision fallback model).
  */
-export async function chat({ model = 'auto', purpose = 'agent', system, messages, tools = [], maxTokens = 1024, usage = {}, fallback, turn = null, direct = false }) {
+export async function chat({ model = 'auto', purpose = 'agent', system, messages, tools = [], maxTokens = 1024, usage = {}, fallback, turn = null, direct = false, accept = null, lastResort = [] }) {
   if (!direct && (!parseRef(model) || parseRef(model).model === 'auto')) await warmModels();
   const fb = direct ? { enabled: false, chain: [] } : (fallback || fallbackSettings());
   const cands = direct ? [{ id: parseRef(model)?.provider, model: parseRef(model)?.model }] : planCandidates({ model, purpose, fallback: fb, sticky: turn?.ref || '' });
+  if (!direct && fb.enabled) {
+    for (const r of lastResort.map((x) => parseRef(x)).filter(Boolean)) if (!cands.some((c) => c.id === r.provider && c.model === r.model)) cands.push({ id: r.provider, model: r.model });
+  }
   const failures = []; const paused = []; let lastErr = null; let configErr = null;
+  const skipped = []; // refused by `accept` (#67)
   const tried = new Set();
   // A paused account counts as a reason for the switch ("after Anthropic (paused: usage limit reached)").
   const notePaused = (p) => {
@@ -449,6 +455,10 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
       }
       const ref = `${p.id}:${modelId}`;
       if (tried.has(ref)) continue;
+      if (accept && !direct && !(await accept(ref))) {
+        if (!skipped.some((x) => x.ref === ref)) skipped.push({ ref, account: p.id, name: p.name });
+        continue;
+      }
       if (!direct && !force.has(p.id) && !breaker.canTry(p.id, { name: p.name })) { notePaused(p); continue; }
       tried.add(ref);
       lastUsed.set(p.id, Date.now()); useOrder.set(p.id, ++useSeq);
@@ -488,6 +498,7 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
   }
   if (!err) err = configErr || Object.assign(new Error('No model available: connect a provider and choose a default model (Models)'), { code: 'no_model' });
   err.failures = failures;
+  err.skipped = skipped;
   if (lastErr) err.fallbackReason ??= classify(lastErr).reason;
   if (failed.length) breaker.allFailed(describeFailures(failed));
   throw err;
