@@ -54,7 +54,7 @@ jobs:
           gh release create "${{ steps.v.outputs.version }}" whatsapp-agent-duniya.zip \
             --target "$GITHUB_SHA" --title "${{ steps.v.outputs.version }}" --generate-notes
 
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
         if: steps.v.outputs.skip == 'false'
       - uses: docker/setup-buildx-action@v3
         if: steps.v.outputs.skip == 'false'
