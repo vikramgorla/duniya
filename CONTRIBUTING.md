@@ -8,3 +8,10 @@
   build, CodeQL. No direct pushes, no force pushes.
 - **Design.** UI follows `DESIGN.md` and its checklist (light/dark, phone at 375 px).
 - **Releases.** Bump `package.json` in the PR; merging to `main` creates the tag, release, OCI stack zip and image.
+
+## Repository settings (one-time, owner)
+Protection for `main` is defined in `.github/rulesets/main-protection.json`: GitHub → Settings → Rules → Rulesets →
+New ruleset → **Import a ruleset** → choose that file → Create. It requires a pull request (squash merge), all
+required checks (test, quality, scripts-and-infra, docker, analyze), linear history, and blocks force pushes and
+deletion — for everyone, including admins. Also enable Settings → Code security → Private vulnerability reporting,
+Dependabot alerts and secret scanning with push protection.
