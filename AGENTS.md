@@ -57,6 +57,10 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 - [ ] Version bumped in `package.json`, `package-lock.json` (both `version` fields) and `infra/oci/schema.yaml`
       (`version:`), semver: **minor** for features, **patch** for fixes and docs, **major** for breaking changes.
       CI fails when `package.json` and `schema.yaml` differ.
+- [ ] `releases.json` has an entry for the new version when owners should know something (CI warns when it is missing).
+      **Breaking change → major version + a `releases.json` entry with `"breaking": true`, title, summary and
+      `actions` (what the owner must do), `data` and `docs`; consider a migration instead.** CI fails on a major bump
+      without it. Breaking releases are never installed automatically: owners confirm them (panel or WhatsApp).
 - [ ] PR opened via REST with `Closes #N`, the spec link and the attribution lines your harness requires.
 - [ ] Never pushed to `main`; squash-merged after all required checks passed.
 - [ ] Issue closed with the release version in the done comment.

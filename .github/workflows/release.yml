@@ -50,9 +50,14 @@ jobs:
         if: steps.v.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+        # Title and notes come from releases.json (045): "⚠️ Breaking — vX.Y.Z" for breaking releases, what the owner
+        # must do, then GitHub's generated notes (appended by --generate-notes).
         run: |
-          gh release create "${{ steps.v.outputs.version }}" whatsapp-agent-duniya.zip \
-            --target "$GITHUB_SHA" --title "${{ steps.v.outputs.version }}" --generate-notes
+          version="${{ steps.v.outputs.version }}"
+          title="$(node scripts/release-notes.mjs "$version" --title)"
+          node scripts/release-notes.mjs "$version" --notes > release-notes.md
+          gh release create "$version" whatsapp-agent-duniya.zip \
+            --target "$GITHUB_SHA" --title "$title" --notes-file release-notes.md --generate-notes
 
       - uses: docker/setup-qemu-action@v4
         if: steps.v.outputs.skip == 'false'

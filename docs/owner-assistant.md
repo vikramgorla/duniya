@@ -27,6 +27,10 @@
   messages handled, replies and cost per agent this week vs last, ignored chats, pending confirmations, update available,
   backup failures — counts only, never message contents. **Send now** sends it at once. Admin MCP tools:
   `get_owner_alerts`, `set_owner_alerts`, `preview_weekly_summary`, `send_weekly_summary`.
+- **Breaking releases** (045, #57): when a release needs your decision, the alert number gets the release notes, and
+  every owner linked to the owner assistant also gets a code: `confirm ABCD` makes a backup, updates and restarts, and
+  the assistant reports the result after the restart; `cancel ABCD` reminds you in 7 days. Only owners can confirm.
+  See [Backups and updates](backups-and-updates.md#updates).
 
 ---
 [Docs index](README.md)

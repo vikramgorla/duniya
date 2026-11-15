@@ -179,6 +179,8 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Docs: `docs/` topic pages (+ `docs/README.md` index), `README.md` highlights, `mobile/README.md`, `docs/admin-mcp.md`, `DESIGN.md` if visual
 - [ ] TXXX Website: section/tile in `docs/site/index.html`; screenshots/videos retaken with `npm run site:shots` when the UI changed; checked at 375 / 393 / 1440 and dark mode
 - [ ] TXXX Version bump (semver) in `package.json`, `package-lock.json`, `infra/oci/schema.yaml`
+- [ ] TXXX `releases.json` entry for the new version; breaking change → major version + `"breaking": true` with
+      actions (consider a migration instead)
 - [ ] TXXX PR via REST with `Closes #N` + spec link + attribution; required checks green; squash merge; never push to `main`
 - [ ] TXXX Issue done comment (what shipped, version, open items) and close with the release
 

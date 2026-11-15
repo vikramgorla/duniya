@@ -1,0 +1,46 @@
+{
+  "$comment": "Release notes the app reads (045). One entry per version that needs the owner's attention; other versions are optional. breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
+  "versions": {
+    "2.9.0": {
+      "breaking": false,
+      "title": "Breaking releases need your confirmation",
+      "summary": "Automatic updates install only releases that need no action and stop before a breaking one. You are asked on the panel and on WhatsApp (alert number, or the owner assistant with a confirm code). A local backup is made before every update when a backup passphrase is set.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/backups-and-updates.md#updates"
+    },
+    "2.7.0": {
+      "breaking": false,
+      "title": "Photos & voice need ffmpeg",
+      "summary": "Voice replies and on-server speech use ffmpeg and bzip2. Servers installed before 2.7.0 do not have them; everything else keeps working.",
+      "actions": [
+        "To use voice replies or on-server speech: run the installer once more (it adds ffmpeg and bzip2), or `sudo apt install ffmpeg bzip2`. Docker images include them."
+      ],
+      "data": "unchanged",
+      "docs": "docs/upgrading.md#within-2x"
+    },
+    "2.5.0": {
+      "breaking": false,
+      "title": "Web address & access: any proxy, safe switching",
+      "summary": "Access can be limited to any supported proxy, not only Cloudflare, and domain changes are done in safe steps. The old \"Cloudflare only\" setting is not carried over (the web server keeps its applied configuration until you apply a change), and the root maintenance helper of older installs does not know the new options.",
+      "actions": [
+        "Run the installer once more so the root maintenance helper understands the new web settings.",
+        "If you limited access to Cloudflare: open Settings → Web address & access, choose Cloudflare again and apply."
+      ],
+      "data": "not-migrated",
+      "docs": "docs/domains-and-access.md"
+    },
+    "2.0.0": {
+      "breaking": true,
+      "title": "Bots are now agents (fresh install)",
+      "summary": "2.0 renamed bots to agents everywhere: database tables, settings, API paths (/api/agents), admin MCP tool names (create_agent) and export files (duniya-agent). There is no migration: a 1.x database, a 1.x backup or a 1.x agent export cannot be used.",
+      "actions": [
+        "Reinstall from scratch on a fresh server (or remove the data directory) and link WhatsApp again.",
+        "Set your agents up again (templates and the AI helper make this quick); 1.x backups and exports cannot be restored.",
+        "Update scripts and AI assistants that call /api/bots or bot tool names to the agent names."
+      ],
+      "data": "not-migrated",
+      "docs": "docs/upgrading.md#from-1x-to-20"
+    }
+  }
+}
