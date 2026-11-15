@@ -2,6 +2,10 @@
 // Failing providers (042): `t.claudeFail` (a queue of failures for the fake Claude API) and `fakeChatProvider()` (an
 // OpenAI-compatible endpoint with per-key scripts and failures). A failure is { status, message?, code?, retryAfter? }
 // (e.g. 429 with Retry-After, 500, 401, 400, 404 model not found) or { network: true } (connection dropped).
+// Streaming (047): both fakes answer `stream: true` requests with SSE (Anthropic-style events / Chat Completions chunks),
+// one text piece per word. `t.claudeStreamFail` / `f.streamFail` queue mid-stream failures { after: n pieces, network }
+// (socket dropped) or { after, error: { type, message } } (an SSE error event); `f.refuseStream` answers streamed
+// requests with 400 (servers without streaming). Streamed requests are counted in t.claudeStreams / f.streams.
 import http from 'node:http';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,13 +30,78 @@ export function sendFailure(req, res, f, style = 'openai') {
     : { error: { message, code: f.code || null, type: f.type || 'error' } }));
 }
 
+/** Split text into word-sized pieces (spaces kept), like a model's token stream. */
+export const streamPieces = (text) => String(text || '').match(/\S+\s*|\s+/g) || [];
+const sse = (res, frames) => { for (const f of frames) res.write(f); };
+const tick = () => new Promise((r) => setTimeout(r, 2)); // let each piece reach the client, like a real stream
+
+/** Anthropic Messages SSE for one scripted answer; `fail` cuts it after `fail.after` text pieces. */
+export async function sendAnthropicStream(req, res, content, { usage = { input_tokens: 3, output_tokens: 2 }, fail = null } = {}) {
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+  const ev = (type, data) => `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`;
+  sse(res, [ev('message_start', { message: { id: 'm', type: 'message', role: 'assistant', model: 'f', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: usage.input_tokens, output_tokens: 0 } } })]);
+  let sent = 0;
+  const cut = async () => {
+    if (!fail || sent < (fail.after ?? 1)) return false;
+    await tick();
+    if (fail.network) req.socket.destroy();
+    else { res.write(ev('error', { error: fail.error || { type: 'overloaded_error', message: 'Overloaded' } })); res.end(); }
+    return true;
+  };
+  for (const [index, b] of content.entries()) {
+    if (b.type === 'text') {
+      sse(res, [ev('content_block_start', { index, content_block: { type: 'text', text: '' } })]);
+      for (const piece of streamPieces(b.text)) {
+        if (await cut()) return;
+        res.write(ev('content_block_delta', { index, delta: { type: 'text_delta', text: piece } })); sent++;
+        await tick();
+      }
+    } else {
+      const json = JSON.stringify(b.input ?? {});
+      sse(res, [ev('content_block_start', { index, content_block: { type: 'tool_use', id: b.id, name: b.name, input: {} } }),
+        ev('content_block_delta', { index, delta: { type: 'input_json_delta', partial_json: json.slice(0, Math.ceil(json.length / 2)) } }),
+        ev('content_block_delta', { index, delta: { type: 'input_json_delta', partial_json: json.slice(Math.ceil(json.length / 2)) } })]);
+    }
+    res.write(ev('content_block_stop', { index }));
+  }
+  if (await cut()) return;
+  sse(res, [ev('message_delta', { delta: { stop_reason: content.some((b) => b.type === 'tool_use') ? 'tool_use' : 'end_turn', stop_sequence: null }, usage: { output_tokens: usage.output_tokens } }), ev('message_stop', {})]);
+  res.end();
+}
+
+/** Chat Completions SSE for one scripted `message`; `fail` cuts it after `fail.after` text pieces. */
+async function sendChatStream(req, res, message, { usage, includeUsage, fail }) {
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+  const chunk = (o) => `data: ${JSON.stringify({ id: 'c', object: 'chat.completion.chunk', ...o })}\n\n`;
+  let sent = 0;
+  for (const piece of streamPieces(message.content)) {
+    if (fail && sent >= (fail.after ?? 1)) {
+      await tick();
+      if (fail.network) req.socket.destroy();
+      else { res.write(`data: ${JSON.stringify({ error: fail.error || { message: 'upstream error', type: 'server_error' } })}\n\n`); res.end(); }
+      return;
+    }
+    res.write(chunk({ choices: [{ index: 0, delta: { ...(sent ? {} : { role: 'assistant' }), content: piece }, finish_reason: null }] })); sent++;
+    await tick();
+  }
+  for (const [index, c] of (message.tool_calls || []).entries()) {
+    const args = String(c.function?.arguments || '{}'); const half = Math.ceil(args.length / 2);
+    sse(res, [chunk({ choices: [{ index: 0, delta: { tool_calls: [{ index, id: c.id, type: 'function', function: { name: c.function?.name, arguments: args.slice(0, half) } }] }, finish_reason: null }] }),
+      chunk({ choices: [{ index: 0, delta: { tool_calls: [{ index, function: { arguments: args.slice(half) } }] }, finish_reason: null }] })]);
+  }
+  res.write(chunk({ choices: [{ index: 0, delta: {}, finish_reason: message.tool_calls ? 'tool_calls' : 'stop' }] }));
+  if (includeUsage) res.write(chunk({ choices: [], usage }));
+  res.end('data: [DONE]\n\n');
+}
+
 /**
  * A fake OpenAI-compatible provider. Every request is recorded with its key; `fail[key]` holds failures for that key
  * (or `fail['*']` for any key), shifted one per chat request; `script` holds assistant replies (Chat Completions
  * `message` objects), shifted per successful chat request; otherwise it answers "<name> (<key>) says hi".
  */
 export function fakeChatProvider({ name = 'fake', models = ['fake-large', 'fake-mini'] } = {}) {
-  const f = { name, reqs: [], fail: {}, script: [], models, media: [], mediaFail: [], transcript: 'see you at the station at nine', imageModels: [], mediaCost: null };
+  const f = { name, reqs: [], fail: {}, script: [], models, media: [], mediaFail: [], transcript: 'see you at the station at nine', imageModels: [], mediaCost: null,
+    streams: 0, streamFail: [], refuseStream: false };
   f.server = http.createServer(async (req, res) => {
     let d = ''; for await (const c of req) d += c;
     const key = String(req.headers.authorization || '').replace(/^Bearer /, '');
@@ -60,7 +129,10 @@ export function fakeChatProvider({ name = 'fake', models = ['fake-large', 'fake-
       const body = JSON.parse(d); f.reqs.push({ key, body });
       const failure = f.fail[key]?.shift() || f.fail['*']?.shift();
       if (failure) return sendFailure(req, res, failure);
+      if (body.stream && f.refuseStream) return json(400, { error: { message: 'stream is not supported', type: 'invalid_request_error' } });
       const message = f.script.shift() || { content: `${name} (${key}) says hi` };
+      const usage = { prompt_tokens: 4, completion_tokens: 3 };
+      if (body.stream) { f.streams++; return sendChatStream(req, res, message, { usage, includeUsage: !!body.stream_options?.include_usage, fail: f.streamFail.shift() }); }
       return json(200, { choices: [{ message, finish_reason: message.tool_calls ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 4, completion_tokens: 3 } });
     }
     json(404, { error: { message: 'not found' } });
@@ -72,7 +144,7 @@ export function fakeChatProvider({ name = 'fake', models = ['fake-large', 'fake-
 
 export async function setup({ bindings = {}, env = {}, seed = true, extend = null, beforeImport = null, chatsOn = true, privacyNotice = false } = {}) {
   const t = {
-    mcpCalls: [], claudeReqs: [], summaryReqs: [], script: [], sent: [], claudeFail: [],
+    mcpCalls: [], claudeReqs: [], summaryReqs: [], script: [], sent: [], claudeFail: [], claudeStreamFail: [], claudeStreams: 0,
     summaryText: 'Decisions: take the 9:10 train. Rao family arrives Saturday.', summaryFail: false,
   };
 
@@ -116,6 +188,7 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
       if (f) return sendFailure(req, res, f, 'anthropic');
     }
     const content = isSummary ? [{ type: 'text', text: t.summaryText }] : (t.script.shift() || [{ type: 'text', text: '(script empty)' }]);
+    if (body.stream) { t.claudeStreams++; return sendAnthropicStream(req, res, content, { fail: t.claudeStreamFail.shift() }); }
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ id: 'm', type: 'message', role: 'assistant', model: 'f', usage: { input_tokens: 3, output_tokens: 2 },
       stop_reason: content.some((b) => b.type === 'tool_use') ? 'tool_use' : 'end_turn', content }));

@@ -102,12 +102,20 @@ export async function readStream(r: { text(): Promise<string>; body?: { getReade
   return lines.end();
 }
 
-/** Ask box state from the events: tool steps (names only) and the latest text. */
+/**
+ * Ask box state from the events: tool steps (names only) and the text so far. #83: `delta` pieces are appended (the
+ * first one after a 'thinking' step replaces the earlier interim text); `restarted` drops the partial text of a broken
+ * stream; the round's whole `text` always wins.
+ */
 export interface AskStep { step: 'thinking' | 'tool' | 'held'; tool?: string; ok?: boolean }
-export interface AskProgress { steps: AskStep[]; text: string }
+export interface AskProgress { steps: AskStep[]; text: string; fresh?: boolean; restarted?: boolean }
 export function applyAskEvent(p: AskProgress, e: StreamEvent): AskProgress {
-  if (e.type === 'step' && ['thinking', 'tool', 'held'].includes(e.step)) return { ...p, steps: [...p.steps, { step: e.step, tool: e.tool, ok: e.ok }] };
-  if (e.type === 'text' && typeof e.text === 'string') return { ...p, text: e.text };
+  if (e.type === 'step' && ['thinking', 'tool', 'held'].includes(e.step)) {
+    return { ...p, steps: [...p.steps, { step: e.step, tool: e.tool, ok: e.ok }], ...(e.step === 'thinking' ? { fresh: true } : {}) };
+  }
+  if (e.type === 'delta' && typeof e.text === 'string') return { ...p, text: p.fresh || !p.text ? e.text : p.text + e.text, fresh: false };
+  if (e.type === 'restarted') return { ...p, text: '', fresh: true, restarted: true };
+  if (e.type === 'text' && typeof e.text === 'string') return { ...p, text: e.text, fresh: false, restarted: false };
   return p;
 }
 /** "search messages" from "search_messages"; list_/get_ prefixes dropped. */

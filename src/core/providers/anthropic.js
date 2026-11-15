@@ -27,8 +27,17 @@ export function anthropicAdapter(secret = SECRET) {
       for await (const m of sdk().models.list({ limit: 100 })) out.push({ id: m.id, label: m.display_name || m.id });
       return out;
     },
-    async chat({ model, system, messages, tools, maxTokens }) {
-      const res = await sdk().messages.create({ model, max_tokens: maxTokens, system, tools, messages });
+    streams: true,
+    /** onText (047, #83): stream the answer's text; deltas go to onText, the final message (content, usage) is returned. */
+    async chat({ model, system, messages, tools, maxTokens, onText = null }) {
+      const params = { model, max_tokens: maxTokens, system, tools, messages };
+      if (!onText) {
+        const res = await sdk().messages.create(params);
+        return { content: res.content, stop_reason: res.stop_reason, usage: res.usage || {} };
+      }
+      const stream = sdk().messages.stream(params);
+      stream.on('text', (delta) => { if (delta) onText(delta); });
+      const res = await stream.finalMessage();
       return { content: res.content, stop_reason: res.stop_reason, usage: res.usage || {} };
     },
   };

@@ -31,9 +31,11 @@ test('#66: steps, interim text and the final answer, in order; the result matche
   assert.equal(r.status, 200);
   assert.equal(r.cache, 'no-store');
   const kinds = r.events.map((e) => (e.type === 'step' ? `${e.step}${e.tool ? `:${e.tool}` : ''}` : e.type));
-  assert.deepEqual(kinds, ['thinking', 'text', 'tool:list_visible_chats', 'thinking', 'tool:search_messages', 'thinking', 'text', 'done']);
-  assert.equal(r.events[1].text, 'Let me look at the chats.');
-  assert.equal(r.events[1].final, false);
+  assert.deepEqual(kinds.filter((k) => k !== 'delta'), ['thinking', 'text', 'tool:list_visible_chats', 'thinking', 'tool:search_messages', 'thinking', 'text', 'done']);
+  assert.equal(r.events.filter((e) => e.type === 'delta').map((e) => e.text).join(''), 'Let me look at the chats.Anu said 9:10.', '047: token deltas add up to the text');
+  const texts = r.events.filter((e) => e.type === 'text');
+  assert.equal(texts[0].text, 'Let me look at the chats.');
+  assert.equal(texts[0].final, false);
   assert.equal(r.events.at(-2).final, true);
   const done = r.events.at(-1);
   assert.equal(done.reply, 'Anu said 9:10.');

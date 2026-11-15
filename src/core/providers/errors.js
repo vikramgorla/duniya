@@ -67,7 +67,8 @@ export function classify(e) {
   const status = Number(e?.status || e?.statusCode || 0) || 0;
   const code = String(e?.code || e?.error?.error?.type || e?.error?.type || '').toLowerCase();
   const msg = String(e?.message || e || '');
-  const causeCode = String(e?.cause?.code || e?.code || '').toUpperCase();
+  // The Anthropic SDK wraps fetch errors once more (a stream cut mid-way: AnthropicError → TypeError "terminated" → UND_ERR_SOCKET).
+  const causeCode = String(e?.cause?.code || e?.cause?.cause?.code || e?.code || '').toUpperCase();
   const name = String(e?.name || '');
   const out = (reason) => ({
     reason, text: REASON_TEXT[reason],
@@ -98,7 +99,7 @@ export function classify(e) {
 
   // No HTTP status: network failures, timeouts, SDK errors, or messages from SDK-based adapters (Copilot).
   if (name === 'TimeoutError' || name === 'AbortError' || name === 'APIConnectionTimeoutError' || /timed? ?out|did not answer in time/i.test(msg)) return out('timeout');
-  if (NET_CODES.has(causeCode) || name === 'APIConnectionError' || /fetch failed|socket hang up|network|ECONNRE|ENOTFOUND|connection (closed|error|refused)/i.test(msg)) return out('network');
+  if (NET_CODES.has(causeCode) || name === 'APIConnectionError' || /fetch failed|socket hang up|network|ECONNRE|ENOTFOUND|connection (closed|error|refused)|^terminated$/i.test(msg)) return out('network');
   if (QUOTA_RE.test(msg)) return out('quota');
   if (RATE_RE.test(msg)) return out('rate_limit');
   if (AUTH_RE.test(msg)) return out('auth');

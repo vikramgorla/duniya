@@ -113,6 +113,14 @@
       "breaking": false,
       "title": "Mobile demo fix",
       "summary": "The mobile app's demo mode shows the Ask box's final answer again (a missing await, found by code scanning)."
+    },
+    "2.12.0": {
+      "breaking": false,
+      "title": "The Ask box writes its answer word by word",
+      "summary": "In the panel and the mobile app, the owner assistant's text now appears as the model writes it (Anthropic, OpenAI, OpenRouter, other OpenAI-compatible endpoints, ChatGPT; GitHub Copilot still shows it after each step). If a stream breaks half-way, the partial text is replaced by a fresh answer; fallback to other models works as before. WhatsApp replies are unchanged.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/owner-assistant.md#owner-assistant-and-the-ask-box"
     }
   }
 }

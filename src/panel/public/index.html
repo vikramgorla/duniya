@@ -477,7 +477,7 @@ async function api(method, path, body) {
   if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { field: data.field, data, status: res.status });
   return data;
 }
-/** POST answered with newline-delimited JSON events (#66 Ask box). onEvent gets 'step' / 'text'; returns the 'done' event. */
+/** POST answered with newline-delimited JSON events (#66 Ask box). onEvent gets 'step' / 'delta' / 'restarted' / 'text'; returns the 'done' event. */
 async function apiStream(path, body, onEvent) {
   const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/x-ndjson' }, body: JSON.stringify(body ?? {}) });
   if (res.status === 401) { renderLogin(); throw new Error('Please sign in'); }
@@ -2801,6 +2801,7 @@ function askCard() {
     btn.disabled = a.busy; out.setAttribute('aria-busy', String(!!a.busy));
     out.replaceChildren(
       askSteps(a),
+      a.busy && a.restarted ? h('div', { class: 'small muted' }, h('span', { 'aria-hidden': 'true' }, '↻ '), 'The answer was interrupted; asking again…') : null,
       a.reply ? h('div', { class: `note${a.busy ? ' askpartial' : ''}`, style: 'white-space:pre-wrap;overflow-wrap:anywhere' }, a.reply) : null,
       ...a.confirms.map((c) => h('div', { class: 'note warn' }, h('div', {}, c.preview),
         h('div', { class: 'row', style: 'gap:8px;margin-top:8px' },
@@ -2816,13 +2817,20 @@ function askCard() {
   }
   async function send() {
     if (!a.q.trim() || a.busy) return;
-    a.busy = true; a.confirms = []; a.reply = ''; a.steps = []; a.redraw();
+    a.busy = true; a.confirms = []; a.reply = ''; a.steps = []; a.fresh = true; a.restarted = false; a.redraw();
+    // #83: token deltas are appended (the first one of a round replaces earlier interim text) and drawn at most once
+    // per frame; "restarted" drops the partial text of a broken stream; the round's whole text and "done" win.
+    let frame = 0;
+    const later = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; a.redraw(); }); };
     try {
       const r = await apiStream('/api/owner/ask/stream', { question: a.q }, (e) => {
-        if (e.type === 'step') a.steps.push(e);
-        else if (e.type === 'text') a.reply = e.text;
+        if (e.type === 'delta') { a.reply = a.fresh ? e.text : a.reply + e.text; a.fresh = false; return later(); }
+        if (e.type === 'step') { a.steps.push(e); if (e.step === 'thinking') a.fresh = true; }
+        else if (e.type === 'restarted') { a.reply = ''; a.fresh = true; a.restarted = true; }
+        else if (e.type === 'text') { a.reply = e.text; a.fresh = false; a.restarted = false; }
         a.redraw();
       });
+      cancelAnimationFrame(frame); frame = 0;
       a.reply = r.reply; a.confirms = r.confirms || []; a.q = ''; q.value = '';
     } catch (e) { toast(e.message); }
     a.busy = false;

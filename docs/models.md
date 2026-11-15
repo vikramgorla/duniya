@@ -49,6 +49,8 @@
 - A failing account is paused (1 min, doubling to 30 min; usage limits until the provider's reset time), shown as
   "Paused until 14:20 — usage limit reached". Pauses and "reconnect" marks survive a restart or update.
 - Photo turns only fall back to models that can see images (then the vision fallback model).
+- The Ask box streams the answer word by word: a stream that fails before its first word falls back as usual; one
+  that breaks half-way is dropped and asked again once without streaming ([details](owner-assistant.md#owner-assistant-and-the-ask-box)).
 - The owner gets a WhatsApp alert after 15 minutes or when no provider can answer.
 - Several accounts per provider with a label (model refs `openai-work:gpt-…`), used *in order* (failover) or
   *spread* (least recently used).
