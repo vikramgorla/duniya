@@ -108,7 +108,7 @@ export function pump() {
 async function signals() {
   if (!channel) return;
   const now = Date.now();
-  for (const job of db.prepare("SELECT * FROM media_jobs WHERE tenant_id = ? AND state = 'queued' AND signaled < 2 AND created_at < ? ORDER BY id LIMIT 50").all(TENANT, now - timing.signalMs)) {
+  for (const job of db.prepare("SELECT * FROM media_jobs WHERE tenant_id = ? AND state = 'queued' AND signaled < 2 AND created_at <= ? ORDER BY id LIMIT 50").all(TENANT, now - timing.signalMs)) {
     if (!isChatEnabled(job.chat)) continue;
     if (job.signaled === 0) {
       db.prepare('UPDATE media_jobs SET signaled = 1 WHERE id = ?').run(job.id);
