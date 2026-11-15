@@ -12,7 +12,7 @@
 - [X] T009 Tests (`test/os-updates.test.js`), shellcheck
 - [X] T010 Demo panel states; `check:responsive` states `server-os-updates`, `server-old-helper`
 - [X] T011 Docs: backups-and-updates, upgrading, admin-mcp, cli, owner-assistant; website text and screenshots
-- [X] T012 Version 2.14.1 (package.json, package-lock.json, infra/oci/schema.yaml) + releases.json entry
+- [X] T012 Version 2.15.1 (package.json, package-lock.json, infra/oci/schema.yaml) + releases.json entry
 - [X] T013 `npm test`, `npm run lint`, `npm run check:panel`, `npm run check:responsive`, `node scripts/ci-checks.mjs`
 - [ ] T014 PR via REST (`Closes #96`), squash-merge after checks (left to the maintainer)
 

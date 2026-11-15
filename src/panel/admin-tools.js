@@ -339,6 +339,49 @@ export const TOOLS = [
     },
     run: (a, x) => x.call('DELETE', `/api/tool-services/${enc(a.name)}`) },
 
+  // ---------- browse the MCP Registry (052) ----------
+  { name: 'search_mcp_registry', readOnly: true, calls: [['GET', '/api/tool-services/registry']],
+    description: 'Search the MCP Registry (registry.modelcontextprotocol.io, or the private registry set in Settings → Tool services) for tool services to add. Returns per entry: registry name, title, publisher (verified GitHub account or domain), whether it can run here hosted (remote) or as a local npm package, which keys it needs, trust hints and warnings, source link. Use next_cursor for more. Add one with add_tool_service_from_registry.',
+    input: { query: str('Words in the service name, e.g. "notion" or "github"'), limit: int('How many (default 10, max 30)', { minimum: 1, maximum: 30 }), cursor: str('next_cursor from an earlier search (optional)') },
+    run: async (a, x) => {
+      const q = new URLSearchParams({ q: String(a.query || ''), limit: String(Math.min(Number(a.limit) || 10, 30)) });
+      if (a.cursor) q.set('cursor', String(a.cursor));
+      const r = await x.call('GET', `/api/tool-services/registry?${q}`);
+      return {
+        next_cursor: r.nextCursor, registry: r.registry,
+        servers: r.items.map((s) => ({ name: s.name, title: s.title, description: s.description, version: s.version, publisher: s.publisher.label,
+          hosted: s.can.remote !== null, local_npm: s.can.local !== null, ...(s.can.any ? {} : { not_supported_here: s.can.reason }),
+          keys: s.auth.text, trust: s.trust.level, trust_hints: s.trust.hints, warnings: s.trust.warnings, source: s.repository?.url || null })),
+      };
+    } },
+  { name: 'add_tool_service_from_registry', risky: true, calls: [['POST', '/api/tool-services/registry/add']],
+    description: 'Add a tool service from the MCP Registry to one agent or to all agents. kind "remote" (hosted; default when offered) or "local" (npm package run on this server; owner only, refused on small servers). values: non-secret settings by field id (e.g. {"env:WORKSPACE": "acme"}). Keys and tokens are never passed here: store each with set_secret under the secret name the preview shows (or in the panel), then add. Organizers get its tools, participants none; risky tools are listed; a preview/confirm service gets the confirm step. Needs confirm_action.',
+    input: { server: str('Registry name, e.g. io.github.owner/server'), target: str('"all" for all agents, or an agent id'), kind: str('remote or local', { enum: ['remote', 'local'] }),
+      name: str('Tool service name (lowercase letters, digits, _; default from the registry name)'), values: obj('Non-secret field values by field id'), replace: bool('Replace a tool service with the same name') },
+    required: ['server', 'target'],
+    preview: async (a, x) => {
+      const q = new URLSearchParams({ name: String(a.server) });
+      if (a.name) q.set('key', String(a.name));
+      const d = await x.call('GET', `/api/tool-services/registry/server?${q}`);
+      const kind = a.kind || (d.remote ? 'remote' : 'local');
+      const way = kind === 'local' ? d.local : d.remote;
+      if (!way) throw Object.assign(new Error(kind === 'local' ? `No package of ${a.server} can run here${d.entry.can.reason ? `: ${d.entry.can.reason}` : ''}` : `${a.server} has no hosted address this app can use`), { status: 400 });
+      if (kind === 'local' && !d.local.allowed) throw Object.assign(new Error(d.local.reason), { status: 403 });
+      const secretGiven = way.fields.filter((f) => f.secret && a.values?.[f.id]);
+      if (secretGiven.length) throw Object.assign(new Error(`Do not pass keys here: store ${secretGiven.map((f) => f.secretName).join(', ')} with set_secret (or in the panel) first`), { status: 400 });
+      const missing = way.fields.filter((f) => f.required && !f.stored && !(a.values?.[f.id]) && !f.default);
+      if (missing.length) throw Object.assign(new Error(`Needs first: ${missing.map((f) => (f.secret ? `secret ${f.secretName} (set_secret)` : `value ${f.id}`)).join(', ')}`), { status: 400 });
+      const where = a.target === 'all' ? 'all agents' : await agentName(x, a.target);
+      const e = d.entry;
+      const what = kind === 'local' ? `the local npm package ${e.packages[e.can.local].spec} (runs on this server)` : `the hosted service ${e.remotes[e.can.remote].url}`;
+      const warn = e.trust.warnings.length ? ` Warnings: ${e.trust.warnings.join('; ')}.` : '';
+      return `Add "${e.title}" (${e.name} ${e.version}, publisher ${e.publisher.label}) as tool service ${a.name || d.key} for ${where}: ${what}. Organizers get its tools, participants none.${warn}`;
+    },
+    run: async (a, x) => {
+      const r = await x.call('POST', '/api/tool-services/registry/add', { server: a.server, target: a.target, kind: a.kind, key: a.name, values: a.values || {}, replace: !!a.replace });
+      return { name: r.key, target: r.target, kind: r.kind, warnings: r.warnings, tools: r.discovery, confirm_step: r.confirmGate };
+    } },
+
   // ---------- secrets ----------
   { name: 'list_secrets', readOnly: true, calls: [['GET', '/api/secrets']], description: 'Names of stored secrets (API keys, tokens) and whether each is set. Values are never shown.', input: {},
     run: (a, x) => x.call('GET', '/api/secrets') },

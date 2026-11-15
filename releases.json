@@ -145,7 +145,15 @@
       "data": "unchanged",
       "docs": "docs/agents.md#set-up-a-direct-chat-before-the-person-writes"
     },
-    "2.14.1": {
+    "2.15.0": {
+      "breaking": false,
+      "title": "Browse tool services: add an MCP server from the MCP Registry in one click",
+      "summary": "Agents → Tool services and Settings → Tool services get Browse tool services: search the official MCP Registry (or a private one), see the publisher, hosted or local, keys needed and a trust hint, and add it with keys stored as secrets. Tools are listed right away with organizers on and participants off. Local packages are owner-only and refused on small servers.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/agents.md#browse-tool-services-mcp-registry"
+    },
+    "2.15.1": {
       "breaking": false,
       "title": "OS updates install new kernels, explain gradual Ubuntu roll-outs and ask for a restart",
       "summary": "Install OS updates now uses apt full-upgrade (kept-back kernel packages install) and removes packages no longer needed. The Server page groups updates (will install / rolling out gradually / held back with the reason), offers Include gradual updates now, shows a one-line result and a Restart needed banner. Run sudo duniya update on the server once (or re-run the installer): the in-panel update cannot refresh the root maintenance helper.",

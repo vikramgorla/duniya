@@ -78,6 +78,7 @@ const CARDS = [
   ['card-assistants', 'settings', '', 'box:Connected AI assistants', 900],
   ['card-logging', 'settings', '', 'box:Activity log', 600],
   ['card-mcp', 'agents/carpool', 'T.openAll(T.box("Tool services"));', 'box:Tool services', 600],
+  ['card-registry', 'agents/carpool', "await T.click('Browse tool services', 'button', 1500);", 'dialog.dlg', 900],
   ['card-wa-actions', 'agents/carpool', 'T.openAll(T.box("WhatsApp actions"));', 'box:WhatsApp actions', 600],
   ['card-people', 'agents/carpool', '', 'box:People & roles', 600],
   ['card-wa-group', 'chats', "[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button')?.click(); await T.until('.wa-card input'); await T.wait(600);", '.wa-card', 900],
