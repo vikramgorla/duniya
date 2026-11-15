@@ -84,7 +84,9 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
   tools-mcp|memory|security|infra|install|backups|cli|docs|build` · `priority: high|medium|low` · `status: triage|in
   progress|blocked|needs info` · `spec: NNN`. Check with `gh api repos/{o}/{r}/labels` before creating issues.
 - **Security alerts:** the `Security alerts (automatic)` issue mirrors open code-scanning alerts on `main` (workflow
-  `security-alerts.yml`), so agents without access to the Security tab still see them. Check it (and Dependabot alerts:
+  `security-alerts.yml`), so agents without access to the Security tab still see them. Fix real findings in code (CodeQL closes them as fixed on the next scan). A reviewed false positive is dismissed by
+  adding an entry (rule id, path, reason `false positive` | `won't fix` | `used in tests`, comment) to
+  `.github/security/dismissals.json` in a PR; the workflow dismisses it after merge. Check the issue (and Dependabot alerts:
   `gh api repos/{o}/{r}/dependabot/alerts?state=open`) at the start of every work session and fix high ones first.
 - **Spec Kit:** `/speckit-specify` → `/speckit-clarify` (if ambiguous) → `/speckit-plan` → `/speckit-tasks` →
   `/speckit-analyze` → `/speckit-implement` → `/speckit-converge`. The templates in `.specify/templates/` end every

@@ -2,19 +2,24 @@ name: Security alerts mirror
 
 # Mirrors the open code-scanning alerts into one GitHub issue ("Security alerts (automatic)"), so people and agents
 # that can read issues but not the Security tab (e.g. coding agents whose GitHub access excludes security events)
-# can see and fix them. Runs after CodeQL on main, daily, and on demand.
+# can see and fix them. It also dismisses alerts that were reviewed as false positives and listed (with a reason) in
+# .github/security/dismissals.json — the only way alerts get dismissed automatically. Runs after CodeQL on main, daily,
+# and on demand.
 on:
   workflow_run:
     workflows: [CodeQL]
     types: [completed]
     branches: [main]
+  push:
+    branches: [main]
+    paths: ['.github/security/**']
   schedule:
     - cron: '17 6 * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
-  security-events: read
+  security-events: write # read alerts; dismiss only those listed in .github/security/dismissals.json
   issues: write
 
 concurrency:
@@ -25,6 +30,27 @@ jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/security
+      - name: Dismiss reviewed alerts (listed in .github/security/dismissals.json)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const list = JSON.parse(fs.readFileSync('.github/security/dismissals.json', 'utf8')).dismissals || [];
+            if (!list.length) return;
+            const REASONS = new Set(['false positive', "won't fix", 'used in tests']);
+            const alerts = await github.paginate(github.rest.codeScanning.listAlertsForRepo, { owner, repo, state: 'open', per_page: 100 });
+            for (const a of alerts) {
+              const path = a.most_recent_instance?.location?.path || '';
+              const d = list.find((x) => x.rule === a.rule?.id && x.path === path && REASONS.has(x.reason));
+              if (!d) continue;
+              await github.rest.codeScanning.updateAlert({ owner, repo, alert_number: a.number, state: 'dismissed',
+                dismissed_reason: d.reason, dismissed_comment: String(d.comment || 'Reviewed; see .github/security/dismissals.json').slice(0, 280) });
+              core.info(`Dismissed #${a.number} ${a.rule?.id} in ${path}: ${d.reason}`);
+            }
       - name: Update the alerts issue
         uses: actions/github-script@v7
         with:

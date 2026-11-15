@@ -1,0 +1,4 @@
+{
+  "_comment": "Code-scanning alerts that were reviewed and are false positives or accepted. The 'Security alerts mirror' workflow dismisses open alerts matching an entry (rule id + file path). Add entries only through a reviewed PR, with a reason.",
+  "dismissals": []
+}
