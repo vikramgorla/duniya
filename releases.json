@@ -79,6 +79,11 @@
       ],
       "data": "unchanged",
       "docs": "docs/google-sign-in.md"
+    },
+    "2.9.7": {
+      "breaking": false,
+      "title": "Security housekeeping",
+      "summary": "Mobile app tooling uses a patched minimatch; console log lines can no longer be split by message text."
     }
   }
 }
