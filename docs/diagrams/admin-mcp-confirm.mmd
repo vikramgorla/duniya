@@ -1,0 +1,7 @@
+sequenceDiagram
+  participant A as ChatGPT or Claude
+  participant D as Duniya
+  A->>D: delete_agent (risky)
+  D-->>A: preview + code
+  A->>D: confirm_action
+  D-->>A: done, logged in Activity

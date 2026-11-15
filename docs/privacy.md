@@ -9,14 +9,16 @@
 - Switching a group on posts a one-time notice (your text; per-group opt-out).
 - Every look at stored messages is logged; contents are logged only where your policy allows.
 
-```mermaid
-flowchart LR
-  M["Message"] --> O{"Chat on?"}
-  O -- no --> D["Dropped:<br/>not stored, no model call"]
-  O -- yes --> S["Stored for memory<br/>(retention limits)"] --> A["Agent may answer"]
-  S --> P{"Private to members?"}
-  P -- yes --> H["Hidden from owner<br/>assistant and Ask"]
-```
+<p align="center"><img src="diagrams/message-privacy.svg" alt="Message privacy: messages from chats that are off are dropped, not stored and never sent to a model; messages from chats that are on are stored for memory within retention limits and the agent may answer; chats private to members are hidden from the owner assistant and Ask" width="607"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. A message arrives.
+2. Chat off: dropped, not stored, no model call.
+3. Chat on: stored for memory (within the retention limits) and the agent may answer.
+4. Chat private to members: hidden from the owner assistant and Ask.
+
+</details>
 
 ## Privacy notice
 

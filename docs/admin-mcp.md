@@ -20,15 +20,16 @@ today?".**
 
 Then a Duniya page opens: sign in (if asked), check what the assistant may do, **Approve**.
 
-```mermaid
-sequenceDiagram
-  participant A as ChatGPT / Claude
-  participant D as Duniya
-  A->>D: delete_agent (risky)
-  D-->>A: preview + code
-  A->>D: confirm_action
-  D-->>A: done (logged in Activity)
-```
+<p align="center"><img src="diagrams/admin-mcp-confirm.svg" alt="Sequence: ChatGPT or Claude calls a risky tool such as delete_agent, Duniya returns a preview and a code, the assistant calls confirm_action, and Duniya carries it out and logs it in Activity" width="543"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. ChatGPT or Claude calls a risky tool, for example `delete_agent`.
+2. Duniya answers with a preview and a code; nothing has changed yet.
+3. The assistant calls `confirm_action` with that code.
+4. Duniya does it and logs it in Activity.
+
+</details>
 
 > [!IMPORTANT]
 > Viewers stay read-only; owner-only actions stay owner-only. Risky: deleting an agent, erasing memory, secrets,

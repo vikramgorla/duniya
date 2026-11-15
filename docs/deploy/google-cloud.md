@@ -32,14 +32,18 @@ Console labels checked November 2026. Fastest way to any page: the console **sea
 
 ## Deploy
 
-```mermaid
-flowchart LR
-  A["Open in<br/>Cloud Shell"] --> B["Project with billing →<br/>bash infra/gcp/deploy.sh"]
-  B --> C["API on, firewall duniya-web,<br/>VM duniya created"]
-  C --> D["Progress page<br/>http://ip/ (10–15 min)"]
-  D --> E["Ready: https://ip.sslip.io<br/>+ setup code"]
-  E --> F["Panel: owner account"]
-```
+<p align="center"><img src="../diagrams/gcp-deploy.svg" alt="Google Cloud deploy: open in Cloud Shell, run infra/gcp/deploy.sh in a project with billing, which enables the API, creates the duniya-web firewall rule and the duniya VM; watch the progress page for 10-15 minutes, then open https://ip.sslip.io with the setup code and create the owner account" width="338"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. Open in Cloud Shell.
+2. Pick a project with billing and run `bash infra/gcp/deploy.sh`.
+3. The script turns the API on, creates the `duniya-web` firewall rule and the `duniya` VM.
+4. Watch the progress page at `http://ip/` (10–15 min).
+5. Ready: open `https://ip.sslip.io` with the setup code.
+6. Create the owner account in the panel.
+
+</details>
 
 1. Click **Open in Cloud Shell** and confirm. Cloud Shell opens with the repository and a tutorial on the right.
 2. Pick a project with billing enabled, then run:
@@ -108,11 +112,17 @@ There is no stack: the script creates a VM and one firewall rule; then the serve
 
 **When:** the install failed, the VM is broken, you want a fresh Debian, another region or another exposure.
 
-```mermaid
-flowchart LR
-  B["Backup .dbk<br/>+ passphrase"] --> D["Delete VM duniya"] --> S["Open in Cloud Shell →<br/>deploy.sh"]
-  S --> R["First screen →<br/>Restore a backup"] --> C["Check WhatsApp,<br/>domain DNS"]
-```
+<p align="center"><img src="../diagrams/gcp-recreate.svg" alt="Recreating on Google Cloud: take a backup and keep the passphrase, delete the duniya VM, run deploy.sh again from Cloud Shell, restore the backup on the first screen, then check WhatsApp and domain DNS" width="252"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. Download a backup (`.dbk`) and keep its passphrase.
+2. Delete the VM `duniya`.
+3. Open in Cloud Shell and run `deploy.sh` again.
+4. First screen → **Restore a backup**.
+5. Check WhatsApp and your domain DNS.
+
+</details>
 
 1. **Back up first**: **Backups** → passphrase (write it down) → **Back up now & download**.
 2. Delete the VM: **Compute Engine → VM instances** → tick `duniya` → **Delete** (or ⋮ → **Delete**) → **Delete**.

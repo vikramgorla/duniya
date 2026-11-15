@@ -1,0 +1,8 @@
+flowchart TD
+  P["Photo or voice note"] --> Q{"Queue full?<br/>20 on small servers"}
+  Q -- "yes" --> A["Please send<br/>again later"]
+  Q -- "no" --> W["Waiting"]
+  W -- "done" --> D["Answer, hourglass removed"]
+  W -- "after about 10 s" --> H["Reacts with an hourglass"]
+  H -- "after about 60 s" --> O["Says I'm on it, once"]
+  O -- "after 15 min" --> S["Short apology<br/>instead of a late answer"]

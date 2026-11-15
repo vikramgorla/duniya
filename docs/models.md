@@ -23,14 +23,17 @@
 
 ## Fallback and several accounts
 
-```mermaid
-flowchart LR
-  A["Agent's model"] --> Q{"Answer?"}
-  Q -- yes --> OK["Reply"]
-  Q -- "rate/usage limit, no credit,<br/>down, timeout, sign-in expired" --> P["Pause that account"] --> N["Next model<br/>in the chain"] --> Q
-  Q -- "refused (400)" --> E["No switch"]
-  N -. "none left / 15 min" .-> AL["Owner alert<br/>on WhatsApp"]
-```
+<p align="center"><img src="diagrams/model-fallback.svg" alt="Model fallback: if the agent model answers, it replies; on a limit, no credit, outage, timeout or expired sign-in that account is paused and the next model in the chain is tried; a refusal (400) does not switch; when none are left for 15 minutes the owner gets a WhatsApp alert" width="562"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. The agent's model is asked.
+2. It answers: the agent replies.
+3. Rate or usage limit, no credit, down, timeout or sign-in expired: that account is paused and the next model in the chain is tried.
+4. Refused (HTTP 400): no switch.
+5. None left, or failing for 15 minutes: the owner gets an alert on WhatsApp.
+
+</details>
 
 - **Models → When a model fails** sets the chain. Default: any other connected provider's *Auto*. Per agent and per
   chat: inherit / switch / don't switch, or an own chain.

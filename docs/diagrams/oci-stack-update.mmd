@@ -1,0 +1,8 @@
+flowchart TD
+  Z["Download the latest<br/>stack zip"] --> E["Stacks, row menu, Edit:<br/>.Zip file, Next, Next"]
+  E --> S["Run apply unticked:<br/>Save changes"]
+  S --> P["Plan"]
+  P --> Q{"Plan says?"}
+  Q -- "0 to destroy or<br/>No changes" --> A["Apply: pick that plan job"]
+  Q -- "must be replaced, -/+,<br/>1 to destroy<br/>oci_core_instance.app" --> X["STOP: undo the change,<br/>or recreate with a backup"]
+  A --> D["Succeeded:<br/>same address"]

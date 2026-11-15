@@ -10,10 +10,16 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/m
 - Needs your domain on Cloudflare. Optional: the installer serves HTTPS directly too (`--domain`, `--ip-https`).
 - Tunnel token + a hostname to `localhost:8080`, then install with the token.
 
-```mermaid
-flowchart LR
-  V["Visitor"] --> CF["Cloudflare<br/>(Access, optional)"] --> T["Tunnel<br/>(outbound from server)"] --> P["Panel<br/>localhost:8080"]
-```
+<p align="center"><img src="../diagrams/cloudflare-tunnel.svg" alt="A visitor reaches Cloudflare (optionally behind Cloudflare Access), which forwards through a tunnel opened outbound from the server to the panel on localhost:8080" width="263"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. A visitor opens your domain.
+2. Cloudflare answers (optionally behind Cloudflare Access).
+3. Traffic goes through the tunnel, which the server opened outbound.
+4. The tunnel reaches the panel on `localhost:8080`; no inbound port is open.
+
+</details>
 
 ## Steps
 

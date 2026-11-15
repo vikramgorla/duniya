@@ -53,17 +53,19 @@
 
 ## How it works
 
-```mermaid
-flowchart LR
-  WA["WhatsApp<br/>(linked device)"] --> AL{"Chat on?"}
-  AL -- "off: dropped,<br/>never stored" --> X(("silent"))
-  AL -- on --> R["Router<br/>trigger · role · limits"]
-  R --> AG["Agent<br/>(stored in the app)"]
-  AG --> M["Model<br/>with fallback"]
-  AG --> T["Tools<br/>MCP · WhatsApp · memory"]
-  T -. "changes" .-> C["confirm CODE<br/>(organizer)"]
-  P["Owner panel<br/>· phone app · ChatGPT/Claude"] --> AG
-```
+<p align="center"><img src="docs/diagrams/overview.svg" alt="How a message flows: WhatsApp, the chat allow-list (chats that are off are dropped and never stored), the router, the agent, its model with fallback and its tools, with changes confirmed by an organizer; the owner manages agents from the panel, the phone app or ChatGPT/Claude" width="612"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. A message arrives on the WhatsApp linked device.
+2. Is the chat switched on? If not, it is dropped, never stored, and the agent stays silent.
+3. The router checks the trigger, the role and the rate limits.
+4. The agent (stored in the app) answers with its model, which falls back to another one if needed.
+5. The agent can use tools: MCP services, WhatsApp actions and memory.
+6. Tools that change something wait until an organizer replies `confirm CODE`.
+7. The owner manages agents from the panel, the phone app or ChatGPT/Claude.
+
+</details>
 
 ## Get it running
 

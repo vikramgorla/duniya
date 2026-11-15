@@ -29,14 +29,18 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/m
 > are not trustworthy ([research](../specs/030-free-vms/research.md)). From your own fork:
 > [Terraform + GitHub Actions](deploy/terraform-github-actions.md).
 
-```mermaid
-flowchart LR
-  A["Button or<br/>one command"] --> B["VM boots,<br/>installer runs"]
-  B --> C["http://server-ip/<br/>live progress page"]
-  C --> D["Panel at<br/>https://ip-with-dashes.sslip.io"]
-  D --> E["Setup code<br/>or owner password"]
-  E --> F["First-run<br/>checklist"]
-```
+<p align="center"><img src="diagrams/install-flow.svg" alt="Install flow: press the button or run one command, the VM boots and the installer runs, follow the live progress page at http://server-ip/, then open the panel at https://ip-with-dashes.sslip.io with the setup code or owner password and follow the first-run checklist" width="320"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. Press the deploy button or run one command.
+2. The VM boots and the installer runs.
+3. Follow the live progress page at `http://server-ip/`.
+4. Open the panel at `https://ip-with-dashes.sslip.io`.
+5. Sign in with the setup code or the owner password.
+6. Follow the first-run checklist.
+
+</details>
 
 ## One command (Ubuntu/Debian)
 
@@ -103,12 +107,15 @@ you remove the `default-allow-ssh` rule.
 Installer servers. Cloud and Docker: [Oracle](deploy/oci-free-tier.md) · [Google](deploy/google-cloud.md) ·
 [Docker](deploy/docker.md).
 
-```mermaid
-flowchart LR
-  U["Update<br/>panel or duniya update"] --> K["Everything kept"]
-  R["Recreate"] --> B1["Backup .dbk"] --> N["Install on new server"] --> RS["Restore a backup<br/>on first screen"]
-  X["Remove"] --> B2["Backup first"] --> D["Delete VM<br/>or remove files"]
-```
+<p align="center"><img src="diagrams/update-recreate-remove.svg" alt="Update keeps everything; recreate means backup, install on a new server and restore the backup on the first screen; remove means backup first, then delete the VM or remove the files" width="635"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. **Update** (panel or `duniya update`): everything is kept.
+2. **Recreate**: download a backup (`.dbk`), install on a new server, restore the backup on the first screen.
+3. **Remove**: back up first, then delete the VM or remove the files.
+
+</details>
 
 ### Update the app
 

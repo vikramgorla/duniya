@@ -41,10 +41,17 @@ More per host: [Install → Where is my panel?](install.md#where-is-my-panel-fin
 > Tools every agent should have (a calendar, a shared planner) go under **Settings → Tool services** once, instead of
 > per agent. The checklist can be dismissed once you know your way around.
 
-```mermaid
-flowchart LR
-  M["Connect<br/>a model"] --> L["Link<br/>WhatsApp"] --> A["Create<br/>an agent"] --> C["Switch<br/>a chat on"] --> R["First<br/>reply"]
-```
+<p align="center"><img src="diagrams/first-steps.svg" alt="First steps: connect a model, link WhatsApp, create an agent, switch a chat on, get the first reply" width="182"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. Connect a model.
+2. Link WhatsApp.
+3. Create an agent.
+4. Switch a chat on.
+5. Get the first reply.
+
+</details>
 
 ## Trying an agent: test console and *Test as*
 

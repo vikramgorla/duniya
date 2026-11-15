@@ -19,13 +19,16 @@
 4. Message an agent number: "what did the families decide this week?", "why is the carpool group quiet?", "turn off
    the helper agent".
 
-```mermaid
-flowchart LR
-  DM["Your DM to an<br/>agent number"] --> Q{"Starts with an agent<br/>trigger or confirm CODE?"}
-  Q -- yes --> AG["That agent"]
-  Q -- no --> OA["Owner assistant<br/>(your panel role)"]
-  OA -- "change" --> C["confirm CODE"]
-```
+<p align="center"><img src="diagrams/owner-dm-routing.svg" alt="Your DM to an agent number goes to that agent when it starts with an agent trigger or confirm CODE; otherwise to the owner assistant with your panel role, whose changes need confirm CODE" width="415"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. You send a DM to an agent number.
+2. It starts with an agent trigger or `confirm CODE`: that agent handles it.
+3. Otherwise the owner assistant handles it, with your panel role.
+4. Changes by the owner assistant need `confirm CODE`.
+
+</details>
 
 | | |
 |---|---|

@@ -37,14 +37,16 @@ word (*Changes only*, *Side by side*, *Whole new text*). Skip any part; nothing 
 
 ## Tool services (MCP)
 
-```mermaid
-flowchart LR
-  M["Model wants<br/>a tool"] --> AL{"Allowed for<br/>this role?"}
-  AL -- no --> N["Not offered"]
-  AL -- yes --> CH{"Changes<br/>something?"}
-  CH -- no --> R["Runs"]
-  CH -- yes --> P["Preview held"] --> C["Organizer replies<br/>confirm CODE"] --> R
-```
+<p align="center"><img src="diagrams/tool-permissions.svg" alt="Tool permissions: a tool not allowed for the role is never offered; an allowed tool that changes something is held as a preview until an organizer replies confirm CODE; other tools run directly" width="442"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. The model wants to use a tool.
+2. Is the tool allowed for this role? If not, it is not offered at all.
+3. Does it change something? If not, it runs.
+4. If it does, a preview is held and an organizer replies `confirm CODE`; then it runs.
+
+</details>
 
 1. Agent page → tool services → enter the URL → **Check**.
 2. **Connect** to sign in (OAuth, your own OAuth app), or use a token or custom headers.

@@ -27,15 +27,16 @@ without you.**
 
 ### Restore
 
-```mermaid
-flowchart LR
-  A["Backups →<br/>Back up now & download"] --> B[".dbk file +<br/>passphrase"]
-  B --> C{"Where?"}
-  C -- "fresh server" --> D["First screen →<br/>Restore a backup<br/>(setup code)"]
-  C -- "running server" --> E["Backups → Restore →<br/>A file or a stored backup"]
-  D --> F["Restart 1–2 min →<br/>sign in with the backup's accounts"]
-  E --> F
-```
+<p align="center"><img src="diagrams/restore-backup.svg" alt="Restoring a backup: download a .dbk file and keep its passphrase, then restore it on the first screen of a fresh server (with the setup code) or under Backups, Restore on a running server; after a 1-2 minute restart sign in with the backup accounts" width="511"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. **Backups → Back up now** and download the `.dbk` file; keep its passphrase.
+2. On a fresh server: first screen → **Restore a backup** (with the setup code).
+3. On a running server: **Backups → Restore** → a file or a stored backup.
+4. The server restarts (1–2 min); sign in with the accounts from the backup.
+
+</details>
 
 Uploads up to `BACKUP_UPLOAD_MAX_MB` ([settings](settings.md)). Command line: `sudo duniya backup-now`. Admin MCP:
 `get_backup_status`, `list_backups`, `run_backup`, `restore_backup` (with confirmation).
@@ -46,19 +47,17 @@ Uploads up to `BACKUP_UPLOAD_MAX_MB` ([settings](settings.md)). Command line: `s
 **Update settings**: *Notify me*, *Install automatically* (time of day) or *Off*; stable or latest `main`
 (`--update-mode off|notify|auto`). Also `sudo duniya update [--check]` or re-running the installer.
 
-```mermaid
-flowchart TD
-  N["New release"] --> Q{"Crosses a breaking<br/>release or a new major?"}
-  Q -- no --> M{"Update mode"}
-  M -- "Install automatically" --> I["Backup → install<br/>at the set time"]
-  M -- "Notify me" --> W["Shown on Updates"]
-  Q -- yes --> S["Auto stops at the last<br/>safe release"]
-  S --> T["Told once: Overview banner,<br/>Updates, Activity, WhatsApp"]
-  T --> D{"Owner decides"}
-  D -- "Review update → Update to vX<br/>or confirm ABCD" --> I2["Backup → update →<br/>result after restart"]
-  D -- "Remind me in 7 days<br/>or cancel ABCD" --> T
-  D -- Dismiss --> H["Hidden until a newer<br/>breaking release"]
-```
+<p align="center"><img src="diagrams/update-decision.svg" alt="How updates are decided: ordinary releases follow the update mode (install automatically after a backup, or notify); a breaking release or new major stops automatic updates, tells the owner once, and the owner updates, postpones or dismisses it" width="720"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. A new release is published.
+2. Not breaking: with *Install automatically* it is installed after a backup at the set time; with *Notify me* it is shown on Updates.
+3. Breaking or a new major: automatic updates stop at the last safe release.
+4. The owner is told once: Overview banner, Updates, Activity and WhatsApp.
+5. The owner decides: **Update to vX** (or `confirm ABCD`) backs up, updates and reports after the restart; **Remind me in 7 days** (or `cancel ABCD`) asks again later; **Dismiss** hides it until a newer breaking release.
+
+</details>
 
 ### Breaking releases need your decision
 
