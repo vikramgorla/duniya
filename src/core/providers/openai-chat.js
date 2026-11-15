@@ -53,7 +53,8 @@ async function request(url, key, body) {
   let json; try { json = JSON.parse(text); } catch { json = null; }
   if (!res.ok) {
     const err = new Error(json?.error?.message || `${res.status} ${text.slice(0, 200)}`);
-    err.status = res.status; err.code = json?.error?.code;
+    // status, code and headers let the fallback chain (042) classify the failure and respect Retry-After.
+    err.status = res.status; err.code = json?.error?.code || json?.error?.type; err.headers = res.headers; err.error = json;
     throw err;
   }
   return json;

@@ -209,9 +209,11 @@ test('US3: Sign in with ChatGPT — connect, list plan models, tool call over Re
   assert.equal(oa.respReqs.at(-1).auth, 'Bearer chatgpt-access-2');
 
   oa.respFail = 'subscription_sharing_usage_limit_exceeded';
+  await t.agents.updateAgent('panduga', { fallback: { mode: 'off' } }); // 042: without fallback the limit is explained
   await t.route(t.msg({ text: '!panduga again?' }));
   assert.match(t.sent.at(-1).text, /usage limit/);
   oa.respFail = null;
+  await t.agents.updateAgent('panduga', { fallback: { mode: 'inherit' } });
 
   await t.api(owner, 'DELETE', '/api/providers/chatgpt');
   assert.equal(au.revoked.at(-1).token, 'r2');

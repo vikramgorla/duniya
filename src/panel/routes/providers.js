@@ -1,5 +1,7 @@
 // Panel routes for model providers (006).
-import { status, allModels, addCompatible, removeCompatible, clearModelCache, resolveModel, addOpenRouter, setFreeOnly, testProvider, clearCopilotExtras, providerModels, providers, OPENROUTER_ID } from '../../core/providers/index.js';
+import { status, allModels, addCompatible, removeCompatible, clearModelCache, resolveModel, addOpenRouter, setFreeOnly, testProvider, clearCopilotExtras, providerModels, providers, OPENROUTER_ID,
+  addAccount, renameAccount, removeAccount, newAccountId, secretFor, accountById, fallbackSettings, setFallbackSettings, strategies, setStrategy } from '../../core/providers/index.js';
+import * as breaker from '../../core/providers/breaker.js';
 import * as chatgpt from '../../core/providers/chatgpt.js';
 import * as copilot from '../../core/providers/copilot.js';
 import { setSecret, getSecret } from '../../core/store.js';
@@ -22,9 +24,9 @@ export function providerRoutes(route) {
 
   // OpenRouter preset (018): one tap, key stored as a secret, "Free models only" switch.
   route('POST', '/api/providers/openrouter', async (req, res, body, q, p, user) => {
-    const prov = addOpenRouter({ key: body.key, freeOnly: body.freeOnly });
-    activity('system', { summary: `OpenRouter ${body.key ? 'connected' : 'updated'} by ${user.username} (free models only: ${prov.freeOnly ? 'on' : 'off'})` });
-    const [row] = (await status({ refresh: true })).filter((x) => x.id === OPENROUTER_ID);
+    const prov = addOpenRouter({ key: body.key, freeOnly: body.freeOnly, label: body.label });
+    activity('system', { summary: `OpenRouter${prov.label ? ` — ${prov.label}` : ''} ${body.key ? 'connected' : 'updated'} by ${user.username} (free models only: ${prov.freeOnly ? 'on' : 'off'})` });
+    const [row] = (await status({ refresh: true })).filter((x) => x.id === (prov.id || OPENROUTER_ID));
     return row;
   });
   route('POST', '/api/providers/compatible/:id/free-only', async (req, res, body, q, p, user) => {
@@ -35,25 +37,33 @@ export function providerRoutes(route) {
   });
 
   // GitHub Copilot via the official SDK (018): owner pastes a fine-grained token; checked before it is kept.
+  // body.label (042): connect another Copilot account with its own token; body.account: replace that account's token.
   route('POST', '/api/providers/copilot', async (req, res, body, q, p, user) => {
     const token = copilot.checkToken(body.token);
-    const previous = getSecret(copilot.SECRET);
-    setSecret(copilot.SECRET, token);
-    clearModelCache('copilot'); clearCopilotExtras();
-    const prov = providers().find((x) => x.id === 'copilot');
+    const existing = body.account ? accountById(String(body.account)) : null;
+    if (body.account && existing?.type !== 'copilot') return [404, { error: 'No such Copilot account' }];
+    const label = String(body.label || '').trim();
+    const id = existing ? existing.id : label ? newAccountId('copilot', label) : 'copilot';
+    const secret = secretFor('copilot', id);
+    const previous = getSecret(secret);
+    if (id !== 'copilot' && !existing) addAccount({ type: 'copilot', label, id });
+    setSecret(secret, token);
+    clearModelCache(id); clearCopilotExtras(id);
+    const prov = providers().find((x) => x.id === id);
     const m = await providerModels(prov, { refresh: true });
     if (m.error) {
-      setSecret(copilot.SECRET, previous || '');
-      clearModelCache('copilot');
+      if (id !== 'copilot' && !existing) await removeAccount(id);
+      else setSecret(secret, previous || '');
+      clearModelCache(id);
       return [400, { error: m.error, field: 'token' }];
     }
-    activity('system', { summary: `GitHub Copilot connected by ${user.username} (${m.models.length} models)` });
-    const [row] = (await status()).filter((x) => x.id === 'copilot');
+    activity('system', { summary: `GitHub Copilot${id === 'copilot' ? '' : ` (${prov.name})`} connected by ${user.username} (${m.models.length} models)` });
+    const [row] = (await status()).filter((x) => x.id === id);
     return row;
   }, { role: 'owner' });
   route('DELETE', '/api/providers/copilot', async (req, res, body, q, p, user) => {
     copilot.disconnect();
-    clearModelCache('copilot'); clearCopilotExtras();
+    clearModelCache('copilot'); clearCopilotExtras('copilot');
     activity('system', { summary: `GitHub Copilot disconnected by ${user.username}` });
     return { ok: true };
   }, { role: 'owner' });
@@ -65,13 +75,23 @@ export function providerRoutes(route) {
     return r;
   });
 
-  route('POST', '/api/providers/chatgpt/start', async () => chatgpt.startSignIn(), { role: 'owner' });
+  // body.label (042): sign in another ChatGPT account; body.account: sign that account in again (reconnect).
+  route('POST', '/api/providers/chatgpt/start', async (req, res, body) => {
+    const existing = body?.account ? accountById(String(body.account)) : null;
+    if (body?.account && existing?.type !== 'chatgpt') return [404, { error: 'No such ChatGPT account' }];
+    const label = String(body?.label || '').trim().slice(0, 40);
+    const id = existing ? existing.id : label ? newAccountId('chatgpt', label) : 'chatgpt';
+    return chatgpt.startSignIn({ secret: secretFor('chatgpt', id), meta: { id, label: existing ? '' : label } });
+  }, { role: 'owner' });
   route('POST', '/api/providers/chatgpt/complete', async (req, res, body, q, p, user) => {
-    const { email } = await chatgpt.completeSignIn(body.callbackUrl);
-    clearModelCache('chatgpt');
-    activity('system', { summary: `ChatGPT plan connected (${email || 'account'}) by ${user.username}` });
-    const models = (await allModels({ refresh: true })).filter((m) => m.provider === 'chatgpt').length;
-    return { ok: true, email, models };
+    const { email, meta = {} } = await chatgpt.completeSignIn(body.callbackUrl);
+    const id = meta.id || 'chatgpt';
+    if (id !== 'chatgpt' && meta.label && !accountById(id)?.label) addAccount({ type: 'chatgpt', label: meta.label, id });
+    clearModelCache(id); breaker.reset(id);
+    const name = accountById(id)?.name || 'ChatGPT plan';
+    activity('system', { summary: `${name} connected (${email || 'account'}) by ${user.username}` });
+    const models = (await allModels({ refresh: true })).filter((m) => m.provider === id).length;
+    return { ok: true, email, models, account: id };
   }, { role: 'owner' });
   route('DELETE', '/api/providers/chatgpt', async (req, res, body, q, p, user) => {
     await chatgpt.disconnect();
@@ -80,9 +100,62 @@ export function providerRoutes(route) {
     return { ok: true };
   }, { role: 'owner' });
 
+  // ---------- accounts (042) ----------
+  // Another API-key account of Anthropic or OpenAI (Copilot, ChatGPT and OpenRouter use their own routes with a label).
+  route('POST', '/api/accounts', async (req, res, body, q, p, user) => {
+    const type = String(body.type || '');
+    if (!['anthropic', 'openai'].includes(type)) return [400, { error: 'Use the ChatGPT, Copilot or OpenRouter buttons for those accounts', field: 'type' }];
+    if (!String(body.key || '').trim()) return [400, { error: 'Paste the API key of the other account', field: 'key' }];
+    const acc = addAccount({ type, label: body.label, key: String(body.key).trim() });
+    activity('system', { summary: `Model account “${acc.name}” added by ${user.username}` });
+    const [row] = (await status({ refresh: true })).filter((x) => x.id === acc.id);
+    return row || acc;
+  });
+  route('PUT', '/api/accounts/:id', async (req, res, body, q, p, user) => {
+    const acc = renameAccount(p.id, body.label);
+    activity('system', { summary: `Model account ${p.id} renamed to “${acc.name}” by ${user.username}` });
+    return { id: acc.id, name: acc.name, label: acc.label };
+  });
+  route('PUT', '/api/accounts/:id/key', async (req, res, body, q, p, user) => {
+    const acc = accountById(p.id);
+    if (!acc || !['anthropic', 'openai', 'openrouter', 'compatible'].includes(acc.type)) return [404, { error: 'No such API-key account' }];
+    if (!String(body.key || '').trim()) return [400, { error: 'Paste the key first', field: 'key' }];
+    setSecret(acc.secret, String(body.key).trim());
+    clearModelCache(acc.id);
+    activity('system', { summary: `Key replaced for ${acc.name} by ${user.username}` });
+    const [row] = (await status({ refresh: true })).filter((x) => x.id === acc.id);
+    return row;
+  });
+  route('DELETE', '/api/accounts/:id', async (req, res, body, q, p, user) => {
+    const acc = accountById(p.id);
+    await removeAccount(p.id);
+    activity('system', { summary: `Model account “${acc?.name || p.id}” removed by ${user.username}` });
+    return { ok: true };
+  }, { role: 'owner' });
+  route('POST', '/api/accounts/:id/retry', async (req, res, body, q, p, user) => {
+    const acc = accountById(p.id);
+    if (!acc) return [404, { error: 'No such account' }];
+    breaker.reset(acc.id);
+    activity('system', { summary: `${acc.name}: pause cleared by ${user.username}; it is tried again on the next message` });
+    return { ok: true };
+  });
+
+  // ---------- fallback (042) ----------
+  route('GET', '/api/fallback', async () => ({ ...fallbackSettings(), strategies: strategies(), health: breaker.allStates() }));
+  route('PUT', '/api/fallback', async (req, res, body, q, p, user) => {
+    const out = setFallbackSettings({ enabled: body.enabled, chain: body.chain });
+    activity('config', { summary: `Fallback ${out.enabled ? 'on' : 'off'}${out.chain.length ? `: ${out.chain.join(' → ')}` : ' (any other connected provider)'} (${user.username})` });
+    return { ...out, strategies: strategies() };
+  });
+  route('PUT', '/api/fallback/strategy', async (req, res, body, q, p, user) => {
+    const out = setStrategy(String(body.group || ''), String(body.strategy || ''));
+    activity('config', { summary: `Accounts of ${body.group}: ${body.strategy === 'spread' ? 'spread across accounts' : 'in order'} (${user.username})` });
+    return { strategies: out };
+  });
+
   route('GET', '/api/models', async (req, res, body, q) => {
     const s = getSettings();
-    const out = { models: await allModels({ refresh: q.get('refresh') === '1' }), defaultModel: s.defaultModel || 'auto', backgroundModel: s.backgroundModel || 'auto' };
+    const out = { models: await allModels({ refresh: q.get('refresh') === '1' }), defaultModel: s.defaultModel || 'auto', backgroundModel: s.backgroundModel || 'auto', fallback: fallbackSettings() };
     try { out.resolvedDefault = resolveModel('auto', 'agent').ref; } catch (e) { out.problem = e.message; }
     try { out.resolvedBackground = resolveModel('auto', 'background').ref; } catch { /* same problem */ }
     return out;

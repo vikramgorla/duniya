@@ -374,7 +374,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
       contextChat: pick, chatName: isGroup ? await channel.chatName?.(pick).catch(() => '') : '' };
     const reply = await runAgent(ctx);
     activity('message.out', { agent: agent.id, chat, summary: reply || '(no reply)' });
-    return { reply, usage: ctx.usage, model: ctx.model, role, chat: pick || 'new', ...(pick ? { chatOn: isChatEnabled(pick) } : {}) };
+    return { reply, usage: ctx.usage, model: ctx.model, answeredBy: ctx.answeredBy || '', fallback: ctx.fallback || null, role, chat: pick || 'new', ...(pick ? { chatOn: isChatEnabled(pick) } : {}) };
   });
   route('POST', '/api/agents/:id/schedules/:sid/run', async (req, res, body, q, p) => {
     const agent = getAgent(p.id);
@@ -397,14 +397,14 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     return [...groups, ...people, ...missing].map((c) => {
       const number = c.number || (c.id.includes('#') ? c.id.split('#')[0] : 'main');
       return { ...c, number, numberLabel: numbers.get(number) || number, agent: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit',
-        enabled: !!prefs[c.id]?.enabled, ignored: ignoredCounts.get(c.id) || 0 };
+        fallback: prefs[c.id]?.fallback || { mode: 'inherit', chain: [] }, enabled: !!prefs[c.id]?.enabled, ignored: ignoredCounts.get(c.id) || 0 };
     });
   });
   route('PUT', '/api/chats/:chat/prefs', async (req, res, body, q, p, user) => {
     const chat = decodeURIComponent(p.chat);
-    const out = setChatPrefs(chat, { model: body.model, logging: body.logging, enabled: body.enabled });
+    const out = setChatPrefs(chat, { model: body.model, logging: body.logging, enabled: body.enabled, fallback: body.fallback });
     if (body.enabled !== undefined) { ignoredCounts.delete(chat); activity('config', { chat, summary: `Chat switched ${out.enabled ? 'ON — agents may answer here' : 'OFF — agents ignore it'} (${user.username})` }); }
-    else activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging} (${user.username})` });
+    else activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging}, fallback ${out.fallback.mode}${out.fallback.chain.length ? ` (${out.fallback.chain.join(' → ')})` : ''} (${user.username})` });
     return out;
   });
   // ---------- activity logging settings (011) ----------
@@ -539,7 +539,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
   route('GET', '/api/usage/summary', async (req, res, body, q) => {
     const from = periodFrom(q.get('period'));
     const by = (g) => Object.fromEntries(usageReport({ from, groupBy: g }).rows.map((r) => [r.key, r]));
-    return { period: q.get('period') || '30d', agent: by('agent'), chat: by('chat'), provider: by('provider'), model: by('model'), prices: listPrices(), plans: PLAN_PROVIDERS };
+    return { period: q.get('period') || '30d', agent: by('agent'), chat: by('chat'), provider: by('provider'), account: by('account'), model: by('model'), prices: listPrices(), plans: PLAN_PROVIDERS };
   });
   route('PUT', '/api/usage/prices', async (req, res, body, q, p, user) => {
     const out = setPrice(String(body.model || ''), { input: body.input, output: body.output });

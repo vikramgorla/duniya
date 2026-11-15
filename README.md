@@ -25,7 +25,8 @@
 - **Silent by default.** Every chat is off until you switch it on; off chats are never stored or sent to a model.
 - **Several WhatsApp numbers, groups and 1:1 chats.** Linked-device login by QR or pairing code, no commercial API.
 - **Any model.** Sign in with ChatGPT, GitHub Copilot, OpenRouter (free models), Anthropic or OpenAI keys,
-  Ollama and other compatible endpoints, or *Auto*; per agent and per chat.
+  Ollama and other compatible endpoints, or *Auto*; per agent and per chat. Several accounts per provider, and
+  automatic fallback to the next model when one hits a usage limit, is down or its sign-in expired.
 - **Real tools via MCP.** Remote servers with OAuth sign-in or tokens, or local ones from npm/GitHub; per agent or
   once for all agents (each agent can opt out); per-role allow lists and a `confirm CODE` step for changes. WhatsApp actions too: media, reactions, polls, group admin.
 - **Manage it from ChatGPT or Claude.** The app is an MCP server with OAuth 2.1, your panel role and confirmations.

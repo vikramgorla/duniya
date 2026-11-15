@@ -12,6 +12,10 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS usage_ts ON usage(ts);
 `);
+// 042: the account that answered and why the call switched (fallback). Added in place so an update keeps usage.
+for (const [col, type] of [['account', 'TEXT'], ['fallback', 'TEXT']]) {
+  if (!db.prepare('PRAGMA table_info(usage)').all().some((c) => c.name === col)) db.exec(`ALTER TABLE usage ADD COLUMN ${col} ${type}`);
+}
 
 export const PLAN_PROVIDERS = { chatgpt: 'ChatGPT plan', copilot: 'Copilot allowance' };
 const priceSetting = () => getSetting('modelPrices', {}) || {};
@@ -42,20 +46,22 @@ export function priceFor(provider, model, published = null) {
   return null;
 }
 
-const ins = db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kind, input, output, cost, priced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-export function recordUsage({ agent = '', chat = '', provider, model, kind = 'reply', input = 0, output = 0, published = null }) {
+const ins = db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kind, input, output, cost, priced, account, fallback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+/** provider = provider type (prices are per provider); account = the account that answered (042); fallback = why it switched. */
+export function recordUsage({ agent = '', chat = '', provider, account = '', model, kind = 'reply', input = 0, output = 0, published = null, fallback = '' }) {
   const price = priceFor(provider, model, published);
   const cost = price ? (input * price.in + output * price.out) / 1e6 : null;
-  ins.run(Date.now(), agent || '', chat || '', provider, model, kind, input | 0, output | 0, cost, price?.source || null);
+  ins.run(Date.now(), agent || '', chat || '', provider, model, kind, input | 0, output | 0, cost, price?.source || null, account || provider, String(fallback || '').slice(0, 300));
   if (Math.random() < 0.01) db.prepare('DELETE FROM usage WHERE ts < ?').run(Date.now() - 400 * 86400000);
 }
 
-const GROUPS = { agent: 'agent', chat: 'chat', provider: 'provider', model: "provider || ':' || model", kind: 'kind', day: "strftime('%Y-%m-%d', ts / 1000, 'unixepoch', 'localtime')" };
+const GROUPS = { agent: 'agent', chat: 'chat', provider: 'provider', account: "COALESCE(account, provider)", model: "COALESCE(account, provider) || ':' || model", kind: 'kind',
+  fallback: "CASE WHEN fallback IS NULL OR fallback = '' THEN 'first choice' ELSE 'fallback' END", day: "strftime('%Y-%m-%d', ts / 1000, 'unixepoch', 'localtime')" };
 
 /** Totals and breakdowns for a period. */
 export function usageReport({ from = 0, to = Date.now(), groupBy = 'agent', agent = '', chat = '' } = {}) {
   const key = GROUPS[groupBy];
-  if (!key) throw Object.assign(new Error('groupBy must be one of agent, chat, provider, model, kind, day'), { status: 400 });
+  if (!key) throw Object.assign(new Error('groupBy must be one of agent, chat, provider, account, model, kind, fallback, day'), { status: 400 });
   const where = ['ts >= ?', 'ts <= ?']; const args = [Number(from) || 0, Number(to) || Date.now()];
   if (agent) { where.push('agent = ?'); args.push(agent); }
   if (chat) { where.push('chat = ?'); args.push(chat); }

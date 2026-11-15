@@ -134,7 +134,7 @@ test('#34: model errors and empty answers are recorded', async () => {
   t.script.push([]); // the model answers nothing
   await t.route(t.msg({ text: '!panduga anything?', phone: '41790000004' }));
   assert.equal((await silences('reason=no_reply'))[0]?.chat, 'g1@g.us');
-  t.chatPrefs.setChatPrefs('g6@g.us', { model: 'nosuchprovider:model' });
+  t.chatPrefs.setChatPrefs('g6@g.us', { model: 'nosuchprovider:model', fallback: { mode: 'off' } }); // 042: no fallback to another model
   await t.agents.bindChat('g6@g.us', 'helper', 'test');
   await t.route(t.msg({ chat: 'g6@g.us', text: '!help hi', phone: '41790000004' }));
   assert.equal((await silences('reason=model_error'))[0]?.chat, 'g6@g.us');
