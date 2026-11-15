@@ -1031,9 +1031,50 @@ async function renderContacts() {
     add);
 }
 
+// ---------- spending caps (040, #35) ----------
+const CAP_STATE = { ok: ['ok', 'Within cap'], warning: ['warn', '80%+ used'], quiet: ['bad', 'Cap reached — quiet'], fallback: ['warn', 'Cap reached — cheaper model'] };
+const capAmount = (c) => [c.cost ? `${fmtCost(c.spent.cost)} of ${fmtCost(c.cost)}` : '', c.tokens ? `${fmtTok(c.spent.tokens)} of ${fmtTok(c.tokens)} tokens` : ''].filter(Boolean).join(' · ');
+const capResets = (c) => new Date(c.resetsAt).toLocaleDateString([], { month: 'short', day: 'numeric' });
+/** One cap as a progress bar with one state line. */
+function capBar(c, { name = true } = {}) {
+  const [cls, label] = CAP_STATE[c.state] || CAP_STATE.ok;
+  return h('div', { class: 'capbar' },
+    h('div', { class: 'row spread', style: 'gap:6px' }, name ? h('b', {}, c.name || c.id) : h('span', { class: 'small' }, 'This month'), h('span', { class: `pill ${cls}` }, `${Math.round(c.used * 100)}% · ${label}`)),
+    meter(Math.round(c.used * 100)),
+    h('div', { class: 'small muted num' }, `${capAmount(c)} · resets ${capResets(c)}`),
+    c.costUntracked ? h('div', { class: 'small', style: 'color:var(--warn)' }, `${c.spent.unpriced} call(s) have no price, so the cost cap can’t count them. Set the price under Usage → By model, or add a token cap.`) : null);
+}
+/** Editor for the monthly cap of an agent or a chat; saves on its own. */
+async function capEditor(scope, id, models) {
+  const box = h('div', {});
+  const path = `/api/budget/${scope}/${encodeURIComponent(id)}`;
+  const draw = (cap) => {
+    const cost = h('input', { type: 'number', min: 0, step: '0.5', inputmode: 'decimal', value: cap?.cost ?? '', placeholder: 'e.g. 5', 'aria-label': 'Monthly cost cap in USD', disabled: !can('admin') });
+    const tokens = h('input', { type: 'number', min: 1000, step: 1000, inputmode: 'numeric', value: cap?.tokens ?? '', placeholder: 'e.g. 2000000', 'aria-label': 'Monthly token cap', disabled: !can('admin') });
+    const fb = h('select', { 'aria-label': 'At the cap', disabled: !can('admin') }, h('option', { value: '' }, 'Stay quiet until next month'),
+      (models?.models || []).map((m) => h('option', { value: m.ref, selected: cap?.fallback === m.ref }, `Switch to ${m.label}`)),
+      cap?.fallback && !(models?.models || []).some((m) => m.ref === cap.fallback) ? h('option', { value: cap.fallback, selected: true }, `Switch to ${cap.fallback} (not available)`) : null);
+    const save = (body, msg) => tryApi(async () => { const r = await api('PUT', path, body); usageCache = null; draw(r.cap); }, msg);
+    box.replaceChildren(
+      h('p', { class: 'small muted', style: 'margin-top:0' }, scope === 'agent'
+        ? 'Limit what this agent may spend per calendar month. At 80% you get a WhatsApp alert; at 100% it stays quiet (or uses a cheaper model) until the month ends.'
+        : 'Limit what agents may spend in this chat per calendar month. At 80% you get a WhatsApp alert; at 100% the agent stays quiet here (or uses a cheaper model).'),
+      cap ? capBar(cap, { name: false }) : h('p', { class: 'small' }, 'No cap — no limit.'),
+      h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px' },
+        field('Cost per month (USD)', cost, 'Needs model prices'), field('or tokens per month', tokens, 'Works without prices')),
+      field('At the cap', fb),
+      can('admin') ? h('div', { class: 'row', style: 'margin-top:10px;gap:8px' },
+        h('button', { class: 'btn primary', type: 'button', onclick: () => save({ cost: cost.value, tokens: tokens.value, fallback: fb.value }, cost.value || tokens.value ? 'Cap saved' : 'Cap removed') }, 'Save cap'),
+        cap ? h('button', { class: 'btn', type: 'button', onclick: () => save({ cost: '', tokens: '' }, 'Cap removed') }, 'Remove cap') : null) : null);
+  };
+  api('GET', path).then((r) => draw(r.cap)).catch((e) => box.replaceChildren(h('p', { class: 'small muted' }, `Could not load the cap: ${e.message}`)));
+  return box;
+}
+
 async function renderUsage() {
   const [byDay, byAgent, byChat, byProv, byModel, byKind, sum, chats, agents] = await Promise.all(['day', 'agent', 'chat', 'provider', 'model', 'kind']
     .map((g) => api('GET', `/api/usage?period=${usagePeriod}&groupBy=${g}`)).concat([usageSummary(), api('GET', '/api/chats').catch(() => []), api('GET', '/api/agents').catch(() => [])]));
+  const caps = await api('GET', '/api/budget').catch(() => null);
   const t = byDay.total;
   const chatName = Object.fromEntries(chats.map((c) => [c.id, c.name])); const agentName = Object.fromEntries(agents.map((b) => [b.id, b.name]));
   const KIND = { reply: 'Replies', summary: 'Memory summaries', scheduled: 'Scheduled posts', 'ai-helper': 'AI helper', test: 'Tests' };
@@ -1064,6 +1105,10 @@ async function renderUsage() {
       tile('Tokens out', fmtTok(t.output), 'what agents wrote'),
       tile('Estimated cost', fmtCost(t.cost), t.unpriced ? `${t.unpriced} call(s) without a price — set prices under “By model”` : t.plan ? `${t.plan} call(s) included in your plans` : 'from the prices below'),
       tile('Model calls', String(t.calls || 0), `${(byKind.rows.find((r) => r.key === 'reply')?.calls) || 0} replies`)),
+    caps ? h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Monthly spending caps'),
+      caps.caps.length ? h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px' }, caps.caps.map((c) => capBar(c)))
+        : h('p', { class: 'small muted' }, 'No caps yet. Set one on an agent’s page (Monthly spending cap) or for a chat under Chats → Spending cap.'),
+      caps.caps.length && !caps.alertsTo ? h('div', { class: 'note warn', style: 'margin-top:10px' }, 'Cap alerts can’t reach you on WhatsApp yet: add your number under Settings → Owner alerts.') : null) : null,
     h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Per day'), days.length ? chart : h('p', { class: 'small muted' }, 'Nothing in this period.')),
     h('div', { class: 'grid', style: 'margin-top:16px;align-items:start' },
       table('By agent', byAgent, (k) => agentName[k] || k || '(no agent)'),
@@ -1534,6 +1579,7 @@ async function renderAgentEditor(id) {
           h('label', { class: 'inline' }, F.confirmOn, 'Hold changes until an organizer replies “confirm CODE”'),
           h('div', { class: 'row' }, field('Preview tools', F.cPreview), field('Confirm tool', F.cTool)),
           h('div', { class: 'row' }, field('Confirmation id field', F.cId), field('Valid for (minutes)', F.cTtl))),
+        h('fieldset', {}, h('legend', {}, 'Monthly spending cap'), await capEditor('agent', id, models)),
         h('fieldset', {}, h('legend', {}, 'Scheduled posts'), schedBox, h('button', { class: 'btn small mut', onclick: () => { scheds.push({ id: `s${scheds.length + 1}`, at: '08:00', days: 'daily', prompt: '', chats: 'all', enabled: true }); drawScheds(); } }, '+ Add schedule')),
         h('fieldset', {}, h('legend', {}, 'Advanced'),
           plugins.length ? field('Plugins', h('div', {}, F.plugins)) : null,
@@ -1733,7 +1779,9 @@ async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply 
 let chatsFilter = 'all';
 async function renderChats() {
   $('#main').replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading chats…')));
-  const [chats, agents, models, us, quiet] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/agents'), loadModels().catch(() => ({ models: [] })), usageSummary(), api('GET', '/api/silences?days=7').catch(() => ({ silences: [] }))]);
+  const [chats, agents, models, us, bud, quiet] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/agents'), loadModels().catch(() => ({ models: [] })), usageSummary(), api('GET', '/api/budget').catch(() => null), api('GET', '/api/silences?days=7').catch(() => ({ silences: [] }))]);
+  const capOf = new Map((bud?.caps || []).filter((x) => x.scope === 'chat').map((x) => [x.id, x]));
+  const openCap = async (c) => { memBox.replaceChildren(h('div', { class: 'card', style: 'margin-top:14px' }, h('h2', {}, `Spending cap · ${c.name || c.id}`), await capEditor('chat', c.id, models))); memBox.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   const quietBy = new Map(); // #34: why agents stayed quiet, per chat (most frequent first)
   for (const q of quiet.silences) { if (!quietBy.has(q.chat)) quietBy.set(q.chat, []); quietBy.get(q.chat).push(q); }
   const memBox = h('div', {});
@@ -1749,9 +1797,12 @@ async function renderChats() {
           h('div', { class: 'small muted' }, c.isGroup ? `${c.size || 0} members` : c.phone ? `+${c.phone}` : '', c.lastAt ? ` · last message ${ago(c.lastAt)} ago` : ''),
           us?.chat?.[c.id] ? h('div', { class: 'small muted num' }, `30 days: ${usageLine(us.chat[c.id])}`) : null,
           !c.enabled ? h('div', { class: 'small', style: 'color:var(--warn)' }, `Off — ignored${c.ignored ? ` (${c.ignored} message${c.ignored > 1 ? 's' : ''} since restart)` : ''}`) : null,
+          capOf.get(c.id) ? h('div', { class: 'small num', style: `color:var(--${capOf.get(c.id).state === 'ok' ? 'muted' : 'warn'})` }, `Cap: ${Math.round(capOf.get(c.id).used * 100)}% used · ${capAmount(capOf.get(c.id))}`) : null,
           (quietBy.get(c.id) || []).slice(0, 2).map((q) => h('div', { class: 'quiet' }, h('span', { class: `small${q.reason === 'not_addressed' ? ' muted' : ''}`, style: q.reason === 'not_addressed' ? '' : 'color:var(--warn)', title: `${q.explain} Last ${ago(q.lastTs)} ago.` }, quietLine(q)),
             silenceFix(q, () => renderChats(), { onChats: true }))),
-          h('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory')),
+          h('div', { class: 'row', style: 'gap:6px;margin-top:6px' },
+            h('button', { class: 'btn small', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory'),
+            h('button', { class: 'btn small', onclick: () => openCap(c) }, 'Spending cap'))),
         h('td', { style: 'min-width:170px', 'data-label': 'Agent' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, agent: e.target.value || null }); c.agent = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
           h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),
         h('td', { style: 'min-width:200px', 'data-label': 'Model' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) })),
@@ -2304,7 +2355,7 @@ async function renderSecrets() {
 
 // ---------- settings ----------
 async function renderSettings() {
-  const [agents, lg, ai, sess, mob] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null), api('GET', '/api/mobile').catch(() => null)]);
+  const [agents, lg, ai, sess, mob, alerts] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null), api('GET', '/api/mobile').catch(() => null), api('GET', '/api/alerts').catch(() => null)]);
   if (sess?.user) { S.user = sess.user; S.google = !!sess.google; }
   const me = S.user;
   const tools = await toolServicesCard().catch((e) => h('div', { class: 'card' }, h('h2', {}, 'Tool services for all agents'), h('p', { class: 'small muted' }, `Could not load: ${e.message}`)));
@@ -2318,6 +2369,7 @@ async function renderSettings() {
     h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default agent for DMs without a trigger'),
       h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmAgent: e.target.value }), 'Saved') },
         h('option', { value: '' }, '— first agent that accepts the sender —'), agents.map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmAgent === b.id }, b.name)))),
+    alerts ? ownerAlertsCard(alerts) : null,
     mob ? mobileCard(mob) : null,
     ai ? assistantsCard(ai) : null,
     lg ? loggingCard(lg) : null,
@@ -2330,6 +2382,38 @@ async function renderSettings() {
   }
   cards.unshift(tools); // Tool services for all agents (035) first: they affect every agent
   $('#main').replaceChildren(h('div', { class: 'grid' }, cards));
+}
+
+// ---------- Settings → Owner alerts (040/041): where cap alerts and the weekly summary go ----------
+const DAY_NAMES = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+function ownerAlertsCard(a) {
+  const own = can('owner');
+  const w = a.weekly;
+  const num = h('input', { type: 'tel', inputmode: 'tel', value: a.alertsTo ? `+${a.alertsTo}` : '', placeholder: '+41 79 123 45 67', 'aria-label': 'Alerts go to', disabled: !own });
+  const day = h('select', { 'aria-label': 'Day', disabled: !own }, Object.entries(DAY_NAMES).map(([v, l]) => h('option', { value: v, selected: w.day === v }, l)));
+  const at = h('input', { type: 'time', value: w.at, 'aria-label': 'Time', disabled: !own });
+  const on = w.enabled === null ? true : w.enabled;
+  const out = h('div', {});
+  const state = !a.alertsTo ? h('div', { class: 'note warn' }, 'No number yet: spending-cap alerts and the weekly summary are only written to Activity. Add the number that should get them.')
+    : w.active ? h('div', { class: 'note ok' }, `✓ Alerts go to +${a.alertsTo}. Weekly summary every ${DAY_NAMES[w.day]} at ${w.at}${w.last ? ` · last sent ${ago(w.last)} ago` : ''}.`)
+      : h('div', { class: 'note' }, `Alerts go to +${a.alertsTo}. Weekly summary is off.`);
+  const save = (body, msg) => tryApi(async () => { await api('PUT', '/api/alerts', body); renderSettings(); }, msg);
+  return h('div', { class: 'card' }, h('h2', {}, 'Owner alerts on WhatsApp'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'The agents’ WhatsApp number messages you here when a spending cap reaches 80% or 100%, and once a week with a short summary: messages handled, replies, cost, ignored chats and anything waiting for you. Never message contents.'),
+    state,
+    field('Alerts go to', h('div', { class: 'row nowrap', style: 'gap:8px' }, num, own ? h('button', { class: 'btn', type: 'button', onclick: () => save({ alertsTo: num.value }, num.value ? 'Number saved' : 'Number removed') }, 'Save') : null),
+      'Your own WhatsApp number with country code. Use a different number than the agents’ one.'),
+    h('div', { class: 'row', style: 'margin-top:12px;gap:10px' }, h('label', { class: 'inline' }, toggle(on, (v) => save({ weekly: { enabled: v } }, v ? 'Weekly summary on' : 'Weekly summary off'), !own), 'Weekly summary')),
+    h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px' }, field('Day', day), field('Time (server time)', at)),
+    own ? h('div', { class: 'row', style: 'margin-top:10px;gap:8px' },
+      h('button', { class: 'btn', type: 'button', onclick: () => save({ weekly: { day: day.value, at: at.value } }, 'Schedule saved') }, 'Save schedule'),
+      h('button', { class: 'btn primary', type: 'button', onclick: async (e) => {
+        const b = e.currentTarget; b.disabled = true;
+        const r = await tryApi(() => api('POST', '/api/alerts/weekly/send'));
+        b.disabled = false;
+        if (r) { toast(r.sent ? `Sent to +${a.alertsTo}` : `Not sent: ${r.reason}`); out.replaceChildren(h('label', {}, r.sent ? 'Sent just now:' : 'Preview (not sent):'), h('pre', { class: 'small' }, r.text)); }
+      } }, 'Send now')) : h('p', { class: 'small muted' }, 'Only the owner can change these.'),
+    out);
 }
 
 // ---------- Settings → Tool services (035): MCP servers every agent can use ----------
