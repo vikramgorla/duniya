@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duniya · AI agents for your WhatsApp groups, on your own server</title>
+<meta name="description" content="Duniya runs AI assistants in your WhatsApp groups and chats, on your own server, managed from a calm web panel. Templates, any model, MCP tools, backups, one-click Oracle Cloud install.">
+<meta name="theme-color" content="#f2f1ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0c0f" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Duniya · self-hosted WhatsApp agents">
+<meta property="og:description" content="AI assistants for your WhatsApp groups, on your own server, managed from a web panel.">
+<meta property="og:image" content="img/overview-desktop.webp">
+<link rel="icon" href="img/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Duniya home"><img src="img/logo.svg" alt="" width="32" height="32">Duniya<span class="led" aria-hidden="true"></span></a>
+    <nav aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="btn gh" href="https://github.com/vikramgorla/whatsapp-agent-duniya">
+      <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.88.87 2.34.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.66 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg>
+      <span>GitHub</span>
+    </a>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ======================= HERO ======================= -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <div class="hero-text">
+      <div class="console" aria-label="Example status">
+        <span><i class="led"></i>WhatsApp <b>2/2</b></span>
+        <span><i class="led"></i>Agents <b>5 live</b></span>
+        <span><i class="led off"></i>Other chats <b>silent</b></span>
+      </div>
+      <h1>A helper in your WhatsApp groups, <em>on your server.</em></h1>
+      <p class="lede">Duniya runs AI agents for your family, school, car-pool or club chats. <strong>You pick which chats they may join, which model they use and which tools they get</strong> — all from a calm web panel, on a free cloud server you own.</p>
+      <div class="hero-side">
+      <div class="cta">
+        <a class="btn primary" href="#install"><span class="led" aria-hidden="true"></span>Install in one click</a>
+        <a class="btn" href="#how">See how it works</a>
+      </div>
+      <p class="fine"><span>Self-hosted</span><span>Runs on a 1&nbsp;GB VM</span><span>No commercial WhatsApp API</span></p>
+      </div>
+    </div>
+    <div class="stage">
+      <svg class="orbit" viewBox="0 0 200 200" aria-hidden="true">
+        <circle class="ring" cx="100" cy="100" r="76"/><circle class="ring" cx="100" cy="100" r="44"/>
+        <circle cx="100" cy="100" r="7" fill="currentColor"/>
+        <circle cx="100" cy="24" r="6" fill="#ff7a3d"/><circle cx="172.3" cy="76.5" r="6" fill="#f2477e"/>
+        <circle cx="144.7" cy="161.5" r="6" fill="#5363ff"/><circle cx="55.3" cy="161.5" r="6" fill="#13b3a1"/><circle cx="27.7" cy="76.5" r="6" fill="#9bd400"/>
+      </svg>
+      <div class="frame">
+        <div class="bar"><i></i><i></i><i></i><small>https://duniya.example.org/#overview</small></div>
+        <img src="img/overview-desktop.webp" width="1440" height="900" alt="The Duniya panel Overview: 'Everything is running', two WhatsApp numbers connected, agents with on/off switches and an update ready to install.">
+      </div>
+      <div class="chatmock" aria-label="Example WhatsApp conversation with an agent">
+        <header><span class="av">M</span><div>Morges ↔ Geneva rides<small>14 members</small></div></header>
+        <div class="msg"><b>Luca</b>@Car pooling who drives tomorrow?<time>07:02</time></div>
+        <div class="msg me"><b>Car pooling</b>Thu 20 Nov: Luca 07:15 from Morges (full), Mia back from Cornavin at 18:10 — 1 seat left.<time>07:02</time></div>
+        <div class="msg"><b>Mia</b>Sophie, see you at 18:10 👍<time>07:04</time></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="figures" role="list">
+    <div role="listitem"><span class="label">Memory</span><b>~180&nbsp;MB</b><span>RAM for the whole app</span></div>
+    <div role="listitem"><span class="label">Server cost</span><b>0&nbsp;€</b><span>on Oracle Cloud Always Free</span></div>
+    <div role="listitem"><span class="label">Model providers</span><b>6+</b><span>Claude, ChatGPT, Copilot, OpenRouter…</span></div>
+    <div role="listitem"><span class="label">Default</span><b>Silent</b><span>until you switch a chat on</span></div>
+  </div>
+</div>
+
+<!-- ======================= HOW ======================= -->
+<section id="how">
+  <div class="wrap">
+    <div class="head">
+      <span class="label"><i class="led"></i>How it works</span>
+      <h2>From zero to a helpful group in four steps.</h2>
+      <p>No terminal needed after the install. Everything below happens in the web panel, on a phone or a laptop.</p>
+    </div>
+    <ol class="steps" style="list-style:none;padding:0;margin:0">
+      <li class="step"><span class="led dot" aria-hidden="true"></span><h3>Install</h3><p>One click on Oracle Cloud's free tier, or one command on any Ubuntu/Debian server. You get a web address and a one-time setup code.</p></li>
+      <li class="step"><span class="led dot" aria-hidden="true"></span><h3>Link a number</h3><p>Scan the QR code with a spare WhatsApp number (<em>Linked devices</em>) or type a pairing code. Add more numbers any time.</p></li>
+      <li class="step"><span class="led dot" aria-hidden="true"></span><h3>Create an agent</h3><p>Start from a template — School friends, Family, Car pooling, Office, Neighbours — or describe it and let the AI helper draft it.</p></li>
+      <li class="step"><span class="led dot" aria-hidden="true"></span><h3>Switch a chat on</h3><p>Every chat is off until you turn it on and pick its agent. Then people write <code>!ride</code> or @mention it.</p></li>
+    </ol>
+    <figure class="tour" style="margin:28px 0 0">
+      <div class="frame">
+        <div class="bar"><i></i><i></i><i></i><small>Overview → Chats → Bots → Models → Usage → Server → Activity</small></div>
+        <video autoplay muted loop playsinline preload="metadata" poster="video/tour-poster.webp" width="1280" height="800" aria-label="Walkthrough of the panel tabs">
+          <source src="video/tour.mp4" type="video/mp4">
+        </video>
+      </div>
+      <figcaption class="caption"><span class="label">A 15-second tour of the panel</span><span>Demo data · numbers like +41 79 000 00 01 are fake</span></figcaption>
+    </figure>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ======================= FEATURES ======================= -->
+<section id="features">
+  <div class="wrap">
+    <div class="head">
+      <span class="label"><i class="led"></i>Features</span>
+      <h2>Everything an organiser needs. Nothing they have to SSH for.</h2>
+    </div>
+
+    <article class="feature">
+      <div>
+        <span class="label">Agents &amp; templates</span>
+        <h3>One server, many agents — each with its own job.</h3>
+        <p>An agent is a set of plain-language instructions plus <strong>triggers, organizers, tools, a model and scheduled posts</strong>. Start from a template and adjust, export it as a file, or import one.</p>
+        <ul class="ticks">
+          <li>Templates: School friends, Family, Car pooling, Office colleagues, Event planning, Neighbours</li>
+          <li>Group memory: follows the conversation, keeps a running summary and notes</li>
+          <li>People &amp; roles: pick organizers from the group's member list (admins pre-selected)</li>
+          <li>Scheduled posts, e.g. “today's rides” every weekday at 06:45</li>
+          <li>A test console that uses the real tools without posting to WhatsApp</li>
+        </ul>
+      </div>
+      <a class="shot m-tall" href="img/bots-desktop.webp"><picture><source media="(max-width: 640px)" srcset="img/bots-mobile.webp" width="786" height="1704"><img src="img/bots-desktop.webp" width="1440" height="900" loading="lazy" alt="Bots page: cards for School friends, Family and Car pooling with model, chats, organizers, tools and 30-day usage."></picture></a>
+    </article>
+
+    <article class="feature flip">
+      <div>
+        <span class="label">Silent by default</span>
+        <h3>Agents only speak where you switched them on.</h3>
+        <p>Every group and every person starts <strong>off</strong>. Messages from an off chat are dropped before they are stored and before any model sees them — the panel only counts how many were ignored.</p>
+        <ul class="ticks">
+          <li>One switch per chat, with the agent, model and log level next to it</li>
+          <li>Groups and 1:1 chats on every number, filterable</li>
+          <li>Per-chat token and cost totals, plus “Messages &amp; memory” for admins</li>
+        </ul>
+      </div>
+      <div class="shot"><video autoplay muted loop playsinline preload="none" poster="video/chat-on-poster.webp" width="1280" height="800" aria-label="Switching the Book club chat on and choosing its agent"><source src="video/chat-on.mp4" type="video/mp4"></video></div>
+    </article>
+
+    <article class="feature">
+      <div>
+        <span class="label">Numbers &amp; direct chats</span>
+        <h3>Several WhatsApp numbers. Groups and one-to-one.</h3>
+        <p>Link a home number and a club number side by side; each shows its own live state. Assign an agent to a <strong>person</strong> so it always answers them, or choose which agent picks up direct messages to each number.</p>
+        <ul class="ticks">
+          <li>QR code or pairing code; reconnect and unlink from the panel</li>
+          <li>Replies always leave from the number the chat belongs to</li>
+          <li>Uses WhatsApp's normal linked-device protocol — no paid connector</li>
+        </ul>
+      </div>
+      <a class="shot m-tall" href="img/chats-desktop.webp"><picture><source media="(max-width: 640px)" srcset="img/chats-mobile.webp" width="786" height="1704"><img src="img/chats-desktop.webp" width="1440" height="900" loading="lazy" alt="Chats page: switches per chat, the agent for each, model and activity-log level; off chats show how many messages were ignored."></picture></a>
+    </article>
+
+    <article class="feature flip">
+      <div>
+        <span class="label">Models</span>
+        <h3>Bring the model you already pay for — or a free one.</h3>
+        <p>Guided steps with links to exactly where a key is made. <strong>Auto</strong> picks a connected model for you; or choose per agent and even per chat.</p>
+        <div class="chips">
+          <span class="pill ok">Sign in with ChatGPT</span><span class="pill ok">GitHub Copilot</span><span class="pill ok">OpenRouter · free models</span>
+          <span class="pill">Anthropic API</span><span class="pill">OpenAI API</span><span class="pill">Ollama / any OpenAI-compatible</span>
+        </div>
+        <ul class="ticks">
+          <li>ChatGPT Plus/Pro plan usage via OpenAI's official sign-in flow</li>
+          <li>Copilot allowance via the official Copilot SDK (downloaded only if you connect it)</li>
+          <li>OpenRouter in one tap with a “Free models only” switch</li>
+        </ul>
+      </div>
+      <a class="shot m-tall" href="img/models-desktop.webp"><picture><source media="(max-width: 640px)" srcset="img/models-mobile.webp" width="786" height="1704"><img src="img/models-desktop.webp" width="1440" height="900" loading="lazy" alt="Models page: OpenRouter, Anthropic and ChatGPT plan connected; OpenAI and GitHub Copilot with step-by-step connect guides."></picture></a>
+    </article>
+
+    <article class="feature">
+      <div>
+        <span class="label">Tools · MCP</span>
+        <h3>Give agents real tools, with rules per role.</h3>
+        <p>Connect any MCP server: <strong>Sign in with OAuth</strong>, your own OAuth app, a token or custom headers — or install a <strong>local</strong> one from npm or GitHub (owner only). Tick which tools participants and organizers may use.</p>
+        <ul class="ticks">
+          <li>Allow lists enforced in code, not in the prompt</li>
+          <li>Changes go through a confirm step: an organizer replies <code>confirm CODE</code></li>
+          <li>Local services run with a scrubbed environment — never the app's secrets</li>
+        </ul>
+      </div>
+      <a class="shot tall" href="img/card-mcp.webp"><img src="img/card-mcp.webp" width="1020" height="2382" loading="lazy" alt="Tool services editor: a local npm package and a remote calendar service with Sign in (OAuth) per role."></a>
+    </article>
+
+    <article class="feature flip">
+      <div>
+        <span class="label"><span class="ai">AI</span> Helper</span>
+        <h3>Describe the agent. Review the draft. Save.</h3>
+        <p>Write what you want in your own words — “a helper for our running club that posts Sunday's run every Saturday” — and get a full proposal with a <strong>before/after for every field</strong>. Works for changes too: “shorter replies”, “make Ravi an organizer”.</p>
+        <p>Nothing is saved until you click apply.</p>
+      </div>
+      <div class="shot"><video autoplay muted loop playsinline preload="none" poster="video/ai-create-poster.webp" width="1280" height="800" aria-label="Creating a Running club agent with the AI helper"><source src="video/ai-create.mp4" type="video/mp4"></video></div>
+    </article>
+
+    <article class="feature">
+      <div>
+        <span class="label">Manage from ChatGPT or Claude</span>
+        <h3>The app is an MCP server too.</h3>
+        <p>Connect Duniya to ChatGPT or Claude and run it by chatting: “which bots are on?”, “turn off the carpool bot”, “what happened in the school group today?”. The assistant acts <strong>as you, with your panel role</strong>.</p>
+        <ul class="ticks">
+          <li>OAuth 2.1 with PKCE and a consent page you approve</li>
+          <li>Risky actions return a preview and need a second confirmation</li>
+          <li>Every call is in the activity log; disconnect any time</li>
+        </ul>
+      </div>
+      <a class="shot" href="img/card-assistants.webp"><img src="img/card-assistants.webp" width="1600" height="757" loading="lazy" alt="Connected AI assistants card: the address to paste, setup steps for ChatGPT and Claude, and two connected assistants."></a>
+    </article>
+
+    <article class="feature flip">
+      <div>
+        <span class="label">WhatsApp powers</span>
+        <h3>More than text: pictures, polls, reactions, groups.</h3>
+        <p>Agents can send images, documents, voice notes, locations and contact cards, react with emoji, run polls and read the votes, and — for organizers — manage the group itself. You choose each action per role.</p>
+        <ul class="ticks">
+          <li>23 actions, from <code>send media</code> to group name, picture and invite link</li>
+          <li>Powerful actions are organizer-only and recorded in Activity</li>
+          <li>Admins get the same group tools in the panel</li>
+        </ul>
+      </div>
+      <a class="shot tall" href="img/card-wa-actions.webp"><img src="img/card-wa-actions.webp" width="1020" height="1390" loading="lazy" alt="WhatsApp actions per role: send media, location, contact, react, with participant and organizer checkboxes."></a>
+    </article>
+
+    <div class="bento" style="margin-top:24px">
+      <div class="tile span-3">
+        <span class="label">Test console</span>
+        <h3>Try an agent before the group does.</h3>
+        <p>Ask as a participant or an organizer. It uses the real tools and saved settings; nothing is posted to WhatsApp.</p>
+        <div class="shot"><video autoplay muted loop playsinline preload="none" poster="video/test-console-poster.webp" width="1280" height="800" aria-label="Asking the School friends agent a question in the test console"><source src="video/test-console.mp4" type="video/mp4"></video></div>
+      </div>
+      <div class="tile span-3">
+        <span class="label">Group tools</span>
+        <h3>Manage the WhatsApp group from the panel.</h3>
+        <p>Members and admins, name and description, who may send or edit, join approval and the invite link — the same functions the agents use.</p>
+        <a class="shot" href="img/card-wa-group.webp"><img src="img/card-wa-group.webp" width="1600" height="901" loading="lazy" alt="WhatsApp group card in the panel: group name, description, admin-only settings and invite link."></a>
+      </div>
+      <div class="tile span-4">
+        <span class="label">Usage &amp; cost</span>
+        <h3>See where the tokens go.</h3>
+        <p>Tokens and estimated cost by agent, chat, provider and model — next to each of them and in one report. Plan-based providers show as “included”; prices are never guessed.</p>
+        <a class="shot m-tall" href="img/usage-desktop.webp"><picture><source media="(max-width: 640px)" srcset="img/usage-mobile.webp" width="786" height="1704"><img src="img/usage-desktop.webp" width="1440" height="900" loading="lazy" alt="Usage page: 2.1M tokens and $3.43 in 30 days, a per-day bar chart and breakdowns by bot, chat and provider."></picture></a>
+      </div>
+      <div class="tile span-2">
+        <span class="label">Logging policy</span>
+        <h3>Log what you need.</h3>
+        <p>Minimal, normal or verbose, by category, with retention — globally or per chat. Errors and changes are always kept.</p>
+        <a class="shot" href="img/card-logging.webp"><img src="img/card-logging.webp" width="726" height="1168" loading="lazy" alt="Activity log settings: Minimal, Normal, Verbose and categories to record."></a>
+      </div>
+      <div class="tile span-3">
+        <span class="label">Server</span>
+        <h3>Health and one-click updates.</h3>
+        <p>CPU, memory, disk and network with six-hour sparklines, logs, OS updates and restart. App updates install from the panel and survive a reload.</p>
+        <a class="shot" href="img/server-desktop.webp"><img src="img/server-desktop.webp" width="1440" height="900" loading="lazy" alt="Server page: CPU, memory, disk, swap and network tiles, services, and OS updates with Install and Restart buttons."></a>
+      </div>
+      <div class="tile span-3">
+        <span class="label">Backups</span>
+        <h3>Encrypted, scheduled, restorable.</h3>
+        <p>To this server, a private GitHub repo the app creates for you, or any S3-compatible bucket. Download a backup and restore it on a fresh server's welcome screen.</p>
+        <a class="shot" href="img/backups-desktop.webp"><img src="img/backups-desktop.webp" width="1440" height="900" loading="lazy" alt="Backups page: daily schedule with a passphrase, local backups, GitHub app and restore options."></a>
+      </div>
+      <div class="tile span-3">
+        <span class="label">Memory &amp; roles</span>
+        <h3>Context, not surveillance.</h3>
+        <p>A running summary and notes per chat; admins can read and search what was stored (each look is logged) and erase it. Organizers are picked from the group's members.</p>
+        <a class="shot" href="img/card-people.webp"><img src="img/card-people.webp" width="1020" height="1120" loading="lazy" alt="People and roles: group members with a Participant / Organizer switch; group admins marked."></a>
+        <a class="shot" style="margin-top:0" href="img/card-memory.webp"><img src="img/card-memory.webp" width="1600" height="547" loading="lazy" alt="Memory of the car-pool chat: running summary, saved ride notes and buttons to rebuild or erase."></a>
+      </div>
+      <div class="tile span-3">
+        <span class="label">Activity</span>
+        <h3>Every message, tool call and token.</h3>
+        <p>A live feed of what agents did and why, filterable per agent. Tap any entry for details.</p>
+        <a class="shot" href="img/activity-desktop.webp"><img src="img/activity-desktop.webp" width="1440" height="900" loading="lazy" alt="Live activity feed with messages in and out, tool calls, model usage and reactions."></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ======================= PHONE ======================= -->
+<section id="phone">
+  <div class="wrap">
+    <div class="head">
+      <span class="label"><i class="led"></i>Works on a phone</span>
+      <h2>Run it between two errands.</h2>
+      <p>The panel is built for an iPad or a phone first: big touch targets, one clear status per thing, light and dark mode.</p>
+    </div>
+    <div class="phones">
+      <figure><div class="phone"><img src="img/overview-mobile.webp" width="786" height="1704" loading="lazy" alt="Overview on a phone"></div><figcaption class="label">Overview</figcaption></figure>
+      <figure><div class="phone"><img src="img/chats-mobile.webp" width="786" height="1704" loading="lazy" alt="Chats on a phone"></div><figcaption class="label">Chats</figcaption></figure>
+      <figure><div class="phone"><img src="img/bots-mobile.webp" width="786" height="1704" loading="lazy" alt="Bots on a phone"></div><figcaption class="label">Bots</figcaption></figure>
+      <figure><div class="phone"><img src="img/usage-mobile.webp" width="786" height="1704" loading="lazy" alt="Usage on a phone"></div><figcaption class="label">Usage</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ======================= INSTALL ======================= -->
+<section id="install">
+  <div class="wrap">
+    <div class="head">
+      <span class="label"><i class="led"></i>Install</span>
+      <h2>Your own server in about ten minutes.</h2>
+      <p>Use a dedicated WhatsApp number (a cheap prepaid SIM is fine). The installer prints the panel address and a one-time setup code for your owner account.</p>
+    </div>
+    <div class="install">
+      <div class="panel oci">
+        <span class="label">Option A · one click</span>
+        <h3>Oracle Cloud Always Free</h3>
+        <p>Creates a free VM that installs itself, with HTTPS at <code>https://&lt;ip&gt;.sslip.io</code> — no domain needed.</p>
+        <a class="btn primary" href="https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip"><span class="led" aria-hidden="true"></span>Deploy to Oracle Cloud</a>
+        <ol>
+          <li>Sign in to Oracle Cloud and click the button.</li>
+          <li>Pick your <b>home region</b>; keep the free shape.</li>
+          <li>Click <b>Apply</b>. Open <code>http://&lt;server-ip&gt;/</code> to watch the install live.</li>
+          <li>Open the panel address and enter the setup code.</li>
+        </ol>
+        <p class="also"><a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/deploy/oci-free-tier.md">Full Oracle Cloud walkthrough →</a></p>
+      </div>
+      <div class="panel">
+        <span class="label">Option B · one command</span>
+        <h3>Any Ubuntu / Debian server</h3>
+        <p>x86_64 or arm64, 1 GB RAM is enough. Run it again any time to update or change how the panel is reached.</p>
+        <div class="term"><button class="copy" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash">Copy</button><pre><span class="p">$ </span>curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash</pre></div>
+        <table class="opts">
+          <tr><td><code>--ip-https</code></td><td>https://&lt;ip&gt;.sslip.io with an automatic certificate</td></tr>
+          <tr><td><code>--domain NAME</code></td><td>your own domain, automatic certificate</td></tr>
+          <tr><td><code>--cloudflare-token T</code></td><td>Cloudflare Tunnel, no open ports</td></tr>
+          <tr><td><code>--local-only</code></td><td>only via an SSH tunnel</td></tr>
+        </table>
+        <p class="also"><a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/deploy/docker.md">Docker Compose →</a><a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/deploy/cloudflare-tunnel.md">Cloudflare Tunnel →</a><a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/configuration.md">Configuration →</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ======================= FAQ ======================= -->
+<section id="faq">
+  <div class="wrap faq">
+    <div>
+      <div class="head" style="margin-bottom:0">
+        <span class="label"><i class="led"></i>FAQ &amp; security</span>
+        <h2>Straight answers.</h2>
+      </div>
+      <ul class="secure">
+        <li><span class="led" aria-hidden="true"></span><span><b>Your server, your data.</b> SQLite on your VM; secrets and backups encrypted.</span></li>
+        <li><span class="led" aria-hidden="true"></span><span><b>Silent by default.</b> Off chats never reach storage or a model.</span></li>
+        <li><span class="led" aria-hidden="true"></span><span><b>Roles everywhere.</b> Owner, admin, viewer in the panel; organizer and participant in chats.</span></li>
+        <li><span class="led" aria-hidden="true"></span><span><b>Confirm before change.</b> Tool changes wait for <code>confirm CODE</code>.</span></li>
+      </ul>
+    </div>
+    <div class="qa">
+      <details open><summary>Is this the official WhatsApp Business API?</summary><p>No. Duniya links to a normal WhatsApp number as a linked device (like WhatsApp Web), using the open-source Baileys library. That keeps it free and simple, but unofficial clients can be banned — so use a dedicated number. Agents only reply when addressed and are rate-limited to keep the risk low.</p></details>
+      <details><summary>What does it cost?</summary><p>The software is free. The server can be free on Oracle Cloud's Always Free tier. Models: use OpenRouter's free models, your ChatGPT Plus/Pro plan or Copilot allowance, or pay per use with an API key. The Usage tab shows tokens and cost.</p></details>
+      <details><summary>Can I use my Claude Pro/Max subscription?</summary><p>No — Anthropic's terms don't allow third-party apps to use Claude subscriptions, so Claude needs an API key. ChatGPT plans work through OpenAI's official open-source sign-in flow.</p></details>
+      <details><summary>Who can see the messages?</summary><p>Only chats you switched on are stored, and only for memory (a running summary, notes and recent messages, with retention limits). Admins and owners can read what was stored for a chat; every look is written to the activity log. Erase a chat's memory with one click. Tell your groups that the assistant keeps context.</p></details>
+      <details><summary>Do I need to know Linux?</summary><p>Only for the one install command — or not at all with the Oracle Cloud button. After that, updates, OS packages, logs, restarts and backups are buttons in the panel.</p></details>
+      <details><summary>Can several people manage it?</summary><p>Yes. Invite people by email to sign in with Google, or add password users, as owner, admin or viewer. You can also manage the app from ChatGPT or Claude, with the same role rules.</p></details>
+      <details><summary>How do I report a security issue?</summary><p>Privately, through GitHub's “Report a vulnerability” on the repository — see <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/SECURITY.md">SECURITY.md</a>.</p></details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="brand" href="#top"><img src="img/logo.svg" alt="" width="32" height="32">Duniya</a>
+      <small><i>Duniya</i> means “the world” — a world of people, each a different colour.</small>
+    </div>
+    <nav aria-label="Project links">
+      <a href="https://github.com/vikramgorla/whatsapp-agent-duniya">GitHub</a>
+      <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/releases">Releases</a>
+      <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/configuration.md">Configuration</a>
+      <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/CONTRIBUTING.md">Contributing</a>
+      <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/SECURITY.md">Security</a>
+      <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/issues">Issues</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  // Copy buttons (the only script on the page).
+  document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied'; } catch { b.textContent = 'Select & copy'; }
+    setTimeout(() => { b.textContent = 'Copy'; }, 1600);
+  }));
+</script>
+</body>
+</html>
