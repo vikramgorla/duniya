@@ -160,10 +160,11 @@ a.shot { display: block; }
 
 /* install */
 .install { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.panel.manage { margin-top: 16px; }
 .panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; box-shadow: var(--shadow); min-width: 0; }
 .panel h3 { font-size: 24px; margin: 12px 0 10px; }
 .panel p, .panel li { color: var(--muted); font-size: 15.5px; }
-.panel ol { padding-left: 20px; margin: 14px 0 0; }
+.panel ol, .panel ul { padding-left: 20px; margin: 14px 0 0; }
 .panel li { margin: 5px 0; }
 .panel li b { color: var(--ink); }
 .oci img { height: 32px; width: auto; margin: 18px 0 4px; }

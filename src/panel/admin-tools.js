@@ -349,7 +349,7 @@ export const TOOLS = [
     run: (a, x) => x.call('POST', '/api/updates/apply') },
 
   // ---------- server ----------
-  { name: 'get_server_metrics', readOnly: true, calls: [['GET', '/api/system']], description: 'Server CPU, memory, disk, load and uptime right now.', input: {},
+  { name: 'get_server_metrics', readOnly: true, calls: [['GET', '/api/system']], description: 'Server CPU, memory, disk, load and uptime right now, and where it is hosted (hosting.provider: oci, gcp, docker, server or unknown) so you can point to the matching hosting guide in docs/deploy/.', input: {},
     run: (a, x) => x.call('GET', '/api/system') },
   { name: 'list_os_updates', readOnly: true, calls: [['GET', '/api/system/os-updates']], description: 'Operating-system packages that can be updated.',
     input: { refresh: bool('Check again now (slower)') },

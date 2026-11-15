@@ -60,14 +60,26 @@
 [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip)
 
 Pick your home region, click **Apply**, and open `http://<server-ip>/` to follow the install.
-[Walkthrough](docs/deploy/oci-free-tier.md).
+[Walkthrough, updating the stack, recreating and removing it](docs/deploy/oci-free-tier.md).
 
 **Google Cloud (free e2-micro)**
 
 [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fwhatsapp-agent-duniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md)
 
 Follow the tutorial on the right. Public (`https://<ip>.sslip.io`, later your domain), or no open ports with
-`--exposure cloudflare` or `--exposure tailscale`. [Details and costs](docs/install.md#google-cloud-always-free-e2-micro).
+`--exposure cloudflare` or `--exposure tailscale`. [Details and costs](docs/install.md#google-cloud-always-free-e2-micro) ·
+[updating, recreating and removing it](docs/deploy/google-cloud.md).
+
+**Where is my panel? (find the IP / URL)**
+
+- **Oracle Cloud**: when the job says *Succeeded*, **reload the page** and open **Application information** (or
+  **Outputs**): **Watch the install** / **Open the panel**, with copy buttons for the address and IP. Also at the end
+  of the job **Logs** (`panel_url = "https://…sslip.io"`) or under **Compute → Instances → duniya → Public IP address**.
+  Sign in as `admin` with the owner password from the form.
+- **Google Cloud**: the end of the Cloud Shell output (`Ready: https://…sslip.io` and the setup code), or **Compute
+  Engine → VM instances → External IP**.
+- `http://<server-ip>/` shows live install progress and then opens the panel at `https://<ip-with-dashes>.sslip.io`.
+  Step by step, also for your own server and Docker: [Where is my panel?](docs/install.md#where-is-my-panel-find-the-ip--url)
 
 **Any Ubuntu/Debian server (x86_64 or arm64)**
 
@@ -78,6 +90,11 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/m
 The installer prints the panel address and a one-time setup code; the first-run checklist takes it from there (link a
 dedicated WhatsApp number, connect a model, create an agent, switch a chat on). Options (`--ip-https`, `--domain`,
 Cloudflare Tunnel, Tailscale, Docker): [Install](docs/install.md). Coming from 1.x: [Upgrading](docs/upgrading.md).
+
+**Already running?** Update, recreate, remove, and find the IP, logs and console menus for your host:
+[Managing your server](docs/README.md) ([Oracle Cloud](docs/deploy/oci-free-tier.md) ·
+[Google Cloud](docs/deploy/google-cloud.md) · [own server](docs/install.md#managing-your-server) ·
+[Docker](docs/deploy/docker.md)).
 
 ## Learn more
 

@@ -12,6 +12,10 @@ update. Two things that may need a step on servers installed with an early 2.x:
 - **Photos & voice** need `ffmpeg` and `bzip2` for voice replies and on-server speech; the installer (re-run) and the
   Docker image include them.
 
+Step by step per host (including updating the Oracle stack itself and recreating a server):
+[Oracle Cloud](deploy/oci-free-tier.md#update-the-app) · [Google Cloud](deploy/google-cloud.md#update-the-app) ·
+[own server](install.md#managing-your-server) · [Docker](deploy/docker.md#update-the-app).
+
 Versions follow semver: minor releases add features, patch releases fix things, a major release may need a reinstall.
 
 ## From 1.x to 2.0
