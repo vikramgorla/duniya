@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Duniya · WhatsApp agents</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%27http%3A//www.w3.org/2000/svg%27%20viewBox=%270%200%2064%2064%27%3E%3Cpath%20d=%27M24.6%2052.6A23%2023%200%201%200%2012.6%2042.5L6.6%2058.4Z%27%20fill=%27%23fff%27%20stroke=%27%231ea446%27%20stroke-width=%276%27%20stroke-linejoin=%27round%27/%3E%3Cg%20fill=%27%23101216%27%3E%3Crect%20x=%2713%27%20y=%2728%27%20width=%2738%27%20height=%2713%27%20rx=%274%27/%3E%3Crect%20x=%2718%27%20y=%2720%27%20width=%2729%27%20height=%2728%27%20rx=%2712%27/%3E%3Cpath%20d=%27M32.5%2022v-8%27%20stroke=%27%23101216%27%20stroke-width=%274%27%20stroke-linecap=%27round%27/%3E%3C/g%3E%3Cpath%20d=%27M23.6%2037.4a3.6%203.6%200%200%201%207.2%200M34.2%2037.4a3.6%203.6%200%200%201%207.2%200%27%20fill=%27none%27%20stroke=%27%23c6f432%27%20stroke-width=%273.4%27%20stroke-linecap=%27round%27/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%27http%3A//www.w3.org/2000/svg%27%20viewBox=%270%200%2064%2064%27%3E%3Cpath%20d=%27M23%205H41A17%2017%200%200%201%2058%2022V44L59.5%2059.5L44%2055H23A17%2017%200%200%201%206%2038V22A17%2017%200%200%201%2023%205Z%27%20fill=%27%234d9b00%27%20stroke=%27%234d9b00%27%20stroke-width=%274%27%20stroke-linejoin=%27round%27/%3E%3Cg%20fill=%27%23101216%27%3E%3Crect%20x=%2710.5%27%20y=%2728%27%20width=%2743%27%20height=%2714%27%20rx=%275%27/%3E%3Cpath%20d=%27M32%2021V11%27%20stroke=%27%23101216%27%20stroke-width=%274%27%20stroke-linecap=%27round%27/%3E%3C/g%3E%3Crect%20x=%2716.5%27%20y=%2720%27%20width=%2731%27%20height=%2730%27%20rx=%2714%27%20fill=%27%23fff%27/%3E%3Crect%20x=%2719.5%27%20y=%2728%27%20width=%2725%27%20height=%2714%27%20rx=%277%27%20fill=%27%23101216%27/%3E%3Cpath%20d=%27M22.6%2037.8a3.6%203.6%200%200%201%207.2%200M34.2%2037.8a3.6%203.6%200%200%201%207.2%200%27%20fill=%27none%27%20stroke=%27%23c6f432%27%20stroke-width=%273.2%27%20stroke-linecap=%27round%27/%3E%3C/svg%3E">
 <meta name="theme-color" content="#f2f1ec">
 <style>
   /* Duniya design language — see DESIGN.md. Base tokens; the Aurora layer at the end overrides them. */
@@ -424,19 +424,19 @@ function icon(name) {
   p.setAttribute('stroke-width', '1.7'); p.setAttribute('stroke-linecap', 'round'); p.setAttribute('stroke-linejoin', 'round');
   svg.append(p); return svg;
 }
-/** Brand mark: a friendly robot in a chat bubble (green bubble, white fill, ink robot, lime eyes). Fixed colours in
- * both themes: the white fill keeps it readable on dark. Same geometry as docs/site/img/logo.svg (see DESIGN.md). */
+/** Brand mark: a friendly robot in a solid green chat bubble (rounded square, tail at lower right). Fixed colours in
+ * both themes. Same geometry as docs/site/img/logo.svg; see DESIGN.md (Mark, Trademark). */
 function logo() {
   const ns = 'http://www.w3.org/2000/svg'; const el = (t, a) => { const e = document.createElementNS(ns, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); return e; };
-  const ink = '#101216';
+  const ink = '#101216'; const green = '#4d9b00';
   const svg = el('svg', { viewBox: '0 0 64 64', class: 'logo', 'aria-hidden': 'true' });
   svg.append(
-    el('path', { d: 'M24.6 52.6A23 23 0 1 0 12.6 42.5L7.6 57.4Z', fill: '#fff', stroke: '#1ea446', 'stroke-width': 4, 'stroke-linejoin': 'round' }),
-    el('rect', { x: 14.5, y: 29, width: 8, height: 12, rx: 3.6, fill: ink }), el('rect', { x: 42.5, y: 29, width: 8, height: 12, rx: 3.6, fill: ink }),
-    el('circle', { cx: 32.5, cy: 15, r: 2.5, fill: ink }), el('path', { d: 'M32.5 17v6', stroke: ink, 'stroke-width': 2.4, 'stroke-linecap': 'round' }),
-    el('rect', { x: 20, y: 23, width: 25, height: 24, rx: 11.5, fill: '#fff', stroke: ink, 'stroke-width': 2.4 }),
-    el('rect', { x: 22.5, y: 30, width: 20, height: 11, rx: 5.5, fill: ink }),
-    el('path', { d: 'M25 37a2.6 2.6 0 0 1 5.2 0M34.8 37a2.6 2.6 0 0 1 5.2 0', fill: 'none', stroke: '#c6f432', 'stroke-width': 1.8, 'stroke-linecap': 'round' }));
+    el('path', { d: 'M23 5H41A17 17 0 0 1 58 22V44L59.5 59.5L44 55H23A17 17 0 0 1 6 38V22A17 17 0 0 1 23 5Z', fill: green, stroke: green, 'stroke-width': 4, 'stroke-linejoin': 'round' }),
+    el('rect', { x: 11.8, y: 28.3, width: 9, height: 13.4, rx: 4, fill: ink }), el('rect', { x: 43.2, y: 28.3, width: 9, height: 13.4, rx: 4, fill: ink }),
+    el('circle', { cx: 32, cy: 12.6, r: 2.8, fill: ink }), el('path', { d: 'M32 14.8v6.7', stroke: ink, 'stroke-width': 2.7, 'stroke-linecap': 'round' }),
+    el('rect', { x: 18, y: 21.5, width: 28, height: 27, rx: 13, fill: '#fff', stroke: ink, 'stroke-width': 2.7 }),
+    el('rect', { x: 20.8, y: 29.4, width: 22.4, height: 12.3, rx: 6.15, fill: ink }),
+    el('path', { d: 'M23.6 37.2a2.9 2.9 0 0 1 5.8 0M34.6 37.2a2.9 2.9 0 0 1 5.8 0', fill: 'none', stroke: '#c6f432', 'stroke-width': 2, 'stroke-linecap': 'round' }));
   return svg;
 }
 function toast(msg) {

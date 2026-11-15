@@ -29,24 +29,29 @@ add or change UI, check it against the principles and the checklist at the end.
 Futuristic but human. Inspired by the friendliness of modern AI assistants, **not** a copy of any of them, and
 deliberately not the generic "AI app" look (no purple-blue gradients everywhere, no glass on every surface, no ✨).
 
-- **Mark:** a friendly robot in a chat bubble — an assistant that lives in your chats. A round speech bubble
-  (thick green `#1ea446` outline, white fill, tail at lower left) holds an ink (`#101216`) robot head: rounded helmet
-  with ear pads, a short antenna with a ball, a dark visor with two smiling lime (`--signal #c6f432`) arc eyes.
+- **Mark:** a friendly robot in a chat bubble — an assistant that lives in your chats. A solid green (`#4d9b00`,
+  "leaf", a yellow-green between the bubble greens of chat apps and our lime) rounded-square speech bubble with the
+  tail at the **lower right** holds a dominant ink (`#101216`) robot head: white helmet with an ink rim, ear pads, a
+  short antenna with a ball, an ink visor with two smiling lime (`--signal #c6f432`) arc eyes.
   - **Files:** master `docs/site/img/logo.svg` (64-unit grid, transparent); small variant
-    `docs/site/img/logo-small.svg` for 16–32 px (thicker bubble, solid head without the helmet ring, bigger eyes).
-    The same geometry is in `logo()` (panel), `Logo.tsx` (mobile), the consent pages (`admin-mcp.js`) and the
-    install progress page (`infra/oci/bootstrap.sh`). Mobile PNGs in `mobile/assets` are rendered from the master.
-  - **Colours are fixed** in light and dark mode: the white fill keeps the ink robot readable on dark grounds. Lime
-    eyes on the ink visor read on both.
+    `docs/site/img/logo-small.svg` for 16–32 px (no helmet rim, no antenna ball, bigger visor and eyes). The same
+    geometry is in `logo()` (panel), `Logo.tsx` (mobile), the consent pages (`admin-mcp.js`) and the install progress
+    page (`infra/oci/bootstrap.sh`). Mobile PNGs in `mobile/assets` are rendered from the master.
+  - **Colours are fixed** in light and dark mode; the solid bubble and white helmet read on both grounds.
   - **Sizes:** small variant at 16–32 px (favicons); master from 30 px up (header 30–32 px, sign-in 76 px, consent
-    page 40 px). App icons: mark at 80 % of the canvas on porcelain (iOS), 60 % on the adaptive-icon foreground.
-  - **Clear space:** at least the bubble outline width × 2 (⅛ of the mark) on every side; never crop the tail.
-  - **Don't:** recolour the bubble or the robot, swap the eyes for another colour, add gradients, shadows or
-    outlines, stretch or rotate it, put it in another shape, place it on busy photos, or redraw it from the old
-    people-circle mark. Green bubble + chat shape is close to WhatsApp's mark: never pair it with WhatsApp's name or
-    logo as if official (Duniya is not affiliated with WhatsApp or Meta).
+    page 40 px). App icons: mark at 80 % of the canvas on porcelain (iOS); 50 % on the adaptive-icon foreground so the
+    tail stays inside Android's safe zone.
+  - **Clear space:** at least ⅛ of the mark on every side; never crop the tail.
+  - **Don't:** recolour the bubble or the robot, add gradients, shadows or outlines, stretch or rotate it, put it in
+    another container shape, or place it on busy photos.
   - Illustrations (site hero orbit, chat mock avatars) may still use the five "people" colours: saffron `#ff7a3d`,
     rose `#f2477e`, teal `#13b3a1`, indigo `#5363ff`, lime `#9bd400`.
+- **Trademark:** Duniya works with WhatsApp, so the mark may *feel* like a chat app, but it must never be confusable
+  with WhatsApp's logo (a green circular speech bubble, tail at lower left, white phone handset) — app stores reject
+  look-alikes. Rules: the robot head is the dominant element; the bubble is a rounded square with the tail at the
+  lower right (never a circle with a lower-left tail); the green stays `#4d9b00`, never WhatsApp's `#25D366` /
+  `#128C7E` / `#075E54` family; no phone handset, no WhatsApp name or wordmark in the icon; the app name is "Duniya"
+  (never "WhatsApp …"). README and site footer say Duniya is not affiliated with WhatsApp or Meta.
 - **Ground:** porcelain `#f2f1ec` with a faint 22 px dot grid (dark: near-black `#0b0c0f`); solid white cards
   (dark `#121419`), hairline borders, a soft shadow; 16 px card radius, 10 px controls.
 - **Ink + one signal:** primary actions and the active tab are **ink** (`#101216`); the single signal colour is
