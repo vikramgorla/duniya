@@ -42,15 +42,20 @@
       "data": "not-migrated",
       "docs": "docs/upgrading.md#from-1x-to-20"
     },
+    "2.9.2": {
+      "breaking": false,
+      "title": "Install: clearer web server start",
+      "summary": "The installer waits for port 80 to be free before starting the web server, retries once, and shows the web server's own error if it still fails."
+    },
     "2.9.1": {
       "breaking": false,
       "title": "Clearer first install",
       "summary": "The install progress page stays live until the final web server is ready and comes back with the error if the install fails; ffmpeg installs after the panel is up; one-click buttons open in a new tab."
     },
-    "2.9.2": {
+    "2.9.3": {
       "breaking": false,
-      "title": "Install: clearer web server start",
-      "summary": "The installer waits for port 80 to be free before starting the web server, retries once, and shows the web server's own error if it still fails."
+      "title": "Visual docs",
+      "summary": "README and guides rewritten as short, visual pages with diagrams, screenshots and clear next steps; a link check keeps them connected."
     }
   }
 }

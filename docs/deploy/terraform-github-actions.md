@@ -1,12 +1,24 @@
-# Advanced example: Terraform + GitHub Actions on OCI
+# Advanced: Terraform + GitHub Actions on OCI
 
-The same Terraform as the Deploy button (`infra/oci/`), driven from a GitHub repository with remote state in OCI
-Object Storage. Useful if you fork the project and want infrastructure changes reviewed in pull requests.
+**The Deploy button's Terraform (`infra/oci/`), run from your fork with infrastructure changes reviewed in pull
+requests.**
+
+**Do it:** **Actions → Infrastructure (OCI, advanced example) → Run workflow** → `plan`, then `apply`.
+
+**In 30 seconds**
+- OCI API key as repository secrets; state in a private, versioned bucket created on first run.
+- Pushes to `infra/oci/**` run `plan`; `apply` is manual; `destroy` removes everything.
+
+```mermaid
+flowchart LR
+  K["OCI API key →<br/>repo secrets"] --> P["Run workflow: plan"] --> A["Run workflow: apply"]
+  PR["Push to infra/oci/**"] --> P
+```
 
 ## 1. OCI API key → repository secrets
 
 OCI console → profile → **My profile → API keys → Add API key → Generate key pair**, download the private key, then
-add repository secrets (Settings → Secrets and variables → Actions):
+add secrets under **Settings → Secrets and variables → Actions**:
 
 | Secret | Value |
 |---|---|
@@ -19,8 +31,10 @@ add repository secrets (Settings → Secrets and variables → Actions):
 Variables (optional): `EXPOSURE` (`ip` default, `domain`, `tunnel`, `local`), `DOMAIN`, `SHAPE`, `UPDATE_MODE`,
 `SSH_INGRESS_CIDR`, `STATE_BUCKET`.
 
-## 2. Run
+## 2. Run `plan`, read it, then `apply`
 
-**Actions → Infrastructure (OCI, advanced example) → Run workflow**: `plan`, then `apply`. The workflow creates a
-private, versioned state bucket on first run. Pushes that change `infra/oci/**` run `plan` automatically; `apply` is
-always manual. `destroy` removes everything.
+> [!WARNING]
+> `destroy` removes the VM and everything on it. Take a backup in the panel first.
+
+---
+**Next:** [Oracle Cloud](oci-free-tier.md) · [Docs index](../README.md)

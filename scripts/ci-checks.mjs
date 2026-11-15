@@ -2,12 +2,15 @@
 //  1. Version consistency (fails): package.json, package-lock.json and infra/oci/schema.yaml carry the same version.
 //  2. Breaking releases (045): a major bump over the latest release tag fails without a breaking releases.json entry
 //     (with actions); a version without an entry warns. Needs tags (checkout with fetch-depth: 0).
-//  3. Docs freshness (warns only): the panel UI changed but no docs/ or README.md file did. Needs the base branch
+//  3. Doc links (fails, #68): relative links, images and #anchors in README.md and docs/**/*.md exist
+//     (scripts/check-doc-links.mjs), also GitHub links into docs/ from the website, the panel and releases.json.
+//  4. Docs freshness (warns only): the panel UI changed but no docs/ or README.md file did. Needs the base branch
 //     (GITHUB_BASE_REF on pull requests, or an argument); skipped when it can't be compared.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { normalizeReleases, releaseCheck } from '../src/core/releases.js';
+import { checkDocLinks } from './check-doc-links.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const read = (f) => readFileSync(resolve(root, f), 'utf8');
@@ -42,7 +45,14 @@ if (off.length) {
   }
 }
 
-// 3. docs freshness hint
+// 3. doc links
+{
+  const { problems, count } = checkDocLinks();
+  for (const p of problems) { failed = true; console.log(`::error::Broken doc link: ${p}`); }
+  if (!problems.length) console.log(`Doc links: ok (${count} checked)`);
+}
+
+// 4. docs freshness hint
 const base = process.argv[2] || process.env.GITHUB_BASE_REF;
 if (base) {
   let files = null;

@@ -1,13 +1,21 @@
 # Mobile app (preview)
 
-A native iOS and Android app (React Native with Expo) for owners and admins: status, the **Ask** box (owner
-assistant), agents, chats, activity, usage, server updates and waiting confirmations. While in preview it runs in
-**Expo Go**: open **Settings → Mobile app** in the panel and follow the three steps (install Expo Go, open the app,
-scan the connect QR code). The app signs in with your panel account through the panel's own OAuth sign-in and can do
-what your account can do. Sign a phone out from the app or from the same card.
+**Status, the Ask box and waiting confirmations in a native iOS and Android app.**
 
-Developer notes and store-build instructions: [`mobile/README.md`](../mobile/README.md). The server never installs
-`mobile/`.
+**Do it:** panel → **Settings → Mobile app** → follow the three steps.
+
+**In 30 seconds**
+- Owners and admins: status, **Ask**, agents, chats, activity, usage, updates, confirmations.
+- Preview: runs in **Expo Go**; signs in with your panel account (the panel's OAuth).
+
+1. Install **Expo Go**.
+2. Open the app.
+3. Scan the connect QR code from **Settings → Mobile app**.
+
+> [!NOTE]
+> Sign a phone out from the app or from the same card. The server never installs `mobile/`.
+
+Developer notes and store builds: [`mobile/README.md`](../mobile/README.md).
 
 ---
-[Docs index](README.md)
+**Next:** [Owner assistant](owner-assistant.md) · [Docs index](README.md)
