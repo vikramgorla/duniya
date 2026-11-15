@@ -12,3 +12,11 @@
   demo data
 - [X] T010 Tests `test/fallback.test.js` (failing fake providers in `test/harness.js`); existing tests adjusted where a
   failure now falls back; docs; version 2.5.0
+
+## #65 — per-chat chain editor (v2.11.0)
+
+- [X] T011 Panel Chats: `chatFallbackLine()` under the model, **Fallback…** opens `chatFallbackEditor()` (shared
+  `fallbackPicker` with an `inheritLabel`), saved through `PUT /api/chats/:chat/prefs`
+- [X] T012 Admin MCP `set_chat_settings`: partial fallback change keeps the other half (reads `GET /api/chats`)
+- [X] T013 Tests `test/chat-fallback-editor.test.js`; responsive state `chats-fallback`
+- [X] T014 Docs `docs/models.md`, `docs/admin-mcp.md`; screenshots `chats-*`, `card-fallback` retaken; version 2.11.0

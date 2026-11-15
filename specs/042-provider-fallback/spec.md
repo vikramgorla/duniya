@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-15
 
-**Status**: Implemented (v2.5.0)
+**Status**: Implemented (v2.5.0); per-chat chain editor in the panel (#65, v2.11.0)
 
 **Input**: Owner question (#43): "Does the app fall back to another provider when one fails or runs out of quota? Can
 people add more than one account of the same provider to pool quota?"
@@ -59,6 +59,23 @@ specific setting wins (chat > agent > global).
 - Background summaries and the AI helper use the same fallback.
 - Pauses live in memory: a restart probes every account again.
 
+### User Story 5 - Edit a chat's fallback chain in the panel (Priority: P3, #65, v2.11.0)
+
+An admin wants the family group to fall back to a cheap model first, then any other provider, without using the API
+or an AI assistant.
+
+**Acceptance Scenarios**:
+
+1. **Given** the Chats page, **Then** every chat shows one line under its model ("If unavailable: as the agent",
+   "If unavailable: switch model: A → B", "If unavailable: don't switch") and a **Fallback…** button.
+2. **When** the admin presses it, **Then** a card opens below the list (as the spending-cap editor) with the same
+   picker as the agent editor: *As the agent* / *Switch to another model* / *Don't switch*, *Own list of models for
+   this chat* and the ordered chain editor (add, ↑, ✕, at most 10). **Save** stores `{ mode, chain }` with the chat
+   settings; the line updates; Activity records it.
+3. Viewers see the line and the card read-only (no Save). The card fits a 375 px phone.
+4. The admin MCP tool `set_chat_settings` stores the same shape; giving only `fallback_mode` or only
+   `fallback_chain` keeps the other half (as the panel, which always sends both).
+
 ## Requirements *(mandatory)*
 
 - **FR-001** Accounts: stable ids; the first account of a type keeps the type id (`anthropic`, `openai`, `chatgpt`,
@@ -78,6 +95,8 @@ specific setting wins (chat > agent > global).
   `set_account_strategy`, `retry_model_account`; `set_chat_settings` takes fallback.
 - **FR-008** Panel: Models (health, accounts, strategy, terms note, "When a model fails"), agent page, Chats, Usage,
   test console; DESIGN.md phone rules.
+- **FR-009** (#65) Chats: summary line + **Fallback…** card reusing `fallbackPicker()` / `chainEditor()` (inherit label
+  "As the agent"); `set_chat_settings` merges a partial fallback change with the stored one.
 
 ## Success Criteria
 
@@ -85,3 +104,4 @@ specific setting wins (chat > agent > global).
 - No duplicate replies or tool runs because of a fallback.
 - `test/fallback.test.js` covers chain order, no retry on 400, model-not-found, breaker cooldown/doubling/recovery,
   reconnect, no double tool execution, failover/spread across accounts, overrides, alerts.
+- `test/chat-fallback-editor.test.js` covers the per-chat chain round trip, validation, roles and the admin MCP merge.

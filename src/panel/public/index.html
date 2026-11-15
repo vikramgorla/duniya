@@ -106,6 +106,7 @@
   .hide { display: none !important; }
   .chainlist { margin: 6px 0 8px; padding-left: 22px; } .chainlist li { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
   .chainlist .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; } .acct { margin-top: 8px; } .acct .row { flex-wrap: wrap; }
+  .chainlist .btn { min-width: 40px; justify-content: center; }
   .code { font-family: var(--mono); font-size: 22px; letter-spacing: 3px; font-weight: 600; }
   .readonly .mut { display: none !important; }
   .meter { height: 8px; border-radius: 999px; background: var(--bg-2); overflow: hidden; margin: 8px 0 4px; }
@@ -1279,11 +1280,11 @@ function chainEditor(models, initial, { emptyText = 'Any other connected provide
   return { el: box, value: () => [...chain] };
 }
 /** Agent / chat override: inherit | on | off, plus an own chain. Returns { el, value() }. */
-function fallbackPicker(models, override, { what = 'agent' } = {}) {
+function fallbackPicker(models, override, { what = 'agent', inheritLabel = '' } = {}) {
   const o = override || { mode: 'inherit', chain: [] };
   const fb = models.fallback || { enabled: true, chain: [] };
-  const mode = h('select', { disabled: !can('admin') },
-    h('option', { value: 'inherit', selected: o.mode === 'inherit' }, `Use the Models setting (${fb.enabled ? 'switch' : 'don’t switch'})`),
+  const mode = h('select', { disabled: !can('admin'), 'aria-label': 'When the model is unavailable' },
+    h('option', { value: 'inherit', selected: o.mode === 'inherit' }, inheritLabel || `Use the Models setting (${fb.enabled ? 'switch' : 'don’t switch'})`),
     h('option', { value: 'on', selected: o.mode === 'on' }, 'Switch to another model'),
     h('option', { value: 'off', selected: o.mode === 'off' }, 'Don’t switch: stay on the chosen model'));
   const own = h('input', { type: 'checkbox', checked: !!o.chain?.length, disabled: !can('admin') });
@@ -1294,6 +1295,23 @@ function fallbackPicker(models, override, { what = 'agent' } = {}) {
   const sync = () => ownRow.classList.toggle('hide', mode.value === 'off');
   mode.onchange = sync; sync();
   return { el: h('div', {}, mode, ownRow, chainBox), value: () => ({ mode: mode.value, chain: own.checked && mode.value !== 'off' ? chain.value() : [] }) };
+}
+/** One line for a chat's fallback override (#65): "If unavailable: switch to A → B". */
+function chatFallbackLine(fb, models) {
+  const o = fb || { mode: 'inherit', chain: [] };
+  if (o.mode === 'off') return 'If unavailable: don’t switch';
+  const chain = o.chain?.length ? `: ${o.chain.map((r) => modelLabel(r, models)).join(' → ')}` : '';
+  return o.mode === 'on' ? `If unavailable: switch model${chain}` : `If unavailable: as the agent${chain ? ` (own list${chain})` : ''}`;
+}
+/** Chats → model fallback for one chat (#65): the same picker as the agent editor; saved with the chat's settings. */
+function chatFallbackEditor(c, models, { onSaved, onClose }) {
+  const pick = fallbackPicker(models, c.fallback, { what: 'chat', inheritLabel: 'As the agent' });
+  return h('div', { class: 'card', id: 'chat-fallback', style: 'margin-top:14px' }, h('h2', {}, `Model fallback · ${c.name || c.id}`),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'When this chat’s model hits a limit, an outage or an expired sign-in, Duniya can answer with another model. Refused requests never switch, and tools are never run twice.'),
+    pick.el,
+    h('div', { class: 'row', style: 'margin-top:12px' },
+      can('admin') ? h('button', { class: 'btn primary', onclick: () => onSaved(pick.value()) }, 'Save') : null,
+      h('button', { class: 'btn', onclick: onClose }, 'Close')));
 }
 
 async function renderAgents() {
@@ -1948,8 +1966,15 @@ async function renderChats() {
   const quietBy = new Map(); // #34: why agents stayed quiet, per chat (most frequent first)
   for (const q of quiet.silences) { if (!quietBy.has(q.chat)) quietBy.set(q.chat, []); quietBy.get(q.chat).push(q); }
   const memBox = h('div', {});
+  const openFallback = (c) => {
+    memBox.replaceChildren(chatFallbackEditor(c, models, {
+      onClose: () => memBox.replaceChildren(),
+      onSaved: async (fallback) => { const ok = await savePrefs(c, { fallback }); if (ok !== undefined) { memBox.replaceChildren(); draw(); } },
+    }));
+    memBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const multi = new Set(chats.map((c) => c.number)).size > 1;
-  const savePrefs = (c, patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, patch)); }, 'Saved');
+  const savePrefs = (c, patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, patch)); return true; }, 'Saved');
   const list = h('div', {});
   const draw = () => {
     const shown = chats.filter((c) => chatsFilter === 'all' || (chatsFilter === 'groups' ? c.isGroup : !c.isGroup));
@@ -1975,9 +2000,9 @@ async function renderChats() {
         h('td', { style: 'min-width:170px', 'data-label': 'Agent' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, agent: e.target.value || null }); c.agent = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
           h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),
         h('td', { style: 'min-width:200px', 'data-label': 'Model' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) }),
-          // 042: per-chat fallback (the chain can be set through the AI assistant / API)
-          h('select', { style: 'margin-top:6px', 'aria-label': 'When the model is unavailable', disabled: !can('admin'), onchange: (e) => { c.fallback = { ...(c.fallback || {}), mode: e.target.value }; savePrefs(c, { fallback: c.fallback }); } },
-            [['inherit', 'If unavailable: as the agent'], ['on', 'If unavailable: switch model'], ['off', 'If unavailable: don’t switch']].map(([v, l]) => h('option', { value: v, selected: (c.fallback?.mode || 'inherit') === v }, l)))),
+          // 042 / #65: per-chat fallback, edited in a card below (same picker and chain editor as agents)
+          h('div', { class: 'small muted', style: 'margin-top:6px;overflow-wrap:anywhere' }, chatFallbackLine(c.fallback, models)),
+          h('button', { class: 'btn small', style: 'margin-top:4px', 'aria-label': `Model fallback for ${c.name || c.id}`, onclick: () => openFallback(c) }, can('admin') ? 'Fallback…' : 'Fallback')),
         h('td', { style: 'min-width:130px', 'data-label': 'Logging' }, h('select', { disabled: !can('admin'), onchange: (e) => savePrefs(c, { logging: e.target.value }) },
           [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message an agent number.' : 'No chats yet (or WhatsApp is not connected).'));
   };
