@@ -33,7 +33,8 @@ More per host: [Install → Where is my panel?](install.md#where-is-my-panel-fin
    *Sign in with ChatGPT*, or connect GitHub Copilot. [Models](models.md)
 4. **Agents → New agent**: pick a template (or *Create an agent with AI*), write the instructions, add organizers,
    connect tool services, save. Try it in the **test console**. [Agents](agents.md)
-5. Add the agent's number to a WhatsApp group. **Chats** → switch the chat **on** and choose the agent.
+5. Add the agent's number to a WhatsApp group. **Chats** → switch the chat **on** and choose the agent. For one
+   person, **Chats → + Add a direct chat** works before they have written ([Agents](agents.md#set-up-a-direct-chat-before-the-person-writes)).
 6. In the group: `!yourtrigger hello` (or @mention the agent).
 7. **Backups**: set a passphrase, connect GitHub or S3, turn on the schedule. [Backups](backups-and-updates.md)
 

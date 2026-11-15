@@ -121,6 +121,14 @@
       "actions": [],
       "data": "unchanged",
       "docs": "docs/owner-assistant.md#owner-assistant-and-the-ask-box"
+    },
+    "2.13.0": {
+      "breaking": false,
+      "title": "Set up a person's chat before they write",
+      "summary": "Chats → Add a direct chat (or Contacts → Set up chat) assigns an agent, on/off, private, model and caps to a phone number before any message; their first message goes to that agent, whichever form WhatsApp uses. The owner assistant does it in one go (\"assign Mochi to Vedika\"). The agent can send an intro, only after you confirm.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/agents.md#set-up-a-direct-chat-before-the-person-writes"
     }
   }
 }

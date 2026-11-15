@@ -105,3 +105,9 @@ export function dmNoticeOnce(who) {
   const r = db.prepare('INSERT OR IGNORE INTO privacy_dm_seen (tenant_id, who, ts) VALUES (?, ?, ?)').run(TENANT, String(who), Date.now());
   return r.changes ? s.dmText : '';
 }
+/** The DM notice line the next message to this person would carry (or ''), without recording it (049: intro preview). */
+export function dmNoticePending(who) {
+  const s = noticeSettings();
+  if (!s.enabled || !s.dmFirstReply || !who) return '';
+  return db.prepare('SELECT 1 FROM privacy_dm_seen WHERE tenant_id = ? AND who = ?').get(TENANT, String(who)) ? '' : s.dmText;
+}

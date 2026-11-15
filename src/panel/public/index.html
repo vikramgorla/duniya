@@ -1140,6 +1140,7 @@ async function renderContacts() {
       h('td', { 'data-label': 'Source' }, h('span', { class: 'pill' }, SRC[c.source]), c.whatsappName && c.ownName && c.whatsappName !== c.ownName ? h('div', { class: 'small muted' }, `WhatsApp: ${c.whatsappName}`) : null),
       h('td', { 'data-label': 'Shared' }, h('label', { class: 'tick' }, shared)),
       h('td', { 'data-label': '' }, edit ? h('div', { class: 'row nowrap', style: 'gap:6px' }, editBtn,
+        h('button', { class: 'btn small', title: 'Choose an agent for this person before they write', onclick: () => { dmPrefill = { phone: c.phone, name: c.name }; if (location.hash === '#chats') renderChats(); else location.hash = '#chats'; } }, 'Set up chat'),
         c.source !== 'whatsapp' ? h('button', { class: 'btn small mut', onclick: () => confirm(`Remove ${c.name}?`) && tryApi(async () => { await api('DELETE', `/api/contacts/${c.phone}`); renderContacts(); }, 'Removed') }, 'Remove') : null) : null));
   };
   $('#main').replaceChildren(
@@ -1981,6 +1982,77 @@ async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply 
 }
 
 let chatsFilter = 'all';
+let dmPrefill = null; // 049: Contacts → "Set up chat" opens Chats → "Add a direct chat" with this contact
+/** 049 (#92): set up a direct chat by phone number (or a contact) before the person writes. */
+function addDirectChatCard(agents, { pre = null, onDone, onClose } = {}) {
+  const numbers = (S.status?.channel?.numbers || []).length ? S.status.channel.numbers : [{ id: 'main', label: 'Main' }];
+  const phone = h('input', { placeholder: '+41 79 123 45 67', inputmode: 'tel', autocomplete: 'off', value: pre?.phone ? `+${pre.phone}` : '', 'aria-label': 'Phone number with country code' });
+  const who = h('div', { class: 'small muted', style: 'margin-top:4px;min-height:1.2em' }, pre?.name ? `Contact: ${pre.name}` : '');
+  const search = h('input', { type: 'search', placeholder: 'Or search your contacts', 'aria-label': 'Search contacts' });
+  const hits = h('div', { class: 'row', style: 'gap:6px;margin-top:6px' });
+  let timer;
+  search.oninput = () => { clearTimeout(timer); timer = setTimeout(async () => {
+    const q = search.value.trim(); if (!q) { hits.replaceChildren(); return; }
+    const list = await api('GET', `/api/contacts?q=${encodeURIComponent(q)}`).catch(() => []);
+    hits.replaceChildren(...list.slice(0, 6).map((c) => h('button', { type: 'button', class: 'btn small', onclick: () => { phone.value = `+${c.phone}`; who.textContent = `Contact: ${c.name}`; hits.replaceChildren(); search.value = ''; check(); } }, `${c.name} · +${c.phone}`)),
+      list.length ? null : h('span', { class: 'small muted' }, 'No contact matches.'));
+  }, 250); };
+  const number = h('select', { 'aria-label': 'WhatsApp number' }, numbers.map((n) => h('option', { value: n.id }, n.label || n.id)));
+  const agent = h('select', { 'aria-label': 'Agent' }, h('option', { value: '' }, '— no agent yet —'), agents.map((b) => h('option', { value: b.id }, b.name + (b.enabled ? '' : ' (off)'))));
+  const on = h('input', { type: 'checkbox', checked: true }); const priv = h('input', { type: 'checkbox' });
+  const status = h('div', { class: 'small', style: 'min-height:1.2em;margin-top:4px' });
+  const check = () => tryApi(async () => {
+    if (!phone.value.trim()) { status.replaceChildren(); return; }
+    const r = await api('POST', '/api/direct-chats/check', { phone: phone.value, number: number.value });
+    if (r.name && !who.textContent) who.textContent = `Contact: ${r.name}`;
+    status.replaceChildren(h('span', { style: `color:var(--${r.onWhatsApp === false ? 'warn' : r.onWhatsApp ? 'ok' : 'muted'})` },
+      r.onWhatsApp === false ? '⚠ Not on WhatsApp? You can still set it up.' : r.onWhatsApp ? '✓ On WhatsApp' : 'Could not check (WhatsApp offline)'),
+    r.existing ? h('span', { class: 'muted' }, ' · already set up — saving changes it') : null);
+  }).catch(() => {});
+  phone.oninput = () => { who.textContent = ''; status.replaceChildren(); };
+  phone.onchange = check; number.onchange = check;
+  const save = h('button', { class: 'btn primary', type: 'submit' }, 'Set up chat');
+  const form = h('form', { class: 'card', style: 'margin-top:14px', onsubmit: async (e) => {
+    e.preventDefault();
+    const r = await tryApi(() => api('POST', '/api/direct-chats', { phone: phone.value, number: number.value, agent: agent.value || undefined, enabled: on.checked, private: priv.checked }));
+    if (!r) return;
+    toast(r.warning ? `Chat ready. ${r.warning}` : `Chat with ${r.name} ready — waiting for the first message`);
+    onDone?.(r);
+  } },
+  h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Add a direct chat'), h('button', { type: 'button', class: 'btn small mut', onclick: () => onClose?.() }, 'Close')),
+  h('p', { class: 'small muted' }, 'Set up a 1:1 chat before the person has written: choose the agent and settings now; their first message goes straight to it. Nothing is sent to them unless you send an intro.'),
+  h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px' },
+    h('div', {}, h('label', {}, 'Phone number'), phone, who, status),
+    h('div', {}, h('label', {}, 'From contacts'), search, hits),
+    numbers.length > 1 ? field('WhatsApp number', number, 'The number this person will write to.') : null,
+    field('Agent', agent)),
+  h('div', { class: 'row spread', style: 'margin-top:10px' },
+    h('div', { class: 'row', style: 'gap:6px 16px' }, h('label', { class: 'tick' }, on, ' On — the agent may answer'), h('label', { class: 'tick', title: 'Hidden from the owner assistant and the Ask box' }, priv, ' Private to members')),
+    save));
+  if (pre?.phone) setTimeout(check, 0);
+  return form;
+}
+/** 049: the agent's first message to a direct chat — preview, edit, then "Send intro now" (the explicit confirm). */
+async function introCard(c, { onClose, onSent } = {}) {
+  const enc = encodeURIComponent(c.id);
+  const head = h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, `Intro message · ${c.name || c.id}`), h('button', { class: 'btn small mut', onclick: () => onClose?.() }, 'Close'));
+  let p;
+  try { p = await api('POST', `/api/chats/${enc}/intro/preview`, {}); } catch (e) {
+    return h('div', { class: 'card', style: 'margin-top:14px' }, head, h('div', { class: 'note warn' }, e.message));
+  }
+  const text = h('textarea', { maxlength: 1000, style: 'min-height:84px', 'aria-label': 'Intro text' }); text.value = p.text;
+  const send = h('button', { class: 'btn primary', onclick: async () => {
+    send.disabled = true;
+    const r = await tryApi(async () => { const q = await api('POST', `/api/chats/${enc}/intro/preview`, { text: text.value }); return api('POST', `/api/chats/${enc}/intro`, { token: q.token }); }, 'Intro sent');
+    send.disabled = false;
+    if (r) onSent?.(r);
+  } }, 'Send intro now');
+  return h('div', { class: 'card', style: 'margin-top:14px' }, head,
+    h('p', { class: 'small muted' }, `${p.agentName} sends this to ${p.to} on WhatsApp when you press Send. Edit it first if you like.`),
+    text,
+    p.notice ? h('div', { class: 'small muted', style: 'margin-top:6px' }, 'Added once, because it is the first message to this person: ', h('i', {}, p.notice)) : null,
+    h('div', { class: 'row', style: 'justify-content:flex-end;margin-top:10px' }, send));
+}
 async function renderChats() {
   $('#main').replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading chats…')));
   const [chats, agents, models, us, bud, quiet] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/agents'), loadModels().catch(() => ({ models: [] })), usageSummary(), api('GET', '/api/budget').catch(() => null), api('GET', '/api/silences?days=7').catch(() => ({ silences: [] }))]);
@@ -1997,6 +2069,8 @@ async function renderChats() {
     memBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const multi = new Set(chats.map((c) => c.number)).size > 1;
+  const openAdd = (pre = null) => { memBox.replaceChildren(addDirectChatCard(agents, { pre, onClose: () => memBox.replaceChildren(), onDone: () => { chatsFilter = 'people'; renderChats(); } })); memBox.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  const openIntro = async (c) => { memBox.replaceChildren(await introCard(c, { onClose: () => memBox.replaceChildren(), onSent: () => { memBox.replaceChildren(); renderChats(); } })); memBox.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   const savePrefs = (c, patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, patch)); return true; }, 'Saved');
   const list = h('div', {});
   const draw = () => {
@@ -2004,7 +2078,8 @@ async function renderChats() {
     list.replaceChildren(shown.length ? h('table', { class: 'stack' }, h('thead', {}, h('tr', {}, h('th', {}, 'On'), h('th', {}, 'Chat'), h('th', {}, 'Agent'), h('th', {}, 'Model'), h('th', {}, 'Activity log'))),
       h('tbody', {}, shown.map((c) => h('tr', { style: c.enabled ? '' : 'opacity:.78' },
         h('td', { style: 'width:52px', 'data-label': 'On' }, toggle(c.enabled, (v) => tryApi(async () => { await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, { enabled: v }); c.enabled = v; c.ignored = 0; draw(); }, v ? 'On — agents may answer here' : 'Off — agents ignore this chat'), !can('admin'))),
-        h('td', { 'data-label': '' }, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, c.name || c.id), h('span', { class: `pill ${c.isGroup ? 'info' : ''}` }, c.isGroup ? 'group' : 'person'), multi ? h('span', { class: 'pill' }, c.numberLabel) : null),
+        h('td', { 'data-label': '' }, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, c.name || c.id), h('span', { class: `pill ${c.isGroup ? 'info' : ''}` }, c.isGroup ? 'group' : 'person'), multi ? h('span', { class: 'pill' }, c.numberLabel) : null,
+            c.waiting ? h('span', { class: 'pill warn', title: 'Set up before this person wrote; their first message goes to the agent chosen here' }, 'Waiting for the first message') : null),
           h('div', { class: 'small muted' }, c.isGroup ? `${c.size || 0} members` : c.phone ? `+${c.phone}` : '', c.lastAt ? ` · last message ${ago(c.lastAt)} ago` : ''),
           us?.chat?.[c.id] ? h('div', { class: 'small muted num' }, `30 days: ${usageLine(us.chat[c.id])}`) : null,
           !c.enabled ? h('div', { class: 'small', style: 'color:var(--warn)' }, `Off — ignored${c.ignored ? ` (${c.ignored} message${c.ignored > 1 ? 's' : ''} since restart)` : ''}`) : null,
@@ -2013,7 +2088,8 @@ async function renderChats() {
             silenceFix(q, () => renderChats(), { onChats: true }))),
           h('div', { class: 'row', style: 'gap:6px;margin-top:6px' },
             h('button', { class: 'btn small', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory'),
-            h('button', { class: 'btn small', onclick: () => openCap(c) }, 'Spending cap')),
+            h('button', { class: 'btn small', onclick: () => openCap(c) }, 'Spending cap'),
+            !c.isGroup && can('admin') && c.enabled && c.agent ? h('button', { class: 'btn small', onclick: () => openIntro(c) }, c.introAt ? 'Send another intro…' : 'Send intro…') : null),
           // 044: hidden from the owner assistant / Ask box; per-group opt-out of the privacy notice (recorded)
           h('div', { class: 'row', style: 'gap:4px 14px;margin-top:4px' },
             h('label', { class: 'tick small', title: 'The agent keeps working here, but the owner assistant and the Ask box never see this chat.' },
@@ -2027,13 +2103,15 @@ async function renderChats() {
           h('div', { class: 'small muted', style: 'margin-top:6px;overflow-wrap:anywhere' }, chatFallbackLine(c.fallback, models)),
           h('button', { class: 'btn small', style: 'margin-top:4px', 'aria-label': `Model fallback for ${c.name || c.id}`, onclick: () => openFallback(c) }, can('admin') ? 'Fallback…' : 'Fallback')),
         h('td', { style: 'min-width:130px', 'data-label': 'Logging' }, h('select', { disabled: !can('admin'), onchange: (e) => savePrefs(c, { logging: e.target.value }) },
-          [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message an agent number.' : 'No chats yet (or WhatsApp is not connected).'));
+          [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message an agent number, or add one with “Add a direct chat”.' : 'No chats yet (or WhatsApp is not connected).'));
   };
   const seg = h('div', { class: 'seg' }, [['all', 'All'], ['groups', 'Groups'], ['people', 'People']].map(([v, l]) => h('button', { class: chatsFilter === v ? 'on' : '', onclick: (e) => { chatsFilter = v; seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === e.target)); draw(); } }, l)));
   draw();
-  $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Chats'), seg),
+  const addBtn = can('admin') ? h('button', { class: 'btn small primary', onclick: () => openAdd() }, '+ Add a direct chat') : null;
+  $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Chats'), h('div', { class: 'row', style: 'gap:8px' }, addBtn, seg)),
     h('p', { class: 'small muted' }, 'Agents only talk in chats that are switched On. A chat that is Off is ignored completely: nothing is stored and no model is called. For each chat that is on, choose the agent and optionally a model or logging level. (An agent set to answer “Anyone” also answers people whose chat is off.)'),
     list), memBox);
+  if (dmPrefill && can('admin')) { const pre = dmPrefill; dmPrefill = null; openAdd(pre); }
 }
 /** WhatsApp group tools for admins (026): members with admin badges, invite link, name/description, settings. */
 function whatsappCard(c) {

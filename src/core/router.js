@@ -11,6 +11,7 @@ import { countStat } from './stats.js';
 import { silenceReason } from './silences.js';
 import { handleOwnerMessage } from './owner-assistant.js';
 import { dmNoticeOnce } from './privacy-notice.js';
+import { resolveDirectChat } from './direct-chats.js';
 import { inboundKind, prepareInbound, wantsVoice, speak, createImage } from './media-ai.js';
 import { enqueue, registerJobHandler, setQueueChannel, startQueue } from './media-queue.js';
 import { readFileSync, rmSync } from 'node:fs';
@@ -147,7 +148,9 @@ function recordEvent(msg) {
 export function createRouter(channel) {
   setWhatsAppChannel(channel);
   registerMediaHandlers(channel);
-  return async function onMessage(msg) {
+  return async function onMessage(incoming) {
+    // 049 (#92): a direct message from a prepared person may arrive from their LID; use the prepared chat id.
+    const msg = resolveDirectChat(incoming);
     // Reactions and poll votes: recorded only for chats that are on (#10).
     if (msg.kind && msg.kind !== 'text') { if (isChatEnabled(msg.chat)) recordEvent(msg); return; }
     // Owner assistant (044): link codes and linked panel users' direct messages (unless they start with an agent trigger).

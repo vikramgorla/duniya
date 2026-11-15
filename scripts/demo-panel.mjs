@@ -173,6 +173,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
       async isMember(jid, phone) { return !!find(jid)?.members.some((m) => m.phone === phone); },
       async send() { return { msgId: `out-${Date.now()}` }; },
       async typing() {},
+      async lookupNumber(phone) { return { jid: `${String(phone).replace(/\D/g, '')}@s.whatsapp.net`, exists: true, lid: '' }; },
       async groupInfo(jid) {
         const g = find(jid) || {};
         return { id: jid, subject: g.name, description: 'Shared rides between Morges and Geneva. Be kind, be on time.', owner: '', size: g.size,
@@ -217,6 +218,8 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const seen = db.db.prepare('INSERT INTO chats_seen (tenant_id, chat, number, is_group, name, phone, last_at) VALUES (?, ?, ?, 0, ?, ?, ?)');
   for (const [i, name] of [[4, 'Sophie'], [7, 'Priya'], [10, 'Nadia']]) seen.run('default', `${P(i)}@s.whatsapp.net`, 'main', name, P(i), now - i * H);
   seen.run('default', `club#${P(12)}@s.whatsapp.net`, 'club', 'Coach Arjun', P(12), now - 5 * H);
+  // 049: a direct chat set up before the person wrote ("Waiting for the first message")
+  await (await imp('src/core/direct-chats.js')).prepareDirectChat({ phone: `+${P(9)}`, agent: 'carpool', private: true }, { by: 'admin' });
 
   // messages & memory of the car-pooling group
   const conv = [

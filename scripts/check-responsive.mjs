@@ -55,6 +55,8 @@ const STATES = [
   { name: 'overview-ask-restarted', hash: 'overview', js: "S.ask = { q: 'Who is driving on Friday?', busy: true, restarted: true, reply: '', confirms: [], steps: [{ step: 'thinking' }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'thinking' }] }; show(S.tab); await T.wait(600); S.ask.busy = false;" },
   { name: 'chats', hash: 'chats' },
   { name: 'chats-fallback', hash: 'chats', js: "[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);" },
+  { name: 'chats-add-dm', hash: 'chats', js: "[...document.querySelectorAll('button')].find((b) => b.textContent.includes('Add a direct chat'))?.click(); await T.wait(300); const i = document.querySelector('input[inputmode=tel]'); if (i) { i.value = '+41 79 000 00 30'; i.dispatchEvent(new Event('change')); } await T.wait(600);" },
+  { name: 'chats-intro', hash: 'chats', js: "[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Waiting for the first message'))?.querySelector('button')?.parentElement?.querySelectorAll('button')?.forEach((b) => { if (b.textContent.startsWith('Send intro')) b.click(); }); await T.until('textarea[aria-label=\"Intro text\"]'); await T.wait(400);" },
   { name: 'chats-memory', hash: 'chats', js: "[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button')?.click(); await T.wait(1800); T.openAll();" },
   { name: 'contacts', hash: 'contacts' },
   { name: 'models', hash: 'models', js: 'T.openAll();' },

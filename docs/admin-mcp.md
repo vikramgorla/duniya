@@ -49,13 +49,13 @@ rotation). Spec: [`specs/017-admin-mcp/`](../specs/017-admin-mcp/spec.md).
 
 ## Tools
 
-88 tools cover the panel:
+90 tools cover the panel:
 
 | Area | Covers |
 |---|---|
 | Overview | status, activity |
 | Agents | create, update, draft with AI, test, export, enable |
-| Chats | assign, settings (model, fallback mode and chain, logging), private, privacy notice, stored messages |
+| Chats | assign, settings (model, fallback mode and chain, logging), private, privacy notice, stored messages, prepare a direct chat before the person writes (`prepare_direct_chat`; confirmed when `send_intro` is set), first message by the agent (`send_chat_intro`, confirmed) |
 | Money | usage, prices, spending caps, owner alerts, weekly summary |
 | People & memory | contacts, memory, WhatsApp groups, WhatsApp numbers, users |
 | Models | models, accounts, fallback, photos & voice |
