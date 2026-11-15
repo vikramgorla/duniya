@@ -128,6 +128,6 @@ export const demoApi: ApiClient = {
       { type: 'step', step: 'tool', tool: 'list_visible_chats', ok: true }, { type: 'step', step: 'thinking' }, { type: 'step', step: 'tool', tool: 'chat_recap', ok: true }, { type: 'step', step: 'thinking' }]) {
       await pause(350); onEvent(e);
     }
-    return { type: 'done', ...(route('POST', '/api/owner/ask', b) as object) } as any;
+    return { type: 'done', ...((await route('POST', '/api/owner/ask', b)) as object) } as any;
   },
 };
