@@ -54,6 +54,7 @@ export const isFreeModel = (id) => /:free$/.test(String(id || ''));
 /** Wrap an adapter so only free models (ids ending ":free") are listed and used. */
 function freeOnlyAdapter(adapter, name) {
   return {
+    streams: !!adapter.streams,
     async listModels() { return (await adapter.listModels()).filter((m) => isFreeModel(m.id)); },
     async chat(args) {
       if (!isFreeModel(args.model)) throw Object.assign(new Error(`“Free models only” is on for ${name}: choose a model ending in :free, or turn the switch off (Models)`), { code: 'free_only' });
@@ -412,8 +413,14 @@ const describeFailures = (failures) => failures.map((f) => `${f.name} (${f.pause
  * fallback, ignores pauses — the Test button), accept (async ref → bool: candidates it refuses are skipped, e.g. models
  * that cannot see the photo of this turn, #67; they are listed in err.skipped when nothing answered), lastResort
  * (refs tried after the chain when fallback is on, e.g. the vision fallback model).
+ * Streaming (047, #83): onText(delta) gets the answer's text as it arrives, from adapters that stream (Anthropic,
+ * OpenAI-compatible, OpenRouter, ChatGPT; Copilot answers whole). Nothing reaches onText before an account's first
+ * token, so a stream that fails before it falls back as usual. A failure after the first token calls
+ * onRestart({ reason, account }) — the caller drops the partial text — and the same account is asked once more without
+ * streaming, then the chain continues without streaming. Usage is recorded once, from the answer that is returned.
  */
-export async function chat({ model = 'auto', purpose = 'agent', system, messages, tools = [], maxTokens = 1024, usage = {}, fallback, turn = null, direct = false, accept = null, lastResort = [] }) {
+export async function chat({ model = 'auto', purpose = 'agent', system, messages, tools = [], maxTokens = 1024, usage = {}, fallback, turn = null, direct = false, accept = null, lastResort = [], onText = null, onRestart = null }) {
+  let streamOn = typeof onText === 'function';
   if (!direct && (!parseRef(model) || parseRef(model).model === 'auto')) await warmModels();
   const fb = direct ? { enabled: false, chain: [] } : (fallback || fallbackSettings());
   const cands = direct ? [{ id: parseRef(model)?.provider, model: parseRef(model)?.model }] : planCandidates({ model, purpose, fallback: fb, sticky: turn?.ref || '' });
@@ -463,8 +470,20 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
       tried.add(ref);
       lastUsed.set(p.id, Date.now()); useOrder.set(p.id, ++useSeq);
       let res;
+      const args = { model: modelId, system, messages, tools, maxTokens };
+      let started = false; // 047: this account already sent text to onText
+      const streamed = streamOn && p.adapter.streams ? { ...args, onText: (d) => { started = true; try { onText(d); } catch { /* a closed stream must not break the call */ } } } : null;
       try {
-        res = await p.adapter.chat({ model: modelId, system, messages, tools, maxTokens });
+        try {
+          res = await p.adapter.chat(streamed || args);
+        } catch (e) {
+          if (!started) throw e;
+          // Failed after the first token (047): the caller drops the partial text (onRestart) and this account is asked
+          // once more without streaming; if that fails too, the normal fallback continues, without streaming.
+          streamOn = false;
+          try { onRestart?.({ reason: classify(e).reason, account: p.id }); } catch { /* ignore */ }
+          res = await p.adapter.chat(args);
+        }
       } catch (e) {
         const cls = classify(e);
         if (cls.breaker) breaker.recordFailure(p.id, cls, { name: p.name, message: e.message });

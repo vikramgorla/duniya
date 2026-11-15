@@ -124,10 +124,14 @@ export const demoApi: ApiClient = {
   // #66: the Ask box streams steps in the demo too (no network)
   stream: async (p, b, onEvent) => {
     if (p !== '/api/owner/ask/stream') throw new ApiError('Not available in the demo', 400);
-    for (const e of [{ type: 'step', step: 'thinking' }, { type: 'text', text: 'Let me look at the chats that are on.', final: false },
+    const words = (text: string) => (text.match(/\S+\s*/g) || []).map((w) => ({ type: 'delta', text: w }));
+    const interim = 'Let me look at the chats that are on.';
+    for (const e of [{ type: 'step', step: 'thinking' }, ...words(interim), { type: 'text', text: interim, final: false },
       { type: 'step', step: 'tool', tool: 'list_visible_chats', ok: true }, { type: 'step', step: 'thinking' }, { type: 'step', step: 'tool', tool: 'chat_recap', ok: true }, { type: 'step', step: 'thinking' }]) {
-      await pause(350); onEvent(e);
+      await pause(e.type === 'delta' ? 40 : 350); onEvent(e);
     }
-    return { type: 'done', ...(route('POST', '/api/owner/ask', b) as object) } as any;
+    const done = (await route('POST', '/api/owner/ask', b)) as { reply?: string; confirms?: unknown[] }; // was spread un-awaited (code scanning #38)
+    for (const e of words(String(done.reply || ''))) { await pause(40); onEvent(e); } // #83: the answer word by word
+    return { type: 'done', ...done } as any;
   },
 };

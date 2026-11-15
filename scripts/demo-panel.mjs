@@ -28,6 +28,26 @@ const EDIT_PROPOSAL = {
   },
 };
 
+/** Anthropic Messages SSE for a scripted answer, one word every 40 ms (the Ask box streams, #83). */
+async function streamAnthropic(res, content, usage) {
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+  const ev = (type, data) => res.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`);
+  ev('message_start', { message: { id: 'm', type: 'message', role: 'assistant', model: 'claude-sonnet-5-5', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: usage.input_tokens, output_tokens: 0 } } });
+  for (const [index, b] of content.entries()) {
+    if (b.type === 'text') {
+      ev('content_block_start', { index, content_block: { type: 'text', text: '' } });
+      for (const w of b.text.match(/\S+\s*/g) || []) { ev('content_block_delta', { index, delta: { type: 'text_delta', text: w } }); await new Promise((r) => setTimeout(r, 40)); }
+    } else {
+      ev('content_block_start', { index, content_block: { type: 'tool_use', id: b.id, name: b.name, input: {} } });
+      ev('content_block_delta', { index, delta: { type: 'input_json_delta', partial_json: JSON.stringify(b.input ?? {}) } });
+    }
+    ev('content_block_stop', { index });
+  }
+  ev('message_delta', { delta: { stop_reason: content.some((b) => b.type === 'tool_use') ? 'tool_use' : 'end_turn', stop_sequence: null }, usage: { output_tokens: usage.output_tokens } });
+  ev('message_stop', {});
+  res.end();
+}
+
 /** Local stand-in for the Anthropic, ChatGPT and OpenRouter APIs. */
 async function fakeModels() {
   const server = http.createServer(async (req, res) => {
@@ -59,7 +79,9 @@ async function fakeModels() {
         } } }]
         : /Geneva on Friday/.test(d) ? [{ type: 'text', text: 'Friday 21 Nov: Marc drives from Morges station at 07:40 → Geneva, 2 seats left (one is saved for Lea). Want me to add it to the shared calendar?' }]
         : [{ type: 'text', text: 'Hi! The museum trip forms are due Monday 24 Nov 📝 Lea and Marc can drive (3 seats each). Want me to start a poll for the remaining seats?' }];
-      return json({ id: 'm', type: 'message', role: 'assistant', model: 'claude-sonnet-5-5', usage: { input_tokens: 1412, output_tokens: 96 }, stop_reason: draft ? 'tool_use' : 'end_turn', content });
+      const usage = { input_tokens: 1412, output_tokens: 96 };
+      if (body.stream) return streamAnthropic(res, content, usage); // #83: the Ask box asks for a token stream
+      return json({ id: 'm', type: 'message', role: 'assistant', model: 'claude-sonnet-5-5', usage, stop_reason: draft ? 'tool_use' : 'end_turn', content });
     }
     res.writeHead(404); res.end('{}');
   }).listen(0, '127.0.0.1');

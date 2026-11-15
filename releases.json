@@ -108,6 +108,14 @@
       "breaking": false,
       "title": "Security alerts handled automatically",
       "summary": "Reviewed false-positive code-scanning alerts are dismissed automatically from a reviewed list; real findings are fixed in code."
+    },
+    "2.12.0": {
+      "breaking": false,
+      "title": "The Ask box writes its answer word by word",
+      "summary": "In the panel and the mobile app, the owner assistant's text now appears as the model writes it (Anthropic, OpenAI, OpenRouter, other OpenAI-compatible endpoints, ChatGPT; GitHub Copilot still shows it after each step). If a stream breaks half-way, the partial text is replaced by a fresh answer; fallback to other models works as before. WhatsApp replies are unchanged.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/owner-assistant.md#owner-assistant-and-the-ask-box"
     }
   }
 }

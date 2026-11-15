@@ -97,8 +97,8 @@ function Console({ st, canAdmin, onPause, onPending }: { st: Status; canAdmin: b
   );
 }
 
-/** Ask (044, streaming #66): the owner assistant, same API as the panel's Ask box. Steps and partial text show as the
- *  answer comes in; changes need Confirm. */
+/** Ask (044, streaming #66, word by word #83): the owner assistant, same API as the panel's Ask box. Steps and partial
+ *  text show as the answer comes in; changes need Confirm. */
 type Held = { code: string; preview: string };
 function Ask() {
   const t = useTheme();
@@ -136,6 +136,7 @@ function Ask() {
           {tools.slice(-8).map((s, i) => <Pill key={i} tone={s.step === 'held' ? 'warn' : s.ok ? 'plain' : 'bad'}>{stepLabel(s)}</Pill>)}
         </View>
       ) : null}
+      {busy && progress.restarted ? <Body small muted>↻ The answer was interrupted; asking again…</Body> : null}
       {shown ? <Note><Body selectable style={busy ? { color: t.muted } : undefined}>{shown}</Body></Note> : null}
       {held.map((c) => (
         <Note key={c.code} tone="warn">

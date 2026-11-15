@@ -84,3 +84,17 @@ test('Ask progress: steps and latest text from events; short labels without argu
   assert.equal(toolWords('get_owner_assistant'), 'owner assistant');
   assert.equal(toolWords('search_messages'), 'search messages');
 });
+
+test('#83: text deltas are appended, a new round starts a new text, "restarted" drops the partial text', () => {
+  let p: AskProgress = { steps: [], text: '' };
+  const run = (events: StreamEvent[]) => { for (const e of events) p = applyAskEvent(p, e); return p.text; };
+  assert.equal(run([{ type: 'step', step: 'thinking' }, { type: 'delta', text: 'Let ' }, { type: 'delta', text: 'me ' }]), 'Let me ');
+  assert.equal(run([{ type: 'delta', text: 'look.' }, { type: 'text', text: 'Let me look.', final: false }]), 'Let me look.');
+  assert.equal(run([{ type: 'step', step: 'tool', tool: 'chat_recap', ok: true }, { type: 'step', step: 'thinking' }]), 'Let me look.', 'interim text stays until the next round writes');
+  assert.equal(run([{ type: 'delta', text: 'Anu ' }]), 'Anu ', 'the first delta of a round replaces it');
+  assert.equal(run([{ type: 'delta', text: 'said' }, { type: 'restarted', reason: 'network' }]), '');
+  assert.equal(p.restarted, true);
+  assert.equal(run([{ type: 'text', text: 'Anu said 9:10.', final: true }]), 'Anu said 9:10.', 'the whole text wins');
+  assert.equal(p.restarted, false, 'the note ends with the restarted round');
+  assert.deepEqual(p.steps.map((s) => s.step), ['thinking', 'tool', 'thinking'], 'deltas and restarts are not steps');
+});

@@ -74,6 +74,69 @@ async function request(url, key, body, { raw = false, timeout = 120000 } = {}) {
   return json;
 }
 
+/**
+ * Read a Chat Completions SSE stream (047, #83): text deltas go to onText as they arrive; tool-call deltas are joined by
+ * index; the last chunk's usage (stream_options.include_usage) is kept. Returns a non-streamed response shape for
+ * fromChatResponse. Only this response is held in memory. A server that ignored `stream` and answered JSON still works.
+ */
+export async function readChatStream(res, onText) {
+  if (!String(res.headers.get('content-type') || '').includes('text/event-stream')) {
+    const json = JSON.parse(await res.text());
+    const text = json?.choices?.[0]?.message?.content;
+    if (text) onText(text);
+    return json;
+  }
+  let content = ''; let finish = null; let usage = null; let ended = false;
+  const calls = []; // index -> { id, function: { name, arguments } }
+  const handle = (data) => {
+    if (!data) return;
+    if (data === '[DONE]') { ended = true; return; }
+    let ev; try { ev = JSON.parse(data); } catch { return; }
+    if (ev.error) throw Object.assign(new Error(ev.error.message || 'The provider stopped the answer'), { code: ev.error.code || ev.error.type, status: Number(ev.error.status) || undefined, error: ev });
+    if (ev.usage) usage = ev.usage;
+    const ch = ev.choices?.[0];
+    if (!ch) return;
+    const d = ch.delta || {};
+    if (typeof d.content === 'string' && d.content) { content += d.content; onText(d.content); }
+    for (const tc of d.tool_calls || []) {
+      const i = Number.isInteger(tc.index) ? tc.index : calls.length;
+      const c = calls[i] || (calls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } });
+      if (tc.id) c.id = tc.id;
+      if (tc.function?.name) c.function.name += tc.function.name;
+      if (tc.function?.arguments) c.function.arguments += tc.function.arguments;
+    }
+    if (ch.finish_reason) finish = ch.finish_reason;
+  };
+  let buf = '';
+  const dec = new TextDecoder();
+  const frames = () => {
+    let i;
+    while ((i = buf.search(/\r?\n\r?\n/)) >= 0) {
+      const frame = buf.slice(0, i); buf = buf.slice(i).replace(/^\r?\n\r?\n/, '');
+      handle(frame.split(/\r?\n/).filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trim()).join('\n'));
+    }
+  };
+  for await (const chunk of res.body) { buf += dec.decode(chunk, { stream: true }); frames(); }
+  buf += `${dec.decode()}\n\n`; frames();
+  if (!finish && !ended) throw new Error('The answer stream ended before completion');
+  const message = { content: content || null, ...(calls.length ? { tool_calls: calls.filter(Boolean) } : {}) };
+  return { choices: [{ message, finish_reason: finish || 'stop' }], usage: usage || {} };
+}
+
+async function streamRequest(url, key, body, onText, { timeout = 120000 } = {}) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { ...(key ? { authorization: `Bearer ${key}` } : {}), 'content-type': 'application/json', accept: 'text/event-stream' },
+    body: JSON.stringify(body), signal: AbortSignal.timeout(timeout),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let json; try { json = JSON.parse(text); } catch { json = null; }
+    throw Object.assign(new Error(json?.error?.message || `${res.status} ${text.slice(0, 200)}`), { status: res.status, code: json?.error?.code || json?.error?.type, headers: res.headers, error: json });
+  }
+  return readChatStream(res, onText);
+}
+
 /** Which documented media endpoints a base URL has: OpenAI's own API, OpenRouter, or none. */
 export function mediaFlavor(baseUrl, official) {
   if (official) return 'openai';
@@ -157,12 +220,24 @@ export function chatCompletionsProvider({ baseUrl, key, official = false }) {
           ...(Array.isArray(ins) ? { inputs: ins } : {}), ...(Array.isArray(outs) ? { outputs: outs } : {}) };
       }).filter((m) => m.id);
     },
-    async chat({ model, system, messages, tools, maxTokens }) {
+    streams: true,
+    async chat({ model, system, messages, tools, maxTokens, onText = null }) {
       const body = {
         model, messages: toChatMessages(system, messages),
         ...(tools?.length ? { tools: toChatTools(tools) } : {}),
         ...(official ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
       };
+      if (onText) {
+        let started = false;
+        const forward = (d) => { started = true; onText(d); };
+        try {
+          return fromChatResponse(await streamRequest(`${base}/chat/completions`, key(), { ...body, stream: true, stream_options: { include_usage: true } }, forward));
+        } catch (e) {
+          // Some OpenAI-compatible servers refuse `stream` / `stream_options` (400 / 422): ask the same account once more
+          // without streaming. Any other failure goes to the fallback chain.
+          if (started || !(e.status === 400 || e.status === 422)) throw e;
+        }
+      }
       return fromChatResponse(await request(`${base}/chat/completions`, key(), body));
     },
   };

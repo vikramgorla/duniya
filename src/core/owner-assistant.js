@@ -311,6 +311,9 @@ function systemPrompt(user, source) {
  * source: 'whatsapp' | 'panel'; surface: where a confirmation must come from.
  * onEvent (optional, #66 streaming Ask box): called with { type: 'step', step: 'thinking' | 'tool' | 'held', … } and
  * { type: 'text', text } as the turn goes on. Steps carry tool names and counts only, never arguments or results.
+ * Token streaming (047, #83): { type: 'delta', text } pieces of a round's text as they arrive (the first delta after a
+ * 'thinking' step starts a new text), { type: 'restarted', reason } when a broken stream is asked again (drop the partial
+ * text). The round's whole { type: 'text' } still follows and is the source of truth.
  */
 export async function ask({ user, text, source, surface, onEvent = null }) {
   const emit = (e) => { try { onEvent?.(e); } catch { /* a closed stream must not break the turn */ } };
@@ -336,12 +339,19 @@ export async function ask({ user, text, source, surface, onEvent = null }) {
   const turn = { ref: '' };
   let reply = '';
   const fallback = fallbackSettings();
+  // 047 (#83): with a stream listener, the model's text arrives token by token ({ type: 'delta', text }); when a stream
+  // breaks after its first token, { type: 'restarted', reason } tells the client to drop the partial text of this round.
+  // Nothing is buffered here: deltas go straight to the listener. WhatsApp (no onEvent) gets whole replies as before.
+  const streaming = onEvent ? {
+    onText: (d) => emit({ type: 'delta', text: d }),
+    onRestart: ({ reason }) => emit({ type: 'restarted', reason }),
+  } : {};
   for (let round = 0; round <= MAX_ROUNDS; round++) {
     let res;
     emit({ type: 'step', step: 'thinking', round });
     try {
       res = await modelChat({ model: ownerSettings().model, purpose: 'agent', maxTokens: 1500, system: systemPrompt(user, source), tools: defs, messages, fallback, turn,
-        usage: { agent: 'owner-assistant', chat: '', kind: 'owner' } });
+        usage: { agent: 'owner-assistant', chat: '', kind: 'owner' }, ...streaming });
     } catch (e) {
       const friendly = friendlyModelError(e);
       activity('error', { summary: `Owner assistant model error: ${e.message}` });

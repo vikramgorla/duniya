@@ -230,7 +230,7 @@ function fromOutputItems(items = []) {
   return content;
 }
 
-async function chatFor(secret, { model, system, messages, tools }) {
+async function chatFor(secret, { model, system, messages, tools, onText = null }) {
   const body = {
     model, instructions: system, input: toResponsesInput(messages), store: false, stream: true,
     ...(tools?.length ? { tools: tools.map((t) => ({ type: 'function', name: t.name, description: t.description || '', parameters: t.input_schema || { type: 'object', properties: {} }, strict: false })) } : {}),
@@ -250,7 +250,8 @@ async function chatFor(secret, { model, system, messages, tools }) {
   const handle = (data) => {
     if (!data || data === '[DONE]') return;
     const ev = JSON.parse(data);
-    if (ev.type === 'response.output_item.done' && ev.item) items.push(ev.item);
+    if (ev.type === 'response.output_text.delta') { if (onText && typeof ev.delta === 'string' && ev.delta) onText(ev.delta); } // 047: Ask box streaming
+    else if (ev.type === 'response.output_item.done' && ev.item) items.push(ev.item);
     else if (ev.type === 'response.completed') completed = ev.response || {};
     else if (ev.type === 'response.failed' || ev.type === 'error') {
       const e = ev.response?.error || ev.error || {};
@@ -274,6 +275,7 @@ async function chatFor(secret, { model, system, messages, tools }) {
 
 /** Adapter for one ChatGPT account (042). */
 export const chatgptAdapter = (secret = CRED) => ({
+  streams: true,
   configured: () => configured(secret),
   listModels: () => listModelsFor(secret),
   chat: (args) => chatFor(secret, args),
