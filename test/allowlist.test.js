@@ -63,3 +63,12 @@ test('scheduled posts and history sync skip chats that are off', async () => {
   await t.onHistory([{ channel: 'whatsapp', isGroup: true, chat: 'g1@g.us', phone: '41790000002', senderName: 'Anu', text: 'old message', msgId: 'h1', ts: Date.now() - 1e6 }]);
   assert.equal(stored('g1@g.us').filter((m) => m.text === 'old message').length, 0);
 });
+
+test('reactions and poll votes in a chat that is off are ignored too', async () => {
+  const before = t.db.db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name = 'wa_reactions'").get().n
+    ? t.db.db.prepare('SELECT COUNT(*) n FROM wa_reactions').get().n : 0;
+  await t.route(t.msg({ kind: 'reaction', chat: 'g1@g.us', text: '', emoji: '👍', targetId: 'x', senderName: 'Anu' }));
+  const after = t.db.db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name = 'wa_reactions'").get().n
+    ? t.db.db.prepare('SELECT COUNT(*) n FROM wa_reactions').get().n : 0;
+  assert.equal(after, before);
+});

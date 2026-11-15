@@ -22,6 +22,7 @@ import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
 import { humanCode } from '../core/crypto.js';
 import { organizerConnection, oauthClientOf } from '../core/tools.js';
 import { draftBot } from '../core/ai-builder.js';
+import { setWhatsAppChannel, whatsappToolCatalog, isGroupChat } from '../core/whatsapp-tools.js';
 import { usageReport, listPrices, setPrice, PLAN_PROVIDERS } from '../core/usage.js';
 import { installPackage, installedInfo } from '../core/mcp-local.js';
 import { snapshot as sysSnapshot, metricsHistory, osUpdates, logs as sysLogs, opsStatus, requestOp } from '../core/system.js';
@@ -78,6 +79,7 @@ const rateLimitLogin = (ip) => loginLimit(ip);
 
 export function startPanel({ channel, extend = [] }) {
   bootstrapAuth();
+  setWhatsAppChannel(channel);
   const routes = [];
   /** opts.role: minimum role (default: viewer for GET, admin otherwise). opts.public: no auth. */
   /** opts.raw: the handler reads the (binary) request body itself; see uploadAllowed() for the CSRF guard. */
@@ -393,6 +395,53 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     if (!q.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${q.get('q') ? ` (search “${String(q.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;
   }, { role: 'admin' });
+  // ---------- WhatsApp group tools for admins (026): same channel functions as the bots' whatsapp tools ----------
+  route('GET', '/api/whatsapp/tools', async () => whatsappToolCatalog());
+  const ADMIN_RANK = { superadmin: 2, admin: 1 };
+  const waGroup = (p) => {
+    const chat = decodeURIComponent(p.chat);
+    if (!isGroupChat(chat)) throw Object.assign(new Error('This is not a WhatsApp group'), { status: 400 });
+    if (typeof channel.groupInfo !== 'function') throw Object.assign(new Error('WhatsApp actions are not available'), { status: 501 });
+    return chat;
+  };
+  const waLog = (chat, user, summary, detail) => activity('whatsapp.action', { bot: botForChat(chat)?.id || '', chat, summary: `${summary} (panel, ${user.username})`, detail: { ...detail, by: user.username, source: 'panel' } });
+  route('GET', '/api/chats/:chat/whatsapp', async (req, res, body, q, p) => {
+    const chat = waGroup(p);
+    const g = await channel.groupInfo(chat);
+    const names = namesInChat(chat);
+    return { ...g, participants: g.participants.map((m) => ({ ...m, name: names[m.phone] || '' }))
+      .sort((a, b) => ((ADMIN_RANK[b.admin] || 0) - (ADMIN_RANK[a.admin] || 0)) || (a.name || a.phone || '~').localeCompare(b.name || b.phone || '~')) };
+  }, { role: 'admin' });
+  route('GET', '/api/chats/:chat/whatsapp/invite', async (req, res, body, q, p, user) => {
+    const chat = waGroup(p);
+    const r = await channel.groupInviteLink(chat);
+    waLog(chat, user, 'Invite link viewed', { tool: 'group_invite_link' });
+    return r;
+  }, { role: 'admin' });
+  route('POST', '/api/chats/:chat/whatsapp/invite/revoke', async (req, res, body, q, p, user) => {
+    const chat = waGroup(p);
+    const r = await channel.groupRevokeInvite(chat);
+    waLog(chat, user, 'Invite link reset', { tool: 'revoke_invite_link' });
+    return r;
+  });
+  route('PUT', '/api/chats/:chat/whatsapp', async (req, res, body, q, p, user) => {
+    const chat = waGroup(p);
+    const done = [];
+    if (typeof body.subject === 'string') {
+      if (!body.subject.trim()) return [400, { error: 'The group name cannot be empty', field: 'subject' }];
+      await channel.groupSubject(chat, body.subject.trim()); done.push(`name “${body.subject.trim().slice(0, 60)}”`);
+    }
+    if (typeof body.description === 'string') { await channel.groupDescription(chat, body.description); done.push('description'); }
+    const settings = Object.fromEntries(['announcement', 'locked', 'joinApproval'].filter((k) => typeof body[k] === 'boolean').map((k) => [k, body[k]]));
+    if (Object.keys(settings).length) {
+      await channel.groupSettings(chat, settings);
+      const label = { announcement: 'only admins send', locked: 'only admins edit info', joinApproval: 'approve new members' };
+      done.push(...Object.entries(settings).map(([k, v]) => `${label[k]} ${v ? 'on' : 'off'}`));
+    }
+    if (!done.length) return [400, { error: 'Nothing to change' }];
+    waLog(chat, user, `Group updated: ${done.join(', ')}`, { tool: 'update_group', input: body });
+    return { ok: true, changed: done };
+  });
   route('GET', '/api/chats/:chat/memory', async (req, res, body, q, p) => memoryView(decodeURIComponent(p.chat)));
   route('POST', '/api/chats/:chat/memory/summarize', async (req, res, body, q, p) => {
     const chat = decodeURIComponent(p.chat);

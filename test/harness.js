@@ -67,6 +67,25 @@ export async function setup({ bindings = {}, env = {}, legacy = null, extend = n
     groupMembers: async (chat) => (chat === 'g1@g.us' ? [{ phone: '41790000001', jid: 'a', admin: true }, { phone: '41790000002', jid: 'b', admin: false }, { phone: '41790000003', jid: 'c', admin: true }, { phone: '', jid: 'x@lid', admin: false }] : []),
     status: async () => ({ status: 'open', me: '41790000099:1@s.whatsapp.net', since: Date.now() }),
   };
+  // WhatsApp actions (026): every call recorded as { fn, chat, args }; results look like the real channel's.
+  t.waCalls = [];
+  const wa = (fn, result) => async (chat, ...args) => { t.waCalls.push({ fn, chat, args }); return typeof result === 'function' ? result(chat, ...args) : result; };
+  Object.assign(t.channel, {
+    sendMedia: wa('sendMedia', () => ({ msgId: `out-${++seq}`, mimetype: 'image/png', bytes: 10 })),
+    sendLocation: wa('sendLocation', () => ({ msgId: `out-${++seq}` })),
+    sendContact: wa('sendContact', () => ({ msgId: `out-${++seq}` })),
+    react: wa('react', { ok: true }), editMessage: wa('editMessage', () => ({ msgId: `out-${++seq}` })), deleteMessage: wa('deleteMessage', { ok: true }),
+    markRead: wa('markRead', { ok: true }), presence: wa('presence', { ok: true }),
+    sendPoll: wa('sendPoll', (chat, p) => { const msgId = `poll-${++seq}`; t.db?.savePoll({ chat, msgId, name: p.name, options: p.options, selectable: p.multi ? 0 : 1 }); return { msgId }; }),
+    groupInfo: wa('groupInfo', (chat) => ({ id: chat, subject: chat === 'g1@g.us' ? 'Panduga families' : 'Group', description: 'Event group', owner: '', size: 3,
+      announcement: false, locked: true, joinApproval: false, participants: [{ phone: '41790000001', jid: 'a', admin: 'superadmin' }, { phone: '41790000002', jid: 'b', admin: null }, { phone: '41790000003', jid: 'c', admin: 'admin' }] })),
+    groupInviteLink: wa('groupInviteLink', { link: 'https://chat.whatsapp.com/AbC123' }), groupRevokeInvite: wa('groupRevokeInvite', { link: 'https://chat.whatsapp.com/NeW456' }),
+    groupParticipants: wa('groupParticipants', (chat, people) => people.map((p) => ({ who: `${String(p).replace(/\D/g, '')}@s.whatsapp.net`, status: '200', ok: true }))),
+    groupSubject: wa('groupSubject', { ok: true }), groupDescription: wa('groupDescription', { ok: true }), groupPicture: wa('groupPicture', { ok: true }),
+    groupSettings: wa('groupSettings', { ok: true }), groupLeave: wa('groupLeave', { ok: true }),
+    profile: wa('profile', (chat, who) => ({ jid: `${String(who).replace(/\D/g, '')}@s.whatsapp.net`, phone: String(who).replace(/\D/g, ''), about: 'Hey there', pictureUrl: 'https://pps.whatsapp.net/x.jpg' })),
+    block: wa('block', { jid: 'x' }), unblock: wa('unblock', { jid: 'x' }),
+  });
   t.msg = (o) => ({
     channel: 'whatsapp', raw: {}, isGroup: true, chat: 'g1@g.us', phone: '41790000002', senderJid: 'x', senderName: 'Anu',
     mentioned: false, replyToBot: false, quoted: '', msgId: `in-${++seq}`, ts: Date.now(), ...o,
