@@ -15,7 +15,7 @@
 // which is also answered on 443 for any host with an internal on-demand certificate the app allows only for the domain
 // being checked. Optional origin lock-down to a proxy's published address list (PROVIDERS).
 import { isIPv4, isIPv6 } from 'node:net';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 // Cloudflare's published ranges (https://www.cloudflare.com/ips-v4, /ips-v6). Used until the app has downloaded
@@ -255,7 +255,7 @@ function cli(argv) {
     if (opt('host')) doc.host = opt('host');
     if (opt('server-ip') !== undefined) doc.serverIp = opt('server-ip') || null;
     const text = renderCaddyfile(doc, { caddyVersion: opt('caddy-version') || '2.7.0' });
-    if (opt('out')) writeFileSync(opt('out'), text, { mode: 0o644 }); else process.stdout.write(text);
+    if (opt('out')) { writeFileSync(opt('out'), text, { mode: 0o644 }); chmodSync(opt('out'), 0o644); } else process.stdout.write(text); // mode ignores umask only with chmod
     const env = envFor(doc);
     if (opt('out')) process.stdout.write(Object.entries(env).map(([k, v]) => `${k}=${v}`).join('\n') + '\n');
     return 0;

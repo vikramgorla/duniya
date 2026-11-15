@@ -64,6 +64,11 @@
       "actions": [],
       "data": "unchanged",
       "docs": "docs/architecture.md"
+    },
+    "2.9.5": {
+      "breaking": false,
+      "title": "Install fix: web server could not read its config",
+      "summary": "Fresh installs failed at 'Setting up HTTPS' because the web server's config file was written unreadable for the web server (installer umask 027). Fixed; redeploy to pick it up."
     }
   }
 }

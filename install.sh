@@ -357,7 +357,8 @@ EOF
     printf '{"host":"%s","port":%s,"access":{}}\n' "$HOSTNAME_PUBLIC" "$PORT" > "$WEB_REQ"
     render_caddy "$WEB_REQ" || die "Could not create the web server configuration for $HOSTNAME_PUBLIC"
   fi
-  mv -f /etc/caddy/Caddyfile.duniya /etc/caddy/Caddyfile
+  # Caddy runs as user "caddy": the config must be readable whatever umask this script runs with (cloud-init: 077).
+  install -m 0644 -o root -g root /etc/caddy/Caddyfile.duniya /etc/caddy/Caddyfile && rm -f /etc/caddy/Caddyfile.duniya
   rm -f "$WEB_REQ"
   open_web_ports
   # Hand port 80 over from the first-boot progress page (OCI bootstrap) to Caddy only now, when the final config is ready.
