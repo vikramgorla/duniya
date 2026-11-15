@@ -260,6 +260,14 @@
   .led b { color: var(--ink); font-weight: 600; letter-spacing: .02em; }
   @media (max-width: 720px) { .console { grid-template-columns: 1fr; } .leds { justify-content: flex-start; } }
   .ai-chip { display: inline-flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .08em; background: var(--signal); color: var(--signal-ink); border-radius: 5px; padding: 2px 6px; margin-right: 8px; vertical-align: 2px; }
+  /* Tables that turn into cards on phones: each cell shows its column name (data-label). */
+  @media (max-width: 640px) {
+    table.stack thead { display: none; }
+    table.stack, table.stack tbody, table.stack tr, table.stack td { display: block; width: 100%; }
+    table.stack tr { border: 1px solid var(--line, rgba(0,0,0,.08)); border-radius: 14px; padding: 8px 12px; margin: 0 0 10px; }
+    table.stack td { border: 0; padding: 4px 0; display: flex; gap: 12px; justify-content: space-between; align-items: center; }
+    table.stack td[data-label]:not([data-label=""])::before { content: attr(data-label); font: 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; opacity: .55; }
+  }
 </style>
 </head>
 <body>
@@ -292,6 +300,7 @@ const ICONS = {
   chats: 'M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9zM9 9.5h6M9 12.5h4',
   models: 'M12 3.5l1.8 4.7 4.7 1.8-4.7 1.8L12 16.5l-1.8-4.7L5.5 10l4.7-1.8zM18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z',
   usage: 'M5 19V10M10 19V5M15 19v-7M20 19v-4M3 19.5h18',
+  contacts: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3.5 19a5.5 5.5 0 0 1 11 0M16 7.5h5M16 11h5M17.5 14.5H21',
   server: 'M5 5h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM5 13h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zM8 8h.01M8 16h.01',
   backups: 'M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9a4.5 4.5 0 0 1 .5 9zM12 11v5M9.5 13.5 12 11l2.5 2.5',
   pending: 'M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 8v4.5l3 2',
@@ -394,7 +403,7 @@ const meterEl = () => { const i = h('i', { style: 'width:0%' }); const m = h('di
 const S = { tab: 'overview', user: null, status: null, feed: [], feedBot: '', es: null, editing: null };
 const RANK = { viewer: 1, admin: 2, owner: 3 };
 const can = (role) => S.user && RANK[S.user.role] >= RANK[role];
-const TABS = () => [['overview', 'Overview'], ['activity', 'Activity'], ['bots', 'Bots'], ['chats', 'Chats'], ['models', 'Models'],
+const TABS = () => [['overview', 'Overview'], ['activity', 'Activity'], ['bots', 'Bots'], ['chats', 'Chats'], ['contacts', 'Contacts'], ['models', 'Models'],
   ['server', 'Server'], ['usage', 'Usage'], can('owner') && ['backups', 'Backups'], ['pending', 'Pending'], ['secrets', 'Secrets'], ['settings', 'Settings']].filter(Boolean);
 
 // ---------- login & first-run setup ----------
@@ -503,7 +512,7 @@ function show(tab) {
   const seq = (S.renderSeq = (S.renderSeq || 0) + 1);
   const main = $('#main');
   const slow = setTimeout(() => { if (S.renderSeq === seq) main?.classList.add('loading'); }, 120);
-  const r = { overview: renderOverview, server: renderServer, usage: renderUsage, activity: renderActivity, bots: renderBots, chats: renderChats, models: renderModels, backups: renderBackups, pending: renderPending, secrets: renderSecrets, settings: renderSettings }[tab];
+  const r = { overview: renderOverview, server: renderServer, usage: renderUsage, activity: renderActivity, bots: renderBots, chats: renderChats, contacts: renderContacts, models: renderModels, backups: renderBackups, pending: renderPending, secrets: renderSecrets, settings: renderSettings }[tab];
   Promise.resolve(r?.()).catch((e) => toast(e.message)).finally(() => {
     clearTimeout(slow);
     if (S.renderSeq === seq) { main?.classList.remove('loading'); S.renderDone = seq; return; }
@@ -757,6 +766,43 @@ async function usageSummary() {
   usageCache = { at: Date.now(), v }; return v;
 }
 let usagePeriod = '30d';
+// ---------- contacts (#11) ----------
+let contactsQuery = '';
+async function renderContacts() {
+  const list = await api('GET', `/api/contacts?q=${encodeURIComponent(contactsQuery)}`);
+  const edit = can('admin');
+  const SRC = { own: 'Own', whatsapp: 'WhatsApp', both: 'Own + WhatsApp' };
+  const search = h('input', { type: 'search', placeholder: 'Search name, note or number', value: contactsQuery, style: 'max-width:320px' });
+  let timer; search.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { contactsQuery = search.value; renderContacts().then(() => { const i = $('#main input[type=search]'); i?.focus(); i?.setSelectionRange(i.value.length, i.value.length); }); }, 250); };
+  const F = { name: h('input', { placeholder: 'Name' }), phone: h('input', { placeholder: '+41 79 000 00 01', inputmode: 'tel' }), note: h('input', { placeholder: 'Note (optional), e.g. “drives on Tuesdays”' }), shared: h('input', { type: 'checkbox' }) };
+  const add = edit ? h('form', { class: 'card', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', `/api/contacts/${encodeURIComponent(F.phone.value)}`, { name: F.name.value, note: F.note.value, shared: F.shared.checked }), 'Contact saved')) renderContacts(); } },
+    h('h2', {}, 'Add a contact'),
+    h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px' }, F.name, F.phone, F.note),
+    h('div', { class: 'row spread', style: 'margin-top:8px' }, h('label', { class: 'inline' }, F.shared, 'Shared — participants may look it up'), h('button', { class: 'btn primary' }, 'Save'))) : null;
+  const row = (c) => {
+    const shared = h('input', { type: 'checkbox', checked: c.shared, disabled: !edit, 'aria-label': `Share ${c.name}`, onchange: () => tryApi(() => api('PUT', `/api/contacts/${c.phone}`, { shared: shared.checked }), shared.checked ? 'Shared' : 'Not shared') });
+    const editBtn = h('button', { class: 'btn small', onclick: async () => {
+      const name = prompt('Name', c.ownName || c.whatsappName); if (name === null) return;
+      const note = prompt('Note (optional)', c.note || ''); if (note === null) return;
+      if (await tryApi(() => api('PUT', `/api/contacts/${c.phone}`, { name, note }), 'Contact saved')) renderContacts();
+    } }, 'Edit');
+    return h('tr', {},
+      h('td', { 'data-label': 'Name' }, h('strong', {}, c.name), c.note ? h('div', { class: 'small muted' }, c.note) : null),
+      h('td', { 'data-label': 'Number', class: 'num' }, `+${c.phone}`),
+      h('td', { 'data-label': 'Source' }, h('span', { class: 'pill' }, SRC[c.source]), c.whatsappName && c.ownName && c.whatsappName !== c.ownName ? h('div', { class: 'small muted' }, `WhatsApp: ${c.whatsappName}`) : null),
+      h('td', { 'data-label': 'Shared' }, shared),
+      h('td', { 'data-label': '' }, edit ? h('div', { class: 'row nowrap', style: 'gap:6px' }, editBtn,
+        c.source !== 'whatsapp' ? h('button', { class: 'btn small mut', onclick: () => confirm(`Remove ${c.name}?`) && tryApi(async () => { await api('DELETE', `/api/contacts/${c.phone}`); renderContacts(); }, 'Removed') }, 'Remove') : null) : null));
+  };
+  $('#main').replaceChildren(
+    h('div', { class: 'card' },
+      h('div', { class: 'row spread' }, h('h2', {}, `Contacts (${list.length})`), search),
+      h('p', { class: 'small muted' }, 'Names from your linked WhatsApp phone appear here automatically, plus the people you add. Agents can look up numbers: organizers see everyone, participants only contacts marked Shared. Nothing is shared until you tick it.'),
+      list.length ? h('table', { class: 'stack' }, h('thead', {}, h('tr', {}, ['Name', 'Number', 'Source', 'Shared', ''].map((x) => h('th', {}, x)))), h('tbody', {}, list.map(row)))
+        : h('p', { class: 'muted' }, contactsQuery ? 'No contact matches.' : 'No contacts yet. They appear once WhatsApp syncs your phone’s address book, or add one below.')),
+    add);
+}
+
 async function renderUsage() {
   const [byDay, byBot, byChat, byProv, byModel, byKind, sum, chats, bots] = await Promise.all(['day', 'bot', 'chat', 'provider', 'model', 'kind']
     .map((g) => api('GET', `/api/usage?period=${usagePeriod}&groupBy=${g}`)).concat([usageSummary(), api('GET', '/api/chats').catch(() => []), api('GET', '/api/bots').catch(() => [])]));

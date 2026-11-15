@@ -18,6 +18,7 @@ import { allChatPrefs, setChatPrefs, seenChats, ignoredCounts, enabledChats } fr
 import { runAgent, handleConfirmCommand, applyPending } from '../core/agent.js';
 import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool, mcpConnection } from '../core/mcp.js';
+import { listContacts, saveContact, removeContact, getContact } from '../core/contacts.js';
 import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
 import { humanCode } from '../core/crypto.js';
 import { organizerConnection, oauthClientOf } from '../core/tools.js';
@@ -449,6 +450,15 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     return { summary: summary ?? memoryView(chat).summary };
   });
   route('DELETE', '/api/chats/:chat/memory', async (req, res, body, q, p, user) => { eraseChatMemory(decodeURIComponent(p.chat), user.username); return { ok: true }; });
+  // ---------- contacts (#11) ----------
+  route('GET', '/api/contacts', async (req, res, body, q) => listContacts({ q: q.get('q') || '', sharedOnly: q.get('shared') === '1' }));
+  route('PUT', '/api/contacts/:phone', async (req, res, body, q, p, user) => saveContact({ ...body, phone: decodeURIComponent(p.phone) }, user.username));
+  route('DELETE', '/api/contacts/:phone', async (req, res, body, q, p, user) => {
+    if (!getContact(decodeURIComponent(p.phone))) return [404, { error: 'Not found' }];
+    removeContact(decodeURIComponent(p.phone), user.username);
+    return { ok: true };
+  });
+
   // Shared agent memory (#8): notes an agent keeps across all its chats.
   route('GET', '/api/bots/:id/memory', async (req, res, body, q, p) => {
     if (!getBot(p.id)) return [404, { error: 'Not found' }];
