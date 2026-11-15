@@ -176,7 +176,7 @@ function fromOutputItems(items = []) {
       const text = (it.content || []).filter((c) => c.type === 'output_text').map((c) => c.text).join('');
       if (text) content.push({ type: 'text', text });
     } else if (it.type === 'function_call') {
-      let input = {};
+      let input;
       try { input = it.arguments ? JSON.parse(it.arguments) : {}; } catch { input = { _raw: it.arguments }; }
       content.push({ type: 'tool_use', id: it.call_id, name: it.name, input });
     }

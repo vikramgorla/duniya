@@ -49,7 +49,7 @@ class McpConnection {
         await this.close();
         const where = this.local ? `local tool service ${this.local.spec}` : `MCP ${this.url}`;
         const tail = this.local && this.stderr ? ` (${this.stderr.trim().split('\n').slice(-3).join(' | ')})` : '';
-        if (e.reconnect || attempt === 1) throw new Error(e.reconnect ? e.message : `${where}: ${e.message}${tail}`);
+        if (e.reconnect || attempt === 1) throw new Error(e.reconnect ? e.message : `${where}: ${e.message}${tail}`, { cause: e });
       }
     }
   }

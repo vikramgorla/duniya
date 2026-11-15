@@ -101,7 +101,7 @@ test('036: Caddyfile — HTTPS only, reachability check on any host, fallback ce
 });
 
 test('031/036: generated Caddyfiles are accepted by the installed Caddy (skipped when caddy is not installed)', (tt) => {
-  let ver = '';
+  let ver;
   try { ver = execFileSync('caddy', ['version'], { encoding: 'utf8' }).split(/\s/)[0]; } catch { return tt.skip('caddy not installed'); }
   const dir = mkdtempSync(join(tmpdir(), 'caddyfile-'));
   const base = { host: 'agents.example.org', aliases: ['new.example.org'], proxiedHosts: ['new.example.org'], redirectHosts: ['141-147-1-2.sslip.io'], serverIp: '141.147.1.2', port: 8080 };

@@ -319,7 +319,7 @@ export function startPanel({ channel, extend = [] }) {
   // The browser comes back here from the service. SameSite=Strict means no session cookie on this cross-site
   // navigation: the single-use state proves the sign-in was started by an admin; the page then returns to the panel.
   route('GET', '/oauth/mcp/callback', async (req, res, body, q) => {
-    let ok = true; let msg; let agentId = '';
+    let ok = true; let msg; let agentId;
     try {
       const r = await finishSignIn({ state: q.get('state'), code: q.get('code'), error: q.get('error'), errorDescription: q.get('error_description') });
       agentId = r.agentId; msg = `Connected ${r.server} for ${r.role}s.`;

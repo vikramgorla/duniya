@@ -57,7 +57,7 @@ const needGroup = (chat) => { if (!isGroupChat(chat)) fail('This only works in a
 /** A stored message → { msgId, fromMe, participant, text }. `message` = id or a few words of it (latest match). */
 function findMessage(chat, message, fallback) {
   const want = String(message || '').trim();
-  let row = null;
+  let row;
   if (want) {
     row = messageByMsgId(chat, want);
     if (!row) {
@@ -195,7 +195,7 @@ const DEFS = [
     input_schema: { type: 'object', properties: { poll: str('Optional: poll id or words of its question. Default: the latest poll.'), chat: CHAT } },
     async run(input, ctx) {
       const chat = await targetChat(input, ctx);
-      let p = null;
+      let p;
       if (input.poll) p = getPoll(chat, input.poll) || findPollByQuestion(chat, input.poll);
       else p = latestPoll(chat);
       if (!p) fail('No poll found in this chat (only polls created while this app was running are tracked)');
