@@ -26,7 +26,7 @@ import { draftAgent } from '../core/ai-builder.js';
 import { setWhatsAppChannel, whatsappToolCatalog, isGroupChat } from '../core/whatsapp-tools.js';
 import { usageReport, listPrices, setPrice, PLAN_PROVIDERS } from '../core/usage.js';
 import { installPackage, installedInfo } from '../core/mcp-local.js';
-import { snapshot as sysSnapshot, metricsHistory, osUpdates, logs as sysLogs, opsStatus, requestOp } from '../core/system.js';
+import { snapshot as sysSnapshot, metricsHistory, osUpdates, osUpdatesCached, rebootStatus, logs as sysLogs, opsStatus, requestOp } from '../core/system.js';
 
 // Local tool services run third-party code on this server: only owners may add or change them.
 const localSig = (cfg) => JSON.stringify(Object.entries(cfg?.mcpServers || {}).filter(([, v]) => v?.type === 'local')
@@ -196,6 +196,8 @@ export function startPanel({ channel, extend = [] }) {
     node: process.version,
     agents: listAgents().map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })),
     pending: listPending().length,
+    // #96: Server tab badge — only updates that will install now (from the last check; never runs apt here)
+    osUpdates: ['admin', 'owner'].includes(user?.role) ? { ...(osUpdatesCached() || { count: 0, security: 0, at: null }), restart: rebootStatus().required } : null,
   }));
   route('POST', '/api/settings', async (req, res, body, q, p, user) => {
     const patch = {};

@@ -27,6 +27,24 @@ run_app() { # run bin/duniya.js as the app user with only the app's environment
   if command -v runuser >/dev/null; then runuser -u "$APP_USER" -- "${base[@]}"; else sudo -u "$APP_USER" -- "${base[@]}"; fi
 }
 
+# #96: the in-panel app update runs as the app user, so it cannot (and must not) replace the root maintenance helper.
+# After `sudo duniya update` (or when already up to date) copy the helper from the checkout, as the installer does,
+# but only when those files are exactly as committed (git runs as the app user, never as root in its repository).
+refresh_helper() {
+  local ops="$APP_DIR/deploy/ops" f changed=0
+  [ -f "$ops/duniya-ops" ] && [ -d /var/lib/duniya-ops ] || return 0
+  if ! (cd "$APP_DIR" && runuser -u "$APP_USER" -- git diff --quiet HEAD -- deploy/ops) 2>/dev/null; then
+    echo "! Not updating the maintenance helper: deploy/ops has local changes. Re-run the installer to repair." >&2; return 0
+  fi
+  for f in duniya-ops:/usr/local/sbin/duniya-ops:0755 duniya-ops.service:/etc/systemd/system/duniya-ops.service:0644 \
+    duniya-ops.path:/etc/systemd/system/duniya-ops.path:0644 webconfig.mjs:/usr/local/lib/duniya-ops/webconfig.mjs:0644; do
+    IFS=: read -r src dst mode <<< "$f"
+    [ -f "$ops/$src" ] || continue
+    if ! cmp -s "$ops/$src" "$dst"; then install -D -m "$mode" -o root -g root "$ops/$src" "$dst"; changed=1; fi
+  done
+  if [ "$changed" = 1 ]; then systemctl daemon-reload; systemctl enable -q --now duniya-ops.path; echo "✓ Maintenance helper updated."; fi
+}
+
 case "${1:-}" in
   restart)
     echo "Restarting $SERVICE (agents are offline for a few seconds)…"
@@ -42,8 +60,8 @@ case "${1:-}" in
     if [[ " $* " == *" --check "* ]]; then run_app "$@"; exit $?; fi
     run_app "$@"; rc=$?
     case $rc in
-      0) systemctl restart "$SERVICE" && echo "✓ Restarted on the new version." ;;
-      3) exit 0 ;; # already up to date
+      0) refresh_helper; systemctl restart "$SERVICE" && echo "✓ Restarted on the new version." ;;
+      3) refresh_helper; exit 0 ;; # already up to date (perhaps updated from the panel): still refresh the helper
       *) exit $rc ;;
     esac
     ;;

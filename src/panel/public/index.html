@@ -234,6 +234,9 @@
   nav button.on { background: var(--accent); color: var(--accent-ink); box-shadow: none; }
   nav button.on svg { opacity: 1; }
   nav button.on::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--signal); margin-left: 2px; box-shadow: 0 0 8px var(--signal); }
+  nav .nbadge { font-family: var(--mono); font-size: 13px; font-weight: 700; line-height: 18px; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--warn-soft); color: var(--warn); text-align: center; }
+  nav .nbadge:empty { display: none; }
+  .pkgs summary { cursor: pointer; } .pkgs .pkg { padding: 3px 0; overflow-wrap: anywhere; } .pkgs .why { color: var(--muted); }
   @media (prefers-color-scheme: dark) { nav button.on::after { background: var(--accent-ink); box-shadow: none; } }
   .card { background: var(--card); border: 1px solid var(--line); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: var(--shadow); }
   fieldset { background: color-mix(in srgb, var(--bg) 45%, var(--card)); border-color: var(--line); border-radius: var(--radius-s); }
@@ -658,7 +661,8 @@ async function boot() {
   document.body.classList.toggle('readonly', !can('admin'));
   const nav = h('nav', { onwheel: (e) => { // a mouse wheel scrolls the tab bar sideways when it does not fit
     if (nav.scrollWidth > nav.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { nav.scrollLeft += e.deltaY; e.preventDefault(); }
-  } }, TABS().map(([id, label]) => h('button', { 'data-tab': id, onclick: () => (location.hash === `#${id}` ? show(id) : (location.hash = id)) }, icon(id), label)));
+  } }, TABS().map(([id, label]) => h('button', { 'data-tab': id, onclick: () => (location.hash === `#${id}` ? show(id) : (location.hash = id)) }, icon(id), label,
+    id === 'server' ? h('span', { class: 'nbadge', id: 'server-badge' }) : null)));
   app.append(
     h('header', {}, h('div', { class: 'bar' }, h('div', { class: 'brand' }, logo(), 'Duniya', h('span', { class: 'dot', id: 'wa-dot', title: 'WhatsApp' }), h('small', { id: 'brand-sub' }, 'agents')),
       h('div', { style: 'flex:1' }), h('span', { class: 'small muted', title: `${S.user.username} · ${S.user.role}` }, S.user.username, h('span', { class: 'who-role' }, ` · ${S.user.role}`)),
@@ -674,7 +678,15 @@ async function refreshStatus() {
   const st = S.status.channel.status;
   const dot = $('#wa-dot'); if (dot) dot.className = `dot ${st === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(st) ? 'warn' : 'bad'}`;
   const sub = $('#brand-sub'); if (sub) sub.textContent = S.status.settings.paused ? 'paused' : `${S.status.agents.filter((b) => b.enabled).length} agents live`;
+  serverBadge(S.status.osUpdates);
   if (S.tab === 'overview') renderOverview(true);
+}
+// #96: the Server tab counts only OS updates that will install now (not gradual roll-outs or held packages); "!" when
+// a restart is needed to finish updates.
+function serverBadge(o) {
+  const b = $('#server-badge'); if (!b) return;
+  b.textContent = !o ? '' : o.count ? String(o.count) : o.restart ? '!' : '';
+  b.title = !o ? '' : [o.count ? `${o.count} OS update${o.count > 1 ? 's' : ''} to install` : '', o.restart ? 'Restart needed to finish updates' : ''].filter(Boolean).join(' · ');
 }
 function show(tab) {
   if (!TABS().some(([id]) => id === tab)) tab = 'overview';
@@ -1003,7 +1015,7 @@ function spark(values, max) {
   return svg;
 }
 const meter = (p) => h('div', { class: `meter ${p >= 85 ? 'hot' : ''}` }, h('i', { style: `width:${Math.min(100, p)}%` }));
-let serverTimer = null; let opsTimer = null; let logUnit = 'whatsapp-agent-duniya';
+let serverTimer = null; let opsTimer = null; let logUnit = 'whatsapp-agent-duniya'; let lastSys = null;
 // Small servers (043): one line about what this server can take, and the media queue when something waits.
 const SIZE_LABEL = { small: 'Small server', medium: 'Medium server', large: 'Large server' };
 function serverSizeNote(s, q) {
@@ -1047,6 +1059,7 @@ async function renderServer() {
     if (S.tab !== 'server') return clearInterval(serverTimer);
     const [x, hist] = await Promise.all([api('GET', '/api/system'), api('GET', '/api/system/history')]).catch(() => [null, []]);
     if (!x) return;
+    lastSys = x;
     if (!hostBox.childElementCount) hostBox.append(hostingCard(x.hosting));
     const m = x.memory; const d = x.disks[0];
     const tile = (eyebrow, stat, sub, extra) => h('div', { class: 'card' }, h('div', { class: 'eyebrow' }, eyebrow), stat, sub ? h('div', { class: 'small muted' }, sub) : null, extra);
@@ -1057,7 +1070,7 @@ async function renderServer() {
       tile('Swap', h('div', { class: 'stat' }, m.swapTotal ? `${pct(m.swapUsed, m.swapTotal)}` : '–', h('small', {}, m.swapTotal ? '%' : '')), m.swapTotal ? `${bytes(m.swapUsed)} of ${bytes(m.swapTotal)}` : 'No swap', m.swapTotal ? meter(pct(m.swapUsed, m.swapTotal)) : null),
       tile('Network', h('div', { class: 'stat' }, bytes(x.network?.rxRate || 0), h('small', {}, '/s in')), `${bytes(x.network?.txRate || 0)}/s out · total ${bytes(x.network?.rx)} in`, spark(hist.map((p) => p.rx + p.tx))),
       tile('Uptime', h('div', { class: 'stat', style: 'font-size:24px' }, ago(Date.now() - x.uptimeSec * 1000)), `since ${time(Date.now() - x.uptimeSec * 1000)}`,
-        x.rebootRequired ? h('div', { class: 'note warn' }, 'Restart required to finish updates') : null));
+        x.rebootRequired ? h('a', { class: 'note warn', href: '#server', style: 'display:block', onclick: (e) => { e.preventDefault(); document.getElementById('restart-needed')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }, 'Restart needed to finish updates') : null));
     infoBox.replaceChildren(h('h2', {}, 'This server'),
       h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {}, [['Host', x.host], ['System', x.os], ['Kernel', `${x.kernel} (${x.arch})`], ['App', `pid ${x.app.pid} · Node ${x.app.node}`]].map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v)))))),
       serverSizeNote(S.status?.server, S.status?.mediaQueue),
@@ -1067,23 +1080,53 @@ async function renderServer() {
     if (S.tab !== 'server') return;
     if (!can('admin')) { opsBox.replaceChildren(h('h2', {}, 'Maintenance'), h('p', { class: 'small muted' }, 'Admins can see OS updates; owners can run maintenance.')); return; }
     const [upd, ops] = await Promise.all([api('GET', '/api/system/os-updates').catch(() => null), can('owner') ? api('GET', '/api/system/ops').catch(() => null) : null]);
+    if (S.tab !== 'server') return;
     const run = ops?.status?.state === 'running' ? ops.status : null;
     const act = (action, label, cls = '', ask = '') => h('button', { class: `btn ${cls}`, disabled: !!run || !ops?.available, onclick: () => (!ask || confirm(ask)) && tryApi(async () => { await api('POST', '/api/system/ops', { action }); setTimeout(opsCard, 1500); }, 'Started') }, label);
+    const reboot = ops?.reboot || lastSys?.reboot || { required: !!lastSys?.rebootRequired, packages: lastSys?.rebootPackages || [] };
+    if (S.status?.osUpdates && upd?.supported) serverBadge({ ...S.status.osUpdates, count: upd.count, restart: reboot.required });
+    const ver = (p) => (p.from || p.to ? ` ${p.from || 'new'} → ${p.to || '?'}` : '');
+    const group = (title, items, row, hint, open = false) => (items?.length ? h('details', { class: 'pkgs', open, style: 'margin-top:6px' },
+      h('summary', { class: 'small' }, h('b', {}, `${title} (${items.length})`)),
+      hint ? h('div', { class: 'small muted', style: 'margin:4px 0' }, hint) : null,
+      h('div', { class: 'small' }, items.slice(0, 200).map(row))) : null);
+    const restartBanner = reboot.required ? h('div', { class: 'note warn', id: 'restart-needed', style: 'margin:10px 0' },
+      h('b', {}, `Restart needed to finish${reboot.kernel ? ' (new kernel)' : ' updates'}`),
+      reboot.since ? ` · waiting since ${time(reboot.since)}` : '',
+      reboot.packages?.length ? h('div', { class: 'small', style: 'margin-top:4px;overflow-wrap:anywhere' }, `For: ${reboot.packages.slice(0, 12).join(', ')}${reboot.packages.length > 12 ? ` and ${reboot.packages.length - 12} more` : ''}`) : null,
+      h('div', { class: 'small muted', style: 'margin-top:4px' }, 'Agents are offline for 1–2 minutes while the server restarts.'),
+      can('owner') && ops?.available ? h('div', { class: 'row', style: 'margin-top:8px' }, act('reboot', 'Restart server', 'danger', 'Restart the whole server now to finish the updates? Agents are offline for 1–2 minutes.')) : null) : null;
+    const phasedHint = 'Ubuntu rolls these out gradually: it installs them automatically within days. They are not needed now.';
+    const updates = !upd ? null : !upd.supported ? h('p', { class: 'small muted' }, 'OS update checks are available on Debian/Ubuntu servers.')
+      : h('div', { style: 'margin:10px 0' },
+        upd.count || upd.newPackages
+          ? h('div', { class: `note ${upd.security ? 'warn' : ''}` }, h('b', {}, `${plural(upd.count, 'update')} to install`), upd.security ? ` · ${upd.security} security` : '',
+            upd.newPackages ? ` · ${plural(upd.newPackages, 'new package')}` : '', ` · checked ${ago(upd.at)} ago`)
+          : h('div', { class: 'note ok' }, h('b', {}, '✓ Nothing to install now'), upd.phased.length ? ` · ${upd.phased.length} rolling out gradually` : '', ` · checked ${ago(upd.at)} ago`),
+        upd.error ? h('div', { class: 'small muted', style: 'margin-top:4px' }, `Check: ${upd.error}`) : null,
+        group('Will install', upd.install, (p) => h('div', { class: 'pkg' }, h('b', {}, p.name), ver(p),
+          p.security ? h('span', { class: 'pill warn', style: 'margin-left:6px' }, 'security') : null, p.isNew ? h('span', { class: 'pill', style: 'margin-left:6px' }, 'new') : null)),
+        group('Rolling out gradually', upd.phased, (p) => h('div', { class: 'pkg' }, h('b', {}, p.name), ver(p), p.phased != null ? h('span', { class: 'why' }, ` · ${p.phased}% of servers so far`) : null), phasedHint),
+        group('Held back', upd.held, (p) => h('div', { class: 'pkg' }, h('b', {}, p.name), ver(p), h('div', { class: 'why' }, p.why))));
+    const last = ops?.status && !run ? ops.status : null;
+    const lastLine = last ? h('p', { class: 'small', style: 'margin:0 0 6px' }, h('span', { class: 'muted' }, `Last: ${ops.actions[last.action] || last.action} · ${time(last.endedAt)} · `),
+      ops.result?.text ? h('b', {}, ops.result.text) : last.state === 'done' ? 'done' : h('b', { style: 'color:var(--bad)' }, 'failed')) : null;
+    const oldHelper = ops?.available && !ops.helperCurrent ? h('div', { class: 'note info', style: 'margin-top:10px' },
+      'This server has an older maintenance helper: it uses apt upgrade, which holds back new kernels. Run ', h('code', {}, 'sudo duniya update'),
+      ' on the server once (or re-run the installer) to get the full update, gradual updates and clear results.') : null;
     opsBox.replaceChildren(h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'OS updates & maintenance'),
       h('button', { class: 'btn small', onclick: async (e) => { e.target.disabled = true; await api('GET', '/api/system/os-updates?refresh=1').catch(() => {}); opsCard(); } }, 'Check')),
-      !upd ? null : !upd.supported ? h('p', { class: 'small muted' }, 'OS update checks are available on Debian/Ubuntu servers.')
-        : h('div', { style: 'margin:10px 0' }, upd.packages.length
-          ? h('div', { class: `note ${upd.security ? 'warn' : ''}` }, h('b', {}, `${upd.packages.length} package update${upd.packages.length > 1 ? 's' : ''}`), upd.security ? ` · ${upd.security} security` : '', ` · checked ${ago(upd.at)} ago`)
-          : h('div', { class: 'note ok' }, h('b', {}, '✓ System packages are up to date'), ` · checked ${ago(upd.at)} ago`),
-        upd.packages.length ? h('details', {}, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Show packages'), h('div', { class: 'small', style: 'margin-top:6px' }, upd.packages.slice(0, 200).map((p) => h('div', {}, h('b', {}, p.name), ` ${p.from || ''} → ${p.to}`, p.security ? h('span', { class: 'pill warn', style: 'margin-left:6px' }, 'security') : null)))) : null),
+      restartBanner, updates,
       can('owner') ? (ops?.available ? h('div', {},
         run ? h('div', { class: 'note' }, h('span', { class: 'spinner' }), h('b', {}, ` ${ops.actions[run.action] || run.action}…`), ` started ${ago(run.startedAt)} ago`) : null,
+        lastLine,
         h('div', { class: 'row', style: 'margin-top:8px' },
-          act('os-update', 'Install OS updates', 'primary', 'Install all OS package updates now? The server stays online; a restart may be needed afterwards.'),
-          act('reboot', 'Restart server', 'danger', 'Restart the whole server now? Agents are offline for 1–2 minutes.')),
+          act('os-update', 'Install OS updates', 'primary', 'Install the OS updates now? Updates Ubuntu is still rolling out gradually wait. The server stays online; a restart may be needed afterwards.'),
+          upd?.phased?.length && ops.helperCurrent ? act('os-update-all', 'Include gradual updates now', '', `Also install ${plural(upd.phased.length, 'update')} Ubuntu is still rolling out gradually (${upd.phased.map((p) => p.name).slice(0, 5).join(', ')})? Normally they arrive within days.`) : null,
+          reboot.required ? null : act('reboot', 'Restart server', 'danger', 'Restart the whole server now? Agents are offline for 1–2 minutes.')),
+        oldHelper,
         h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'More'),
           h('div', { class: 'row', style: 'margin-top:8px' }, act('os-cleanup', 'Remove unused packages'), act('restart-web', 'Restart web server'), act('restart-tunnel', 'Restart tunnel'))),
-        ops.status && !run ? h('p', { class: 'small muted' }, `Last: ${ops.actions[ops.status.action] || ops.status.action} — ${ops.status.state === 'done' ? 'done' : 'failed'} ${time(ops.status.endedAt)}`) : null,
         ops.log ? h('details', { open: !!run }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Output'), h('pre', {}, ops.log)) : null)
         : h('div', { class: 'note' }, 'Maintenance actions need a one-time setup on this server: re-run the installer, or redeploy. Metrics and update checks work without it.'))
         : h('p', { class: 'small muted' }, 'Only the owner can run maintenance.'));

@@ -9,6 +9,7 @@ import { ownerNumber, sendOwnerAlert } from './owner-alerts.js';
 import { updateStatus } from './updates.js';
 import { lastBackup } from './backup/index.js';
 import { listCaps, capStatus, monthOf } from './budget.js';
+import { rebootStatus } from './system.js';
 
 export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DEFAULTS = { enabled: null, day: 'mon', at: '09:00' };
@@ -54,6 +55,7 @@ export function weeklyData(now = Date.now()) {
   const lb = lastBackup();
   const up = updateStatus();
   const month = monthOf(now);
+  const rb = rebootStatus(); // #96: an OS update waiting for a restart for more than 7 days gets one line
   return {
     from, to: Math.min(to, now), agents,
     ignored: { messages: ignoredRows.reduce((a, r) => a + r.n, 0), chats: new Set(ignoredRows.map((r) => r.chat)).size },
@@ -62,6 +64,7 @@ export function weeklyData(now = Date.now()) {
     pending: listPending().length,
     update: up?.available ? { latest: up.latest, current: up.current, decision: up.breaking && up.decisionVersion ? `v${up.decisionVersion}` : null } : null,
     backups: { failures: backupFailures, lastFailed: !!lb && Object.values(lb.results || {}).some((v) => String(v).startsWith('error')) },
+    restart: rb.required && rb.since && now - rb.since > 7 * 86400000 ? { days: Math.floor((now - rb.since) / 86400000), kernel: rb.kernel } : null,
   };
 }
 
@@ -84,6 +87,7 @@ export function weeklyText(d = weeklyData()) {
   if (d.pending) todo.push(`${plural(d.pending, 'change')} waiting for confirmation`);
   if (d.update) todo.push(d.update.decision ? `update ${d.update.decision} needs your decision (breaking release; running ${d.update.current})` : `update available: ${d.update.latest} (running ${d.update.current})`);
   if (d.backups.failures || d.backups.lastFailed) todo.push(d.backups.failures ? `${plural(d.backups.failures, 'backup')} failed` : 'the last backup failed');
+  if (d.restart) todo.push(`the server has waited ${d.restart.days} days for a restart to finish OS updates${d.restart.kernel ? ' (new kernel)' : ''} (Server → Restart server)`);
   lines.push(todo.length ? `Needs you: ${todo.join('; ')}. Open the panel to sort it out.` : 'Nothing needs you right now.');
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }

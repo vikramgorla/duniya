@@ -21,7 +21,7 @@ docker compose exec app duniya help   # Docker
 | `status` | version, uptime, WhatsApp numbers, agents, last backup |
 | `doctor` | checks DNS, HTTPS, ports, disk, memory, swap and prints fixes |
 | `backup-now`, `restart`, `logs [-f]` | maintenance |
-| `update [--check] [--breaking]` | newest release that needs no decision, backup first; `--breaking` also crosses a breaking release |
+| `update [--check] [--breaking]` | newest release that needs no decision, backup first; `--breaking` also crosses a breaking release; also refreshes the root maintenance helper (OS updates) |
 | `open-access` | removes the IP allow-list if it locked you out |
 
 ---

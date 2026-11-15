@@ -1,0 +1,23 @@
+NOTE: This is only a simulation!
+      apt-get needs root privileges for real execution.
+      Keep also in mind that locking is deactivated,
+      so don't depend on the relevance to the real current situation!
+Reading package lists...
+Building dependency tree...
+Reading state information...
+Calculating upgrade...
+Upgrading:
+  curl  libcurl4t64
+
+Not upgrading yet due to phasing:
+  snapd
+
+Not upgrading:
+  docker-ce
+
+Summary:
+  Upgrading: 2, Installing: 0, Removing: 0, Not Upgrading: 2
+Inst libcurl4t64 [8.12.1-3ubuntu1] (8.12.1-3ubuntu1.1 Ubuntu:25.04/plucky-security [arm64])
+Inst curl [8.12.1-3ubuntu1] (8.12.1-3ubuntu1.1 Ubuntu:25.04/plucky-security [arm64])
+Conf libcurl4t64 (8.12.1-3ubuntu1.1 Ubuntu:25.04/plucky-security [arm64])
+Conf curl (8.12.1-3ubuntu1.1 Ubuntu:25.04/plucky-security [arm64])

@@ -23,7 +23,8 @@ Step by step per host: [Oracle Cloud](deploy/oci-free-tier.md#update-the-app) ·
 > [!NOTE]
 > Servers installed with an early 2.x may need one step:
 > - **Web address & access**, OS updates and restarts are applied by the root maintenance helper. If the panel says
->   maintenance needs a one-time setup, re-run the installer.
+>   maintenance needs a one-time setup, re-run the installer. A newer helper later on: `sudo duniya update` refreshes
+>   it (the in-panel app update cannot, it has no root).
 > - **Photos & voice** need `ffmpeg` and `bzip2` (voice replies, on-server speech): re-run the installer; the Docker
 >   image includes them.
 
@@ -36,6 +37,7 @@ release (or a new major) and you are asked on the panel and on WhatsApp.
 
 | Version | Breaking | What to do |
 |---|---|---|
+| 2.14.1 | no | Full OS updates (new kernels, gradual updates, restart banner): run `sudo duniya update` on the server once (or re-run the installer) so the root maintenance helper is refreshed; the in-panel update cannot replace it. ([details](backups-and-updates.md#os-updates-installer-servers)) |
 | 2.9.6 | no | Sign in with Google on more than one address (or after a domain change): register every origin and redirect URI shown under **Settings → Sign in with Google** ([how](google-sign-in.md#when-the-panels-address-changes)). |
 | 2.7.0 | no | Voice replies and on-server speech: re-run the installer (adds `ffmpeg`, `bzip2`). |
 | 2.5.0 | no | Re-run the installer (root maintenance helper). Limited access to Cloudflare? Choose it again under **Settings → Web address & access**: not carried over. |

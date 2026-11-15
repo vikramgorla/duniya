@@ -85,11 +85,36 @@ A jump is *breaking* when the major version grows or a release in between is mar
 
 </details>
 
+### OS updates (installer servers)
+
+**Server → OS updates & maintenance → Install OS updates**, then **Restart server** when the page says so.
+
+- The list is grouped: **Will install** (the count on the **Server** tab), **Rolling out gradually** and **Held
+  back** (with the reason, e.g. *On hold (apt-mark hold)*).
+- The install uses `apt-get full-upgrade`, so new kernels install too (plain `apt upgrade` keeps them back), then
+  removes packages nobody needs any more (`autoremove --purge`; the running kernel is kept). This frees disk on small
+  servers.
+- **Rolling out gradually**: Ubuntu releases some updates to a growing share of servers over a few days (*phased
+  updates*). They install by themselves within days; **Include gradual updates now** installs them right away.
+- After a run you get one line, e.g. *Installed 3 updates · 4 new packages · 1 rolling out gradually · restart
+  needed*. The full apt output stays under **Output**.
+- **Restart needed to finish (new kernel)** shows the packages that asked for it and a **Restart server** button
+  (agents are offline 1–2 minutes). If it waits more than 7 days, the [weekly summary](owner-assistant.md#owner-alerts-and-weekly-summary) says so.
+
+> [!NOTE]
+> On a 1 GB server a kernel update takes a few minutes and uses swap (the installer adds 2 GB); apt runs at low
+> priority so agents keep answering. A run that was cut off is finished first on the next run.
+
+> [!IMPORTANT]
+> The OS update steps live in the root maintenance helper, which the in-panel app update cannot replace. If the
+> page says *This server has an older maintenance helper*, run `sudo duniya update` on the server once (or re-run
+> the installer). Admin MCP: `list_os_updates`, `run_maintenance` with `os-update` or `os-update-all`.
+
 ### Per host
 
 | Host | App | OS / infrastructure |
 |---|---|---|
-| Installer server | as above | **Server → OS updates & maintenance** (security updates, restart when needed) |
+| Installer server | as above | **Server → OS updates & maintenance** ([details](#os-updates-installer-servers)) |
 | Docker | `docker compose pull && docker compose up -d` | host `apt upgrade` |
 | Oracle Cloud stack | as above | **Edit** stack → latest zip → **Plan** → **Apply** ([step by step](deploy/oci-free-tier.md#update-the-stack-infrastructure)) |
 | Google Cloud | as above ([guide](deploy/google-cloud.md#update-the-app)) | panel OS updates |
