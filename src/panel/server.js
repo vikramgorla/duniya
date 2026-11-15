@@ -54,7 +54,12 @@ import { ownerAlertRoutes } from './routes/owner-alerts.js';
 import { directChatRoutes } from './routes/direct-chats.js';
 import { listDirectChats, isChatAlias } from '../core/direct-chats.js';
 import { mediaRoutes } from './routes/media.js';
-import { serverSize } from '../core/resources.js';
+import { serverSize, smallServerMode, setSmallServerMode } from '../core/resources.js';
+/** What Small server mode is and what it covers here (055). */
+const smallModeView = () => ({ enabled: smallServerMode(), server: serverSize(),
+  covers: ['On-server speech (about 900 MB minimum, one voice note at a time, only with enough free memory)',
+    'Local tool services (at most 2 at once, started when first used, stopped when memory is tight)'],
+  notCovered: ['GitHub Copilot sign-in (its ~400 MB download and helper do not fit next to the app; needs 2 GB)'] });
 import { queueStats } from '../core/media-queue.js';
 import { insightRoutes } from './routes/insights.js';
 import { ownerAssistantRoutes } from './routes/owner-assistant.js';
@@ -193,7 +198,7 @@ export function startPanel({ channel, extend = [] }) {
     version: await gitVersion(),
     uptimeSec: Math.round((Date.now() - startedAt) / 1000),
     memoryMb: Math.round(process.memoryUsage().rss / 1048576),
-    server: serverSize(), // small-server guardrails (043): size class, RAM, free memory, CPUs
+    server: { ...serverSize(), smallMode: smallServerMode() }, // small-server guardrails (043, 055): size, RAM, CPUs, switch
     mediaQueue: queueStats(),
     node: process.version,
     agents: listAgents().map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })),
@@ -201,6 +206,14 @@ export function startPanel({ channel, extend = [] }) {
     // #96: Server tab badge — only updates that will install now (from the last check; never runs apt here)
     osUpdates: ['admin', 'owner'].includes(user?.role) ? { ...(osUpdatesCached() || { count: 0, security: 0, at: null }), restart: rebootStatus().required } : null,
   }));
+  // 055: Small server mode — one server-wide switch for heavier features on a small server (owner only).
+  route('GET', '/api/server/small-mode', async () => smallModeView());
+  route('PUT', '/api/server/small-mode', async (req, res, body, q, p, user) => {
+    if (typeof body.enabled !== 'boolean') return [400, { error: 'enabled must be true or false', field: 'enabled' }];
+    setSmallServerMode(body.enabled);
+    activity('config', { summary: `Small server mode ${body.enabled ? 'on' : 'off'} by ${user.username}` });
+    return smallModeView();
+  }, { role: 'owner' });
   route('POST', '/api/settings', async (req, res, body, q, p, user) => {
     const patch = {};
     if ('paused' in body) patch.paused = !!body.paused;

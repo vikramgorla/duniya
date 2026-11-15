@@ -1,12 +1,13 @@
 // 055 (#106): local (on-server, command-based) tool services are refused on small servers on every path, with the same
-// message as the MCP Registry browser (052). Already-configured ones stay saved but are not started. The server size
-// comes from a fake probe; nothing is installed and no package runs.
+// message as the MCP Registry browser (052), unless the owner switched on Small server mode (one server-wide switch,
+// also used by on-server speech). Already-configured ones stay saved but are not started. The server size comes from a
+// fake probe; nothing is installed and no package runs.
 import { test, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { setup } from './harness.js';
 
 const t = await setup();
-const { setResourceProbe } = await import('../src/core/resources.js');
+const { setResourceProbe, setSmallServerMode, smallServerMode, heavyCheck, optionalPaused } = await import('../src/core/resources.js');
 const { localServiceCheck, addedLocalServices } = await import('../src/core/mcp-local.js');
 const { localRegistryCheck } = await import('../src/core/mcp-registry.js');
 const { toolsFor } = await import('../src/core/tools.js');
@@ -15,22 +16,22 @@ const { TOOLS } = await import('../src/panel/admin-tools.js');
 const owner = await t.login();
 const SMALL = { totalMb: 970, cgroupLimitMb: null, availableMb: 500, cpus: 1, rssMb: 150 };
 const BIG = { totalMb: 8000, cgroupLimitMb: null, availableMb: 6000, cpus: 4, rssMb: 150 };
-after(() => { setResourceProbe(null); return t.close(); });
-beforeEach(() => setResourceProbe(BIG));
+after(() => { setResourceProbe(null); setSmallServerMode(false); return t.close(); });
+beforeEach(() => { setResourceProbe(BIG); setSmallServerMode(false); });
 
 const LOCAL = { type: 'local', package: '@acme/files-mcp@0.3.1', args: [], env: {} };
 const base = { name: 'Files agent', prompt: 'Help.', tools: { organizer: ['files:*'], participant: [] } };
 const isSmallRefusal = (r) => {
   assert.equal(r.status, 400, JSON.stringify(r.body));
   assert.equal(r.body.code, 'small_server');
-  assert.match(r.body.error, /small server .*local tool services are not run here.*hosted tool service/);
+  assert.match(r.body.error, /small server .*local tool services are not run here.*hosted tool service.*or switch on Small server mode in Settings → Server/);
 };
 const x = { call: async (method, path, body) => { const r = await t.api(owner, method, path, body); if (r.status >= 400) throw Object.assign(new Error(r.body.error), { status: r.status }); return r.body; } };
 const tool = (n) => TOOLS.find((v) => v.name === n);
 
 test('one rule: the registry check is the shared check; only new or changed local services count', () => {
   assert.equal(localRegistryCheck, localServiceCheck);
-  assert.deepEqual(localServiceCheck(), { ok: true });
+  assert.equal(localServiceCheck().ok, true);
   setResourceProbe(SMALL);
   assert.equal(localServiceCheck().code, 'small_server');
   assert.deepEqual(addedLocalServices({ a: LOCAL }, { a: { ...LOCAL }, b: { url: 'https://x.example/mcp' } }), []);
@@ -111,4 +112,74 @@ test('already configured on a small server: not started, the reason is listed, i
   setResourceProbe(BIG);
   assert.equal((await t.api(owner, 'GET', '/api/agents/files-b/local')).body.find((l) => l.server === 'files').blocked, null);
   await t.api(owner, 'DELETE', '/api/tool-services/gfiles');
+});
+
+// ---------- Small server mode: the one switch ----------
+const viewer = await (async () => { t.store.createUser({ username: 'vic', role: 'admin', password: 'admin password 1234' }); return t.login('vic', 'admin password 1234'); })();
+
+test('small server mode: owner-only switch, carried over once from the old Photos & voice switch, shown in status', async () => {
+  const { updateSettings } = await import('../src/core/store.js');
+  updateSettings({ smallServerMode: null, media: { local: { listen: false, speak: false, smallServer: true } } });
+  assert.equal(smallServerMode(), true, 'the old switch is read once');
+  updateSettings({ media: { local: { listen: false, speak: false } } });
+  assert.equal(smallServerMode(), true, 'and kept as the server-wide setting');
+  setSmallServerMode(false);
+  assert.equal((await t.api(viewer, 'PUT', '/api/server/small-mode', { enabled: true })).status, 403);
+  assert.equal((await t.api(owner, 'PUT', '/api/server/small-mode', { enabled: 'yes' })).status, 400);
+  const on = await t.api(owner, 'PUT', '/api/server/small-mode', { enabled: true });
+  assert.equal(on.body.enabled, true);
+  assert.match(on.body.notCovered.join(' '), /Copilot/);
+  assert.equal((await t.api(owner, 'GET', '/api/status')).body.server.smallMode, true);
+});
+
+test('small server mode on: every local path is allowed on a small server; off again: refused again', async () => {
+  setResourceProbe(SMALL);
+  setSmallServerMode(true);
+  assert.equal((await t.api(owner, 'POST', '/api/agents', { id: 'files-m', config: { ...base, mcpServers: { files: LOCAL } } })).status, 201);
+  assert.equal((await t.api(owner, 'POST', '/api/agents/files-m/duplicate', { id: 'files-m2' })).status, 201);
+  assert.equal((await t.api(owner, 'POST', '/api/agents/import', { format: 'duniya-agent', version: 1, config: { ...base, name: 'Imported', mcpServers: { files: LOCAL } } })).status, 201);
+  assert.equal((await t.api(owner, 'PUT', '/api/tool-services/gmode', LOCAL)).status, 201);
+  await tool('update_agent').run({ agent_id: 'files-m', changes: { mcpServers: { files: { ...LOCAL, args: ['--ro'] } } } }, x);
+  assert.equal((await t.api(owner, 'GET', '/api/agents/files-m/local')).body[0].blocked, null);
+  // Started lazily with the usual cap; refused while memory is tight.
+  const { toolsFor: tf } = await import('../src/core/tools.js');
+  setResourceProbe({ ...SMALL, rssMb: 900 });
+  const { meta } = await tf({ ...getAgent('files-m'), tools: { organizer: ['files:*'], participant: [] } }, 'organizer');
+  assert.match((meta.get('__errors') || []).join('\n'), /Memory is tight on this small server/);
+  setResourceProbe(SMALL);
+  setSmallServerMode(false);
+  isSmallRefusal(await t.api(owner, 'PUT', '/api/tool-services/gmode2', LOCAL));
+  isSmallRefusal(await t.api(owner, 'PUT', '/api/agents/files-m', { mcpServers: { files: { ...LOCAL, package: 'other-mcp@1.0.0' } } }));
+  assert.match((await t.api(owner, 'GET', '/api/agents/files-m/local')).body[0].blocked, /Small server mode/);
+  await t.api(owner, 'DELETE', '/api/tool-services/gmode');
+});
+
+test('memory pressure on a small server stops running local tool services', async () => {
+  const mcp = await import('../src/core/mcp.js');
+  const conn = mcp.mcpConnection('local:test:x', { local: { spec: 'x@1.0.0', args: [], env: {} } });
+  let closed = 0;
+  conn.client = { close: async () => { closed++; } };
+  setResourceProbe({ ...SMALL, rssMb: 900 });
+  optionalPaused();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(closed, 1);
+  assert.equal(conn.client, null);
+  setResourceProbe(SMALL); optionalPaused();
+});
+
+test('Copilot (heavyCheck) stays refused below 2 GB even with Small server mode, and says why', () => {
+  setResourceProbe(SMALL);
+  setSmallServerMode(true);
+  const c = heavyCheck('GitHub Copilot');
+  assert.equal(c.ok, false);
+  assert.match(c.reason, /Small server mode does not cover this/);
+});
+
+test('admin MCP: set_small_server_mode needs confirm_action and previews what it covers', async () => {
+  const st = tool('set_small_server_mode');
+  assert.ok(st.risky);
+  setResourceProbe(SMALL);
+  assert.match(await st.preview({ enabled: true }, x), /Switch Small server mode on .*small server.*Local tool services.*Not covered: GitHub Copilot/);
+  assert.equal((await st.run({ enabled: true }, x)).enabled, true);
+  assert.equal((await st.run({ enabled: false }, x)).enabled, false);
 });

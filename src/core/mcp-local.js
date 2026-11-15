@@ -8,7 +8,7 @@ import { resolve, join, dirname } from 'node:path';
 import { DATA_DIR } from './config.js';
 import { sha256 } from './crypto.js';
 import { activity } from './events.js';
-import { serverSize } from './resources.js';
+import { smallServerCheck } from './resources.js';
 
 export const LOCAL_ROOT = resolve(DATA_DIR, 'mcp-local');
 const NPM_SPEC_RE = /^(@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*(@[A-Za-z0-9._^~<>=*|+ -]{1,60})?$/;
@@ -30,14 +30,12 @@ export const netEnv = () => Object.fromEntries(Object.entries(process.env).filte
 /**
  * May local tool services run on this server? The one rule for every path (agent and global tool services, import,
  * duplicate, admin MCP, owner assistant, MCP Registry, install buttons, and starting one): small servers (1 GB /
- * 1 CPU, serverSize()) say no, because each local service is an extra Node.js process.
+ * 1 CPU, serverSize()) say no, because each local service is an extra Node.js process, unless the owner switched on
+ * Small server mode (then at most maxLocalServices() run, started on first use and stopped when memory is tight).
  */
 export function localServiceCheck() {
-  const s = serverSize();
-  if (s.size === 'small') {
-    return { ok: false, code: 'small_server', reason: `This is a small server (${s.effectiveMb} MB memory, ${s.cpus} CPU): local tool services are not run here, because each one is an extra Node.js process. Use a hosted tool service (one with a web address) instead, or a server with at least 2 GB and 2 CPUs.` };
-  }
-  return { ok: true };
+  return smallServerCheck({ what: 'local tool services are not run here, because each one is an extra Node.js process',
+    alternative: 'Use a hosted tool service (one with a web address) instead' });
 }
 const localSig = (srv) => JSON.stringify([String(srv?.package || '').trim(), srv?.args || [], srv?.env || {}, !!srv?.allowScripts]);
 /**

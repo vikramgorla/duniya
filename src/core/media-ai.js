@@ -39,7 +39,7 @@ export const agentMedia = (agent) => ({ ...MEDIA_DEFAULTS, ...(agent?.media || {
 
 // ---------- server settings ----------
 export const VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar'];
-const SETTINGS_DEFAULTS = { visionFallback: '', voice: 'alloy', maxVoiceSeconds: 300, imageModel: '', imagePrices: {}, local: { listen: false, speak: false, smallServer: false } };
+const SETTINGS_DEFAULTS = { visionFallback: '', voice: 'alloy', maxVoiceSeconds: 300, imageModel: '', imagePrices: {}, local: { listen: false, speak: false } }; // Small server mode moved to Settings → Server (055)
 export function mediaSettings() {
   const s = getSetting('media', {}) || {};
   return { ...SETTINGS_DEFAULTS, ...s, imagePrices: { ...(s.imagePrices || {}) }, local: { ...SETTINGS_DEFAULTS.local, ...(s.local || {}) } };
@@ -65,7 +65,7 @@ export function setMediaSettings(patch = {}) {
   }
   if (patch.local) {
     const pick = (k) => (patch.local[k] !== undefined ? !!patch.local[k] : cur.local[k]);
-    next.local = { listen: pick('listen'), speak: pick('speak'), smallServer: pick('smallServer') };
+    next.local = { listen: pick('listen'), speak: pick('speak') };
   }
   updateSettings({ media: next });
   return mediaSettings();

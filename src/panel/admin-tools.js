@@ -373,7 +373,7 @@ export const TOOLS = [
       };
     } },
   { name: 'add_tool_service_from_registry', risky: true, calls: [['POST', '/api/tool-services/registry/add']],
-    description: 'Add a tool service from the MCP Registry to one agent or to all agents. kind "remote" (hosted; default when offered) or "local" (npm package run on this server; owner only, refused on small servers). values: non-secret settings by field id (e.g. {"env:WORKSPACE": "acme"}). Keys and tokens are never passed here: store each with set_secret under the secret name the preview shows (or in the panel), then add. Organizers get its tools, participants none; risky tools are listed; a preview/confirm service gets the confirm step. Needs confirm_action.',
+    description: 'Add a tool service from the MCP Registry to one agent or to all agents. kind "remote" (hosted; default when offered) or "local" (npm package run on this server; owner only, refused on small servers unless Small server mode is on). values: non-secret settings by field id (e.g. {"env:WORKSPACE": "acme"}). Keys and tokens are never passed here: store each with set_secret under the secret name the preview shows (or in the panel), then add. Organizers get its tools, participants none; risky tools are listed; a preview/confirm service gets the confirm step. Needs confirm_action.',
     input: { server: str('Registry name, e.g. io.github.owner/server'), target: str('"all" for all agents, or an agent id'), kind: str('remote or local', { enum: ['remote', 'local'] }),
       name: str('Tool service name (lowercase letters, digits, _; default from the registry name)'), values: obj('Non-secret field values by field id'), replace: bool('Replace a tool service with the same name') },
     required: ['server', 'target'],
@@ -432,6 +432,16 @@ export const TOOLS = [
   { name: 'set_agents_paused', calls: [['POST', '/api/settings']], description: 'Pause (true) or resume (false) all agents at once.',
     input: { paused: bool('true = pause all agents') }, required: ['paused'],
     run: async (a, x) => ({ paused: !!(await x.call('POST', '/api/settings', { paused: !!a.paused })).paused }) },
+  { name: 'set_small_server_mode', risky: true, calls: [['GET', '/api/server/small-mode'], ['PUT', '/api/server/small-mode']],
+    description: 'Small server mode (owner only): on a small server (under 2 GB or 1 CPU) allow heavier features anyway: on-server speech and local tool services, each one at a time / at most 2, started only when memory allows and stopped when it is tight. Slower and may be refused at busy moments. Does not cover GitHub Copilot sign-in (needs 2 GB). Needs confirm_action.',
+    input: { enabled: bool('true = allow heavier features on this small server') }, required: ['enabled'],
+    preview: async (a, x) => {
+      const cur = await x.call('GET', '/api/server/small-mode');
+      const size = `${cur.server.size} server, ${cur.server.effectiveMb} MB, ${cur.server.cpus} CPU`;
+      return a.enabled ? `Switch Small server mode on (${size}; now ${cur.enabled ? 'on' : 'off'}). Allows: ${cur.covers.join('; ')}. Slower; heavier work waits or is refused when memory is tight. Not covered: ${cur.notCovered.join('; ')}.`
+        : `Switch Small server mode off (${size}; now ${cur.enabled ? 'on' : 'off'}). On a small server, on-server speech stops being used and local tool services stop starting (they stay saved).`;
+    },
+    run: (a, x) => x.call('PUT', '/api/server/small-mode', { enabled: !!a.enabled }) },
   { name: 'get_logging_settings', readOnly: true, calls: [['GET', '/api/logging']], description: 'What the activity log records: level, categories, retention.', input: {},
     run: (a, x) => x.call('GET', '/api/logging') },
   { name: 'set_logging_settings', calls: [['PUT', '/api/logging']],
