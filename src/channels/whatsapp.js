@@ -11,6 +11,7 @@ import { DATA_DIR, digits } from '../core/config.js';
 import { activity } from '../core/events.js';
 import { loadMedia } from '../core/media.js';
 import { savePoll, getPoll } from '../core/db.js';
+import { syncWhatsAppContacts } from '../core/contacts.js';
 
 const logger = pino({ level: process.env.BAILEYS_LOG || 'warn' });
 const AUTH_DIR = resolve(DATA_DIR, 'whatsapp-auth');
@@ -88,9 +89,13 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     });
 
     // History delivered on link/reconnect (store only, never answered)
-    sock.ev.on('messaging-history.set', async ({ messages }) => {
+    sock.ev.on('messaging-history.set', async ({ messages, contacts }) => {
+      if (contacts?.length) syncWhatsAppContacts(contacts);
       await deliverHistory(messages || []);
     });
+    // Address-book names from the phone (#11); stored only, never shared with participants unless the owner says so.
+    sock.ev.on('contacts.upsert', (list) => { syncWhatsAppContacts(list || []); });
+    sock.ev.on('contacts.update', (list) => { syncWhatsAppContacts(list || []); });
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       if (type !== 'notify') { await deliverHistory(messages || []); return; }
