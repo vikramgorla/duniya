@@ -10,7 +10,8 @@ import { GLOBAL_SCOPE } from './mcp-oauth.js';
 import { activity } from './events.js';
 
 const EDITABLE = ['name', 'description', 'prompt', 'triggers', 'respondToMentions', 'dm', 'organizers', 'participants',
-  'mcpServers', 'globalMcp', 'tools', 'confirm', 'schedules', 'memory', 'model', 'timezone', 'historySize', 'maxTokens', 'enabled', 'media'];
+  'mcpServers', 'globalMcp', 'tools', 'confirm', 'schedules', 'memory', 'model', 'timezone', 'historySize', 'maxTokens', 'enabled', 'media',
+  'quickReplies', 'help', 'welcome', 'faq'];
 
 const TOOL = {
   name: 'propose_agent',
@@ -38,6 +39,11 @@ const GUIDE = `You configure WhatsApp assistant agents on a self-hosted platform
 - confirm: {preview:"server:*_preview", tool:"server:confirm"} when a service uses preview/confirm for changes, else null.
 - schedules: [{id, at:"HH:MM", days:"daily"|"mon,wed,…", prompt, enabled}] — the agent posts the result of prompt to its chats.
 - media: {photos, documents, stickers, voiceNotes: true|false, voiceReply: "never"|"voice"|"always", createImages: {organizer: bool, participant: bool}} — photos & voice (look at photos, read PDFs, listen to voice notes, answer with voice notes, who may ask for pictures).
+- Built-in answers (no AI, no tokens; prefer them for fixed information people ask again and again):
+  quickReplies: [{command:"!rides" (one word), text (placeholders {name} sender, {group}, {date}), who:"everyone"|"organizers"}];
+  help: true|false (built-in "!help" lists the commands and triggers);
+  welcome: {enabled, text ({name} = new members as @mentions, {group}, {rules}, {date}), rules} — posted once per person when people join;
+  faq: {items:[{questions:[phrasings], keywords:[words], answer}], strictness:"strict"|"normal", wholeGroup: true|false}. Never invent facts for answers: use what the admin wrote or leave a clear placeholder like [time].
 - memory: {enabled: true|false}; model: "auto" | "provider:auto" | "provider:model"; timezone (IANA); historySize (recent messages in context, 5–200); maxTokens (reply length); enabled.
 Rules: change only what the request needs; return complete values for each changed field; keep secrets as \${NAME} references; never add people you were not told about except when the request asks to use group admins; keep instructions in the language the admin writes in unless asked otherwise.`;
 

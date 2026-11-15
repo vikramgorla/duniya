@@ -108,6 +108,7 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 | `src/core/router.js` | Message routing: allow-list, triggers, roles, rate limits, silence reasons, owner assistant hand-off |
 | `src/core/runner.js`, `tools.js`, `mcp*.js` | Agent turns, tool allow lists, confirm gate, MCP clients (remote, OAuth, local) |
 | `src/core/agents.js`, `schema.js`, `ai-builder.js` | Agents as data, validation, the AI helper |
+| `src/core/quick.js`, `welcome.js` | Built-in answers without AI: quick replies, `!help`, FAQ matching; welcome for new group members |
 | `src/core/providers/` | Anthropic, ChatGPT sign-in, Copilot, OpenAI-compatible; `breaker.js` + `fallback-config.js` (fallback, accounts) |
 | `src/core/media*.js`, `speech-*.js`, `resources.js` | Photos & voice, media queue, on-server speech, small-server guardrails |
 | `src/core/memory.js`, `contacts.js`, `chat-prefs.js` | Chat and shared memory, contacts, per-chat settings (on/off, private) |

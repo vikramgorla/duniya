@@ -31,6 +31,8 @@ context…" (edit under **Settings → Privacy notice**).
 - Per-group opt-out on **Chats** (recorded).
 - Direct messages get a line in the agent's first reply, once per person (can be switched off). An intro the agent
   sends to a [prepared direct chat](agents.md#set-up-a-direct-chat-before-the-person-writes) carries it too.
+- A [welcome message](agents.md#quick-replies-welcome--faq) for new members comes after the notice when the notice is
+  still due.
 - Admin MCP: `get_privacy_notice`, `set_privacy_notice`, `set_chat_privacy_notice`.
 
 ![Privacy notice settings](site/img/card-privacy.webp)
@@ -43,6 +45,7 @@ context…" (edit under **Settings → Privacy notice**).
 | **Chats that are off** | the id, time and sender id of the newest message only (no text, no names), to ask the phone for history later |
 | **Activity log** | minimal, normal or verbose, by category and per chat, with retention. Errors, confirmations, configuration changes and channel status are always recorded |
 | **Summaries** | the weekly summary and *Why agents stayed quiet* keep counts only |
+| **Welcomes** | a hash of the group and the new member's id, so each person is welcomed once (no names or numbers); the activity log says how many were welcomed |
 | **Personal details** | agents don't post phone numbers, emails, health or payment details in groups |
 
 ![Logging settings](site/img/card-logging.webp)

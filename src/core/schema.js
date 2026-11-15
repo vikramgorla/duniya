@@ -2,6 +2,7 @@
 import { validPackageSpec } from './mcp-local.js';
 import { digits } from './config.js';
 import { cleanOverride } from './providers/fallback-config.js';
+import { QUICK_WHO, FAQ_STRICTNESS } from './quick.js';
 
 export const AGENT_DEFAULTS = Object.freeze({
   name: '',
@@ -27,6 +28,12 @@ export const AGENT_DEFAULTS = Object.freeze({
   timezone: '',
   // Photos & voice (043): what the agent does with photos, PDFs and voice notes, and when it answers with voice.
   media: { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', createImages: { organizer: true, participant: false } },
+  // Built-in answers (054): no AI, no tokens. Quick replies [{ command, text, who }], the "!help" list, a welcome for new
+  // group members and FAQ auto-answers [{ questions, keywords, answer }].
+  quickReplies: [],
+  help: false,
+  welcome: { enabled: false, text: '', rules: '' },
+  faq: { items: [], strictness: 'normal', wholeGroup: false },
 });
 
 export const AGENT_ID_RE = /^[a-z0-9][a-z0-9-]{1,40}$/;
@@ -218,7 +225,44 @@ export function validateAgentConfig(input) {
   out.media = { photos: flag('photos'), documents: flag('documents'), stickers: flag('stickers'), voiceNotes: flag('voiceNotes'), voiceReply,
     createImages: { organizer: md.createImages?.organizer === undefined ? mdef.createImages.organizer : !!md.createImages.organizer,
       participant: md.createImages?.participant === undefined ? mdef.createImages.participant : !!md.createImages.participant } };
+  Object.assign(out, builtins(c));
   return { config: out, warnings };
+}
+
+const COMMAND_RE = /^[^\s]{2,40}$/;
+/** Built-in answers (054): quick replies, !help, welcome and FAQ, validated and normalised. */
+function builtins(c) {
+  if (c.quickReplies != null && !Array.isArray(c.quickReplies)) fail('quickReplies', 'must be a list');
+  const qr = c.quickReplies || [];
+  if (qr.length > 30) fail('quickReplies', 'at most 30 quick replies');
+  const seen = new Set();
+  const quickReplies = qr.map((q, i) => {
+    const f = `quickReplies[${i + 1}]`;
+    const command = str(q?.command, `${f}.command`, { min: 1, max: 40 }).toLowerCase().replace(/[?.,:;]+$/, '');
+    if (!COMMAND_RE.test(command)) fail(`${f}.command`, 'must be one word of 2–40 characters, like !rides');
+    if (seen.has(command)) fail(`${f}.command`, `"${command}" is used twice`);
+    seen.add(command);
+    const who = q.who ?? 'everyone';
+    if (!QUICK_WHO.includes(who)) fail(`${f}.who`, 'must be everyone or organizers');
+    return { command, text: str(q.text, `${f}.text`, { min: 1, max: 2000 }), who };
+  });
+  const w = c.welcome && typeof c.welcome === 'object' ? c.welcome : {};
+  const welcome = { enabled: !!w.enabled, text: str(w.text, 'welcome.text', { max: 1000 }), rules: str(w.rules, 'welcome.rules', { max: 2000 }) };
+  const fq = c.faq && typeof c.faq === 'object' ? c.faq : {};
+  if (fq.items != null && !Array.isArray(fq.items)) fail('faq.items', 'must be a list');
+  if ((fq.items || []).length > 50) fail('faq.items', 'at most 50 questions');
+  const strictness = fq.strictness ?? 'normal';
+  if (!FAQ_STRICTNESS.includes(strictness)) fail('faq.strictness', 'must be strict or normal');
+  const items = (fq.items || []).map((it, i) => {
+    const f = `faq.items[${i + 1}]`;
+    const questions = list(it?.questions, `${f}.questions`).map((x) => str(x, `${f}.questions`, { max: 200 }));
+    const keywords = [...new Set(list(it?.keywords, `${f}.keywords`).map((x) => str(x, `${f}.keywords`, { max: 40 }).toLowerCase()))];
+    if (questions.length > 10) fail(`${f}.questions`, 'at most 10 phrasings');
+    if (keywords.length > 20) fail(`${f}.keywords`, 'at most 20 keywords');
+    if (!questions.length && !keywords.length) fail(`${f}.questions`, 'add a question or keywords');
+    return { questions, keywords, answer: str(it.answer, `${f}.answer`, { min: 1, max: 2000 }) };
+  });
+  return { quickReplies, help: !!c.help, welcome, faq: { items, strictness, wholeGroup: !!fq.wholeGroup } };
 }
 
 /**

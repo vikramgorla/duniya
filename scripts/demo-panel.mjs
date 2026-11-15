@@ -262,6 +262,9 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     chats: [G(3)], model: 'anthropic:claude-haiku-5-5', organizers: [`+${P(2)}`],
     mcpServers: { transport: { type: 'local', package: 'mcp-swiss@latest', args: [], env: {} }, calendar: { url: 'https://calendar.example.org/mcp', auth: 'oauth' } },
     tools: { participant: ['transport:*', 'calendar:events_list'], organizer: ['calendar:*'], deny: [] },
+    // 054: built-in answers (no AI): an FAQ entry next to the template's quick replies and welcome
+    faq: { items: [{ questions: ['Where do we meet in Geneva?', 'Where is the pick-up point?'], keywords: ['meeting point', 'pick-up'], answer: 'Pick-up in Geneva is at Cornavin, Rue de Lausanne exit, next to the taxi rank.' }], strictness: 'normal', wholeGroup: false },
+    welcome: { enabled: true, text: 'Welcome {name} to {group}! 🚗 Type !rides to see how to offer or find a seat.', rules: 'Be on time, and cancel your seat as soon as plans change.' },
   });
   await mk('office', 'office-colleagues.json', { chats: [G(4)], model: 'auto' });
   await mk('football', 'event-planning.json', { name: 'U11 football', description: 'Match days, lifts and snack rota for the U11 team.', triggers: ['!coach'], chats: [`club#${G(8)}`], model: 'openrouter:deepseek/deepseek-v4:free' });

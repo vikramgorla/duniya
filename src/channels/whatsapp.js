@@ -33,6 +33,7 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
   let sock = null;
   let onMessage = () => {};
   let onHistory = () => {};
+  let onJoin = () => {};
   let state = { status: 'starting', qr: null, pairingCode: null, me: null, since: Date.now(), lastError: null };
   let retries = 0;
   let stopping = false;
@@ -97,6 +98,29 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     // Address-book names from the phone (#11); stored only, never shared with participants unless the owner says so.
     sock.ev.on('contacts.upsert', (list) => { syncWhatsAppContacts(list || []); });
     sock.ev.on('contacts.update', (list) => { syncWhatsAppContacts(list || []); });
+
+    // Welcome (054): people added to a group, joined by invite link or let in after a join request. This Baileys version
+    // reports all of them as action "add" (stub types GROUP_PARTICIPANT_ADD / _INVITE / _ADD_REQUEST_JOIN); "invite"
+    // and "join" are accepted too. Participants are contacts ({ id, phoneNumber }) or plain jids. The number itself is
+    // skipped (its own join is not a new member).
+    sock.ev.on('group-participants.update', async ({ id, participants, action }) => {
+      if (mySock !== sock || !['add', 'invite', 'join'].includes(action) || !isJidGroup(id)) return;
+      groupCache.delete(id);
+      const meUser = sock.user?.id ? jidNormalizedUser(sock.user.id).split('@')[0] : '';
+      const meLid = sock.user?.lid ? jidNormalizedUser(sock.user.lid).split('@')[0] : '';
+      const people = [];
+      for (const p of participants || []) {
+        const jid = typeof p === 'string' ? p : p?.id;
+        if (!jid) continue;
+        const user = jidNormalizedUser(jid).split('@')[0];
+        if (user && (user === meUser || user === meLid)) continue;
+        let phone = '';
+        for (const j of [typeof p === 'object' ? p.phoneNumber : '', jid]) if (!phone && j && isPnUser(j)) phone = digits(jidNormalizedUser(j).split('@')[0]);
+        people.push({ jid, phone });
+      }
+      if (!people.length) return;
+      try { await onJoin({ chat: id, participants: people }); } catch (e) { activity('error', { summary: `Welcome handling failed: ${e.message}` }); }
+    });
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       if (type !== 'notify') { await deliverHistory(messages || []); return; }
@@ -442,16 +466,17 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
       const key = { remoteJid: jid, id: String(anchor.msgId), fromMe: !!anchor.fromMe, ...(isJidGroup(jid) && !anchor.fromMe && anchor.participant ? { participant: anchor.participant } : {}) };
       return s.fetchMessageHistory(Math.max(1, Math.min(50, Number(count) || 50)), key, Number(anchor.ts) || Date.now());
     },
-    async start(handler, { onHistory: historyHandler } = {}) {
+    async start(handler, { onHistory: historyHandler, onJoin: joinHandler } = {}) {
       onMessage = handler;
       if (historyHandler) onHistory = historyHandler;
+      if (joinHandler) onJoin = joinHandler;
       await connect();
     },
     /** Sends text; returns { msgId } of the sent message. */
-    async send(chat, text, { quoted, quote } = {}) {
+    async send(chat, text, { quoted, quote, mentions } = {}) {
       if (state.status !== 'open') throw new Error('WhatsApp is not connected');
       const q = quoted || quotedOf(chat, quote);
-      const sent = await sock.sendMessage(chat, { text }, q ? { quoted: q } : undefined);
+      const sent = await sock.sendMessage(chat, { text, ...(mentions?.length ? { mentions } : {}) }, q ? { quoted: q } : undefined);
       return { msgId: sent?.key?.id || null };
     },
     async chatName(chat) {

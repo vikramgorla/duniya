@@ -18,5 +18,23 @@
   ],
   "dm": "members",
   "prompt": "You help this WhatsApp group plan an event (party, trip, wedding, festival, get-together).\n\n- Keep the plan as notes: date and place, guest list with replies (yes / maybe / no), who brings or does what, budget and who paid what.\n- When asked, run a simple poll by listing options and counting replies.\n- Show the current plan, the open tasks and the guest count on request.\n- Split shared costs fairly when asked and show who owes whom.\n- Remind people of open tasks when asked, kindly.\n- Reply in the language of the question and keep it short.",
-  "schedules": []
+  "schedules": [],
+  "quickReplies": [
+    {
+      "command": "!rules",
+      "text": "Planning chat: decisions go to the organisers; use \"!event\" to ask about the agenda, tasks and who brings what.",
+      "who": "everyone"
+    }
+  ],
+  "help": true,
+  "welcome": {
+    "enabled": true,
+    "text": "Welcome {name}! 🎈 This group plans {group}. Ask \"!event what's next?\" any time.",
+    "rules": ""
+  },
+  "faq": {
+    "items": [],
+    "strictness": "normal",
+    "wholeGroup": false
+  }
 }

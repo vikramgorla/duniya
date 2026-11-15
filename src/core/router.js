@@ -16,6 +16,9 @@ import { resolveDirectChat } from './direct-chats.js';
 import { inboundKind, prepareInbound, wantsVoice, speak, createImage } from './media-ai.js';
 import { enqueue, registerJobHandler, setQueueChannel, startQueue } from './media-queue.js';
 import { readFileSync, rmSync } from 'node:fs';
+import { builtinAnswer, todayText, fillPlaceholders } from './quick.js';
+import { recordUsage } from './usage.js';
+import { noteJoin } from './welcome.js';
 
 export { silenceReason }; // #34: other modules (usage caps) report why an agent stayed silent, e.g. silenceReason('budget', …)
 
@@ -53,7 +56,7 @@ const earliestTriggered = (agents, lower) => {
   return best;
 };
 
-function stripTriggers(agent, text) {
+export function stripTriggers(agent, text) {
   let t = text.replace(/@\d{5,}/g, ' ').trim();
   // A trigger at the start is an address ("!family …"): drop it. Elsewhere it is part of the sentence: keep the text.
   const trig = findTrigger(agent, t.toLowerCase());
@@ -279,6 +282,24 @@ export function createRouter(channel) {
       || !!findTrigger(agent, lower);
     const triggered = addressed || isConfirm;
 
+    // Built-in answers (054): quick replies and !help work without a trigger (the command is the address); the FAQ
+    // answers messages that wake the agent (or every group message when the agent is set so). No model call.
+    if (!isConfirm && hasBuiltins(agent)) {
+      const stripped = stripTriggers(agent, wake);
+      const ans = builtinAnswer(agent, { texts: [wake, stripped], question: stripped, role,
+        faqAllowed: !msg.mediaInfo && (addressed || (msg.isGroup && agent.faq.wholeGroup)),
+        values: { name: msg.senderName || '', date: todayText(agent.timezone) } });
+      if (ans) {
+        if (ans.text.includes('{group}')) ans.text = fillPlaceholders(ans.text, { group: msg.isGroup ? await channel.chatName?.(msg.chat).catch(() => '') || 'the group' : 'this chat' });
+        if (rateLimited(`${agent.id}:${msg.phone || msg.senderJid}`)) { quiet('rate_limited', agent.id); return; }
+        countStat('handled', { agent: agent.id });
+        activity('message.in', { agent: agent.id, chat: msg.chat, summary: `${msg.senderName} (${role}): ${stripped || wake}`, detail: { answeredBy: ans.label } });
+        await deliver(channel, msg, agent, ans.text, { textOnly: true });
+        const kind = ans.kind === 'faq' ? 'faq' : 'quick reply';
+        recordUsage({ agent: agent.id, chat: msg.chat, provider: 'built-in', model: kind, kind, cost: 0, priced: 'free' });
+        return;
+      }
+    }
     if (!triggered) { quiet('not_addressed', agent.id); return; }
     if (rateLimited(`${agent.id}:${msg.phone || msg.senderJid}`)) { quiet('rate_limited', agent.id); return; }
 
@@ -302,6 +323,18 @@ export function createRouter(channel) {
   };
 }
 
+const hasBuiltins = (agent) => !!(agent.quickReplies?.length || agent.help || agent.faq?.items?.length);
+
+/**
+ * Welcome (054): people joined a group ({ chat, participants: [{ jid, phone }] } from the channel). Only chats that
+ * are on with an enabled agent whose welcome is on; see welcome.js.
+ */
+export function createJoinHandler(channel) {
+  return async (ev) => {
+    try { noteJoin(channel, ev); } catch (e) { activity('error', { chat: ev?.chat, summary: `Welcome failed: ${e.message}` }); }
+  };
+}
+
 const overloadedAt = new Map();
 /** What a queued turn needs to run later, even after a restart (no media bytes, no raw message object). */
 const packMsg = (m) => ({ channel: m.channel, chat: m.chat, number: m.number, isGroup: m.isGroup, phone: m.phone, senderJid: m.senderJid, senderName: m.senderName,
@@ -313,8 +346,8 @@ function unpackMsg(channel, p) {
 const quoteOf = (msg) => (msg.raw ? { quoted: msg.raw } : msg.msgId ? { quote: { msgId: msg.msgId, fromMe: false, participant: msg.isGroup ? msg.senderJid : undefined, text: msg.text } } : {});
 
 /** Send a reply (as a voice note when the agent's setting asks for it) and remember it. */
-async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false } = {}) {
-  if (voiceNow && wantsVoice(agent, { voiceIn, text })) {
+async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false, textOnly = false } = {}) {
+  if (textOnly) { /* built-in answers (054): always text */ } else if (voiceNow && wantsVoice(agent, { voiceIn, text })) {
     const v = await speak(text, { agent, chat: msg.chat }).catch(() => null);
     if (v) {
       const sent = await channel.sendMedia(msg.chat, { kind: 'audio', base64: v.buffer.toString('base64'), mimetype: 'audio/ogg', voiceNote: true, ...(quoteOf(msg).quote ? { quote: quoteOf(msg).quote } : {}) });

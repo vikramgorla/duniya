@@ -72,6 +72,23 @@ export const TOOLS = [
     description: 'Change fields of an agent (only the fields given change), e.g. { "prompt": "…", "triggers": ["!help"], "model": "auto" } or { "fallback": { "mode": "off" } } (model fallback: inherit | on | off, optional "chain"). Returns the agent and any warnings.',
     input: { agent_id: str('Agent id'), changes: obj('Fields to change') }, required: ['agent_id', 'changes'],
     run: (a, x) => x.call('PUT', `/api/agents/${enc(a.agent_id)}`, a.changes || {}) },
+  // 054: built-in answers without AI (quick replies, !help, welcome, FAQ).
+  { name: 'set_agent_quick_answers', calls: [['GET', '/api/agents/x'], ['PUT', '/api/agents/x']],
+    description: 'Built-in answers of an agent — no AI, no tokens (panel: agent editor → "Quick replies, welcome & FAQ"). Only the parts given change; each part replaces the whole list. quick_replies: [{ command: "!rides" (one word, matched as the whole message or its first word, any case), text: answer with {name} (sender), {group}, {date}, who: "everyone" | "organizers" }]. help: true = "!help" lists the commands and triggers. welcome: { enabled, text with {name} (the new members as @mentions), {group}, {rules}, {date}, rules } — posted once per person when people join a group that is on. faq: { items: [{ questions: [phrasings], keywords: [words], answer }], strictness: "strict" | "normal", whole_group: true = answer matching questions in the whole group, not only messages that wake the agent }. Unmatched messages go to the model, which gets the FAQ as short reference context.',
+    input: { agent_id: str('Agent id'), quick_replies: { type: 'array', items: { type: 'object', additionalProperties: true }, description: 'The quick replies (optional)' }, help: bool('Built-in !help (optional)'),
+      welcome: obj('Welcome settings (optional)'), faq: obj('FAQ settings (optional)') }, required: ['agent_id'],
+    run: async (a, x) => {
+      const cur = (await x.call('GET', `/api/agents/${enc(a.agent_id)}`)).config;
+      const changes = {};
+      if (a.quick_replies !== undefined) changes.quickReplies = a.quick_replies;
+      if (a.help !== undefined) changes.help = !!a.help;
+      if (a.welcome !== undefined) changes.welcome = { ...cur.welcome, ...a.welcome };
+      if (a.faq !== undefined) {
+        const { whole_group: wg, ...rest } = a.faq || {};
+        changes.faq = { ...cur.faq, ...rest, ...(wg !== undefined ? { wholeGroup: !!wg } : {}) };
+      }
+      return x.call('PUT', `/api/agents/${enc(a.agent_id)}`, changes);
+    } },
   { name: 'get_agent_people', readOnly: true, calls: [['GET', '/api/agents/x/people']],
     description: 'Members of the agent\'s WhatsApp groups (name, number, group admin) with their role for this agent (organizer or participant). To change roles, update_agent with "organizers" (phone numbers).',
     input: { agent_id: str('Agent id') }, required: ['agent_id'],
@@ -97,7 +114,7 @@ export const TOOLS = [
     input: { agent_id: str('Agent id'), schedule_id: str('Schedule id (see get_agent → schedules)') }, required: ['agent_id', 'schedule_id'],
     run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/schedules/${enc(a.schedule_id)}/run`) },
   { name: 'test_agent', calls: [['POST', '/api/agents/x/test']],
-    description: 'Send a test message to an agent, like the panel\'s test console, and get its reply. Nothing is posted to WhatsApp. "as" picks the sender\'s role (organizer or participant).',
+    description: 'Send a test message to an agent, like the panel\'s test console, and get its reply. Nothing is posted to WhatsApp. "as" picks the sender\'s role (organizer or participant). "path" says what answered: quick (quick reply or !help), faq or model.',
     input: { agent_id: str('Agent id'), text: str('Message text'), as: { type: 'string', enum: ['organizer', 'participant'], description: 'Sender role (default participant)' },
       chat: str('Test as if in this chat of the agent (its memory, group or direct, model); omit for a new direct chat') }, required: ['agent_id', 'text'],
     run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/test`, { text: a.text, role: ROLE_TEXT[a.as] || 'participant', chat: a.chat || 'new' }) },
@@ -123,9 +140,10 @@ export const TOOLS = [
     input: { chat: str('Chat id (see list_chats)'), agent_id: str('Agent id, or empty to unassign') }, required: ['chat'],
     run: (a, x) => x.call('POST', '/api/chats/bind', { chat: a.chat, agent: a.agent_id || null }) },
   { name: 'set_chat_settings', calls: [['PUT', '/api/chats/x/prefs'], ['GET', '/api/chats']],
-    description: 'Per-chat model, model fallback and activity logging (the panel\'s Chats page: Model, Fallback…, Logging). model: inherit | auto | provider:auto | provider:model. fallback_mode: inherit | on | off (use other models when this one fails with a limit, outage or expired sign-in); fallback_chain: models to try in order (empty list = the agent\'s or the Models setting). Giving only one of fallback_mode / fallback_chain keeps the other as it is. logging: inherit | off | minimal | normal | verbose.',
+    description: 'Per-chat model, model fallback and activity logging (the panel\'s Chats page: Model, Fallback…, Logging). model: inherit | auto | provider:auto | provider:model. fallback_mode: inherit | on | off (use other models when this one fails with a limit, outage or expired sign-in); fallback_chain: models to try in order (empty list = the agent\'s or the Models setting). Giving only one of fallback_mode / fallback_chain keeps the other as it is. logging: inherit | off | minimal | normal | verbose. welcome: inherit | on | off — "Welcome new members" in this group (inherit = the agent\'s setting).',
     input: { chat: str('Chat id'), model: str('Model (optional)'), logging: { type: 'string', enum: ['inherit', 'off', 'minimal', 'normal', 'verbose'], description: 'Logging level (optional)' },
-      fallback_mode: { type: 'string', enum: ['inherit', 'on', 'off'], description: 'Model fallback for this chat (optional)' }, fallback_chain: { type: 'array', items: { type: 'string' }, description: 'provider:model or provider:auto, in order (optional)' } }, required: ['chat'],
+      fallback_mode: { type: 'string', enum: ['inherit', 'on', 'off'], description: 'Model fallback for this chat (optional)' }, fallback_chain: { type: 'array', items: { type: 'string' }, description: 'provider:model or provider:auto, in order (optional)' },
+      welcome: { type: 'string', enum: ['inherit', 'on', 'off'], description: 'Welcome new members in this group (optional)' } }, required: ['chat'],
     run: async (a, x) => {
       let fallback;
       if (a.fallback_mode !== undefined || a.fallback_chain !== undefined) { // #65: a partial change keeps the rest, as in the panel editor
@@ -133,7 +151,7 @@ export const TOOLS = [
           ? ((await x.call('GET', '/api/chats')) || []).find((c) => c.id === a.chat)?.fallback || { mode: 'inherit', chain: [] } : {};
         fallback = { mode: a.fallback_mode ?? cur.mode ?? 'inherit', chain: a.fallback_chain ?? cur.chain ?? [] };
       }
-      return x.call('PUT', `/api/chats/${enc(a.chat)}/prefs`, { model: a.model, logging: a.logging, ...(fallback ? { fallback } : {}) });
+      return x.call('PUT', `/api/chats/${enc(a.chat)}/prefs`, { model: a.model, logging: a.logging, ...(fallback ? { fallback } : {}), ...(a.welcome ? { welcome: a.welcome } : {}) });
     } },
   // #91: chats that are off store nothing, so a chat switched on starts empty; these load earlier messages from the phone.
   { name: 'load_chat_history', noConfirm: true, calls: [['POST', '/api/chats/x/history'], ['GET', '/api/chats/x/history']],

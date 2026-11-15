@@ -14,6 +14,7 @@ import { checkBudget } from './budget.js';
 import { silenceReason } from './silences.js';
 import { countStat } from './stats.js';
 import { planAttachments, visionCallOptions, noVisionNote } from './media-ai.js';
+import { faqContext } from './quick.js';
 
 const MAX_TOOL_ROUNDS = 8;
 
@@ -46,6 +47,7 @@ function systemPrompt({ agent, role, isGroup, chatName }) {
     'You see the recent conversation of this chat, a running summary of older discussion and saved notes. Use them to stay aware of what people have said and decided. When someone asks you to remember something, save it with the memory tool. If something older is not in your context, search the chat history before saying you do not know.',
     roleText,
     'Write for WhatsApp: short plain text, *bold* sparingly, simple "-" lists, no markdown headings or tables.',
+    faqContext(agent), // 054: the owner's FAQ as small, capped reference context
   ].filter(Boolean).join('\n\n');
 }
 

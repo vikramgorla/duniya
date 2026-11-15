@@ -26,5 +26,23 @@
       "enabled": false,
       "prompt": "Post a short, friendly summary of the family's plans and birthdays for the coming week, based on the notes and recent messages. If there is nothing planned, wish everyone a good week."
     }
-  ]
+  ],
+  "quickReplies": [
+    {
+      "command": "!rules",
+      "text": "Family group: be kind, keep it family-friendly, and use \"!family\" to ask the assistant about birthdays, plans and lists.",
+      "who": "everyone"
+    }
+  ],
+  "help": true,
+  "welcome": {
+    "enabled": true,
+    "text": "Welcome to the family chat, {name}! 🎉",
+    "rules": ""
+  },
+  "faq": {
+    "items": [],
+    "strictness": "normal",
+    "wholeGroup": false
+  }
 }

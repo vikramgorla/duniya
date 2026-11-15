@@ -1,6 +1,6 @@
 import { loadAgents, listAgents } from './core/agents.js';
 import { createChannelRegistry } from './channels/registry.js';
-import { createRouter, createHistoryHandler } from './core/router.js';
+import { createRouter, createHistoryHandler, createJoinHandler } from './core/router.js';
 import { startScheduler } from './core/scheduler.js';
 import { startPanel } from './panel/server.js';
 import { providerRoutes } from './panel/routes/providers.js';
@@ -21,7 +21,7 @@ console.log(`Agents: ${listAgents().map((b) => `${b.id}${b.enabled ? '' : ' (dis
 
 const whatsapp = createChannelRegistry();
 startPanel({ channel: whatsapp, extend: [providerRoutes, backupRoutes, updateRoutes] });
-await whatsapp.start(createRouter(whatsapp), { onHistory: createHistoryHandler() });
+await whatsapp.start(createRouter(whatsapp), { onHistory: createHistoryHandler(), onJoin: createJoinHandler(whatsapp) });
 startScheduler(whatsapp);
 startBackupScheduler();
 startUpdateScheduler();

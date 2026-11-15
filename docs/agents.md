@@ -32,6 +32,32 @@ word (*Changes only*, *Side by side*, *Whole new text*). Skip any part; nothing 
 
 ![AI helper visual diff](site/img/card-ai-diff.webp)
 
+## Quick replies, welcome & FAQ
+
+Built-in answers for the things people ask again and again: **no AI, no tokens**, instant. Agent editor →
+**Quick replies, welcome & FAQ** (rows to add, edit and remove, with a live preview).
+
+![Quick replies, welcome and FAQ in the agent editor](site/img/card-quick.webp)
+
+| Feature | What happens |
+|---|---|
+| **Quick replies** | A command such as `!rides` as the whole message or its first word (any case, also after a trigger) gets your text right away, before the model. Placeholders: `{name}` (who asked), `{group}`, `{date}`. *Who may use it*: everyone or organizers only (others get no built-in answer; addressed messages go to the model as usual). |
+| **`!help`** | When switched on, `!help` lists the quick replies this person may use and how to wake the agent. A quick reply named `!help` wins. |
+| **Welcome new members** | When people are added, join by invite link or are let in, the group's agent posts your welcome once per person: `{name}` becomes an @mention, `{rules}` your group rules (added at the end when the text has no `{rules}`). People who join together get **one** message; at most one welcome per group per minute. Only chats that are **on** with an enabled agent; the privacy notice is posted first if it is still due. A group can override the agent's setting under **Chats → Welcome new members** (as the agent / on / off). |
+| **FAQ auto-answers** | Question phrasings, optional keywords and an answer. A message that would wake the agent (trigger, @mention, reply, direct message) and clearly matches gets your answer. **Normal**: most of a question's words or all keywords; **Strict**: the whole question or every keyword. *Answer FAQ in the whole group* also answers matching messages without a trigger. Everything else goes to the model, which gets the FAQ as short reference context (capped at 1,500 characters). |
+
+> [!NOTE]
+> Built-in answers count in **Usage** as `quick reply`, `faq` and `welcome` with cost 0 and no tokens, and in the
+> weekly summary as replies. "Once per person" is stored as a hash of the group and the person's id: no names or
+> numbers. The **test console** shows which path answered (*Quick reply !rides · no AI*, *FAQ answer · no AI* or the
+> model). The car pooling, family, school, office, event and neighbours templates come with `!rules` (car pooling also
+> `!rides`), `!help` and a short welcome switched on; their FAQ starts empty.
+
+![Test console: a quick reply answered without AI](site/img/card-quick-test.webp)
+
+Admin MCP and owner assistant: `set_agent_quick_answers` (only the parts given change) and `set_chat_settings`
+(`welcome`); the AI helper can propose all of these and shows them in its visual diff.
+
 ## Roles
 
 | Role | Who | Gets |
