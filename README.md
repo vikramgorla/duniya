@@ -46,7 +46,7 @@
 </tr>
 <tr>
 <td valign="top"><a href="docs/domains-and-access.md"><img src="docs/img/thumb-web-access.webp" alt="Web address and access settings" width="100%"></a><br><b>Your domain, any proxy</b><br>Automatic HTTPS, a switch that never locks you out.</td>
-<td valign="top"><a href="docs/backups-and-updates.md"><img src="docs/img/thumb-backups.webp" alt="Backups page" width="100%"></a><br><b>Backups &amp; updates</b><br>Encrypted to GitHub or S3; updates wait for your OK when breaking.</td>
+<td valign="top"><a href="docs/backups-and-updates.md"><img src="docs/img/thumb-backups.webp" alt="Backups page" width="100%"></a><br><b>Backups &amp; updates</b><br>Encrypted to GitHub or S3; updates wait for your OK when breaking; no SSH needed, even for the root helper.</td>
 <td valign="top"><a href="docs/admin-mcp.md"><img src="docs/img/thumb-assistants.webp" alt="Connected AI assistants card" width="100%"></a><br><b>Run it from ChatGPT or Claude</b><br>The app is an MCP server too.</td>
 </tr>
 </table>
@@ -82,6 +82,9 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/m
 
 Then the first-run checklist walks you through it: link a WhatsApp number, connect a model, create an agent, switch
 a chat on. [Getting started →](docs/getting-started.md)
+
+A free 1 GB VM is enough: heavier extras (on-server speech, local tool services) stay off there unless you switch on
+**Small server mode** in Settings → Server. [Small servers →](docs/small-servers.md)
 
 > [!IMPORTANT]
 > **Where is my panel?** Open `http://<server-ip>/`: a live progress page that turns into the panel at

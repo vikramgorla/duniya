@@ -455,17 +455,17 @@ test('panel: capabilities, settings and admin MCP tools', async () => {
 
 test('small server mode: on-server speech on a ~1 GB server only when switched on and with room right now', async () => {
   const res = await import('../src/core/resources.js');
-  const { setMediaSettings } = await import('../src/core/media-ai.js');
-  setMediaSettings({ local: { smallServer: false } });
+  res.setSmallServerMode(false);
   res.setResourceProbe({ totalMb: 960, availableMb: 700, cpus: 1, rssMb: 150 });
   assert.equal(res.localEngineCheck({ forEnable: true }).code, 'too_small');
-  setMediaSettings({ local: { smallServer: true } });
+  assert.match(res.localEngineCheck({ forEnable: true }).reason, /switch on Small server mode in Settings → Server/);
+  res.setSmallServerMode(true); // 055: the one server-wide switch (Settings → Server)
   assert.equal(res.localEngineCheck({ forEnable: true }).ok, true);
   assert.equal(res.localEngineCheck({ needMb: 400 }).ok, true); // 700 free ≥ 400 + 150
   res.setResourceProbe({ totalMb: 960, availableMb: 520, cpus: 1, rssMb: 150 });
   assert.equal(res.localEngineCheck({ needMb: 400 }).code, 'low_memory');
   res.setResourceProbe({ totalMb: 700, availableMb: 500, cpus: 1, rssMb: 150 });
   assert.equal(res.localEngineCheck({ forEnable: true }).code, 'too_small');
-  setMediaSettings({ local: { smallServer: false } });
+  res.setSmallServerMode(false);
   res.setResourceProbe(null);
 });

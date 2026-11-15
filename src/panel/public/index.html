@@ -1036,6 +1036,9 @@ const meter = (p) => h('div', { class: `meter ${p >= 85 ? 'hot' : ''}` }, h('i',
 let serverTimer = null; let opsTimer = null; let logUnit = 'whatsapp-agent-duniya'; let lastSys = null;
 // Small servers (043): one line about what this server can take, and the media queue when something waits.
 const SIZE_LABEL = { small: 'Small server', medium: 'Medium server', large: 'Large server' };
+/** 055: small servers do not run local (on-server) tool services unless Small server mode is on. */
+const smallServer = () => S.status?.server?.size === 'small' && !S.status?.server?.smallMode;
+const SMALL_MODE_LINK = () => h('a', { href: '#settings', onclick: () => setTimeout(() => $('#small-mode')?.scrollIntoView({ block: 'center' }), 400) }, 'Small server mode in Settings → Server');
 function serverSizeNote(s, q) {
   if (!s) return null;
   const ram = s.effectiveMb >= 1024 ? `${(s.effectiveMb / 1024).toFixed(s.effectiveMb % 1024 ? 1 : 0)} GB` : `${s.effectiveMb} MB`;
@@ -1043,7 +1046,8 @@ function serverSizeNote(s, q) {
   return h('div', { class: `note ${s.pressure ? 'warn' : s.size === 'small' ? 'info' : ''}`, style: 'margin-top:10px' },
     h('b', {}, `${SIZE_LABEL[s.size]}: `), `${ram} memory${s.cgroupLimitMb ? ' (container limit)' : ''}, ${s.cpus} CPU${s.cpus > 1 ? 's' : ''}, ${s.availableMb} MB free. `,
     s.pressure ? `The app uses ${s.rssMb} MB — above ${s.softLimitMb} MB, so summaries, on-server speech and picture creation are paused until memory frees up. Replies continue.`
-      : s.size === 'small' ? 'Photos and voice notes are handled one at a time, on-server speech engines and the Copilot helper are not available, and at most 2 local tool services run at once. Providers (OpenAI, OpenRouter) handle photos and voice fine.'
+      : s.size === 'small' ? (s.smallMode ? 'Small server mode is on: on-server speech and up to 2 local tool services may run, one job at a time and only when memory allows. Photos and voice notes are handled one at a time; the Copilot helper is not available.'
+        : 'Photos and voice notes are handled one at a time; on-server speech, local tool services and the Copilot helper are not available (Small server mode in Settings → Server allows the first two). Providers (OpenAI, OpenRouter) handle photos and voice fine.')
         : 'Everything is available.',
     waiting);
 }
@@ -1129,9 +1133,15 @@ async function renderServer() {
     const last = ops?.status && !run ? ops.status : null;
     const lastLine = last ? h('p', { class: 'small', style: 'margin:0 0 6px' }, h('span', { class: 'muted' }, `Last: ${ops.actions[last.action] || last.action} · ${time(last.endedAt)} · `),
       ops.result?.text ? h('b', {}, ops.result.text) : last.state === 'done' ? 'done' : h('b', { style: 'color:var(--bad)' }, 'failed')) : null;
-    const oldHelper = ops?.available && !ops.helperCurrent ? h('div', { class: 'note info', style: 'margin-top:10px' },
-      'This server has an older maintenance helper: it uses apt upgrade, which holds back new kernels. Run ', h('code', {}, 'sudo duniya update'),
-      ' on the server once (or re-run the installer) to get the full update, gradual updates and clear results.') : null;
+    // 056: the root maintenance helper updates itself from a release (version 3+); older ones need one root run.
+    const helperDoc = h('a', { href: `${DOCS}upgrading.md#the-maintenance-helper`, target: '_blank', rel: 'noopener' }, 'how to reinstall');
+    const oldHelper = !ops?.available || !(ops.helperOutdated || !ops.helperCurrent) ? null
+      : ops.helperSelfUpdate ? h('div', { class: 'note info', id: 'helper-update', style: 'margin-top:10px' },
+        h('b', {}, 'A newer maintenance helper comes with this release'), ` (version ${ops.helperVersion} → ${ops.helperBundled}). It normally updates itself after an app update; if that did not happen, update it here. It is downloaded from the official repository by the server itself.`,
+        h('div', { class: 'row', style: 'margin-top:8px' }, act('update-helper', 'Update maintenance helper', 'primary', 'Update the root maintenance helper to the one of this release? The server downloads it from the official repository; agents keep running.')))
+        : h('div', { class: 'note info', id: 'helper-update', style: 'margin-top:10px' },
+          h('b', {}, 'This server has an older maintenance helper'), ' that cannot update itself yet. Run ', h('code', {}, 'sudo duniya update'),
+          ' on the server once; after that it updates itself from here. No SSH access (for example an Oracle server created without an SSH key)? Reinstall instead: ', helperDoc, ' (your data comes back from a backup).');
     opsBox.replaceChildren(h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'OS updates & maintenance'),
       h('button', { class: 'btn small', onclick: async (e) => { e.target.disabled = true; await api('GET', '/api/system/os-updates?refresh=1').catch(() => {}); opsCard(); } }, 'Check')),
       restartBanner, updates,
@@ -1505,7 +1515,7 @@ function toolServiceEditor(s, o) {
     ? h('div', { style: 'margin-top:8px' }, h('div', { class: 'small muted' }, 'Sign in on the service for each role. You will come back here when done.'), connRow('organizer'), connRow('participant'))
     : s.auth === 'token' ? h('div', {}, field('Organizer credential (secret reference)', org), field('Participant credential (optional; least privilege)', part)) : null;
   const typeSel = h('select', { style: 'max-width:230px;min-width:180px', 'aria-label': 'Kind of tool service', disabled: !o.isOwner && s.type === 'local', onchange: (e) => { s.type = e.target.value; o.redraw(); } },
-    [['remote', 'Remote (URL)'], ['local', 'Local (npm or GitHub package)']].map(([v, l]) => h('option', { value: v, selected: s.type === v }, l)));
+    [['remote', 'Remote (URL)'], ['local', smallServer() ? 'Local (not on small servers)' : 'Local (npm or GitHub package)']].map(([v, l]) => h('option', { value: v, selected: s.type === v, disabled: v === 'local' && smallServer() && s.type !== 'local' }, l)));
   const ta = (prop, ph, rows = 2) => h('textarea', { value: s[prop], placeholder: ph, style: `min-height:${rows * 22 + 16}px`, oninput: (e) => (s[prop] = e.target.value) });
   const redirectUri = `${location.origin}/oauth/mcp/callback`;
   const advanced = h('details', { style: 'margin-top:8px' }, h('summary', { class: 'small muted' }, 'Advanced'),
@@ -1530,17 +1540,21 @@ function toolServiceEditor(s, o) {
       if (r) { o.locals.splice(0, o.locals.length, ...(await api('GET', `${o.base}/local`))); o.redraw(); toast(`Installed ${r.name}@${r.version}`); }
     };
     const pkg = h('input', { value: s.pkg, placeholder: '@scope/server@1.2.3 or github:owner/repo#tag', disabled: !o.isOwner, oninput: (e) => (s.pkg = e.target.value.trim()) });
+    // 055: small servers do not run local tool services; saved ones stay in the config but are not started.
+    const blocked = st?.blocked || (smallServer() ? 'This is a small server: local tool services are not run here, because each one is an extra Node.js process. Use a hosted tool service (one with a web address) instead, or switch on Small server mode in Settings → Server.' : '');
     return h('fieldset', {}, legend,
       h('div', { class: 'row' }, key, typeSel),
+      blocked ? h('div', { class: 'note warn', id: 'local-blocked', style: 'margin-top:8px' }, h('b', {}, savedLocal ? 'Not started on this server. ' : 'Not available on this server. '), blocked,
+        savedLocal ? ' It stays saved and starts again on a bigger server; remove it here if you no longer need it.' : '') : null,
       h('div', { class: 'note warn', style: 'margin-top:8px' }, 'A local tool service runs that package’s code on this server, with the same access as the app (including its data). Only add packages you trust, and pin a version.'),
       field('Package', pkg),
       h('div', { class: 'row' }, field('Arguments (one per line)', ta('args', '--read-only', 2)), field('Environment (NAME=value; values may use ${SECRET})', ta('env', 'API_KEY=${MY_KEY}', 2))),
       h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.allowScripts, disabled: !o.isOwner, onchange: (e) => (s.allowScripts = e.target.checked) }), 'Allow install scripts (needed by some GitHub packages that build themselves)'),
       h('div', { class: 'row', style: 'align-items:center;margin-top:8px' },
         st?.installed ? h('span', { class: 'pill ok' }, `Installed ${st.installed.name}@${st.installed.version}`) : h('span', { class: 'pill' }, savedLocal ? 'Not installed yet (installs on first use)' : 'Save to install'),
-        o.isOwner ? h('button', { class: 'btn small', onclick: () => install(false) }, st?.installed ? 'Reinstall' : 'Install') : h('span', { class: 'small muted' }, 'Only the owner can install or change local tool services'),
-        o.isOwner && st?.installed ? h('button', { class: 'btn small', onclick: () => install(true) }, 'Update (fresh install)') : null),
-      h('div', { class: 'row', style: 'margin-top:8px' }, discoverButton({ type: 'local', server: s.key }),
+        o.isOwner ? h('button', { class: 'btn small', disabled: !!blocked, onclick: () => install(false) }, st?.installed ? 'Reinstall' : 'Install') : h('span', { class: 'small muted' }, 'Only the owner can install or change local tool services'),
+        o.isOwner && st?.installed && !blocked ? h('button', { class: 'btn small', onclick: () => install(true) }, 'Update (fresh install)') : null),
+      h('div', { class: 'row', style: 'margin-top:8px' }, blocked ? null : discoverButton({ type: 'local', server: s.key }),
         h('button', { class: 'btn small danger mut', disabled: !o.isOwner, onclick: o.remove }, 'Remove')),
       o.extra || null, grid);
   }
@@ -2985,12 +2999,28 @@ async function renderSettings() {
     h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any agent can send:'),
       h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups'))),
   ];
+  cards.push(smallModeCard(S.status?.server));
   if (can('owner')) {
     const [users, inv, gcfg, signin, web] = await Promise.all([api('GET', '/api/users'), api('GET', '/api/invites'), api('GET', '/api/auth/google'), api('GET', '/api/auth/signin').catch(() => null), api('GET', '/api/web').catch(() => null)]);
     cards.unshift(usersCard(users, inv, signin), signin ? signinCard(signin) : null, googleSetupCard(gcfg), web ? webAccessCard(web) : null);
   }
   cards.unshift(tools); // Tool services for all agents (035) first: they affect every agent
   $('#main').replaceChildren(h('div', { class: 'grid' }, cards));
+}
+
+// ---------- Settings → Server: Small server mode (055), one switch for heavier features on a small server ----------
+function smallModeCard(sv) {
+  if (!sv) return null;
+  const on = !!sv.smallMode;
+  const small = sv.size === 'small';
+  const ram = sv.effectiveMb >= 1024 ? `${(sv.effectiveMb / 1024).toFixed(1)} GB` : `${sv.effectiveMb} MB`;
+  const flip = (v) => tryApi(async () => { await api('PUT', '/api/server/small-mode', { enabled: v }); S.status = await api('GET', '/api/status'); renderSettings(); }, v ? 'Small server mode on' : 'Small server mode off');
+  return h('div', { class: 'card', id: 'small-mode' }, h('h2', {}, 'Server'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, `${SIZE_LABEL[sv.size]}: ${ram} memory, ${sv.cpus} CPU${sv.cpus > 1 ? 's' : ''}.`),
+    h('label', { class: 'inline' }, toggle(on, flip, !can('owner')), h('b', {}, 'Small server mode: allow heavier features on this server')),
+    h('div', { class: 'small', style: 'margin-top:6px' }, 'On a small server (under 2 GB or 1 CPU), allows on-server speech and local tool services anyway. Caveats: slower; one job at a time and at most 2 local tool services; they start only when enough memory is free and are stopped when memory gets tight (the agent then answers without them). GitHub Copilot sign-in is not covered: it needs 2 GB.'),
+    !small ? h('div', { class: 'small muted', style: 'margin-top:6px' }, 'This server is not small: everything is available, the switch changes nothing here.') : null,
+    !can('owner') ? h('div', { class: 'small muted', style: 'margin-top:6px' }, 'Only the owner can change this.') : null);
 }
 
 // ---------- Settings → Owner assistant (044): link your WhatsApp number, model ----------
@@ -3163,8 +3193,8 @@ async function photosVoiceCard() {
     h('p', { class: 'small muted', style: 'margin-top:0' }, 'Listen to voice notes and answer with voice on this server, without a provider — free, private, slower. Used after the providers, or alone. Open-source engines (Whisper, Piper via sherpa-onnx), downloaded only if you choose to.'),
     !m.local.supported ? h('div', { class: 'note warn' }, `On-server speech runs on Linux (x64 or arm64); this server is ${m.local.platform}.`) : null,
     m.server?.effectiveMb < 2048 && m.local.supported ? h('div', { class: 'note' },
-      h('label', { class: 'inline' }, toggle(!!st.local.smallServer, (v) => save({ local: { smallServer: v } }, v ? 'Small server mode on' : 'Small server mode off'), !can('owner')), h('b', {}, 'Small server mode (experimental)')),
-      h('div', { class: 'small', style: 'margin-top:6px' }, 'Lets on-server speech run on a server with about 1 GB of memory. Caveats: one voice note at a time and slow (a 30-second voice note can take a minute on one shared CPU); only the smallest models; a job starts only when enough memory is free at that moment, otherwise the provider is used or the agent asks the person to type. The installer adds swap space as a safety net. A provider (OpenAI or OpenRouter) is faster and safer on small servers.')) : null,
+      h('b', {}, `Small server mode is ${S.status?.server?.smallMode ? 'on' : 'off'}. `), 'On a server with about 1 GB of memory, on-server speech runs only with ', SMALL_MODE_LINK(),
+      ': one voice note at a time, slow, only the smallest models. A provider (OpenAI or OpenRouter) is faster and safer on small servers.') : null,
     !allowed ? h('div', { class: 'note warn' }, m.localAllowed.reason) : m.server?.size !== 'large' ? h('div', { class: 'note' }, `Each engine needs about 300–400 MB of free memory while it works; this server has ${m.server.availableMb} MB free now. If memory is short at that moment, the provider is used or the agent asks for text.`) : null,
     engines.map(engineRow));
   return card;

@@ -106,9 +106,10 @@ A jump is *breaking* when the major version grows or a release in between is mar
 > priority so agents keep answering. A run that was cut off is finished first on the next run.
 
 > [!IMPORTANT]
-> The OS update steps live in the root maintenance helper, which the in-panel app update cannot replace. If the
-> page says *This server has an older maintenance helper*, run `sudo duniya update` on the server once (or re-run
-> the installer). Admin MCP: `list_os_updates`, `run_maintenance` with `os-update` or `os-update-all`.
+> The OS update steps live in the root maintenance helper. Since 2.17 it updates itself from the release after an app
+> update (or **Update maintenance helper** on this page). A helper from before 2.17 needs one root run first:
+> [The maintenance helper](upgrading.md#the-maintenance-helper). Admin MCP: `list_os_updates`, `run_maintenance` with
+> `os-update`, `os-update-all` or `update-helper`.
 
 ### Per host
 

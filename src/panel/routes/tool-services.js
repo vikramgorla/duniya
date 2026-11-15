@@ -5,7 +5,7 @@ import { interpolate } from '../../core/store.js';
 import { listAgents, updateAgent } from '../../core/agents.js';
 import { listGlobalRows, getGlobalServer, saveGlobalServer, removeGlobalServer } from '../../core/global-mcp.js';
 import { probeServer, startSignIn, listConnections, disconnect, deleteServerConnections, OAUTH_ROLES, GLOBAL_SCOPE } from '../../core/mcp-oauth.js';
-import { installPackage, installedInfo } from '../../core/mcp-local.js';
+import { installPackage, installedInfo, localServiceCheck } from '../../core/mcp-local.js';
 import { resetMcpPool, mcpConnection } from '../../core/mcp.js';
 import { serverConnection, oauthClientOf } from '../../core/tools.js';
 import { referencedSecrets } from '../../core/schema.js';
@@ -76,7 +76,7 @@ export function toolServiceRoutes(route) {
 
   route('GET', '/api/tool-services/local', async () => listGlobalRows().filter((r) => r.config.type === 'local').map(({ name, config }) => {
     const i = installedInfo(config.package, config.allowScripts);
-    return { server: name, package: config.package, installed: i ? { name: i.name, version: i.version, at: i.at } : null };
+    return { server: name, package: config.package, blocked: localServiceCheck().reason || null, installed: i ? { name: i.name, version: i.version, at: i.at } : null };
   }));
   route('POST', '/api/tool-services/local/:server/install', async (req, res, body, q, p, user) => {
     const srv = getGlobalServer(p.server);

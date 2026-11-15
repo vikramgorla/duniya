@@ -113,7 +113,8 @@ no paid media calls.
   ~65 MB), run by the open-source [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) runtime (`sherpa-onnx-node`,
   prebuilt for Linux x64 and arm64, downloaded into `DATA_DIR/speech` only when you choose to). Each job runs in its
   own low-priority process (~300 MB listening, ~180 MB speaking) and needs ffmpeg and bzip2 (installer and Docker
-  image include them). Below 2 GB: see [Small servers](small-servers.md). whisper.cpp publishes no Linux binaries, so
+  image include them). Below 2 GB: only with [Small server mode](small-servers.md#small-server-mode) (Settings →
+  Server). whisper.cpp publishes no Linux binaries, so
   it is not used.
 - Admin MCP: `get_photos_and_voice`, `set_photos_and_voice_settings`, `install_speech_engine`,
   `set_agent_photos_and_voice`.

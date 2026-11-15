@@ -1,5 +1,7 @@
 import { interpolate } from './store.js';
 import { mcpConnection } from './mcp.js';
+import { localServiceCheck } from './mcp-local.js';
+import { activity } from './events.js';
 import { isConnected, runtimeProvider, GLOBAL_SCOPE } from './mcp-oauth.js';
 import { globalServers } from './global-mcp.js';
 import { memoryTools, memoryEnabled, MEMORY_DEFAULT_ALLOW } from './memory.js';
@@ -31,10 +33,22 @@ export function effectiveServers(agent) {
   return Object.assign(out, own);
 }
 
+const notStarted = new Set();
+function notStartedOnce(scope, key, reason) {
+  const id = `${scope}:${key}`;
+  if (notStarted.has(id)) return;
+  notStarted.add(id);
+  activity('system', { summary: `Local tool service ${key} not started: ${reason}` });
+}
+
 /** Connection to a tool service (of the agent, or a global one) for a role. */
 export function serverConnection(srvRaw, { scope, key, role, where }) {
   const srv = interpolate(srvRaw);
   if (srv?.type === 'local') {
+    // 055: a local service configured before (or restored onto) a small server stays in the config but is not
+    // started; the agent answers without its tools and the panel shows why.
+    const small = localServiceCheck();
+    if (!small.ok) { notStartedOnce(scope, key, small.reason); throw Object.assign(new Error(`Local tool service "${key}" is not started: ${small.reason}`), { code: small.code }); }
     // One process per service (per agent, or one shared by all agents for a global service); roles are separated
     // by the per-role tool lists.
     return mcpConnection(`local:${scope}:${key}`, { local: { spec: srv.package, allowScripts: !!srv.allowScripts, args: srv.args || [], env: srv.env || {} } });

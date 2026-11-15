@@ -5,7 +5,7 @@ import { launchSpec } from './mcp-local.js';
 import { onSecretChange } from './store.js';
 import { onOAuthChange } from './mcp-oauth.js';
 import { onGlobalMcpChange } from './global-mcp.js';
-import { maxLocalServices } from './resources.js';
+import { maxLocalServices, serverSize, onMemoryPressure } from './resources.js';
 import { activity } from './events.js';
 
 /** Pool of MCP connections keyed by url + credential (token, or an OAuth sign-in identity). */
@@ -85,6 +85,9 @@ const pool = new Map();
  * server). Starting another stops the one used least recently; it starts again on its next use.
  */
 async function makeRoomForLocal(starting) {
+  // 055: Small server mode lets local services run on a small server, but never while memory is tight.
+  const size = serverSize();
+  if (size.size === 'small' && size.pressure) throw new Error('Memory is tight on this small server right now, so local tool services wait until it frees up');
   const running = [...pool.values()].filter((c) => c !== starting && c.local && c.client).sort((a, b) => (a.usedAt || 0) - (b.usedAt || 0));
   const max = maxLocalServices();
   while (running.length >= max) {
@@ -110,6 +113,15 @@ export async function resetMcpPool() {
   pool.clear();
   await Promise.all(conns.map((c) => c.close()));
 }
+
+/** 055: on a small server, memory pressure stops the running local tool services; each starts again when needed. */
+export async function stopLocalServices(reason) {
+  const running = [...pool.values()].filter((c) => c.local && c.client);
+  for (const c of running) await c.close();
+  if (running.length) activity('system', { summary: `Stopped ${running.length} local tool service${running.length === 1 ? '' : 's'}: ${reason}` });
+  return running.length;
+}
+onMemoryPressure((tight) => { if (tight && serverSize().size === 'small') stopLocalServices('memory is tight on this small server').catch(() => {}); });
 
 onSecretChange(() => { resetMcpPool(); });
 onOAuthChange(() => { resetMcpPool(); });

@@ -373,7 +373,7 @@ export const TOOLS = [
       };
     } },
   { name: 'add_tool_service_from_registry', risky: true, calls: [['POST', '/api/tool-services/registry/add']],
-    description: 'Add a tool service from the MCP Registry to one agent or to all agents. kind "remote" (hosted; default when offered) or "local" (npm package run on this server; owner only, refused on small servers). values: non-secret settings by field id (e.g. {"env:WORKSPACE": "acme"}). Keys and tokens are never passed here: store each with set_secret under the secret name the preview shows (or in the panel), then add. Organizers get its tools, participants none; risky tools are listed; a preview/confirm service gets the confirm step. Needs confirm_action.',
+    description: 'Add a tool service from the MCP Registry to one agent or to all agents. kind "remote" (hosted; default when offered) or "local" (npm package run on this server; owner only, refused on small servers unless Small server mode is on). values: non-secret settings by field id (e.g. {"env:WORKSPACE": "acme"}). Keys and tokens are never passed here: store each with set_secret under the secret name the preview shows (or in the panel), then add. Organizers get its tools, participants none; risky tools are listed; a preview/confirm service gets the confirm step. Needs confirm_action.',
     input: { server: str('Registry name, e.g. io.github.owner/server'), target: str('"all" for all agents, or an agent id'), kind: str('remote or local', { enum: ['remote', 'local'] }),
       name: str('Tool service name (lowercase letters, digits, _; default from the registry name)'), values: obj('Non-secret field values by field id'), replace: bool('Replace a tool service with the same name') },
     required: ['server', 'target'],
@@ -432,6 +432,16 @@ export const TOOLS = [
   { name: 'set_agents_paused', calls: [['POST', '/api/settings']], description: 'Pause (true) or resume (false) all agents at once.',
     input: { paused: bool('true = pause all agents') }, required: ['paused'],
     run: async (a, x) => ({ paused: !!(await x.call('POST', '/api/settings', { paused: !!a.paused })).paused }) },
+  { name: 'set_small_server_mode', risky: true, calls: [['GET', '/api/server/small-mode'], ['PUT', '/api/server/small-mode']],
+    description: 'Small server mode (owner only): on a small server (under 2 GB or 1 CPU) allow heavier features anyway: on-server speech and local tool services, each one at a time / at most 2, started only when memory allows and stopped when it is tight. Slower and may be refused at busy moments. Does not cover GitHub Copilot sign-in (needs 2 GB). Needs confirm_action.',
+    input: { enabled: bool('true = allow heavier features on this small server') }, required: ['enabled'],
+    preview: async (a, x) => {
+      const cur = await x.call('GET', '/api/server/small-mode');
+      const size = `${cur.server.size} server, ${cur.server.effectiveMb} MB, ${cur.server.cpus} CPU`;
+      return a.enabled ? `Switch Small server mode on (${size}; now ${cur.enabled ? 'on' : 'off'}). Allows: ${cur.covers.join('; ')}. Slower; heavier work waits or is refused when memory is tight. Not covered: ${cur.notCovered.join('; ')}.`
+        : `Switch Small server mode off (${size}; now ${cur.enabled ? 'on' : 'off'}). On a small server, on-server speech stops being used and local tool services stop starting (they stay saved).`;
+    },
+    run: (a, x) => x.call('PUT', '/api/server/small-mode', { enabled: !!a.enabled }) },
   { name: 'get_logging_settings', readOnly: true, calls: [['GET', '/api/logging']], description: 'What the activity log records: level, categories, retention.', input: {},
     run: (a, x) => x.call('GET', '/api/logging') },
   { name: 'set_logging_settings', calls: [['PUT', '/api/logging']],
@@ -469,17 +479,18 @@ export const TOOLS = [
   { name: 'list_os_updates', readOnly: true, calls: [['GET', '/api/system/os-updates']], description: 'Operating-system package updates, grouped: install (will install now; count = how many), phased (Ubuntu is rolling them out gradually: they install automatically within days, or now with run_maintenance os-update-all) and held (kept back, with the reason in why).',
     input: { refresh: bool('Check again now (slower)') },
     run: (a, x) => x.call('GET', `/api/system/os-updates${a.refresh ? '?refresh=1' : ''}`) },
-  { name: 'get_maintenance_status', readOnly: true, calls: [['GET', '/api/system/ops']], description: 'Available server maintenance actions, the state of the last one, result.text (summary of the last OS update) and reboot (whether a restart is needed to finish updates, and for which packages).', input: {},
+  { name: 'get_maintenance_status', readOnly: true, calls: [['GET', '/api/system/ops']], description: 'Available server maintenance actions, the state of the last one, result.text (summary of the last OS update), reboot (whether a restart is needed to finish updates, and for which packages) and the maintenance helper: helperVersion, helperBundled (the one this release ships), helperOutdated, helperSelfUpdate (it can update itself with run_maintenance update-helper; otherwise sudo duniya update once or a reinstall).', input: {},
     run: (a, x) => x.call('GET', '/api/system/ops') },
   { name: 'run_maintenance', risky: true, calls: [['POST', '/api/system/ops']],
-    description: 'Run a server maintenance action: os-update (install OS updates; Ubuntu\'s gradual roll-outs wait), os-update-all (also the updates Ubuntu is still rolling out gradually), os-cleanup, restart-web, restart-tunnel or reboot (also finishes updates that need a restart). Needs confirm_action.',
-    input: { action: { type: 'string', enum: ['os-update', 'os-update-all', 'os-cleanup', 'restart-web', 'restart-tunnel', 'reboot'], description: 'Action' } }, required: ['action'],
+    description: 'Run a server maintenance action: os-update (install OS updates; Ubuntu\'s gradual roll-outs wait), os-update-all (also the updates Ubuntu is still rolling out gradually), os-cleanup, restart-web, restart-tunnel, reboot (also finishes updates that need a restart) or update-helper (the root maintenance helper fetches the copy of this app\'s release from the official repository and installs it; get_maintenance_status shows helperOutdated / helperSelfUpdate). Needs confirm_action.',
+    input: { action: { type: 'string', enum: ['os-update', 'os-update-all', 'os-cleanup', 'restart-web', 'restart-tunnel', 'reboot', 'update-helper'], description: 'Action' } }, required: ['action'],
     preview: async (a, x) => {
       const ops = await x.call('GET', '/api/system/ops');
       const label = ops.actions?.[a.action];
       if (!label) throw Object.assign(new Error('Unknown action'), { status: 400 });
       const effect = { reboot: 'The whole server restarts: agents and the panel are offline for a few minutes.', 'os-update': 'Takes a few minutes; services may restart.',
         'os-update-all': 'Takes a few minutes; services may restart. Also installs updates Ubuntu is still rolling out gradually (normally they come within days).',
+        'update-helper': `The root helper downloads its own files of this app's release (helper ${ops.helperVersion} → ${ops.helperBundled}) from the official repository and installs them; agents keep running.`,
         'restart-web': 'The panel and AI-assistant access are unreachable for a few seconds.', 'restart-tunnel': 'The panel and AI-assistant access are unreachable for a few seconds.' }[a.action] || '';
       return `${label}. ${effect}`.trim();
     },

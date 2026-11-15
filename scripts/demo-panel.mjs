@@ -150,7 +150,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const registryUrl = await fakeRegistry(weatherUrl);
   const data = join(dataDir, 'data'); const ops = join(dataDir, 'ops');
   for (const d of [data, join(ops, 'req'), join(ops, 'state')]) mkdirSync(d, { recursive: true });
-  writeFileSync(join(ops, 'helper'), '#!/bin/sh\n# duniya-ops-version: 2\n'); // maintenance helper present (nothing runs it in the demo)
+  writeFileSync(join(ops, 'helper'), `#!/bin/sh\n# duniya-ops-version: ${readFileSync(join(ROOT, 'deploy/ops/duniya-ops'), 'utf8').match(/^# duniya-ops-version: (\d+)$/m)[1]}\n`); // current maintenance helper (nothing runs it in the demo)
   // #96: OS updates from captured apt output (3 to install, snapd rolling out gradually, docker-ce on hold), the last
   // run's log (kernel installed) and a pending restart, so the Server page shows every group and the restart banner.
   const apt = join(ops, 'apt'); mkdirSync(apt, { recursive: true });
@@ -176,6 +176,8 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const imp = (p) => import(pathToFileURL(join(ROOT, p)).href);
   if (small) (await imp('src/core/resources.js')).setResourceProbe({ totalMb: 958, cgroupLimitMb: null, availableMb: 540, cpus: 1 });
   const store = await imp('src/core/store.js');
+  // 055: the small demo has Small server mode on, so the carpool agent's local tool service is shown as allowed.
+  if (small) store.updateSettings({ smallServerMode: true });
   const db = await imp('src/core/db.js');
   const agents = await imp('src/core/agents.js');
   const prefs = await imp('src/core/chat-prefs.js');

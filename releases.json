@@ -1,6 +1,13 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.17.0": {
+      "breaking": false,
+      "title": "Small server mode in Settings → Server; local tool services refused on small servers everywhere; the maintenance helper updates itself",
+      "summary": "On a small server (1 GB / 1 CPU) local tool services are now refused on every path, not only in Browse; ones saved before stay but are not started. One switch, Small server mode (Settings → Server, owner), allows on-server speech and local tool services anyway (moved from Photos & voice; your setting is kept). The root maintenance helper now updates itself from the release after an app update (or Update maintenance helper on the Server page). Servers whose helper predates 2.17 need one sudo duniya update (or a reinstall without SSH) to get this.",
+      "data": "unchanged",
+      "docs": "docs/upgrading.md#the-maintenance-helper"
+    },
     "2.16.0": {
       "breaking": false,
       "title": "Quick replies, welcome messages and FAQ answers without AI; code plugins removed",

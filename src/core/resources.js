@@ -8,7 +8,7 @@
 //    media-queue.js, which bounds how much work can pile up;
 //  - optionalPaused(): true while the app's own memory is above the soft limit (70 % of RAM): background summaries,
 //    on-server engines and image creation wait; WhatsApp and replies keep running. Logged once per episode.
-import { getSetting } from './store.js';
+import { getSetting, updateSettings } from './store.js';
 import os from 'node:os';
 import { readFileSync, accessSync, constants } from 'node:fs';
 import { join } from 'node:path';
@@ -67,13 +67,17 @@ export const SIZE_TEXT = { small: 'Small server', medium: 'Medium server', large
 
 // ---------- memory pressure: pause optional work ----------
 let paused = false;
+const pressureListeners = new Set();
+/** fn(true) when memory gets tight, fn(false) when it is back to normal (local tool services stop on small servers). */
+export const onMemoryPressure = (fn) => pressureListeners.add(fn);
 /** True while the app uses more than the soft limit: optional work (summaries, on-server engines, image creation) waits. */
 export function optionalPaused() {
   const s = serverSize();
   if (s.pressure !== paused) {
     paused = s.pressure;
+    for (const fn of pressureListeners) { try { fn(paused); } catch { /* never crash on bookkeeping */ } }
     activity('system', { summary: paused
-      ? `Memory is tight (app uses ${s.rssMb} MB of ${s.effectiveMb} MB): optional work paused — summaries, on-server speech, image creation. Replies continue.`
+      ? `Memory is tight (app uses ${s.rssMb} MB of ${s.effectiveMb} MB): optional work paused — summaries, on-server speech, image creation${s.size === 'small' ? ', local tool services' : ''}. Replies continue.`
       : `Memory is back to normal (${s.rssMb} MB): optional work resumed.` });
   }
   return paused;
@@ -93,14 +97,40 @@ export function startResourceWatch() {
  */
 export const SMALL_MODE_MIN_TOTAL_MB = 900; // a "1 GB" VM reports roughly 950–990 MB
 export const SMALL_MODE_HEADROOM_MB = 150; // free memory kept beyond what the engine itself needs
-/** Owner's opt-in to run on-server speech on a small server (Settings → Photos & voice), with caveats. */
-export const smallServerMode = () => { try { return !!getSetting('media', {})?.local?.smallServer; } catch { return false; } };
+// ---------- Small server mode (055): one server-wide switch ----------
+/**
+ * Owner's opt-in (Settings → Server → Small server mode) to allow heavier features on a small server anyway: on-server
+ * speech and local tool services, each with its own extra guards. One setting for every path. Before 2.17 the switch
+ * lived in Settings → Photos & voice (media.local.smallServer); that value is still read until the new one is saved.
+ */
+export const SMALL_MODE_HINT = 'or switch on Small server mode in Settings → Server';
+export function smallServerMode() {
+  try {
+    const v = getSetting('smallServerMode', null);
+    if (v !== null) return !!v;
+    const old = !!getSetting('media', {})?.local?.smallServer; // carried over once from the Photos & voice switch
+    updateSettings({ smallServerMode: old });
+    return old;
+  } catch { return false; }
+}
+export const setSmallServerMode = (on) => updateSettings({ smallServerMode: !!on }).smallServerMode;
+/**
+ * The shared small-server gate: { ok, small, mode, code, reason }. Not small → ok. Small → ok only with Small server
+ * mode on (`mode: true`, so callers apply their own extra limits). The refusal names the alternative and the switch.
+ */
+export function smallServerCheck({ what, alternative }) {
+  const s = serverSize();
+  if (s.size !== 'small') return { ok: true, small: false, mode: false };
+  if (smallServerMode()) return { ok: true, small: true, mode: true };
+  return { ok: false, small: true, mode: false, code: 'small_server',
+    reason: `This is a small server (${s.effectiveMb} MB memory, ${s.cpus} CPU): ${what}. ${alternative}, ${SMALL_MODE_HINT}.` };
+}
 export function localEngineCheck({ forEnable = false, needMb = LOCAL_MIN_FREE_MB } = {}) {
   const s = serverSize();
   let need = needMb;
   if (s.effectiveMb < LOCAL_MIN_TOTAL_MB) {
     if (!smallServerMode()) {
-      return { ok: false, code: 'too_small', reason: `This server has ${s.effectiveMb} MB of memory; on-server speech normally needs ${LOCAL_MIN_TOTAL_MB} MB. Use a provider (OpenAI or OpenRouter under Models), or switch on “Small server mode” below to try it anyway (slow, one voice note at a time).` };
+      return { ok: false, code: 'too_small', reason: `This server has ${s.effectiveMb} MB of memory; on-server speech normally needs ${LOCAL_MIN_TOTAL_MB} MB. Use a provider (OpenAI or OpenRouter under Models), ${SMALL_MODE_HINT} to try it anyway (slow, one voice note at a time).` };
     }
     if (s.effectiveMb < SMALL_MODE_MIN_TOTAL_MB) {
       return { ok: false, code: 'too_small', reason: `This server has only ${s.effectiveMb} MB of memory — too little for on-server speech even in small server mode. Use a provider instead.` };
@@ -112,10 +142,14 @@ export function localEngineCheck({ forEnable = false, needMb = LOCAL_MIN_FREE_MB
   if (s.availableMb < need) return { ok: false, code: 'low_memory', reason: `Only ${s.availableMb} MB of memory is free right now (needs ${need} MB).` };
   return { ok: true };
 }
-/** Big downloads that run their own helper (Copilot SDK): refused on small servers. */
+/**
+ * Big downloads that run their own helper (Copilot SDK): refused below 2 GB, also with Small server mode on. The
+ * ~400 MB npm install and the helper process run inside the app service's 700 MB memory cap next to the app itself,
+ * so on 1 GB they fail or get the app stopped; Small server mode does not cover this (055).
+ */
 export function heavyCheck(what) {
   const s = serverSize();
-  if (s.effectiveMb < HEAVY_MIN_TOTAL_MB) return { ok: false, reason: `${what} needs a server with at least ${HEAVY_MIN_TOTAL_MB / 1024} GB of memory; this one has ${s.effectiveMb} MB. Use another provider (an API key or OpenRouter works on any server).` };
+  if (s.effectiveMb < HEAVY_MIN_TOTAL_MB) return { ok: false, code: 'too_small', reason: `${what} needs a server with at least ${HEAVY_MIN_TOTAL_MB / 1024} GB of memory; this one has ${s.effectiveMb} MB. Small server mode does not cover this: its ~400 MB download and helper process do not fit next to the app on this server. Use another provider (an API key or OpenRouter works on any server).` };
   return { ok: true };
 }
 /** How many local tool services (stdio processes) may run at once. */
