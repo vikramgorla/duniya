@@ -2,9 +2,10 @@ import { env } from './config.js';
 import { getSettings } from './store.js';
 import { listBots, getBot, botForChat, roleIn } from './bots.js';
 import { runAgent, handleConfirmCommand } from './agent.js';
-import { logMessage } from './db.js';
+import { logMessage, messageByMsgId, saveReaction, savePollVote, pollTally } from './db.js';
 import { activity } from './events.js';
 import { maybeSummarize } from './memory.js';
+import { setWhatsAppChannel } from './whatsapp-tools.js';
 
 const rate = new Map();
 function rateLimited(key) {
@@ -74,11 +75,11 @@ export function createHistoryHandler() {
     const touched = new Map();
     let stored = 0;
     for (const m of msgs) {
-      if (!m.isGroup) continue; // never store private chats from history
+      if (!m.isGroup || (m.kind && m.kind !== 'text')) continue; // never store private chats from history
       const bot = botForChat(m.chat);
       const id = logMessage({
         channel: m.channel, chat: m.chat, bot: bot?.id || '', msgId: m.msgId, sender: m.phone, name: m.senderName,
-        text: m.text, quoted: m.quoted, fromBot: m.fromMe, ts: m.ts,
+        text: m.text, quoted: m.quoted, fromBot: m.fromMe, ts: m.ts, senderJid: m.fromMe ? '' : m.senderJid,
       });
       if (id) { stored++; touched.set(m.chat, bot); }
     }
@@ -87,10 +88,39 @@ export function createHistoryHandler() {
   };
 }
 
+const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
+
+/**
+ * Reactions and poll votes (026): stored for context, never answered. Reactions are kept when they are on a bot's
+ * message or in a chat bound to an enabled bot; votes when the poll is known (created while the app ran).
+ */
+function recordEvent(msg) {
+  const who = msg.phone || msg.senderJid || 'someone';
+  const bot = botForChat(msg.chat);
+  if (msg.kind === 'reaction') {
+    const target = msg.target ? messageByMsgId(msg.chat, msg.target) : null;
+    if (!target?.from_bot && !(bot?.enabled && msg.isGroup)) return;
+    saveReaction({ chat: msg.chat, msgId: msg.target, sender: who, name: msg.senderName, emoji: msg.emoji, ts: msg.ts });
+    activity('whatsapp.reaction', { bot: bot?.id || target?.bot || '', chat: msg.chat,
+      summary: msg.emoji ? `${msg.senderName} reacted ${msg.emoji} to "${clip(target?.text || 'a message', 80)}"` : `${msg.senderName} removed a reaction` });
+    return;
+  }
+  if (msg.kind === 'poll_vote') {
+    const p = savePollVote({ chat: msg.chat, msgId: msg.pollId, voter: who, name: msg.senderName, selected: msg.selected || [], ts: msg.ts });
+    if (!p) return;
+    activity('whatsapp.vote', { bot: bot?.id || '', chat: msg.chat,
+      summary: `${msg.senderName} voted ${msg.selected?.length ? msg.selected.join(', ') : '(withdrew)'} in "${clip(p.name, 60)}" → ${pollTally(p).map((o) => `${o.name} ${o.votes}`).join(', ')}` });
+  }
+}
+
 /** Build the live message router for a channel. */
 export function createRouter(channel) {
+  setWhatsAppChannel(channel);
   return async function onMessage(msg) {
-    const lower = msg.text.trim().toLowerCase();
+    if (msg.kind && msg.kind !== 'text') { recordEvent(msg); return; }
+    // A media caption can address the bot ("!panduga what is this?"); the stored text is the placeholder.
+    const wake = msg.caption || msg.text;
+    const lower = wake.trim().toLowerCase();
     const groupBot = msg.isGroup ? botForChat(msg.chat) : null;
 
     // Groups: remember everything said (bound or not, paused or not) so bots have context.
@@ -98,7 +128,7 @@ export function createRouter(channel) {
     if (msg.isGroup) {
       rowId = logMessage({
         channel: msg.channel, chat: msg.chat, bot: groupBot?.id || '', msgId: msg.msgId, sender: msg.phone,
-        name: msg.senderName, text: msg.text, quoted: msg.quoted, ts: msg.ts,
+        name: msg.senderName, text: msg.text, quoted: msg.quoted, ts: msg.ts, senderJid: msg.senderJid,
       });
       summarizeLater(msg.chat, groupBot);
     }
@@ -122,7 +152,7 @@ export function createRouter(channel) {
     if (!msg.isGroup) {
       rowId = logMessage({
         channel: msg.channel, chat: msg.chat, bot: bot.id, msgId: msg.msgId, sender: msg.phone,
-        name: msg.senderName, text: msg.text, quoted: msg.quoted, addressed: true, ts: msg.ts,
+        name: msg.senderName, text: msg.text, quoted: msg.quoted, addressed: true, ts: msg.ts, senderJid: msg.senderJid,
       });
     }
 
@@ -147,7 +177,7 @@ export function createRouter(channel) {
       return;
     }
 
-    const text = stripTriggers(bot, msg.text);
+    const text = msg.caption ? `${msg.text.replace(/:.*$/s, ']')} ${stripTriggers(bot, msg.caption)}`.trim() : stripTriggers(bot, msg.text);
     let out = await handleConfirmCommand({ bot, text, role, chat: msg.chat });
     if (out === undefined && !addressed) return; // looked like "cancel ABCD" but isn't ours
     activity('message.in', {
@@ -161,7 +191,7 @@ export function createRouter(channel) {
       await channel.typing?.(msg.chat);
       const ctx = {
         bot, role, chat: msg.chat, senderName: msg.senderName, requester: msg.phone,
-        text, isGroup: msg.isGroup, source: msg.channel, msgRowId: rowId,
+        text, isGroup: msg.isGroup, source: msg.channel, msgRowId: rowId, msgId: msg.msgId, senderJid: msg.senderJid,
         chatName: msg.isGroup ? await channel.chatName?.(msg.chat) : '',
       };
       try {

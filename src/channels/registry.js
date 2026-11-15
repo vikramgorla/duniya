@@ -16,6 +16,12 @@ export function splitChat(chat) {
   return i > 0 ? { number: chat.slice(0, i), jid: chat.slice(i + 1) } : { number: MAIN, jid: chat };
 }
 
+/** WhatsApp actions (026) that act on one chat: registry.<name>(chat, ...args) → session.<name>(jid, ...args). */
+export const CHAT_ACTIONS = ['sendMedia', 'sendLocation', 'sendContact', 'react', 'editMessage', 'deleteMessage', 'markRead', 'presence', 'sendPoll',
+  'groupInfo', 'groupInviteLink', 'groupRevokeInvite', 'groupParticipants', 'groupSubject', 'groupDescription', 'groupPicture', 'groupSettings', 'groupLeave'];
+/** Actions of the number itself: registry.<name>(chat, ...args) → session.<name>(...args) on the chat's number. */
+export const NUMBER_ACTIONS = ['profile', 'block', 'unblock', 'setProfileName', 'setProfileStatus'];
+
 export const numbersSetting = () => {
   const list = getSetting('whatsappNumbers', null);
   return Array.isArray(list) && list.length ? list : [{ id: MAIN, label: 'Main' }];
@@ -52,8 +58,30 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
     return ch;
   };
 
+  const actions = {};
+  for (const name of CHAT_ACTIONS) {
+    actions[name] = async (chat, ...args) => {
+      const { ch, jid } = route(chat);
+      if (typeof ch[name] !== 'function') throw Object.assign(new Error(`This WhatsApp number cannot ${name}`), { status: 501 });
+      return ch[name](jid, ...args);
+    };
+  }
+  for (const name of NUMBER_ACTIONS) {
+    actions[name] = async (chat, ...args) => {
+      const { ch } = route(chat);
+      if (typeof ch[name] !== 'function') throw Object.assign(new Error(`This WhatsApp number cannot ${name}`), { status: 501 });
+      return ch[name](...args);
+    };
+  }
+
   return {
     id: 'whatsapp',
+    ...actions,
+    /** New group on a number; returns its chat id as the rest of the app sees it. */
+    async groupCreate(number, subject, people) {
+      const g = await byNumber(number).groupCreate(subject, people);
+      return { ...g, id: chatKey(number || MAIN, g.id) };
+    },
     async start(onMessage, { onHistory } = {}) {
       handler = onMessage; historyHandler = onHistory || null;
       for (const n of numbersSetting()) await startOne(n);

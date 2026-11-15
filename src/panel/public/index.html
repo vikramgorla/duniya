@@ -118,6 +118,12 @@
   .steps > li.now::before { background: var(--accent); color: var(--accent-ink); }
   .steps > li:not(:last-child)::after { content: ""; position: absolute; left: 13.5px; top: 32px; bottom: 4px; width: 1px; background: var(--line); }
   .steps b.t { display: block; font-family: var(--font-display); font-size: 15px; margin-bottom: 2px; }
+  .wa-settings { display: grid; gap: 10px; }
+  .wa-setting { display: flex; align-items: flex-start; gap: 10px; min-height: 36px; font-size: 14px; }
+  .wa-members { list-style: none; padding: 0; margin: 8px 0 0; }
+  .wa-members li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+  .wa-members li > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+  .wa-card .row.nowrap input { min-width: 0; }
   .copyrow { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
   .copyrow code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; background: var(--bg-2); border-radius: 10px; padding: 7px 10px; font: 13px var(--mono); scrollbar-width: thin; }
   .btn.google { background: var(--card); color: var(--ink); border-color: var(--line-2); font-weight: 600; }
@@ -868,7 +874,7 @@ async function renderBots() {
 function openBot(id) { location.hash = `bots/${encodeURIComponent(id)}`; }
 
 async function renderBotEditor(id) {
-  const [b, models, plugins, conns, locals] = await Promise.all([api('GET', `/api/bots/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', '/api/plugins'), api('GET', `/api/bots/${encodeURIComponent(id)}/connections`).catch(() => []), api('GET', `/api/bots/${encodeURIComponent(id)}/local`).catch(() => [])]);
+  const [b, models, plugins, conns, locals, waTools] = await Promise.all([api('GET', `/api/bots/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', '/api/plugins'), api('GET', `/api/bots/${encodeURIComponent(id)}/connections`).catch(() => []), api('GET', `/api/bots/${encodeURIComponent(id)}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => [])]);
   const c = structuredClone(b.config);
   const F = {};
   const inp = (key, attrs = {}) => (F[key] = h('input', { value: c[key] ?? '', ...attrs }));
@@ -925,6 +931,32 @@ async function renderBotEditor(id) {
   const rulesBox = { participant: h('textarea', { value: lines(rules.participant), style: 'min-height:60px' }), organizer: h('textarea', { value: lines(rules.organizer), style: 'min-height:60px' }), deny: h('textarea', { value: lines(rules.deny), style: 'min-height:40px' }) };
   const glob = (p) => new RegExp(`^${p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
   const allowed = (role, fq) => splitLines(rulesBox[role].value).some((r) => glob(r).test(fq));
+  // WhatsApp actions (026): a tick per role. No whatsapp: rule for a role = the defaults; ticking writes explicit rules
+  // (whatsapp:- = none). Organizer-only actions cannot be given to participants (enforced on the server too).
+  const waBox = h('div', {});
+  const waOn = (role, t) => {
+    const mine = splitLines(rulesBox[role].value).filter((r) => r.startsWith('whatsapp:'));
+    if (!mine.length) return role === 'organizer' || t.participantDefault;
+    return mine.some((r) => glob(r).test(`whatsapp:${t.name}`));
+  };
+  function setWa(role, name, on) {
+    const can = waTools.filter((t) => role === 'organizer' || !t.organizerOnly);
+    const next = can.filter((t) => (t.name === name ? on : waOn(role, t))).map((t) => t.name);
+    const rest = splitLines(rulesBox[role].value).filter((r) => !r.startsWith('whatsapp:'));
+    const out = !next.length ? ['whatsapp:-'] : role === 'organizer' && next.length === can.length ? ['whatsapp:*'] : next.map((n) => `whatsapp:${n}`);
+    rulesBox[role].value = [...rest, ...out].join('\n');
+  }
+  function drawWa() {
+    if (!waTools.length) return waBox.replaceChildren();
+    waBox.replaceChildren(h('div', { class: 'tablewrap', style: 'overflow-x:auto' }, h('table', {},
+      h('thead', {}, h('tr', {}, h('th', {}, 'Action'), h('th', { class: 'c' }, 'Participants'), h('th', { class: 'c' }, 'Organizers'))),
+      h('tbody', {}, waTools.map((t) => h('tr', {},
+        h('td', {}, h('b', {}, t.name.replace(/_/g, ' ')), t.organizerOnly ? h('span', { class: 'pill warn', style: 'margin-left:6px' }, 'organizers only') : null,
+          h('div', { class: 'small muted' }, t.description)),
+        h('td', { class: 'c' }, h('input', { type: 'checkbox', 'aria-label': `${t.name} for participants`, checked: !t.organizerOnly && waOn('participant', t), disabled: t.organizerOnly, onchange: (e) => setWa('participant', t.name, e.target.checked) })),
+        h('td', { class: 'c' }, h('input', { type: 'checkbox', 'aria-label': `${t.name} for organizers`, checked: waOn('organizer', t), onchange: (e) => setWa('organizer', t.name, e.target.checked) }))))))));
+  }
+  drawWa();
   const srvList = h('div', {});
   function drawServers() {
     srvList.replaceChildren(...servers.map((s, i) => {
@@ -1119,6 +1151,9 @@ async function renderBotEditor(id) {
           srvList, h('button', { class: 'btn small mut', onclick: () => { servers.push({ key: '', url: '', auth: 'oauth', org: '', part: '' }); drawServers(); } }, '+ Add tool service'),
           h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted' }, 'Advanced: tool rules'),
             field('Participant rules', rulesBox.participant), field('Organizer rules', rulesBox.organizer), field('Never allowed', rulesBox.deny))),
+        waTools.length ? h('fieldset', {}, h('legend', {}, 'WhatsApp actions'),
+          h('p', { class: 'small muted', style: 'margin-top:0' }, 'What the bot may do in WhatsApp besides answering: send pictures and files, react, post polls, manage the group. Actions marked “organizers only” happen right away when an organizer asks — no confirm code — so give the bot’s number group-admin rights only where you want that. Every action is recorded in Activity.'),
+          waBox) : null,
         h('fieldset', {}, h('legend', {}, 'Changes need confirmation'),
           h('label', { class: 'inline' }, F.confirmOn, 'Hold changes until an organizer replies “confirm CODE”'),
           h('div', { class: 'row' }, field('Preview tools', F.cPreview), field('Confirm tool', F.cTool)),
@@ -1196,6 +1231,59 @@ async function renderChats() {
     h('p', { class: 'small muted' }, 'Choose which bot answers in each group or with each person, and optionally a different model or logging level for that chat. A person assigned to a bot is always answered by it; unassigned direct messages go to the default bot of the number. Messages in groups are remembered so a bot added later has context.'),
     list), memBox);
 }
+/** WhatsApp group tools for admins (026): members with admin badges, invite link, name/description, settings. */
+function whatsappCard(c) {
+  const enc = encodeURIComponent(c.id);
+  const body = h('div', {}, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Asking WhatsApp…'));
+  const card = h('div', { class: 'card wa-card', style: 'margin-top:16px' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'WhatsApp'), h('span', { class: 'eyebrow' }, 'Group')), body);
+  const put = (patch, ok) => tryApi(() => api('PUT', `/api/chats/${enc}/whatsapp`, patch), ok);
+  async function load() {
+    let g;
+    try { g = await api('GET', `/api/chats/${enc}/whatsapp`); } catch (e) {
+      body.replaceChildren(h('div', { class: 'note warn' }, `Could not read this group from WhatsApp: ${e.message}. Check that the number is connected (Overview) and still in the group.`));
+      return;
+    }
+    const meAdmin = g.participants.some((p) => p.admin) ? null : h('div', { class: 'note warn' }, 'No admins found for this group.');
+    const subject = h('input', { value: g.subject, maxlength: 100, 'aria-label': 'Group name' });
+    const desc = h('textarea', { value: g.description, maxlength: 2048, style: 'min-height:60px', 'aria-label': 'Group description' });
+    const linkBox = h('div', {});
+    const showLink = async () => {
+      const r = await tryApi(() => api('GET', `/api/chats/${enc}/whatsapp/invite`));
+      if (!r) return;
+      linkBox.replaceChildren(r.link ? copyRow(r.link) : h('p', { class: 'small muted' }, 'WhatsApp did not return a link.'),
+        h('button', { class: 'btn small danger', onclick: async () => {
+          if (!confirm('Reset the invite link? Anyone with the old link can no longer join with it.')) return;
+          const n = await tryApi(() => api('POST', `/api/chats/${enc}/whatsapp/invite/revoke`), 'New invite link created');
+          if (n) { linkBox.firstChild.replaceWith(copyRow(n.link)); }
+        } }, 'Reset link'));
+    };
+    const setting = (key, label, hint) => h('div', { class: 'wa-setting' },
+      toggle(!!g[key], async (on) => { if (await put({ [key]: on }, `${label}: ${on ? 'on' : 'off'}`)) g[key] = on; else load(); }),
+      h('span', {}, h('b', {}, label), h('span', { class: 'small muted', style: 'display:block' }, hint)));
+    const admins = g.participants.filter((p) => p.admin).length;
+    body.replaceChildren(
+      h('div', { class: 'row', style: 'gap:6px;margin:6px 0 10px' }, h('span', { class: 'pill' }, `${g.size} members`), h('span', { class: 'pill info' }, `${admins} admin${admins === 1 ? '' : 's'}`)),
+      meAdmin,
+      h('p', { class: 'small muted', style: 'margin-top:0' }, 'Changes here happen in WhatsApp right away and are recorded in Activity. The bot’s number must be a group admin for most of them.'),
+      field('Group name', h('div', { class: 'row nowrap' }, subject, h('button', { class: 'btn small', onclick: async () => { if (await put({ subject: subject.value }, 'Group renamed')) g.subject = subject.value; } }, 'Save'))),
+      field('Description', desc),
+      h('div', { class: 'row', style: 'margin:6px 0 12px' }, h('button', { class: 'btn small', onclick: () => put({ description: desc.value }, 'Description saved') }, 'Save description')),
+      h('div', { class: 'eyebrow', style: 'margin:8px 0 6px' }, 'Settings'),
+      h('div', { class: 'wa-settings' },
+        setting('announcement', 'Only admins send', 'Everyone else can read but not write.'),
+        setting('locked', 'Only admins edit info', 'Name, picture and description.'),
+        setting('joinApproval', 'Approve new members', 'People joining by link wait for an admin.')),
+      h('div', { class: 'eyebrow', style: 'margin:14px 0 6px' }, 'Invite link'),
+      linkBox, h('button', { class: 'btn small', onclick: (e) => { e.currentTarget.remove(); showLink(); } }, 'Show invite link'),
+      h('details', { style: 'margin-top:14px' }, h('summary', { class: 'small', style: 'cursor:pointer' }, `Members (${g.participants.length})`),
+        h('ul', { class: 'wa-members' }, g.participants.map((p) => h('li', {},
+          h('span', {}, h('b', {}, p.name || (p.phone ? `+${p.phone}` : 'Hidden number')), p.name && p.phone ? h('span', { class: 'small muted num' }, ` +${p.phone}`) : null),
+          p.admin ? h('span', { class: 'pill ok' }, p.admin === 'superadmin' ? 'owner' : 'admin') : null)))));
+  }
+  load();
+  return card;
+}
+
 /** Stored messages of a chat (admins): newest at the bottom, search, load older. Viewing is logged. */
 function messagesCard(c) {
   const enc = encodeURIComponent(c.id);
@@ -1236,6 +1324,7 @@ async function renderMemory(c, box) {
     h('div', { class: 'row mut', style: 'margin-top:10px' },
       h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('POST', `/api/chats/${enc}/memory/summarize`); renderMemory(c, box); }, 'Summary rebuilt') }, 'Rebuild summary'),
       h('button', { class: 'btn danger', onclick: () => confirm(`Erase all stored messages, the summary and notes for “${c.name}”?`) && tryApi(async () => { await api('DELETE', `/api/chats/${enc}/memory`); renderMemory(c, box); }, 'Memory erased') }, 'Erase memory'))));
+  if (can('admin') && c.isGroup) box.append(whatsappCard(c));
   if (can('admin')) box.append(messagesCard(c));
   box.scrollIntoView({ behavior: 'smooth' });
 }

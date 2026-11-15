@@ -2,6 +2,7 @@ import { interpolate } from './store.js';
 import { mcpConnection } from './mcp.js';
 import { isConnected, runtimeProvider } from './mcp-oauth.js';
 import { memoryTools, memoryEnabled, MEMORY_DEFAULT_ALLOW } from './memory.js';
+import { whatsappTools, whatsappRules, whatsappChannel } from './whatsapp-tools.js';
 
 /** "panduga:*_preview" style globs. */
 export function globToRegex(glob) {
@@ -90,6 +91,19 @@ export async function toolsFor(bot, role) {
       const fq = `memory:${t.name}`;
       if (!t.roles.includes(role) || !matchesAny(fq, memAllow) || matchesAny(fq, deny)) continue;
       const name = exposedName('memory', t.name);
+      defs.push({ name, description: t.description, input_schema: t.input_schema });
+      meta.set(name, { kind: 'local', fq, tool: t });
+    }
+  }
+
+  // WhatsApp actions (026): role defaults unless the role has explicit whatsapp: rules; organizer-only tools never
+  // reach participants (t.roles), and the deny list always wins.
+  if (whatsappChannel()) {
+    const waAllow = whatsappRules(bot, role);
+    for (const t of whatsappTools) {
+      const fq = `whatsapp:${t.name}`;
+      if (!t.roles.includes(role) || !matchesAny(fq, waAllow) || matchesAny(fq, deny)) continue;
+      const name = exposedName('whatsapp', t.name);
       defs.push({ name, description: t.description, input_schema: t.input_schema });
       meta.set(name, { kind: 'local', fq, tool: t });
     }
