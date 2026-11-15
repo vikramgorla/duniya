@@ -69,7 +69,7 @@ li.fail{color:var(--bad);font-weight:600}li.fail .d{background:var(--bad);border
 pre{background:#0d0f13;color:#d6dae3;border-radius:12px;padding:14px;max-height:50vh;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12px/1.5 var(--mono)}
 details summary{cursor:pointer;color:var(--mute);font-size:14px;margin-top:14px}a{color:inherit}
 </style></head><body><main>
-<div class=brand><svg viewBox="0 0 32 32" width=30 height=30 aria-hidden=true><circle cx=16 cy=16 r=3.1 fill=currentColor /><g id=ppl></g></svg>Duniya</div>
+<div class=brand><svg viewBox="0 0 64 64" width=30 height=30 aria-hidden=true><path d="M23 5H41A17 17 0 0 1 58 22V44L59.5 59.5L44 55H23A17 17 0 0 1 6 38V22A17 17 0 0 1 23 5Z" fill="#4d9b00" stroke="#4d9b00" stroke-width="4" stroke-linejoin="round"/><g fill="#101216"><rect x="11.8" y="28.3" width="9" height="13.4" rx="4"/><rect x="43.2" y="28.3" width="9" height="13.4" rx="4"/><circle cx="32" cy="12.6" r="2.8"/></g><path d="M32 14.8v6.7" stroke="#101216" stroke-width="2.7" stroke-linecap="round"/><rect x="18" y="21.5" width="28" height="27" rx="13" fill="#fff" stroke="#101216" stroke-width="2.7"/><rect x="20.8" y="29.4" width="22.4" height="12.3" rx="6.15" fill="#101216"/><path d="M23.6 37.2a2.9 2.9 0 0 1 5.8 0M34.6 37.2a2.9 2.9 0 0 1 5.8 0" fill="none" stroke="#c6f432" stroke-width="2" stroke-linecap="round"/></svg>Duniya</div>
 <div class=card><div class=eyebrow id=eyebrow>Setting up your server</div><h1 id=title>Starting…</h1><p id=sub>First boot takes about 10–15 minutes on the free VM. Keep this page open: it follows the setup and opens your admin panel when it is ready.</p>
 <ol id=steps></ol><div id=banner class=banner style="display:none"></div>
 <details id=logbox open><summary>Log</summary><pre id=log>Waiting for the first lines…</pre></details></div>
@@ -77,7 +77,6 @@ details summary{cursor:pointer;color:var(--mute);font-size:14px;margin-top:14px}
 </main><script>
 const FINAL='__FINAL__';
 const $=(i)=>document.getElementById(i);
-(function(){const c=['#ff7a3d','#f2477e','#5363ff','#13b3a1','#9bd400'],g=$('ppl'),ns='http://www.w3.org/2000/svg';c.forEach((col,i)=>{const t=(-90+i*72)*Math.PI/180;const h=document.createElementNS(ns,'circle');h.setAttribute('cx',16+12.2*Math.cos(t));h.setAttribute('cy',16+12.2*Math.sin(t));h.setAttribute('r',2.5);h.setAttribute('fill',col);const p=document.createElementNS(ns,'path');p.setAttribute('d','M-3.7 2.2a3.7 3.7 0 0 1 7.4 0z');p.setAttribute('fill',col);p.setAttribute('transform',`translate(${16+6.6*Math.cos(t)} ${16+6.6*Math.sin(t)}) rotate(${-90+i*72+90})`);g.append(h,p);});})();
 $('final').href=FINAL;$('final').textContent=FINAL;
 let steps=['Preparing the server','Installing system packages','Installing Node.js','Downloading the app','Setting up HTTPS','Starting the panel'],cur=-1,state='running',lostSince=0,start=Date.now(),opened=false;
 const EXTRA=['Switching to the secure web server','Opening your panel'];
@@ -158,6 +157,7 @@ ARGS=(--yes --repo "$REPO_URL" --branch "${BRANCH:-main}" --update-mode "${UPDAT
 case "${EXPOSURE:-ip}" in
   domain) ARGS+=(--domain "$DOMAIN") ;;
   tunnel) ARGS+=(--cloudflare-token "$CF_TUNNEL_TOKEN") ;;
+  tailscale) ARGS+=(--tailscale-authkey "$TS_AUTHKEY") ;;
   local) ARGS+=(--local-only) ;;
   *) ARGS+=(--ip-https) ;;
 esac

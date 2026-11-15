@@ -34,7 +34,7 @@ export function fromChatResponse(json) {
   const content = [];
   if (msg.content) content.push({ type: 'text', text: msg.content });
   for (const c of msg.tool_calls || []) {
-    let input = {};
+    let input;
     try { input = c.function?.arguments ? JSON.parse(c.function.arguments) : {}; } catch { input = { _raw: c.function?.arguments }; }
     content.push({ type: 'tool_use', id: c.id, name: c.function?.name, input });
   }

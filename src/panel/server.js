@@ -41,6 +41,7 @@ import {
 } from './http.js';
 import { googleRoutes, googleReady } from './routes/google.js';
 import { webRoutes } from './routes/web.js';
+import { domainCheckResponse } from '../core/webaccess.js';
 import { passwordLoginAllowed } from '../core/google-signin.js';
 import { createAdminMcp } from './admin-mcp.js';
 import { validateAccess } from '../core/admin-oauth.js';
@@ -318,7 +319,7 @@ export function startPanel({ channel, extend = [] }) {
   // The browser comes back here from the service. SameSite=Strict means no session cookie on this cross-site
   // navigation: the single-use state proves the sign-in was started by an admin; the page then returns to the panel.
   route('GET', '/oauth/mcp/callback', async (req, res, body, q) => {
-    let ok = true; let msg; let agentId = '';
+    let ok = true; let msg; let agentId;
     try {
       const r = await finishSignIn({ state: q.get('state'), code: q.get('code'), error: q.get('error'), errorDescription: q.get('error_description') });
       agentId = r.agentId; msg = `Connected ${r.server} for ${r.role}s.`;
@@ -632,6 +633,11 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
         return send(res, 200, readFileSync(resolve(PUBLIC, 'index.html')), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
       }
       if (url.pathname === '/healthz') return send(res, 200, 'ok');
+      // 036: domain reachability proof + Caddy's on-demand TLS "ask" (public, answers only one-time tokens).
+      if (req.method === 'GET' && url.pathname.startsWith('/.well-known/duniya-check')) {
+        const r = domainCheckResponse(url, req);
+        return send(res, r.status, r.body, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+      }
       if (req.method === 'GET' && (url.pathname === '/qr.js' || url.pathname === '/diff.js')) {
         return send(res, 200, readFileSync(resolve(PUBLIC, url.pathname.slice(1))), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=3600' });
       }

@@ -4,7 +4,7 @@
 //
 //   node scripts/demo-panel.mjs [port]      → http://127.0.0.1:8099, sign in as admin / demo-password-123
 import http from 'node:http';
-import { mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -92,11 +92,14 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const weatherUrl = await fakeToolService();
   const data = join(dataDir, 'data'); const ops = join(dataDir, 'ops');
   for (const d of [data, join(ops, 'req'), join(ops, 'state')]) mkdirSync(d, { recursive: true });
+  writeFileSync(join(ops, 'helper'), '#!/bin/sh\n'); // maintenance helper present (nothing runs it in the demo)
   Object.assign(process.env, {
     DATA_DIR: data, PANEL_PORT: String(port), ADMIN_PASSWORD: DEMO_PASSWORD,
     ANTHROPIC_BASE_URL: `${F}/anthropic`, OPENAI_API_BASE: `${F}/chatgpt`, OPENROUTER_API_BASE: `${F}/openrouter`,
     DUNIYA_INSTALL: 'systemd', DUNIYA_OPS_HELPER: join(ops, 'helper'), DUNIYA_OPS_REQUEST_DIR: join(ops, 'req'), DUNIYA_OPS_STATE_DIR: join(ops, 'state'),
     UPDATE_MODE: 'notify', TZ_DEFAULT: 'Europe/Zurich', PUBLIC_URL: 'https://duniya.example.org',
+    // Web address & access card with its full form (036), without network lookups.
+    DUNIYA_OPS_WEBCONFIG: join(ROOT, 'deploy/ops/webconfig.mjs'), DUNIYA_PUBLIC_IP: '203.0.113.10', DUNIYA_TLS_PORT: '1', DUNIYA_FAKE_CADDY_LOG: join(ops, 'caddy.log'),
   });
   const imp = (p) => import(pathToFileURL(join(ROOT, p)).href);
   const store = await imp('src/core/store.js');

@@ -51,7 +51,8 @@ Walkthrough: [docs/deploy/oci-free-tier.md](docs/deploy/oci-free-tier.md).
 
 [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fwhatsapp-agent-duniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md)
 
-Follow the tutorial on the right (the public IPv4 may cost about US$3.65/month). Why only these two:
+Follow the tutorial on the right. Free: Google's free-tier guide says the free e2-micro's external IP is not charged
+(a static IP, a second VM or Cloud NAT would be). No open ports: `--exposure cloudflare` or `--exposure tailscale`. Why only these two:
 [free VM research](specs/030-free-vms/research.md).
 
 **Any Ubuntu/Debian server (x86_64 or arm64)**
@@ -61,7 +62,7 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/m
 ```
 
 The installer prints the panel address and a one-time setup code. Then: link a dedicated WhatsApp number, connect a
-model, create an agent, switch a chat on. Options (`--ip-https`, `--domain`, Cloudflare Tunnel, Docker) and every
+model, create an agent, switch a chat on. Options (`--ip-https`, `--domain`, Cloudflare Tunnel, Tailscale, Docker) and every
 setting are in [docs/configuration.md](docs/configuration.md).
 
 ## Learn more
@@ -75,3 +76,6 @@ setting are in [docs/configuration.md](docs/configuration.md).
 
 > Use a dedicated WhatsApp number: Duniya links as a normal linked device (via
 > [Baileys](https://github.com/WhiskeySockets/Baileys)), and unofficial clients can be banned.
+>
+> Duniya is an independent open-source project, not affiliated with, endorsed by or sponsored by WhatsApp or Meta.
+> WhatsApp is a trademark of its owner.

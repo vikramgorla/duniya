@@ -5,7 +5,15 @@
 // imports the repository copy for checks, previews and tests.
 //
 //   node webconfig.mjs render <request.json> --out <Caddyfile> [--caddy-version 2.7.6] [--host H] [--server-ip IP]
-//     → validates, writes the Caddyfile, prints HOST=… PUBLIC_URL=… TRUST_PROXY=… EXPOSURE=… lines; exit 2 if invalid
+//     → validates, writes the Caddyfile, prints HOST= PUBLIC_URL= TRUST_PROXY= EXPOSURE= CHECK_STRICT= CHECK_PROXIED= lines;
+//       exit 2 if invalid
+//
+// 036: addresses reached through a proxy/CDN (proven by the app's reachability check, not by DNS) get Let's Encrypt via
+// HTTP-01 through the proxy with Caddy's internal CA as fallback, so the proxy can connect encrypted at once (SSL mode
+// "Full"; "Full (strict)" once the real certificate is issued). The panel is only ever served over HTTPS; port 80
+// answers ACME challenges, redirects, and the app's one-time reachability check (/.well-known/duniya-check/<token>),
+// which is also answered on 443 for any host with an internal on-demand certificate the app allows only for the domain
+// being checked. Optional origin lock-down to a proxy's published address list (PROVIDERS).
 import { isIPv4, isIPv6 } from 'node:net';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -103,20 +111,48 @@ function cidrList(list, field, max = MAX_CIDRS) {
   return out;
 }
 
+// ---------- proxies / CDNs with published address lists (036) ----------
+// Listed alphabetically; "custom" is the owner's own ranges. `header` is where the visitor's address is read from
+// when the request comes from one of the provider's addresses (Cloudflare sets CF-Connecting-IP itself; the others
+// append to X-Forwarded-For, which Caddy then reads right to left, skipping trusted proxies: trusted_proxies_strict).
+export const PROVIDERS = {
+  bunny: { name: 'Bunny CDN', header: 'X-Forwarded-For' },
+  cloudflare: { name: 'Cloudflare', header: 'CF-Connecting-IP' },
+  cloudfront: { name: 'Amazon CloudFront', header: 'X-Forwarded-For' },
+  custom: { name: 'your own proxy', header: 'X-Forwarded-For' },
+  fastly: { name: 'Fastly', header: 'X-Forwarded-For' },
+  gcore: { name: 'Gcore', header: 'X-Forwarded-For' },
+};
+const MAX_PROXY_RANGES = 3000;
+
 // ---------- the request ----------
-const KEYS = new Set(['version', 'host', 'redirectHosts', 'serverIp', 'port', 'access', 'cloudflareRanges', 'requestedBy', 'requestedAt']);
+const KEYS = new Set(['version', 'host', 'aliases', 'redirectHosts', 'proxiedHosts', 'serverIp', 'port', 'access', 'proxyRanges',
+  'requestedBy', 'requestedAt']);
+function hostList(list, field, max) {
+  const out = [];
+  for (const r of [].concat(list || [])) { const d = normalizeDomain(r); if (!out.includes(d)) out.push(d); }
+  if (out.length > max) throw bad(`Too many ${field}`);
+  return out;
+}
 /**
  * Validate the JSON the app writes. Unknown keys are refused; every value that ends up in the Caddyfile is
  * re-generated from parsed data (canonical CIDR text, lowercase domain), never copied as given.
+ *  host          the main address (PUBLIC_URL)
+ *  aliases       more addresses that serve the panel too (a new domain before the owner confirmed it, or the old
+ *                one until the owner turns it off)
+ *  redirectHosts old addresses that only forward to host
+ *  proxiedHosts  addresses reached through a proxy/CDN: Let's Encrypt with Caddy's internal CA as fallback
+ *  access        { proxy: <provider id> | null, allow: [CIDR] }
  */
 export function validateWebConfig(doc) {
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) throw bad('Invalid web config');
   for (const k of Object.keys(doc)) if (!KEYS.has(k)) throw bad(`Unknown setting "${String(k).slice(0, 30)}"`);
   if (doc.version !== undefined && doc.version !== 1) throw bad('Unsupported web config version');
   const host = normalizeDomain(doc.host);
-  const redirectHosts = [];
-  for (const r of [].concat(doc.redirectHosts || [])) { const d = normalizeDomain(r); if (d !== host && !redirectHosts.includes(d)) redirectHosts.push(d); }
-  if (redirectHosts.length > 4) throw bad('Too many old addresses');
+  const aliases = hostList(doc.aliases, 'additional addresses', 4).filter((d) => d !== host);
+  const redirectHosts = hostList(doc.redirectHosts, 'old addresses', 4).filter((d) => d !== host && !aliases.includes(d));
+  const served = [host, ...aliases];
+  const proxiedHosts = hostList(doc.proxiedHosts, 'proxied addresses', 5).filter((d) => served.includes(d));
   let serverIp = null;
   if (doc.serverIp != null && doc.serverIp !== '') {
     const ip = String(doc.serverIp).trim();
@@ -127,12 +163,14 @@ export function validateWebConfig(doc) {
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw bad('Invalid app port', 'port');
   const a = doc.access ?? {};
   if (typeof a !== 'object' || Array.isArray(a)) throw bad('Invalid access settings');
-  for (const k of Object.keys(a)) if (!['cloudflareOnly', 'allow'].includes(k)) throw bad(`Unknown access setting "${String(k).slice(0, 30)}"`);
-  if (a.cloudflareOnly !== undefined && typeof a.cloudflareOnly !== 'boolean') throw bad('cloudflareOnly must be true or false');
-  const access = { cloudflareOnly: a.cloudflareOnly === true, allow: cidrList(a.allow, 'allow') };
-  let cloudflareRanges = cidrList(doc.cloudflareRanges, 'cloudflareRanges', 100);
-  if (access.cloudflareOnly && cloudflareRanges.length < 5) cloudflareRanges = [...CLOUDFLARE_V4, ...CLOUDFLARE_V6];
-  return { version: 1, host, redirectHosts, serverIp, port, access, cloudflareRanges: access.cloudflareOnly ? cloudflareRanges : [] };
+  for (const k of Object.keys(a)) if (!['proxy', 'allow'].includes(k)) throw bad(`Unknown access setting "${String(k).slice(0, 30)}"`);
+  const proxy = a.proxy ?? null;
+  if (proxy !== null && (typeof proxy !== 'string' || !Object.hasOwn(PROVIDERS, proxy))) throw bad('Unknown proxy / CDN', 'proxy');
+  const access = { proxy, allow: cidrList(a.allow, 'allow') };
+  let proxyRanges = cidrList(doc.proxyRanges, 'proxyRanges', MAX_PROXY_RANGES);
+  if (proxy === 'cloudflare' && proxyRanges.length < 5) proxyRanges = [...CLOUDFLARE_V4, ...CLOUDFLARE_V6];
+  if (proxy && !proxyRanges.length) throw bad(`The address list of ${PROVIDERS[proxy].name} is missing`, 'proxy');
+  return { version: 1, host, aliases, redirectHosts, proxiedHosts, serverIp, port, access, proxyRanges: proxy ? proxyRanges : [] };
 }
 
 export const caddyAtLeast = (version, want) => {
@@ -142,41 +180,66 @@ export const caddyAtLeast = (version, want) => {
   return true;
 };
 
-/** The Caddyfile for a validated config. Caddy < 2.7 has no client_ip matcher: Cloudflare + own list is refused there. */
+/**
+ * The Caddyfile for a validated config. Caddy < 2.7 has no client_ip matcher, and X-Forwarded-For can only be read
+ * safely (right to left) from 2.8: a proxy restriction plus an own list is refused where it cannot be enforced.
+ */
 export function renderCaddyfile(input, { caddyVersion = '2.7.0' } = {}) {
   const cfg = validateWebConfig(input);
-  const modern = caddyAtLeast(caddyVersion, '2.7.0');
-  const { cloudflareOnly, allow } = cfg.access;
-  if (cloudflareOnly && allow.length && !modern) {
-    throw bad(`"Only Cloudflare" together with your own list needs a newer web server (Caddy 2.7 or later, this server has ${caddyVersion}). Use one of the two, or update Caddy.`, 'allow');
+  const v27 = caddyAtLeast(caddyVersion, '2.7.0'); const v28 = caddyAtLeast(caddyVersion, '2.8.0');
+  const { proxy, allow } = cfg.access;
+  const prov = proxy ? PROVIDERS[proxy] : null;
+  const xff = prov && prov.header === 'X-Forwarded-For';
+  if (proxy && allow.length && (!v27 || (xff && !v28))) {
+    throw bad(`Only ${prov.name} together with your own list needs a newer web server (Caddy ${xff ? '2.8' : '2.7'} or later, this server has ${caddyVersion}). Use one of the two, or update Caddy.`, 'allow');
   }
   const L = [];
   L.push('# Managed by Duniya: Settings → Web address & access. Changes made here are replaced on the next apply.');
-  if (cloudflareOnly && modern) {
-    // Requests come from Cloudflare: trust its edge addresses so client_ip is the visitor's real address.
-    L.push('{', '\tservers {', `\t\ttrusted_proxies static ${cfg.cloudflareRanges.join(' ')}`, '\t\tclient_ip_headers CF-Connecting-IP X-Forwarded-For', '\t}', '}', '');
+  L.push('{', '\tskip_install_trust', '\ton_demand_tls {', `\t\task http://127.0.0.1:${cfg.port}/.well-known/duniya-check-ask`, '\t}');
+  if (prov && v27) {
+    // Requests come from the proxy: trust its addresses so client_ip is the visitor's real address.
+    L.push('\tservers {', `\t\ttrusted_proxies static ${cfg.proxyRanges.join(' ')}`, `\t\tclient_ip_headers ${prov.header}${xff ? '' : ' X-Forwarded-For'}`);
+    if (xff && v28) L.push('\t\ttrusted_proxies_strict');
+    L.push('\t}');
   }
+  L.push('}', '');
   const rules = [];
-  if (cloudflareOnly) {
-    rules.push(`\t@not_cloudflare not remote_ip ${[...cfg.cloudflareRanges, ...LOOPBACK].join(' ')}`);
-    rules.push('\trespond @not_cloudflare "Access denied: this site is only reachable through Cloudflare." 403');
+  if (prov) {
+    rules.push(`\t@not_proxy not remote_ip ${[...cfg.proxyRanges, ...LOOPBACK].join(' ')}`);
+    rules.push(`\trespond @not_proxy "Access denied: this site is only reachable through ${prov.name}." 403`);
   }
   if (allow.length) {
-    rules.push(`\t@not_allowed not ${cloudflareOnly ? 'client_ip' : 'remote_ip'} ${[...allow, ...LOOPBACK].join(' ')}`);
+    rules.push(`\t@not_allowed not ${prov ? 'client_ip' : 'remote_ip'} ${[...allow, ...LOOPBACK].join(' ')}`);
     rules.push('\trespond @not_allowed "Access denied: your address is not on this panel\'s allow-list." 403');
   }
-  L.push(`${cfg.host} {`, '\tencode gzip', ...rules, `\treverse_proxy 127.0.0.1:${cfg.port}`, '}');
-  for (const old of cfg.redirectHosts) L.push('', `${old} {`, ...rules, `\tredir https://${cfg.host}{uri} 308`, '}');
-  if (cfg.serverIp && !cfg.serverIp.includes(':')) L.push('', `http://${cfg.serverIp} {`, `\tredir https://${cfg.host}{uri} 302`, '}');
+  // What the app relies on: the visitor address as Caddy resolved it, and the scheme the request reached this server
+  // with (to spot a proxy that talks plain HTTP to it).
+  const up = [`\t\theader_up X-Duniya-Client-IP {${v27 ? 'client_ip' : 'remote_host'}}`, '\t\theader_up X-Duniya-Origin-Scheme {scheme}'];
+  const proxyTo = (indent = '\t') => [`${indent}reverse_proxy 127.0.0.1:${cfg.port} {`, ...up.map((x) => indent.slice(1) + x), `${indent}}`];
+  // Behind a proxy: Let's Encrypt first, then Caddy's internal CA (2 h certificates, so Let's Encrypt is retried
+  // about every 80 minutes until it works).
+  const fallback = ['\ttls {', '\t\tissuer acme', '\t\tissuer internal {', '\t\t\tlifetime 2h', '\t\t}', '\t}'];
+  for (const h of [cfg.host, ...cfg.aliases]) {
+    L.push(`${h} {`, ...(cfg.proxiedHosts.includes(h) ? fallback : []), '\tencode gzip', ...rules, ...proxyTo(), '}', '');
+  }
+  for (const old of cfg.redirectHosts) L.push(`${old} {`, ...rules, `\tredir https://${cfg.host}{uri} 308`, '}', '');
+  if (cfg.serverIp && !cfg.serverIp.includes(':')) L.push(`http://${cfg.serverIp} {`, `\tredir https://${cfg.host}{uri} 302`, '}', '');
+  // Reachability check for any other host (a domain being checked before it is added). Nothing else is served:
+  // the panel itself never answers on plain HTTP.
+  const check = ['\thandle /.well-known/duniya-check/* {', ...proxyTo('\t\t'), '\t}', '\thandle {', '\t\trespond 404', '\t}'];
+  L.push('http:// {', ...check, '}', '', 'https:// {', '\ttls internal {', '\t\ton_demand', '\t}', ...check, '}');
   return `${L.join('\n')}\n`;
 }
 
-/** What the helper writes to app.env / install.conf after a successful apply. */
+/** What the helper writes to app.env / install.conf after a successful apply, and which addresses it checks. */
 export function envFor(input) {
   const cfg = validateWebConfig(input);
+  const served = [cfg.host, ...cfg.aliases];
   return {
-    HOST: cfg.host, PUBLIC_URL: `https://${cfg.host}`, TRUST_PROXY: cfg.access.cloudflareOnly ? 'cloudflare' : '1',
+    HOST: cfg.host, PUBLIC_URL: `https://${cfg.host}`, TRUST_PROXY: '1',
     EXPOSURE: /\.sslip\.io$/.test(cfg.host) ? 'ip' : 'domain',
+    CHECK_STRICT: served.filter((h) => !cfg.proxiedHosts.includes(h)).join(',') || '-',
+    CHECK_PROXIED: served.filter((h) => cfg.proxiedHosts.includes(h)).join(',') || '-',
   };
 }
 
@@ -187,7 +250,7 @@ function cli(argv) {
   if (cmd !== 'render' || !file) { process.stderr.write('usage: webconfig.mjs render <request.json> --out <Caddyfile> [--caddy-version V] [--host H] [--server-ip IP]\n'); return 64; }
   try {
     const raw = readFileSync(file, 'utf8');
-    if (raw.length > 65536) throw bad('Web config too large');
+    if (raw.length > 262144) throw bad('Web config too large');
     const doc = JSON.parse(raw);
     if (opt('host')) doc.host = opt('host');
     if (opt('server-ip') !== undefined) doc.serverIp = opt('server-ip') || null;

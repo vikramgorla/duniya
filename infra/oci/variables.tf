@@ -43,10 +43,10 @@ variable "boot_volume_gb" {
 variable "exposure" {
   type        = string
   default     = "ip"
-  description = "How the admin panel is reached: ip (https://<ip>.sslip.io), domain, tunnel (Cloudflare), local"
+  description = "How the admin panel is reached: ip (https://<ip>.sslip.io), domain, tunnel (Cloudflare), tailscale, local"
   validation {
-    condition     = contains(["ip", "domain", "tunnel", "local"], var.exposure)
-    error_message = "exposure must be ip, domain, tunnel or local"
+    condition     = contains(["ip", "domain", "tunnel", "tailscale", "local"], var.exposure)
+    error_message = "exposure must be ip, domain, tunnel, tailscale or local"
   }
 }
 
@@ -61,6 +61,13 @@ variable "cf_tunnel_token" {
   default     = ""
   sensitive   = true
   description = "Cloudflare Tunnel token for exposure=tunnel"
+}
+
+variable "tailscale_authkey" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "Tailscale auth key for exposure=tailscale (panel at https://<vm>.<tailnet>.ts.net, no open ports)"
 }
 
 variable "admin_password" {

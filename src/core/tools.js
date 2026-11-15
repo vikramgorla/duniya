@@ -88,7 +88,7 @@ export async function toolsFor(agent, role) {
     const sAllow = serverAllow(srv, serverKey, allow, role);
     if (!sAllow.some((r) => r.startsWith(`${serverKey}:`))) continue; // nothing of it allowed for this role
     let conn;
-    let tools = [];
+    let tools;
     try {
       conn = connectionFor(agent, serverKey, role);
       tools = await conn.listTools();
