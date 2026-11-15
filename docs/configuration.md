@@ -8,6 +8,8 @@ architecture, development and settings. For a visual tour see the
 - [First steps in the panel](#first-steps-in-the-panel)
 - [Manage it from ChatGPT or Claude](#manage-it-from-chatgpt-or-claude)
 - [How it works](#how-it-works)
+- [Photos & voice](#photos--voice)
+- [Small servers](#small-servers)
 - [Optional settings (environment)](#optional-settings-environment)
 - [Development](#development)
 - [Notes](#notes)
@@ -283,6 +285,70 @@ Admin panel (localhost:8080 behind Caddy / Cloudflare Tunnel / SSH) · SQLite ·
   Neighbours. Agents themselves are data in the app (export/import as JSON).
 - **Several WhatsApp numbers**: chats on the first number keep their WhatsApp id; others are `<number>#<jid>`.
 
+## Photos & voice
+
+(043, #48) When a connected provider supports it, agents see photos, listen to voice notes, create pictures and answer
+with voice notes. Photos and voice notes are sent to that provider. **Models → Photos & voice** shows what each
+provider can do and how to enable what is missing; each agent switches its use under **Photos & voice** on its page;
+server-wide choices are under **Settings → Photos & voice**.
+
+| | Anthropic | OpenAI (API key) | ChatGPT sign-in | Copilot | OpenRouter | Other endpoints | This server |
+|---|---|---|---|---|---|---|---|
+| Sees photos / PDFs | ✓ | ✓ | ✓ | — (vision fallback) | models that list image input | by model | — |
+| Hears voice notes | — | ✓ `gpt-4o-mini-transcribe` | — ¹ | — | ✓ (paid) | — | Whisper tiny (optional) |
+| Creates pictures | — | ✓ `gpt-image-*` listed for the key | — ¹ | — | ✓ image models (paid) | — | — |
+| Speaks | — | ✓ `gpt-4o-mini-tts` (Ogg/Opus) | — | — | ✓ (paid, needs ffmpeg) | — | Piper voice (optional) |
+
+¹ OpenAI's Sign in with ChatGPT preview lists image generation and the transcription API as unsupported for ChatGPT
+plan usage on `api.openai.com`, and says not to use ChatGPT's `backend-api` endpoints, so Duniya does not use the plan for
+these. Free-only OpenRouter makes no paid media calls.
+
+- **Photos in** (and PDFs, stickers optional): only in chats that are on and when the agent is addressed (a caption with
+  the trigger, a mention, a reply to the agent, or a direct message). The photo goes to the model as an image; a model
+  that can't see images uses the **vision fallback model** (Settings) or says kindly that it can't look at photos.
+  Photos are kept in temp files under `DATA_DIR/media-tmp` (deleted after 15 minutes); the history keeps only
+  `[image: caption]`.
+- **Voice notes in**: transcribed (OpenAI → OpenRouter → on-server engine), then handled like typed text; stored and
+  shown as `🎤 transcript`. In groups a voice note counts as addressed when it replies to the agent or mentions it.
+  Longest voice note: 5 minutes (Settings).
+- **Create images**: tool `media__create_image` (`prompt`, `size`, `caption`, `edit_of: "last_photo"`), only when a
+  capable provider is connected; organizers by default, participants if the agent allows it. The picture is made in
+  the media queue and sent as a WhatsApp image with a caption.
+- **Voice replies**: per agent *never* / *to voice notes* / *always*; sent as a WhatsApp voice note (Ogg/Opus), text
+  kept in the history. Replies with a confirm code or a link stay text; if speaking fails, the text is sent.
+- **Usage & caps**: transcriptions (`transcribe`), pictures (`image`) and speech (`speech`) appear in Usage and count
+  toward spending caps — with the cost the provider reports (OpenRouter), a price per picture you set, or token prices.
+- **On-server speech** (owner, Settings): Whisper tiny (listening, ~115 MB download) and a Piper voice (speaking,
+  ~65 MB), run by the open-source [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) runtime (`sherpa-onnx-node`,
+  prebuilt for Linux x64 and arm64, downloaded into `DATA_DIR/speech` only when you choose to). Each job runs in its
+  own low-priority process (~300 MB while listening, ~180 MB while speaking) and needs ffmpeg and bzip2 (the
+  installer and the Docker image include them). whisper.cpp publishes no Linux binaries (it would need a build
+  toolchain), so it is not used.
+- Admin MCP tools: `get_photos_and_voice`, `set_photos_and_voice_settings`, `install_speech_engine`,
+  `set_agent_photos_and_voice`.
+
+## Small servers
+
+A 1 GB / 1 vCPU VM (OCI `VM.Standard.E2.1.Micro`, Google `e2-micro`) runs Duniya fine; optional heavy features adapt
+so they never take the WhatsApp connection down. The size is detected at startup (RAM, a Docker/cgroup memory limit,
+CPUs) and shown on **Server** ("Small server: 1 GB memory, 1 CPU…") and in `/api/status` (`server.size`: small < 2 GB or
+1 CPU, large ≥ 8 GB and 4 CPUs, medium otherwise).
+
+- **Media queue**: photo and voice-note turns, picture creation and voice replies run in a queue kept in SQLite (a
+  restart picks them up again), one at a time on small servers (2 on medium, 3 on large), in order per chat. If a job
+  hasn't started after ~10 s the agent reacts ⏳ to the message (removed when done); after ~60 s it says once "I'm on
+  it". Jobs older than 15 minutes (`MEDIA_JOB_MAX_AGE_MIN`) get a short apology instead of a late answer. Only when the
+  queue is full (20 jobs on small servers) does the agent ask to send it again later. Text messages never wait in it.
+- **Limits**: media larger than `WA_MEDIA_MAX_MB` is refused by WhatsApp's declared size, before downloading; every
+  download, conversion, transcription and picture has a timeout; ffmpeg runs with `nice` and a memory cap; temp files
+  are always removed.
+- **On-server engines** can't be switched on below 2 GB of memory (use OpenAI or OpenRouter instead), and each job
+  checks for ~400 MB of free memory first — otherwise the provider is used or the agent asks for text.
+- **Memory pressure**: when the app uses more than 70 % of the memory, optional work pauses (background summaries,
+  on-server speech, picture creation) with one activity entry, and resumes when memory frees up. Replies continue.
+- **Copilot**: its helper (~400 MB download, its own process) is refused below 2 GB. **Local tool services**: at most 2
+  run at once on small servers (6 on medium); the least recently used one stops and starts again when needed.
+
 ## Optional settings (environment)
 
 | Variable | Default | Meaning |
@@ -295,7 +361,8 @@ Admin panel (localhost:8080 behind Caddy / Cloudflare Tunnel / SSH) · SQLite ·
 | `TZ_DEFAULT` | `Europe/Zurich` | Default timezone for schedules |
 | `RATE_LIMIT_PER_MIN` | 6 | Requests one person may make to one agent per minute |
 | `MEMORY_RETENTION_DAYS` / `MEMORY_MAX_MESSAGES` | 90 / 5000 | Stored-message limits per chat |
-| `WA_MEDIA_MAX_MB` | 16 | Largest media file an agent may send |
+| `WA_MEDIA_MAX_MB` | 16 | Largest media file an agent may send or receive (photos, PDFs, voice notes) |
+| `MEDIA_JOB_MAX_AGE_MIN` | 15 | Photo / voice-note jobs older than this get a short apology instead of a late answer |
 | `UPDATE_MODE` | `notify` | `off`, `notify` or `auto` |
 | `BACKUP_UPLOAD_MAX_MB` | 200 | Largest backup file accepted by "Restore from a file" |
 

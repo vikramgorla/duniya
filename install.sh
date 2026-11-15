@@ -156,6 +156,9 @@ fi
 say "Installing packages"
 apt-get update -qq
 apt-get install -y -qq git curl ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https >/dev/null
+# Photos & voice (043): ffmpeg makes WhatsApp voice notes (Ogg/Opus) and reads them for on-server speech; bzip2 unpacks
+# the optional on-server speech models. Optional: the app works without them (provider routes only).
+apt-get install -y -qq --no-install-recommends ffmpeg bzip2 >/dev/null || echo "  (ffmpeg not installed: voice replies through OpenRouter and on-server speech stay off)"
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ]; then
   say "Installing Node.js 22"
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null

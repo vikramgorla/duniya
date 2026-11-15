@@ -422,4 +422,47 @@ export const TOOLS = [
       return `Remove the WhatsApp number "${n.label}" (${n.id}). It is unlinked from this app and its chats stop getting replies.`;
     },
     run: (a, x) => x.call('DELETE', `/api/whatsapp/numbers/${enc(a.number_id)}`) },
+  // ---------- photos & voice (043) ----------
+  { name: 'get_photos_and_voice', readOnly: true, calls: [['GET', '/api/media']],
+    description: 'What the connected providers can do beyond text (sees images / hears voice notes / creates images / speaks), with how to enable what is missing; the on-server speech engines; the server size (small servers refuse on-server engines) and the media queue.',
+    input: {},
+    run: async (a, x) => { const r = await x.call('GET', '/api/media'); return { summary: r.summary, providers: r.providers, settings: r.settings, onServer: r.local, server: r.server, localAllowed: r.localAllowed, queue: r.queue }; } },
+  { name: 'set_photos_and_voice_settings', calls: [['PUT', '/api/media/settings']],
+    description: 'Server-wide photo & voice settings: vision_fallback (provider:model used when an agent\'s model cannot see photos; empty = none), image_model (provider:model for pictures; empty = automatic), voice (OpenAI voice for spoken replies), max_voice_seconds (longest voice note to transcribe), image_price (USD per picture for image_model, for usage and caps), local_listen / local_speak (owner only: use the on-server engines; refused on servers under 2 GB of memory).',
+    input: { vision_fallback: str('provider:model or empty (optional)'), image_model: str('provider:model or empty (optional)'), voice: str('alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer, verse, marin, cedar (optional)'),
+      max_voice_seconds: int('10–1800 (optional)', { minimum: 10, maximum: 1800 }), image_price: { type: 'number', description: 'USD per picture for image_model (optional)' },
+      local_listen: bool('Use the on-server listening engine (optional)'), local_speak: bool('Use the on-server speaking engine (optional)') },
+    run: async (a, x) => {
+      const body = {};
+      if (a.vision_fallback !== undefined) body.visionFallback = a.vision_fallback;
+      if (a.image_model !== undefined) body.imageModel = a.image_model;
+      if (a.voice) body.voice = a.voice;
+      if (a.max_voice_seconds) body.maxVoiceSeconds = a.max_voice_seconds;
+      if (a.image_price !== undefined) {
+        const cur = await x.call('GET', '/api/media');
+        const ref = a.image_model || cur.settings.imageModel;
+        if (!ref) throw Object.assign(new Error('Give image_model with image_price'), { status: 400 });
+        body.imagePrices = { ...cur.settings.imagePrices, [ref]: a.image_price };
+      }
+      if (a.local_listen !== undefined || a.local_speak !== undefined) body.local = { ...(a.local_listen !== undefined ? { listen: a.local_listen } : {}), ...(a.local_speak !== undefined ? { speak: a.local_speak } : {}) };
+      const r = await x.call('PUT', '/api/media/settings', body);
+      return { settings: r.settings, summary: r.summary };
+    } },
+  { name: 'install_speech_engine', calls: [['POST', '/api/media/local/x/install']],
+    description: 'Owner only. Download an on-server speech engine (stt = listening, Whisper tiny ~115 MB; tts = speaking, Piper voice ~65 MB) into the data folder. Needs a server with 2 GB+ of memory. Runs in the background; check get_photos_and_voice for progress.',
+    input: { engine: { type: 'string', enum: ['stt', 'tts'], description: 'stt (listening) or tts (speaking)' } }, required: ['engine'],
+    run: (a, x) => x.call('POST', `/api/media/local/${enc(a.engine)}/install`) },
+  { name: 'set_agent_photos_and_voice', calls: [['PUT', '/api/agents/x']],
+    description: 'An agent\'s "Photos & voice" switches: photos (look at photos), documents (read PDFs), stickers, voice_notes (listen to voice notes), voice_reply (never | voice = when they sent a voice note | always), organizers_create_images, participants_create_images.',
+    input: { agent_id: str('Agent id'), photos: bool('optional'), documents: bool('optional'), stickers: bool('optional'), voice_notes: bool('optional'),
+      voice_reply: { type: 'string', enum: ['never', 'voice', 'always'] }, organizers_create_images: bool('optional'), participants_create_images: bool('optional') }, required: ['agent_id'],
+    run: async (a, x) => {
+      const cur = (await x.call('GET', `/api/agents/${enc(a.agent_id)}`)).config?.media || {};
+      const media = { ...cur, createImages: { ...(cur.createImages || {}) } };
+      for (const [k, f] of [['photos', 'photos'], ['documents', 'documents'], ['stickers', 'stickers'], ['voice_notes', 'voiceNotes'], ['voice_reply', 'voiceReply']]) if (a[k] !== undefined) media[f] = a[k];
+      if (a.organizers_create_images !== undefined) media.createImages.organizer = a.organizers_create_images;
+      if (a.participants_create_images !== undefined) media.createImages.participant = a.participants_create_images;
+      const r = await x.call('PUT', `/api/agents/${enc(a.agent_id)}`, { media });
+      return { agent: r.id, media: r.config?.media };
+    } },
 ];

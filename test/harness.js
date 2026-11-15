@@ -10,6 +10,11 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
+/** A tiny valid PNG (1×1) for fake image results. */
+export const FAKE_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+/** A fake OGG voice note (only the magic bytes matter to the app). */
+export const FAKE_OGG = Buffer.concat([Buffer.from('OggS'), Buffer.alloc(40, 1)]);
+
 /** Answer a request with a scripted failure (see the header). */
 export function sendFailure(req, res, f, style = 'openai') {
   if (f.network) { req.socket.destroy(); return; }
@@ -27,12 +32,30 @@ export function sendFailure(req, res, f, style = 'openai') {
  * `message` objects), shifted per successful chat request; otherwise it answers "<name> (<key>) says hi".
  */
 export function fakeChatProvider({ name = 'fake', models = ['fake-large', 'fake-mini'] } = {}) {
-  const f = { name, reqs: [], fail: {}, script: [], models };
+  const f = { name, reqs: [], fail: {}, script: [], models, media: [], mediaFail: [], transcript: 'see you at the station at nine', imageModels: [], mediaCost: null };
   f.server = http.createServer(async (req, res) => {
     let d = ''; for await (const c of req) d += c;
     const key = String(req.headers.authorization || '').replace(/^Bearer /, '');
     const json = (code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
-    if (req.method === 'GET' && req.url.endsWith('/models')) return json(200, { data: f.models.map((id) => ({ id })) });
+    if (req.method === 'GET' && req.url.endsWith('/models') && !req.url.endsWith('/images/models')) return json(200, { data: f.models.map((id) => ({ id })) });
+    // Photos & voice (043): the documented media endpoints, recorded in f.media as { path, key, body }.
+    const media = (path, body) => { f.media.push({ path, key, body }); const failure = f.mediaFail.shift(); if (failure) { sendFailure(req, res, failure); return true; } return false; };
+    const route = req.url.replace(/^.*\/v1|^.*\/api\/v1/, '');
+    if (route === '/audio/transcriptions') {
+      const isJson = String(req.headers['content-type'] || '').includes('json');
+      if (media(route, isJson ? JSON.parse(d) : { multipart: true, model: (d.match(/name="model"\r\n\r\n([^\r]+)/) || [])[1] })) return;
+      return json(200, { text: f.transcript, usage: { input_tokens: 10, output_tokens: 5, ...(f.mediaCost != null ? { cost: f.mediaCost } : {}) } });
+    }
+    if (route === '/audio/speech') {
+      if (media(route, JSON.parse(d))) return;
+      res.writeHead(200, { 'content-type': 'audio/ogg' }); return res.end(Buffer.from('OggS\0fake-opus-voice-note'));
+    }
+    if (route === '/images/models') return json(200, { data: f.imageModels.map((id) => ({ id, name: id, architecture: { input_modalities: ['text', 'image'], output_modalities: ['image'] } })) });
+    if (route === '/images/generations' || route === '/images/edits' || route === '/images') {
+      const isJson = String(req.headers['content-type'] || '').includes('json');
+      if (media(route, isJson ? JSON.parse(d) : { multipart: true, hasImage: d.includes('name="image[]"') })) return;
+      return json(200, { data: [{ b64_json: FAKE_PNG.toString('base64') }], usage: { input_tokens: 20, output_tokens: 100, ...(f.mediaCost != null ? { cost: f.mediaCost } : {}) } });
+    }
     if (req.url.endsWith('/chat/completions')) {
       const body = JSON.parse(d); f.reqs.push({ key, body });
       const failure = f.fail[key]?.shift() || f.fail['*']?.shift();
@@ -128,6 +151,18 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
     profile: wa('profile', (chat, who) => ({ jid: `${String(who).replace(/\D/g, '')}@s.whatsapp.net`, phone: String(who).replace(/\D/g, ''), about: 'Hey there', pictureUrl: 'https://pps.whatsapp.net/x.jpg' })),
     block: wa('block', { jid: 'x' }), unblock: wa('unblock', { jid: 'x' }),
   });
+  // Photos & voice (043): inbound media messages. t.mediaMsg({ type: 'image'|'audio'|'sticker'|'document', buffer, ... })
+  // builds a message like the WhatsApp channel's (mediaInfo, mediaRef, fetchMedia); downloads are counted in t.downloads.
+  t.mediaStore = new Map(); t.downloads = [];
+  t.channel.downloadMedia = async (chat, ref) => { t.downloads.push(ref); if (!t.mediaStore.has(ref)) throw new Error('media expired'); return t.mediaStore.get(ref); };
+  t.mediaMsg = ({ type = 'image', buffer = FAKE_PNG, mimetype, size, seconds = 4, caption = '', fileName = '', ...o } = {}) => {
+    const ref = `media-${++seq}`;
+    t.mediaStore.set(ref, buffer);
+    const mt = mimetype || { image: 'image/png', sticker: 'image/webp', audio: 'audio/ogg', document: 'application/pdf' }[type];
+    const text = type === 'audio' ? '[voice note]' : type === 'sticker' ? '[sticker]' : type === 'document' ? `[document: ${fileName || 'file.pdf'}]` : `[image${caption ? `: ${caption}` : ''}]`;
+    return t.msg({ text, caption, media: true, mediaInfo: { type, mimetype: mt, size: size ?? buffer.length, ...(type === 'audio' ? { seconds, ptt: true } : {}), ...(fileName ? { fileName } : {}) },
+      mediaRef: ref, fetchMedia: async () => t.channel.downloadMedia('', ref), ...o });
+  };
   t.msg = (o) => ({
     channel: 'whatsapp', raw: {}, isGroup: true, chat: 'g1@g.us', phone: '41790000002', senderJid: 'x', senderName: 'Anu',
     mentioned: false, replyToAgent: false, quoted: '', msgId: `in-${++seq}`, ts: Date.now(), ...o,

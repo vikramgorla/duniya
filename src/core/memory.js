@@ -1,4 +1,5 @@
 // Group memory (feature 004): stored messages, rolling summary, notes, memory tools.
+import { optionalPaused } from './resources.js';
 import { env } from './config.js';
 import {
   history, messagesAfter, getChatMemory, setChatMemory, addNote, listNotes, deleteNote, getNote, updateNote, searchNotes,
@@ -80,6 +81,7 @@ const running = new Set();
  */
 export async function maybeSummarize(chat, agent, { force = false } = {}) {
   if ((agent && !memoryEnabled(agent)) || running.has(chat)) return null;
+  if (!force && optionalPaused()) return null; // small servers (043): summaries wait while memory is tight
   const windowRows = history(chat, windowFor(agent));
   if (!windowRows.length) return null;
   const boundary = force ? Number.MAX_SAFE_INTEGER : windowRows[0].id;

@@ -3,7 +3,7 @@ import { env } from './config.js';
 import { getSettings } from './store.js';
 import { listAgents, getAgent, agentForChat, roleIn } from './agents.js';
 import { runAgent, handleConfirmCommand } from './runner.js';
-import { logMessage, messageByMsgId, saveReaction, savePollVote, pollTally } from './db.js';
+import { logMessage, messageByMsgId, saveReaction, savePollVote, pollTally, setMessageText } from './db.js';
 import { activity } from './events.js';
 import { maybeSummarize } from './memory.js';
 import { setWhatsAppChannel } from './whatsapp-tools.js';
@@ -11,6 +11,9 @@ import { countStat } from './stats.js';
 import { silenceReason } from './silences.js';
 import { handleOwnerMessage } from './owner-assistant.js';
 import { dmNoticeOnce } from './privacy-notice.js';
+import { inboundKind, prepareInbound, wantsVoice, speak, createImage } from './media-ai.js';
+import { enqueue, registerJobHandler, setQueueChannel, startQueue } from './media-queue.js';
+import { readFileSync, rmSync } from 'node:fs';
 
 export { silenceReason }; // #34: other modules (usage caps) report why an agent stayed silent, e.g. silenceReason('budget', …)
 
@@ -143,6 +146,7 @@ function recordEvent(msg) {
 /** Build the live message router for a channel. */
 export function createRouter(channel) {
   setWhatsAppChannel(channel);
+  registerMediaHandlers(channel);
   return async function onMessage(msg) {
     // Reactions and poll votes: recorded only for chats that are on (#10).
     if (msg.kind && msg.kind !== 'text') { if (isChatEnabled(msg.chat)) recordEvent(msg); return; }
@@ -227,21 +231,93 @@ export function createRouter(channel) {
     if (agent.hooks.onMessage) {
       const hookReply = await agent.hooks.onMessage({ msg, agent, role, triggered, channel });
       if (typeof hookReply === 'string' && hookReply) {
-        await reply(hookReply);
+        await deliver(channel, msg, agent, hookReply);
         return;
       }
     }
     if (!triggered) { quiet('not_addressed', agent.id); return; }
     if (rateLimited(`${agent.id}:${msg.phone || msg.senderJid}`)) { quiet('rate_limited', agent.id); return; }
 
-    const text = msg.caption ? `${msg.text.replace(/:.*$/s, ']')} ${stripTriggers(agent, msg.caption)}`.trim() : stripTriggers(agent, msg.text);
+    // Photos & voice (043): photos, PDFs and voice notes addressed to the agent go through the media queue (a small
+    // server does one at a time; nobody has to resend). Only chats that are on get this far.
+    if (inboundKind(msg, agent)) {
+      try {
+        enqueue({ kind: 'turn', chat: msg.chat, msgId: msg.msgId, senderJid: msg.senderJid, agent: agent.id,
+          payload: { msg: packMsg(msg), agent: agent.id, role, addressed, rowId } });
+      } catch (e) {
+        if (e.code !== 'overloaded') throw e;
+        quiet('overloaded', agent.id);
+        if (Date.now() - (overloadedAt.get(msg.chat) || 0) > 5 * 60000) {
+          overloadedAt.set(msg.chat, Date.now());
+          await channel.send(msg.chat, 'I’m overloaded right now — please send that again in a few minutes.', { quoted: msg.raw });
+        }
+      }
+      return;
+    }
+    await runTurn(channel, msg, { agent, role, addressed, rowId, quiet });
+  };
+}
+
+const overloadedAt = new Map();
+/** What a queued turn needs to run later, even after a restart (no media bytes, no raw message object). */
+const packMsg = (m) => ({ channel: m.channel, chat: m.chat, number: m.number, isGroup: m.isGroup, phone: m.phone, senderJid: m.senderJid, senderName: m.senderName,
+  msgId: m.msgId, ts: m.ts, text: m.text, caption: m.caption || '', quoted: m.quoted || '', mentioned: !!m.mentioned, replyToAgent: !!m.replyToAgent,
+  mediaInfo: m.mediaInfo || null, mediaRef: m.mediaRef || '' });
+function unpackMsg(channel, p) {
+  return { ...p, raw: null, fetchMedia: () => channel.downloadMedia(p.chat, p.mediaRef, p.mediaInfo?.size || 0) };
+}
+const quoteOf = (msg) => (msg.raw ? { quoted: msg.raw } : msg.msgId ? { quote: { msgId: msg.msgId, fromMe: false, participant: msg.isGroup ? msg.senderJid : undefined, text: msg.text } } : {});
+
+/** Send a reply (as a voice note when the agent's setting asks for it) and remember it. */
+async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false } = {}) {
+  if (voiceNow && wantsVoice(agent, { voiceIn, text })) {
+    const v = await speak(text, { agent, chat: msg.chat }).catch(() => null);
+    if (v) {
+      const sent = await channel.sendMedia(msg.chat, { kind: 'audio', base64: v.buffer.toString('base64'), mimetype: 'audio/ogg', voiceNote: true, ...(quoteOf(msg).quote ? { quote: quoteOf(msg).quote } : {}) });
+      const notice = !msg.isGroup ? dmNoticeOnce(msg.phone || msg.chat) : null; // 044: once per person
+      if (notice) await channel.send(msg.chat, `_${notice}_`).catch(() => {});
+      countStat('reply', { agent: agent.id });
+      logMessage({ channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
+      activity('message.out', { agent: agent.id, chat: msg.chat, summary: `🔊 ${text}`, detail: { voice: v.by } });
+      return;
+    }
+  } else if (!voiceNow && wantsVoice(agent, { voiceIn, text })) {
+    // A text turn whose answer should be spoken: the voice note is made in the media queue (falls back to text).
+    try {
+      enqueue({ kind: 'voice', chat: msg.chat, msgId: msg.msgId, senderJid: msg.senderJid, agent: agent.id, payload: { msg: packMsg(msg), agent: agent.id, text } });
+      return;
+    } catch { /* queue full: send it as text */ }
+  }
+  if (!msg.isGroup) { const notice = dmNoticeOnce(msg.phone || msg.chat); if (notice) text = `${text}\n\n_${notice}_`; } // 044: once per person
+  const sent = await channel.send(msg.chat, text, quoteOf(msg));
+  countStat('reply', { agent: agent.id });
+  logMessage({
+    channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent',
+    name: 'Assistant', text, fromAgent: true,
+  });
+  activity('message.out', { agent: agent.id, chat: msg.chat, summary: text });
+}
+
+/** One agent turn for a routed message (inline for text; from the media queue for photos and voice notes). */
+async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, queued = false }) {
+  let media = null;
+  try {
+    if (queued) {
+      media = await prepareInbound(msg, { agent, chat: msg.chat });
+      if (media?.quiet) { quiet('budget', agent.id); return; }
+      if (media?.reply) { await deliver(channel, msg, agent, media.reply); return; }
+      if (media?.transcript && msg.msgId) setMessageText(msg.chat, msg.msgId, `🎤 ${media.transcript}`);
+    }
+    const voiceIn = msg.mediaInfo?.type === 'audio' && !!media?.transcript;
+    const base = voiceIn ? media.transcript : msg.caption ? `${msg.text.replace(/:.*$/s, ']')} ${stripTriggers(agent, msg.caption)}`.trim() : stripTriggers(agent, msg.text);
+    const text = voiceIn ? stripTriggers(agent, base) || base : base;
     let out = await handleConfirmCommand({ agent, text, role, chat: msg.chat });
     if (out === undefined && !addressed) return; // looked like "cancel ABCD" but isn't ours
     countStat('handled', { agent: agent.id });
     activity('message.in', {
       agent: agent.id, chat: msg.chat,
-      summary: `${msg.senderName} (${role}): ${text}`,
-      detail: { phone: msg.phone, isGroup: msg.isGroup, quoted: msg.quoted || undefined },
+      summary: `${msg.senderName} (${role}): ${voiceIn ? `🎤 ${text}` : text}`,
+      detail: { phone: msg.phone, isGroup: msg.isGroup, quoted: msg.quoted || undefined, ...(media?.blocks?.length ? { attachments: media.blocks.map((b) => b.type) } : {}) },
     });
 
     if (out === undefined) {
@@ -251,6 +327,7 @@ export function createRouter(channel) {
         agent, role, chat: msg.chat, senderName: msg.senderName, requester: msg.phone,
         text, isGroup: msg.isGroup, source: msg.channel, msgRowId: rowId, msgId: msg.msgId, senderJid: msg.senderJid,
         chatName: msg.isGroup ? await channel.chatName?.(msg.chat) : '',
+        attachments: media?.blocks || [], mediaNote: media?.note || '',
       };
       try {
         out = await runAgent(ctx);
@@ -262,17 +339,55 @@ export function createRouter(channel) {
       if (ctx.modelError) quiet('model_error', agent.id);
       else if (!out) quiet('no_reply', agent.id);
     }
-    if (out) await reply(out);
+    if (out) await deliver(channel, msg, agent, out, { voiceIn, voiceNow: queued });
+  } finally {
+    media?.cleanup?.();
+  }
+}
 
-    async function reply(text) {
-      if (!msg.isGroup) { const notice = dmNoticeOnce(msg.phone || msg.chat); if (notice) text = `${text}\n\n_${notice}_`; } // 044: once per person
-      const sent = await channel.send(msg.chat, text, { quoted: msg.raw });
-      countStat('reply', { agent: agent.id });
-      logMessage({
-        channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent',
-        name: 'Assistant', text, fromAgent: true,
-      });
-      activity('message.out', { agent: agent.id, chat: msg.chat, summary: text });
-    }
-  };
+/** Media queue handlers (043): queued photo / voice-note turns, pictures and voice replies. */
+function registerMediaHandlers(channel) {
+  setQueueChannel(channel);
+  const quietFor = (msg) => (reason, agentId) => silenceReason(reason, { chat: msg.chat, agent: agentId, sender: msg.senderName || '' });
+  registerJobHandler('turn', {
+    async run(p) {
+      const agent = getAgent(p.agent);
+      if (!agent?.enabled || getSettings().paused) return;
+      const msg = unpackMsg(channel, p.msg);
+      await runTurn(channel, msg, { agent, role: p.role, addressed: p.addressed, rowId: p.rowId, quiet: quietFor(msg), queued: true });
+    },
+    async stale(p) {
+      const msg = unpackMsg(channel, p.msg);
+      await channel.send(msg.chat, `Sorry, I couldn’t get to your ${msg.mediaInfo?.type === 'audio' ? 'voice note' : 'photo'} in time. Please send it again if you still need an answer.`, quoteOf(msg)).catch(() => {});
+    },
+    async failed(p) {
+      const msg = unpackMsg(channel, p.msg);
+      await channel.send(msg.chat, 'Sorry, something went wrong with that. Please try again in a minute.', quoteOf(msg)).catch(() => {});
+    },
+  });
+  registerJobHandler('image', {
+    async run(p) {
+      const agent = getAgent(p.agent);
+      if (!agent) return;
+      let image = null;
+      if (p.imageFile) {
+        try { image = { buffer: readFileSync(p.imageFile), mimetype: p.mimetype || 'image/png' }; } catch { throw Object.assign(new Error('The photo to change is gone (the server restarted); please send it again'), { permanent: true }); }
+      }
+      try { await createImage(p.input, { agent, chat: p.chat, image }); } finally { if (p.imageFile && !image) rmSync(p.imageFile, { force: true }); }
+      if (p.imageFile) rmSync(p.imageFile, { force: true });
+    },
+    async stale(p) { if (p.imageFile) rmSync(p.imageFile, { force: true }); await channel.send(p.chat, 'Sorry, I couldn’t make that picture in time. Ask me again if you still want it.').catch(() => {}); },
+    async failed(p, job, e) { if (p.imageFile) rmSync(p.imageFile, { force: true }); await channel.send(p.chat, `Sorry, I couldn’t make that picture${e?.permanent ? ` (${e.message})` : ''}.`).catch(() => {}); },
+  });
+  const voiceText = async (p) => { const agent = getAgent(p.agent) || { id: p.agent, media: { voiceReply: 'never' } }; await deliver(channel, unpackMsg(channel, p.msg), agent, p.text); };
+  registerJobHandler('voice', {
+    async run(p) {
+      const agent = getAgent(p.agent);
+      if (!agent) return;
+      await deliver(channel, unpackMsg(channel, p.msg), agent, p.text, { voiceIn: true, voiceNow: true });
+    },
+    stale: voiceText, // the answer itself is never dropped: sent as text
+    failed: voiceText,
+  });
+  startQueue();
 }

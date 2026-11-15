@@ -811,6 +811,7 @@ function silenceFix(s, after, { onChats = false } = {}) {
     case 'assign': return onChats ? null : link('Choose an agent', '#chats');
     case 'models': return link('Open Models', '#models');
     case 'usage': return link('Open Usage', '#usage');
+    case 'server': return link('Open Server', '#server');
     default: return null;
   }
 }
@@ -923,6 +924,19 @@ function spark(values, max) {
 }
 const meter = (p) => h('div', { class: `meter ${p >= 85 ? 'hot' : ''}` }, h('i', { style: `width:${Math.min(100, p)}%` }));
 let serverTimer = null; let opsTimer = null; let logUnit = 'whatsapp-agent-duniya';
+// Small servers (043): one line about what this server can take, and the media queue when something waits.
+const SIZE_LABEL = { small: 'Small server', medium: 'Medium server', large: 'Large server' };
+function serverSizeNote(s, q) {
+  if (!s) return null;
+  const ram = s.effectiveMb >= 1024 ? `${(s.effectiveMb / 1024).toFixed(s.effectiveMb % 1024 ? 1 : 0)} GB` : `${s.effectiveMb} MB`;
+  const waiting = q && (q.queued || q.running) ? h('div', { class: 'small muted', style: 'margin-top:4px' }, `Photos & voice queue: ${q.running} working, ${q.queued} waiting (up to ${q.workers} at once, ${q.max} max).`) : null;
+  return h('div', { class: `note ${s.pressure ? 'warn' : s.size === 'small' ? 'info' : ''}`, style: 'margin-top:10px' },
+    h('b', {}, `${SIZE_LABEL[s.size]}: `), `${ram} memory${s.cgroupLimitMb ? ' (container limit)' : ''}, ${s.cpus} CPU${s.cpus > 1 ? 's' : ''}, ${s.availableMb} MB free. `,
+    s.pressure ? `The app uses ${s.rssMb} MB — above ${s.softLimitMb} MB, so summaries, on-server speech and picture creation are paused until memory frees up. Replies continue.`
+      : s.size === 'small' ? 'Photos and voice notes are handled one at a time, on-server speech engines and the Copilot helper are not available, and at most 2 local tool services run at once. Providers (OpenAI, OpenRouter) handle photos and voice fine.'
+        : 'Everything is available.',
+    waiting);
+}
 async function renderServer() {
   clearInterval(serverTimer); clearTimeout(opsTimer);
   const tilesBox = h('div', { class: 'tiles' }); const infoBox = h('div', { class: 'card' }); const opsBox = h('div', { class: 'card' }); const logBox = h('div', { class: 'card', style: 'margin-top:16px' });
@@ -944,6 +958,7 @@ async function renderServer() {
         x.rebootRequired ? h('div', { class: 'note warn' }, 'Restart required to finish updates') : null));
     infoBox.replaceChildren(h('h2', {}, 'This server'),
       h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {}, [['Host', x.host], ['System', x.os], ['Kernel', `${x.kernel} (${x.arch})`], ['App', `pid ${x.app.pid} · Node ${x.app.node}`]].map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v)))))),
+      serverSizeNote(S.status?.server, S.status?.mediaQueue),
       Object.keys(x.services).length ? h('div', {}, h('h3', {}, 'Services'), h('div', { class: 'row' }, Object.entries(x.services).filter(([, v]) => v !== 'inactive' && v !== 'unknown' || true).map(([k, v]) => h('span', { class: `pill ${v === 'active' ? 'ok' : v === 'inactive' ? '' : 'bad'}` }, `${k}: ${v}`)))) : h('p', { class: 'small muted' }, 'Service status is available on installs that use systemd.'));
   }
   async function opsCard() {
@@ -1359,6 +1374,7 @@ function toolServiceEditor(s, o) {
 
 async function renderAgentEditor(id) {
   const [b, models, plugins, conns, locals, waTools] = await Promise.all([api('GET', `/api/agents/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', '/api/plugins'), api('GET', `/api/agents/${encodeURIComponent(id)}/connections`).catch(() => []), api('GET', `/api/agents/${encodeURIComponent(id)}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => [])]);
+  const mediaCaps = await api('GET', '/api/media').catch(() => null);
   const c = structuredClone(b.config);
   const F = {};
   const inp = (key, attrs = {}) => (F[key] = h('input', { value: c[key] ?? '', ...attrs }));
@@ -1506,6 +1522,22 @@ async function renderAgentEditor(id) {
   drawScheds();
   F.plugins = plugins.map((p) => h('label', { class: 'inline' }, h('input', { type: 'checkbox', value: p.name, checked: (c.plugins || []).includes(p.name) }), p.name));
   F.timezone = h('input', { value: c.timezone || '', placeholder: 'Europe/Zurich (default)' });
+  // Photos & voice (043)
+  const md = { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', ...(c.media || {}), createImages: { organizer: true, participant: false, ...(c.media?.createImages || {}) } };
+  const mtick = (key, label, obj = md) => h('div', {}, h('label', { class: 'inline', style: 'min-height:40px' }, h('input', { type: 'checkbox', checked: !!obj[key], disabled: !can('admin'), onchange: (e) => { obj[key] = e.target.checked; } }), label));
+  const vr = h('div', { class: 'seg', role: 'group', 'aria-label': 'Reply with voice' }, [['never', 'Never'], ['voice', 'To voice notes'], ['always', 'Always']].map(([v, l]) => h('button', {
+    type: 'button', class: md.voiceReply === v ? 'on' : '', disabled: !can('admin'), onclick: (e) => { md.voiceReply = v; vr.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); } }, l)));
+  const ms = mediaCaps?.summary || {};
+  const capHint = (ok, text) => (ok ? null : h('div', { class: 'small muted', style: 'margin:-2px 0 6px 2px' }, text, ' ', h('a', { href: '#models' }, 'Models')));
+  const mediaBox = h('fieldset', {}, h('legend', {}, 'Photos & voice'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'What the agent does with photos and voice notes people send it (only in chats that are on and when it is addressed), and whether it answers with voice. Photos and voice notes go to the AI provider; only a short placeholder or the transcript stays in the chat history.'),
+    mtick('photos', 'Look at photos'), capHint(ms.sees !== false, 'No connected model can see photos.'),
+    mtick('documents', 'Read PDF files'), mtick('stickers', 'Look at stickers too'),
+    mtick('voiceNotes', 'Listen to voice notes (turned into text)'), capHint(ms.hears, 'Nothing connected can listen yet: add an OpenAI key or OpenRouter, or switch on on-server listening in Settings.'),
+    field('Reply with voice', vr, ms.speaks ? '“To voice notes”: only when they sent one. Voice replies are WhatsApp voice notes; the text is kept in the history. Replies with a confirm code or a link stay text.' : 'Nothing connected can speak yet (OpenAI key, OpenRouter, or on-server speaking in Settings).'),
+    h('div', { style: 'margin-top:8px' }, h('label', {}, 'Who may ask for pictures'),
+      mtick('organizer', 'Organizers', md.createImages), mtick('participant', 'Participants', md.createImages),
+      capHint(ms.creates, 'No connected provider can create pictures yet (OpenAI key with image models, or OpenRouter).')));
   F.historySize = h('input', { type: 'number', value: c.historySize, style: 'max-width:110px' });
   F.maxTokens = h('input', { type: 'number', value: c.maxTokens, style: 'max-width:110px' });
 
@@ -1519,6 +1551,7 @@ async function renderAgentEditor(id) {
       tools: { participant: splitLines(rulesBox.participant.value), organizer: splitLines(rulesBox.organizer.value), deny: splitLines(rulesBox.deny.value) },
       confirm: F.confirmOn.checked ? { preview: F.cPreview.value.trim(), tool: F.cTool.value.trim(), idField: F.cId.value.trim(), ttlMinutes: Number(F.cTtl.value) } : null,
       schedules: scheds, plugins: F.plugins.map((l) => l.querySelector('input')).filter((x) => x.checked).map((x) => x.value),
+      media: md,
     };
     try {
       const r = await api('PUT', `/api/agents/${encodeURIComponent(id)}`, config);
@@ -1624,6 +1657,7 @@ async function renderAgentEditor(id) {
         waTools.length ? h('fieldset', {}, h('legend', {}, 'WhatsApp actions'),
           h('p', { class: 'small muted', style: 'margin-top:0' }, 'What the agent may do in WhatsApp besides answering: send pictures and files, react, post polls, manage the group. Actions marked “organizers only” happen right away when an organizer asks — no confirm code — so give the agent’s number group-admin rights only where you want that. Every action is recorded in Activity.'),
           h('details', {}, h('summary', { class: 'small', style: 'cursor:pointer;min-height:36px' }, `Choose actions per role (${waTools.length})`), waBox)) : null,
+        mediaBox,
         h('fieldset', {}, h('legend', {}, 'Changes need confirmation'),
           h('label', { class: 'inline' }, F.confirmOn, 'Hold changes until an organizer replies “confirm CODE”'),
           h('div', { class: 'row' }, field('Preview tools', F.cPreview), field('Confirm tool', F.cTool)),
@@ -1647,10 +1681,10 @@ async function renderAgentEditor(id) {
 // ---------- AI helper (016) ----------
 const FIELD_LABEL = { name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', dm: 'Who may message it directly',
   organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', globalMcp: 'Global tool services', tools: 'Tool rules', confirm: 'Confirmation', schedules: 'Scheduled posts', memory: 'Group memory',
-  model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', plugins: 'Plugins', enabled: 'Enabled' };
+  model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', plugins: 'Plugins', enabled: 'Enabled', media: 'Photos & voice' };
 // The editor's sections, in the editor's order: the review groups changes the same way.
 const AI_SECTIONS = [['General', ['name', 'description', 'enabled', 'memory', 'respondToMentions', 'model', 'triggers', 'dm']], ['Instructions', ['prompt']],
-  ['People & roles', ['organizers', 'participants']], ['Tool services', ['mcpServers', 'globalMcp', 'tools']], ['Changes need confirmation', ['confirm']],
+  ['People & roles', ['organizers', 'participants']], ['Tool services', ['mcpServers', 'globalMcp', 'tools']], ['Photos & voice', ['media']], ['Changes need confirmation', ['confirm']],
   ['Scheduled posts', ['schedules']], ['Advanced', ['plugins', 'timezone', 'historySize', 'maxTokens']]];
 const AI_ORDER = AI_SECTIONS.flatMap(([, f]) => f);
 const sectionOf = (f) => (AI_SECTIONS.find(([, fs]) => fs.includes(f)) || ['Other'])[0];
@@ -1676,6 +1710,8 @@ function aiScalar(field, v, ctx) {
   if (field === 'dm') return DM_LABEL[v] || String(v ?? '—');
   if (field === 'memory') return v?.enabled === false ? 'off' : 'on';
   if (field === 'confirm') return v ? `on (preview ${v.preview || '—'}, confirm with ${v.tool || '—'})` : 'off';
+  if (field === 'media' && v) return [v.photos !== false && 'photos', v.documents !== false && 'PDFs', v.stickers && 'stickers', v.voiceNotes !== false && 'voice notes',
+    `voice replies: ${({ never: 'never', voice: 'to voice notes', always: 'always' })[v.voiceReply || 'never']}`, `pictures: ${[v.createImages?.organizer !== false && 'organizers', v.createImages?.participant && 'participants'].filter(Boolean).join(' + ') || 'nobody'}`].filter(Boolean).join(', ');
   if (typeof v === 'boolean') return v ? 'on' : 'off';
   if (v == null || v === '') return '—';
   return typeof v === 'object' ? JSON.stringify(v) : String(v);
@@ -2125,7 +2161,7 @@ const saveSecretKey = (name) => async (value) => { await api('PUT', '/api/secret
 const replaceKey = (form) => h('details', { class: 'small mut' }, h('summary', {}, 'Replace key'), form);
 
 async function renderModels() {
-  const [provs, models, us] = await Promise.all([api('GET', '/api/providers'), loadModels(true), usageSummary()]);
+  const [provs, models, us, media] = await Promise.all([api('GET', '/api/providers'), loadModels(true), usageSummary(), api('GET', '/api/media').catch(() => null)]);
   providerCard.usage = us;
   const by = Object.fromEntries(provs.map((p) => [p.id, p]));
   const anyOn = provs.some((p) => p.connected);
@@ -2279,7 +2315,31 @@ async function renderModels() {
 
   const cards = [orCard, anCard, oaCard, cgCard, coCard];
   if (anyOn) cards.sort((a, b) => b.classList.contains('on') - a.classList.contains('on')); // connected first
-  $('#main').replaceChildren(start, h('div', { class: 'grid pgrid' }, cards, otherCard, anyOn ? fallbackCard : null, defaults));
+  $('#main').replaceChildren(start, media && anyOn ? mediaCapsCard(media) : null, h('div', { class: 'grid pgrid' }, cards, otherCard, anyOn ? fallbackCard : null, defaults));
+}
+
+// ---------- Models → Photos & voice (043): what each connected provider can do beyond text ----------
+const CAP_COLS = [['sees', 'Sees images'], ['hears', 'Hears voice'], ['creates', 'Creates images'], ['speaks', 'Speaks']];
+const capPill = (on, some) => h('span', { class: `pill ${on ? 'ok' : ''}` }, some ? '✓ some models' : on ? '✓ yes' : '— no');
+function mediaCapsCard(m) {
+  const cell = (r, k) => {
+    const v = r[k];
+    const on = v === true || v === 'yes' || v === 'some';
+    return h('td', { 'data-label': CAP_COLS.find((c) => c[0] === k)[1] }, capPill(on, v === 'some'));
+  };
+  // One "how to enable" line per distinct hint, under the provider's name (not repeated in every cell).
+  const hints = (r) => [...new Set(CAP_COLS.filter(([k]) => !(r[k] === true || r[k] === 'yes' || r[k] === 'some') && r.how?.[k]).map(([k]) => r.how[k]))]
+    .map((x) => h('div', { class: 'small muted', style: 'margin-top:3px' }, x));
+  const s = m.summary;
+  const local = s.localListen || s.localSpeak ? h('tr', {}, h('td', { 'data-label': '' }, h('b', {}, 'This server'), h('div', { class: 'small muted' }, 'On-server engines')),
+    h('td', { 'data-label': 'Sees images' }, capPill(false)), h('td', { 'data-label': 'Hears voice' }, capPill(s.localListen)),
+    h('td', { 'data-label': 'Creates images' }, capPill(false)), h('td', { 'data-label': 'Speaks' }, capPill(s.localSpeak))) : null;
+  const line = [s.sees && 'see photos', s.hears && 'listen to voice notes', s.creates && 'create pictures', s.speaks && 'answer with voice'].filter(Boolean);
+  return h('div', { class: 'card', style: 'margin-top:16px' },
+    h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Photos & voice'), h('a', { class: 'btn small', href: '#settings' }, 'Settings')),
+    h('p', { class: 'small muted', style: 'margin:6px 0 10px' }, line.length ? `With what is connected, agents can ${line.join(', ')}. Photos and voice notes are sent to the provider. Switch each agent’s use on its page (Photos & voice).` : 'Connect a provider to let agents see photos, listen to voice notes, create pictures or answer with voice.'),
+    h('table', { class: 'stack' }, h('thead', {}, h('tr', {}, h('th', {}, 'Provider'), CAP_COLS.map(([, l]) => h('th', {}, l)))),
+      h('tbody', {}, m.providers.map((r) => h('tr', {}, h('td', { 'data-label': '' }, h('b', {}, r.name), hints(r)), CAP_COLS.map(([k]) => cell(r, k)))), local)));
 }
 
 // ---------- backups (owner) ----------
@@ -2523,6 +2583,7 @@ async function renderSettings() {
     oa ? ownerAssistantCard(oa, models) : null,
     notice ? privacyNoticeCard(notice) : null,
     alerts ? ownerAlertsCard(alerts) : null,
+    await photosVoiceCard().catch((e) => h('div', { class: 'card' }, h('h2', {}, 'Photos & voice'), h('p', { class: 'small muted' }, `Could not load: ${e.message}`))),
     mob ? mobileCard(mob) : null,
     ai ? assistantsCard(ai) : null,
     lg ? loggingCard(lg) : null,
@@ -2621,6 +2682,62 @@ function askCard() {
   return h('div', { class: 'card', id: 'ov-ask', style: 'grid-column:1/-1' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Ask'), h('span', { class: 'pill' }, S.user.role)),
     h('p', { class: 'small muted' }, 'The owner assistant looks across the chats that are on (not those private to members). Changes need your Confirm.'),
     q, h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn primary', onclick: send }, 'Ask')), out);
+}
+
+// ---------- Settings → Photos & voice (043): fallback model, pictures, voice, on-server speech engines ----------
+let mediaTimer = null;
+async function photosVoiceCard() {
+  const [m, models] = await Promise.all([api('GET', '/api/media'), loadModels().catch(() => ({ models: [] }))]);
+  const card = h('div', { class: 'card', id: 'photos-voice' });
+  const st = m.settings;
+  const save = (patch, ok = 'Saved') => tryApi(async () => { await api('PUT', '/api/media/settings', patch); redraw(); }, ok);
+  async function redraw() { const next = await photosVoiceCard().catch(() => null); if (next && card.isConnected) card.replaceWith(next); }
+  const fb = modelSelect(models, st.visionFallback || '', { autoLabel: 'None — say “I can’t see photos”', disabled: !can('admin') });
+  fb.querySelector('option[value="auto"]').value = '';
+  const imgChoices = m.providers.filter((r) => r.creates && r.imageModel).map((r) => [`${r.id}:${r.imageModel}`, `${r.name} · ${r.imageModel}`]);
+  const img = h('select', { disabled: !can('admin') }, h('option', { value: '' }, 'Automatic'), imgChoices.map(([v, l]) => h('option', { value: v, selected: st.imageModel === v }, l)),
+    st.imageModel && !imgChoices.some(([v]) => v === st.imageModel) ? h('option', { value: st.imageModel, selected: true }, `${st.imageModel} (not available)`) : null);
+  const priceRef = st.imageModel || imgChoices[0]?.[0] || '';
+  const price = h('input', { type: 'number', min: '0', step: '0.001', placeholder: 'USD per picture', value: priceRef && st.imagePrices[priceRef] != null ? st.imagePrices[priceRef] : '', style: 'max-width:160px', disabled: !can('admin') || !priceRef });
+  const voice = h('select', { disabled: !can('admin') }, m.voices.map((v) => h('option', { value: v, selected: st.voice === v }, v)));
+  const maxMin = h('input', { type: 'number', min: '1', max: '30', value: Math.round(st.maxVoiceSeconds / 60), style: 'max-width:90px', disabled: !can('admin') });
+  // On-server engines
+  const allowed = m.localAllowed?.ok;
+  const engines = Object.entries(m.local.engines);
+  const installing = engines.some(([, e]) => e.installing);
+  clearTimeout(mediaTimer);
+  if (installing) mediaTimer = setTimeout(() => { if (S.tab === 'settings') redraw(); }, 3000);
+  const useKey = { stt: 'listen', tts: 'speak' };
+  const engineRow = ([kind, e]) => {
+    const on = !!st.local[useKey[kind]];
+    const state = e.installing ? h('span', { class: 'small' }, h('span', { class: 'spinner' }), ` ${e.installing.step}… started ${ago(e.installing.startedAt)} ago`)
+      : e.error ? h('span', { class: 'pill bad' }, 'Install failed') : e.installed ? h('span', { class: `pill ${on ? 'ok' : ''}` }, on ? '✓ In use' : 'Installed, not in use') : h('span', { class: 'pill' }, 'Not installed');
+    return h('div', { class: 'number-card' },
+      h('div', { class: 'row spread' }, h('b', {}, e.label), state),
+      h('div', { class: 'small muted', style: 'margin-top:4px' }, `Download about ${e.downloadMb} MB · ${e.diskMb} MB of disk · about ${e.ramMb} MB of memory while it works (only then).`),
+      e.error ? h('div', { class: 'note bad' }, e.error) : null,
+      kind === 'tts' && !m.local.ffmpeg ? h('div', { class: 'note warn' }, 'Needs ffmpeg on the server to make WhatsApp voice notes. Update the app with the installer (it adds ffmpeg), or run: sudo apt install ffmpeg') : null,
+      can('owner') ? h('div', { class: 'row', style: 'margin-top:8px' },
+        !e.installed && !e.installing ? h('button', { class: 'btn small', disabled: !allowed || !m.local.supported, onclick: () => tryApi(async () => { await api('POST', `/api/media/local/${kind}/install`); redraw(); }, 'Download started') }, e.error ? 'Try again' : 'Download') : null,
+        e.installed ? h('label', { class: 'inline' }, toggle(on, (v) => save({ local: { [useKey[kind]]: v } }, v ? 'On' : 'Off'), !allowed), 'Use it') : null,
+        e.installed ? h('button', { class: 'btn small danger mut', onclick: () => confirm(`Remove ${e.label}? Agents stop using it; you can download it again later.`) && tryApi(async () => { await api('DELETE', `/api/media/local/${kind}`); redraw(); }, 'Removed') }, 'Remove') : null) : null);
+  };
+  card.append(h('h2', {}, 'Photos & voice'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Server-wide choices for photos, pictures and voice. Each agent switches what it uses on its own page; what each provider can do is on ', h('a', { href: '#models' }, 'Models'), '.'),
+    field('When an agent’s model can’t see photos, use', fb, 'A model that sees images (Claude, GPT, many OpenRouter models). Without one, the agent says kindly that it can’t look at photos.'),
+    imgChoices.length ? [field('Pictures are made with', img), field(`Price per picture${priceRef ? ` (${priceRef})` : ''}`, price, 'Optional, for Usage and spending caps when the provider does not report a cost (OpenRouter does).')] : h('p', { class: 'small muted' }, 'No connected provider can create pictures (an OpenAI key with image models, or OpenRouter).'),
+    h('div', { class: 'row' }, field('Voice for spoken replies (OpenAI)', voice), field('Longest voice note (minutes)', maxMin)),
+    can('admin') ? h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => {
+      const patch = { visionFallback: fb.value, imageModel: img.value, voice: voice.value, maxVoiceSeconds: Math.max(10, Math.round(Number(maxMin.value || 5) * 60)) };
+      if (priceRef) patch.imagePrices = { ...st.imagePrices, [img.value || priceRef]: price.value };
+      save(patch);
+    } }, 'Save') : null,
+    h('h3', { style: 'margin:18px 0 6px' }, 'On-server speech'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Listen to voice notes and answer with voice on this server, without a provider — free, private, slower. Used after the providers, or alone. Open-source engines (Whisper, Piper via sherpa-onnx), downloaded only if you choose to.'),
+    !m.local.supported ? h('div', { class: 'note warn' }, `On-server speech runs on Linux (x64 or arm64); this server is ${m.local.platform}.`) : null,
+    !allowed ? h('div', { class: 'note warn' }, m.localAllowed.reason) : m.server?.size !== 'large' ? h('div', { class: 'note' }, `Each engine needs about 300–400 MB of free memory while it works; this server has ${m.server.availableMb} MB free now. If memory is short at that moment, the provider is used or the agent asks for text.`) : null,
+    engines.map(engineRow));
+  return card;
 }
 
 // ---------- Settings → Owner alerts (040/041): where cap alerts and the weekly summary go ----------

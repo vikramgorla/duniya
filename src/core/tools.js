@@ -5,6 +5,7 @@ import { globalServers } from './global-mcp.js';
 import { memoryTools, memoryEnabled, MEMORY_DEFAULT_ALLOW } from './memory.js';
 import { contactsTools, CONTACTS_DEFAULT_ALLOW } from './contacts.js';
 import { whatsappTools, whatsappRules, whatsappChannel } from './whatsapp-tools.js';
+import { mediaTools, imageToolAllowed } from './media-ai.js';
 
 /** "panduga:*_preview" style globs. */
 export function globToRegex(glob) {
@@ -150,6 +151,18 @@ export async function toolsFor(agent, role) {
       const fq = `whatsapp:${t.name}`;
       if (!t.roles.includes(role) || !matchesAny(fq, waAllow) || matchesAny(fq, deny)) continue;
       const name = exposedName('whatsapp', t.name);
+      defs.push({ name, description: t.description, input_schema: t.input_schema });
+      meta.set(name, { kind: 'local', fq, tool: t });
+    }
+  }
+
+  // Photos & voice (043): create_image only when a connected provider can make pictures and the agent allows it for
+  // this role (organizers on, participants off by default); the deny list always wins.
+  if (whatsappChannel() && await imageToolAllowed(agent, role).catch(() => false)) {
+    for (const t of mediaTools) {
+      const fq = `media:${t.name}`;
+      if (!t.roles.includes(role) || matchesAny(fq, deny)) continue;
+      const name = exposedName('media', t.name);
       defs.push({ name, description: t.description, input_schema: t.input_schema });
       meta.set(name, { kind: 'local', fq, tool: t });
     }

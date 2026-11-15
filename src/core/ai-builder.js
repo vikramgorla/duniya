@@ -10,7 +10,7 @@ import { GLOBAL_SCOPE } from './mcp-oauth.js';
 import { activity } from './events.js';
 
 const EDITABLE = ['name', 'description', 'prompt', 'triggers', 'respondToMentions', 'dm', 'organizers', 'participants',
-  'mcpServers', 'globalMcp', 'tools', 'confirm', 'schedules', 'memory', 'model', 'timezone', 'historySize', 'maxTokens', 'plugins', 'enabled'];
+  'mcpServers', 'globalMcp', 'tools', 'confirm', 'schedules', 'memory', 'model', 'timezone', 'historySize', 'maxTokens', 'plugins', 'enabled', 'media'];
 
 const TOOL = {
   name: 'propose_agent',
@@ -37,6 +37,7 @@ const GUIDE = `You configure WhatsApp assistant agents on a self-hosted platform
 - tools: {participant:[rules], organizer:[rules], deny:[rules]} with rules "server:tool" or globs "server:*", "server:*_list". Least privilege: participants read-only tools; organizers can also prepare changes. Built-in memory tools: "memory:remember", "memory:list_notes", "memory:search_history", "memory:forget" (organizers only).
 - confirm: {preview:"server:*_preview", tool:"server:confirm"} when a service uses preview/confirm for changes, else null.
 - schedules: [{id, at:"HH:MM", days:"daily"|"mon,wed,…", prompt, enabled}] — the agent posts the result of prompt to its chats.
+- media: {photos, documents, stickers, voiceNotes: true|false, voiceReply: "never"|"voice"|"always", createImages: {organizer: bool, participant: bool}} — photos & voice (look at photos, read PDFs, listen to voice notes, answer with voice notes, who may ask for pictures).
 - memory: {enabled: true|false}; model: "auto" | "provider:auto" | "provider:model"; timezone (IANA); historySize (recent messages in context, 5–200); maxTokens (reply length); plugins (names); enabled.
 Rules: change only what the request needs; return complete values for each changed field; keep secrets as \${NAME} references; never add people you were not told about except when the request asks to use group admins; keep instructions in the language the admin writes in unless asked otherwise.`;
 
