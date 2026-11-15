@@ -21,7 +21,7 @@
 ## Highlights
 
 - **Agents from templates or plain words.** School friends, Family, Car pooling, Office, Neighbours, or describe one
-  and let the AI helper draft it; review before saving. Group memory, organizers, scheduled posts, test console.
+  and let the AI helper draft it; review the changes as a friendly before/after diff before saving. Group memory, organizers, scheduled posts, test console.
 - **Silent by default.** Every chat is off until you switch it on; off chats are never stored or sent to a model.
 - **Several WhatsApp numbers, groups and 1:1 chats.** Linked-device login by QR or pairing code, no commercial API.
 - **Any model.** Sign in with ChatGPT, GitHub Copilot, OpenRouter (free models), Anthropic or OpenAI keys,

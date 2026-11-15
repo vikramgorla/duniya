@@ -14,7 +14,7 @@ import {
 import { referencedSecrets } from '../core/schema.js';
 import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages, listNotes } from '../core/db.js';
 import { bus, activity, loggingSettings, resetLoggingCache, LOG_CATEGORIES } from '../core/events.js';
-import { allChatPrefs, setChatPrefs, seenChats, ignoredCounts, enabledChats } from '../core/chat-prefs.js';
+import { allChatPrefs, setChatPrefs, seenChats, ignoredCounts, enabledChats, isChatEnabled } from '../core/chat-prefs.js';
 import { runAgent, handleConfirmCommand, applyPending } from '../core/runner.js';
 import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool, mcpConnection } from '../core/mcp.js';
@@ -48,6 +48,7 @@ import { baseUrl, minuteLimiter } from './http-util.js';
 import { mobileRoutes } from './routes/mobile.js';
 import { toolServiceRoutes } from './routes/tool-services.js';
 import { ownerAlertRoutes } from './routes/owner-alerts.js';
+import { insightRoutes } from './routes/insights.js';
 import { globalServers } from '../core/global-mcp.js';
 import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES, GLOBAL_SCOPE } from '../core/mcp-oauth.js';
 
@@ -360,15 +361,20 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     const agent = getAgent(p.id);
     if (!agent) return [404, { error: 'Not found' }];
     const role = body.role === 'organizer' ? 'organizer' : 'participant';
-    const chat = `panel:${p.id}`;
+    // #37 "Test as…": a chat of this agent (its memory, type and model) or a new direct chat; never sent to WhatsApp.
+    const pick = body.chat && body.chat !== 'new' ? String(body.chat) : '';
+    if (pick && !agent.chats.includes(pick)) return [400, { error: 'Choose one of this agent’s chats, or a new direct chat', field: 'chat' }];
+    const isGroup = pick ? isGroupChat(pick) : false;
+    const chat = pick ? `panel:${p.id}:${pick}` : `panel:${p.id}`;
     const text = String(body.text || '').slice(0, 4000);
     const confirm = await handleConfirmCommand({ agent, text, role, chat });
     if (confirm !== undefined) return { reply: confirm };
-    activity('message.in', { agent: agent.id, chat, summary: `Panel test (${role}): ${text}` });
-    const ctx = { agent, role, chat, senderName: 'Panel admin', requester: 'panel', text, isGroup: false, source: 'panel' };
+    activity('message.in', { agent: agent.id, chat, summary: `Panel test (${role}${pick ? ` in ${pick}` : ''}): ${text}` });
+    const ctx = { agent, role, chat, senderName: 'Panel admin', requester: 'panel', text, isGroup, source: 'panel',
+      contextChat: pick, chatName: isGroup ? await channel.chatName?.(pick).catch(() => '') : '' };
     const reply = await runAgent(ctx);
     activity('message.out', { agent: agent.id, chat, summary: reply || '(no reply)' });
-    return { reply, usage: ctx.usage, model: ctx.model };
+    return { reply, usage: ctx.usage, model: ctx.model, role, chat: pick || 'new', ...(pick ? { chatOn: isChatEnabled(pick) } : {}) };
   });
   route('POST', '/api/agents/:id/schedules/:sid/run', async (req, res, body, q, p) => {
     const agent = getAgent(p.id);
@@ -573,6 +579,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
 
   // ---------- global tool services (035): Settings → Tool services ----------
   toolServiceRoutes(route);
+  insightRoutes(route, { channel }); // silences (#34), first-run checklist (#36), test tools (#37)
 
   // ---------- spending caps (040) and owner alerts / weekly summary (041) ----------
   ownerAlertRoutes(route, { channel });
@@ -625,8 +632,8 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
         return send(res, 200, readFileSync(resolve(PUBLIC, 'index.html')), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
       }
       if (url.pathname === '/healthz') return send(res, 200, 'ok');
-      if (req.method === 'GET' && url.pathname === '/qr.js') {
-        return send(res, 200, readFileSync(resolve(PUBLIC, 'qr.js')), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=3600' });
+      if (req.method === 'GET' && (url.pathname === '/qr.js' || url.pathname === '/diff.js')) {
+        return send(res, 200, readFileSync(resolve(PUBLIC, url.pathname.slice(1))), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=3600' });
       }
       if (await adminMcp.handle(req, res, url)) return;
       const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));

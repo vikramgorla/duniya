@@ -9,9 +9,20 @@ import { buildContext } from './memory.js';
 import { activity } from './events.js';
 import { toolsFor, matchesAny, organizerConnection } from './tools.js';
 import { checkBudget } from './budget.js';
+import { silenceReason } from './silences.js';
 import { countStat } from './stats.js';
 
 const MAX_TOOL_ROUNDS = 8;
+
+// Test console (#37): WhatsApp actions are never carried out from the panel. Read-only ones look at the chat being
+// tested; every other one returns what it would have done.
+const WA_READ_ONLY = new Set(['whatsapp:poll_results', 'whatsapp:group_info', 'whatsapp:profile_info']);
+async function runTool(run, m, call, ctx) {
+  const fq = m?.fq || '';
+  if (ctx.source !== 'panel' || !fq.startsWith('whatsapp:')) return run(call.name, call.input, { ...ctx, toolName: call.name });
+  if (WA_READ_ONLY.has(fq)) return run(call.name, call.input, { ...ctx, chat: ctx.contextChat || ctx.chat, toolName: call.name });
+  return { isError: false, text: JSON.stringify({ testConsole: true, notSent: true, note: `Test console: ${fq} was not carried out; in WhatsApp it would run with this input.`, input: call.input }) };
+}
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from({ length: 4 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
 
@@ -62,18 +73,19 @@ export function extractConfirmId(text, field = 'confirm_id') {
 /**
  * One agent turn for an agent. Returns reply text or null.
  * ctx: { agent, role, chat, senderName, requester, text, isGroup, source: 'whatsapp'|'panel'|'schedule' }
+ * contextChat (panel tests, #37): the chat whose memory and model the test uses; `chat` stays the panel test chat.
  */
 export async function runAgent(ctx) {
   const { agent, role, chat, senderName, text, isGroup } = ctx;
   // Spending caps (040): checked before the first model call of a turn (a turn that started finishes). Panel tests
   // are never held back, so the owner can still try the agent.
-  let model = chatModel(agent, chat);
+  let model = chatModel(agent, ctx.contextChat || chat);
   if (ctx.source !== 'panel') {
     const budget = await checkBudget(agent, chat, { names: { chat: ctx.chatName } });
     if (budget.action === 'quiet') {
       ctx.silenceReason = 'budget';
       countStat('budget', { agent: agent.id, chat });
-      activity('system', { agent: agent.id, chat, summary: `Stayed quiet: monthly ${budget.status.scope === 'agent' ? 'agent' : 'chat'} spending cap reached`, detail: { silenceReason: 'budget', scope: budget.status.scope } });
+      silenceReason('budget', { chat, agent: agent.id, sender: ctx.senderName || '' });
       return null;
     }
     if (budget.action === 'fallback') model = budget.model;
@@ -81,7 +93,7 @@ export async function runAgent(ctx) {
   const { defs, run, meta } = await toolsFor(agent, role);
   for (const err of meta.get('__errors') || []) activity('error', { agent: agent.id, chat, summary: err });
 
-  const memory = buildContext({ agent, chat, excludeId: ctx.msgRowId || 0 });
+  const memory = buildContext({ agent, chat: ctx.contextChat || chat, excludeId: ctx.msgRowId || 0 });
   const messages = [{
     role: 'user',
     content: `${memory ? `${memory}\n\n` : ''}New message from ${senderName} (${role}):\n${text}`,
@@ -102,6 +114,7 @@ export async function runAgent(ctx) {
       const friendly = friendlyModelError(e);
       if (!friendly) throw e;
       activity('error', { agent: agent.id, chat, summary: `Model error: ${e.message}`, detail: { code: e.code } });
+      ctx.modelError = e.code || 'model_error'; // the router records why the agent could not really answer (#34)
       return friendly;
     }
     ctx.model = res.model;
@@ -116,7 +129,7 @@ export async function runAgent(ctx) {
     for (const call of calls) {
       const m = meta.get(call.name);
       const started = Date.now();
-      const out = await run(call.name, call.input, { ...ctx, toolName: call.name });
+      const out = await runTool(run, m, call, ctx);
       let content = String(out.text ?? '').slice(0, 12000);
       activity(out.isError ? 'tool.error' : 'tool.call', {
         agent: agent.id, chat,
