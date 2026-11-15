@@ -59,6 +59,8 @@
 
 [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip)
 
+*Tip: open the buttons in a new tab (⌘/Ctrl-click, or long-press on iPad) so these steps stay open.*
+
 Pick your home region, click **Apply**, and open `http://<server-ip>/` to follow the install.
 [Walkthrough, updating the stack, recreating and removing it](docs/deploy/oci-free-tier.md).
 

@@ -101,6 +101,8 @@ async function tick(){
  if(await finalUp())return ready();}
 function ready(){opened=true;state='ready';cur=steps.length+1;draw();$('eyebrow').textContent='Ready';$('title').textContent='Your panel is ready';banner('Opening your admin panel…');setTimeout(()=>{location.href=FINAL;},1500);}
 draw();tick();setInterval(tick,3000);
+// Phones and iPads pause timers in background tabs: check at once when the page is shown again.
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();});
 </script></body></html>
 PAGE
   sed -i "s#__FINAL__#${FINAL_URL}#" "$STATUS_DIR/index.html"

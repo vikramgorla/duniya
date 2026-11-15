@@ -10,8 +10,8 @@
 //    on-server engines and image creation wait; WhatsApp and replies keep running. Logged once per episode.
 import { getSetting } from './store.js';
 import os from 'node:os';
-import { readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { readFileSync, accessSync, constants } from 'node:fs';
+import { join } from 'node:path';
 import { activity } from './events.js';
 
 const MB = 1024 * 1024;
@@ -154,9 +154,15 @@ export const queueState = () => ({ running, waiting: waiting.length, ...limits()
 
 // ---------- low-priority child processes ----------
 const has = new Map();
+/** Is `cmd` on the PATH? Found: cached. Missing: checked again after a minute (the installer may add it later). */
 export function hasCommand(cmd) {
-  if (!has.has(cmd)) { try { execFileSync('sh', ['-c', `command -v ${cmd}`], { stdio: 'ignore' }); has.set(cmd, true); } catch { has.set(cmd, false); } }
-  return has.get(cmd);
+  const hit = has.get(cmd);
+  if (hit === true || (hit && Date.now() - hit < 60000)) return hit === true;
+  const found = String(process.env.PATH || '/usr/local/bin:/usr/bin:/bin').split(':').some((d) => {
+    try { accessSync(join(d || '.', cmd), constants.X_OK); return true; } catch { return false; }
+  });
+  has.set(cmd, found ? true : Date.now());
+  return found;
 }
 /**
  * [command, args] that runs `cmd` at low CPU priority (nice) and, for native tools like ffmpeg, with a virtual
