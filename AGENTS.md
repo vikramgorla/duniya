@@ -40,6 +40,12 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 **Small servers**
 - [ ] Impact on a 1 GB / 1 vCPU VM considered: memory (< 400 MB RSS normally), no native build toolchains, heavy work
       goes through the media queue / `runJob` with timeouts, large downloads are refused on small servers.
+- [ ] Background work rides on the existing scheduler tick (`src/core/upkeep.js`) or on events, bounded per tick and
+      skipped while memory is tight; no new timers or intervals per feature, chat or number.
+
+**No chores for the owner**
+- [ ] Anything the server can do or retry itself happens automatically (refresh, reload, sync, retry, re-check);
+      buttons are optional extras, never required steps; if something needs the owner, the panel says exactly why.
 
 **Documentation** (the part most often forgotten)
 - [ ] `docs/` topic pages updated (and `docs/README.md` index if a page was added).

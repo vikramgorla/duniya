@@ -31,7 +31,7 @@ export const numbersSetting = () => {
 /** `factory` makes one channel per number (tests pass fakes). */
 export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) {
   const sessions = new Map(); // id -> channel
-  let handler = null; let historyHandler = null; let joinHandler = null;
+  let handler = null; let historyHandler = null; let joinHandler = null; let tagHandler = null; let activeHandler = null; let groupHandler = null;
 
   const make = (n) => factory({ number: n.id, label: n.label, authDir: resolve(DATA_DIR, n.id === MAIN ? 'whatsapp-auth' : `whatsapp-auth-${n.id}`) });
   const wrapMsg = (n) => (m) => ({ ...m, chat: chatKey(n.id, m.chat), number: n.id });
@@ -46,7 +46,10 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
       return handler(msg);
     }, { onHistory: async (msgs, meta = {}) => historyHandler?.(msgs.map(wrap), { ...meta, // #91: keys and chats in app chat ids
       keys: (meta.keys || []).map((k) => ({ ...k, chat: chatKey(n.id, k.chat), number: n.id })), chats: (meta.chats || []).map((c) => chatKey(n.id, c)) }),
-    onJoin: async (ev) => joinHandler?.({ ...ev, chat: chatKey(n.id, ev.chat) }) }); // 054: welcome
+    onJoin: async (ev) => joinHandler?.({ ...ev, chat: chatKey(n.id, ev.chat) }), // 054: welcome
+    onMemberTag: async (ev) => tagHandler?.({ ...ev, chat: chatKey(n.id, ev.chat) }), // 057: member tags
+    onPhoneActive: (ev) => activeHandler?.({ ...ev, number: n.id }), // 057: retry history loads
+    onGroupChange: (ev) => groupHandler?.({ ...ev, chat: chatKey(n.id, ev.chat) }) }); // 057: refresh member list
     return ch;
   }
   const route = (chat) => {
@@ -85,8 +88,9 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
       const g = await byNumber(number).groupCreate(subject, people);
       return { ...g, id: chatKey(number || MAIN, g.id) };
     },
-    async start(onMessage, { onHistory, onJoin } = {}) {
-      handler = onMessage; historyHandler = onHistory || null; joinHandler = onJoin || null;
+    async start(onMessage, { onHistory, onJoin, onMemberTag, onPhoneActive, onGroupChange } = {}) {
+      handler = onMessage; historyHandler = onHistory || null; joinHandler = onJoin || null; tagHandler = onMemberTag || null; activeHandler = onPhoneActive || null;
+      groupHandler = onGroupChange || null;
       for (const n of numbersSetting()) await startOne(n);
     },
     async send(chat, text, opts) { const { ch, jid } = route(chat); return ch.send(jid, text, opts); },
@@ -113,6 +117,18 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
     },
     /** 049: is this phone on WhatsApp (and its LID, when WhatsApp shares it)? { exists, jid, lid } or null when unknown. */
     async lookupNumber(number, phone) { const ch = byNumber(number); return ch.lookupNumber ? ch.lookupNumber(phone) : null; },
+    /** 057: shared upkeep tick — the first number whose names refresh is due does it (one per tick). */
+    async upkeep() {
+      for (const ch of sessions.values()) { const r = await ch.upkeep?.().catch(() => null); if (r?.ok || (r && r.reason !== 'not_due')) return r; }
+      return { ok: false, reason: 'not_due' };
+    },
+    async refreshGroup(chat) { const { ch, jid } = route(chat); return ch.refreshGroup ? ch.refreshGroup(jid) : null; },
+    /** 057: refresh address-book names on every number (each number also does this by itself). */
+    async refreshNames() {
+      const out = [];
+      for (const [id, ch] of sessions) out.push({ number: id, ...(ch.refreshNames ? await ch.refreshNames().catch(() => ({ ok: false })) : { ok: false, reason: 'unsupported' }) });
+      return out;
+    },
     pair: (phone, number) => byNumber(number).pair(phone),
     logout: (number) => byNumber(number).logout(),
     restart: (number) => byNumber(number).restart(),

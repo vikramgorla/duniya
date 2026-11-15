@@ -1,5 +1,11 @@
 <!--
-Sync Impact Report (1.4.0 → 1.4.1, PATCH)
+Sync Impact Report (1.4.1 → 1.4.2, PATCH)
+- Principle VIII clarified: "No chores for the owner" (#110). Anything the server can do or retry itself happens
+  automatically; buttons are optional extras, never required steps; if something needs the owner, say exactly why.
+  Background work rides on one shared tick, not new timers. Templates: tasks and checklist templates (both copies)
+  got the matching item; AGENTS.md Definition of Done has it. Follow-up: none.
+
+Previous (1.4.0 → 1.4.1, PATCH)
 - Principle II renamed "Generic Core, Agents as Data": code plugins were removed (#101); templates are the only agent
   files. No other principle changed. Templates: no change needed. Follow-up: none.
 
@@ -101,6 +107,11 @@ and confirmations that state the consequence. One-click flows are preferred when
 UI work MUST follow `DESIGN.md` and its checklist; a feature is not done until its screens pass that checklist in
 light and dark mode on a phone and an iPad.
 
+**No chores for the owner**: anything the server can do or retry itself (refresh, reload, sync, retry, re-check)
+MUST happen automatically; buttons are optional extras, never required steps; if something needs the owner, the
+panel MUST say exactly why. Such background work runs on the shared upkeep tick or on events, bounded per tick, not
+on new timers per feature.
+
 *Rationale*: the owners judge the product by how it feels to set up and run; capability that can't be found or
 understood does not exist for them.
 
@@ -170,4 +181,4 @@ principle removed or redefined; MINOR: principle or section added or materially 
 clarification), and reviewed in a pull request. Reviewers verify constitution compliance for every
 change.
 
-**Version**: 1.4.1 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-15
+**Version**: 1.4.2 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-15

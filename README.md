@@ -31,7 +31,7 @@
 <table>
 <tr>
 <td width="33%" valign="top"><a href="docs/agents.md"><img src="docs/img/thumb-agents.webp" alt="AI helper showing a visual diff of an agent change" width="100%"></a><br><b>Agents in plain words</b><br>Templates or describe it; review a visual diff. Quick replies, welcomes and FAQ answers without AI.</td>
-<td width="33%" valign="top"><a href="docs/privacy.md"><img src="docs/img/thumb-privacy.webp" alt="Privacy notice settings" width="100%"></a><br><b>Silent by default</b><br>Chats are off until you switch them on; then recent messages load from your phone. Set up a person's chat before they write.</td>
+<td width="33%" valign="top"><a href="docs/privacy.md"><img src="docs/img/thumb-privacy.webp" alt="Privacy notice settings" width="100%"></a><br><b>Silent by default</b><br>Chats are off until you switch them on; then recent messages load from your phone (retried by itself). Set up a person's chat before they write.</td>
 <td width="33%" valign="top"><a href="docs/owner-assistant.md"><img src="docs/img/thumb-ask.webp" alt="Ask box with a weekly recap" width="100%"></a><br><b>Ask about your chats</b><br>Recaps from WhatsApp, or streamed word by word in the Ask box.</td>
 </tr>
 <tr>
@@ -41,7 +41,7 @@
 </tr>
 <tr>
 <td valign="top"><a href="docs/agents.md#tool-services-mcp"><img src="docs/img/thumb-mcp.webp" alt="Adding an MCP tool service" width="100%"></a><br><b>Real tools via MCP</b><br>Browse the MCP Registry and add in one click; per-role allow lists, confirm step for changes.</td>
-<td valign="top"><a href="docs/agents.md#whatsapp-actions"><img src="docs/img/thumb-wa-group.webp" alt="WhatsApp group settings card" width="100%"></a><br><b>WhatsApp powers</b><br>Media, polls, reactions, group admin per role.</td>
+<td valign="top"><a href="docs/agents.md#whatsapp-actions"><img src="docs/img/thumb-wa-group.webp" alt="WhatsApp group settings card" width="100%"></a><br><b>WhatsApp powers</b><br>Media, polls, reactions, group admin per role. Names from your phone contacts and group member tags.</td>
 <td valign="top"><a href="docs/getting-started.md#why-didnt-it-answer"><img src="docs/img/thumb-quiet.webp" alt="Why agents stayed quiet, with fixes" width="100%"></a><br><b>"Why didn't it answer?"</b><br>Reasons per chat, one-click fixes.</td>
 </tr>
 <tr>

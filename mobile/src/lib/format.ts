@@ -46,7 +46,9 @@ export const pct = (part: number, total: number): number => (total > 0 ? Math.ma
 /** WhatsApp chat id → something a person recognises (used only when no name is known). */
 export function chatLabel(id: string, name?: string): string {
   if (name && name !== id) return name;
-  const phone = /^(\d{6,})@(s\.whatsapp\.net|lid)$/.exec(id.split('#').pop() || '');
+  const jid = id.split('#').pop() || '';
+  if (/@(hosted\.)?lid$/.test(jid)) return 'Unknown (hidden number)'; // 057: a LID is not a phone number
+  const phone = /^(\d{6,})@s\.whatsapp\.net$/.exec(jid);
   if (phone) return `+${phone[1]}`;
   if (id.startsWith('panel:')) return 'Panel test';
   return id;

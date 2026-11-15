@@ -1,5 +1,6 @@
 // Panel routes for spending caps (040, #35) and owner alerts / weekly summary (041, #38).
 import { budgetOverview, setCap, getCap, capStatus, CURRENCY, SCOPES } from '../../core/budget.js';
+import { chatTitle } from '../../core/contacts.js';
 import { ownerNumber, setOwnerNumber } from '../../core/owner-alerts.js';
 import { getWeeklySettings, setWeeklySettings, sendWeekly, weeklyText, weeklyData } from '../../core/weekly.js';
 import { listAgents, getAgent } from '../../core/agents.js';
@@ -10,7 +11,7 @@ const OWNER = { role: 'owner' };
 
 export function ownerAlertRoutes(route, { channel } = {}) {
   const chatNames = async () => {
-    const names = new Map(seenChats().map((c) => [c.id, c.name || (c.phone ? `+${c.phone}` : c.id)]));
+    const names = new Map(seenChats().map((c) => [c.id, chatTitle(c)]));
     for (const g of await channel?.listChats?.().catch(() => []) || []) names.set(g.id, g.name);
     return names;
   };

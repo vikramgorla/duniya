@@ -520,6 +520,10 @@ async function apiStream(path, body, onEvent) {
   return done;
 }
 const tryApi = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message); return undefined; } };
+/** 057: a member tag (WhatsApp's per-group label) as a small pill; text only. */
+const tagPill = (t) => (t ? h('span', { class: 'pill', style: 'margin-left:6px', title: 'Member tag in this WhatsApp group' }, t) : null);
+/** 057: a person's name line — the server's resolver decides the name; a hidden number is never shown as digits. */
+const whoLabel = (m) => m.label || m.name || (m.phone ? `+${m.phone}` : 'Unknown (hidden number)');
 const ago = (ts) => { const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s / 60)}m` : s < 86400 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`; };
 const time = (ts) => (ts ? new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
@@ -1188,8 +1192,10 @@ let usagePeriod = '30d';
 // ---------- contacts (#11) ----------
 let contactsQuery = '';
 async function renderContacts() {
-  const list = await api('GET', `/api/contacts?q=${encodeURIComponent(contactsQuery)}`);
+  const [list, sum] = await Promise.all([api('GET', `/api/contacts?q=${encodeURIComponent(contactsQuery)}`), api('GET', '/api/contacts/summary').catch(() => null)]);
   const edit = can('admin');
+  // 057: which WhatsApp name is shown (the panel picks own > phone contact > business > profile name)
+  const KIND = (c) => (c.ownName ? '' : c.bookName ? 'phone contact' : c.businessName ? 'business name' : c.profileName ? 'profile name' : '');
   const SRC = { own: 'Own', whatsapp: 'WhatsApp', both: 'Own + WhatsApp' };
   const search = h('input', { type: 'search', placeholder: 'Search name, note or number', value: contactsQuery, style: 'max-width:320px' });
   let timer; search.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { contactsQuery = search.value; renderContacts().then(() => { const i = $('#main input[type=search]'); i?.focus(); i?.setSelectionRange(i.value.length, i.value.length); }); }, 250); };
@@ -1206,7 +1212,7 @@ async function renderContacts() {
       if (await tryApi(() => api('PUT', `/api/contacts/${c.phone}`, { name, note }), 'Contact saved')) renderContacts();
     } }, 'Edit');
     return h('tr', {},
-      h('td', { 'data-label': '' }, h('strong', {}, c.name), c.note ? h('div', { class: 'small muted' }, c.note) : null),
+      h('td', { 'data-label': '' }, h('strong', {}, c.name), KIND(c) ? h('span', { class: 'small muted' }, ` · ${KIND(c)}`) : null, c.note ? h('div', { class: 'small muted' }, c.note) : null),
       h('td', { 'data-label': 'Number', class: 'num' }, `+${c.phone}`),
       h('td', { 'data-label': 'Source' }, h('span', { class: 'pill' }, SRC[c.source]), c.whatsappName && c.ownName && c.whatsappName !== c.ownName ? h('div', { class: 'small muted' }, `WhatsApp: ${c.whatsappName}`) : null),
       h('td', { 'data-label': 'Shared' }, h('label', { class: 'tick' }, shared)),
@@ -1218,6 +1224,8 @@ async function renderContacts() {
     h('div', { class: 'card' },
       h('div', { class: 'row spread' }, h('h2', {}, `Contacts (${list.length})`), search),
       h('p', { class: 'small muted' }, 'Names from your linked WhatsApp phone appear here automatically, plus the people you add. Agents can look up numbers: organizers see everyone, participants only contacts marked Shared. Nothing is shared until you tick it.'),
+      sum ? h('p', { class: 'small muted', role: 'status' }, `Names refresh from your phone by themselves (after it connects and once a day)${sum.refreshedAt ? `, last ${ago(sum.refreshedAt)} ago` : ''}: ${sum.book} phone contact${sum.book === 1 ? '' : 's'}, ${sum.profile} profile name${sum.profile === 1 ? '' : 's'}${sum.hiddenNumbers ? `, ${sum.hiddenNumbers} waiting for WhatsApp to share their number` : ''}.`,
+        edit ? [' ', h('button', { class: 'btn small mut', title: 'Optional: the server also does this by itself', onclick: () => tryApi(async () => { await api('POST', '/api/contacts/refresh'); setTimeout(renderContacts, 4000); }, 'Asked WhatsApp for names') }, 'Refresh now')] : null) : null,
       list.length ? h('table', { class: 'stack' }, h('thead', {}, h('tr', {}, ['Name', 'Number', 'Source', 'Shared', ''].map((x) => h('th', {}, x)))), h('tbody', {}, list.map(row)))
         : h('p', { class: 'muted' }, contactsQuery ? 'No contact matches.' : 'No contacts yet. They appear once WhatsApp syncs your phone’s address book, or add one below.')),
     add);
@@ -1597,7 +1605,7 @@ async function renderAgentEditor(id) {
     for (const g of pp.groups) for (const m of g.members) if (m.phone) groupPhones.add(m.phone);
     syncOthers();
     const roleSeg = (m) => {
-      if (!m.phone) return h('span', { class: 'small muted' }, 'number hidden by WhatsApp');
+      if (!m.phone) return h('span', { class: 'small muted' }, 'number hidden by WhatsApp (roles need a number)');
       const seg = h('div', { class: 'seg' }, [['participant', 'Participant'], ['organizer', 'Organizer']].map(([v, l]) => h('button', {
         class: (orgSet.has(m.phone) ? 'organizer' : 'participant') === v ? 'on' : '', disabled: !can('admin'),
         onclick: (e) => { if (v === 'organizer') orgSet.add(m.phone); else orgSet.delete(m.phone); seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.target)); syncOthers(); dirty.classList.remove('hide'); } }, l)));
@@ -1611,7 +1619,7 @@ async function renderAgentEditor(id) {
         h('div', { class: 'row spread' }, h('b', {}, g.name), h('span', { class: 'pill' }, `${g.members.length} members`)),
         g.error ? h('div', { class: 'small', style: 'color:var(--bad)' }, g.error) : null,
         h('table', { class: 'stack flat' }, h('tbody', {}, g.members.map((m) => h('tr', {},
-          h('td', { 'data-label': '' }, h('b', {}, m.name || (m.phone ? `+${m.phone}` : 'Unknown member')), m.admin ? h('span', { class: 'pill info', style: 'margin-left:6px' }, 'group admin') : null,
+          h('td', { 'data-label': '' }, h('b', {}, whoLabel(m)), tagPill(m.tag), m.admin ? h('span', { class: 'pill info', style: 'margin-left:6px' }, 'group admin') : null,
             h('div', { class: 'small muted' }, m.phone && m.name ? `+${m.phone}` : '')),
           h('td', { 'data-label': '', style: 'text-align:right' }, roleSeg(m)))))))) : h('p', { class: 'small muted' }, 'Bind this agent to a group on the Chats page to pick people from its members.'));
   }).catch((e) => peopleBox.replaceChildren(h('p', { class: 'small muted' }, `Could not load members: ${e.message}`)));
@@ -2274,7 +2282,7 @@ async function renderChats() {
   const hist = new Map(); // chat id -> { box, btn }
   const histBox = (c) => { const box = h('div', {}, historyLine(c)); hist.set(c.id, { ...hist.get(c.id), box }); return box; };
   const histBtn = (c) => {
-    const btn = h('button', { class: 'btn small', disabled: c.history?.state === 'loading', title: 'Ask your phone for the messages before the oldest stored one (keep the phone online)',
+    const btn = h('button', { class: 'btn small', disabled: c.history?.state === 'loading', title: 'Optional: ask your phone now for the messages before the oldest stored one (the server also retries by itself)',
       onclick: () => tryApi(async () => { c.history = (await api('POST', `/api/chats/${encodeURIComponent(c.id)}/history`, {})).status; showHist(c); watchHistory(c); }) }, 'Load recent messages');
     hist.set(c.id, { ...hist.get(c.id), btn });
     return btn;
@@ -2313,9 +2321,11 @@ function historyLine(c) {
   if (!hs) return null;
   if (hs.state === 'loading') return h('div', { class: 'small muted', role: 'status' }, h('span', { class: 'spinner' }), ' Loading recent messages from your phone…');
   if (hs.state === 'loaded') return h('div', { class: 'small muted', role: 'status' }, hs.loaded ? `Loaded ${hs.loaded} earlier message${hs.loaded === 1 ? '' : 's'}${hs.doneAt ? ` · ${ago(hs.doneAt)} ago` : ''}` : 'Your phone had no earlier messages for this chat');
-  if (hs.state === 'no_response') return h('div', { class: 'small', role: 'status', style: 'color:var(--warn)' }, 'Your phone didn’t send history (keep it online and try again)');
-  if (hs.state === 'no_anchor') return h('div', { class: 'small', role: 'status', style: 'color:var(--warn)' }, 'No message from this chat has reached the server yet: try again after the next message');
-  return h('div', { class: 'small', role: 'status', style: 'color:var(--warn)' }, `Couldn’t ask your phone: ${hs.error || 'unknown error'}`);
+  // 057: nothing to click — the server retries by itself (sooner when the phone comes online); the button is optional.
+  const retry = hs.retryAt ? ` Will retry automatically${hs.retryAt > Date.now() + 60000 ? ` in about ${ago(Date.now() - (hs.retryAt - Date.now()))}` : ' shortly'}, sooner when your phone is online.` : '';
+  if (hs.state === 'no_response') return h('div', { class: 'small muted', role: 'status' }, `Waiting for your phone to send recent messages.${retry || ' It did not answer after several tries.'}`);
+  if (hs.state === 'no_anchor') return h('div', { class: 'small muted', role: 'status' }, 'No message from this chat has reached the server yet. Recent messages load by themselves after the next message.');
+  return h('div', { class: 'small', role: 'status', style: 'color:var(--warn)' }, `Couldn’t ask your phone: ${hs.error || 'unknown error'}.${retry}`);
 }
 /** WhatsApp group tools for admins (026): members with admin badges, invite link, name/description, settings. */
 function whatsappCard(c) {
@@ -2363,7 +2373,7 @@ function whatsappCard(c) {
       linkBox, h('button', { class: 'btn small', onclick: (e) => { e.currentTarget.remove(); showLink(); } }, 'Show invite link'),
       h('details', { style: 'margin-top:14px' }, h('summary', { class: 'small', style: 'cursor:pointer' }, `Members (${g.participants.length})`),
         h('ul', { class: 'wa-members' }, g.participants.map((p) => h('li', {},
-          h('span', {}, h('b', {}, p.name || (p.phone ? `+${p.phone}` : 'Hidden number')), p.name && p.phone ? h('span', { class: 'small muted num' }, ` +${p.phone}`) : null),
+          h('span', {}, h('b', {}, whoLabel(p)), tagPill(p.tag), p.name && p.phone ? h('span', { class: 'small muted num' }, ` +${p.phone}`) : null),
           p.admin ? h('span', { class: 'pill ok' }, p.admin === 'superadmin' ? 'owner' : 'admin') : null)))));
   }
   load();
@@ -2378,7 +2388,7 @@ function messagesCard(c) {
   let oldest = 0; let rows = [];
   const more = h('button', { class: 'btn small', onclick: () => load(true) }, 'Load older');
   const bubble = (m) => h('div', { class: `bubble ${m.fromAgent ? 'me' : 'agent'}` },
-    h('div', { class: 'small', style: 'opacity:.75;margin-bottom:2px' }, m.fromAgent ? 'Agent' : (m.name || (m.sender ? `+${m.sender}` : 'someone')), ` · ${time(m.ts)}`, m.addressed ? ' · to the agent' : ''),
+    h('div', { class: 'small', style: 'opacity:.75;margin-bottom:2px' }, m.fromAgent ? 'Agent' : (m.name || (m.sender ? `+${m.sender}` : 'someone')), m.tag ? ` (${m.tag})` : '', ` · ${time(m.ts)}`, m.addressed ? ' · to the agent' : ''),
     m.quoted ? h('div', { class: 'small', style: 'opacity:.75;border-left:2px solid currentColor;padding-left:6px;margin:2px 0 4px' }, m.quoted) : null, m.text);
   async function load(older) {
     const page = await tryApi(() => api('GET', `/api/chats/${enc}/messages?limit=50${older && oldest ? `&before=${oldest}` : ''}${q.value.trim() ? `&q=${encodeURIComponent(q.value.trim())}` : ''}`));

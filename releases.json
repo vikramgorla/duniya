@@ -1,6 +1,13 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.18.0": {
+      "breaking": false,
+      "title": "Names instead of numbers, group member tags, and automatic retries",
+      "summary": "The panel shows people by the name you gave them, then your phone contact name, business name or profile name, instead of numbers; a profile-name change no longer replaces your contact name, and people WhatsApp shows only by a hidden id get their name once the number is known. Contact names refresh by themselves (one full refresh after this update, then daily). Group member tags (\"Driver\") show next to names and agents see them, for chats that are on. Loading recent messages retries by itself when your phone was offline. Existing synced names start as profile names until the first refresh brings back your contact names.",
+      "data": "migrated",
+      "docs": "docs/agents.md#which-name-is-shown"
+    },
     "2.17.0": {
       "breaking": false,
       "title": "Small server mode in Settings → Server; local tool services refused on small servers everywhere; the maintenance helper updates itself",

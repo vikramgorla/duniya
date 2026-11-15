@@ -12,7 +12,7 @@ import {
   listTemplates, templateConfig, exportAgent, importAgent,
 } from '../core/agents.js';
 import { referencedSecrets } from '../core/schema.js';
-import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages, listNotes } from '../core/db.js';
+import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages, listNotes, kvGet } from '../core/db.js';
 import { bus, activity, loggingSettings, resetLoggingCache, LOG_CATEGORIES } from '../core/events.js';
 import { allChatPrefs, setChatPrefs, seenChats, ignoredCounts, enabledChats, isChatEnabled } from '../core/chat-prefs.js';
 import { runAgent, handleConfirmCommand, applyPending } from '../core/runner.js';
@@ -20,7 +20,8 @@ import { stripTriggers } from '../core/router.js';
 import { builtinAnswer, todayText } from '../core/quick.js';
 import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool, mcpConnection } from '../core/mcp.js';
-import { listContacts, saveContact, removeContact, getContact } from '../core/contacts.js';
+import { listContacts, saveContact, removeContact, getContact, personInfo, contactSummary, chatTitle } from '../core/contacts.js';
+import { tagsInChat, memberTag } from '../core/member-tags.js';
 import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
 import { humanCode } from '../core/crypto.js';
 import { organizerConnection, oauthClientOf } from '../core/tools.js';
@@ -291,6 +292,11 @@ export function startPanel({ channel, extend = [] }) {
       throw Object.assign(new Error(e.code === 'no_model' ? 'Connect a model provider first (Models).' : e.message), { status: e.status || 400 });
     }
   });
+  /** 057: what the panel shows for a person: { phone, name, label, source, hidden, tag }. */
+  function personView(who, chat = '', tags = null) {
+    const p = personInfo(who);
+    return { phone: p.phone, name: p.name, label: p.label, nameSource: p.source, hidden: p.hidden, tag: chat ? memberTag(chat, { phone: p.phone, jid: who.jid }, tags) : '' };
+  }
   async function peopleOf(agent) {
     const suggest = agent.organizers.length === 0;
     const groups = [];
@@ -298,10 +304,12 @@ export function startPanel({ channel, extend = [] }) {
       let members = []; let error = '';
       try { members = await channel.groupMembers?.(chat) || []; } catch (e) { error = e.message; }
       const names = namesInChat(chat);
+      const tags = tagsInChat(chat);
       groups.push({
         chat, name: (await channel.chatName?.(chat).catch(() => '')) || chat, error,
         members: members.map((m) => ({
-          phone: m.phone, admin: m.admin, name: names[m.phone] || '',
+          // 057: one resolver — own name > address book > business > profile > number; hidden numbers never as digits
+          ...personView({ phone: m.phone, jid: m.jid, fallbackName: names[m.phone] }, chat, tags), admin: m.admin,
           role: m.phone && agent.organizers.includes(m.phone) ? 'organizer' : suggest && m.admin && m.phone ? 'organizer' : 'participant',
           suggested: suggest && m.admin && !!m.phone,
         })).sort((a, b) => (b.admin - a.admin) || (a.name || a.phone).localeCompare(b.name || b.phone)),
@@ -432,7 +440,7 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
     const numbers = new Map(((await channel.status()).numbers || []).map((n) => [n.id, n.label]));
     const known = new Set(groups.map((c) => c.id));
     // 1:1 chats the numbers have seen (name and number only) and any bound chat we can't see right now
-    const people = seenChats({ groups: false }).filter((c) => !known.has(c.id)).map((c) => ({ id: c.id, name: c.name || `+${c.phone}`, phone: c.phone, number: c.number, isGroup: false, lastAt: c.lastAt }));
+    const people = seenChats({ groups: false }).filter((c) => !known.has(c.id)).map((c) => ({ id: c.id, name: chatTitle(c), phone: c.phone || personInfo({ jid: String(c.id).split('#').pop() }).phone, number: c.number, isGroup: false, lastAt: c.lastAt }));
     for (const c of people) known.add(c.id);
     // 049: direct chats prepared before the person wrote ("Waiting for the first message"); LID aliases are not listed.
     const prepared = listDirectChats();
@@ -501,7 +509,10 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
   // Stored messages of a chat (024): admins and owners only; each look is recorded.
   route('GET', '/api/chats/:chat/messages', async (req, res, body, q, p, user) => {
     const chat = decodeURIComponent(p.chat);
-    const rows = listMessages(chat, { before: q.get('before'), limit: q.get('limit'), q: q.get('q') || '' });
+    const tags = tagsInChat(chat);
+    // 057: the sender as the panel knows them (own / address-book name), with their group tag; raw ids are not returned
+    const rows = listMessages(chat, { before: q.get('before'), limit: q.get('limit'), q: q.get('q') || '' }).map(({ senderJid, ...m }) => (m.fromAgent ? m
+      : { ...m, name: personInfo({ phone: m.sender, jid: senderJid, fallbackName: m.name }).label, ...(memberTag(chat, { phone: m.sender, jid: senderJid }, tags) ? { tag: memberTag(chat, { phone: m.sender, jid: senderJid }, tags) } : {}) }));
     if (!q.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${q.get('q') ? ` (search “${String(q.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;
   }, { role: 'admin' });
@@ -519,7 +530,8 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
     const chat = waGroup(p);
     const g = await channel.groupInfo(chat);
     const names = namesInChat(chat);
-    return { ...g, participants: g.participants.map((m) => ({ ...m, name: names[m.phone] || '' }))
+    const tags = tagsInChat(chat);
+    return { ...g, participants: g.participants.map((m) => ({ ...m, ...personView({ phone: m.phone, jid: m.jid, fallbackName: names[m.phone] }, chat, tags) }))
       .sort((a, b) => ((ADMIN_RANK[b.admin] || 0) - (ADMIN_RANK[a.admin] || 0)) || (a.name || a.phone || '~').localeCompare(b.name || b.phone || '~')) };
   }, { role: 'admin' });
   route('GET', '/api/chats/:chat/whatsapp/invite', async (req, res, body, q, p, user) => {
@@ -561,6 +573,19 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
   route('DELETE', '/api/chats/:chat/memory', async (req, res, body, q, p, user) => { eraseChatMemory(decodeURIComponent(p.chat), user.username); return { ok: true }; });
   // ---------- contacts (#11) ----------
   route('GET', '/api/contacts', async (req, res, body, q) => listContacts({ q: q.get('q') || '', sharedOnly: q.get('shared') === '1' }));
+  // 057: counts per kind of name and when names were last refreshed (refreshes run by themselves after connect and daily)
+  route('GET', '/api/contacts/summary', async () => {
+    const numbers = ((await channel.status()).numbers || [{ id: 'main' }]).map((n) => n.id);
+    const at = numbers.map((n) => Number(kvGet(`contactsRefreshedAt:${n}`)) || 0).filter(Boolean);
+    return { ...contactSummary(), refreshedAt: at.length ? Math.max(...at) : null, automatic: true };
+  });
+  // Optional extra: refresh now (the server also does it by itself). At most every 10 minutes per number.
+  route('POST', '/api/contacts/refresh', async (req, res, body, q, p, user) => {
+    if (typeof channel.refreshNames !== 'function') return [501, { error: 'Not available' }];
+    const r = await channel.refreshNames();
+    activity('config', { summary: `Contact names refreshed from WhatsApp (${user.username})` });
+    return { numbers: r, ...contactSummary() };
+  });
   route('PUT', '/api/contacts/:phone', async (req, res, body, q, p, user) => saveContact({ ...body, phone: decodeURIComponent(p.phone) }, user.username));
   route('DELETE', '/api/contacts/:phone', async (req, res, body, q, p, user) => {
     if (!getContact(decodeURIComponent(p.phone))) return [404, { error: 'Not found' }];

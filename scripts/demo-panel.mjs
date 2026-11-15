@@ -304,7 +304,11 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   }
 
   // contacts, a pending confirmation
-  contacts.syncWhatsAppContacts(people.map((name, i) => ({ id: `${P(i + 1)}@s.whatsapp.net`, name })));
+  // 057: phone contact names for most people, a profile name only for one, and group member tags
+  contacts.syncWhatsAppContacts(people.map((name, i) => (i === 5 ? { id: `${P(i + 1)}@s.whatsapp.net`, notify: `${name} 🏸` } : { id: `${P(i + 1)}@s.whatsapp.net`, name })));
+  const tags = await imp('src/core/member-tags.js');
+  for (const [i, label] of [[0, 'Class rep'], [2, 'Treasurer'], [4, 'Snacks']]) tags.saveMemberTag({ chat: G(1), participant: `${P(i + 1)}@s.whatsapp.net`, phone: P(i + 1), label });
+  for (const [i, label] of [[1, 'Driver'], [7, 'Driver']]) tags.saveMemberTag({ chat: G(3), participant: `${P(i + 1)}@s.whatsapp.net`, phone: P(i + 1), label });
   contacts.saveContact({ phone: `+${P(20)}`, name: 'Dr. Meier (paediatrician)', note: 'Mon–Fri 8–12, Rue de Lausanne 14, 1110 Morges — call before 11', shared: true }, 'admin');
   contacts.saveContact({ phone: `+${P(21)}`, name: 'Taxi Morges', note: 'Night line', shared: true }, 'admin');
   contacts.saveContact({ phone: `+${P(3)}`, name: 'Lea Fontaine-Bernasconi', note: 'Car-pool organizer, prefers voice notes' }, 'admin');
