@@ -5,7 +5,8 @@
 import os from 'node:os';
 import { readFileSync, existsSync, writeFileSync, statfsSync, statSync, mkdirSync } from 'node:fs';
 import { execFile } from 'node:child_process';
-import { DATA_DIR } from './config.js';
+import { DATA_DIR, ROOT } from './config.js';
+import { getSetting, updateSettings } from './store.js';
 import { activity } from './events.js';
 
 export const OPS_REQUEST_DIR = process.env.DUNIYA_OPS_REQUEST_DIR || '/var/lib/duniya/ops-request';
@@ -19,6 +20,7 @@ export const OPS_ACTIONS = {
   'restart-tunnel': 'Restart the Cloudflare tunnel',
   reboot: 'Reboot the server',
   'apply-web-config': 'Apply the web address & access settings',
+  'update-helper': 'Update the maintenance helper',
 };
 // 031: the root-owned copy of deploy/ops/webconfig.mjs the helper runs (present once the installer ran with 031).
 export const OPS_WEBCONFIG = process.env.DUNIYA_OPS_WEBCONFIG || '/usr/local/lib/duniya-ops/webconfig.mjs';
@@ -84,6 +86,21 @@ function sample() {
   history.push({ t: Date.now(), cpu: cpu ?? 0, mem: m.used / m.total * 100, swap: m.swapTotal ? m.swapUsed / m.swapTotal * 100 : 0, disk: d ? d.used / d.total * 100 : 0, rx: n.rxRate, tx: n.txRate });
   if (history.length > 720) history.shift();
 }
+/**
+ * 056: after an app update (the app restarts on the new version), ask the root helper to update itself when it is
+ * older than the one this release ships and can do that. Once per app version, so a failing fetch does not repeat.
+ */
+export function maybeUpdateHelper({ by = 'auto (after app update)', bundled = opsHelperBundled() } = {}) {
+  if (!opsAvailable()) return { requested: false, reason: 'no helper' };
+  const installed = opsHelperVersion();
+  const v = appVersion();
+  if (!(installed < bundled)) return { requested: false, reason: 'current' };
+  if (installed < OPS_HELPER_SELF_UPDATE) return { requested: false, reason: 'too_old' };
+  if (getSetting('opsHelperAuto', null)?.version === v) return { requested: false, reason: 'already tried' };
+  updateSettings({ opsHelperAuto: { version: v, at: Date.now() } });
+  try { requestOp('update-helper', by); return { requested: true }; } catch (e) { return { requested: false, reason: e.message }; }
+}
+
 export function startMetrics() {
   cpuPercent(); network();
   setTimeout(sample, 2000).unref();
@@ -92,6 +109,7 @@ export function startMetrics() {
   // (apt's simulation is short-lived; on a small server it runs at most twice a day).
   const check = () => osUpdates().catch(() => {});
   setTimeout(check, 5 * 60000).unref();
+  setTimeout(() => { try { maybeUpdateHelper(); } catch { /* never crash on bookkeeping */ } }, 30000).unref();
   setInterval(check, 12 * 3600000).unref();
 }
 
@@ -286,10 +304,16 @@ export function opsAvailable() {
 // #96: the installed helper says which version it is ("# duniya-ops-version: N"). The in-panel app update runs as
 // the app user and cannot replace the root-owned helper, so features that need a newer one check this first.
 export const OPS_HELPER_NEEDED = 2;
+// 056: from this version on the helper can replace itself with the one of a release (action update-helper).
+export const OPS_HELPER_SELF_UPDATE = 3;
+const helperVersionOf = (text) => { const m = String(text).slice(0, 4096).match(/^# duniya-ops-version: (\d+)$/m); return m ? Number(m[1]) : 0; };
 export function opsHelperVersion() {
-  const m = read(OPS_HELPER).slice(0, 4096).match(/^# duniya-ops-version: (\d+)$/m);
-  return m ? Number(m[1]) : existsSync(OPS_HELPER) ? 1 : 0;
+  return helperVersionOf(read(OPS_HELPER)) || (existsSync(OPS_HELPER) ? 1 : 0);
 }
+/** The helper version this app release ships (deploy/ops/duniya-ops in the app's checkout; read, never run). */
+export const opsHelperBundled = () => helperVersionOf(read(`${ROOT}/deploy/ops/duniya-ops`));
+export const appVersion = () => { try { return `v${JSON.parse(read(`${ROOT}/package.json`)).version}`; } catch { return ''; } };
+const RELEASE_RE = /^v\d{1,4}\.\d{1,4}\.\d{1,4}$/;
 export function opsStatus() {
   let status = null;
   try { status = JSON.parse(read(`${OPS_STATE_DIR}/status.json`) || 'null'); } catch { /* none */ }
@@ -301,7 +325,10 @@ export function opsStatus() {
     result = { ...r, rebootRequired: reboot.required, text: runSummaryText(r, { rebootRequired: reboot.required }) };
   }
   const helperVersion = opsHelperVersion();
+  const helperBundled = opsHelperBundled();
   return { available: opsAvailable(), actions: OPS_ACTIONS, status, result, reboot, helperVersion, helperCurrent: helperVersion >= OPS_HELPER_NEEDED,
+    // 056: older than this release's helper? Then either the panel can update it (selfUpdate) or root must run once.
+    helperBundled, helperOutdated: !!helperVersion && helperVersion < helperBundled, helperSelfUpdate: helperVersion >= OPS_HELPER_SELF_UPDATE,
     log: full.split('\n').slice(-120).join('\n') };
 }
 export function requestOp(action, by = '', { files = {} } = {}) {
@@ -309,6 +336,14 @@ export function requestOp(action, by = '', { files = {} } = {}) {
   if (!opsAvailable()) throw Object.assign(new Error('Server maintenance is not set up on this install. Re-run the installer once (or redeploy) to enable it.'), { status: 400 });
   if (action === 'os-update-all' && opsHelperVersion() < OPS_HELPER_NEEDED) {
     throw Object.assign(new Error('Including gradual updates needs the newer maintenance helper: run sudo duniya update on the server (or re-run the installer) once.'), { status: 400 });
+  }
+  if (action === 'update-helper') {
+    if (opsHelperVersion() < OPS_HELPER_SELF_UPDATE) {
+      throw Object.assign(new Error('This server\'s maintenance helper is too old to update itself: run sudo duniya update on the server once, or reinstall if you have no SSH access. After that it updates itself.'), { status: 400, code: 'helper_too_old' });
+    }
+    const v = appVersion();
+    if (!RELEASE_RE.test(v)) throw Object.assign(new Error('The app version is not a release number'), { status: 400 });
+    files = { ...files, 'helper-version': `${v}\n` }; // the helper accepts only vX.Y.Z and fetches that release itself
   }
   const cur = opsStatus().status;
   if (cur?.state === 'running' && Date.now() - (cur.startedAt || 0) < 60 * 60000) throw Object.assign(new Error(`Already running: ${cur.action}`), { status: 409 });

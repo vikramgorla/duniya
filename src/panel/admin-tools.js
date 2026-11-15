@@ -479,17 +479,18 @@ export const TOOLS = [
   { name: 'list_os_updates', readOnly: true, calls: [['GET', '/api/system/os-updates']], description: 'Operating-system package updates, grouped: install (will install now; count = how many), phased (Ubuntu is rolling them out gradually: they install automatically within days, or now with run_maintenance os-update-all) and held (kept back, with the reason in why).',
     input: { refresh: bool('Check again now (slower)') },
     run: (a, x) => x.call('GET', `/api/system/os-updates${a.refresh ? '?refresh=1' : ''}`) },
-  { name: 'get_maintenance_status', readOnly: true, calls: [['GET', '/api/system/ops']], description: 'Available server maintenance actions, the state of the last one, result.text (summary of the last OS update) and reboot (whether a restart is needed to finish updates, and for which packages).', input: {},
+  { name: 'get_maintenance_status', readOnly: true, calls: [['GET', '/api/system/ops']], description: 'Available server maintenance actions, the state of the last one, result.text (summary of the last OS update), reboot (whether a restart is needed to finish updates, and for which packages) and the maintenance helper: helperVersion, helperBundled (the one this release ships), helperOutdated, helperSelfUpdate (it can update itself with run_maintenance update-helper; otherwise sudo duniya update once or a reinstall).', input: {},
     run: (a, x) => x.call('GET', '/api/system/ops') },
   { name: 'run_maintenance', risky: true, calls: [['POST', '/api/system/ops']],
-    description: 'Run a server maintenance action: os-update (install OS updates; Ubuntu\'s gradual roll-outs wait), os-update-all (also the updates Ubuntu is still rolling out gradually), os-cleanup, restart-web, restart-tunnel or reboot (also finishes updates that need a restart). Needs confirm_action.',
-    input: { action: { type: 'string', enum: ['os-update', 'os-update-all', 'os-cleanup', 'restart-web', 'restart-tunnel', 'reboot'], description: 'Action' } }, required: ['action'],
+    description: 'Run a server maintenance action: os-update (install OS updates; Ubuntu\'s gradual roll-outs wait), os-update-all (also the updates Ubuntu is still rolling out gradually), os-cleanup, restart-web, restart-tunnel, reboot (also finishes updates that need a restart) or update-helper (the root maintenance helper fetches the copy of this app\'s release from the official repository and installs it; get_maintenance_status shows helperOutdated / helperSelfUpdate). Needs confirm_action.',
+    input: { action: { type: 'string', enum: ['os-update', 'os-update-all', 'os-cleanup', 'restart-web', 'restart-tunnel', 'reboot', 'update-helper'], description: 'Action' } }, required: ['action'],
     preview: async (a, x) => {
       const ops = await x.call('GET', '/api/system/ops');
       const label = ops.actions?.[a.action];
       if (!label) throw Object.assign(new Error('Unknown action'), { status: 400 });
       const effect = { reboot: 'The whole server restarts: agents and the panel are offline for a few minutes.', 'os-update': 'Takes a few minutes; services may restart.',
         'os-update-all': 'Takes a few minutes; services may restart. Also installs updates Ubuntu is still rolling out gradually (normally they come within days).',
+        'update-helper': `The root helper downloads its own files of this app's release (helper ${ops.helperVersion} → ${ops.helperBundled}) from the official repository and installs them; agents keep running.`,
         'restart-web': 'The panel and AI-assistant access are unreachable for a few seconds.', 'restart-tunnel': 'The panel and AI-assistant access are unreachable for a few seconds.' }[a.action] || '';
       return `${label}. ${effect}`.trim();
     },

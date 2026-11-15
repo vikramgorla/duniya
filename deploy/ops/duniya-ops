@@ -1,5 +1,5 @@
 #!/bin/bash
-# duniya-ops-version: 2
+# duniya-ops-version: 3
 # Root maintenance helper for whatsapp-agent-duniya (installed to /usr/local/sbin/duniya-ops by install.sh).
 # Started by duniya-ops.path when the app writes an action word to the request file. Accepts ONLY the actions
 # below; never executes anything taken from the request beyond matching it against this list.
@@ -15,6 +15,13 @@
 # `autoremove --purge` (apt keeps the running kernel). Ubuntu's phased updates are respected unless the owner chose
 # os-update-all. "== step: …" lines mark each apt step so the app can summarise the run. The version line at the
 # top tells the app which actions this copy understands (the in-panel app update cannot replace this root file).
+#
+# update-helper (056, version 3): this helper replaces itself (and its units and webconfig.mjs) with the copy from an
+# official release, so owners without SSH never need `sudo duniya update`. Root never runs the app's own checkout:
+# it fetches the repository itself over HTTPS (TLS verified) into a root-owned directory, from the URL in the
+# root-owned install config (or the official one), never from the app. The app only names the release (helper-version,
+# strictly vX.Y.Z); releases older than the first self-updating one or than the last one installed are refused, and so
+# is a fetched helper with a lower version line (no downgrades). Shallow and blobless: only deploy/ops is downloaded.
 set -uo pipefail
 # Paths can be overridden for the automated tests only (systemd starts this with a clean environment).
 REQ_DIR=${DUNIYA_OPS_REQUEST_DIR:-/var/lib/duniya/ops-request}
@@ -29,12 +36,20 @@ HTTPS_POLL=${DUNIYA_HTTPS_POLL:-5}
 REBOOT_FILE=${DUNIYA_REBOOT_REQUIRED_FILE:-/var/run/reboot-required}
 APT_GET=${DUNIYA_OPS_APT_GET:-apt-get}
 DPKG=${DUNIYA_OPS_DPKG:-dpkg}
+# update-helper (056): where the helper's files go; the repository override is for the automated tests only.
+OPS_SBIN=${DUNIYA_OPS_SBIN:-/usr/local/sbin/duniya-ops}
+UNIT_DIR=${DUNIYA_OPS_UNIT_DIR:-/etc/systemd/system}
+REPO_OVERRIDE=${DUNIYA_OPS_REPO:-}
+OFFICIAL_REPO=https://github.com/vikramgorla/whatsapp-agent-duniya.git
+HELPER_MIN_RELEASE=v2.17.0 # the first release whose helper can update itself
+SELF_VERSION="$(sed -n 's/^# duniya-ops-version: \([0-9][0-9]*\)$/\1/p' "${BASH_SOURCE[0]}" 2>/dev/null | head -n1)"
+SELF_VERSION=${SELF_VERSION:-0}
 install -d -m 755 "$STATE_DIR"
 [ -f "$REQ" ] || exit 0
 # Read at most one short line; ignore anything that is not a known action (do not echo unknown content).
 ACTION="$(head -c 32 "$REQ" 2>/dev/null | head -n1 | tr -cd 'a-z-')"
 rm -f "$REQ"
-case "$ACTION" in os-update|os-update-all|os-cleanup|restart-web|restart-tunnel|reboot|apply-web-config) ;; *) exit 0 ;; esac
+case "$ACTION" in os-update|os-update-all|os-cleanup|restart-web|restart-tunnel|reboot|apply-web-config|update-helper) ;; *) exit 0 ;; esac
 
 LOG="$STATE_DIR/last.log"
 STATUS="$STATE_DIR/status.json"
@@ -145,6 +160,70 @@ os_update() { # [phased] — "phased" also installs updates Ubuntu is still roll
   "${NICE[@]}" "${APT[@]}" autoremove --purge || return $?
   "$APT_GET" clean 2>/dev/null || true
 }
+version_lt() { # a b — true when release a is older than release b (both vX.Y.Z)
+  [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "${1#v}" "${2#v}" | sort -V | head -n1)" = "${1#v}" ]
+}
+helper_repo() { # the repository to fetch from: root-owned install config (https only), else the official one
+  local r=""
+  if [ -n "$REPO_OVERRIDE" ]; then echo "$REPO_OVERRIDE"; return 0; fi
+  [ -f "$INSTALL_CONF" ] && r="$(sed -n "s/^REPO='\(.*\)'$/\1/p" "$INSTALL_CONF" | head -n1)"
+  if [[ "$r" =~ ^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~-]+)+/?$ ]]; then echo "$r"; else echo "$OFFICIAL_REPO"; fi
+}
+update_helper() {
+  local tag floor last repo src="$STATE_DIR/src" newv f dst mode changed=0
+  # The app names the release; read at most one short line from its directory and accept only vX.Y.Z.
+  tag="$(head -c 32 "$REQ_DIR/helper-version" 2>/dev/null | head -n1 | tr -d '\r ')"
+  rm -f "$REQ_DIR/helper-version"
+  if ! [[ "$tag" =~ ^v[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$ ]]; then echo "Refused: the requested version is not a release number (vX.Y.Z)"; return 2; fi
+  floor="$HELPER_MIN_RELEASE"
+  last="$(head -c 32 "$STATE_DIR/helper-release" 2>/dev/null | head -n1)"
+  if [[ "$last" =~ ^v[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$ ]] && version_lt "$floor" "$last"; then floor="$last"; fi
+  if version_lt "$tag" "$floor"; then echo "Refused: $tag is older than $floor (the helper is never downgraded)"; return 2; fi
+  repo="$(helper_repo)"
+  echo "== step: fetch"
+  echo "Fetching the maintenance helper of $tag from $repo"
+  rm -rf "$src"; install -d -m 700 "$src"
+  # git runs as root only in this root-owned directory: clean environment, no system/user config, no hooks, HTTPS
+  # only (with certificate checks), one tag, no history and no file contents except the few read below.
+  local protos=(-c protocol.allow=never -c protocol.https.allow=always)
+  [ -n "$REPO_OVERRIDE" ] && protos=(-c protocol.allow=always) # tests: a local bare repository
+  local G=(env -i PATH=/usr/local/bin:/usr/bin:/bin HOME="$src" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
+    timeout 300 git -C "$src" -c http.sslVerify=true -c core.hooksPath=/dev/null -c credential.helper= "${protos[@]}")
+  "${G[@]}" init -q || return 1
+  "${G[@]}" remote add origin "$repo" || return 1
+  if ! "${G[@]}" fetch -q --depth 1 --filter=blob:none --no-tags origin "+refs/tags/$tag:refs/tags/$tag"; then
+    echo "Could not fetch $tag (is it a published release? is the server online?)"; rm -rf "$src"; return 1
+  fi
+  install -d -m 700 "$src/out"
+  for f in duniya-ops duniya-ops.service duniya-ops.path webconfig.mjs; do
+    if ! "${G[@]}" show "refs/tags/$tag:deploy/ops/$f" > "$src/out/$f" 2>/dev/null || [ ! -s "$src/out/$f" ]; then
+      echo "Refused: $tag has no deploy/ops/$f"; rm -rf "$src"; return 1
+    fi
+  done
+  echo "== step: check"
+  newv="$(sed -n 's/^# duniya-ops-version: \([0-9][0-9]*\)$/\1/p' "$src/out/duniya-ops" | head -n1)"
+  if [ "$(head -n1 "$src/out/duniya-ops")" != '#!/bin/bash' ] || [ -z "$newv" ] || ! bash -n "$src/out/duniya-ops"; then
+    echo "Refused: the helper in $tag does not look right"; rm -rf "$src"; return 1
+  fi
+  if [ "$newv" -lt "$SELF_VERSION" ]; then echo "Refused: $tag has helper version $newv, older than this one ($SELF_VERSION)"; rm -rf "$src"; return 2; fi
+  echo "== step: install"
+  for f in "duniya-ops:$OPS_SBIN:0755" "duniya-ops.service:$UNIT_DIR/duniya-ops.service:0644" \
+    "duniya-ops.path:$UNIT_DIR/duniya-ops.path:0644" "webconfig.mjs:$WEBCONFIG:0644"; do
+    IFS=: read -r f dst mode <<< "$f"
+    cmp -s "$src/out/$f" "$dst" && continue
+    # A new file renamed into place: this running script keeps reading its own (old) copy.
+    install -D -m "$mode" "$src/out/$f" "$dst.duniya-new" && mv -f "$dst.duniya-new" "$dst" || { echo "Could not install $dst"; return 1; }
+    echo "Updated $dst"; changed=1
+  done
+  rm -rf "$src"
+  printf '%s\n' "$tag" > "$STATE_DIR/helper-release"; chmod 644 "$STATE_DIR/helper-release"
+  if [ "$changed" = 1 ]; then
+    systemctl daemon-reload && systemctl enable -q --now duniya-ops.path || return 1
+    echo "Maintenance helper updated to version $newv ($tag)"
+  else
+    echo "The maintenance helper is already the one of $tag (version $newv)"
+  fi
+}
 rollback() { # host message
   echo "Rolling back: $2"
   if [ -f "$STATE_DIR/Caddyfile.prev" ]; then
@@ -172,6 +251,7 @@ command -v ionice >/dev/null && NICE=(ionice -c3 nice -n 10)
     restart-tunnel) systemctl restart cloudflared && systemctl is-active cloudflared ;;
     reboot) echo "Rebooting in 5 seconds"; true ;;
     apply-web-config) apply_web_config ;;
+    update-helper) update_helper ;;
   esac
 } >> "$LOG" 2>&1
 CODE=$?
