@@ -10,12 +10,11 @@
 //   - no horizontal page scrolling (only tab bars, tables in a scroll box and code may scroll sideways)
 //   - phones (< 600 px): tap targets at least 40 × 40 px, text at least 13 px
 // Exit code 1 lists what failed.
-import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { startDemo, DEMO_PASSWORD } from './demo-panel.mjs';
+import { launch, newPage } from './cdp.mjs';
 
 const { values: opt } = parseArgs({ options: {
   widths: { type: 'string', default: '375,393,1440' }, schemes: { type: 'string', default: 'light,dark' },
@@ -104,55 +103,6 @@ function audit(W, phone) {
   return { overflow: out.overflow, wide: uniq(out.wide), taps: uniq(out.taps), text: uniq(out.text) };
 }
 
-// ---------- a tiny DevTools-protocol client ----------
-function findChrome() {
-  const c = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser',
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Chromium.app/Contents/MacOS/Chromium'].filter(Boolean);
-  const hit = c.find((p) => existsSync(p));
-  if (!hit) { console.error('No Chrome or Chromium found. Set CHROME_PATH=/path/to/chrome and run again.'); process.exit(2); }
-  return hit;
-}
-async function launch() {
-  const profile = mkdtempSync(join(tmpdir(), 'duniya-chrome-'));
-  const proc = spawn(findChrome(), ['--headless=new', '--no-sandbox', '--disable-gpu', '--hide-scrollbars', '--force-color-profile=srgb', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
-  const portFile = join(profile, 'DevToolsActivePort');
-  for (let i = 0; i < 100 && !existsSync(portFile); i++) await sleep(100);
-  const [port, path] = readFileSync(portFile, 'utf8').trim().split('\n');
-  const ws = new WebSocket(`ws://127.0.0.1:${port}${path}`);
-  await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
-  let id = 0; const waiting = new Map();
-  ws.onmessage = (m) => { const msg = JSON.parse(m.data); const w = waiting.get(msg.id); if (w) { waiting.delete(msg.id); msg.error ? w.reject(new Error(msg.error.message)) : w.resolve(msg.result); } };
-  const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => { const i = ++id; waiting.set(i, { resolve, reject }); ws.send(JSON.stringify({ id: i, method, params, sessionId })); });
-  return { send, close: () => { ws.close(); proc.kill(); setTimeout(() => rmSync(profile, { recursive: true, force: true }), 500); } };
-}
-async function newPage(cdp, { width, scheme }) {
-  const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
-  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
-  const s = (m, p) => cdp.send(m, p, sessionId);
-  const phone = width < 600;
-  await s('Emulation.setDeviceMetricsOverride', { width, height: phone ? 800 : 900, deviceScaleFactor: 1, mobile: phone });
-  if (phone) await s('Emulation.setTouchEmulationEnabled', { enabled: true });
-  await s('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });
-  await s('Page.enable');
-  await s('Page.setLifecycleEventsEnabled', { enabled: true }).catch(() => {});
-  const evaluate = async (expression) => {
-    const r = await s('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-    if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
-    return r.result.value;
-  };
-  const goto = async (url) => {
-    // via about:blank: a URL that differs only in its #hash would not load the page again
-    await s('Page.navigate', { url: 'about:blank' });
-    await s('Page.navigate', { url });
-    for (let i = 0; i < 100; i++) { await sleep(100); if (await evaluate('document.readyState').catch(() => '') === 'complete') break; }
-  };
-  const shot = async (file) => {
-    const { cssContentSize: c } = await s('Page.getLayoutMetrics');
-    const { data } = await s('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width: Math.ceil(c.width), height: Math.ceil(c.height), scale: 1 } });
-    writeFileSync(file, Buffer.from(data, 'base64'));
-  };
-  return { evaluate, goto, shot, close: () => cdp.send('Target.closeTarget', { targetId }) };
-}
 
 // ---------- run ----------
 const { base } = await startDemo();

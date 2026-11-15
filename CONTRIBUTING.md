@@ -1,13 +1,23 @@
 # Contributing
 
-- **Issues first.** Every change starts from an issue with labels (`type:`, `area:`, `priority:`; `spec: NNN` once a
-  spec exists). Progress, decisions and releases are posted as comments; issues close with the release that ships them.
+Thanks for helping. The full working rules and the **Definition of Done** are in [AGENTS.md](AGENTS.md) (they apply to
+people and AI agents alike). In short:
+
+- **Issues first.** Every change starts from an issue with labels (`type:`, `area:`, `priority:`, `status:`;
+  `spec: NNN` once a spec exists). Plan, progress and done are posted as comments; issues close with the release that
+  ships them.
 - **Spec Kit.** Features follow `.specify/` (constitution → spec → plan → tasks) in `specs/NNN-name/`.
 - **Pull requests only.** `main` is protected: changes land through a PR from a branch named `<type>/<issue>-<slug>`
-  (e.g. `feat/10-silent-by-default`), after all required checks pass — tests, lint/quality, scripts & infra, Docker
-  build, CodeQL. No direct pushes, no force pushes.
-- **Design.** UI follows `DESIGN.md` and its checklist (light/dark, phone at 375 px).
-- **Releases.** Bump `package.json` in the PR; merging to `main` creates the tag, release, OCI stack zip and image.
+  (e.g. `feat/10-silent-by-default`), squash-merged after all required checks pass — test, quality (lint, panel
+  script, dependency audit, version consistency), scripts & infra, Docker build, CodeQL. No direct or force pushes.
+- **Checks you run locally:** `npm test`, `npm run lint`, `npm run check:panel`; for UI also
+  `npm run check:responsive` (needs Chrome). The demo panel: `node scripts/demo-panel.mjs`.
+- **Design.** UI follows `DESIGN.md` and its checklist (light/dark, phones at 375/393 px).
+- **Docs are part of the change.** Update `docs/`, `README.md`, the website `docs/site/` (retake screenshots with
+  `npm run site:shots` when the UI changed) and `mobile/README.md` where relevant. The PR template has the checklist.
+- **Releases.** Bump the version in `package.json`, `package-lock.json` and `infra/oci/schema.yaml` in the PR (minor
+  for features, patch for fixes, major for breaking changes); merging to `main` creates the tag, release, OCI stack zip
+  and Docker image.
 
 ## Repository settings (one-time, owner)
 Protection for `main` is defined in `.github/rulesets/main-protection.json`: GitHub → Settings → Rules → Rulesets →

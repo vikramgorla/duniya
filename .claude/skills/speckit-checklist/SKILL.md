@@ -49,6 +49,10 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Project rules (this repository)
+
+Follow `AGENTS.md` (working rules and Definition of Done). After the generated categories, always add the template's **Definition of Done** items (tests with fakes, security, privacy, small servers, documentation incl. website/screenshots, version and issue/PR flow), numbered after the last CHK.
+
 ## Pre-Execution Checks
 
 **Check for extension hooks (before checklist generation)**:

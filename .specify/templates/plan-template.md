@@ -42,6 +42,28 @@
 
 [Gates determined based on constitution file]
 
+Always include, for this repository:
+
+- [ ] I–VIII principles (self-hosted channel, generic core, least privilege in code, confirm gate, observable, free tier
+      / 1 GB, spec + tests with fakes, experience first) — pass / violation recorded in Complexity Tracking
+- [ ] IX Definition of Done & documentation: the plan names the docs, website, screenshots, admin MCP, version and
+      issue steps below
+
+## Definition of Done plan (constitution IX, AGENTS.md)
+
+| Item | Plan for this feature |
+|------|-----------------------|
+| Issue & labels | #[N], type / area / priority / status / `spec: [NNN]`; plan, progress, done comments |
+| Tests (fakes) | [which test files in `test/`, which fakes] |
+| Checks | `npm test`, `npm run lint`, `npm run check:panel`; `npm run check:responsive` if UI |
+| Security | [secrets, TLS, shell input, untrusted text, permissions in code, CodeQL] |
+| Privacy | [allow-list, logging of contents, privacy notice] |
+| Small servers | [memory / CPU / downloads on a 1 GB VM; queue, timeouts, refusal below 2 GB] |
+| Admin MCP | [new or changed tools in `src/panel/admin-tools.js`, or n/a] |
+| Docs | [`docs/*.md` pages, `docs/README.md`, `README.md` highlights, `mobile/README.md`, `DESIGN.md`] |
+| Website | [section/tile in `docs/site/index.html`; shots to retake with `npm run site:shots`] |
+| Version | [x.y.z] (minor feature / patch fix / major breaking) in `package.json`, `package-lock.json`, `infra/oci/schema.yaml` |
+
 ## Project Structure
 
 ### Documentation (this feature)

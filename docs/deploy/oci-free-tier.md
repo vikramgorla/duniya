@@ -1,7 +1,7 @@
 # Example: Oracle Cloud Always Free
 
 This is one way to run Duniya for free. Any Ubuntu/Debian server works the same way with the
-[one-command installer](../../README.md#install).
+[one-command installer](../install.md).
 
 ## What you get
 
@@ -17,11 +17,11 @@ This is one way to run Duniya for free. Any Ubuntu/Debian server works the same 
 3. Fill the form:
    - **How to reach the admin panel**: `ip` (https://<ip>.sslip.io, simplest), `domain`, `tunnel` (Cloudflare, no
      open ports) or `local`.
-   - **Owner password**: optional. Leave it empty to use the one-time setup code.
+   - **Owner password** (required, at least 10 characters): you sign in as `admin` with it. Later you can switch
+     to Google-only sign-in in the panel.
    - **Shape**: keep `VM.Standard.E2.1.Micro` unless you have A1 capacity.
-4. **Apply**. After ~5–10 minutes the VM has installed itself. Open the `panel_url` from the job outputs.
-5. Setup code: in the OCI console open the instance → **Console connection** (or SSH if you allowed it) and run
-   `sudo grep -A1 'Setup code' /var/log/duniya-install.log`. Or set an owner password in the form to skip this.
+4. **Apply**. Open `http://<server-ip>/` for a live progress page; after ~10 minutes the VM has installed itself and
+   the page opens the panel (`panel_url` in the job outputs). Sign in as `admin` with the owner password.
 
 ## Option B — create the VM yourself, then one command
 

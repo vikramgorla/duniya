@@ -19,6 +19,10 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Project rules (this repository)
+
+Follow `AGENTS.md` (working rules and Definition of Done). Implementation is not finished until the **Phase Final: Definition of Done** tasks are done (or marked n/a with a reason): docs, README, website and screenshots (`npm run site:shots`), admin MCP, version bump in package.json + package-lock + infra/oci/schema.yaml, `npm test` / `npm run lint` / `npm run check:panel` green.
+
 ## Pre-Execution Checks
 
 **Check for extension hooks (before implementation)**:

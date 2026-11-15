@@ -1,13 +1,14 @@
-# Working on this repository (for Claude and other agents)
+# Working on this repository (Claude Code)
 
-- Read `.specify/memory/constitution.md` and `DESIGN.md` before changing anything.
-- **Track all work as GitHub issues** (REST API; GraphQL is unavailable): create/label the issue first, comment when
-  starting (plan), at milestones and when done (what shipped, version, open items); close with the release.
-- **Labels:** one `type:` (bug, feature, improvement, security, docs, chore, dependencies), one or more `area:`
-  (whatsapp, agents, panel, mobile, models, tools-mcp, memory, security, infra, install, backups, cli, docs, build),
-  `priority:` (high, medium, low), `status:` (triage, in progress, blocked, needs info), and `spec: NNN` when a spec
-  exists.
-- **Never push to `main`.** Branch `<type>/<issue>-<slug>`, open a PR (REST `POST /repos/{o}/{r}/pulls`), wait for
-  all required checks, then merge (squash) via REST. The PR body links the issue and the spec.
-- Tests use fakes (`test/harness.js`); `npm test` and `npm run lint` must pass. No backward-compatibility layers for
-  old data unless an issue asks for it (single-owner deployments reinstall freely).
+**Read [AGENTS.md](AGENTS.md) first and follow it.** It is the single source of truth for the working rules and the
+**Definition of Done** (issue + labels + comments, spec, tests, checks, security, privacy, small servers, docs/README/
+website/screenshots, version bump, PR via REST, no pushes to `main`).
+
+@AGENTS.md
+
+Claude-specific:
+- Use the Spec Kit skills in `.claude/skills/speckit-*` for feature work; their templates already end with the
+  Definition-of-Done tasks.
+- GitHub GraphQL may be blocked in this harness: use `gh api` (REST) for issues, comments, PRs and merges.
+- Before saying a change is done, go through the Definition of Done in AGENTS.md item by item and report anything
+  you skipped and why.

@@ -19,6 +19,10 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Project rules (this repository)
+
+Follow `AGENTS.md` (working rules and Definition of Done). Tests are required here (constitution VII: e2e with fakes in `test/`), not optional. Always end tasks.md with the template's **Phase Final: Definition of Done** (issue, checks, security, privacy, small servers, admin MCP, docs/README/website/screenshots, version bump, PR) — never drop it.
+
 ## Pre-Execution Checks
 
 **Check for extension hooks (before tasks generation)**:

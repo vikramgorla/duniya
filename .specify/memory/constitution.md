@@ -1,3 +1,10 @@
+<!--
+Sync Impact Report (1.3.2 → 1.4.0, MINOR)
+- Added principle IX "Definition of Done & Documentation" (AGENTS.md is the single source of truth for working rules).
+- Development Workflow: issues, branches, REST, version bump in three files, docs as part of every change.
+- Templates updated: .specify/templates/plan-template.md, tasks-template.md, checklist-template.md (final DoD tasks).
+- Follow-up: none.
+-->
 # whatsapp-agent-duniya Constitution
 
 ## Core Principles
@@ -93,6 +100,21 @@ light and dark mode on a phone and an iPad.
 *Rationale*: the owners judge the product by how it feels to set up and run; capability that can't be found or
 understood does not exist for them.
 
+### IX. Definition of Done & Documentation
+
+`AGENTS.md` at the repository root is the single source of truth for working rules and holds the **Definition of
+Done**; harness files (`CLAUDE.md`, `.github/copilot-instructions.md`), `CONTRIBUTING.md` and the PR template point to
+it and MUST NOT contradict it. No change is done until every applicable item holds: a labelled issue with plan,
+progress and done comments; Spec Kit artifacts for features; tests with fakes; `npm test`, `npm run lint` and
+`npm run check:panel` green (`npm run check:responsive` for UI); a security and privacy review; the small-server
+impact considered; **documentation updated in the same change** — `docs/`, `README.md`, the website `docs/site/`
+(with screenshots and videos retaken from the demo panel when the UI changed), `mobile/README.md`, admin MCP tools and
+`DESIGN.md` where relevant; and the version bumped in `package.json`, `package-lock.json` and
+`infra/oci/schema.yaml` (semver). Plans MUST list these as final tasks; the Spec Kit templates do so.
+
+*Rationale*: features that are not documented, shown or versioned are invisible to the owners, and rules that live
+in one harness's file are missed by every other agent.
+
 ## Security & Privacy Constraints
 
 - Secrets (API keys, MCP tokens, admin password) MUST NOT be committed. Runtime secrets are entered in
@@ -128,8 +150,12 @@ never the app's own secrets or settings).
   reason in the plan.
 - Live operator settings (agent toggles, organizers, chats, schedules, secrets) live in the data
   directory and MUST survive code updates; repository files hold defaults only.
-- Releases: merge to `main`, then "Update from GitHub" in the panel. Infrastructure changes run
-  `plan` on push and require a manual `apply`.
+- Work is tracked in GitHub issues (REST API; GraphQL may be unavailable) and lands through pull requests from
+  `<type>/<issue>-<slug>` branches, squash-merged after the required checks; nobody pushes to `main`. Details and the
+  Definition of Done: `AGENTS.md`.
+- Releases: bump the version (semver) in `package.json`, `package-lock.json` and `infra/oci/schema.yaml` (CI checks
+  they match) and merge to `main`; the release workflow tags and publishes, and servers update from the panel.
+  Infrastructure changes run `plan` on push and require a manual `apply`.
 
 ## Governance
 
@@ -140,4 +166,4 @@ principle removed or redefined; MINOR: principle or section added or materially 
 clarification), and reviewed in a pull request. Reviewers verify constitution compliance for every
 change.
 
-**Version**: 1.3.2 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-15
+**Version**: 1.4.0 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-15

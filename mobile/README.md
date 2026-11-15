@@ -1,8 +1,13 @@
 # Duniya mobile app (preview)
 
-Native iOS and Android app for owners and admins of a Duniya server: status console, agents (on/off, edit basics,
-"Change with AI"), chats (assign agent, model, stored messages), activity, usage, server health and updates, and
-changes waiting for confirmation. One codebase: React Native with [Expo](https://expo.dev) (SDK 58, TypeScript,
+**State (v2.8):** preview, runs in Expo Go (SDK 58); store builds are prepared in `eas.json` but not published. The app
+icon is the store-safe Duniya logo (no third-party marks). Everything the app does goes through the panel's API with
+the signed-in user's role, so new server features appear here only when a screen is added for them.
+
+Native iOS and Android app for owners and admins of a Duniya server: status console with the **Ask** box (the owner
+assistant: questions about your chats, changes with Confirm), agents (on/off, edit basics, "Change with AI"), chats
+(assign agent, model, stored messages), activity, usage, server health and updates, and changes waiting for
+confirmation. One codebase: React Native with [Expo](https://expo.dev) (SDK 58, TypeScript,
 expo-router). Spec: [`specs/027-mobile-app`](../specs/027-mobile-app/spec.md).
 
 This folder is **not** part of the server install: it has its own `package.json`, the server's `npm ci` never sees
@@ -66,6 +71,8 @@ npm run export:web    # web build with demo data (used for screenshots only; the
   (Constellation: porcelain/ink, one lime signal, mono labels, LEDs). Logo: `src/components/Logo.tsx`.
 - API client: `src/lib/api-core.ts` (pure, tested) and `src/lib/auth.tsx` (secure storage, sign-in).
 - Add native libraries only with `npx expo install` and only ones included in Expo Go, or Expo Go stops working.
+- Changing the app? Update this README and the panel's **Settings → Mobile app** text if the steps change, and follow
+  the Definition of Done in [AGENTS.md](../AGENTS.md). CI runs typecheck, lint and tests (`.github/workflows/mobile.yml`).
 
 ## Store builds later (TestFlight / Play), prepared in `eas.json`
 

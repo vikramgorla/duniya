@@ -18,6 +18,10 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Project rules (this repository)
+
+Follow `AGENTS.md` (working rules and Definition of Done). Treat unchecked **Definition of Done** items (docs, README, website/screenshots, admin MCP, version bump, checks) as remaining work and append them as tasks.
+
 ## Pre-Execution Checks
 
 **Check for extension hooks (before convergence)**:
