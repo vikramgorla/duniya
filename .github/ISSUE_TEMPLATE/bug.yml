@@ -1,0 +1,9 @@
+name: Bug
+description: Something does not work as expected
+labels: ["type: bug", "status: triage"]
+body:
+  - type: textarea
+    attributes: { label: What happened, description: "Steps, what you expected, what you saw (screenshots welcome)" }
+    validations: { required: true }
+  - type: input
+    attributes: { label: Version, description: "Server page → Version (e.g. v1.9.0)" }

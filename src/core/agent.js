@@ -75,7 +75,7 @@ export async function runAgent(ctx) {
 
   const codes = [];
   let reply = '';
-  let usage = { input: 0, output: 0 };
+  const usage = { input: 0, output: 0 };
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     let res;

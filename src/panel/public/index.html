@@ -588,11 +588,13 @@ async function renderOverview(soft) {
   const led = (label, ok, value) => h('div', { class: 'led' }, h('span', { class: `dot ${ok === true ? 'ok' : ok === false ? 'bad' : 'warn'}` }), label, h('b', {}, value));
   const hero = h('div', { class: 'card console' },
     h('div', {}, h('div', { class: 'eyebrow' }, `${hello} · ${S.user.username}`),
-      h('h2', {}, st.settings.paused ? 'All bots are paused' : allGood ? 'Everything is running' : open < numbers.length ? 'A WhatsApp number needs attention' : live ? 'Running, with something to check' : 'No bot is switched on yet')),
+      h('h2', {}, st.settings.paused ? 'All bots are paused' : st.enabledChats === 0 ? 'No chat is switched on — agents stay silent' : allGood ? 'Everything is running' : open < numbers.length ? 'A WhatsApp number needs attention' : live ? 'Running, with something to check' : 'No bot is switched on yet')),
     h('div', { class: 'leds' },
       led('WhatsApp', open === numbers.length ? true : open ? null : false, `${open}/${numbers.length}`),
       led('Bots', st.settings.paused ? false : live ? true : null, st.settings.paused ? 'paused' : `${live} live`),
-      led('Waiting', st.pending ? null : true, String(st.pending || 0))));
+      led('Chats on', st.enabledChats ? true : null, String(st.enabledChats ?? 0)),
+      led('Waiting', st.pending ? null : true, String(st.pending || 0))),
+    st.enabledChats === 0 ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
   $('#main').replaceChildren(hero, h('div', { class: 'grid' }, wa, control, server, recent));
   if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
@@ -883,7 +885,7 @@ async function renderBotEditor(id) {
   const inp = (key, attrs = {}) => (F[key] = h('input', { value: c[key] ?? '', ...attrs }));
   // General
   const modelSel = (F.model = modelSelect(models, c.model, { autoLabel: `Auto${models.resolvedDefault ? ` (now ${models.resolvedDefault})` : ''}` }));
-  F.dm = h('select', {}, [['members', 'Members of its groups + listed participants'], ['organizers', 'Organizers only'], ['anyone', 'Anyone'], ['none', 'Nobody']].map(([v, l]) => h('option', { value: v, selected: c.dm === v }, l)));
+  F.dm = h('select', {}, [['members', 'Members of its groups + listed participants'], ['organizers', 'Organizers only'], ['anyone', 'Anyone — even people whose chat is off'], ['none', 'Nobody']].map(([v, l]) => h('option', { value: v, selected: c.dm === v }, l)));
   F.enabled = h('input', { type: 'checkbox', checked: c.enabled }); F.respondToMentions = h('input', { type: 'checkbox', checked: c.respondToMentions });
   F.memory = h('input', { type: 'checkbox', checked: c.memory?.enabled !== false });
   F.prompt = h('textarea', { class: 'prose', value: c.prompt });
@@ -1215,11 +1217,13 @@ async function renderChats() {
   const list = h('div', {});
   const draw = () => {
     const shown = chats.filter((c) => chatsFilter === 'all' || (chatsFilter === 'groups' ? c.isGroup : !c.isGroup));
-    list.replaceChildren(shown.length ? h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Chat'), h('th', {}, 'Bot'), h('th', {}, 'Model'), h('th', {}, 'Activity log'))),
-      h('tbody', {}, shown.map((c) => h('tr', {},
+    list.replaceChildren(shown.length ? h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'On'), h('th', {}, 'Chat'), h('th', {}, 'Bot'), h('th', {}, 'Model'), h('th', {}, 'Activity log'))),
+      h('tbody', {}, shown.map((c) => h('tr', { style: c.enabled ? '' : 'opacity:.78' },
+        h('td', { style: 'width:52px' }, toggle(c.enabled, (v) => tryApi(async () => { await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, { enabled: v }); c.enabled = v; c.ignored = 0; draw(); }, v ? 'On — agents may answer here' : 'Off — agents ignore this chat'), !can('admin'))),
         h('td', {}, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, c.name || c.id), h('span', { class: `pill ${c.isGroup ? 'info' : ''}` }, c.isGroup ? 'group' : 'person'), multi ? h('span', { class: 'pill' }, c.numberLabel) : null),
           h('div', { class: 'small muted' }, c.isGroup ? `${c.size || 0} members` : c.phone ? `+${c.phone}` : '', c.lastAt ? ` · last message ${ago(c.lastAt)} ago` : ''),
           us?.chat?.[c.id] ? h('div', { class: 'small muted num' }, `30 days: ${usageLine(us.chat[c.id])}`) : null,
+          !c.enabled ? h('div', { class: 'small', style: 'color:var(--warn)' }, `Off — ignored${c.ignored ? ` (${c.ignored} message${c.ignored > 1 ? 's' : ''} since restart)` : ''}`) : null,
           h('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory')),
         h('td', { style: 'min-width:170px' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, bot: e.target.value || null }); c.bot = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
           h('option', { value: '' }, c.isGroup ? '— no bot —' : '— default for direct messages —'), bots.map((b) => h('option', { value: b.id, selected: c.bot === b.id }, b.name)))),
@@ -1230,7 +1234,7 @@ async function renderChats() {
   const seg = h('div', { class: 'seg' }, [['all', 'All'], ['groups', 'Groups'], ['people', 'People']].map(([v, l]) => h('button', { class: chatsFilter === v ? 'on' : '', onclick: (e) => { chatsFilter = v; seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === e.target)); draw(); } }, l)));
   draw();
   $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Chats'), seg),
-    h('p', { class: 'small muted' }, 'Choose which bot answers in each group or with each person, and optionally a different model or logging level for that chat. A person assigned to a bot is always answered by it; unassigned direct messages go to the default bot of the number. Messages in groups are remembered so a bot added later has context.'),
+    h('p', { class: 'small muted' }, 'Agents only talk in chats that are switched On. A chat that is Off is ignored completely: nothing is stored and no model is called. For each chat that is on, choose the agent and optionally a model or logging level. (An agent set to answer “Anyone” also answers people whose chat is off.)'),
     list), memBox);
 }
 /** WhatsApp group tools for admins (026): members with admin badges, invite link, name/description, settings. */
