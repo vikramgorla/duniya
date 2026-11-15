@@ -2735,6 +2735,9 @@ async function photosVoiceCard() {
     h('h3', { style: 'margin:18px 0 6px' }, 'On-server speech'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, 'Listen to voice notes and answer with voice on this server, without a provider — free, private, slower. Used after the providers, or alone. Open-source engines (Whisper, Piper via sherpa-onnx), downloaded only if you choose to.'),
     !m.local.supported ? h('div', { class: 'note warn' }, `On-server speech runs on Linux (x64 or arm64); this server is ${m.local.platform}.`) : null,
+    m.server?.effectiveMb < 2048 && m.local.supported ? h('div', { class: 'note' },
+      h('label', { class: 'inline' }, toggle(!!st.local.smallServer, (v) => save({ local: { smallServer: v } }, v ? 'Small server mode on' : 'Small server mode off'), !can('owner')), h('b', {}, 'Small server mode (experimental)')),
+      h('div', { class: 'small', style: 'margin-top:6px' }, 'Lets on-server speech run on a server with about 1 GB of memory. Caveats: one voice note at a time and slow (a 30-second voice note can take a minute on one shared CPU); only the smallest models; a job starts only when enough memory is free at that moment, otherwise the provider is used or the agent asks the person to type. The installer adds swap space as a safety net. A provider (OpenAI or OpenRouter) is faster and safer on small servers.')) : null,
     !allowed ? h('div', { class: 'note warn' }, m.localAllowed.reason) : m.server?.size !== 'large' ? h('div', { class: 'note' }, `Each engine needs about 300–400 MB of free memory while it works; this server has ${m.server.availableMb} MB free now. If memory is short at that moment, the provider is used or the agent asks for text.`) : null,
     engines.map(engineRow));
   return card;

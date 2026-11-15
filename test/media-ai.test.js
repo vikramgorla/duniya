@@ -348,7 +348,7 @@ test('small servers: size in status, on-server engines and Copilot refused, low 
   const st = (await t.api(owner, 'GET', '/api/status')).body;
   assert.equal(st.server.size, 'small'); assert.equal(st.server.effectiveMb, 958);
   const on = await t.api(owner, 'PUT', '/api/media/settings', { local: { listen: true } });
-  assert.equal(on.status, 400); assert.match(on.body.error, /needs at least 2048 MB/);
+  assert.equal(on.status, 400); assert.match(on.body.error, /normally needs 2048 MB/);
   const inst = await t.api(owner, 'POST', '/api/media/local/stt/install');
   assert.equal(inst.status, 400);
   const co = await t.api(owner, 'POST', '/api/providers/copilot', { token: 'github_pat_abcdefghijklmnop' });
@@ -387,7 +387,7 @@ test('job limiter: one heavy call at a time on small servers, per-call timeouts'
   assert.equal(peak, 1);
   await assert.rejects(() => res.runJob('slow', () => new Promise((r) => setTimeout(r, 200)), { timeoutMs: 20 }), { code: 'timeout' });
   const [cmd, args] = res.lowPriority('ffmpeg', ['-i', 'a'], { memMb: 512 });
-  assert.equal(cmd, '/bin/sh'); assert.match(args[1], /ulimit -v 524288/);
+  assert.equal(cmd, 'prlimit'); assert.deepEqual(args.slice(0, 5), [`--as=${512 * 1024 * 1024}`, '--', 'nice', '-n', '10']); assert.deepEqual(args.slice(5), ['ffmpeg', '-i', 'a']);
 });
 
 test('panel: capabilities, settings and admin MCP tools', async () => {
@@ -400,4 +400,21 @@ test('panel: capabilities, settings and admin MCP tools', async () => {
   assert.equal(ok.body.settings.voice, 'coral');
   const { TOOLS } = await import('../src/panel/admin-tools.js');
   for (const n of ['get_photos_and_voice', 'set_photos_and_voice_settings', 'install_speech_engine', 'set_agent_photos_and_voice']) assert.ok(TOOLS.some((x) => x.name === n), n);
+});
+
+test('small server mode: on-server speech on a ~1 GB server only when switched on and with room right now', async () => {
+  const res = await import('../src/core/resources.js');
+  const { setMediaSettings } = await import('../src/core/media-ai.js');
+  setMediaSettings({ local: { smallServer: false } });
+  res.setResourceProbe({ totalMb: 960, availableMb: 700, cpus: 1, rssMb: 150 });
+  assert.equal(res.localEngineCheck({ forEnable: true }).code, 'too_small');
+  setMediaSettings({ local: { smallServer: true } });
+  assert.equal(res.localEngineCheck({ forEnable: true }).ok, true);
+  assert.equal(res.localEngineCheck({ needMb: 400 }).ok, true); // 700 free ≥ 400 + 150
+  res.setResourceProbe({ totalMb: 960, availableMb: 520, cpus: 1, rssMb: 150 });
+  assert.equal(res.localEngineCheck({ needMb: 400 }).code, 'low_memory');
+  res.setResourceProbe({ totalMb: 700, availableMb: 500, cpus: 1, rssMb: 150 });
+  assert.equal(res.localEngineCheck({ forEnable: true }).code, 'too_small');
+  setMediaSettings({ local: { smallServer: false } });
+  res.setResourceProbe(null);
 });
