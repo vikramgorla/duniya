@@ -219,6 +219,8 @@ npm install
 ADMIN_PASSWORD=dev-password-123 npm start     # panel on http://127.0.0.1:8080
 npm test                                      # e2e with fake WhatsApp, Claude, OpenAI, MCP, GitHub and S3
 npm run lint
+node scripts/demo-panel.mjs                   # seeded demo panel on :8099 (admin / demo-password-123), no network
+npm run check:responsive                      # every screen at 375 / 393 / 1440 px, light + dark (needs Chrome)
 ```
 
 Built with [GitHub Spec Kit](https://github.com/github/spec-kit): the constitution is

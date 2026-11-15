@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/site/img/overview-desktop.webp" alt="The Duniya panel: everything running, two WhatsApp numbers connected, agents with on/off switches and an update ready to install." width="900">
+  <img src="docs/site/img/overview-desktop.webp" alt="The Duniya panel: everything running, two WhatsApp numbers connected, agents with on/off switches and the server up to date." width="900">
 </p>
 
 ## Highlights

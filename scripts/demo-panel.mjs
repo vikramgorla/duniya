@@ -1,0 +1,273 @@
+// Demo panel: the real core + admin panel against a throwaway data directory, seeded through the app's own modules.
+// Fake WhatsApp numbers (+41 79 000 00 xx), a fake local model endpoint; no provider or WhatsApp network calls.
+// Used by `npm run check:responsive` and for the screenshots of the GitHub Pages site.
+//
+//   node scripts/demo-panel.mjs [port]      → http://127.0.0.1:8099, sign in as admin / demo-password-123
+import http from 'node:http';
+import { mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const ROOT = resolve(import.meta.dirname, '..');
+export const DEMO_PASSWORD = 'demo-password-123';
+
+/** Local stand-in for the Anthropic, ChatGPT and OpenRouter APIs. */
+async function fakeModels() {
+  const server = http.createServer(async (req, res) => {
+    let d = ''; for await (const c of req) d += c;
+    const json = (o) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
+    const u = req.url;
+    if (u.startsWith('/anthropic/v1/models')) {
+      return json({ data: ['Sonnet', 'Haiku', 'Opus'].map((n) => ({ id: `claude-${n.toLowerCase()}-5-5`, display_name: `Claude ${n} 5.5`, type: 'model', created_at: '2026-01-01T00:00:00Z' })), has_more: false, first_id: 'a', last_id: 'c' });
+    }
+    if (u.startsWith('/chatgpt/models')) return json({ models: [{ slug: 'gpt-5.5', display_name: 'GPT-5.5' }, { slug: 'gpt-5.5-mini', display_name: 'GPT-5.5 mini' }] });
+    if (u.startsWith('/openrouter/models')) {
+      return json({ data: [
+        { id: 'deepseek/deepseek-v4:free', name: 'DeepSeek V4 (free)', pricing: { prompt: '0', completion: '0' } },
+        { id: 'meta-llama/llama-4-maverick:free', name: 'Llama 4 Maverick (free)', pricing: { prompt: '0', completion: '0' } },
+        { id: 'mistralai/mistral-medium-4', name: 'Mistral Medium 4', pricing: { prompt: '0.0000004', completion: '0.000002' } }] });
+    }
+    if (u.startsWith('/anthropic/v1/messages')) {
+      const body = JSON.parse(d || '{}');
+      const draft = (body.tools || []).some((t) => t.name === 'propose_agent');
+      await new Promise((r) => setTimeout(r, draft ? 900 : 500));
+      const content = draft ? [{ type: 'tool_use', id: 'tu1', name: 'propose_agent', input: {
+        summary: 'A friendly helper for your running club: it keeps the weekly run schedule, answers “where do we meet?” and posts a reminder every Saturday evening.',
+        changes: {
+          name: 'Running club', description: 'Weekly runs, meeting points and pace groups for the club.',
+          prompt: 'You help a small running club in its WhatsApp group.\n\n- Keep the weekly schedule as notes: day, time, meeting point, distance, pace groups.\n- Answer “where do we meet?” from the notes and recent messages.\n- Every Saturday at 18:00 post Sunday’s run.\n- Keep replies short and warm.',
+          triggers: ['!run'], dm: 'members', model: 'auto',
+          schedules: [{ id: 'sunday-run', at: '18:00', days: 'sat', enabled: true, prompt: 'Post tomorrow’s run: time, meeting point, distance and pace groups.' }],
+        } } }]
+        : [{ type: 'text', text: 'Hi! The museum trip forms are due Monday 24 Nov 📝 Lea and Marc can drive (3 seats each). Want me to start a poll for the remaining seats?' }];
+      return json({ id: 'm', type: 'message', role: 'assistant', model: 'claude-sonnet-5-5', usage: { input_tokens: 1412, output_tokens: 96 }, stop_reason: draft ? 'tool_use' : 'end_turn', content });
+    }
+    res.writeHead(404); res.end('{}');
+  }).listen(0, '127.0.0.1');
+  await new Promise((r) => server.once('listening', r));
+  return `http://127.0.0.1:${server.address().port}`;
+}
+
+/** Local stand-in for a remote tool service (MCP) with a few weather tools. */
+async function fakeToolService() {
+  const { Server } = await import('@modelcontextprotocol/sdk/server/index.js');
+  const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
+  const { ListToolsRequestSchema, CallToolRequestSchema } = await import('@modelcontextprotocol/sdk/types.js');
+  const tools = [['forecast', 'Weather forecast for a place and day (temperature, rain, wind).'], ['alerts', 'Official weather warnings for a region.'], ['sunrise', 'Sunrise and sunset times for a place.']]
+    .map(([name, description]) => ({ name, description, inputSchema: { type: 'object', properties: { place: { type: 'string' } } } }));
+  const server = http.createServer(async (req, res) => {
+    let d = ''; for await (const c of req) d += c;
+    const s = new Server({ name: 'weather', version: '1' }, { capabilities: { tools: {} } });
+    s.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
+    s.setRequestHandler(CallToolRequestSchema, async () => ({ content: [{ type: 'text', text: 'Morges: 9 °C, light rain until 10:00, then dry.' }] }));
+    const tr = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    await s.connect(tr);
+    await tr.handleRequest(req, res, d ? JSON.parse(d) : undefined);
+  }).listen(0, '127.0.0.1');
+  await new Promise((r) => server.once('listening', r));
+  return `http://127.0.0.1:${server.address().port}/mcp`;
+}
+
+/** Start the seeded demo panel. Returns { base, dataDir }. Call once per process (the app's modules are singletons). */
+export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(), 'duniya-demo-')) } = {}) {
+  const F = await fakeModels();
+  const weatherUrl = await fakeToolService();
+  const data = join(dataDir, 'data'); const ops = join(dataDir, 'ops');
+  for (const d of [data, join(ops, 'req'), join(ops, 'state')]) mkdirSync(d, { recursive: true });
+  Object.assign(process.env, {
+    DATA_DIR: data, PANEL_PORT: String(port), ADMIN_PASSWORD: DEMO_PASSWORD,
+    ANTHROPIC_BASE_URL: `${F}/anthropic`, OPENAI_API_BASE: `${F}/chatgpt`, OPENROUTER_API_BASE: `${F}/openrouter`,
+    DUNIYA_INSTALL: 'systemd', DUNIYA_OPS_HELPER: join(ops, 'helper'), DUNIYA_OPS_REQUEST_DIR: join(ops, 'req'), DUNIYA_OPS_STATE_DIR: join(ops, 'state'),
+    UPDATE_MODE: 'notify', TZ_DEFAULT: 'Europe/Zurich', PUBLIC_URL: 'https://duniya.example.org',
+  });
+  const imp = (p) => import(pathToFileURL(join(ROOT, p)).href);
+  const store = await imp('src/core/store.js');
+  const db = await imp('src/core/db.js');
+  const agents = await imp('src/core/agents.js');
+  const prefs = await imp('src/core/chat-prefs.js');
+  const providers = await imp('src/core/providers/index.js');
+  const system = await imp('src/core/system.js');
+  const backup = await imp('src/core/backup/index.js');
+  const contacts = await imp('src/core/contacts.js');
+  const globalMcp = await imp('src/core/global-mcp.js');
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  const { createChannelRegistry } = await imp('src/channels/registry.js');
+  const { createRouter, createHistoryHandler } = await imp('src/core/router.js');
+
+  const now = Date.now(); const MIN = 60000; const H = 60 * MIN; const D = 24 * H;
+  const P = (n) => `417900000${String(n).padStart(2, '0')}`; // +41 79 000 00 NN — obviously fake
+  const people = ['Anu', 'Marc', 'Lea', 'Ravi', 'Sophie', 'Jonas', 'Priya', 'Luca', 'Mia', 'Tom', 'Nadia', 'Arjun'];
+  const member = (i, admin = false) => ({ phone: P(i + 1), jid: `${P(i + 1)}@s.whatsapp.net`, admin });
+  const G = (n) => `12036304112233000${n}@g.us`;
+  const GROUPS = {
+    main: [
+      { id: G(1), name: 'Class 4B parents', size: 23, members: [0, 1, 2, 3, 4, 5].map((i) => member(i, i === 0)) },
+      { id: G(2), name: 'Family ❤️', size: 9, members: [0, 3, 6, 9].map((i) => member(i, i === 3)) },
+      { id: G(3), name: 'Morges ↔ Geneva rides', size: 14, members: [1, 2, 4, 5, 7, 8].map((i) => member(i, i === 1)) },
+      { id: G(4), name: 'Product team', size: 11, members: [2, 4, 7, 10].map((i) => member(i, i === 10)) },
+      { id: G(5), name: 'Rue du Midi neighbours', size: 31, members: [5, 8, 11].map((i) => member(i)) },
+      { id: G(6), name: 'Book club', size: 7, members: [6, 8].map((i) => member(i)) },
+      { id: G(7), name: 'Tuesday badminton', size: 12, members: [1, 9].map((i) => member(i)) },
+    ],
+    club: [
+      { id: G(8), name: 'U11 football parents', size: 18, members: [3, 5, 7, 9].map((i) => member(i, i === 3)) },
+      { id: G(9), name: 'Coaches', size: 5, members: [3, 11].map((i) => member(i)) },
+    ],
+  };
+  const factory = ({ number }) => {
+    const list = GROUPS[number] || [];
+    const find = (jid) => list.find((g) => g.id === jid);
+    return {
+      id: 'whatsapp',
+      async start() {},
+      async status() { return { status: 'open', me: `${number === 'main' ? P(99) : P(98)}:1@s.whatsapp.net`, since: now - 3 * D - 4 * H }; },
+      async listChats() { return list.map(({ id, name, size }) => ({ id, name, size })); },
+      async chatName(jid) { return find(jid)?.name || ''; },
+      async groupMembers(jid) { return find(jid)?.members || []; },
+      async isMember(jid, phone) { return !!find(jid)?.members.some((m) => m.phone === phone); },
+      async send() { return { msgId: `out-${Date.now()}` }; },
+      async typing() {},
+      async groupInfo(jid) {
+        const g = find(jid) || {};
+        return { id: jid, subject: g.name, description: 'Shared rides between Morges and Geneva. Be kind, be on time.', owner: '', size: g.size,
+          announcement: false, locked: true, joinApproval: false, participants: (g.members || []).map((m) => ({ phone: m.phone, jid: m.jid, admin: m.admin ? 'admin' : null })) };
+      },
+      async groupInviteLink() { return { link: 'https://chat.whatsapp.com/DEMO-INVITE' }; },
+      async pair() { return 'DEMO-1234'; }, async logout() {}, async restart() {}, async remove() {},
+    };
+  };
+
+  // numbers, providers
+  store.updateSettings({ whatsappNumbers: [{ id: 'main', label: 'Home' }, { id: 'club', label: 'Football club' }] });
+  store.setSecret('ANTHROPIC_API_KEY', 'sk-ant-demo-not-a-real-key');
+  store.setSecret('CHATGPT_CREDENTIALS', JSON.stringify({ access_token: 'demo', refresh_token: 'demo', expires_at: now + 365 * D, email: 'owner@example.org', client_id: 'demo', scopes: [] }));
+  providers.addOpenRouter({ key: 'sk-or-demo-not-a-real-key', freeOnly: true });
+
+  // agents from the templates
+  await agents.loadAgents();
+  const tpl = (f) => JSON.parse(readFileSync(join(ROOT, 'templates', f), 'utf8'));
+  const mk = (id, file, patch) => agents.createAgent({ id, config: { ...tpl(file), enabled: true, ...patch }, by: 'admin' });
+  await mk('school', 'school-friends.json', { chats: [G(1)], model: 'auto' });
+  await mk('family', 'family.json', { chats: [G(2), `${P(4)}@s.whatsapp.net`], model: 'chatgpt:gpt-5.5', organizers: [`+${P(4)}`] });
+  await mk('carpool', 'carpool.json', {
+    chats: [G(3)], model: 'anthropic:claude-haiku-5-5', organizers: [`+${P(2)}`],
+    mcpServers: { transport: { type: 'local', package: 'mcp-swiss@latest', args: [], env: {} }, calendar: { url: 'https://calendar.example.org/mcp', auth: 'oauth' } },
+    tools: { participant: ['transport:*', 'calendar:events_list'], organizer: ['calendar:*'], deny: [] },
+  });
+  await mk('office', 'office-colleagues.json', { chats: [G(4)], model: 'auto' });
+  await mk('football', 'event-planning.json', { name: 'U11 football', description: 'Match days, lifts and snack rota for the U11 team.', triggers: ['!coach'], chats: [`club#${G(8)}`], model: 'openrouter:deepseek/deepseek-v4:free' });
+  await mk('neighbours', 'neighbours.json', { enabled: false, chats: [] });
+  globalMcp.saveGlobalServer('weather', { url: weatherUrl, defaults: { organizer: ['*'], participant: ['forecast'] } }, 'admin');
+
+  // chats: on/off (silent by default), direct chats seen
+  for (const c of [G(1), G(2), G(3), G(4), `club#${G(8)}`, `${P(4)}@s.whatsapp.net`]) prefs.setChatPrefs(c, { enabled: true });
+  prefs.setChatPrefs(G(3), { logging: 'verbose' }); prefs.setChatPrefs(G(2), { logging: 'minimal' });
+  prefs.ignoredCounts.set(G(5), 37); prefs.ignoredCounts.set(G(6), 12); prefs.ignoredCounts.set(G(7), 5);
+  const seen = db.db.prepare('INSERT INTO chats_seen (tenant_id, chat, number, is_group, name, phone, last_at) VALUES (?, ?, ?, 0, ?, ?, ?)');
+  for (const [i, name] of [[4, 'Sophie'], [7, 'Priya'], [10, 'Nadia']]) seen.run('default', `${P(i)}@s.whatsapp.net`, 'main', name, P(i), now - i * H);
+  seen.run('default', `club#${P(12)}@s.whatsapp.net`, 'club', 'Coach Arjun', P(12), now - 5 * H);
+
+  // messages & memory of the car-pooling group
+  const conv = [
+    [2, 'Marc', 'I drive to Geneva Friday, leaving Morges station 07:40. 3 seats.', false, false],
+    [3, 'Lea', '!ride any seat to Geneva on Friday morning?', true, false],
+    [0, 'Car pooling', 'Friday 21 Nov: Marc drives from Morges station at 07:40, 3 seats. I saved a seat for you, Lea — 2 left.', false, true],
+    [5, 'Sophie', 'Can someone take me back Thursday evening? Geneva Cornavin → Morges around 18:00', false, false],
+    [8, 'Luca', '@Car pooling who drives tomorrow?', true, false],
+    [0, 'Car pooling', 'Tomorrow (Thu 20 Nov): Luca 07:15 from Morges (full), Mia back from Cornavin at 18:10 (1 seat). Sophie, Mia could take you.', false, true],
+    [9, 'Mia', 'Yes Sophie, meet at Cornavin 18:10 👍', false, false],
+  ];
+  let lastId = 0;
+  conv.forEach(([p, name, text, addressed, fromAgent], i) => {
+    lastId = db.logMessage({ chat: G(3), agent: fromAgent ? 'carpool' : '', msgId: `m${i}`, sender: fromAgent ? '' : P(p), name, text, addressed, fromAgent, ts: now - (conv.length - i) * 23 * MIN });
+  });
+  db.setChatMemory(G(3), 'Regular rides: Marc (Mon/Wed/Fri 07:40 Morges station → Geneva), Luca (Tue/Thu 07:15). Mia returns from Cornavin around 18:10. Lea needs Friday mornings.', lastId);
+  for (const [text, author] of [['Fri 21 Nov — Marc, 07:40 Morges station → Geneva, seats: Lea + 1 free', 'Marc'], ['Thu 20 Nov — Mia, 18:10 Geneva Cornavin → Morges, seats: Sophie', 'Mia'], ['Sophie needs a ride back on Thursdays (Cornavin → Morges)', 'Sophie']]) {
+    db.addNote({ chat: G(3), agent: 'carpool', text, author, role: 'participant' });
+  }
+
+  // contacts, a pending confirmation
+  contacts.syncWhatsAppContacts(people.map((name, i) => ({ id: `${P(i + 1)}@s.whatsapp.net`, name })));
+  contacts.saveContact({ phone: `+${P(20)}`, name: 'Dr. Meier (paediatrician)', note: 'Mon–Fri 8–12, Rue de Lausanne 14, 1110 Morges — call before 11', shared: true }, 'admin');
+  contacts.saveContact({ phone: `+${P(21)}`, name: 'Taxi Morges', note: 'Night line', shared: true }, 'admin');
+  contacts.saveContact({ phone: `+${P(3)}`, name: 'Lea Fontaine-Bernasconi', note: 'Car-pool organizer, prefers voice notes' }, 'admin');
+  db.addPending({ code: 'K7Q2', agent: 'carpool', server: 'calendar', confirmTool: 'confirm', confirmId: 'cf_demo_1', tool: 'events_create', chat: G(3), requester: P(2), summary: 'Add “Friday ride: Marc 07:40 Morges → Geneva” to the shared calendar', expires: now + 50 * MIN });
+
+  // activity
+  const acts = [
+    [26 * H, 'system', '', '', 'Started'],
+    [6 * H, 'schedule.run', 'carpool', G(3), "Posted today's rides (3 rides, 2 free seats)"],
+    [5 * H, 'message.in', 'family', G(2), 'Ravi: !family what time is Diwali dinner on Saturday?'],
+    [5 * H - 40000, 'model.usage', 'family', G(2), 'chatgpt:gpt-5.5 · 1,204 in / 88 out tokens'],
+    [5 * H - 30000, 'message.out', 'family', G(2), 'Saturday 22 Nov, 19:00 at Ravi & Priya’s. Bring dessert!'],
+    [3 * H, 'config', '', G(5), 'Chat switched OFF — agents ignore it (admin)'],
+    [2 * H, 'mcp.call', '', '', 'Claude (AI assistant): list_agents'],
+    [95 * MIN, 'message.in', 'school', G(1), 'Anu: !buddy reminder for the museum trip forms?'],
+    [94 * MIN, 'tool.call', 'school', G(1), 'whatsapp:send_poll — "Who can drive on the museum trip?" (3 options)'],
+    [93 * MIN, 'message.out', 'school', G(1), 'Forms are due Monday 24 Nov. I started a poll for drivers 🚗'],
+    [40 * MIN, 'whatsapp.vote', 'school', G(1), 'Lea voted “I can drive (3 seats)”'],
+    [24 * MIN, 'message.in', 'carpool', G(3), 'Luca: @Car pooling who drives tomorrow?'],
+    [23 * MIN, 'tool.call', 'carpool', G(3), 'transport:connections — Morges → Geneva, Thu 07:15'],
+    [23 * MIN - 9000, 'model.usage', 'carpool', G(3), 'anthropic:claude-haiku-5-5 · 2,310 in / 71 out tokens'],
+    [23 * MIN - 8000, 'message.out', 'carpool', G(3), 'Tomorrow (Thu 20 Nov): Luca 07:15 from Morges (full), Mia back from Cornavin at 18:10 (1 seat).'],
+    [22 * MIN, 'whatsapp.reaction', 'carpool', G(3), 'Mia reacted 👍 to the agent'],
+    [8 * MIN, 'message.in', 'football', `club#${G(8)}`, 'Arjun: !coach who brings snacks Saturday?'],
+    [8 * MIN - 6000, 'message.out', 'football', `club#${G(8)}`, 'Saturday snacks: the Meier family (oranges) and Priya (water). Kick-off 10:30 in Nyon.'],
+  ];
+  for (const [ago, type, agent, chat, summary] of acts) db.insertActivity({ ts: now - ago, type, agent, chat, summary });
+
+  // 30 days of usage
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0); const todaySpan = now - startOfToday.getTime();
+  const ins = db.db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kind, input, output, cost, priced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const plan = [
+    ['carpool', G(3), 'anthropic', 'claude-haiku-5-5', 9, 1.0, 5.0, 'set'],
+    ['school', G(1), 'anthropic', 'claude-sonnet-5-5', 5, 3.0, 15.0, 'set'],
+    ['family', G(2), 'chatgpt', 'gpt-5.5', 6, 0, 0, 'plan'],
+    ['office', G(4), 'anthropic', 'claude-sonnet-5-5', 4, 3.0, 15.0, 'set'],
+    ['football', `club#${G(8)}`, 'openrouter', 'deepseek/deepseek-v4:free', 5, 0, 0, 'free'],
+  ];
+  let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let day = 29; day >= 0; day--) {
+    for (const [agent, chat, prov, model, perDay, pin, pout, priced] of plan) {
+      const n = Math.max(1, Math.round(perDay * (0.5 + rnd() * (day < 10 ? 1.4 : 0.9))));
+      for (let k = 0; k < n; k++) {
+        const input = Math.round(900 + rnd() * 2600); const output = Math.round(40 + rnd() * 220);
+        ins.run(day === 0 ? now - Math.round(rnd() * todaySpan) : now - day * D - Math.round(rnd() * 20 * H), agent, chat, prov, model, rnd() < 0.12 ? 'summary' : 'reply', input, output, (input * pin + output * pout) / 1e6, priced);
+      }
+    }
+  }
+  store.updateSettings({ modelPrices: { 'anthropic:claude-haiku-5-5': { in: 1, out: 5 }, 'anthropic:claude-sonnet-5-5': { in: 3, out: 15 } } });
+
+  // backups (local only), update status, server metrics history
+  backup.setPassphrase('demo passphrase for screenshots');
+  backup.updateBackupSettings({ enabled: true, schedule: 'daily', at: '04:00', keep: 14 });
+  await backup.runBackup({ reason: 'schedule' }); await new Promise((r) => setTimeout(r, 1100)); await backup.runBackup({ reason: 'manual' });
+  db.kvSet('updates:status', JSON.stringify({ current: `v${pkg.version}`, latest: `v${pkg.version}`, available: false, target: null, channel: 'stable', checkedAt: now - 12 * MIN, lastResult: null }));
+  const hist = system.metricsHistory();
+  for (let i = 720; i > 0; i--) {
+    const w = Math.sin(i / 40) * 0.5 + 0.5;
+    hist.push({ t: now - i * 30000, cpu: 3 + w * 9 + rnd() * 6 + (i % 120 < 4 ? 30 : 0), mem: 41 + w * 4 + rnd(), swap: 2, disk: 23.4, rx: 1500 + rnd() * 9000, tx: 900 + rnd() * 5000 });
+  }
+
+  // start the panel; keep setup and sign-in noise out of the activity log
+  const { providerRoutes } = await imp('src/panel/routes/providers.js');
+  const { backupRoutes } = await imp('src/panel/routes/backups.js');
+  const { updateRoutes } = await imp('src/panel/routes/updates.js');
+  const { startPanel } = await imp('src/panel/server.js');
+  const wa = createChannelRegistry({ factory });
+  const panel = startPanel({ channel: wa, extend: [providerRoutes, (r) => backupRoutes(r, { restart: () => {} }), (r) => updateRoutes(r, { restart: () => {} })] });
+  await new Promise((r) => (panel.listening ? r() : panel.once('listening', r)));
+  store.createUser({ username: 'priya', email: 'priya@example.org', role: 'admin', password: 'demo-password-456' });
+  store.createUser({ username: 'grandpa-viewer', role: 'viewer', password: 'demo-password-789' });
+  await wa.start(createRouter(wa), { onHistory: createHistoryHandler() });
+  system.startMetrics();
+  const noise = () => db.db.prepare("DELETE FROM activity WHERE summary LIKE 'Panel login%' OR summary LIKE 'Owner \"admin\" created%' OR summary LIKE 'Backup passphrase changed%' OR summary LIKE 'User %' OR summary LIKE 'Contact %' OR summary LIKE 'Global tool service%' OR summary LIKE 'Created \"%' OR (type = 'backup.done' AND ts > ?)").run(now - 60000);
+  noise(); setInterval(noise, 300).unref();
+  return { base: `http://127.0.0.1:${panel.address().port}`, dataDir };
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { base, dataDir } = await startDemo({ port: Number(process.argv[2] || 8099) });
+  console.log(`Demo panel on ${base} — sign in as admin / ${DEMO_PASSWORD} (data in ${dataDir})`);
+}
