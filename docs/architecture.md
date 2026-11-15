@@ -8,22 +8,18 @@ top.**
 - Panel on `localhost:8080` behind Caddy, a tunnel, Tailscale or SSH. Roles: owner, admin (agents, chats, models,
   memory), viewer (read-only).
 
-```mermaid
-flowchart LR
-  WA["WhatsApp<br/>linked device(s)"] --> AL{"Allow-list:<br/>chat on?"}
-  AL -- off --> X["dropped"]
-  AL -- on --> R["Router<br/>triggers · roles · rate limits"]
-  R -- "owner DM" --> OA["Owner assistant"]
-  R --> AG["Agent<br/>(stored in the app)"]
-  AG --> M["Model provider<br/>+ fallback"]
-  AG --> T["MCP tool services<br/>per-role allow lists"]
-  AG --> W["WhatsApp actions"]
-  AG --> MEM["Memory: messages,<br/>summary, notes, search"]
-  AG --> PL["Plugins (optional)"]
-  T -- "preview tools" --> CG["Confirm gate:<br/>organizer replies confirm CODE"]
-  P["Panel · mobile app ·<br/>admin MCP"] --> DB[("SQLite · encrypted<br/>secrets & backups")]
-  AG --> DB
-```
+<p align="center"><img src="diagrams/architecture.svg" alt="Architecture: WhatsApp linked devices feed the allow-list (off chats are dropped), then the router (owner DMs go to the owner assistant), then the agent, which uses a model provider with fallback, MCP tools behind the confirm gate, WhatsApp actions, memory and optional plugins; the agent and the panel, app and admin MCP use SQLite with encrypted secrets" width="720"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. Messages come from one or more WhatsApp linked devices.
+2. Allow-list: chats that are off are dropped.
+3. Router: triggers, roles and rate limits; owner DMs go to the owner assistant.
+4. The agent (stored in the app) uses a model provider with fallback, MCP tools with per-role allow lists, WhatsApp actions, memory (messages, summary, notes, search) and optional plugins.
+5. Preview tools go through the confirm gate: an organizer replies `confirm CODE`.
+6. The agent, the panel, the mobile app and the admin MCP use SQLite with encrypted secrets and backups.
+
+</details>
 
 | | |
 |---|---|

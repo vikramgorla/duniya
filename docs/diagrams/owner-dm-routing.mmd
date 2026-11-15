@@ -1,0 +1,5 @@
+flowchart TD
+  DM["Your DM to an<br/>agent number"] --> Q{"Starts with a trigger<br/>or confirm CODE?"}
+  Q -- "yes" --> AG["That agent"]
+  Q -- "no" --> OA["Owner assistant<br/>with your panel role"]
+  OA -- "change" --> C["confirm CODE"]

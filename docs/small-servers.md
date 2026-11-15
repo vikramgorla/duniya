@@ -27,16 +27,19 @@ Examples: OCI `VM.Standard.E2.1.Micro`, Google `e2-micro`. Size also in `/api/st
 
 Photo and voice turns, pictures and voice replies queue in SQLite (survives a restart), in order per chat.
 
-```mermaid
-flowchart LR
-  P["Photo / voice note"] --> Q{"Queue full?<br/>(20 on small)"}
-  Q -- yes --> A["Please send again later"]
-  Q -- no --> W["Waiting"]
-  W -- "~10 s" --> H["reacts ⏳"]
-  W -- "~60 s" --> O["'I'm on it' once"]
-  W -- "> 15 min" --> S["short apology<br/>instead of a late answer"]
-  W --> D["Done, ⏳ removed"]
-```
+<p align="center"><img src="diagrams/media-queue.svg" alt="Media queue: a photo or voice note is refused with please send again later when the queue is full (20 on small servers); otherwise it waits, gets an hourglass reaction after about 10 seconds, an I am on it message after about 60 seconds, and a short apology instead of a late answer after 15 minutes; the hourglass is removed when done" width="572"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. A photo or voice note arrives.
+2. Queue full (20 on small servers): "please send again later".
+3. Otherwise it waits in the queue.
+4. After about 10 s the agent reacts with ⏳.
+5. After about 60 s it says "I'm on it" once.
+6. After 15 min it sends a short apology instead of a late answer.
+7. When done, the answer comes and ⏳ is removed.
+
+</details>
 
 Max age: `MEDIA_JOB_MAX_AGE_MIN` (15). [Settings](settings.md)
 

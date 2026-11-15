@@ -19,15 +19,18 @@ out.**
    keeps working.
 3. When nobody needs the old address: **Turn off** (it then only forwards).
 
-```mermaid
-flowchart LR
-  A["Add this domain"] --> B{"HTTPS up<br/>within 4 min?"}
-  B -- no --> R["Previous settings<br/>come back"]
-  B -- yes --> C["Both addresses work"]
-  C --> D["Open new address →<br/>Confirm — new address works"]
-  D --> E["New is main,<br/>old still works"]
-  E --> F["Turn off old<br/>(forwards only)"]
-```
+<p align="center"><img src="diagrams/domain-change.svg" alt="Changing the domain: add the domain; if HTTPS is not up within 4 minutes the previous settings come back; otherwise both addresses work until you confirm from the new address, then the new one is main and the old one can be turned off to only forward" width="497"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. **Add this domain**.
+2. If HTTPS is not up within 4 minutes, the previous settings come back.
+3. Otherwise both addresses work.
+4. Open the new address and click **Confirm — new address works**.
+5. The new address is the main one; the old one still works.
+6. Turn the old one off when you like (it then only forwards).
+
+</details>
 
 > [!NOTE]
 > **Confirm** is accepted only from a request that really arrived through the new domain. The HTTPS check runs on

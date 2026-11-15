@@ -1,0 +1,6 @@
+flowchart TD
+  A["Agent's model"] --> Q{"Answer?"}
+  Q -- "yes" --> OK["Reply"]
+  Q -- "limit reached, no credit,<br/>down, timeout,<br/>sign-in expired" --> P["Pause that account"] --> N["Next model<br/>in the chain"] --> Q
+  Q -- "refused, 400" --> E["No switch"]
+  N -. "none left, 15 min" .-> AL["Owner alert<br/>on WhatsApp"]

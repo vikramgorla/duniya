@@ -1,0 +1,7 @@
+flowchart TD
+  A["Add this domain"] --> B{"HTTPS up<br/>within 4 min?"}
+  B -- "no" --> R["Previous settings<br/>come back"]
+  B -- "yes" --> C["Both addresses work"]
+  C --> D["Open the new address:<br/>Confirm, new address works"]
+  D --> E["New is main,<br/>old still works"]
+  E --> F["Turn off the old one<br/>forwards only"]

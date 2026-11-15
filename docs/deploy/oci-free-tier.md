@@ -35,14 +35,18 @@ Console labels checked November 2026; some pages show **tabs**, others a **Resou
 
 ## Deploy
 
-```mermaid
-flowchart LR
-  A["Deploy to<br/>Oracle Cloud"] --> B["Create stack:<br/>form → Run apply → Create"]
-  B --> C["Job Succeeded<br/>(2–3 min)"]
-  C --> D["Reload page →<br/>Application information"]
-  D --> E["Watch the install<br/>http://ip/ (10–30 min)"]
-  E --> F["Panel: sign in as admin<br/>with the owner password"]
-```
+<p align="center"><img src="../diagrams/oci-deploy.svg" alt="Oracle Cloud deploy: Deploy to Oracle Cloud, create the stack with Run apply, wait 2-3 minutes for the job to succeed, reload to see Application information, watch the install for 10-30 minutes, then sign in to the panel as admin with the owner password" width="287"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. Click **Deploy to Oracle Cloud**.
+2. Create the stack: fill in the form, keep **Run apply** ticked, **Create**.
+3. Wait for the job to show *Succeeded* (2–3 min).
+4. Reload the page and open **Application information**.
+5. Watch the install at `http://ip/` (10–30 min).
+6. Sign in to the panel as `admin` with the owner password.
+
+</details>
 
 ### Option A: the Deploy button (a "stack")
 
@@ -130,16 +134,18 @@ server** if asked.
 Rarely needed: a release note says the stack changed, or you change a stack setting (shape, A1 size, SSH, Logging,
 ports).
 
-```mermaid
-flowchart TD
-  Z["Download latest<br/>stack zip"] --> E["Stacks → ⋮ → Edit →<br/>.Zip file → Next → Next"]
-  E --> S["Run apply unticked →<br/>Save changes"]
-  S --> P["Plan"]
-  P --> Q{"Plan says?"}
-  Q -- "0 to destroy /<br/>No changes" --> A["Apply → pick that plan job"]
-  Q -- "must be replaced, -/+,<br/>1 to destroy oci_core_instance.app" --> X["STOP: undo the change,<br/>or recreate with a backup"]
-  A --> D["Succeeded:<br/>same address"]
-```
+<p align="center"><img src="../diagrams/oci-stack-update.svg" alt="Updating the OCI stack: download the latest stack zip, edit the stack and upload it with Run apply unticked, run Plan; apply only if the plan destroys nothing, and stop if it would replace the instance" width="550"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. Download the latest stack zip.
+2. **Stacks → ⋮ → Edit** → upload the `.Zip` file → **Next** → **Next**.
+3. Untick **Run apply** and **Save changes**.
+4. Run **Plan** and read it.
+5. *0 to destroy* or *No changes*: **Apply** and pick that plan job; it succeeds with the same address.
+6. *must be replaced*, `-/+` or *1 to destroy* `oci_core_instance.app`: **stop**, undo the change, or recreate with a backup.
+
+</details>
 
 1. Download [whatsapp-agent-duniya.zip](https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip)
    (also on [Releases](https://github.com/vikramgorla/whatsapp-agent-duniya/releases)).
@@ -175,11 +181,18 @@ flowchart TD
 **When:** the install failed, the VM is broken or reclaimed, you want a fresh Ubuntu, or you switch between x86
 (E2.1.Micro) and Arm (A1.Flex), which can't change in place.
 
-```mermaid
-flowchart LR
-  B["Backup .dbk<br/>+ passphrase"] --> D["Stack → Destroy"] --> A["(Edit) → Apply"]
-  A --> W["Reload → Watch the install"] --> R["Backups → Restore →<br/>A file"] --> C["Check WhatsApp,<br/>domain DNS"]
-```
+<p align="center"><img src="../diagrams/oci-recreate.svg" alt="Recreating on Oracle Cloud: take a backup and keep the passphrase, destroy the stack, edit if needed and apply, reload and watch the install, restore the backup file under Backups, then check WhatsApp and domain DNS" width="292"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. Download a backup (`.dbk`) and keep its passphrase.
+2. Stack → **Destroy**.
+3. (Edit if needed) → **Apply**.
+4. Reload → watch the install.
+5. **Backups → Restore → A file**.
+6. Check WhatsApp and your domain DNS.
+
+</details>
 
 1. **Back up first**: **Backups** → passphrase (write it down) → **Back up now & download**. Keep the `.dbk` (GitHub
    or S3 backups work too).

@@ -25,10 +25,17 @@ npm install && ADMIN_PASSWORD=dev-password-123 npm start     # panel on http://1
 Built with [GitHub Spec Kit](https://github.com/github/spec-kit): constitution `.specify/memory/constitution.md`,
 every feature under [`specs/`](../specs).
 
-```mermaid
-flowchart LR
-  S["/speckit-specify"] --> P["/speckit-plan"] --> T["/speckit-tasks"] --> I["/speckit-implement"] --> C["/speckit-converge"]
-```
+<p align="center"><img src="diagrams/speckit-workflow.svg" alt="Spec Kit workflow: /speckit-specify, then /speckit-plan, /speckit-tasks, /speckit-implement and /speckit-converge" width="246"></p>
+
+<details><summary>Diagram as text</summary>
+
+1. `/speckit-specify`
+2. `/speckit-plan`
+3. `/speckit-tasks`
+4. `/speckit-implement`
+5. `/speckit-converge`
+
+</details>
 
 Process: [AGENTS.md](../AGENTS.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) · design: [DESIGN.md](../DESIGN.md).
 
@@ -45,8 +52,36 @@ Process: [AGENTS.md](../AGENTS.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) · 
 
 > [!TIP]
 > Docs pages follow one template: promise · primary action · *In 30 seconds* · steps with screenshots · callouts ·
-> Mermaid for flows · `<details>` for reference · **Next:** links. Thumbnails in `docs/img/` are 800×500 WebP crops of
+> a diagram for flows · `<details>` for reference · **Next:** links. Thumbnails in `docs/img/` are 800×500 WebP crops of
 > `docs/site/img` shots.
+
+## Diagrams
+
+GitHub's Mermaid rendering is unreliable on github.com and absent in the GitHub mobile app, so docs never contain
+` ```mermaid ` blocks (CI fails on them). Instead:
+
+1. Write the source in `docs/diagrams/<name>.mmd` (Mermaid; quote every label, use `<br/>` for line breaks, prefer
+   `flowchart TD` so it stays narrow enough for a phone, at most ~900 px wide).
+2. Run `npm run docs:diagrams` (or `npm run docs:diagrams -- <name> --grid /tmp/grid.png` to render one and check it).
+   It renders `docs/diagrams/<name>.svg` with Mermaid in headless Chrome: pure SVG text (no `foreignObject`, works
+   inside `<img>` on iOS and in the GitHub app), system fonts only, Constellation colours on a white card that reads
+   in dark mode. Needs Chrome (`CHROME_PATH`) and npm; Mermaid itself is fetched into a temp directory and checked
+   against a pinned hash, it is not a project dependency.
+3. Embed it centred with a meaningful `alt`, at most 720 px wide, followed by a collapsed text version:
+
+   ```html
+   <p align="center"><img src="diagrams/install-flow.svg" alt="Install flow: …" width="320"></p>
+
+   <details><summary>Diagram as text</summary>
+
+   1. First step.
+   2. Second step.
+
+   </details>
+   ```
+
+Each SVG stores the hash of its source (`<!-- src-sha256: … -->`); `scripts/ci-checks.mjs` fails when a source changed
+without re-rendering, when an SVG has no source, or when a ` ```mermaid ` block is back.
 
 ---
 **Next:** [How it works](architecture.md) · [Docs index](README.md)

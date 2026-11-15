@@ -1,0 +1,7 @@
+flowchart TD
+  A["Backups: Back up now<br/>and download"] --> B[".dbk file<br/>+ passphrase"]
+  B --> C{"Where?"}
+  C -- "fresh server" --> D["First screen:<br/>Restore a backup<br/>with the setup code"]
+  C -- "running server" --> E["Backups, Restore:<br/>a file or a stored backup"]
+  D --> F["Restart, 1-2 min:<br/>sign in with the backup's accounts"]
+  E --> F

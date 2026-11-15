@@ -1,0 +1,6 @@
+flowchart TD
+  M["Message"] --> O{"Chat on?"}
+  O -- "no" --> D["Dropped:<br/>not stored, no model call"]
+  O -- "yes" --> S["Stored for memory<br/>retention limits"] --> A["Agent may answer"]
+  S --> P{"Private to<br/>members?"}
+  P -- "yes" --> H["Hidden from owner<br/>assistant and Ask"]

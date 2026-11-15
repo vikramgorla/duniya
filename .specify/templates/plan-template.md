@@ -60,7 +60,7 @@ Always include, for this repository:
 | Privacy | [allow-list, logging of contents, privacy notice] |
 | Small servers | [memory / CPU / downloads on a 1 GB VM; queue, timeouts, refusal below 2 GB] |
 | Admin MCP | [new or changed tools in `src/panel/admin-tools.js`, or n/a] |
-| Docs | [`docs/*.md` pages, `docs/README.md`, `README.md` highlights, `mobile/README.md`, `DESIGN.md`] |
+| Docs | [`docs/*.md` pages, `docs/README.md`, `README.md` highlights, `mobile/README.md`, `DESIGN.md`, diagrams in `docs/diagrams/` (`npm run docs:diagrams`)] |
 | Website | [section/tile in `docs/site/index.html`; shots to retake with `npm run site:shots`] |
 | Version | [x.y.z] (minor feature / patch fix / major breaking) in `package.json`, `package-lock.json`, `infra/oci/schema.yaml` |
 | Releases | `releases.json` entry; breaking? → major bump, `breaking: true`, actions for the owner (or a migration instead) |

@@ -56,6 +56,14 @@
       "breaking": false,
       "title": "Visual docs",
       "summary": "README and guides rewritten as short, visual pages with diagrams, screenshots and clear next steps; a link check keeps them connected."
+    },
+    "2.9.4": {
+      "breaking": false,
+      "title": "Diagrams show everywhere",
+      "summary": "Docs diagrams are now images with a text version, so they show on github.com, in the GitHub mobile app and on phones. Nothing changes on your server.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/architecture.md"
     }
   }
 }

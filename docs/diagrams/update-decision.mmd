@@ -1,0 +1,11 @@
+flowchart TD
+  N["New release"] --> Q{"Crosses a breaking<br/>release or a new major?"}
+  Q -- "no" --> M{"Update mode"}
+  M -- "Install automatically" --> I["Backup, then install<br/>at the set time"]
+  M -- "Notify me" --> W["Shown on Updates"]
+  Q -- "yes" --> S["Auto stops at the last<br/>safe release"]
+  S --> T["Told once: Overview banner,<br/>Updates, Activity, WhatsApp"]
+  T --> D{"Owner decides"}
+  D -- "Update to vX<br/>or confirm ABCD" --> I2["Backup, update,<br/>result after restart"]
+  D -- "Remind me in 7 days<br/>or cancel ABCD" --> T
+  D -- "Dismiss" --> H["Hidden until a newer<br/>breaking release"]
