@@ -12,6 +12,10 @@ RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY src ./src
 COPY templates ./templates
 COPY plugins ./plugins
+COPY bin ./bin
+COPY deploy/ops/webconfig.mjs ./deploy/ops/webconfig.mjs
+# Command line tool (029): docker compose exec app duniya <command>
+RUN printf '#!/bin/sh\nexec node --disable-warning=ExperimentalWarning /app/bin/duniya.js "$@"\n' > /usr/local/bin/duniya && chmod 755 /usr/local/bin/duniya
 RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME ["/data"]

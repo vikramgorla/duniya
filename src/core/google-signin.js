@@ -1,7 +1,8 @@
 // Sign in with Google for the admin panel (019): OpenID Connect authorization code flow with PKCE (S256), state,
 // nonce and a browser-binding cookie; the ID token is verified (RS256, Google's JWKS from discovery).
 import { createHash, randomBytes } from 'node:crypto';
-import { getSecret, setSecret, getSetting, updateSettings, findUserByGoogleSub, findUsersByEmail, linkGoogle, acceptInvite, getUser } from './store.js';
+import { getSecret, setSecret, getSetting, updateSettings, findUserByGoogleSub, findUsersByEmail, linkGoogle, acceptInvite, getUser, listUsers } from './store.js';
+import { activity } from './events.js';
 import { oidcDiscovery, verifyIdToken } from './providers/jwt.js';
 import { sha256 } from './crypto.js';
 
@@ -18,6 +19,37 @@ export function googleConfig() {
   return { clientId: s.clientId || '', enabled: s.enabled !== false, secretSet: !!getSecret(GOOGLE_SECRET), lastTest: s.lastTest || null };
 }
 export const googleReady = () => { const c = googleConfig(); return !!(c.enabled && c.clientId && c.secretSet); };
+
+// ---------- "Only allow Sign in with Google" (028) ----------
+/** Passwords are refused only while the owner switched them off AND Google sign-in actually works (never a lock-out). */
+export const passwordLoginAllowed = () => !(getSetting('googleOnly', false) === true && googleReady());
+
+/** What the Sign-in card shows: the setting, whether it is in force, whether `user` may turn it on, who would be locked out. */
+export function googleOnlyState(user) {
+  const on = getSetting('googleOnly', false) === true;
+  const ready = googleReady();
+  let reason = '';
+  if (!ready) reason = 'Set up Sign in with Google first (the card below), and test it.';
+  else if (!user?.google) reason = 'Link your own Google account first (Your Google account → Link), so you can still sign in.';
+  const withoutGoogle = listUsers().filter((u) => !u.disabled && !u.google).map((u) => u.username);
+  return { on, active: on && ready, canEnable: !reason, reason, withoutGoogle };
+}
+
+/** Owner turns the setting on/off. `source` says where the change came from for the activity log. */
+export function setGoogleOnly(on, { user = null, by = '', source = 'panel' } = {}) {
+  const cur = getSetting('googleOnly', false) === true;
+  if (on) {
+    const st = googleOnlyState(user);
+    if (!st.canEnable) throw fail(st.reason);
+  }
+  if (cur !== !!on) {
+    updateSettings({ googleOnly: !!on });
+    const who = by || user?.username || '';
+    activity('config', { summary: on ? `Password sign-in switched off: only Sign in with Google (${who})`
+      : `Password sign-in switched back on${source === 'cli' ? ' from the server command line' : source === 'auto' ? ' because Sign in with Google was turned off' : ''}${who ? ` (${who})` : ''}` });
+  }
+  return !!on;
+}
 
 export function saveGoogleConfig({ clientId, clientSecret, enabled }) {
   const cur = getSetting('googleSignin', {}) || {};

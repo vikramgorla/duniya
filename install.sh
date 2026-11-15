@@ -177,6 +177,9 @@ OLD_PW=""
 [ -f "$CONF_DIR/app.env" ] && OLD_PW="$(grep -E '^ADMIN_PASSWORD=' "$CONF_DIR/app.env" | cut -d= -f2- || true)"
 TRUST_PROXY=0
 case "$EXPOSURE" in domain|ip|tunnel) TRUST_PROXY=1 ;; esac
+# Web address & access (031): keep "Only Cloudflare" from the panel across re-runs
+WEB_APPLIED=/var/lib/duniya-ops/web-applied.json
+if [ "$TRUST_PROXY" = 1 ] && [ -f "$WEB_APPLIED" ] && grep -q '"cloudflareOnly":true' "$WEB_APPLIED"; then TRUST_PROXY=cloudflare; fi
 umask 027
 cat > "$CONF_DIR/app.env" <<EOF
 NODE_ENV=production
@@ -187,6 +190,7 @@ TRUST_PROXY=$TRUST_PROXY
 PUBLIC_URL=$PUBLIC_URL
 UPDATE_MODE=$UPDATE_MODE
 DUNIYA_INSTALL=systemd
+DUNIYA_EXPOSURE=$EXPOSURE
 ADMIN_PASSWORD=${ADMIN_PASSWORD:-$OLD_PW}
 EOF
 chown root:"$APP_USER" "$CONF_DIR/app.env"; chmod 640 "$CONF_DIR/app.env"
@@ -248,6 +252,11 @@ install -m 0644 "$APP_DIR/deploy/ops/duniya-ops.service" /etc/systemd/system/dun
 install -m 0644 "$APP_DIR/deploy/ops/duniya-ops.path" /etc/systemd/system/duniya-ops.path
 install -d -m 0750 -o "$APP_USER" -g "$APP_USER" /var/lib/duniya/ops-request
 install -d -m 0755 -o root -g root /var/lib/duniya-ops
+# Web address & access (031): the helper runs this root-owned copy, never the app's own (app-writable) code.
+install -d -m 0755 -o root -g root /usr/local/lib/duniya-ops
+install -m 0644 -o root -g root "$APP_DIR/deploy/ops/webconfig.mjs" /usr/local/lib/duniya-ops/webconfig.mjs
+# Command line tool (029): sudo duniya <command>
+install -m 0755 -o root -g root "$APP_DIR/deploy/duniya" /usr/local/bin/duniya
 getent group systemd-journal >/dev/null && usermod -a -G systemd-journal "$APP_USER"
 systemctl daemon-reload
 systemctl enable -q whatsapp-agent-duniya
@@ -332,6 +341,18 @@ http://$SERVER_IP {
 }
 EOF
   fi
+  # Keep the IP allow-list set in the panel (031), for the address chosen now.
+  if [ -f "$WEB_APPLIED" ]; then
+    CVER="$(caddy version 2>/dev/null | awk '{print $1}' | tr -cd 'v0-9.')"
+    if (cd / && node /usr/local/lib/duniya-ops/webconfig.mjs render "$WEB_APPLIED" --out /etc/caddy/Caddyfile.duniya --host "$HOSTNAME_PUBLIC" --server-ip "$SERVER_IP" --caddy-version "${CVER:-2.6.0}" >/dev/null) \
+      && caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile.duniya >/dev/null 2>&1; then
+      mv -f /etc/caddy/Caddyfile.duniya /etc/caddy/Caddyfile
+      say "Kept the access settings from the panel (Settings → Web address & access)"
+    else
+      rm -f /etc/caddy/Caddyfile.duniya
+      warn "Could not keep the panel's access settings; the panel is open to everyone. Apply them again in Settings → Web address & access."
+    fi
+  fi
   open_web_ports
   systemctl enable -q caddy && systemctl reload-or-restart caddy
   systemctl disable -q --now cloudflared 2>/dev/null || true
@@ -372,5 +393,5 @@ esac
 if [ -n "$CODE" ]; then echo "  Setup code:  $CODE   (enter it in the panel to create the owner account)"
 elif [ -n "${ADMIN_PASSWORD:-$OLD_PW}" ]; then echo "  Sign in as:  admin (the password you provided)"
 else echo "  Already set up: sign in with your existing account."; fi
-echo "  Logs:        journalctl -u whatsapp-agent-duniya -f"
+echo "  Logs:        sudo duniya logs -f      (all commands: sudo duniya help)"
 echo "  Re-run this installer any time to update or change how the panel is reached."

@@ -5,6 +5,7 @@ import { DATA_DIR, env } from './config.js';
 export const db = new DatabaseSync(resolve(DATA_DIR, 'duniya.sqlite'));
 db.exec(`
   PRAGMA journal_mode = WAL;
+  PRAGMA busy_timeout = 5000;
   CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY, channel TEXT, chat TEXT, bot TEXT, sender TEXT, name TEXT,
     text TEXT, from_bot INTEGER DEFAULT 0, ts INTEGER
