@@ -20,7 +20,9 @@ export async function launch() {
   const portFile = join(profile, 'DevToolsActivePort');
   for (let i = 0; i < 100 && !existsSync(portFile); i++) await sleep(100);
   const [port, path] = readFileSync(portFile, 'utf8').trim().split('\n');
-  const ws = new WebSocket(`ws://127.0.0.1:${port}${path}`);
+  // Only a local DevTools endpoint written by the Chrome we just started.
+  if (!/^\d{2,5}$/.test(port) || !/^\/devtools\/browser\/[A-Za-z0-9-]+$/.test(path)) throw new Error('Unexpected DevToolsActivePort content');
+  const ws = new WebSocket(`ws://127.0.0.1:${Number(port)}/devtools/browser/${path.split('/').pop()}`);
   await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
   let id = 0; const waiting = new Map();
   ws.onmessage = (m) => { const msg = JSON.parse(m.data); const w = waiting.get(msg.id); if (w) { waiting.delete(msg.id); msg.error ? w.reject(new Error(msg.error.message)) : w.resolve(msg.result); } };

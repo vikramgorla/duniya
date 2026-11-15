@@ -115,6 +115,9 @@ for (const [phone, size] of [[false, { width: 1440, height: 900, scale: 1 }], [t
 }
 
 // cards
+/** A string as a JS literal that is safe to embed in evaluated code (escapes <, >, / and line separators too). */
+const jsLiteral = (v) => JSON.stringify(String(v)).replace(/[<>/\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+
 for (const width of [...new Set(CARDS.map((c) => c[4]))]) {
   const page = await newPage(cdp, { width, height: 900, scale: 2, scheme: opt.scheme });
   await page.goto(base); await page.evaluate(login);
@@ -122,7 +125,7 @@ for (const width of [...new Set(CARDS.map((c) => c[4]))]) {
     if (w !== width || !want(name)) continue;
     try {
       await open(page, hash, js);
-      const find = sel.startsWith('box:') ? `T.box(${JSON.stringify(sel.slice(4))})` : `document.querySelector(${JSON.stringify(sel)})`;
+      const find = sel.startsWith('box:') ? `T.box(${jsLiteral(sel.slice(4))})` : `document.querySelector(${jsLiteral(sel)})`;
       const r = await page.evaluate(`(() => { ${PRELUDE} const e = ${find}; if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.left + scrollX, y: b.top + scrollY, width: b.width, height: b.height }; })()`);
       if (!r) { console.log('✗', name, 'not found'); continue; }
       // @2x, at most 1600 px wide (the page already renders at device scale 2)
