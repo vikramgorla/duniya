@@ -101,8 +101,9 @@ export function releaseCheck({ version, previous = '', releases = {} }) {
     if (!e?.breaking) errors.push(`Version ${bare(version)} is a new major version (previous release ${previous}) but releases.json has no entry for it with "breaking": true. Add one with title, summary and actions (AGENTS.md, Definition of Done), or consider a migration instead.`);
     else if (!e.actions.length) errors.push(`releases.json entry ${bare(version)} is breaking but lists no actions: say what the owner must do.`);
   } else if (!e && (!prev || compareVersions(version, previous) > 0)) {
-    warnings.push(`releases.json has no entry for ${bare(version)}. Add one (breaking: false) when owners should know something about this release.`);
+    errors.push(`releases.json has no entry for ${bare(version)}. Every version gets one: at least { "breaking": false, "title": "…" } (AGENTS.md, Definition of Done).`);
   }
+  if (e && !e.title) errors.push(`releases.json entry ${bare(version)} has no title: add a one-line title.`);
   if (e?.breaking && prev && cur[0] === prev[0] && compareVersions(version, previous) > 0) warnings.push(`releases.json marks ${bare(version)} as breaking without a major version bump: breaking changes should bump the major version.`);
   return { errors, warnings };
 }
