@@ -126,6 +126,11 @@
       "breaking": false,
       "title": "Switching a chat on loads its recent messages from your phone",
       "summary": "Chats that are off still store no messages (only the id and time of the newest one). When you switch a chat on, its recent messages (50 by default) are loaded from your phone and summarised, so the agent starts with context; keep the phone online. Chats → “Load recent messages” asks again or goes further back. Agents now say plainly what history they have."
+    },
+    "2.13.0": {
+      "breaking": false,
+      "title": "Triggers work anywhere in a message",
+      "summary": "\"can mochi help?\" now wakes the agent whose trigger is mochi; only whole words count. A trigger at the start is still removed from what the agent reads."
     }
   }
 }

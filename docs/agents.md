@@ -11,6 +11,13 @@
 
 ![Agents page](site/img/agents-desktop.webp)
 
+
+> [!TIP]
+> **Triggers work anywhere in a message.** "can mochi help with this?" wakes the agent whose trigger is `mochi`, the
+> same as "mochi, help". Only whole words count (`mochiko` doesn't), case doesn't matter, and when several agents'
+> triggers appear, the first one in the message wins. In your own direct chat with the owner assistant, a trigger only
+> hands the message to that agent when the message *starts* with it, so you can talk *about* agents freely.
+
 ## Create and change agents
 
 | Way | How |

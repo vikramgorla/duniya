@@ -28,12 +28,35 @@ function rateLimited(key) {
 }
 
 const isAnyOrganizer = (phone) => !!phone && listAgents().some((b) => b.organizers.includes(phone));
-const startsWithTrigger = (agent, lower) => (agent.triggers || []).find((t) => lower.startsWith(t));
+/** Index of a trigger in the text as a whole word (anywhere: "can mochi help?" works), or -1. */
+function triggerAt(trigger, lower) {
+  const word = /[\p{L}\p{N}_]/u;
+  for (let i = lower.indexOf(trigger); i !== -1; i = lower.indexOf(trigger, i + 1)) {
+    const before = i === 0 ? '' : lower[i - 1];
+    const after = lower[i + trigger.length] || '';
+    const edgeOk = (ch, inner) => !ch || !word.test(ch) || !word.test(inner);
+    if (edgeOk(before, trigger[0]) && edgeOk(after, trigger[trigger.length - 1])) return i;
+  }
+  return -1;
+}
+/** The agent's trigger found in the message (anywhere, earliest first), or undefined. */
+const findTrigger = (agent, lower) => {
+  let best; let at = Infinity;
+  for (const t of agent.triggers || []) { const i = triggerAt(t, lower); if (i !== -1 && i < at) { at = i; best = t; } }
+  return best;
+};
+/** Among agents, the one whose trigger appears earliest in the message. */
+const earliestTriggered = (agents, lower) => {
+  let best = null; let at = Infinity;
+  for (const b of agents) for (const t of b.triggers || []) { const i = triggerAt(t, lower); if (i !== -1 && i < at) { at = i; best = b; } }
+  return best;
+};
 
 function stripTriggers(agent, text) {
   let t = text.replace(/@\d{5,}/g, ' ').trim();
-  const trig = startsWithTrigger(agent, t.toLowerCase());
-  if (trig) t = t.slice(trig.length);
+  // A trigger at the start is an address ("!family …"): drop it. Elsewhere it is part of the sentence: keep the text.
+  const trig = findTrigger(agent, t.toLowerCase());
+  if (trig && t.toLowerCase().startsWith(trig)) t = t.slice(trig.length);
   return t.trim();
 }
 
@@ -63,11 +86,11 @@ async function agentForDm(msg, channel, { openOnly = false } = {}) {
     const open = listAgents().filter((b) => b.enabled && b.dm === 'anyone');
     const lower = msg.text.trim().toLowerCase();
     const numberDefault = (getSettings().whatsappNumbers || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
-    return open.find((b) => startsWithTrigger(b, lower)) || open.find((b) => b.id === numberDefault) || open.find((b) => b.id === getSettings().defaultDmAgent) || open[0] || null;
+    return earliestTriggered(open, lower) || open.find((b) => b.id === numberDefault) || open.find((b) => b.id === getSettings().defaultDmAgent) || open[0] || null;
   }
   const lower = msg.text.trim().toLowerCase();
   const enabled = listAgents().filter((b) => b.enabled);
-  const byTrigger = enabled.find((b) => startsWithTrigger(b, lower));
+  const byTrigger = earliestTriggered(enabled, lower);
   const numberDefault = (getSettings().whatsappNumbers || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
   const candidates = byTrigger ? [byTrigger]
     : [getAgent(numberDefault), getAgent(getSettings().defaultDmAgent), ...enabled].filter((b) => b?.enabled);
@@ -93,7 +116,7 @@ function dmSilence(msg) {
   if (!enabled.length) return { agent: all[0]?.id || '', reason: all.length ? 'agent_disabled' : 'no_agent' };
   const lower = msg.text.trim().toLowerCase();
   const numberDefault = (getSettings().whatsappNumbers || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
-  const c = enabled.find((b) => startsWithTrigger(b, lower)) || [getAgent(numberDefault), getAgent(getSettings().defaultDmAgent)].find((b) => b?.enabled) || enabled[0];
+  const c = earliestTriggered(enabled, lower) || [getAgent(numberDefault), getAgent(getSettings().defaultDmAgent)].find((b) => b?.enabled) || enabled[0];
   return { agent: c.id, reason: c.dm === 'none' ? 'dm_not_allowed' : 'role_not_allowed' };
 }
 
@@ -183,7 +206,7 @@ export function createRouter(channel) {
     const lower = wake.trim().toLowerCase();
     const groupAgent = msg.isGroup ? agentForChat(msg.chat) : null;
     // #34: would this message have woken an agent? (Only then is staying silent worth explaining.)
-    const wakes = !msg.isGroup || msg.mentioned || msg.replyToAgent || listAgents().some((b) => startsWithTrigger(b, lower));
+    const wakes = !msg.isGroup || msg.mentioned || msg.replyToAgent || listAgents().some((b) => findTrigger(b, lower));
     const sender = msg.senderName || (msg.phone ? `+${msg.phone}` : '');
     const quiet = (reason, agentId = groupAgent?.id || '') => silenceReason(reason, { chat: msg.chat, agent: agentId, sender });
 
@@ -235,7 +258,7 @@ export function createRouter(channel) {
     if (!agent || !agent.enabled) {
       if (msg.isGroup) {
         if (!groupAgent) { if (wakes) quiet('no_agent', ''); }
-        else if (msg.mentioned || msg.replyToAgent || startsWithTrigger(groupAgent, lower)) quiet('agent_disabled');
+        else if (msg.mentioned || msg.replyToAgent || findTrigger(groupAgent, lower)) quiet('agent_disabled');
       } else { const d = dmSilence(msg); quiet(d.reason, d.agent); }
       return;
     }
@@ -250,7 +273,7 @@ export function createRouter(channel) {
     const isConfirm = /^(confirm|cancel)\s+[a-z0-9]{4}$/i.test(lower);
     const addressed = !msg.isGroup
       || (agent.respondToMentions && (msg.mentioned || msg.replyToAgent))
-      || !!startsWithTrigger(agent, lower);
+      || !!findTrigger(agent, lower);
     const triggered = addressed || isConfirm;
 
     // Hooks can observe every routed message and optionally answer without the LLM.
