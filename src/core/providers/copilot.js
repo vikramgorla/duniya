@@ -23,7 +23,7 @@ const STEP_TIMEOUT_MS = 180000;
 const ABANDONED_MS = 5 * 60000;
 const TOOL_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 
-export const configured = () => !!getSecret(SECRET);
+export const configured = (secret = SECRET) => !!getSecret(secret);
 
 /** Fine-grained PATs (github_pat_…) and OAuth user tokens (gho_/ghu_) work; classic PATs (ghp_) do not. */
 export function checkToken(token) {
@@ -86,33 +86,43 @@ let factory = defaultFactory;
 /** Tests: replace how the SDK client is made (no runtime, no network). Pass null to restore. */
 export function setClientFactory(fn) { stopClient(); factory = fn || defaultFactory; }
 
-let current = null; // { token, client, started: Promise }
+// 042: one runtime per connected Copilot account (each account's token lives in its own secret).
+const clients = new Map(); // secret -> { token, started: Promise }
 let idleTimer = null;
 function touch() {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => { if (!conversations.size) stopClient(); }, IDLE_MS);
   idleTimer.unref?.();
 }
-export function stopClient() {
-  clearTimeout(idleTimer);
-  for (const c of conversations.values()) c.abandon('Copilot connection closed');
-  conversations.clear();
-  const c = current; current = null;
-  if (c) c.started.then((cl) => cl.stop?.()).catch(() => {});
+/** Stop one account's runtime (or all of them). */
+export function stopClient(secret) {
+  if (!secret) clearTimeout(idleTimer);
+  for (const [k, c] of [...conversations]) {
+    if (secret && c.secret !== secret) continue;
+    c.abandon('Copilot connection closed');
+    conversations.delete(k);
+  }
+  for (const [k, c] of [...clients]) {
+    if (secret && k !== secret) continue;
+    clients.delete(k);
+    c.started.then((cl) => cl.stop?.()).catch(() => {});
+  }
 }
-onSecretChange((n) => { if (n === SECRET) stopClient(); });
+onSecretChange((n) => { if (clients.has(n)) stopClient(n); });
 
-async function client() {
-  const token = getSecret(SECRET);
+async function client(secret = SECRET) {
+  const token = getSecret(secret);
   if (!token) throw Object.assign(new Error('GitHub Copilot is not connected (Models)'), { code: 'no_model' });
-  if (!current || current.token !== token) {
-    stopClient();
+  let cur = clients.get(secret);
+  if (!cur || cur.token !== token) {
+    if (cur) stopClient(secret);
     const started = (async () => { const cl = await factory({ token }); await cl.start?.(); return cl; })();
-    current = { token, started };
-    started.catch(() => { if (current?.started === started) current = null; });
+    cur = { token, started };
+    clients.set(secret, cur);
+    started.catch(() => { if (clients.get(secret)?.started === started) clients.delete(secret); });
   }
   touch();
-  return current.started;
+  return cur.started;
 }
 
 export const friendlyError = (e) => {
@@ -125,9 +135,9 @@ export const friendlyError = (e) => {
 };
 
 // ---------- models & quota ----------
-export async function listModels() {
+async function listModelsFor(secret) {
   try {
-    const cl = await client();
+    const cl = await client(secret);
     const res = await cl.rpc.models.list({});
     return (res?.models || res || [])
       .filter((m) => m?.id && m.policy?.state !== 'disabled')
@@ -136,8 +146,8 @@ export async function listModels() {
 }
 
 /** Remaining Copilot allowance, when the account reports it. */
-export async function quota() {
-  const cl = await client();
+export async function quota(secret = SECRET) {
+  const cl = await client(secret);
   const res = await cl.rpc.account.getQuota({});
   const snaps = res?.quotaSnapshots || {};
   const key = ['premium_interactions', 'chat'].find((k) => snaps[k]) || Object.keys(snaps)[0];
@@ -150,11 +160,11 @@ export async function quota() {
 }
 
 /** Signed-in GitHub login, when the runtime reports it. */
-export async function account() {
-  try { const cl = await client(); const s = await cl.getAuthStatus?.(); return s?.login || ''; } catch { return ''; }
+export async function account(secret = SECRET) {
+  try { const cl = await client(secret); const s = await cl.getAuthStatus?.(); return s?.login || ''; } catch { return ''; }
 }
 
-export function disconnect() { setSecret(SECRET, ''); stopClient(); }
+export function disconnect(secret = SECRET) { setSecret(secret, ''); stopClient(secret); }
 
 // ---------- chat bridge ----------
 const conversations = new Map(); // tool_use id -> Conversation (one entry per open tool call)
@@ -179,8 +189,8 @@ export function toPrompt(messages) {
 }
 
 class Conversation {
-  constructor(session, cl, toolNames) {
-    this.session = session; this.client = cl; this.toolNames = toolNames;
+  constructor(session, cl, toolNames, secret) {
+    this.session = session; this.client = cl; this.toolNames = toolNames; this.secret = secret;
     this.pending = new Map(); // toolCallId -> { name, input, resolve }
     this.texts = []; this.expected = null; this.usage = { input_tokens: 0, output_tokens: 0 };
     this.waiter = null; this.error = null; this.idle = false; this.closed = false;
@@ -278,7 +288,7 @@ async function run(conv) {
   return { content, stop_reason: 'end_turn', usage: r.usage };
 }
 
-export async function chat({ model, system, messages, tools = [] }) {
+async function chatFor(secret, { model, system, messages, tools = [] }) {
   // Continuing a conversation: the last user turn answers tool calls the runtime is waiting for.
   const last = messages.at(-1);
   const results = last?.role === 'user' ? blocksOf(last).filter((b) => b.type === 'tool_result') : [];
@@ -291,7 +301,7 @@ export async function chat({ model, system, messages, tools = [] }) {
   }
 
   let cl;
-  try { cl = await client(); } catch (e) { throw friendlyError(e); }
+  try { cl = await client(secret); } catch (e) { throw friendlyError(e); }
   const toolNames = new Map(); // SDK-safe name -> our name
   const sdkTools = tools.map((t) => {
     let safe = TOOL_NAME_RE.test(t.name) ? t.name : t.name.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -311,8 +321,17 @@ export async function chat({ model, system, messages, tools = [] }) {
     enableSessionStore: false,
     onPermissionRequest: cl.approveAll || (() => ({ kind: 'approved' })),
   }).catch((e) => { throw friendlyError(e); });
-  c = new Conversation(session, cl, toolNames);
+  c = new Conversation(session, cl, toolNames, secret);
   const done = run(c);
   try { await session.send({ prompt: toPrompt(messages) }); } catch (e) { c.close(); c.finish({ error: e }); }
   return done;
 }
+
+/** Adapter for one Copilot account (042). */
+export const copilotAdapter = (secret = SECRET) => ({
+  configured: () => configured(secret),
+  listModels: () => listModelsFor(secret),
+  chat: (args) => chatFor(secret, args),
+});
+export const listModels = () => listModelsFor(SECRET);
+export const chat = (args) => chatFor(SECRET, args);

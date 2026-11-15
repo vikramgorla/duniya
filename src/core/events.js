@@ -34,6 +34,7 @@ export function categoryOf(type) {
   if (type === 'tool.call') return 'tools';
   if (type.startsWith('confirm.')) return 'confirmations';
   if (type === 'model.usage') return 'models';
+  if (type === 'model.fallback' || type === 'model.provider') return 'system'; // provider switches and pauses (042)
   if (type.startsWith('memory.')) return 'memory';
   if (type.startsWith('schedule.')) return 'schedules';
   if (type === 'channel.status') return 'channel';

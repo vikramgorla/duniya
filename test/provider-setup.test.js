@@ -128,12 +128,18 @@ test('OpenRouter preset: one tap, key kept secret, free-only filter, auto picks 
   assert.match(orr.chatReqs.at(-1).model, /:free$/);
   assert.match(t.sent.at(-1).text, /^Hi from .+:free$/);
 
-  // a paid model is refused while free-only is on
-  await t.agents.updateAgent('helper', { model: 'openrouter:anthropic/claude-sonnet-5.5' });
+  // a paid model is refused while free-only is on (fallback off: with fallback a free model answers instead, 042)
+  await t.agents.updateAgent('helper', { model: 'openrouter:anthropic/claude-sonnet-5.5', fallback: { mode: 'off' } });
   const before = orr.chatReqs.length;
   await t.route(t.msg({ chat: 'g2@g.us', text: '!help hello again' }));
   assert.equal(orr.chatReqs.length, before, 'no request for a paid model');
   assert.match(t.sent.at(-1).text, /only allows free models/);
+  // with fallback on, the free Auto model answers and no paid model is requested
+  await t.agents.updateAgent('helper', { fallback: { mode: 'inherit' } });
+  await t.route(t.msg({ chat: 'g2@g.us', text: '!help hello once more' }));
+  assert.match(orr.chatReqs.at(-1).model, /:free$/);
+  assert.ok(orr.chatReqs.slice(before).every((r) => /:free$/.test(r.model)), 'never a paid model');
+  assert.match(t.sent.at(-1).text, /^Hi from .+:free$/);
   t.store.setSecret('ANTHROPIC_API_KEY', keepKey);
   await t.agents.updateAgent('helper', { model: 'claude-sonnet-5-5' });
 });
@@ -202,10 +208,12 @@ test('GitHub Copilot: chat round trip with a tool call through the agent (bridge
   const acts = (await t.api(owner, 'GET', '/api/activity?limit=50')).body;
   assert.ok(acts.some((a) => a.type === 'model.usage' && /copilot:claude-sonnet-4.5: 14 in \/ 10 out/.test(a.summary)));
 
-  // errors reported by the runtime reach the chat as a clear message, not a crash
+  // errors reported by the runtime reach the chat as a clear message, not a crash (fallback off for this agent)
+  await t.agents.updateAgent('panduga', { fallback: { mode: 'off' } });
   cp.script.push([{ error: 'You have reached your Copilot usage limit' }]);
   await t.route(t.msg({ text: '!panduga again?' }));
   assert.match(t.sent.at(-1).text, /Copilot usage limit/);
+  await t.agents.updateAgent('panduga', { fallback: { mode: 'inherit' } });
 
   cp.script.push([{ text: 'Hi there!' }]);
   const r = await t.api(owner, 'POST', '/api/providers/copilot/test', {});

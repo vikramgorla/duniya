@@ -1,4 +1,7 @@
 // Shared e2e harness: fake MCP server, scripted fake Claude API, fake WhatsApp channel, real core + panel.
+// Failing providers (042): `t.claudeFail` (a queue of failures for the fake Claude API) and `fakeChatProvider()` (an
+// OpenAI-compatible endpoint with per-key scripts and failures). A failure is { status, message?, code?, retryAfter? }
+// (e.g. 429 with Retry-After, 500, 401, 400, 404 model not found) or { network: true } (connection dropped).
 import http from 'node:http';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,9 +10,46 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
+/** Answer a request with a scripted failure (see the header). */
+export function sendFailure(req, res, f, style = 'openai') {
+  if (f.network) { req.socket.destroy(); return; }
+  const headers = { 'content-type': 'application/json', ...(f.retryAfter != null ? { 'retry-after': String(f.retryAfter) } : {}) };
+  res.writeHead(f.status || 500, headers);
+  const message = f.message || `fake failure ${f.status || 500}`;
+  res.end(JSON.stringify(style === 'anthropic'
+    ? { type: 'error', error: { type: f.code || (f.status === 429 ? 'rate_limit_error' : f.status === 401 ? 'authentication_error' : f.status === 404 ? 'not_found_error' : f.status >= 500 ? 'api_error' : 'invalid_request_error'), message } }
+    : { error: { message, code: f.code || null, type: f.type || 'error' } }));
+}
+
+/**
+ * A fake OpenAI-compatible provider. Every request is recorded with its key; `fail[key]` holds failures for that key
+ * (or `fail['*']` for any key), shifted one per chat request; `script` holds assistant replies (Chat Completions
+ * `message` objects), shifted per successful chat request; otherwise it answers "<name> (<key>) says hi".
+ */
+export function fakeChatProvider({ name = 'fake', models = ['fake-large', 'fake-mini'] } = {}) {
+  const f = { name, reqs: [], fail: {}, script: [], models };
+  f.server = http.createServer(async (req, res) => {
+    let d = ''; for await (const c of req) d += c;
+    const key = String(req.headers.authorization || '').replace(/^Bearer /, '');
+    const json = (code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
+    if (req.method === 'GET' && req.url.endsWith('/models')) return json(200, { data: f.models.map((id) => ({ id })) });
+    if (req.url.endsWith('/chat/completions')) {
+      const body = JSON.parse(d); f.reqs.push({ key, body });
+      const failure = f.fail[key]?.shift() || f.fail['*']?.shift();
+      if (failure) return sendFailure(req, res, failure);
+      const message = f.script.shift() || { content: `${name} (${key}) says hi` };
+      return json(200, { choices: [{ message, finish_reason: message.tool_calls ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 4, completion_tokens: 3 } });
+    }
+    json(404, { error: { message: 'not found' } });
+  }).listen(0);
+  f.url = () => `http://127.0.0.1:${f.server.address().port}/v1`;
+  f.close = () => f.server.close();
+  return f;
+}
+
 export async function setup({ bindings = {}, env = {}, seed = true, extend = null, beforeImport = null, chatsOn = true } = {}) {
   const t = {
-    mcpCalls: [], claudeReqs: [], summaryReqs: [], script: [], sent: [],
+    mcpCalls: [], claudeReqs: [], summaryReqs: [], script: [], sent: [], claudeFail: [],
     summaryText: 'Decisions: take the 9:10 train. Rao family arrives Saturday.', summaryFail: false,
   };
 
@@ -49,6 +89,8 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
       if (t.summaryFail) { res.writeHead(500, { 'content-type': 'application/json' }); res.end('{"type":"error","error":{"type":"api_error","message":"boom"}}'); return; }
     } else {
       t.claudeReqs.push(body);
+      const f = t.claudeFail.shift();
+      if (f) return sendFailure(req, res, f, 'anthropic');
     }
     const content = isSummary ? [{ type: 'text', text: t.summaryText }] : (t.script.shift() || [{ type: 'text', text: '(script empty)' }]);
     res.writeHead(200, { 'content-type': 'application/json' });

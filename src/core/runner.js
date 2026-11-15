@@ -1,6 +1,7 @@
 import { env } from './config.js';
 import { addPending, takePending, peekPending, dropPending } from './db.js';
-import { chat as modelChat } from './providers/index.js';
+import { chat as modelChat, effectiveFallback } from './providers/index.js';
+import { REASON_TEXT } from './providers/errors.js';
 import { getChatPrefs } from './chat-prefs.js';
 
 /** The model for a chat: the chat's own choice (auto, provider:auto or provider:model) or the agent's. */
@@ -52,6 +53,10 @@ export function friendlyModelError(e) {
   if (code === 'copilot_limit') return 'I have reached the GitHub Copilot usage limit for now. Please try again later.';
   if (code === 'free_only') return 'My model isn’t available right now (this server only allows free models). An admin can choose another model.';
   if (code === 'no_model') return 'No AI model is configured yet. An admin needs to connect a model provider.';
+  // 042: every model in the fallback chain failed or is paused for a retryable reason (limits, outages, sign-in).
+  if (code === 'all_paused' || ['rate_limit', 'quota', 'server', 'network', 'timeout', 'auth'].includes(e?.fallbackReason)) {
+    return `My AI model isn’t available right now (${REASON_TEXT[e.fallbackReason] || 'provider problem'}). Please try again ${e.fallbackReason === 'quota' ? 'later' : 'in a few minutes'}.`;
+  }
   return null;
 }
 
@@ -102,22 +107,31 @@ export async function runAgent(ctx) {
   const codes = [];
   let reply = '';
   const usage = { input: 0, output: 0 };
+  // Fallback (042): per model call, keeping this turn's messages, so tools that already ran never run again and
+  // nothing is sent before the turn ends. The account that answered stays first for the rest of the turn.
+  const fallback = effectiveFallback({ agent, chatPrefs: getChatPrefs(ctx.contextChat || chat) });
+  const turn = { ref: '' };
+  const failed = [];
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     let res;
     try {
       res = await modelChat({
         model, purpose: 'agent', maxTokens: agent.maxTokens, usage: { agent: agent.id, chat, kind: ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : 'reply' },
-        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName }), tools: defs, messages,
+        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName }), tools: defs, messages, fallback, turn,
       });
     } catch (e) {
+      if (e.failures?.length) ctx.fallback = { answeredBy: '', failed: [...failed, ...e.failures.filter((f) => f.reason !== 'unavailable').map(({ ref, name, reason }) => ({ ref, name, reason }))] };
       const friendly = friendlyModelError(e);
       if (!friendly) throw e;
-      activity('error', { agent: agent.id, chat, summary: `Model error: ${e.message}`, detail: { code: e.code } });
+      activity('error', { agent: agent.id, chat, summary: `Model error: ${e.message}`, detail: { code: e.code, reason: e.fallbackReason, failures: e.failures } });
       ctx.modelError = e.code || 'model_error'; // the router records why the agent could not really answer (#34)
       return friendly;
     }
     ctx.model = res.model;
+    ctx.answeredBy = res.answeredBy || res.model;
+    for (const f of res.failures || []) failed.push({ ref: f.ref, name: f.name, reason: f.reason });
+    if (failed.length) ctx.fallback = { answeredBy: ctx.answeredBy, model: res.model, failed };
     usage.input += res.usage?.input_tokens || 0;
     usage.output += res.usage?.output_tokens || 0;
     reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
@@ -161,7 +175,8 @@ export async function runAgent(ctx) {
     reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm.ttlMinutes || 9} min).`;
   }
   ctx.usage = usage;
-  activity('model.usage', { agent: agent.id, chat, summary: `${ctx.model || agent.model}: ${usage.input} in / ${usage.output} out` });
+  const via = failed.length ? ` (after ${failed.map((f) => `${f.name}: ${REASON_TEXT[f.reason] || f.reason}`).join(', ')})` : '';
+  activity('model.usage', { agent: agent.id, chat, summary: `${ctx.model || agent.model}: ${usage.input} in / ${usage.output} out${via}`, detail: failed.length ? { fallback: failed } : undefined });
   return reply.trim() || null;
 }
 

@@ -1,7 +1,7 @@
 title: "WhatsApp agents (whatsapp-agent-duniya)"
 description: "Self-hosted WhatsApp agents with an admin panel, on an Always Free VM."
 schemaVersion: 1.1.0
-version: "2.5.1"
+version: "2.6.0"
 locale: "en"
 
 variableGroups:

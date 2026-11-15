@@ -236,6 +236,14 @@ Admin panel (localhost:8080 behind Caddy / Cloudflare Tunnel / SSH) · SQLite ·
 - **Models**: OpenRouter (optionally free models only), Anthropic API key, OpenAI API key, any OpenAI-compatible
   endpoint (Ollama, …), your ChatGPT Plus/Pro plan via Sign in with ChatGPT, or your GitHub Copilot allowance via the
   official Copilot SDK (downloaded only if you connect it). Pick per agent and per chat, or *Auto*.
+- **Fallback and several accounts** (042): when a model hits a rate or usage limit, runs out of credit, is down, times
+  out or its sign-in expired, the agent answers with the next model of the fallback chain (**Models → When a model
+  fails**; default: any other connected provider's Auto; per agent and per chat: inherit / switch / don't switch, own
+  chain). Refused requests (400) never switch, and tools that already ran never run again. A failing account is paused
+  (1 min, doubling to 30 min; usage limits until the provider's reset time) and shown as "Paused until 14:20 — usage
+  limit reached"; the owner gets a WhatsApp alert after 15 minutes or when no provider can answer. Each provider can
+  have several accounts with a label (model refs `openai-work:gpt-…`), used *in order* (failover) or *spread* (least
+  recently used). Use your own accounts: some plans' terms forbid sharing accounts or getting around their limits.
 - **Global tool services** (035): MCP servers defined once under **Settings → Tool services** are available to every
   agent. An agent can switch one off (`globalMcp.disabled` in its config), and an agent's own service with the same name
   replaces the global one for that agent. Tools still follow the agent's `server:tool` rules; for a role without explicit

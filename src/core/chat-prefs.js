@@ -1,6 +1,7 @@
 // Per-chat preferences (013/011): model choice and activity logging level for a single chat (group or person).
 // The agent a chat talks to stays in the agent's `chats` list (one source of truth for bindings).
 import { db } from './db.js';
+import { cleanOverride } from './providers/fallback-config.js';
 
 const TENANT = 'default';
 db.exec(`
@@ -13,6 +14,9 @@ db.exec(`
     name TEXT, phone TEXT, last_at INTEGER, PRIMARY KEY (tenant_id, chat)
   );
 `);
+// 042: per-chat fallback override (JSON { mode, chain }). Added in place so an update keeps chat settings.
+if (!db.prepare('PRAGMA table_info(chat_prefs)').all().some((c) => c.name === 'fallback')) db.exec("ALTER TABLE chat_prefs ADD COLUMN fallback TEXT NOT NULL DEFAULT ''");
+const parseFallback = (v) => { try { return v ? cleanOverride(JSON.parse(v)) : { mode: 'inherit', chain: [] }; } catch { return { mode: 'inherit', chain: [] }; } };
 
 export const LOGGING_LEVELS = ['inherit', 'off', 'minimal', 'normal', 'verbose'];
 const MODEL_RE = /^(inherit|auto|[a-z][a-z0-9-]{1,30}:[A-Za-z0-9._:/@+-]{1,120})$/;
@@ -21,23 +25,25 @@ const MODEL_RE = /^(inherit|auto|[a-z][a-z0-9-]{1,30}:[A-Za-z0-9._:/@+-]{1,120})
 // or sent to a model (chat_prefs.enabled).
 const cache = new Map();
 export function getChatPrefs(chat) {
-  if (!chat) return { model: 'inherit', logging: 'inherit', enabled: false };
+  if (!chat) return { model: 'inherit', logging: 'inherit', enabled: false, fallback: parseFallback('') };
   if (cache.has(chat)) return cache.get(chat);
-  const r = db.prepare('SELECT model, logging, enabled FROM chat_prefs WHERE tenant_id = ? AND chat = ?').get(TENANT, chat);
-  const v = { model: r?.model || 'inherit', logging: r?.logging || 'inherit', enabled: !!r?.enabled };
+  const r = db.prepare('SELECT model, logging, enabled, fallback FROM chat_prefs WHERE tenant_id = ? AND chat = ?').get(TENANT, chat);
+  const v = { model: r?.model || 'inherit', logging: r?.logging || 'inherit', enabled: !!r?.enabled, fallback: parseFallback(r?.fallback) };
   cache.set(chat, v);
   return v;
 }
-export function setChatPrefs(chat, { model, logging, enabled }) {
+export function setChatPrefs(chat, { model, logging, enabled, fallback }) {
   const cur = getChatPrefs(chat);
-  const next = { model: model ?? cur.model, logging: logging ?? cur.logging, enabled: enabled === undefined ? cur.enabled : !!enabled };
+  const next = { model: model ?? cur.model, logging: logging ?? cur.logging, enabled: enabled === undefined ? cur.enabled : !!enabled,
+    fallback: fallback === undefined ? cur.fallback : cleanOverride(fallback, 'fallback') };
   if (!MODEL_RE.test(next.model)) throw Object.assign(new Error('model must be inherit, auto, provider:auto or provider:model'), { status: 400, field: 'model' });
   if (!LOGGING_LEVELS.includes(next.logging)) throw Object.assign(new Error(`logging must be one of ${LOGGING_LEVELS.join(', ')}`), { status: 400, field: 'logging' });
-  db.prepare('INSERT OR REPLACE INTO chat_prefs (tenant_id, chat, model, logging, enabled, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run(TENANT, chat, next.model, next.logging, next.enabled ? 1 : 0, Date.now());
+  const fb = next.fallback.mode === 'inherit' && !next.fallback.chain.length ? '' : JSON.stringify(next.fallback);
+  db.prepare('INSERT OR REPLACE INTO chat_prefs (tenant_id, chat, model, logging, enabled, fallback, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(TENANT, chat, next.model, next.logging, next.enabled ? 1 : 0, fb, Date.now());
   cache.set(chat, next);
   return next;
 }
-export const allChatPrefs = () => Object.fromEntries(db.prepare('SELECT chat, model, logging, enabled FROM chat_prefs WHERE tenant_id = ?').all(TENANT).map((r) => [r.chat, { model: r.model, logging: r.logging, enabled: !!r.enabled }]));
+export const allChatPrefs = () => Object.fromEntries(db.prepare('SELECT chat, model, logging, enabled, fallback FROM chat_prefs WHERE tenant_id = ?').all(TENANT).map((r) => [r.chat, { model: r.model, logging: r.logging, enabled: !!r.enabled, fallback: parseFallback(r.fallback) }]));
 export const isChatEnabled = (chat) => getChatPrefs(chat).enabled;
 export const enabledChats = () => db.prepare('SELECT chat FROM chat_prefs WHERE tenant_id = ? AND enabled = 1').all(TENANT).map((r) => r.chat);
 /** Count of messages ignored because the chat is off (shown on the Chats page; in memory only). */

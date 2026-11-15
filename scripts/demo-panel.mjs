@@ -163,6 +163,10 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   store.setSecret('ANTHROPIC_API_KEY', 'sk-ant-demo-not-a-real-key');
   store.setSecret('CHATGPT_CREDENTIALS', JSON.stringify({ access_token: 'demo', refresh_token: 'demo', expires_at: now + 365 * D, email: 'owner@example.org', client_id: 'demo', scopes: [] }));
   providers.addOpenRouter({ key: 'sk-or-demo-not-a-real-key', freeOnly: true });
+  // 042: a second ChatGPT account, and OpenRouter paused by its daily free limit
+  store.updateSettings({ accounts: [{ id: 'chatgpt-sam', type: 'chatgpt', label: 'Sam' }] });
+  store.setSecret('PROVIDER_CHATGPT_SAM_CREDENTIALS', JSON.stringify({ access_token: 'demo', refresh_token: 'demo', expires_at: now + 365 * D, email: 'sam@example.org', client_id: 'demo', scopes: [] }));
+  (await imp('src/core/providers/breaker.js')).recordFailure('openrouter', { reason: 'quota', retryAfterMs: 3 * H }, { name: 'OpenRouter', message: 'Rate limit exceeded: free-models-per-day' });
 
   // agents from the templates
   await agents.loadAgents();
@@ -244,21 +248,22 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
 
   // 30 days of usage
   const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0); const todaySpan = now - startOfToday.getTime();
-  const ins = db.db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kind, input, output, cost, priced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const ins = db.db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kind, input, output, cost, priced, account, fallback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
   const plan = [
     ['carpool', G(3), 'anthropic', 'claude-haiku-5-5', 9, 1.0, 5.0, 'set'],
     ['school', G(1), 'anthropic', 'claude-sonnet-5-5', 5, 3.0, 15.0, 'set'],
     ['family', G(2), 'chatgpt', 'gpt-5.5', 6, 0, 0, 'plan'],
     ['office', G(4), 'anthropic', 'claude-sonnet-5-5', 4, 3.0, 15.0, 'set'],
     ['football', `club#${G(8)}`, 'openrouter', 'deepseek/deepseek-v4:free', 5, 0, 0, 'free'],
+    ['family', G(2), 'chatgpt', 'gpt-5.5', 2, 0, 0, 'plan', 'chatgpt-sam', 'after ChatGPT plan (usage limit reached)'],
   ];
   let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   for (let day = 29; day >= 0; day--) {
-    for (const [agent, chat, prov, model, perDay, pin, pout, priced] of plan) {
+    for (const [agent, chat, prov, model, perDay, pin, pout, priced, account = prov, fallback = ''] of plan) {
       const n = Math.max(1, Math.round(perDay * (0.5 + rnd() * (day < 10 ? 1.4 : 0.9))));
       for (let k = 0; k < n; k++) {
         const input = Math.round(900 + rnd() * 2600); const output = Math.round(40 + rnd() * 220);
-        ins.run(day === 0 ? now - Math.round(rnd() * todaySpan) : now - day * D - Math.round(rnd() * 20 * H), agent, chat, prov, model, rnd() < 0.12 ? 'summary' : 'reply', input, output, (input * pin + output * pout) / 1e6, priced);
+        ins.run(day === 0 ? now - Math.round(rnd() * todaySpan) : now - day * D - Math.round(rnd() * 20 * H), agent, chat, prov, model, rnd() < 0.12 ? 'summary' : 'reply', input, output, (input * pin + output * pout) / 1e6, priced, account, fallback);
       }
     }
   }

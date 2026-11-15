@@ -19,13 +19,15 @@ const CRED = 'CHATGPT_CREDENTIALS';
 const b64url = (buf) => Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const pending = new Map(); // state -> { verifier, nonce, clientId, registering, at }
 
-export function credentials() {
-  const raw = getSecret(CRED);
+export const SECRET = CRED;
+// 042: every ChatGPT account keeps its sign-in in its own secret (the first account in CHATGPT_CREDENTIALS).
+export function credentials(secret = CRED) {
+  const raw = getSecret(secret);
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
 }
-const saveCredentials = (c) => setSecret(CRED, JSON.stringify(c));
-export const configured = () => !!credentials()?.access_token;
+const saveCredentials = (secret, c) => setSecret(secret, JSON.stringify(c));
+export const configured = (secret = CRED) => !!credentials(secret)?.access_token;
 
 function hostId() {
   let h = getSetting('siwcHostId');
@@ -33,10 +35,10 @@ function hostId() {
   return h;
 }
 
-/** Step 1: build the authorize URL. */
-export function startSignIn() {
+/** Step 1: build the authorize URL. `secret` = where this account's sign-in is kept; `meta` comes back on completion. */
+export function startSignIn({ secret = CRED, meta = {} } = {}) {
   for (const [s, p] of pending) if (Date.now() - p.at > 15 * 60000) pending.delete(s);
-  const saved = credentials();
+  const saved = credentials(secret);
   const verifier = b64url(randomBytes(32));
   const state = b64url(randomBytes(16));
   const nonce = b64url(randomBytes(16));
@@ -57,7 +59,7 @@ export function startSignIn() {
     if (saved.id_token) params.set('id_token_hint', saved.id_token);
     if (saved.email) params.set('login_hint', saved.email);
   }
-  pending.set(state, { verifier, nonce, clientId, registering: !saved, at: Date.now() });
+  pending.set(state, { verifier, nonce, clientId, registering: !saved, at: Date.now(), secret, meta });
   return { authorizeUrl: `${AUTH_BASE()}/api/accounts/authorize?${params}`, redirectUri: REDIRECT_URI, expiresIn: 900 };
 }
 
@@ -104,32 +106,37 @@ export async function completeSignIn(callbackUrl) {
     id_token: tok.id_token, access_token: tok.access_token, refresh_token: tok.refresh_token, token_type: tok.token_type || 'Bearer',
     expires_at: Date.now() + (Number(tok.expires_in) || 3600) * 1000, scopes, saved_at: new Date().toISOString(),
   };
-  saveCredentials(creds);
-  return { email: creds.email };
+  saveCredentials(p.secret, creds);
+  return { email: creds.email, secret: p.secret, meta: p.meta };
 }
 
-let refreshing = null;
-async function accessToken() {
-  const c = credentials();
-  if (!c?.access_token) throw new Error('ChatGPT is not connected (Models → Sign in with ChatGPT)');
+const refreshing = new Map(); // secret -> Promise
+async function accessToken(secret = CRED) {
+  const c = credentials(secret);
+  if (!c?.access_token) throw Object.assign(new Error('ChatGPT is not connected (Models → Sign in with ChatGPT)'), { code: 'no_model' });
   if (c.expires_at - Date.now() > 5 * 60000) return c.access_token;
-  refreshing ??= (async () => {
-    try {
-      const tok = await tokenRequest({ grant_type: 'refresh_token', client_id: c.client_id, refresh_token: c.refresh_token });
-      const next = {
-        ...c, access_token: tok.access_token, refresh_token: tok.refresh_token || c.refresh_token,
-        id_token: tok.id_token || c.id_token, expires_at: Date.now() + (Number(tok.expires_in) || 3600) * 1000,
-        scopes: tok.scope || tok.scopes ? scopesOf(tok) : c.scopes, saved_at: new Date().toISOString(),
-      };
-      saveCredentials(next);
-      return next.access_token;
-    } finally { refreshing = null; }
-  })();
-  return refreshing;
+  if (!refreshing.has(secret)) {
+    refreshing.set(secret, (async () => {
+      try {
+        const tok = await tokenRequest({ grant_type: 'refresh_token', client_id: c.client_id, refresh_token: c.refresh_token }).catch((e) => {
+          // A refused refresh means the sign-in is no longer valid: the account needs reconnecting (042).
+          throw Object.assign(new Error(`ChatGPT sign-in expired (${e.message}). Sign in again under Models.`), { code: 'signin_expired' });
+        });
+        const next = {
+          ...c, access_token: tok.access_token, refresh_token: tok.refresh_token || c.refresh_token,
+          id_token: tok.id_token || c.id_token, expires_at: Date.now() + (Number(tok.expires_in) || 3600) * 1000,
+          scopes: tok.scope || tok.scopes ? scopesOf(tok) : c.scopes, saved_at: new Date().toISOString(),
+        };
+        saveCredentials(secret, next);
+        return next.access_token;
+      } finally { refreshing.delete(secret); }
+    })());
+  }
+  return refreshing.get(secret);
 }
 
-export async function disconnect() {
-  const c = credentials();
+export async function disconnect(secret = CRED) {
+  const c = credentials(secret);
   if (c?.refresh_token) {
     try {
       const disc = await (await fetch(`${AUTH_BASE()}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(10000) })).json();
@@ -138,13 +145,15 @@ export async function disconnect() {
       }
     } catch { /* best effort */ }
   }
-  setSecret(CRED, '');
+  setSecret(secret, '');
 }
 
-export async function listModels() {
-  const res = await fetch(`${API_BASE()}/models`, { headers: { authorization: `Bearer ${await accessToken()}` }, signal: AbortSignal.timeout(20000) });
+const httpError = (res, json, fallback) => Object.assign(new Error(json.error?.message || fallback), { code: json.error?.code || json.error?.type, status: res.status, headers: res.headers, error: json });
+
+async function listModelsFor(secret) {
+  const res = await fetch(`${API_BASE()}/models`, { headers: { authorization: `Bearer ${await accessToken(secret)}` }, signal: AbortSignal.timeout(20000) });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error?.message || `models ${res.status}`);
+  if (!res.ok) throw httpError(res, json, `models ${res.status}`);
   return (json.models || []).filter((m) => (m.visibility ?? 'list') === 'list').map((m) => ({ id: m.slug, label: m.display_name || m.slug }));
 }
 
@@ -184,18 +193,18 @@ function fromOutputItems(items = []) {
   return content;
 }
 
-export async function chat({ model, system, messages, tools }) {
+async function chatFor(secret, { model, system, messages, tools }) {
   const body = {
     model, instructions: system, input: toResponsesInput(messages), store: false, stream: true,
     ...(tools?.length ? { tools: tools.map((t) => ({ type: 'function', name: t.name, description: t.description || '', parameters: t.input_schema || { type: 'object', properties: {} }, strict: false })) } : {}),
   };
   const res = await fetch(`${API_BASE()}/responses`, {
-    method: 'POST', headers: { authorization: `Bearer ${await accessToken()}`, 'content-type': 'application/json', accept: 'text/event-stream' },
+    method: 'POST', headers: { authorization: `Bearer ${await accessToken(secret)}`, 'content-type': 'application/json', accept: 'text/event-stream' },
     body: JSON.stringify(body), signal: AbortSignal.timeout(180000),
   });
   if (!res.ok) {
     const json = await res.json().catch(() => ({}));
-    throw Object.assign(new Error(json.error?.message || `ChatGPT request failed (${res.status})`), { code: json.error?.code, status: res.status });
+    throw httpError(res, json, `ChatGPT request failed (${res.status})`);
   }
   const items = [];
   let completed = null;
@@ -208,7 +217,7 @@ export async function chat({ model, system, messages, tools }) {
     else if (ev.type === 'response.completed') completed = ev.response || {};
     else if (ev.type === 'response.failed' || ev.type === 'error') {
       const e = ev.response?.error || ev.error || {};
-      throw Object.assign(new Error(e.message || 'ChatGPT request failed'), { code: e.code });
+      throw Object.assign(new Error(e.message || 'ChatGPT request failed'), { code: e.code, error: { error: e } });
     } else if (ev.type === 'response.incomplete') completed = { ...(ev.response || {}), incomplete: true };
   };
   for await (const chunk of res.body) {
@@ -225,3 +234,12 @@ export async function chat({ model, system, messages, tools }) {
   const stop = content.some((b) => b.type === 'tool_use') ? 'tool_use' : completed.incomplete ? 'max_tokens' : 'end_turn';
   return { content, stop_reason: stop, usage: { input_tokens: completed.usage?.input_tokens || 0, output_tokens: completed.usage?.output_tokens || 0 } };
 }
+
+/** Adapter for one ChatGPT account (042). */
+export const chatgptAdapter = (secret = CRED) => ({
+  configured: () => configured(secret),
+  listModels: () => listModelsFor(secret),
+  chat: (args) => chatFor(secret, args),
+});
+export const listModels = () => listModelsFor(CRED);
+export const chat = (args) => chatFor(CRED, args);

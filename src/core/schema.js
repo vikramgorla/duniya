@@ -1,6 +1,7 @@
 // Agent configuration: defaults, validation and normalisation (005). Single source of truth for agent shape.
 import { validPackageSpec } from './mcp-local.js';
 import { digits } from './config.js';
+import { cleanOverride } from './providers/fallback-config.js';
 
 export const AGENT_DEFAULTS = Object.freeze({
   name: '',
@@ -8,6 +9,7 @@ export const AGENT_DEFAULTS = Object.freeze({
   enabled: true,
   model: 'auto',
   maxTokens: 1024,
+  fallback: { mode: 'inherit', chain: [] }, // 042: inherit | on | off, and an own chain (empty = Models setting)
   historySize: 30,
   prompt: 'You are a helpful assistant in a WhatsApp group.',
   triggers: [],
@@ -138,6 +140,7 @@ export function validateAgentConfig(input) {
   out.enabled = !!c.enabled;
   out.model = str(c.model || 'auto', 'model', { min: 1, max: 120 });
   out.maxTokens = int(c.maxTokens, 'maxTokens', 64, 8192);
+  try { out.fallback = cleanOverride(c.fallback, 'fallback'); } catch (e) { fail(e.field || 'fallback', e.message); }
   out.historySize = int(c.historySize, 'historySize', 0, 200);
   out.prompt = str(c.prompt, 'prompt', { min: 1, max: 20000 });
   out.triggers = [...new Set(list(c.triggers, 'triggers').map((t) => t.toLowerCase()))];

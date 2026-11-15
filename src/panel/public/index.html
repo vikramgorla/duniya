@@ -104,6 +104,8 @@
   .bubble { padding: 9px 12px; border-radius: 16px; max-width: 85%; white-space: pre-wrap; word-break: break-word; }
   .bubble.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; } .bubble.agent { align-self: flex-start; background: var(--bg-2); border-bottom-left-radius: 4px; }
   .hide { display: none !important; }
+  .chainlist { margin: 6px 0 8px; padding-left: 22px; } .chainlist li { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .chainlist .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; } .acct { margin-top: 8px; } .acct .row { flex-wrap: wrap; }
   .code { font-family: var(--mono); font-size: 22px; letter-spacing: 3px; font-weight: 600; }
   .readonly .mut { display: none !important; }
   .meter { height: 8px; border-radius: 999px; background: var(--bg-2); overflow: hidden; margin: 8px 0 4px; }
@@ -1073,8 +1075,9 @@ async function capEditor(scope, id, models) {
 }
 
 async function renderUsage() {
-  const [byDay, byAgent, byChat, byProv, byModel, byKind, sum, chats, agents] = await Promise.all(['day', 'agent', 'chat', 'provider', 'model', 'kind']
-    .map((g) => api('GET', `/api/usage?period=${usagePeriod}&groupBy=${g}`)).concat([usageSummary(), api('GET', '/api/chats').catch(() => []), api('GET', '/api/agents').catch(() => [])]));
+  const [byDay, byAgent, byChat, byProv, byModel, byKind, byAcct, byFb, sum, chats, agents, provList] = await Promise.all(['day', 'agent', 'chat', 'provider', 'model', 'kind', 'account', 'fallback']
+    .map((g) => api('GET', `/api/usage?period=${usagePeriod}&groupBy=${g}`)).concat([usageSummary(), api('GET', '/api/chats').catch(() => []), api('GET', '/api/agents').catch(() => []), api('GET', '/api/providers').catch(() => [])]));
+  const acctName = Object.fromEntries(provList.map((p) => [p.id, p.name]));
   const caps = await api('GET', '/api/budget').catch(() => null);
   const t = byDay.total;
   const chatName = Object.fromEntries(chats.map((c) => [c.id, c.name])); const agentName = Object.fromEntries(agents.map((b) => [b.id, b.name]));
@@ -1115,6 +1118,8 @@ async function renderUsage() {
       table('By agent', byAgent, (k) => agentName[k] || k || '(no agent)'),
       table('By chat', byChat, (k) => chatName[k] || (k ? k.replace(/@.*/, '') : '(no chat)')),
       table('By provider', byProv, (k) => k),
+      byAcct.rows.length > 1 || byProv.rows.some((r) => !byAcct.rows.some((a) => a.key === r.key)) ? table('By account', byAcct, (k) => acctName[k] || k) : null,
+      byFb.rows.some((r) => r.key === 'fallback') ? table('First choice or fallback', byFb, (k) => (k === 'fallback' ? 'Answered by a fallback model' : 'Answered by the chosen model')) : null,
       table('By kind', byKind, (k) => KIND[k] || k)),
     h('div', { style: 'margin-top:16px' }, table('By model', byModel, (k) => k, priceEditor)),
     h('p', { class: 'small muted' }, 'Costs are estimates from the prices you set (or the provider publishes, e.g. OpenRouter). ChatGPT plan and Copilot calls are included in those plans. Your provider’s bill is the source of truth.'));
@@ -1159,6 +1164,45 @@ function modelSelect(models, value, { withInherit = false, autoLabel = 'Auto (be
       list.map((m) => h('option', { value: m.ref, selected: value === m.ref }, m.label.split(' · ').slice(1).join(' · ') || m.ref)))),
     value && !known.has(value) ? h('option', { value, selected: true }, `${value} (not available)`) : null);
 }
+// ---------- model fallback (042) ----------
+const FB_REASON = { rate_limit: 'rate limit', quota: 'usage limit', server: 'provider error', network: 'network error', timeout: 'timed out', auth: 'sign-in expired', model_not_found: 'model not available', unavailable: 'not connected', bad_request: 'request refused' };
+/** "Answered by OpenAI — work after Anthropic failed (usage limit)" for the test console. */
+const fallbackLine = (fb) => (fb?.failed?.length ? `${fb.answeredBy ? `Answered by ${fb.answeredBy}` : 'No model could answer'} after ${fb.failed.map((f) => `${f.name} failed (${FB_REASON[f.reason] || f.reason})`).join(', ')}` : '');
+/** Ordered list of models to try. Empty = any other connected provider (Auto). Returns { el, value() }. */
+function chainEditor(models, initial, { emptyText = 'Any other connected provider, each with its Auto model, in the order shown on this page.' } = {}) {
+  const chain = [...(initial || [])];
+  const box = h('div', { class: 'chain' });
+  const draw = () => {
+    const add = modelSelect(models, 'auto', { autoLabel: chain.length ? '+ Add another model…' : '+ Add a model…', disabled: !can('admin'), onchange: (e) => { const v = e.target.value; if (v !== 'auto' && !chain.includes(v) && chain.length < 10) chain.push(v); draw(); } });
+    box.replaceChildren(
+      chain.length ? h('ol', { class: 'chainlist' }, chain.map((ref, i) => h('li', {},
+        h('span', { class: 'grow' }, modelLabel(ref, models)),
+        h('button', { type: 'button', class: 'btn small mut', disabled: i === 0, 'aria-label': 'Move up', onclick: () => { [chain[i - 1], chain[i]] = [chain[i], chain[i - 1]]; draw(); } }, '↑'),
+        h('button', { type: 'button', class: 'btn small danger mut', 'aria-label': 'Remove', onclick: () => { chain.splice(i, 1); draw(); } }, '✕'))))
+        : h('p', { class: 'small muted', style: 'margin:4px 0' }, emptyText),
+      add);
+  };
+  draw();
+  return { el: box, value: () => [...chain] };
+}
+/** Agent / chat override: inherit | on | off, plus an own chain. Returns { el, value() }. */
+function fallbackPicker(models, override, { what = 'agent' } = {}) {
+  const o = override || { mode: 'inherit', chain: [] };
+  const fb = models.fallback || { enabled: true, chain: [] };
+  const mode = h('select', { disabled: !can('admin') },
+    h('option', { value: 'inherit', selected: o.mode === 'inherit' }, `Use the Models setting (${fb.enabled ? 'switch' : 'don’t switch'})`),
+    h('option', { value: 'on', selected: o.mode === 'on' }, 'Switch to another model'),
+    h('option', { value: 'off', selected: o.mode === 'off' }, 'Don’t switch: stay on the chosen model'));
+  const own = h('input', { type: 'checkbox', checked: !!o.chain?.length, disabled: !can('admin') });
+  const chain = chainEditor(models, o.chain?.length ? o.chain : fb.chain, { emptyText: 'Any other connected provider (Auto).' });
+  const chainBox = h('div', { class: own.checked ? '' : 'hide', style: 'margin-top:6px' }, chain.el);
+  own.onchange = () => chainBox.classList.toggle('hide', !own.checked);
+  const ownRow = h('label', { class: 'inline small', style: 'margin-top:6px' }, own, `Own list of models for this ${what}`);
+  const sync = () => ownRow.classList.toggle('hide', mode.value === 'off');
+  mode.onchange = sync; sync();
+  return { el: h('div', {}, mode, ownRow, chainBox), value: () => ({ mode: mode.value, chain: own.checked && mode.value !== 'off' ? chain.value() : [] }) };
+}
+
 async function renderAgents() {
   const route = location.hash.split('/');
   if (route[1]) return renderAgentEditor(decodeURIComponent(route[1]));
@@ -1320,6 +1364,7 @@ async function renderAgentEditor(id) {
   const inp = (key, attrs = {}) => (F[key] = h('input', { value: c[key] ?? '', ...attrs }));
   // General
   const modelSel = (F.model = modelSelect(models, c.model, { autoLabel: `Auto${models.resolvedDefault ? ` (now ${models.resolvedDefault})` : ''}` }));
+  const fbPick = fallbackPicker(models, c.fallback, { what: 'agent' });
   F.dm = h('select', {}, [['members', 'Members of its groups + listed participants'], ['organizers', 'Organizers only'], ['anyone', 'Anyone — even people whose chat is off'], ['none', 'Nobody']].map(([v, l]) => h('option', { value: v, selected: c.dm === v }, l)));
   F.enabled = h('input', { type: 'checkbox', checked: c.enabled }); F.respondToMentions = h('input', { type: 'checkbox', checked: c.respondToMentions });
   F.memory = h('input', { type: 'checkbox', checked: c.memory?.enabled !== false });
@@ -1466,7 +1511,7 @@ async function renderAgentEditor(id) {
 
   async function save() {
     const config = {
-      name: F.name.value, description: F.description.value, enabled: F.enabled.checked, model: F.model.value, prompt: F.prompt.value,
+      name: F.name.value, description: F.description.value, enabled: F.enabled.checked, model: F.model.value, fallback: fbPick.value(), prompt: F.prompt.value,
       triggers: splitLines(F.triggers.value), respondToMentions: F.respondToMentions.checked, dm: F.dm.value,
       organizers: [...orgSet], participants: splitLines(F.participants.value), timezone: F.timezone.value.trim(),
       historySize: Number(F.historySize.value), maxTokens: Number(F.maxTokens.value), memory: { enabled: F.memory.checked },
@@ -1523,7 +1568,9 @@ async function renderAgentEditor(id) {
     const wait = h('div', { class: 'bubble agent muted' }, '…'); log.append(wait); log.scrollTop = 1e9;
     try {
       const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/test`, { text, role: as, chat: where });
-      wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); if (r.model) wait.title = `${r.model} · as ${as}`;
+      wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); if (r.model) wait.title = `${r.answeredBy || r.model} · as ${as}`;
+      const fbl = fallbackLine(r.fallback); // 042: which model really answered, and why it switched
+      if (fbl) wait.after(h('div', { class: 'small muted', style: 'align-self:flex-start;margin:-2px 0 4px 4px' }, `${fbl}.`));
     } catch (x) { wait.textContent = `Error: ${x.message}`; }
     log.scrollTop = 1e9;
   } }, input, h('button', { class: 'btn' }, 'Send'));
@@ -1557,6 +1604,7 @@ async function renderAgentEditor(id) {
           field('Name', inp('name')), field('Description', inp('description')),
           h('div', { class: 'row', style: 'margin-top:8px' }, h('label', { class: 'inline' }, F.enabled, 'Enabled'), h('label', { class: 'inline' }, F.memory, 'Group memory'), h('label', { class: 'inline' }, F.respondToMentions, 'Reply when @mentioned')),
           field('Model', modelSel, models.problem || 'Auto uses the default model set under Models.'),
+          field('When the model is unavailable', fbPick.el, 'Usage limit, outage or expired sign-in: answer with another model instead of failing. Refused requests never switch, and tools never run twice.'),
           field('Triggers', F.triggers, 'Group messages starting with one of these wake the agent, e.g. !panduga'),
           field('Who may message it directly', F.dm)),
         h('fieldset', {}, h('legend', {}, 'Instructions'), F.prompt),
@@ -1806,7 +1854,10 @@ async function renderChats() {
             h('button', { class: 'btn small', onclick: () => openCap(c) }, 'Spending cap'))),
         h('td', { style: 'min-width:170px', 'data-label': 'Agent' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, agent: e.target.value || null }); c.agent = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
           h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),
-        h('td', { style: 'min-width:200px', 'data-label': 'Model' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) })),
+        h('td', { style: 'min-width:200px', 'data-label': 'Model' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) }),
+          // 042: per-chat fallback (the chain can be set through the AI assistant / API)
+          h('select', { style: 'margin-top:6px', 'aria-label': 'When the model is unavailable', disabled: !can('admin'), onchange: (e) => { c.fallback = { ...(c.fallback || {}), mode: e.target.value }; savePrefs(c, { fallback: c.fallback }); } },
+            [['inherit', 'If unavailable: as the agent'], ['on', 'If unavailable: switch model'], ['off', 'If unavailable: don’t switch']].map(([v, l]) => h('option', { value: v, selected: (c.fallback?.mode || 'inherit') === v }, l)))),
         h('td', { style: 'min-width:130px', 'data-label': 'Logging' }, h('select', { disabled: !can('admin'), onchange: (e) => savePrefs(c, { logging: e.target.value }) },
           [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message an agent number.' : 'No chats yet (or WhatsApp is not connected).'));
   };
@@ -1949,10 +2000,11 @@ function testBox(id) {
 }
 
 /** One provider card: what it is + cost, then either the steps to connect or the connected state. */
-function providerCard({ id, mark, title, cost, tag, p, steps, form, connected, extra, ownerOnly }) {
+function providerCard({ id, mark, title, cost, tag, p, steps, form, connected, extra, ownerOnly, accounts }) {
   const isOn = p?.connected;
-  const u = providerCard.usage?.provider?.[id];
-  const pill = isOn ? h('span', { class: 'pill ok' }, `✓ Connected · ${p.models} model${p.models === 1 ? '' : 's'}`)
+  const u = providerCard.usage?.account?.[id] || providerCard.usage?.provider?.[id];
+  const pill = isOn && p.health?.state && p.health.state !== 'ok' ? healthPill(p) // 042: one clear state while paused
+    : isOn ? h('span', { class: 'pill ok' }, `✓ Connected · ${p.models} model${p.models === 1 ? '' : 's'}`)
     : p?.error ? h('span', { class: 'pill bad' }, 'Needs attention') : h('span', { class: 'pill' }, 'Not connected');
   const t = isOn ? testBox(id) : null;
   return h('div', { class: `card pcard${isOn ? ' on' : ''}`, id: `prov-${id}` },
@@ -1961,9 +2013,95 @@ function providerCard({ id, mark, title, cost, tag, p, steps, form, connected, e
     u ? h('div', { class: 'small num', style: 'margin-top:6px' }, h('a', { href: '#usage' }, 'Last 30 days: '), usageLine(u)) : null,
     tag ? h('div', { class: 'ptags' }, tag) : null,
     p?.error ? h('div', { class: 'note bad' }, p.error) : null,
-    isOn ? h('div', {}, connected, h('div', { class: 'row', style: 'margin-top:10px' }, t.btn, extra), t.out)
+    healthNote(p),
+    isOn ? h('div', {}, connected, h('div', { class: 'row', style: 'margin-top:10px' }, t.btn, extra), t.out, accounts || null)
       : ownerOnly && !can('owner') ? h('p', { class: 'small muted' }, 'Ask an owner to connect this account.')
         : h('div', {}, h('div', { class: 'eyebrow', style: 'margin-top:14px' }, 'How to connect'), stepList(steps), form));
+}
+
+/** 042: "Paused until 14:20 — usage limit reached" with a "Try again now" button; nothing when the account is fine. */
+function healthNote(p) {
+  const st = p?.health;
+  if (!st || st.state === 'ok') return null;
+  return h('div', { class: `note ${st.state === 'reconnect' ? 'bad' : 'warn'}` }, h('b', {}, st.text),
+    st.message ? h('div', { class: 'small muted', style: 'overflow-wrap:anywhere' }, st.message) : null,
+    can('admin') ? h('div', { style: 'margin-top:6px' }, h('button', { class: 'btn small mut', onclick: () => tryApi(async () => { await api('POST', `/api/accounts/${encodeURIComponent(p.id)}/retry`, {}); renderModels(); }, 'It is tried again on the next message') }, 'Try again now')) : null);
+}
+const healthPill = (p) => (!p.connected ? h('span', { class: 'pill bad' }, 'Needs attention') : p.health?.state === 'reconnect' ? h('span', { class: 'pill bad' }, 'Reconnect')
+  : p.health?.state && p.health.state !== 'ok' ? h('span', { class: 'pill warn' }, 'Paused') : h('span', { class: 'pill ok' }, `✓ ${p.models} model${p.models === 1 ? '' : 's'}`));
+const TERMS_NOTE = 'Use your own accounts. Some subscription plans’ terms forbid sharing an account or using several accounts to get around their limits, so check the provider’s terms first.';
+
+/** A label + key form for another account. submit(label, key). */
+function accountKeyForm({ placeholder, submit, button = 'Add account', keyLabel = 'Paste its key' }) {
+  const lab = h('input', { placeholder: 'Label, e.g. work or your name', maxlength: 40 });
+  const v = h('input', { type: 'password', placeholder, autocomplete: 'off', spellcheck: 'false' });
+  const err = h('div', { class: 'small', style: 'color:var(--bad)' });
+  const btn = h('button', { class: 'btn primary' }, button);
+  return h('form', { class: 'mut pasteform', onsubmit: async (e) => {
+    e.preventDefault(); err.textContent = '';
+    if (!lab.value.trim()) { err.textContent = 'Give the account a label first.'; return; }
+    if (!v.value.trim()) { err.textContent = 'Paste the key first.'; return; }
+    btn.disabled = true; btn.replaceChildren(h('span', { class: 'spinner' }), ' Checking…');
+    try { await submit(lab.value.trim(), v.value.trim()); toast('Account added'); modelsCache = null; renderModels(); } catch (x) { err.textContent = x.message; btn.disabled = false; btn.replaceChildren(button); }
+  } }, h('label', {}, 'Label'), lab, h('label', {}, keyLabel), h('div', { class: 'row nowrap' }, v, btn), err);
+}
+
+/** Sign in with ChatGPT: body = {} (first account), { label } (another account) or { account } (sign in again). */
+function chatgptFlow(body = {}) {
+  const paste = h('input', { placeholder: 'http://127.0.0.1:1455/auth/callback?code=…', autocomplete: 'off', spellcheck: 'false' });
+  const err = h('div', { class: 'small', style: 'color:var(--bad)' });
+  const open = h('div', { class: 'row' });
+  const label = body.label === '' ? h('input', { placeholder: 'Label, e.g. your name', maxlength: 40 }) : null;
+  const start = h('button', { type: 'button', class: 'btn primary', onclick: async () => {
+    if (label && !label.value.trim()) { err.textContent = 'Give the account a label first.'; return; }
+    err.textContent = ''; start.disabled = true;
+    const r = await tryApi(() => api('POST', '/api/providers/chatgpt/start', label ? { label: label.value.trim() } : body));
+    start.disabled = false; if (!r) return;
+    open.replaceChildren(h('a', { class: 'btn primary', href: r.authorizeUrl, target: '_blank', rel: 'noopener' }, 'Open ChatGPT sign-in ↗'), h('span', { class: 'small muted' }, 'Link valid for 15 minutes'));
+    start.classList.add('hide');
+  } }, body.account ? 'Sign in again' : 'Sign in with ChatGPT');
+  const form = h('form', { class: 'mut pasteform', onsubmit: async (e) => {
+    e.preventDefault(); err.textContent = '';
+    const d = await api('POST', '/api/providers/chatgpt/complete', { callbackUrl: paste.value }).catch((x) => { err.textContent = x.message; });
+    if (d) { toast(`Connected ${d.email} · ${d.models} models`); modelsCache = null; renderModels(); }
+  } }, h('label', {}, 'Paste the whole address here'), h('div', { class: 'row nowrap' }, paste, h('button', { class: 'btn primary' }, 'Finish')), err);
+  return { start: h('div', {}, label ? field('Label', label) : null, h('div', { style: 'margin-top:8px' }, start, open)), form };
+}
+
+/**
+ * 042: the other accounts of a provider (each with its own status, Test, Rename, Remove), how they are used
+ * (in order / spread) and "Add another account".
+ */
+function accountsBox({ first, provs, addForm, ownerOnly }) {
+  if (!first?.connected && !first?.error) return null;
+  const others = provs.filter((p) => p.group === first.group && p.id !== first.id && (p.connected || p.error));
+  const n = others.length + 1;
+  const mayAdd = ownerOnly ? can('owner') : can('admin');
+  const rows = others.map((p) => {
+    const t = p.connected ? testBox(p.id) : null;
+    const u = providerCard.usage?.account?.[p.id];
+    const name = h('input', { value: p.label || '', maxlength: 40, placeholder: 'Label' });
+    return h('div', { class: 'number-card acct' },
+      h('div', { class: 'row spread' }, h('div', {}, h('b', {}, p.name), p.account ? h('div', { class: 'small muted' }, p.account) : null), healthPill(p)),
+      u ? h('div', { class: 'small num' }, 'Last 30 days: ', usageLine(u)) : null,
+      p.error ? h('div', { class: 'note bad' }, p.error) : null,
+      healthNote(p),
+      p.health?.state === 'reconnect' && p.type === 'chatgpt' && can('owner') ? (() => { const f = chatgptFlow({ account: p.id }); return h('div', {}, f.start, f.form); })() : null,
+      h('div', { class: 'row', style: 'margin-top:8px' }, t?.btn,
+        can('admin') ? h('details', { class: 'small mut' }, h('summary', {}, 'Rename'), h('form', { class: 'row nowrap', style: 'margin-top:6px', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', `/api/accounts/${encodeURIComponent(p.id)}`, { label: name.value.trim() }), 'Renamed')) { modelsCache = null; renderModels(); } } }, name, h('button', { class: 'btn small' }, 'Save'))) : null,
+        can('owner') ? h('button', { class: 'btn small danger mut', onclick: () => confirm(`Remove ${p.name}? Its key or sign-in is deleted. Agents set to its models switch to the next model in the fallback chain.`) && tryApi(async () => { await api('DELETE', `/api/accounts/${encodeURIComponent(p.id)}`); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove') : null),
+      t?.out);
+  });
+  const strat = first.strategy || 'order';
+  const seg = n > 1 ? h('div', { class: 'seg', role: 'group', 'aria-label': 'How the accounts are used' }, [['order', 'In order'], ['spread', 'Spread']].map(([v, l]) => h('button', { type: 'button', class: strat === v ? 'on' : '', disabled: !can('admin'),
+    onclick: () => tryApi(async () => { await api('PUT', '/api/fallback/strategy', { group: first.group, strategy: v }); renderModels(); }, v === 'spread' ? 'Spread across accounts' : 'In order') }, l))) : null;
+  return h('div', { style: 'margin-top:14px' },
+    h('div', { class: 'eyebrow' }, n > 1 ? `${n} accounts` : 'More accounts'),
+    rows,
+    seg ? h('div', { style: 'margin-top:10px' }, seg, h('div', { class: 'small muted', style: 'margin-top:4px' }, strat === 'spread' ? 'Each message goes to the account used least recently. A failing account is skipped.' : 'The first account answers; the others only when it hits a limit or fails.')) : null,
+    mayAdd ? h('details', { class: 'mut', style: 'margin-top:10px' }, h('summary', {}, 'Add another account'),
+      h('p', { class: 'small muted' }, 'Connect another account of this provider, with its own key or sign-in. When one hits a limit, the next one answers.'),
+      h('div', { class: 'note info small' }, TERMS_NOTE), addForm()) : null);
 }
 
 function keyForm({ placeholder, button = 'Connect', submit, busy = 'Checking…' }) {
@@ -2015,6 +2153,7 @@ async function renderModels() {
     form: keyForm({ placeholder: 'sk-or-v1-…', button: 'Add OpenRouter', submit: (key) => api('POST', '/api/providers/openrouter', { key, freeOnly: true }) }),
     connected: h('div', {}, h('div', { class: 'row spread' }, freeToggle, ext(LINKS.openrouterFree, 'See free models')),
       h('p', { class: 'small muted', style: 'margin:4px 0 0' }, or?.freeOnly ? 'Only models ending in “:free” are listed and used, so nothing is charged. Auto picks one of them.' : 'All OpenRouter models are listed. Paid models use your OpenRouter credit.')),
+    accounts: accountsBox({ first: or, provs, addForm: () => accountKeyForm({ placeholder: 'sk-or-v1-…', submit: (label, key) => api('POST', '/api/providers/openrouter', { label, key, freeOnly: true }) }) }),
     extra: [replaceKey(keyForm({ placeholder: 'sk-or-v1-…', button: 'Save', submit: (key) => api('POST', '/api/providers/openrouter', { key }) })),
       h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove OpenRouter? Agents using OpenRouter models switch to Auto.') && tryApi(async () => { await api('DELETE', '/api/providers/compatible/openrouter'); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')],
   });
@@ -2030,6 +2169,7 @@ async function renderModels() {
     ],
     form: keyForm({ placeholder: 'sk-ant-…', submit: saveSecretKey('ANTHROPIC_API_KEY') }),
     connected: h('p', { class: 'small muted', style: 'margin:0' }, 'Claude Pro/Max subscriptions can’t be used here; this uses your API key.'),
+    accounts: accountsBox({ first: by.anthropic, provs, addForm: () => accountKeyForm({ placeholder: 'sk-ant-…', submit: (label, key) => api('POST', '/api/accounts', { type: 'anthropic', label, key }) }) }),
     extra: [replaceKey(keyForm({ placeholder: 'sk-ant-…', button: 'Save', submit: saveSecretKey('ANTHROPIC_API_KEY') })),
       h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove the Anthropic key? Agents using Claude stop answering until another model is chosen.') && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'ANTHROPIC_API_KEY', value: '' }); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')],
   });
@@ -2044,39 +2184,28 @@ async function renderModels() {
       [h('span', {}, 'Copy the key (starts with ', h('code', {}, 'sk-'), '). It is shown only once.'), cue.win('platform.openai.com', cue.hl(cue.field('sk-proj-4Tq…')))],
     ],
     form: keyForm({ placeholder: 'sk-…', submit: saveSecretKey('OPENAI_API_KEY') }),
+    accounts: accountsBox({ first: by.openai, provs, addForm: () => accountKeyForm({ placeholder: 'sk-…', submit: (label, key) => api('POST', '/api/accounts', { type: 'openai', label, key }) }) }),
     extra: [replaceKey(keyForm({ placeholder: 'sk-…', button: 'Save', submit: saveSecretKey('OPENAI_API_KEY') })),
       h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove the OpenAI key? Agents using OpenAI models stop answering until another model is chosen.') && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'OPENAI_API_KEY', value: '' }); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')],
   });
 
   // ChatGPT plan (sign-in logic unchanged; clearer steps)
   const cg = by.chatgpt;
-  const paste = h('input', { placeholder: 'http://127.0.0.1:1455/auth/callback?code=…', autocomplete: 'off', spellcheck: 'false' });
-  const cgErr = h('div', { class: 'small', style: 'color:var(--bad)' });
-  const cgOpen = h('div', { class: 'row' });
-  const startBtn = h('button', { class: 'btn primary', onclick: async () => {
-    startBtn.disabled = true;
-    const r = await tryApi(() => api('POST', '/api/providers/chatgpt/start'));
-    startBtn.disabled = false; if (!r) return;
-    cgOpen.replaceChildren(h('a', { class: 'btn primary', href: r.authorizeUrl, target: '_blank', rel: 'noopener' }, 'Open ChatGPT sign-in ↗'), h('span', { class: 'small muted' }, 'Link valid for 15 minutes'));
-    startBtn.classList.add('hide');
-  } }, 'Sign in with ChatGPT');
-  const cgForm = h('form', { class: 'mut pasteform', onsubmit: async (e) => {
-    e.preventDefault(); cgErr.textContent = '';
-    const d = await api('POST', '/api/providers/chatgpt/complete', { callbackUrl: paste.value }).catch((x) => { cgErr.textContent = x.message; });
-    if (d) { toast(`Connected ${d.email} · ${d.models} models`); modelsCache = null; renderModels(); }
-  } }, h('label', {}, 'Paste the whole address here'), h('div', { class: 'row nowrap' }, paste, h('button', { class: 'btn primary' }, 'Finish')), cgErr);
+  const cgFlow = chatgptFlow({});
   const cgCard = providerCard({
     id: 'chatgpt', mark: 'm-cg', title: 'ChatGPT plan', p: cg, ownerOnly: true,
     cost: 'Uses the usage included in your ChatGPT Plus or Pro plan. No extra cost; plan limits apply.',
     steps: [
-      [h('span', {}, 'Click the button and open the sign-in.'), h('div', { style: 'margin-top:8px' }, startBtn, cgOpen)],
+      [h('span', {}, 'Click the button and open the sign-in.'), cgFlow.start],
       [h('span', {}, 'Sign in with your ChatGPT account and allow access.'), cue.win('auth.openai.com', h('span', { class: 'muted' }, 'Allow duniya to use your plan?'), cue.hl(cue.btn('Allow', true)))],
       [h('span', {}, 'Your browser then shows “This site can’t be reached”. ', h('b', {}, 'That’s expected'), ', the sign-in worked.'),
         h('div', { class: 'cue', 'aria-hidden': 'true' }, h('div', { class: 'cue-addr' }, cue.hl(h('span', {}, '127.0.0.1:1455/auth/callback?code=ac_…&state=…'))), h('div', { class: 'cue-body' }, h('b', {}, 'This site can’t be reached'), h('span', { class: 'muted' }, '127.0.0.1 refused to connect.')))],
       [h('span', {}, 'Click the address bar, copy the ', h('b', {}, 'whole address'), ' and paste it below.')],
     ],
-    form: cgForm,
-    connected: h('p', { style: 'margin:0' }, `Signed in as ${cg.account || 'your ChatGPT account'}.`),
+    form: cgFlow.form,
+    connected: h('div', {}, h('p', { style: 'margin:0' }, `Signed in as ${cg.account || 'your ChatGPT account'}.`),
+      cg?.health?.state === 'reconnect' && can('owner') ? h('div', {}, cgFlow.start, cgFlow.form) : null),
+    accounts: accountsBox({ first: cg, provs, ownerOnly: true, addForm: () => { const f = chatgptFlow({ label: '' }); return h('div', {}, f.start, f.form); } }),
     extra: can('owner') ? disconnect('ChatGPT', '/api/providers/chatgpt', 'Agents using ChatGPT models stop answering until another model is chosen.') : null,
   });
 
@@ -2099,6 +2228,7 @@ async function renderModels() {
     form: h('div', {}, keyForm({ placeholder: 'github_pat_…', busy: 'Connecting… the first time this downloads Copilot support (about 400 MB, a few minutes)', submit: (token) => api('POST', '/api/providers/copilot', { token }) }),
       h('p', { class: 'small muted' }, 'If GitHub refuses the token, open it on GitHub and switch “Copilot requests” to the other access level (Read-only ↔ Read and write), then try again. The first connection downloads GitHub’s official Copilot helper to this server (about 400 MB of disk, about 60 MB of memory while in use); nothing is downloaded if you never connect Copilot.')),
     connected: h('div', {}, h('p', { style: 'margin:0 0 6px' }, `Signed in as ${co?.account || 'your GitHub account'}.`), quotaView),
+    accounts: accountsBox({ first: co, provs, ownerOnly: true, addForm: () => accountKeyForm({ placeholder: 'github_pat_…', keyLabel: 'Paste its GitHub token (fine-grained, with Copilot requests)', submit: (label, token) => api('POST', '/api/providers/copilot', { label, token }) }) }),
     extra: can('owner') ? [replaceKey(keyForm({ placeholder: 'github_pat_…', button: 'Save', submit: (token) => api('POST', '/api/providers/copilot', { token }) })),
       disconnect('GitHub Copilot', '/api/providers/copilot', 'Agents using Copilot models stop answering until another model is chosen.')] : null,
   });
@@ -2110,8 +2240,8 @@ async function renderModels() {
   const otherCard = h('div', { class: 'card' }, h('h2', {}, 'Other endpoints'),
     h('p', { class: 'small muted' }, 'Ollama, LM Studio, vLLM, Groq, Mistral… anything with an OpenAI-style /chat/completions.'),
     compat.map((p) => { const t = p.connected ? testBox(p.id) : null; return h('div', { class: 'number-card' },
-      h('div', { class: 'row spread' }, h('div', {}, h('b', {}, p.name), h('div', { class: 'small muted' }, p.baseUrl)), h('span', { class: `pill ${p.connected ? 'ok' : 'bad'}` }, p.connected ? `✓ ${p.models} models` : 'Needs attention')),
-      p.error ? h('div', { class: 'note bad' }, p.error) : null,
+      h('div', { class: 'row spread' }, h('div', {}, h('b', {}, p.name), h('div', { class: 'small muted' }, p.baseUrl)), healthPill(p)),
+      p.error ? h('div', { class: 'note bad' }, p.error) : null, healthNote(p),
       h('div', { class: 'row', style: 'margin-top:8px' }, t?.btn, h('button', { class: 'btn small danger mut', onclick: () => confirm(`Remove ${p.name}? Agents using its models switch to Auto.`) && tryApi(async () => { await api('DELETE', `/api/providers/compatible/${p.id}`); modelsCache = null; renderModels(); }, 'Removed') }, 'Remove')), t?.out); }),
     h('details', { class: 'mut' }, h('summary', {}, 'Add an endpoint'),
       h('form', { onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('POST', '/api/providers/compatible', { id: cid.value.trim(), name: cname.value.trim(), baseUrl: curl.value.trim(), key: ckey.value }), 'Saved')) { modelsCache = null; renderModels(); } } },
@@ -2128,9 +2258,22 @@ async function renderModels() {
       h('button', { class: 'btn primary mut', onclick: () => tryApi(async () => { await api('POST', '/api/models/defaults', { defaultModel: def.value, backgroundModel: bg.value }); modelsCache = null; renderModels(); }, 'Saved') }, 'Save'),
       h('button', { class: 'btn', onclick: async () => { modelsCache = null; await api('GET', '/api/providers?refresh=1'); renderModels(); } }, 'Refresh model lists')));
 
+  // When a model fails (042)
+  const fb = models.fallback || { enabled: true, chain: [] };
+  const fbOn = h('input', { type: 'checkbox', checked: fb.enabled, disabled: !can('admin') });
+  const fbChain = chainEditor(models, fb.chain);
+  const troubled = provs.filter((p) => p.connected && p.health && p.health.state !== 'ok');
+  const fallbackCard = h('div', { class: 'card', id: 'fallback' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'When a model fails'),
+    h('span', { class: `pill ${troubled.length ? 'warn' : fb.enabled ? 'ok' : ''}` }, troubled.length ? `${troubled.length} paused` : fb.enabled ? 'Switching on' : 'Off')),
+    h('p', { class: 'small muted' }, 'If the model an agent uses hits a usage limit, is down, times out or its sign-in expired, the agent answers with the next model below instead of failing. A paused account is skipped and tried again later (1 minute, then longer; for usage limits when the provider says it resets). Refused requests never switch, and tools never run twice.'),
+    troubled.map((p) => h('div', { class: 'row spread small', style: 'margin:4px 0' }, h('span', {}, h('b', {}, p.name), ` — ${p.health.text}`), h('a', { href: `#models`, onclick: (e) => { e.preventDefault(); document.getElementById(`prov-${p.type}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }, 'See account'))),
+    h('label', { class: 'inline', style: 'margin-top:8px' }, fbOn, 'Switch to another model automatically'),
+    field('Try these, in order', fbChain.el, 'Agents and chats can have their own setting (agent page, Chats).'),
+    can('admin') ? h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn primary mut', onclick: () => tryApi(async () => { await api('PUT', '/api/fallback', { enabled: fbOn.checked, chain: fbChain.value() }); modelsCache = null; renderModels(); }, 'Saved') }, 'Save')) : null);
+
   const cards = [orCard, anCard, oaCard, cgCard, coCard];
   if (anyOn) cards.sort((a, b) => b.classList.contains('on') - a.classList.contains('on')); // connected first
-  $('#main').replaceChildren(start, h('div', { class: 'grid pgrid' }, cards, otherCard, defaults));
+  $('#main').replaceChildren(start, h('div', { class: 'grid pgrid' }, cards, otherCard, anyOn ? fallbackCard : null, defaults));
 }
 
 // ---------- backups (owner) ----------
