@@ -52,12 +52,14 @@ const ins = db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kin
  * Record one model call. Photos & voice (043): `cost` (USD) and `priced` record a cost known for the call itself —
  * reported by the provider (OpenRouter), an owner-set per-image price, or 0 for on-server engines.
  */
+let lastPrune = 0;
 export function recordUsage({ agent = '', chat = '', provider, account = '', model, kind = 'reply', input = 0, output = 0, published = null, fallback = '', cost: known, priced }) {
   const fixed = known !== undefined && known !== null && Number.isFinite(Number(known));
   const price = fixed ? null : priceFor(provider, model, published);
   const cost = fixed ? Number(known) : price ? (input * price.in + output * price.out) / 1e6 : null;
   ins.run(Date.now(), agent || '', chat || '', provider, model, kind, input | 0, output | 0, cost, fixed ? (priced || 'provider') : price?.source || null, account || provider, String(fallback || '').slice(0, 300));
-  if (Math.random() < 0.01) db.prepare('DELETE FROM usage WHERE ts < ?').run(Date.now() - 400 * 86400000);
+  // Prune old rows about once a day (not on every call).
+  if (Date.now() - lastPrune > 86400000) { lastPrune = Date.now(); db.prepare('DELETE FROM usage WHERE ts < ?').run(Date.now() - 400 * 86400000); }
 }
 
 const GROUPS = { agent: 'agent', chat: 'chat', provider: 'provider', account: "COALESCE(account, provider)", model: "COALESCE(account, provider) || ':' || model", kind: 'kind',

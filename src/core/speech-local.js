@@ -8,7 +8,7 @@
 //
 // Every job runs in a child process (speech-worker.cjs) at low priority, after the small-server checks
 // (resources.js), through the media job queue, with a timeout; temp files are always removed.
-import { mkdirSync, existsSync, rmSync, writeFileSync, readFileSync, readdirSync, createWriteStream, statSync } from 'node:fs';
+import { mkdirSync, existsSync, rmSync, writeFileSync, readFileSync, readdirSync, createWriteStream } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -166,8 +166,9 @@ export async function speakLocal(text) {
     try {
       writeFileSync(txt, String(text));
       await worker(['tts', modelDir('tts'), txt, wav], 120000);
-      if (!statSync(wav).size) throw new Error('no audio produced');
-      return await convertAudio(readFileSync(wav), 'ogg');
+      const audio = readFileSync(wav);
+      if (!audio.length) throw new Error('no audio produced');
+      return await convertAudio(audio, 'ogg');
     } finally { rmSync(txt, { force: true }); rmSync(wav, { force: true }); }
   }, { timeoutMs: 150000 });
 }
