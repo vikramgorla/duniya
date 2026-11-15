@@ -1,9 +1,11 @@
-// Chat detail: which agent answers here (or none = off), which model, and the stored messages (admins; each look is
-// recorded in Activity, as in the panel).
+// Chat detail: which agent answers here (or none = off), which model and what happens when it is unavailable, privacy
+// (private to members, privacy notice) and the stored messages (admins; each look is recorded in Activity, as in the
+// panel).
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
-import { Body, Button, Card, Divider, H2, Label, Led, Loading, Note, Row, Screen, Spread } from '@/components/ui';
+import { Body, Button, Card, Divider, H2, Label, Led, Loading, Note, Row, Screen, Spread, Toggle } from '@/components/ui';
+import { modelLabel } from '@/lib/ai-review';
 import { can, useAuth } from '@/lib/auth';
 import { ago, chatLabel } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
@@ -32,6 +34,12 @@ export default function ChatDetail() {
     const before = chat.model; update({ model });
     try { await api!.put(`/api/chats/${encodeURIComponent(id)}/prefs`, { model }); } catch (e) { update({ model: before }); Alert.alert('Not changed', (e as Error).message); }
   };
+  // 044 / #63: the same prefs the panel's Chats page sets (one field per request, like the panel)
+  const setPref = async (patch: Partial<Chat>) => {
+    const before = { ...chat }; update(patch);
+    try { update(await api!.put<Partial<Chat>>(`/api/chats/${encodeURIComponent(id)}/prefs`, patch)); } catch (e) { update(before); Alert.alert('Not changed', (e as Error).message); }
+  };
+  const fb = chat.fallback || { mode: 'inherit' as const, chain: [] };
   const loadMessages = async () => {
     setLoadingMsgs(true);
     try { setMsgs(await api!.get<StoredMessage[]>(`/api/chats/${encodeURIComponent(id)}/messages?limit=50`)); } catch (e) { Alert.alert('Cannot show messages', (e as Error).message); } finally { setLoadingMsgs(false); }
@@ -66,6 +74,32 @@ export default function ChatDetail() {
           {(models.data?.models || []).slice(0, 12).map((m) => option(m.ref, m.label, chat.model === m.ref, () => setModel(m.ref)))}
         </Card>
       ) : null}
+      {admin ? (
+        <Card style={{ gap: 0 }}>
+          <H2 style={{ marginBottom: 6 }}>If the model is unavailable</H2>
+          {option('fb-inherit', 'As the agent', fb.mode === 'inherit', () => setPref({ fallback: { mode: 'inherit', chain: fb.chain } }))}
+          {option('fb-on', 'Switch to another model', fb.mode === 'on', () => setPref({ fallback: { mode: 'on', chain: fb.chain } }),
+            fb.chain.length ? `in order: ${fb.chain.map((r) => modelLabel(r, models.data)).join(' → ')}` : 'the agent’s or the Models list')}
+          {option('fb-off', 'Don’t switch', fb.mode === 'off', () => setPref({ fallback: { mode: 'off', chain: [] } }))}
+          <Body small muted style={{ marginTop: 6 }}>Only for limits, outages and expired sign-ins. The list of models is edited in the web panel (Chats → Fallback…).</Body>
+        </Card>
+      ) : null}
+      <Card>
+        <H2>Privacy</H2>
+        <Spread>
+          <View style={{ flex: 1 }}><Body style={{ fontWeight: '600' }}>Private to members</Body><Body small muted>The agent keeps working here, but the owner assistant and the Ask box never see this chat.</Body></View>
+          <Toggle label="Private to members" value={!!chat.private} onChange={(v) => setPref({ private: v })} disabled={!admin} />
+        </Spread>
+        {chat.isGroup ? (
+          <>
+            <Divider />
+            <Spread>
+              <View style={{ flex: 1 }}><Body style={{ fontWeight: '600' }}>Privacy notice</Body><Body small muted>{chat.noticePostedAt ? `Posted ${ago(chat.noticePostedAt)} ago.` : 'Posted once when this group is switched on.'}</Body></View>
+              <Toggle label="Privacy notice" value={!chat.noticeOff} onChange={(v) => setPref({ noticeOff: !v })} disabled={!admin} />
+            </Spread>
+          </>
+        ) : null}
+      </Card>
       {admin ? (
         <Card>
           <Spread><H2>Stored messages</H2>{msgs ? <Button small kind="ghost" title="Reload" onPress={loadMessages} /> : null}</Spread>

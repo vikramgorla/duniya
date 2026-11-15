@@ -36,6 +36,17 @@ export interface Agent {
 export interface Chat {
   id: string; name: string; size?: number; isGroup: boolean; number: string; numberLabel: string;
   agent: string; model: string; logging: string; phone?: string; lastAt?: number;
+  /** 042/#65: model fallback override (the chain is edited in the panel) */
+  fallback?: { mode: 'inherit' | 'on' | 'off'; chain: string[] };
+  /** 044: hidden from the owner assistant; privacy notice opt-out (groups) */
+  private?: boolean; noticeOff?: boolean; noticePostedAt?: number | null; enabled?: boolean;
+}
+/** Settings → Owner assistant (044), as GET /api/owner-assistant returns it. */
+export interface OwnerAssistantInfo {
+  settings: { model: string }; role: string;
+  link: { status: 'none' | 'code' | 'pending' | 'linked'; phone?: string; expiresAt?: number | null; linkedAt?: number | null };
+  sendTo: { id: string; label: string; phone: string }[];
+  links?: { userId: number; username: string; phone: string; linkedAt: number }[];
 }
 export interface StoredMessage { id: number; ts: number; sender?: string; name?: string; text: string; quoted?: string; fromAgent: boolean; addressed?: boolean }
 
@@ -64,5 +75,5 @@ export interface ModelList { models: { ref: string; provider: string; label: str
 
 export interface AgentDraft {
   summary: string; questions: string[]; changes: { field: string; before: unknown; after: unknown }[];
-  proposed: AgentConfig; warnings?: string[]; model: string;
+  proposed: AgentConfig; warnings?: string[]; model: string; names?: Record<string, string>;
 }

@@ -16,6 +16,14 @@ components only. A pure API core (`src/lib/api-core.ts`: discovery, code exchang
 calls) with unit tests; `auth.tsx` adds expo-auth-session (PKCE in the system browser), expo-secure-store and
 expo-local-authentication; `useData` gives focus-loading, polling, pull-to-refresh and last-good data offline.
 
+### #63 (v2.11.0)
+
+The panel's diff (`src/panel/public/diff.js`) is ported line for line to `mobile/src/lib/diff.ts` (typed; same
+algorithm: Myers over word tokens, slide/tidy, line hunks) and the panel's change-card reading to `ai-review.ts`, so
+both are unit-tested without React; the unit test imports the web module and compares outputs. Views are plain
+`Text` spans (no WebView, no new dependency). Parity screens use existing routes (`/api/chats/:chat/prefs`,
+`/api/owner-assistant…`).
+
 ## Technical Context
 
 - **Server**: Node 22 ESM, no new dependencies. **App**: Expo modules that ship in Expo Go only (expo-router,

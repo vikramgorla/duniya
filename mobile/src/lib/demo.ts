@@ -2,7 +2,7 @@
 // made up and stays on the phone; changes are kept in memory until the app is closed.
 import type { ApiClient } from './api-core';
 import { ApiError } from './api-core';
-import type { Activity, Agent, Chat, Pending, Status, StoredMessage } from './types';
+import type { Activity, Agent, Chat, OwnerAssistantInfo, Pending, Status, StoredMessage } from './types';
 
 const now = Date.now();
 const min = 60_000;
@@ -21,10 +21,11 @@ const agents: Agent[] = [
 ];
 const chats: Chat[] = [
   { id: 'g1@g.us', name: 'Gorla family', size: 23, isGroup: true, number: 'main', numberLabel: 'Main', agent: 'family', model: 'inherit', logging: 'inherit' },
-  { id: 'g2@g.us', name: 'School carpool', size: 8, isGroup: true, number: 'main', numberLabel: 'Main', agent: 'carpool', model: 'inherit', logging: 'inherit' },
+  { id: 'g2@g.us', name: 'School carpool', size: 8, isGroup: true, number: 'main', numberLabel: 'Main', agent: 'carpool', model: 'inherit', logging: 'inherit', fallback: { mode: 'on', chain: ['openai:auto', 'anthropic:auto'] }, private: false, noticeOff: false },
   { id: 'g3@g.us', name: 'Building Rue du Midi', size: 31, isGroup: true, number: 'main', numberLabel: 'Main', agent: '', model: 'inherit', logging: 'inherit' },
   { id: '41790000003@s.whatsapp.net', name: 'Anu', isGroup: false, phone: '41790000003', number: 'main', numberLabel: 'Main', agent: '', model: 'inherit', logging: 'inherit', lastAt: now - 40 * min },
 ];
+let ownerInfo: OwnerAssistantInfo = { settings: { model: 'auto' }, role: 'owner', link: { status: 'linked', phone: '41790000001', linkedAt: now - 3 * 86400_000 }, sendTo: [{ id: 'main', label: 'Main', phone: '41790000099' }] };
 let pending: Pending[] = [
   { code: 'K7Q2', agent: 'carpool', tool: 'calendar:event_update', chat: 'g2@g.us', requester: 'Anu', summary: 'Move Thursday football pickup from 17:00 to 17:30 and make Rupa the driver', expires: now + 7 * min },
 ];
@@ -93,7 +94,14 @@ async function route(method: string, path: string, body: any): Promise<unknown> 
   }
   if (method === 'POST' && p === '/api/settings') { paused = !!body.paused; return status().settings; }
   if (method === 'POST' && p === '/api/chats/bind') { const c = chats.find((x) => x.id === body.chat); if (c) c.agent = body.agent || ''; return { ok: true }; }
-  if (method === 'PUT' && (m = /^\/api\/chats\/([^/]+)\/prefs$/.exec(p))) { const c = chats.find((x) => x.id === decodeURIComponent(m![1])); if (c && body.model) c.model = body.model; return { model: c?.model, logging: c?.logging }; }
+  if (method === 'PUT' && (m = /^\/api\/chats\/([^/]+)\/prefs$/.exec(p))) {
+    const c = chats.find((x) => x.id === decodeURIComponent(m![1]));
+    if (c) { if (body.model) c.model = body.model; if (body.fallback) c.fallback = body.fallback; if (body.private !== undefined) c.private = !!body.private; if (body.noticeOff !== undefined) c.noticeOff = !!body.noticeOff; }
+    return { model: c?.model, logging: c?.logging, fallback: c?.fallback || { mode: 'inherit', chain: [] }, private: !!c?.private, noticeOff: !!c?.noticeOff };
+  }
+  if (method === 'GET' && p === '/api/owner-assistant') return ownerInfo;
+  if (method === 'DELETE' && p === '/api/owner-assistant/link') { ownerInfo = { ...ownerInfo, link: { status: 'none' } }; return { ok: true }; }
+  if (method === 'PUT' && p === '/api/owner-assistant/settings') { ownerInfo = { ...ownerInfo, settings: { model: body.model || 'auto' } }; return ownerInfo.settings; }
   if ((m = /^\/api\/pending\/([^/]+)(\/apply)?$/.exec(p))) { pending = pending.filter((x) => x.code !== m![1]); return m[2] ? { result: 'Applied (demo)' } : { ok: true }; }
   if (method === 'POST' && p === '/api/updates/apply') { updateRunning = { target: 'v1.9.1', startedAt: Date.now() }; setTimeout(() => { updateRunning = null; }, 8000); return { started: true, running: updateRunning }; }
   if (method === 'POST' && p === '/api/updates/check') return { current: 'v1.9.0', latest: 'v1.9.1', available: true };
@@ -101,7 +109,10 @@ async function route(method: string, path: string, body: any): Promise<unknown> 
   if (method === 'POST' && p === '/api/ai/agent-draft') {
     const b = agents.find((x) => x.id === body.agentId);
     const after = `${b?.config.prompt || ''}\n- ${String(body.request || '').trim()}`;
-    return { summary: 'Added your request to the instructions.', questions: [], changes: [{ field: 'prompt', before: b?.config.prompt, after }], proposed: { ...b?.config, prompt: after }, warnings: [], model: 'demo' };
+    const triggers = [...(b?.config.triggers || []), '!weather'];
+    return { summary: 'Added your request to the instructions and a !weather trigger.', questions: [],
+      changes: [{ field: 'prompt', before: b?.config.prompt, after }, { field: 'triggers', before: b?.config.triggers, after: triggers }, { field: 'dm', before: b?.config.dm, after: 'anyone' }],
+      proposed: { ...b?.config, prompt: after, triggers, dm: 'anyone' }, warnings: [], model: 'demo' };
   }
   throw new ApiError('Not available in the demo', 400);
 }

@@ -31,4 +31,4 @@ cd mobile && npm ci && npm run typecheck && npm run lint && npm test
 EXPO_PUBLIC_DEMO=1 npx expo export --platform web   # web build with demo data, for screenshots
 ```
 
-Screenshots: [screenshots/](screenshots/) — app in light and dark (12 screens), iPad overview, panel card.
+Screenshots: [screenshots/](screenshots/) — app in light and dark (12 screens), iPad overview, panel card; AI review diff (light, dark) and the streaming Ask box (#63, #66).

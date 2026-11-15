@@ -34,6 +34,7 @@ function Navigation() {
           <Stack.Screen name="server" options={{ title: 'Server' }} />
           <Stack.Screen name="pending" options={{ title: 'Waiting for you' }} />
           <Stack.Screen name="settings" options={{ title: 'App settings' }} />
+          <Stack.Screen name="owner" options={{ title: 'Owner assistant' }} />
         </Stack.Protected>
         <Stack.Protected guard={state === 'locked'} redirectTo={state === 'ready' ? '/' : '/connect'}>
           <Stack.Screen name="lock" options={{ headerShown: false }} />

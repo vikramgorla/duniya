@@ -14,6 +14,8 @@ export const light = {
   primary: '#101216', onPrimary: '#ffffff', grid: 'rgba(16,18,22,0.075)',
   ok: '#3f6b00', okSoft: '#e9f7c4', warn: '#9a4b00', warnSoft: '#ffeedd', bad: '#c42443', badSoft: '#ffe6ea', info: '#2c4fd6', infoSoft: '#e8edff',
   led: { ok: '#8fd400', warn: '#ff9a3d', bad: '#ff3b5c', off: '#b9b6ad' },
+  // AI review diff (#63), as the panel's --add-* / --del-*: additions lime with +, removals red struck through with −
+  addBg: '#e3f7a8', addInk: '#2f4d00', delBg: '#ffe1e6', delInk: '#a8183a',
 };
 export const dark: typeof light = {
   ...shared, dark: true,
@@ -21,6 +23,7 @@ export const dark: typeof light = {
   primary: '#c6f432', onPrimary: '#101216', grid: 'rgba(255,255,255,0.07)',
   ok: '#c6f432', okSoft: 'rgba(198,244,50,0.12)', warn: '#ffb36b', warnSoft: 'rgba(255,150,70,0.13)', bad: '#ff7d93', badSoft: 'rgba(255,80,110,0.13)', info: '#9fb2ff', infoSoft: 'rgba(110,140,255,0.14)',
   led: { ok: '#c6f432', warn: '#ffb36b', bad: '#ff5c78', off: '#4a4e58' },
+  addBg: 'rgba(198,244,50,0.2)', addInk: '#dcff8a', delBg: 'rgba(255,80,110,0.18)', delInk: '#ffa3b3',
 };
 export type Theme = typeof light;
 

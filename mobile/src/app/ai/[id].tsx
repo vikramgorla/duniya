@@ -1,21 +1,22 @@
 // "Change with AI": describe the change in plain words; the server's AI helper (/api/ai/agent-draft) proposes edits,
-// you see each one, and nothing is saved until you tap Apply.
+// you see each one as a friendly diff (#63, as in the panel), and nothing is saved until you tap Apply.
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
-import { Body, Button, Card, Field, H2, Label, Mono, Note, Screen } from '@/components/ui';
-import { useAuth } from '@/lib/auth';
-import type { Agent, AgentDraft } from '@/lib/types';
-
-const FIELD: Record<string, string> = { name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', dm: 'Who may message it directly',
-  organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', tools: 'Tool rules', confirm: 'Confirmation', schedules: 'Scheduled posts', memory: 'Group memory',
-  model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', plugins: 'Plugins', enabled: 'Enabled' };
-const show = (v: unknown) => (v == null || v === '' ? '—' : typeof v === 'string' ? v : JSON.stringify(v, null, 1));
+import { Alert, Text, View } from 'react-native';
+import { ChangeBody } from '@/components/Diff';
+import { Body, Button, Card, Field, H2, Label, Note, Row, Screen } from '@/components/ui';
+import { plural, review } from '@/lib/ai-review';
+import { can, useAuth } from '@/lib/auth';
+import { useTheme } from '@/lib/theme';
+import type { Agent, AgentDraft, ModelList } from '@/lib/types';
+import { useData } from '@/lib/useData';
 
 export default function ChangeWithAI() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { api } = useAuth();
+  const t = useTheme();
+  const { api, user } = useAuth();
+  const models = useData<ModelList>(can(user, 'admin') ? 'models' : null, (a) => a.get('/api/models'));
   const [request, setRequest] = useState('');
   const [busy, setBusy] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -49,13 +50,24 @@ export default function ChangeWithAI() {
           <Note tone="ok" title="Draft ready">{draft.summary || `${draft.changes.length} change(s)`}</Note>
           {draft.questions?.length ? <Note title="The AI asks">{draft.questions.join(' ')}</Note> : null}
           {draft.warnings?.length ? <Note tone="warn">{draft.warnings.join(' ')}</Note> : null}
-          {draft.changes.length === 0 ? <Body muted>No changes were needed.</Body> : draft.changes.map((c) => (
-            <Card key={c.field}>
-              <H2>{FIELD[c.field] || c.field}</H2>
-              <View style={{ gap: 4 }}><Label>Before</Label><Mono size={12}>{show(c.before).slice(0, 1200)}</Mono></View>
-              <View style={{ gap: 4 }}><Label>After</Label><Mono size={12}>{show(c.after).slice(0, 2400)}</Mono></View>
-            </Card>
-          ))}
+          {draft.changes.length === 0 ? <Body muted>No changes were needed.</Body> : (() => {
+            const r = review(draft.changes, { names: draft.names, models: models.data });
+            return (
+              <>
+                <Row wrap gap={8} style={{ alignItems: 'center' }}>
+                  <Body style={{ fontWeight: '700' }}>{r.title}</Body>
+                  {r.added ? <Text accessibilityLabel={`${plural(r.added, 'word')} added`} style={{ backgroundColor: t.addBg, color: t.addInk, borderRadius: 6, paddingHorizontal: 6, fontSize: 13 }}>{`+${plural(r.added, 'word')}`}</Text> : null}
+                  {r.removed ? <Text accessibilityLabel={`${plural(r.removed, 'word')} removed`} style={{ backgroundColor: t.delBg, color: t.delInk, borderRadius: 6, paddingHorizontal: 6, fontSize: 13 }}>{`−${plural(r.removed, 'word')}`}</Text> : null}
+                </Row>
+                {r.views.map((v) => (
+                  <Card key={v.field}>
+                    <View style={{ gap: 2 }}><Label>{v.section}</Label><H2>{v.head}</H2></View>
+                    <ChangeBody v={v} />
+                  </Card>
+                ))}
+              </>
+            );
+          })()}
           {draft.changes.length ? <Button kind="primary" title="Apply these changes" busy={applying} onPress={apply} /> : null}
           <Label style={{ textAlign: 'center' }}>{`drafted with ${draft.model}`}</Label>
         </>
