@@ -2,6 +2,8 @@
 // Public clients only (dynamic registration, PKCE S256), opaque tokens stored as sha256 hashes, access 1 h,
 // refresh 30 d with rotation and reuse detection (the whole family is revoked). Tokens act as the panel user who
 // approved them; disabled or deleted users and revoked grants stop working on the next call.
+// Mobile app (027): one built-in public client, `duniya-mobile`, with the custom-scheme redirect `duniya://oauth`
+// (store/dev builds) and Expo Go's `exp://<dev-host>/--/oauth`; its tokens are bound to the resource `<base>/api`.
 import { createHash } from 'node:crypto';
 import { db } from './db.js';
 import { TENANT, onUserDeleted } from './store.js';
@@ -14,6 +16,11 @@ export const CODE_TTL = 5 * 60 * 1000;
 export const CONFIRM_TTL = 10 * 60 * 1000;
 export const SCOPE = 'duniya';
 const MAX_CLIENTS = 300;
+export const MOBILE_CLIENT_ID = 'duniya-mobile';
+export const MOBILE_CLIENT_NAME = 'Duniya mobile app';
+export const MOBILE_REDIRECT = 'duniya://oauth';
+// Expo Go during development: exp://192.168.1.20:8081/--/oauth, exp://u.expo.dev/<id>/--/oauth, exp://abc-anon-8081.exp.direct/--/oauth
+const EXPO_GO_REDIRECT = /^exps?:\/\/[A-Za-z0-9.-]+(:\d{1,5})?(\/[A-Za-z0-9._~-]+)*\/--\/oauth$/;
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS admin_oauth_clients (
@@ -31,6 +38,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS admin_oauth_tokens_family ON admin_oauth_tokens(family);
   CREATE INDEX IF NOT EXISTS admin_oauth_tokens_user ON admin_oauth_tokens(user_id, client_id);
 `);
+// The mobile app's client always exists (RFC 8252 native app: public client, PKCE, custom-scheme redirect).
+db.prepare(`INSERT INTO admin_oauth_clients (client_id, tenant_id, name, client_uri, redirect_uris, created_at) VALUES (?, ?, ?, '', ?, ?)
+  ON CONFLICT (client_id) DO UPDATE SET name = excluded.name, redirect_uris = excluded.redirect_uris`)
+  .run(MOBILE_CLIENT_ID, TENANT, MOBILE_CLIENT_NAME, JSON.stringify([MOBILE_REDIRECT]), Date.now());
 onUserDeleted((id) => {
   db.prepare('DELETE FROM admin_oauth_grants WHERE user_id = ?').run(id);
   db.prepare('DELETE FROM admin_oauth_tokens WHERE user_id = ?').run(id);
@@ -56,7 +67,13 @@ const clean = (s, n) => String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, '').tr
 const clientRow = (id) => db.prepare('SELECT * FROM admin_oauth_clients WHERE client_id = ? AND tenant_id = ?').get(String(id || ''), TENANT);
 export function getClient(id) {
   const r = clientRow(id);
-  return r && { clientId: r.client_id, name: r.name || 'AI assistant', clientUri: r.client_uri || '', redirectUris: JSON.parse(r.redirect_uris) };
+  return r && { clientId: r.client_id, name: r.name || 'AI assistant', clientUri: r.client_uri || '', redirectUris: JSON.parse(r.redirect_uris), mobile: r.client_id === MOBILE_CLIENT_ID };
+}
+/** Exact match with a registered redirect URI; the mobile app may also return to Expo Go (exp://…/--/oauth). */
+export function redirectAllowed(client, uri) {
+  if (!client || !uri) return false;
+  if (client.redirectUris.includes(String(uri))) return true;
+  return client.clientId === MOBILE_CLIENT_ID && EXPO_GO_REDIRECT.test(String(uri));
 }
 
 export function registerClient(meta = {}) {
@@ -70,7 +87,7 @@ export function registerClient(meta = {}) {
   const n = db.prepare('SELECT COUNT(*) AS n FROM admin_oauth_clients WHERE tenant_id = ?').get(TENANT).n;
   if (n >= MAX_CLIENTS) {
     db.prepare(`DELETE FROM admin_oauth_clients WHERE client_id IN (SELECT c.client_id FROM admin_oauth_clients c
-      WHERE c.tenant_id = ? AND NOT EXISTS (SELECT 1 FROM admin_oauth_grants g WHERE g.client_id = c.client_id)
+      WHERE c.tenant_id = ? AND c.client_id != '${MOBILE_CLIENT_ID}' AND NOT EXISTS (SELECT 1 FROM admin_oauth_grants g WHERE g.client_id = c.client_id)
       ORDER BY c.created_at LIMIT ?)`).run(TENANT, n - MAX_CLIENTS + 1);
   }
   const clientId = `duniya-${newToken(12)}`;
@@ -191,8 +208,9 @@ export function listGrants({ userId = null } = {}) {
     WHERE g.tenant_id = ? AND (? IS NULL OR g.user_id = ?) ORDER BY g.created_at DESC`).all(TENANT, userId, userId);
   return rows.map((r) => {
     let host = '';
-    try { host = new URL(JSON.parse(r.redirect_uris || '[]')[0]).host; } catch { /* none */ }
-    return { userId: r.user_id, username: r.username, role: r.role, clientId: r.client_id, clientName: r.name || 'AI assistant', redirectHost: host, connectedAt: r.created_at, lastUsedAt: r.last_used_at };
+    try { const u = new URL(JSON.parse(r.redirect_uris || '[]')[0]); host = /^https?:$/.test(u.protocol) ? u.host : ''; } catch { /* none */ }
+    const mobile = r.client_id === MOBILE_CLIENT_ID;
+    return { userId: r.user_id, username: r.username, role: r.role, clientId: r.client_id, clientName: r.name || 'AI assistant', kind: mobile ? 'app' : 'assistant', redirectHost: mobile ? 'phone app' : host, connectedAt: r.created_at, lastUsedAt: r.last_used_at };
   });
 }
 export function revokeGrant(userId, clientId) {

@@ -92,6 +92,10 @@
   .toggle input:checked + span { background: var(--accent); } .toggle input:checked + span::after { transform: translateX(18px); }
   .toggle input:disabled + span { opacity: .5; cursor: default; }
   .qr { background: #fff; padding: 10px; border-radius: var(--radius-s); width: 220px; max-width: 100%; }
+  svg.qr { display: block; height: auto; padding: 6px; border: 1px solid var(--line); }
+  .mobile-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 10px 0 4px; }
+  .mobile-step { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 12px 14px; min-width: 0; }
+  .mobile-step svg.qr { width: 180px; margin: 6px 0; }
   .center { min-height: 80vh; display: grid; place-items: center; padding: 24px 0; }
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; z-index: 20; max-width: 90vw; box-shadow: var(--shadow); }
   .chatlog { display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow: auto; margin: 10px 0; }
@@ -272,6 +276,7 @@
 </head>
 <body>
 <div id="app"></div>
+<script src="/qr.js"></script>
 <script>
 'use strict';
 // ---------- DOM helper: untrusted text only ever goes through textContent ----------
@@ -1843,7 +1848,7 @@ async function renderSecrets() {
 
 // ---------- settings ----------
 async function renderSettings() {
-  const [bots, lg, ai, sess] = await Promise.all([api('GET', '/api/bots'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null)]);
+  const [bots, lg, ai, sess, mob] = await Promise.all([api('GET', '/api/bots'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null), api('GET', '/api/mobile').catch(() => null)]);
   if (sess?.user) { S.user = sess.user; S.google = !!sess.google; }
   const me = S.user;
   const cur = h('input', { type: 'password', placeholder: 'current', autocomplete: 'current-password' });
@@ -1856,6 +1861,7 @@ async function renderSettings() {
     h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default bot for DMs without a trigger'),
       h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmBot: e.target.value }), 'Saved') },
         h('option', { value: '' }, '— first bot that accepts the sender —'), bots.map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmBot === b.id }, b.name)))),
+    mob ? mobileCard(mob) : null,
     ai ? assistantsCard(ai) : null,
     lg ? loggingCard(lg) : null,
     h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any bot can send:'),
@@ -1875,6 +1881,7 @@ function copyButton(text) {
   } }, 'Copy');
 }
 function assistantsCard(a) {
+  a = { ...a, grants: a.grants.filter((g) => g.kind !== 'app') }; // phones are listed under Mobile app
   const url = h('input', { value: a.mcpUrl, readonly: true, 'aria-label': 'Address for AI assistants', onfocus: (e) => e.target.select() });
   const steps = (title, items) => h('details', {}, h('summary', { style: 'cursor:pointer;font-weight:600;margin:10px 0 4px' }, title), h('ol', { class: 'small', style: 'margin:6px 0 0;padding-left:20px' }, items.map((x) => h('li', { style: 'margin:3px 0' }, x))));
   const others = a.grants.some((g) => g.userId !== a.you);
@@ -1895,6 +1902,48 @@ function assistantsCard(a) {
       h('td', { class: 'small muted' }, `connected ${ago(g.connectedAt)} ago`, h('br'), g.lastUsedAt ? `last used ${ago(g.lastUsedAt)} ago` : 'not used yet'),
       h('td', { style: 'text-align:right' }, h('button', { class: 'btn small danger', onclick: () => revoke(g) }, 'Disconnect'))))))
       : h('p', { class: 'small muted' }, 'No AI assistants connected yet. Follow the steps above; it takes about a minute.'));
+}
+
+// ---------- Mobile app (027) ----------
+/** QR code drawn in the browser (qr.js); nothing is sent to another service. */
+function qrSvg(text, label) {
+  if (!window.DuniyaQR) return h('p', { class: 'small muted' }, 'QR code unavailable — reload the page.');
+  const ns = 'http://www.w3.org/2000/svg'; const el = (t, a) => { const e = document.createElementNS(ns, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); return e; };
+  const { d, viewBox } = DuniyaQR.svgPath(DuniyaQR.encode(text, 'M'));
+  const svg = el('svg', { viewBox, class: 'qr', role: 'img', 'aria-label': label, 'shape-rendering': 'crispEdges' });
+  svg.append(el('rect', { width: '100%', height: '100%', fill: '#fff' }), el('path', { d, fill: '#101216' }));
+  return svg;
+}
+function mobileCard(m) {
+  const step = (n, title, ...body) => h('div', { class: 'mobile-step' }, h('div', { class: 'eyebrow', style: 'font-family:var(--mono)' }, `Step ${n}`), h('h3', { style: 'margin:2px 0 6px' }, title), ...body);
+  const expo = h('input', { value: m.expoUrl, placeholder: 'exp://u.expo.dev/… or exp://192.168.1.20:8081', 'aria-label': 'Expo link' });
+  const signOut = (g) => confirm(`Sign out the Duniya app of ${g.userId === m.you ? 'your phone' : g.username}? It stops working right away; signing in again takes a minute.`)
+    && tryApi(async () => { await api('DELETE', `/api/assistants/${g.userId}/${encodeURIComponent(g.clientId)}`); renderSettings(); }, 'Signed out');
+  const others = m.devices.some((g) => g.userId !== m.you);
+  return h('div', { class: 'card', style: 'grid-column:1/-1' },
+    h('div', { class: 'row spread' }, h('h2', {}, 'Mobile app'), h('span', { class: 'pill info' }, 'Preview · Expo Go')),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Run Duniya from your phone: status, agents, chats, usage, server updates and waiting confirmations. The app signs in with your panel account and can do exactly what your account can do here.'),
+    m.https ? null : h('div', { class: 'note warn' }, 'Your phone can only reach this app at its public https address. Set up internet access first (Caddy or Cloudflare, see the install guide), open the panel at that address and come back here.'),
+    h('div', { class: 'mobile-steps' },
+      step(1, 'Install Expo Go', h('p', { class: 'small' }, 'The free Expo Go app runs Duniya while it is in preview (store versions come later).'),
+        h('div', { class: 'row' }, h('a', { class: 'btn small', href: 'https://apps.apple.com/app/expo-go/id982107779', target: '_blank', rel: 'noopener' }, 'App Store'),
+          h('a', { class: 'btn small', href: 'https://play.google.com/store/apps/details?id=host.exp.exponent', target: '_blank', rel: 'noopener' }, 'Google Play'))),
+      step(2, 'Open the Duniya app',
+        m.expoUrl ? [qrSvg(m.expoUrl, 'QR code that opens the Duniya app in Expo Go'), h('p', { class: 'small muted' }, 'iPhone: scan with the Camera. Android: open Expo Go → Scan QR code.')]
+          : h('p', { class: 'small' }, 'No app link yet. Whoever looks after this server starts the app from the repository (', h('code', {}, 'npm run mobile'), ', see ', h('code', {}, 'mobile/README.md'), ') and scans the QR code it prints, or publishes it with ', h('code', {}, 'eas update'), ' and pastes the link below.'),
+        can('owner') ? h('details', { open: !m.expoUrl }, h('summary', { style: 'cursor:pointer;font-weight:600;margin:6px 0' }, 'Expo link'),
+          h('form', { class: 'row nowrap', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/mobile', { expoUrl: expo.value }), expo.value ? 'Link saved' : 'Link removed')) renderSettings(); } },
+            expo, h('button', { class: 'btn' }, 'Save')),
+          h('p', { class: 'small muted' }, 'Paste the exp:// link from ', h('code', {}, 'npx expo start'), ' (same Wi-Fi only) or from ', h('code', {}, 'eas update'), ' (works anywhere).')) : null),
+      step(3, 'Connect to this server', qrSvg(m.connectUrl, 'QR code with this server address for the Duniya app'),
+        h('p', { class: 'small muted' }, 'In the app tap ', h('b', {}, 'Scan the panel’s QR code'), ', or type this address:'),
+        h('div', { class: 'row nowrap' }, h('input', { value: m.serverUrl, readonly: true, 'aria-label': 'Server address for the app', onfocus: (e) => e.target.select() }), copyButton(m.serverUrl)))),
+    h('h3', {}, 'Signed-in phones'),
+    m.devices.length ? h('table', {}, h('tbody', {}, m.devices.map((g) => h('tr', {},
+      h('td', {}, h('b', {}, g.userId === m.you ? 'Your phone' : 'Phone'), others ? [' · ', g.username, ' ', h('span', { class: 'pill' }, g.role)] : null),
+      h('td', { class: 'small muted' }, `signed in ${ago(g.connectedAt)} ago`, h('br'), g.lastUsedAt ? `last used ${ago(g.lastUsedAt)} ago` : 'not used yet'),
+      h('td', { style: 'text-align:right' }, h('button', { class: 'btn small danger', onclick: () => signOut(g) }, 'Sign out'))))))
+      : h('p', { class: 'small muted' }, 'No phone signed in yet. Follow the three steps above.'));
 }
 
 function myGoogleCard(me) {

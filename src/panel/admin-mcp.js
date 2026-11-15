@@ -3,6 +3,8 @@
 //   /.well-known/oauth-protected-resource[/mcp]  RFC 9728   /.well-known/oauth-authorization-server  RFC 8414
 //   /oauth/register (RFC 7591, public clients)  /oauth/authorize (consent page)  /oauth/token  /oauth/revoke (RFC 7009)
 //   /mcp  Streamable HTTP, stateless, JSON responses. Every call acts as the panel user who approved the assistant.
+// Mobile app (027): the built-in client `duniya-mobile` signs in here too; its tokens are for the resource <base>/api
+// (/.well-known/oauth-protected-resource/api) and are accepted as Bearer on the panel's /api/* routes (server.js).
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -15,7 +17,7 @@ import { activity } from '../core/events.js';
 import { sha256 } from '../core/crypto.js';
 import {
   OAuthError, SCOPE, registerClient, getClient, createCode, exchangeCode, refreshTokens, revokeToken, validateAccess, normResource,
-  saveGrant, listGrants, revokeGrant, createConfirm, takeConfirm,
+  saveGrant, listGrants, revokeGrant, createConfirm, takeConfirm, redirectAllowed, MOBILE_CLIENT_ID,
 } from '../core/admin-oauth.js';
 import { baseUrl, clientIp, cookie, isHttps, minuteLimiter } from './http-util.js';
 import { TOOLS, scrub } from './admin-tools.js';
@@ -31,7 +33,7 @@ const CORS = {
   'access-control-max-age': '600',
 };
 const CORS_PATHS = new Set(['/mcp', '/oauth/token', '/oauth/register', '/oauth/revoke', '/.well-known/oauth-protected-resource',
-  '/.well-known/oauth-protected-resource/mcp', '/.well-known/oauth-authorization-server']);
+  '/.well-known/oauth-protected-resource/mcp', '/.well-known/oauth-protected-resource/api', '/.well-known/oauth-authorization-server']);
 const SECRET_ARGS = new Set(['value', 'password', 'passphrase']);
 const redact = (args) => Object.fromEntries(Object.entries(args || {}).map(([k, v]) => [k, SECRET_ARGS.has(k) ? '•••' : v]));
 
@@ -77,6 +79,10 @@ export function createAdminMcp({ invoke, routeRole }) {
   const resourceMetadata = (req) => ({
     resource: resourceOf(req), authorization_servers: [baseUrl(req)], scopes_supported: [SCOPE], bearer_methods_supported: ['header'],
     resource_name: 'Duniya admin (WhatsApp agents)',
+  });
+  const apiResourceMetadata = (req) => ({
+    resource: `${baseUrl(req)}/api`, authorization_servers: [baseUrl(req)], scopes_supported: [SCOPE], bearer_methods_supported: ['header'],
+    resource_name: 'Duniya panel API (mobile app)', mobile_client_id: MOBILE_CLIENT_ID,
   });
   const serverMetadata = (req) => {
     const b = baseUrl(req);
@@ -124,11 +130,17 @@ code{font-size:13px}
     const client = getClient(p.client_id);
     if (!client) return { fatal: 'Unknown app (client_id). It may have been registered on another server.' };
     const redirectUri = p.redirect_uri || (client.redirectUris.length === 1 ? client.redirectUris[0] : '');
-    if (!client.redirectUris.includes(redirectUri)) return { fatal: 'The return address (redirect_uri) is not the one this app registered.' };
+    if (!redirectAllowed(client, redirectUri)) return { fatal: 'The return address (redirect_uri) is not the one this app registered.' };
     const back = (error, description) => ({ client, redirectUri, error, description });
     if (p.response_type !== 'code') return back('unsupported_response_type', 'Only response_type=code is supported');
     if (!p.code_challenge || p.code_challenge_method !== 'S256') return back('invalid_request', 'PKCE with code_challenge_method=S256 is required');
     const base = baseUrl(req);
+    if (client.mobile) {
+      // The phone app only gets tokens for the panel API; AI assistants only for /mcp.
+      const want = p.resource ? normResource(p.resource) : `${base}/api`;
+      if (want !== `${base}/api`) return back('invalid_target', `Unknown resource; the mobile app signs in for ${base}/api`);
+      return { client, redirectUri, resource: `${base}/api` };
+    }
     const wanted = p.resource ? normResource(p.resource) : `${base}/mcp`;
     if (wanted !== `${base}/mcp` && wanted !== base) return back('invalid_target', `Unknown resource; use ${base}/mcp`);
     return { client, redirectUri, resource: `${base}/mcp` };
@@ -140,10 +152,22 @@ code{font-size:13px}
   };
   const csrfFor = (token) => sha256(`consent:${token}`).slice(0, 32);
 
+  // Where the browser goes after the form: an https origin, or a custom scheme (duniya:, exp:) for the phone app.
+  // CSP form-action also covers the redirect that follows the POST, so the scheme must be listed.
+  const formTarget = (uri) => { const u = new URL(uri); return /^https?:$/.test(u.protocol) ? u.origin : u.protocol; };
   function consentPage(req, res, p, chk, user, sessionToken) {
-    const host = new URL(chk.redirectUri).host;
     const abilities = ROLE_ABILITIES[user.role] || ROLE_ABILITIES.viewer;
-    page(res, 200, { title: `Connect ${chk.client.name}`, formTo: new URL(chk.redirectUri).origin, body: `
+    if (chk.client.mobile) {
+      return page(res, 200, { title: 'Sign in the Duniya app', formTo: formTarget(chk.redirectUri), body: `
+<h1>Sign in the Duniya app on your phone?</h1>
+<p>The app will act as <b>${esc(user.username)}</b> <span class=pill>${esc(user.role)}</span>, with the same rights as in this panel:</p>
+<ul>${abilities.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
+<p class="small muted">Only approve if you just tapped Sign in in the Duniya app yourself. You can sign the phone out any time in Settings → Mobile app.</p>
+<form method=post action="/oauth/authorize" class=row>${hidden(p)}<input type=hidden name=csrf value="${csrfFor(sessionToken)}">
+<button class="btn primary" name=action value=approve>Approve</button><button class="btn danger" name=action value=deny>Deny</button></form>` });
+    }
+    const host = new URL(chk.redirectUri).host;
+    page(res, 200, { title: `Connect ${chk.client.name}`, formTo: formTarget(chk.redirectUri), body: `
 <h1>Connect ${esc(chk.client.name)}?</h1>
 <p class=muted><b>${esc(chk.client.name)}</b> <span class=small>(returns to <code>${esc(host)}</code>)</span> wants to manage this Duniya app for you.</p>
 <p>It acts as <b>${esc(user.username)}</b> <span class=pill>${esc(user.role)}</span> and can:</p>
@@ -187,18 +211,20 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
       if (limitLogin(`login:${ip}`)) return loginPage(res, p, chk, { error: 'Too many attempts, wait a minute.' });
       if (!passwordLoginAllowed()) return loginPage(res, p, chk, { error: 'Password sign-in is switched off. Use Sign in with Google.' });
       user = authenticate(p.username || 'admin', String(p.password || ''));
-      if (!user) { activity('system', { summary: `Panel login failed for "${p.username || 'admin'}" from ${ip} (AI assistant sign-in)` }); return loginPage(res, p, chk, { error: 'Wrong username or password.' }); }
+      if (!user) { activity('system', { summary: `Panel login failed for "${p.username || 'admin'}" from ${ip} (${chk.client.mobile ? 'mobile app' : 'AI assistant'} sign-in)` }); return loginPage(res, p, chk, { error: 'Wrong username or password.' }); }
       const s = createSession(user.id, ip);
       token = s.token;
       res.setHeader('set-cookie', `duniya_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${s.maxAge}${isHttps(req) ? '; Secure' : ''}`);
-      activity('system', { summary: `Panel login: ${user.username} from ${ip} (AI assistant sign-in)` });
+      activity('system', { summary: `Panel login: ${user.username} from ${ip} (${chk.client.mobile ? 'mobile app' : 'AI assistant'} sign-in)` });
       return consentPage(req, res, p, chk, user, token);
     }
     if (p.action === 'approve') {
       if (!user) return loginPage(res, p, chk, { error: 'Your session ended. Sign in again.' });
       if (p.csrf !== csrfFor(token)) return errorPage(res, 'This approval form is out of date. Start again from your AI assistant.');
       saveGrant(user.id, chk.client.clientId);
-      activity('config', { summary: `AI assistant "${chk.client.name}" connected by ${user.username} (${user.role}), returns to ${new URL(chk.redirectUri).host}` });
+      activity('config', { summary: chk.client.mobile
+        ? `Mobile app signed in by ${user.username} (${user.role})${chk.redirectUri.startsWith('exp') ? ' (Expo Go)' : ''}`
+        : `AI assistant "${chk.client.name}" connected by ${user.username} (${user.role}), returns to ${new URL(chk.redirectUri).host}` });
       const code = createCode({ clientId: chk.client.clientId, userId: user.id, redirectUri: chk.redirectUri, codeChallenge: p.code_challenge, resource: chk.resource });
       res.writeHead(302, { location: redirectTo(chk.redirectUri, { code, state: p.state, iss: baseUrl(req) }) });
       return res.end();
@@ -315,7 +341,10 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
       if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return true; }
     }
     try {
-      if (path === '/.well-known/oauth-protected-resource' || path === '/.well-known/oauth-protected-resource/mcp') {
+      if (path === '/.well-known/oauth-protected-resource/api') {
+        if (req.method !== 'GET') return json(res, 405, { error: 'method_not_allowed' }), true;
+        json(res, 200, apiResourceMetadata(req), { 'cache-control': 'max-age=300' });
+      } else if (path === '/.well-known/oauth-protected-resource' || path === '/.well-known/oauth-protected-resource/mcp') {
         if (req.method !== 'GET') return json(res, 405, { error: 'method_not_allowed' }), true;
         json(res, 200, resourceMetadata(req), { 'cache-control': 'max-age=300' });
       } else if (path === '/.well-known/oauth-authorization-server') {
