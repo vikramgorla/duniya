@@ -51,6 +51,7 @@ variables:
     enum: [VM.Standard.E2.1.Micro, VM.Standard.A1.Flex]
     default: VM.Standard.E2.1.Micro
     required: true
+    description: "E2.1.Micro: x86, 1 GB, 1/8 CPU — always available but slow (first install about 20–30 minutes). A1.Flex: Arm, up to 2 CPU / 12 GB free — much faster, but Oracle sometimes has no capacity (then try again later or pick E2.1.Micro)."
   a1_ocpus:
     type: number
     title: "OCPUs (A1 only)"
@@ -98,21 +99,31 @@ variables:
 primaryOutputButton: panel_url
 
 outputGroups:
-  - title: "Open"
-    outputs: [panel_url, install_progress_url, panel_access]
+  - title: "Open your panel"
+    outputs: [install_progress_url, panel_url, panel_access]
+  - title: "Copy"
+    outputs: [panel_address, install_progress_address, public_ip]
   - title: "Details"
-    outputs: [public_ip, instance_id, manage_stack_url, logs_url]
+    outputs: [instance_id, manage_stack_url, logs_url]
 
 outputs:
   panel_url:
     type: link
     title: "Admin panel"
-    displayText: "Open the admin panel"
+    displayText: "Open the panel"
     visible: true
   install_progress_url:
     type: link
     title: "Install progress"
     displayText: "Watch the install"
+    visible: true
+  panel_address:
+    type: copyableString
+    title: "Panel address"
+    visible: true
+  install_progress_address:
+    type: copyableString
+    title: "Install progress address"
     visible: true
   panel_access:
     type: string

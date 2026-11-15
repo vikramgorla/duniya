@@ -26,8 +26,20 @@ for screenshots. These pages are the reference.
 - [Small servers](small-servers.md): 1 GB guardrails
 - [Command line (`duniya`)](cli.md)
 - [Optional settings (environment)](settings.md)
-- Deploy guides: [Oracle Cloud](deploy/oci-free-tier.md) · [Docker](deploy/docker.md) ·
-  [Cloudflare Tunnel](deploy/cloudflare-tunnel.md) · [Terraform + GitHub Actions](deploy/terraform-github-actions.md)
+- Deploy guides: [Oracle Cloud](deploy/oci-free-tier.md) · [Google Cloud](deploy/google-cloud.md) ·
+  [Docker](deploy/docker.md) · [Cloudflare Tunnel](deploy/cloudflare-tunnel.md) ·
+  [Terraform + GitHub Actions](deploy/terraform-github-actions.md)
+
+**Managing your server** (step by step, with the exact console menus)
+
+| Hosted on | Update the app | Update the infrastructure | Recreate | Remove | Find IP, logs, reboot, errors |
+|---|---|---|---|---|---|
+| Oracle Cloud stack | [panel](deploy/oci-free-tier.md#update-the-app) | [new stack zip → Plan → Apply](deploy/oci-free-tier.md#update-the-stack-infrastructure) | [Destroy → Apply → restore](deploy/oci-free-tier.md#recreate-from-scratch) | [Destroy, then Delete](deploy/oci-free-tier.md#remove-everything) | [console](deploy/oci-free-tier.md#find-things-fast) · [errors](deploy/oci-free-tier.md#common-errors) |
+| Google Cloud script | [panel](deploy/google-cloud.md#update-the-app) | [re-run safely](deploy/google-cloud.md#update-the-infrastructure) | [delete VM → script → restore](deploy/google-cloud.md#recreate-from-scratch) | [VM, firewall rule, IPs](deploy/google-cloud.md#remove-everything) | [console](deploy/google-cloud.md#find-things-fast) · [errors](deploy/google-cloud.md#common-errors) |
+| Own server (installer) | [panel / `duniya update`](install.md#update-the-app) | [re-run the installer](install.md#change-how-the-panel-is-reached) | [backup → install → restore](install.md#recreate-from-scratch-new-server-or-fresh-os) | [commands](install.md#remove-duniya-from-a-server) | [where to look](install.md#find-things-fast) |
+| Docker | [pull + up](deploy/docker.md#update-the-app) | n/a | [down / new machine](deploy/docker.md#recreate-from-scratch) | [down (-v)](deploy/docker.md#remove-everything) | [commands](deploy/docker.md#find-things-fast) |
+
+The panel's **Server** page has a **Hosting help** card that links to the right guide for your server.
 
 **Build**
 - [How it works](architecture.md)

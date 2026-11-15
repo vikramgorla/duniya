@@ -94,6 +94,9 @@ gcloud compute instances delete duniya --zone us-central1-a && gcloud compute fi
 gcloud compute routers delete duniya-router --region us-central1
 ```
 
+Updating, recreating, removing, and where to find the IP, logs and serial console later:
+[docs/deploy/google-cloud.md](https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/deploy/google-cloud.md).
+
 <walkthrough-conclusion-trophy></walkthrough-conclusion-trophy>
 
 You're done. Your agents run on your own server, for free.

@@ -28,6 +28,23 @@ const run = (cmd, args, timeout = 20000) => new Promise((res) => {
   execFile(cmd, args, { timeout, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, LC_ALL: 'C' } }, (err, stdout, stderr) => res({ ok: !err, out: String(stdout || ''), err: String(stderr || err?.message || '') }));
 });
 
+// ---------- hosting (#56): which guide the panel's "Hosting help" card opens ----------
+// Docker from the install kind; Oracle Cloud and Google Cloud from the VM's DMI strings (world-readable, no root):
+// OCI sets chassis_asset_tag "OracleCloud.com", Compute Engine sets product_name "Google Compute Engine".
+// DUNIYA_HOST (oci | gcp | other) overrides the guess.
+const HOSTS = ['oci', 'gcp', 'docker', 'server'];
+export function detectHosting({ env = process.env, dmiDir = env.DUNIYA_DMI_DIR || '/sys/class/dmi/id' } = {}) {
+  const install = env.DUNIYA_INSTALL || 'unknown';
+  const override = String(env.DUNIYA_HOST || '').toLowerCase();
+  if (HOSTS.includes(override)) return { provider: override, install, detected: false };
+  if (override === 'other') return { provider: 'server', install, detected: false };
+  if (install === 'docker') return { provider: 'docker', install, detected: true };
+  const dmi = (f) => read(`${dmiDir}/${f}`).trim();
+  if (dmi('chassis_asset_tag') === 'OracleCloud.com') return { provider: 'oci', install, detected: true };
+  if (dmi('product_name') === 'Google Compute Engine' || dmi('sys_vendor') === 'Google') return { provider: 'gcp', install, detected: true };
+  return { provider: install === 'systemd' ? 'server' : 'unknown', install, detected: false };
+}
+
 // ---------- metrics ----------
 let lastCpu = null;
 function cpuPercent() {
@@ -90,6 +107,7 @@ export async function snapshot() {
     services, rebootRequired: existsSync('/var/run/reboot-required'),
     rebootPackages: read('/var/run/reboot-required.pkgs').split('\n').filter(Boolean),
     ops: opsAvailable(),
+    hosting: detectHosting(),
   };
 }
 export const metricsHistory = () => history;

@@ -38,10 +38,18 @@ are listed with the local backups and are kept apart from the normal retention: 
     `apply_update` (`breaking: true` to cross one; confirmation required), `snooze_update_decision`.
 - **OS packages**: **Server → OS updates & maintenance** (security updates, restart when needed).
 - **Docker**: `docker compose pull && docker compose up -d`.
-- **Oracle Cloud stack**: the app updates itself as above; to update the infrastructure, *Edit stack* with the latest
-  stack zip and *Apply* (see [Install](install.md)).
+- **Oracle Cloud stack**: the app updates itself as above; to update the infrastructure, **Edit** the stack with the
+  latest stack zip, **Plan**, then **Apply** ([step by step](deploy/oci-free-tier.md#update-the-stack-infrastructure)).
+- **Google Cloud**: the app updates itself as above ([guide](deploy/google-cloud.md#update-the-app)).
 
-See also [Upgrading](upgrading.md).
+## Moving to a new server or recreating one
+
+Back up (**Backups → Back up now & download**), set up the new server, then **Restore a backup** on its first screen
+(or **Backups → Restore → A file**). Per host, with what changes (IP, sslip.io address, domain DNS, WhatsApp link):
+[Oracle Cloud](deploy/oci-free-tier.md#recreate-from-scratch) · [Google Cloud](deploy/google-cloud.md#recreate-from-scratch) ·
+[own server](install.md#recreate-from-scratch-new-server-or-fresh-os) · [Docker](deploy/docker.md#recreate-from-scratch).
+
+See also [Upgrading](upgrading.md) and [Managing your server](README.md).
 
 ---
 [Docs index](README.md)

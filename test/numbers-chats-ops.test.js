@@ -133,6 +133,7 @@ test('011: server metrics, OS updates, logs; maintenance is owner-only and only 
   const s = (await t.api(admin, 'GET', '/api/system')).body;
   assert.ok(s.memory.total > 0 && s.cpus > 0 && Array.isArray(s.load));
   assert.equal(s.ops, true);
+  assert.ok(['oci', 'gcp', 'docker', 'server', 'unknown'].includes(s.hosting?.provider), 'hosting guide hint (#56)');
   assert.ok(Array.isArray((await t.api(admin, 'GET', '/api/system/history')).body));
   assert.equal((await t.api(admin, 'GET', '/api/system/logs?unit=sshd')).status, 400, 'only our services');
   assert.equal((await t.api(admin, 'POST', '/api/system/ops', { action: 'os-update' })).status, 403, 'owner only');
@@ -152,4 +153,18 @@ test('012: remove a number', async () => {
   await reg.removeNumber('shop');
   assert.equal(sessions.shop.removed, true);
   assert.deepEqual((await reg.status()).numbers.map((x) => x.id), ['main']);
+});
+
+test('#56: hosting is detected from the install kind, the VM\'s DMI strings, or DUNIYA_HOST', async () => {
+  const { detectHosting } = await import('../src/core/system.js');
+  const dmi = (files) => { const d = mkdtempSync(join(tmpdir(), 'duniya-dmi-')); for (const [f, v] of Object.entries(files)) writeFileSync(join(d, f), `${v}\n`); return d; };
+  assert.equal(detectHosting({ env: { DUNIYA_INSTALL: 'systemd' }, dmiDir: dmi({ chassis_asset_tag: 'OracleCloud.com', sys_vendor: 'QEMU' }) }).provider, 'oci');
+  assert.equal(detectHosting({ env: { DUNIYA_INSTALL: 'systemd' }, dmiDir: dmi({ product_name: 'Google Compute Engine', sys_vendor: 'Google' }) }).provider, 'gcp');
+  assert.equal(detectHosting({ env: { DUNIYA_INSTALL: 'systemd' }, dmiDir: dmi({ sys_vendor: 'Hetzner' }) }).provider, 'server');
+  assert.equal(detectHosting({ env: {}, dmiDir: dmi({}) }).provider, 'unknown', 'no install kind, no cloud: show every guide');
+  assert.equal(detectHosting({ env: { DUNIYA_INSTALL: 'docker' }, dmiDir: dmi({ chassis_asset_tag: 'OracleCloud.com' }) }).provider, 'docker', 'Docker wins: its guide is the one that applies');
+  const forced = detectHosting({ env: { DUNIYA_INSTALL: 'systemd', DUNIYA_HOST: 'GCP' }, dmiDir: dmi({ chassis_asset_tag: 'OracleCloud.com' }) });
+  assert.deepEqual([forced.provider, forced.detected], ['gcp', false]);
+  assert.equal(detectHosting({ env: { DUNIYA_HOST: 'other' }, dmiDir: dmi({}) }).provider, 'server');
+  assert.equal(detectHosting({ env: { DUNIYA_HOST: 'nonsense', DUNIYA_INSTALL: 'systemd' }, dmiDir: dmi({}) }).provider, 'server', 'unknown override is ignored');
 });
