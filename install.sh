@@ -158,7 +158,7 @@ apt-get update -qq
 apt-get install -y -qq git curl ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https >/dev/null
 # Photos & voice (043): ffmpeg makes WhatsApp voice notes (Ogg/Opus) and reads them for on-server speech; bzip2 unpacks
 # the optional on-server speech models. Optional: the app works without them (provider routes only).
-apt-get install -y -qq --no-install-recommends ffmpeg bzip2 >/dev/null || echo "  (ffmpeg not installed: voice replies through OpenRouter and on-server speech stay off)"
+apt-get install -y -qq --no-install-recommends bzip2 >/dev/null || true
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ]; then
   say "Installing Node.js 22"
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
@@ -290,13 +290,19 @@ open_web_ports() {
 }
 
 if [ "$EXPOSURE" = "domain" ] || [ "$EXPOSURE" = "ip" ]; then
-  systemctl stop duniya-status-page duniya-status-render 2>/dev/null || true  # first-boot progress page (OCI bootstrap)
   if ! command -v caddy >/dev/null; then
     say "Installing Caddy (automatic HTTPS)"
     # Use the distro's signed package (Ubuntu 24.04 / Debian 12 ship Caddy 2.6+). Caddy's own apt repo has had signing-key
     # mismatches, so we don't depend on it; fall back to the official release binary from GitHub.
     rm -f /etc/apt/sources.list.d/caddy-stable.list
-    if ! { apt-get install -y -qq caddy >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq caddy >/dev/null 2>&1; }; }; then
+    # The package would start Caddy with its "Caddy works!" page on port 80 and push the progress page away while the
+    # rest of the install runs. policy-rc.d stops packages from starting services; Caddy starts below with our config.
+    printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d && chmod 755 /usr/sbin/policy-rc.d
+    trap 'rm -f /usr/sbin/policy-rc.d' EXIT
+    CADDY_OK=1
+    { apt-get install -y -qq caddy >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq caddy >/dev/null 2>&1; }; } || CADDY_OK=0
+    rm -f /usr/sbin/policy-rc.d
+    if [ "$CADDY_OK" -eq 0 ]; then
       say "Distro package not available; installing the Caddy release binary"
       case "$(uname -m)" in x86_64) CARCH=amd64 ;; aarch64|arm64) CARCH=arm64 ;; *) die "Unsupported CPU $(uname -m) for Caddy" ;; esac
       CVER="$(curl -fsSL https://api.github.com/repos/caddyserver/caddy/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' | head -1)"
@@ -354,6 +360,8 @@ EOF
   mv -f /etc/caddy/Caddyfile.duniya /etc/caddy/Caddyfile
   rm -f "$WEB_REQ"
   open_web_ports
+  # Hand port 80 over from the first-boot progress page (OCI bootstrap) to Caddy only now, when the final config is ready.
+  systemctl stop duniya-status-page duniya-status-render 2>/dev/null || true
   systemctl enable -q caddy && systemctl reload-or-restart caddy
   systemctl disable -q --now cloudflared 2>/dev/null || true
   if command -v tailscale >/dev/null; then tailscale serve reset >/dev/null 2>&1 || true; fi
@@ -406,6 +414,13 @@ for _ in $(seq 1 40); do
   fi
   sleep 1
 done
+
+# ffmpeg (043: voice notes, on-server speech) is large; install it after the panel is up so the first start is quick.
+if ! command -v ffmpeg >/dev/null; then
+  say "Installing ffmpeg (voice notes) in the background"
+  (apt-get install -y -qq --no-install-recommends ffmpeg >/dev/null 2>&1 || true) </dev/null >/dev/null 2>&1 &
+  disown || true
+fi
 
 echo
 say "Installed."

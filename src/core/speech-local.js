@@ -105,7 +105,8 @@ export function removeEngine(kind) {
 
 // ---------- ffmpeg ----------
 let ffmpegOk = null;
-export function hasFfmpeg() { if (ffmpegOk === null) ffmpegOk = hasCommand('ffmpeg'); return ffmpegOk; }
+// Only a positive answer is cached: the installer adds ffmpeg in the background after the panel starts.
+export function hasFfmpeg() { if (ffmpegOk !== true) ffmpegOk = hasCommand('ffmpeg'); return ffmpegOk; }
 export const setFfmpeg = (v) => { ffmpegOk = v; }; // tests
 let fakeConvert = null;
 /** Tests: (buffer, target) → Buffer. */
