@@ -4,7 +4,7 @@
 //
 //   node scripts/demo-panel.mjs [port]      → http://127.0.0.1:8099, sign in as admin / demo-password-123
 import http from 'node:http';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -150,11 +150,25 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const registryUrl = await fakeRegistry(weatherUrl);
   const data = join(dataDir, 'data'); const ops = join(dataDir, 'ops');
   for (const d of [data, join(ops, 'req'), join(ops, 'state')]) mkdirSync(d, { recursive: true });
-  writeFileSync(join(ops, 'helper'), '#!/bin/sh\n'); // maintenance helper present (nothing runs it in the demo)
+  writeFileSync(join(ops, 'helper'), '#!/bin/sh\n# duniya-ops-version: 2\n'); // maintenance helper present (nothing runs it in the demo)
+  // #96: OS updates from captured apt output (3 to install, snapd rolling out gradually, docker-ce on hold), the last
+  // run's log (kernel installed) and a pending restart, so the Server page shows every group and the restart banner.
+  const apt = join(ops, 'apt'); mkdirSync(apt, { recursive: true });
+  const fx = (f) => readFileSync(join(ROOT, 'test/fixtures/apt', f), 'utf8');
+  writeFileSync(join(apt, 'simulate.txt'), fx('sim-full-upgrade-phased-held.txt'));
+  writeFileSync(join(apt, 'policy.txt'), fx('policy.txt'));
+  writeFileSync(join(apt, 'holds.txt'), 'docker-ce\n');
+  writeFileSync(join(ops, 'state', 'last.log'), fx('run-full-upgrade.log'));
+  const ranAt = Date.now() - 26 * 3600000;
+  writeFileSync(join(ops, 'state', 'status.json'), JSON.stringify({ action: 'os-update', state: 'done', code: 0, startedAt: ranAt - 277000, endedAt: ranAt }));
+  writeFileSync(join(ops, 'reboot-required'), '*** System restart required ***\n');
+  writeFileSync(join(ops, 'reboot-required.pkgs'), 'linux-image-6.8.0-1035-oracle\nlinux-base\n');
+  utimesSync(join(ops, 'reboot-required'), ranAt / 1000, ranAt / 1000);
   Object.assign(process.env, {
     DATA_DIR: data, PANEL_PORT: String(port), ADMIN_PASSWORD: DEMO_PASSWORD,
     ANTHROPIC_BASE_URL: `${F}/anthropic`, OPENAI_API_BASE: `${F}/chatgpt`, OPENROUTER_API_BASE: `${F}/openrouter`,
     DUNIYA_INSTALL: 'systemd', DUNIYA_HOST: process.env.DUNIYA_HOST || 'oci', DUNIYA_OPS_HELPER: join(ops, 'helper'), DUNIYA_OPS_REQUEST_DIR: join(ops, 'req'), DUNIYA_OPS_STATE_DIR: join(ops, 'state'),
+    DUNIYA_FAKE_APT: apt, DUNIYA_REBOOT_REQUIRED_FILE: join(ops, 'reboot-required'),
     UPDATE_MODE: 'notify', TZ_DEFAULT: 'Europe/Zurich', PUBLIC_URL: 'https://duniya.example.org',
     // Web address & access card with its full form (036), without network lookups.
     DUNIYA_OPS_WEBCONFIG: join(ROOT, 'deploy/ops/webconfig.mjs'), DUNIYA_PUBLIC_IP: '203.0.113.10', DUNIYA_TLS_PORT: '1', DUNIYA_FAKE_CADDY_LOG: join(ops, 'caddy.log'),
@@ -167,6 +181,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const prefs = await imp('src/core/chat-prefs.js');
   const providers = await imp('src/core/providers/index.js');
   const system = await imp('src/core/system.js');
+  await system.osUpdates(); // #96: the Server tab badge counts from the last check
   const backup = await imp('src/core/backup/index.js');
   const contacts = await imp('src/core/contacts.js');
   const globalMcp = await imp('src/core/global-mcp.js');

@@ -1,0 +1,26 @@
+linux-oracle:
+  Installed: 6.8.0-1032.33
+  Candidate: 6.8.0-1035.36
+  Version table:
+     6.8.0-1035.36 500
+        500 http://ports.ubuntu.com/ubuntu-ports noble-updates/main arm64 Packages
+        500 http://ports.ubuntu.com/ubuntu-ports noble-security/main arm64 Packages
+ *** 6.8.0-1032.33 100
+        100 /var/lib/dpkg/status
+snapd:
+  Installed: 2.77+ubuntu24.04
+  Candidate: 2.78+ubuntu24.04
+  Version table:
+     2.78+ubuntu24.04 500 (phased 20%)
+        500 http://ports.ubuntu.com/ubuntu-ports noble-updates/main arm64 Packages
+ *** 2.77+ubuntu24.04 500
+        500 http://ports.ubuntu.com/ubuntu-ports noble-security/main arm64 Packages
+        100 /var/lib/dpkg/status
+docker-ce:
+  Installed: 5:28.5.1-1~ubuntu.24.04~noble
+  Candidate: 5:28.5.2-1~ubuntu.24.04~noble
+  Version table:
+     5:28.5.2-1~ubuntu.24.04~noble 500
+        500 https://download.docker.com/linux/ubuntu noble/stable arm64 Packages
+ *** 5:28.5.1-1~ubuntu.24.04~noble 100
+        100 /var/lib/dpkg/status

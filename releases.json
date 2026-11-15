@@ -152,6 +152,16 @@
       "actions": [],
       "data": "unchanged",
       "docs": "docs/agents.md#browse-tool-services-mcp-registry"
+    },
+    "2.15.1": {
+      "breaking": false,
+      "title": "OS updates install new kernels, explain gradual Ubuntu roll-outs and ask for a restart",
+      "summary": "Install OS updates now uses apt full-upgrade (kept-back kernel packages install) and removes packages no longer needed. The Server page groups updates (will install / rolling out gradually / held back with the reason), offers Include gradual updates now, shows a one-line result and a Restart needed banner. Run sudo duniya update on the server once (or re-run the installer): the in-panel update cannot refresh the root maintenance helper.",
+      "actions": [
+        "Run sudo duniya update on the server once (or re-run the installer) so the maintenance helper is refreshed"
+      ],
+      "data": "unchanged",
+      "docs": "docs/backups-and-updates.md#os-updates-installer-servers"
     }
   }
 }

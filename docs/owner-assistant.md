@@ -68,8 +68,8 @@
 
 - **Cap alerts** go there ([spending caps](spending.md)).
 - **Weekly summary** (on by default once a number is set; day and time configurable): messages handled, replies and
-  cost per agent this week vs last, ignored chats, pending confirmations, update available, backup failures. **Send
-  now** sends it at once.
+  cost per agent this week vs last, ignored chats, pending confirmations, update available, backup failures, a server
+  restart waiting more than 7 days to finish OS updates. **Send now** sends it at once.
 - Admin MCP: `get_owner_alerts`, `set_owner_alerts`, `preview_weekly_summary`, `send_weekly_summary`.
 
 > [!IMPORTANT]

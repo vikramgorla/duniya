@@ -77,6 +77,14 @@ const STATES = [
       return r; }; modelsCache = null;`, js: "await T.click('Sign in with ChatGPT', 'button', 1200); T.openAll();" },
   { name: 'usage', hash: 'usage' },
   { name: 'server', hash: 'server', wait: 2000, js: 'T.openAll();' },
+  // #96: OS updates grouped (will install / rolling out gradually / held back), the restart banner and last-run summary
+  { name: 'server-os-updates', hash: 'server', wait: 2000, js: "T.openAll(); document.getElementById('restart-needed')?.scrollIntoView(); await T.wait(300);" },
+  // #96: an older root helper (in-panel app update cannot replace it): no gradual button, a note to run sudo duniya update
+  { name: 'server-old-helper', hash: 'server', wait: 2000, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
+      if (String(u) === '/api/system/ops' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json();
+        return new Response(JSON.stringify({ ...j, helperVersion: 1, helperCurrent: false, result: null, reboot: { required: false, packages: [] } })); }
+      if (String(u) === '/api/system') { const j = await r.clone().json(); return new Response(JSON.stringify({ ...j, rebootRequired: false, reboot: { required: false, packages: [] } })); }
+      return r; };`, js: 'T.openAll();' },
   { name: 'backups', hash: 'backups', js: 'T.openAll();' },
   { name: 'pending', hash: 'pending' },
   { name: 'secrets', hash: 'secrets' },
