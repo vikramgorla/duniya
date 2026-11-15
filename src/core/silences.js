@@ -55,6 +55,7 @@ export function silenceReason(reason, { chat = '', agent = '', sender = '' } = {
       const r = SILENCE_REASONS[reason];
       activity('silence', { agent, chat, summary: `Stayed quiet: ${r.label} (${row.count}×). ${r.explain}`, detail: { reason, count: row.count } });
     }
+    if (Math.random() < 0.001) pruneSilences();
     return { reason, count: row.count };
   } catch (e) {
     console.error('silence record failed', e.message);
