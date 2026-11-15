@@ -1,5 +1,5 @@
 import { randomBytes, createCipheriv, createDecipheriv, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DATA_DIR } from './config.js';
 
@@ -13,7 +13,7 @@ export function getMasterKey() {
     return masterKey;
   }
   const file = resolve(DATA_DIR, 'master.key');
-  if (!existsSync(file)) writeFileSync(file, randomBytes(32).toString('base64'), { mode: 0o600 });
+  try { writeFileSync(file, randomBytes(32).toString('base64'), { mode: 0o600, flag: 'wx' }); } catch (e) { if (e.code !== 'EEXIST') throw e; }
   masterKey = Buffer.from(readFileSync(file, 'utf8').trim(), 'base64');
   return masterKey;
 }

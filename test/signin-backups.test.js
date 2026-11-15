@@ -189,7 +189,7 @@ test('Google sign-in: PKCE + nonce; existing user linked by email; session works
   assert.equal(r.loc.searchParams.get('client_id'), CLIENT_ID);
   assert.equal(r.status, 200, r.html);
   assert.match(r.sessionCookie, /HttpOnly; SameSite=Strict/);
-  assert.match(r.html, /location\.replace\("\/"\)/, 'result page continues to the panel on the same origin');
+  assert.match(r.html, /<meta http-equiv=refresh content="1;url=\/">/, 'result page continues to the panel on the same origin');
   const s = (await t.api(r.session, 'GET', '/api/session')).body;
   assert.equal(s.authed, true); assert.equal(s.user.username, 'adm'); assert.equal(s.user.google, true);
   // next time the Google id is enough, even if the email changed
