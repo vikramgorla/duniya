@@ -11,6 +11,7 @@ import { serverConnection, oauthClientOf } from '../../core/tools.js';
 import { referencedSecrets } from '../../core/schema.js';
 import { getSecret } from '../../core/store.js';
 import { isHttps } from '../http.js';
+import { registryRoutes } from './mcp-registry.js';
 
 const ownerOnly = (user, ...configs) => {
   if (user?.role !== 'owner' && configs.some((c) => c?.type === 'local')) {
@@ -31,6 +32,7 @@ export function globalView(row, agents = listAgents()) {
 }
 
 export function toolServiceRoutes(route) {
+  registryRoutes(route); // 052: browse the MCP Registry and add from it
   route('GET', '/api/tool-services', async () => { const agents = listAgents(); return listGlobalRows().map((r) => globalView(r, agents)); });
 
   route('PUT', '/api/tool-services/:name', async (req, res, body, q, p, user) => {

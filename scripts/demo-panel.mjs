@@ -109,11 +109,45 @@ async function fakeToolService() {
   return `http://127.0.0.1:${server.address().port}/mcp`;
 }
 
+/** Local stand-in for the MCP Registry (052): a few fictional entries, the same API (v0.1), no network. */
+async function fakeRegistry(weatherUrl) {
+  const S = (server, status = 'active') => ({ server, _meta: { 'io.modelcontextprotocol.registry/official': { status, publishedAt: '2026-10-02T09:00:00Z', isLatest: true } } });
+  const entries = [
+    S({ name: 'io.github.example-weather/forecast-mcp', title: 'Weather forecasts', description: 'Forecasts, warnings and sunrise times for any place. Free, no key needed.', version: '1.4.0',
+      repository: { url: 'https://github.com/example-weather/forecast-mcp', source: 'github' }, remotes: [{ type: 'streamable-http', url: weatherUrl }] }),
+    S({ name: 'org.example.recipes/recipes', title: 'Recipe box', description: 'Search recipes, scale ingredients and build a shopping list for a group dinner.', version: '2.1.0',
+      repository: { url: 'https://github.com/example-recipes/recipes-mcp', source: 'github' },
+      remotes: [{ type: 'streamable-http', url: 'https://mcp.recipes.example.org/mcp', headers: [{ name: 'Authorization', value: 'Bearer {api_key}', isRequired: true, isSecret: true, description: 'API key from your Recipe box account' }] }] }),
+    S({ name: 'io.github.swiss-tools/transit', title: 'Train times', description: 'Connections, departures and delays for Swiss public transport.', version: '0.9.2',
+      repository: { url: 'https://github.com/swiss-tools/transit', source: 'github' },
+      packages: [{ registryType: 'npm', identifier: '@swiss-tools/transit-mcp', version: '0.9.2', transport: { type: 'stdio' } }] }),
+    S({ name: 'io.github.doc-lab/pdf-tools', title: 'PDF tools', description: 'Split, merge and read PDF files.', version: '3.0.0',
+      repository: { url: 'https://github.com/doc-lab/pdf-tools', source: 'github' }, packages: [{ registryType: 'pypi', identifier: 'pdf-tools-mcp', version: '3.0.0', transport: { type: 'stdio' } }] }),
+    S({ name: 'io.github.quicknotes/notes-sync', title: 'Notes sync', description: 'Save and share notes between chats.', version: '0.2.0',
+      remotes: [{ type: 'streamable-http', url: 'https://notes-sync.example.net/mcp' }] }),
+  ];
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url, 'http://x');
+    const json = (status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
+    if (url.pathname === '/v0.1/servers') {
+      const q = (url.searchParams.get('search') || '').toLowerCase();
+      const hits = entries.filter((e) => `${e.server.name} ${e.server.title}`.toLowerCase().includes(q));
+      return json(200, { servers: hits, metadata: { count: hits.length } });
+    }
+    const m = url.pathname.match(/^\/v0\.1\/servers\/([^/]+)\/versions\/latest$/);
+    const e = m && entries.find((x) => x.server.name === decodeURIComponent(m[1]));
+    return e ? json(200, e) : json(404, { error: 'not found' });
+  }).listen(0, '127.0.0.1');
+  await new Promise((r) => server.once('listening', r));
+  return `http://127.0.0.1:${server.address().port}`;
+}
+
 /** Start the seeded demo panel. Returns { base, dataDir }. Call once per process (the app's modules are singletons). */
 /** `small: true` pretends to run on a 1 GB / 1 CPU VM (the free-tier size), so the small-server guardrails show. */
 export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(), 'duniya-demo-')), small = !!process.env.DEMO_SMALL } = {}) {
   const F = await fakeModels();
   const weatherUrl = await fakeToolService();
+  const registryUrl = await fakeRegistry(weatherUrl);
   const data = join(dataDir, 'data'); const ops = join(dataDir, 'ops');
   for (const d of [data, join(ops, 'req'), join(ops, 'state')]) mkdirSync(d, { recursive: true });
   writeFileSync(join(ops, 'helper'), '#!/bin/sh\n'); // maintenance helper present (nothing runs it in the demo)
@@ -195,6 +229,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   // numbers, providers
   store.updateSettings({ whatsappNumbers: [{ id: 'main', label: 'Home' }, { id: 'club', label: 'Football club' }] });
   store.setSecret('ANTHROPIC_API_KEY', 'sk-ant-demo-not-a-real-key');
+  store.updateSettings({ mcpRegistry: { enabled: true, baseUrl: registryUrl } }); // 052: Browse tool services, offline
   store.setSecret('CHATGPT_CREDENTIALS', JSON.stringify({ access_token: 'demo', refresh_token: 'demo', expires_at: now + 365 * D, email: 'owner@example.org', client_id: 'demo', scopes: [] }));
   providers.addOpenRouter({ key: 'sk-or-demo-not-a-real-key', freeOnly: true });
   // 042: a second ChatGPT account, and OpenRouter paused by its daily free limit

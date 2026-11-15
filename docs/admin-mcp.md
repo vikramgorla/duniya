@@ -49,7 +49,7 @@ rotation). Spec: [`specs/017-admin-mcp/`](../specs/017-admin-mcp/spec.md).
 
 ## Tools
 
-92 tools cover the panel:
+94 tools cover the panel:
 
 | Area | Covers |
 |---|---|
@@ -59,7 +59,7 @@ rotation). Spec: [`specs/017-admin-mcp/`](../specs/017-admin-mcp/spec.md).
 | Money | usage, prices, spending caps, owner alerts, weekly summary |
 | People & memory | contacts, memory, WhatsApp groups, WhatsApp numbers, users |
 | Models | models, accounts, fallback, photos & voice |
-| Tools | global tool services, secrets, confirmations, logging |
+| Tools | global tool services, browse and add from the MCP Registry (`search_mcp_registry`, `add_tool_service_from_registry`), secrets, confirmations, logging |
 | Server | updates (incl. breaking releases: `apply_update` with `breaking: true`, `snooze_update_decision`), metrics (with hosting), OS maintenance, restart, backups |
 
 The list is in `src/panel/admin-tools.js`; a feature that adds panel functionality adds its tool there
