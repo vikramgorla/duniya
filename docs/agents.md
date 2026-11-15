@@ -85,6 +85,22 @@ Admins can read, search (each look logged), rebuild or erase it. Tools:
 
 ![Memory card](site/img/card-memory.webp)
 
+### Earlier messages when a chat is switched on
+
+Chats start **off**, so the history WhatsApp sends when you link a number is not stored (only the id and time of each
+chat's newest message are kept). When you switch a chat **on**, the server asks your phone for its recent messages
+(default 50; *When a chat is switched on, load its last …* on **Chats**, 0–200) and builds the running summary from
+them. The chat row shows *Loading recent messages from your phone…*, then *Loaded N earlier messages*.
+
+- **Load recent messages** on a chat that is on asks for the messages before the oldest stored one (again for older
+  ones; at most every 30 s). Admin MCP: `load_chat_history`.
+- The phone must be **online** (WhatsApp answers from the phone, not from the server). No answer within a minute →
+  *Your phone didn't send history (keep it online and try again)*.
+- The agent is told what it has ("12 stored messages since 3 Nov …", or "none yet") and says so instead of guessing.
+
+> [!NOTE]
+> The newest message seen while the chat was off is the starting point, so that one message is not loaded itself.
+
 ## Contacts
 
 Names synced from the linked phone(s) plus your own entries with notes (**Contacts**). Agents look people up

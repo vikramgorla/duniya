@@ -1,4 +1,5 @@
-import { isChatEnabled, ignoredCounts } from './chat-prefs.js';
+import { isChatEnabled, ignoredCounts, noteLatestKeys } from './chat-prefs.js';
+import { storeLoadedBatch, setHistoryChannel } from './history-load.js';
 import { env } from './config.js';
 import { getSettings } from './store.js';
 import { listAgents, getAgent, agentForChat, roleIn } from './agents.js';
@@ -98,9 +99,29 @@ function dmSilence(msg) {
 
 const summarizeLater = (chat, agent) => { maybeSummarize(chat, agent).catch(() => {}); };
 
-/** Store WhatsApp history batches (link/reconnect sync). Never replies. Group chats only. */
+/**
+ * Store WhatsApp history batches (link/reconnect sync). Never replies. Group chats only.
+ * #91: every batch also updates the newest message key per chat (metadata only, also for chats that are off), and
+ * batches the phone sent on demand (`meta.onDemand`) go to history-load: stored before what is stored, chats that
+ * are on only (groups and people: the owner asked for them).
+ */
 export function createHistoryHandler() {
-  return async function onHistory(msgs) {
+  return async function onHistory(msgs, meta = {}) {
+    try {
+      noteLatestKeys(meta.keys || msgs.filter((m) => m.msgId).map((m) => ({ chat: m.chat, number: m.number, isGroup: m.isGroup, msgId: m.msgId, fromMe: m.fromMe, participant: m.isGroup && !m.fromMe ? m.senderJid : '', ts: m.ts })));
+    } catch (e) { activity('error', { summary: `Could not note chat keys: ${e.message}` }); }
+    if (meta.onDemand) {
+      const byChat = new Map((meta.chats || []).map((c) => [c, []]));
+      for (const m of msgs) {
+        if (m.kind && m.kind !== 'text') continue;
+        if (!byChat.has(m.chat)) byChat.set(m.chat, []);
+        const agent = agentForChat(m.chat);
+        byChat.get(m.chat).push({ channel: m.channel, agent: agent?.id || '', msgId: m.msgId, sender: m.phone, name: m.senderName,
+          text: m.text, quoted: m.quoted, fromAgent: m.fromMe, ts: m.ts, senderJid: m.fromMe ? '' : m.senderJid });
+      }
+      for (const [chat, rows] of byChat) storeLoadedBatch(chat, rows); // chats that are off: nothing stored
+      return;
+    }
     const touched = new Map();
     let stored = 0;
     for (const m of msgs) {
@@ -146,8 +167,13 @@ function recordEvent(msg) {
 /** Build the live message router for a channel. */
 export function createRouter(channel) {
   setWhatsAppChannel(channel);
+  setHistoryChannel(channel);
   registerMediaHandlers(channel);
   return async function onMessage(msg) {
+    // #91: newest message key per chat (metadata only, also while the chat is off) to load history when it goes on.
+    if (msg.msgId && (!msg.kind || msg.kind === 'text')) {
+      try { noteLatestKeys([{ chat: msg.chat, number: msg.number, isGroup: msg.isGroup, msgId: msg.msgId, fromMe: !!msg.fromMe, participant: msg.isGroup && !msg.fromMe ? msg.senderJid : '', ts: msg.ts }]); } catch { /* best effort */ }
+    }
     // Reactions and poll votes: recorded only for chats that are on (#10).
     if (msg.kind && msg.kind !== 'text') { if (isChatEnabled(msg.chat)) recordEvent(msg); return; }
     // Owner assistant (044): link codes and linked panel users' direct messages (unless they start with an agent trigger).

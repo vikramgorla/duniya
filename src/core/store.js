@@ -76,7 +76,7 @@ export function interpolate(value) {
 }
 
 // ---------- settings ----------
-const SETTINGS_DEFAULTS = { paused: false, defaultDmAgent: '' };
+const SETTINGS_DEFAULTS = { paused: false, defaultDmAgent: '', historyLoadCount: 50 }; // #91: earlier messages loaded when a chat goes on
 export function getSettings() {
   const out = { ...SETTINGS_DEFAULTS };
   for (const r of db.prepare('SELECT key, value FROM settings WHERE tenant_id = ?').all(TENANT)) {

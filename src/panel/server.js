@@ -56,6 +56,7 @@ import { insightRoutes } from './routes/insights.js';
 import { ownerAssistantRoutes } from './routes/owner-assistant.js';
 import { setOwnerToolRunner } from '../core/owner-assistant.js';
 import { maybePostNotice, setChatNoticeOff, noticePostedAt } from '../core/privacy-notice.js';
+import { loadChatHistory, historyStatus, historyLoadCount, MAX_LOAD } from '../core/history-load.js';
 import { TOOLS as ADMIN_TOOLS } from './admin-tools.js';
 import { globalServers } from '../core/global-mcp.js';
 import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES, GLOBAL_SCOPE } from '../core/mcp-oauth.js';
@@ -198,6 +199,8 @@ export function startPanel({ channel, extend = [] }) {
     const patch = {};
     if ('paused' in body) patch.paused = !!body.paused;
     if ('defaultDmAgent' in body) patch.defaultDmAgent = String(body.defaultDmAgent || '');
+    // #91: how many earlier messages to load from the phone when a chat is switched on (0 = don't)
+    if ('historyLoadCount' in body) patch.historyLoadCount = Math.max(0, Math.min(MAX_LOAD, Math.round(Number(body.historyLoadCount)) || 0));
     activity('system', { summary: `Settings by ${user.username}: ${JSON.stringify(patch)}` });
     return updateSettings(patch);
   });
@@ -409,7 +412,7 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
       const number = c.number || (c.id.includes('#') ? c.id.split('#')[0] : 'main');
       return { ...c, number, numberLabel: numbers.get(number) || number, agent: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit',
         fallback: prefs[c.id]?.fallback || { mode: 'inherit', chain: [] }, enabled: !!prefs[c.id]?.enabled, ignored: ignoredCounts.get(c.id) || 0,
-        private: !!prefs[c.id]?.private, noticeOff: !!prefs[c.id]?.noticeOff, noticePostedAt: c.isGroup ? noticePostedAt(c.id) : null };
+        private: !!prefs[c.id]?.private, noticeOff: !!prefs[c.id]?.noticeOff, noticePostedAt: c.isGroup ? noticePostedAt(c.id) : null, history: historyStatus(c.id) };
     });
   });
   route('PUT', '/api/chats/:chat/prefs', async (req, res, body, q, p, user) => {
@@ -425,9 +428,20 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
     if (body.enabled !== undefined) {
       ignoredCounts.delete(chat); activity('config', { chat, summary: `Chat switched ${out.enabled ? 'ON — agents may answer here' : 'OFF — agents ignore it'} (${user.username})` });
       if (out.enabled && !wasOn) await maybePostNotice(chat, channel); // privacy notice (044): groups only, once
+      // #91: nothing was stored while the chat was off: ask the phone for its recent messages (answered later).
+      if (out.enabled && !wasOn && historyLoadCount() > 0) {
+        try { await loadChatHistory(chat, { by: user.username, reason: 'switch_on' }); } catch (e) { activity('memory.history', { chat, summary: `Could not ask the phone for earlier messages: ${e.message}` }); }
+      }
     } else if (body.private !== undefined || body.noticeOff !== undefined) { /* recorded above */ } else activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging}, fallback ${out.fallback.mode}${out.fallback.chain.length ? ` (${out.fallback.chain.join(' → ')})` : ''} (${user.username})` });
-    return out;
+    return { ...out, history: historyStatus(chat) };
   });
+  // #91: "Load recent messages": ask the linked phone for earlier messages of a chat that is on (status by polling).
+  route('GET', '/api/chats/:chat/history', async (req, res, body, q, p) => ({ status: historyStatus(decodeURIComponent(p.chat)), count: historyLoadCount() }));
+  route('POST', '/api/chats/:chat/history', async (req, res, body, q, p, user) => {
+    const chat = decodeURIComponent(p.chat);
+    const status = await loadChatHistory(chat, { count: body.count, by: user.username, reason: 'button' });
+    return { status };
+  }, { role: 'admin' });
   // ---------- activity logging settings (011) ----------
   route('GET', '/api/logging', async () => ({ settings: loggingSettings(), categories: LOG_CATEGORIES }));
   route('PUT', '/api/logging', async (req, res, body, q, p, user) => {
