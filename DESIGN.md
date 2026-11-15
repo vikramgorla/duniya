@@ -20,8 +20,9 @@ add or change UI, check it against the principles and the checklist at the end.
    with the consequence ("Agents are offline for 1–2 minutes"). Owner-only actions are hidden or explained for others.
 6. **Stable screens.** Nothing flickers: periodic refreshes update values in place and only redraw when something
    visible changed; inputs being typed in are never replaced.
-7. **Works on a phone and an iPad.** Touch targets ≥ 36 px, horizontal scrolling only inside tab bars and tables,
-   no hover-only affordances.
+7. **Works on a phone and an iPad.** Down to 375 px wide (iPhone SE; iPhone 15 is 393 px): touch targets ≥ 40 px
+   and text ≥ 13 px on phones, no page wider than the screen (only the tab bar, code and `.tscroll` boxes scroll
+   sideways), wide tables become cards (`table.stack`), long ids and URLs wrap, no hover-only affordances.
 
 ## Visual language — "Constellation" (since v1.7)
 
@@ -49,7 +50,9 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
 
 ## Components (in `src/panel/public/index.html`)
 
-`card`, `tiles` + stat tile, `meter`, `spark(values)`, `pill`, `note`, `seg` (segmented control), `toggle`,
+`card`, `tiles` + stat tile, `table.stack` (cards on phones; every `td` has a `data-label`, empty for a full-width
+cell; `stack flat` for long lists), `.tscroll` (key/value tables that keep their columns), `label.tick` (a checkbox on
+its own with a 40 px tap area), `meter`, `spark(values)`, `pill`, `note`, `seg` (segmented control), `toggle`,
 `btn` (`primary`, `danger`, `small`), `number-card`, `feed`, `bubble` (test console), `spinner`, `modelSelect()`
 (Auto / provider · Auto / specific model), `field(label, input, hint)`.
 
@@ -67,5 +70,6 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
 - [ ] One clear state; no `null`, ids or stale status visible.
 - [ ] Long actions show progress, survive a reload and cannot double-run.
 - [ ] Destructive actions confirm with the consequence.
-- [ ] Looks right in light and dark mode, on a phone and an iPad.
+- [ ] Looks right in light and dark mode, on a phone and an iPad; `npm run check:responsive` passes (375 / 393 /
+  1440 px).
 - [ ] No flicker on the 5-second refresh.

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Duniya · WhatsApp agents</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2716%27%20r%3D%273.1%27%20fill%3D%27%23101216%27/%3E%3Ccircle%20cx%3D%2716.00%27%20cy%3D%273.80%27%20r%3D%272.5%27%20fill%3D%27%23ff7a3d%27/%3E%3Cg%20transform%3D%27translate%2816.00%209.40%29%20rotate%280%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%23ff7a3d%27/%3E%3C/g%3E%3Ccircle%20cx%3D%2727.60%27%20cy%3D%2712.23%27%20r%3D%272.5%27%20fill%3D%27%23f2477e%27/%3E%3Cg%20transform%3D%27translate%2822.28%2013.96%29%20rotate%2872%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%23f2477e%27/%3E%3C/g%3E%3Ccircle%20cx%3D%2723.17%27%20cy%3D%2725.87%27%20r%3D%272.5%27%20fill%3D%27%235363ff%27/%3E%3Cg%20transform%3D%27translate%2819.88%2021.34%29%20rotate%28144%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%235363ff%27/%3E%3C/g%3E%3Ccircle%20cx%3D%278.83%27%20cy%3D%2725.87%27%20r%3D%272.5%27%20fill%3D%27%2313b3a1%27/%3E%3Cg%20transform%3D%27translate%2812.12%2021.34%29%20rotate%28216%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%2313b3a1%27/%3E%3C/g%3E%3Ccircle%20cx%3D%274.40%27%20cy%3D%2712.23%27%20r%3D%272.5%27%20fill%3D%27%239bd400%27/%3E%3Cg%20transform%3D%27translate%289.72%2013.96%29%20rotate%28288%29%27%3E%3Cpath%20d%3D%27M-3.7%202.2a3.7%203.7%200%200%201%207.4%200z%27%20fill%3D%27%239bd400%27/%3E%3C/g%3E%3C/svg%3E">
 <meta name="theme-color" content="#f2f1ec">
@@ -97,7 +97,9 @@
   .mobile-step { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 12px 14px; min-width: 0; }
   .mobile-step svg.qr { width: 180px; margin: 6px 0; }
   .center { min-height: 80vh; display: grid; place-items: center; padding: 24px 0; }
-  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; z-index: 20; max-width: 90vw; box-shadow: var(--shadow); }
+  /* toasts stack above each other instead of on top of each other */
+  .toasts { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; max-width: 90vw; pointer-events: none; }
+  .toast { background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; max-width: 100%; box-shadow: var(--shadow); }
   .chatlog { display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow: auto; margin: 10px 0; }
   .bubble { padding: 9px 12px; border-radius: 16px; max-width: 85%; white-space: pre-wrap; word-break: break-word; }
   .bubble.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; } .bubble.agent { align-self: flex-start; background: var(--bg-2); border-bottom-left-radius: 4px; }
@@ -141,6 +143,7 @@
   .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
   .filepick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border: 1px dashed var(--line-2); border-radius: var(--radius-s); padding: 12px; background: color-mix(in srgb, var(--bg) 40%, transparent); }
   .filepick input[type=file] { border: 0; padding: 0; background: none; flex: 1; min-width: 180px; }
+  input[type=file]::file-selector-button { font: inherit; font-weight: 550; min-height: 40px; padding: 0 14px; margin-right: 10px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--card); color: var(--ink); cursor: pointer; }
   .list-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   .list-row:last-child { border-bottom: 0; } .list-row > .grow { flex: 1; min-width: 160px; }
   .pgrid { margin-top: 16px; align-items: start; }
@@ -271,6 +274,64 @@
     table.stack tr { border: 1px solid var(--line, rgba(0,0,0,.08)); border-radius: 14px; padding: 8px 12px; margin: 0 0 10px; }
     table.stack td { border: 0; padding: 4px 0; display: flex; gap: 12px; justify-content: space-between; align-items: center; }
     table.stack td[data-label]:not([data-label=""])::before { content: attr(data-label); font: 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; opacity: .55; }
+    table.stack td { flex-wrap: wrap; min-width: 0 !important; width: 100% !important; text-align: left !important; }
+    table.stack td[data-label]:not([data-label=""])::before { flex: none; }
+    table.stack td:not([data-label]), table.stack td[data-label=""] { display: block; }
+    table.stack td > select, table.stack td > .row, table.stack td > form { flex: 1 1 150px; min-width: 0; }
+    table.stack td.c { justify-content: space-between; }
+    table.stack td.tname { font-weight: 600; }
+    /* flat: rows separated by a rule instead of a card each (long lists inside a card) */
+    table.stack.flat tr { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; margin: 0; padding: 8px 0; }
+    table.stack.flat tr:last-child { border-bottom: 0; }
+  }
+  /* Key/value tables and other tables that keep their columns scroll inside their card on narrow screens. */
+  .tscroll { overflow-x: auto; max-width: 100%; }
+  code { overflow-wrap: anywhere; }
+  .grid { grid-template-columns: repeat(auto-fit, minmax(min(310px, 100%), 1fr)); }
+  .tiles { grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); }
+  /* A checkbox on its own (tables): the whole 40 px square is the tap target. */
+  label.tick { display: inline-flex; align-items: center; justify-content: center; margin: 0; cursor: pointer; }
+  .phone-only { display: none !important; }
+  main > * { scroll-margin-top: 120px; }
+  /* Wide screens: the tab bar may run past the content column so every tab fits (12 tabs need ~1240 px). */
+  @media (min-width: 1200px) { nav { max-width: none; margin: 0; padding-left: max(16px, calc((100% - 1160px) / 2 + 16px)); } }
+  /* Phones (iPhone 15 = 393 px, SE = 375 px): 40 px touch targets, nothing under 13 px, nothing wider than the screen. */
+  @media (max-width: 640px) {
+    .phone-only { display: inline-flex !important; }
+    label.tick { min-width: 40px; min-height: 40px; }
+    .btn, button.btn, .btn.small, .btn.primary, button.btn.primary { min-height: 40px; }
+    .btn.small { padding: 6px 12px; white-space: nowrap; }
+    nav { padding: 4px 10px 8px; }
+    nav button { min-height: 40px; }
+    .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+    .seg button { min-height: 40px; padding: 6px 10px; flex: 1 0 auto; white-space: nowrap; min-width: 40px; }
+    summary, .card summary { padding: 10px 0; line-height: 20px; }
+    label.inline { min-height: 40px; margin: 0 14px 0 0; }
+    .toggle { height: 40px; } .toggle span { inset: 8px 0; }
+    input, select { min-height: 40px; }
+    input[type=checkbox], input[type=radio] { min-height: 0; width: 18px; height: 18px; }
+    .pill, .eyebrow, legend, th, .led, .feed .meta, pre, .steps code, .ptags code, .copyrow code, .toast, .brand small,
+    table.stack td[data-label]:not([data-label=""])::before { font-size: 13px; }
+    .pill { letter-spacing: .02em; white-space: normal; overflow-wrap: anywhere; }
+    legend, .eyebrow, th, .led { letter-spacing: .08em; }
+    td { overflow-wrap: anywhere; }
+    .tscroll td:first-child { overflow-wrap: normal; white-space: nowrap; width: 1%; }
+    .feed .sum, .card p, .note { overflow-wrap: anywhere; }
+    /* header: brand, who is signed in, Sign out on one line */
+    .bar { gap: 8px; }
+    .brand small, .who-role { display: none; }
+    .bar > .small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .bar .btn { white-space: nowrap; flex: none; }
+    .editor-bar { gap: 8px; }
+    .editor-bar .actions { flex: 1 1 100%; justify-content: flex-start; }
+    .editor-bar .actions > .btn { flex: 1 0 auto; justify-content: center; }
+    /* the agent editor is long on a phone: Save floats at the bottom right, always in reach */
+    .editor-bar .actions > .btn.primary { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 6; flex: none; min-height: 48px; padding: 0 24px; box-shadow: 0 10px 28px -8px rgba(16,18,22,.55); }
+    main { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+    .toasts { bottom: calc(76px + env(safe-area-inset-bottom)); }
+    .console h2 { font-size: 22px; }
+    .phead h2 { flex: 1 1 140px; overflow-wrap: anywhere; }
+    .stat { font-size: 28px; }
   }
 </style>
 </head>
@@ -332,7 +393,10 @@ function logo() {
   });
   return svg;
 }
-function toast(msg) { const t = h('div', { class: 'toast' }, msg); document.body.append(t); setTimeout(() => t.remove(), 3500); }
+function toast(msg) {
+  let box = $('#toasts'); if (!box) { box = h('div', { id: 'toasts', class: 'toasts', role: 'status', 'aria-live': 'polite' }); document.body.append(box); }
+  const t = h('div', { class: 'toast' }, msg); box.append(t); setTimeout(() => t.remove(), 3500);
+}
 async function api(method, path, body) {
   const opts = { method, headers: {} };
   if (method !== 'GET') { opts.headers['content-type'] = 'application/json'; opts.body = JSON.stringify(body ?? {}); }
@@ -500,10 +564,12 @@ let statusTimer = null;
 async function boot() {
   const app = $('#app'); app.replaceChildren();
   document.body.classList.toggle('readonly', !can('admin'));
-  const nav = h('nav', {}, TABS().map(([id, label]) => h('button', { 'data-tab': id, onclick: () => (location.hash === `#${id}` ? show(id) : (location.hash = id)) }, icon(id), label)));
+  const nav = h('nav', { onwheel: (e) => { // a mouse wheel scrolls the tab bar sideways when it does not fit
+    if (nav.scrollWidth > nav.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { nav.scrollLeft += e.deltaY; e.preventDefault(); }
+  } }, TABS().map(([id, label]) => h('button', { 'data-tab': id, onclick: () => (location.hash === `#${id}` ? show(id) : (location.hash = id)) }, icon(id), label)));
   app.append(
     h('header', {}, h('div', { class: 'bar' }, h('div', { class: 'brand' }, logo(), 'Duniya', h('span', { class: 'dot', id: 'wa-dot', title: 'WhatsApp' }), h('small', { id: 'brand-sub' }, 'agents')),
-      h('div', { style: 'flex:1' }), h('span', { class: 'small muted' }, `${S.user.username} · ${S.user.role}`),
+      h('div', { style: 'flex:1' }), h('span', { class: 'small muted', title: `${S.user.username} · ${S.user.role}` }, S.user.username, h('span', { class: 'who-role' }, ` · ${S.user.role}`)),
       h('button', { class: 'btn small', onclick: async () => { await api('POST', '/api/logout').catch(() => {}); S.user = null; renderLogin(); } }, 'Sign out')), nav),
     h('main', { id: 'main' }));
   connectEvents();
@@ -523,6 +589,12 @@ function show(tab) {
   S.tab = tab;
   if (location.hash.slice(1).split('/')[0] !== tab) history.replaceState(null, '', `#${tab}`);
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+  // Phones: the tab bar scrolls sideways; keep the current tab in view.
+  const onBtn = document.querySelector('nav button.on'); const navEl = onBtn?.parentElement;
+  if (navEl) {
+    const b = onBtn.getBoundingClientRect(); const n = navEl.getBoundingClientRect();
+    if (b.left < n.left || b.right > n.right) navEl.scrollTo({ left: navEl.scrollLeft + (b.left - n.left) - (n.width - b.width) / 2, behavior: 'smooth' });
+  }
   const seq = (S.renderSeq = (S.renderSeq || 0) + 1);
   const main = $('#main');
   const slow = setTimeout(() => { if (S.renderSeq === seq) main?.classList.add('loading'); }, 120);
@@ -594,14 +666,14 @@ async function renderOverview(soft) {
   const control = h('div', { class: 'card' }, h('h2', {}, 'Control'),
     h('div', { class: 'row spread nowrap' }, h('div', {}, h('b', {}, 'Pause all agents'), h('div', { class: 'small muted' }, 'Stops all replies and scheduled posts')),
       toggle(st.settings.paused, (v) => tryApi(async () => { await api('POST', '/api/settings', { paused: v }); refreshStatus(); }, v ? 'Paused' : 'Resumed'))),
-    h('table', { style: 'margin-top:10px' }, h('tbody', {}, st.agents.length ? st.agents.map((b) => h('tr', {},
+    h('div', { class: 'tscroll' }, h('table', { style: 'margin-top:10px' }, h('tbody', {}, st.agents.length ? st.agents.map((b) => h('tr', {},
       h('td', {}, h('b', {}, b.name), h('div', { class: 'small muted' }, `${b.chats} chat(s)`)),
-      h('td', { style: 'text-align:right' }, toggle(b.enabled, (v) => tryApi(async () => { await api('PUT', `/api/agents/${b.id}`, { enabled: v }); refreshStatus(); }, `${b.name} ${v ? 'on' : 'off'}`))))) : h('tr', {}, h('td', { class: 'muted' }, 'No agents yet — create one under Agents.')))),
+      h('td', { style: 'text-align:right' }, toggle(b.enabled, (v) => tryApi(async () => { await api('PUT', `/api/agents/${b.id}`, { enabled: v }); refreshStatus(); }, `${b.name} ${v ? 'on' : 'off'}`))))) : h('tr', {}, h('td', { class: 'muted' }, 'No agents yet — create one under Agents.'))))),
     st.pending ? h('p', {}, h('span', { class: 'pill warn' }, `${st.pending} pending confirmation(s)`)) : null);
   const reusedUpdates = soft && $('#updates-box')?.childElementCount ? $('#updates-box') : null;
   const server = h('div', { class: 'card' }, h('h2', {}, 'Server'),
-    h('table', {}, h('tbody', {}, [['Version', st.version], ['Uptime', ago(Date.now() - st.uptimeSec * 1000), 'ov-uptime'], ['Memory', `${st.memoryMb} MB`, 'ov-memory'], ['Node', st.node]]
-      .map(([k, v, id]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', id ? { id } : {}, v))))),
+    h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {}, [['Version', st.version], ['Uptime', ago(Date.now() - st.uptimeSec * 1000), 'ov-uptime'], ['Memory', `${st.memoryMb} MB`, 'ov-memory'], ['Node', st.node]]
+      .map(([k, v, id]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', id ? { id } : {}, v)))))),
     reusedUpdates || h('div', { id: 'updates-box' }));
   const recent = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('div', { class: 'row spread' }, h('h2', {}, 'Recent activity'), h('button', { class: 'btn small', onclick: () => show('activity') }, 'All activity')),
     h('ul', { class: 'feed', id: 'recent' }, S.feed.slice(0, 8).map(feedItem)));
@@ -727,7 +799,7 @@ async function renderServer() {
       tile('Uptime', h('div', { class: 'stat', style: 'font-size:24px' }, ago(Date.now() - x.uptimeSec * 1000)), `since ${time(Date.now() - x.uptimeSec * 1000)}`,
         x.rebootRequired ? h('div', { class: 'note warn' }, 'Restart required to finish updates') : null));
     infoBox.replaceChildren(h('h2', {}, 'This server'),
-      h('table', {}, h('tbody', {}, [['Host', x.host], ['System', x.os], ['Kernel', `${x.kernel} (${x.arch})`], ['App', `pid ${x.app.pid} · Node ${x.app.node}`]].map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v))))),
+      h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {}, [['Host', x.host], ['System', x.os], ['Kernel', `${x.kernel} (${x.arch})`], ['App', `pid ${x.app.pid} · Node ${x.app.node}`]].map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v)))))),
       Object.keys(x.services).length ? h('div', {}, h('h3', {}, 'Services'), h('div', { class: 'row' }, Object.entries(x.services).filter(([, v]) => v !== 'inactive' && v !== 'unknown' || true).map(([k, v]) => h('span', { class: `pill ${v === 'active' ? 'ok' : v === 'inactive' ? '' : 'bad'}` }, `${k}: ${v}`)))) : h('p', { class: 'small muted' }, 'Service status is available on installs that use systemd.'));
   }
   async function opsCard() {
@@ -802,10 +874,10 @@ async function renderContacts() {
       if (await tryApi(() => api('PUT', `/api/contacts/${c.phone}`, { name, note }), 'Contact saved')) renderContacts();
     } }, 'Edit');
     return h('tr', {},
-      h('td', { 'data-label': 'Name' }, h('strong', {}, c.name), c.note ? h('div', { class: 'small muted' }, c.note) : null),
+      h('td', { 'data-label': '' }, h('strong', {}, c.name), c.note ? h('div', { class: 'small muted' }, c.note) : null),
       h('td', { 'data-label': 'Number', class: 'num' }, `+${c.phone}`),
       h('td', { 'data-label': 'Source' }, h('span', { class: 'pill' }, SRC[c.source]), c.whatsappName && c.ownName && c.whatsappName !== c.ownName ? h('div', { class: 'small muted' }, `WhatsApp: ${c.whatsappName}`) : null),
-      h('td', { 'data-label': 'Shared' }, shared),
+      h('td', { 'data-label': 'Shared' }, h('label', { class: 'tick' }, shared)),
       h('td', { 'data-label': '' }, edit ? h('div', { class: 'row nowrap', style: 'gap:6px' }, editBtn,
         c.source !== 'whatsapp' ? h('button', { class: 'btn small mut', onclick: () => confirm(`Remove ${c.name}?`) && tryApi(async () => { await api('DELETE', `/api/contacts/${c.phone}`); renderContacts(); }, 'Removed') }, 'Remove') : null) : null));
   };
@@ -831,16 +903,16 @@ async function renderUsage() {
   const ns = 'http://www.w3.org/2000/svg'; const chart = document.createElementNS(ns, 'svg'); chart.setAttribute('viewBox', `0 0 ${Math.max(days.length, 1) * 10} 60`); chart.setAttribute('preserveAspectRatio', 'none'); chart.setAttribute('class', 'bars');
   days.forEach((d, i) => { const hgt = ((d.input + d.output) / max) * 56; const r = document.createElementNS(ns, 'rect'); r.setAttribute('x', i * 10 + 1.5); r.setAttribute('y', 60 - hgt); r.setAttribute('width', 7); r.setAttribute('height', Math.max(hgt, 0.5)); r.setAttribute('rx', 1.5);
     const tt = document.createElementNS(ns, 'title'); tt.textContent = `${d.key}: ${fmtTok(d.input + d.output)} tokens, ${fmtCost(d.cost)}`; r.append(tt); chart.append(r); });
-  const table = (title, rep, name, extra) => h('div', { class: 'card' }, h('h2', {}, title), rep.rows.length ? h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, ''), h('th', { style: 'text-align:right' }, 'Calls'), h('th', { style: 'text-align:right' }, 'Tokens in / out'), h('th', { style: 'text-align:right' }, 'Cost'), extra ? h('th', {}, 'Price / 1M (in · out)') : null)),
-    h('tbody', {}, rep.rows.map((r) => h('tr', {}, h('td', {}, name(r.key)), h('td', { class: 'num', style: 'text-align:right' }, r.calls), h('td', { class: 'num', style: 'text-align:right' }, `${fmtTok(r.input)} / ${fmtTok(r.output)}`),
-      h('td', { class: 'num', style: 'text-align:right' }, r.plan === r.calls ? 'in plan' : r.unpriced === r.calls ? 'price not set' : fmtCost(r.cost)), extra ? h('td', {}, extra(r.key)) : null)))) : h('p', { class: 'small muted' }, 'Nothing in this period.'));
+  const table = (title, rep, name, extra) => h('div', { class: 'card' }, h('h2', {}, title), rep.rows.length ? h('table', { class: 'stack' }, h('thead', {}, h('tr', {}, h('th', {}, ''), h('th', { style: 'text-align:right' }, 'Calls'), h('th', { style: 'text-align:right' }, 'Tokens in / out'), h('th', { style: 'text-align:right' }, 'Cost'), extra ? h('th', {}, 'Price / 1M (in · out)') : null)),
+    h('tbody', {}, rep.rows.map((r) => h('tr', {}, h('td', { 'data-label': '', class: 'tname' }, name(r.key)), h('td', { class: 'num', style: 'text-align:right', 'data-label': 'Calls' }, r.calls), h('td', { class: 'num', style: 'text-align:right', 'data-label': 'Tokens in / out' }, `${fmtTok(r.input)} / ${fmtTok(r.output)}`),
+      h('td', { class: 'num', style: 'text-align:right', 'data-label': 'Cost' }, r.plan === r.calls ? 'in plan' : r.unpriced === r.calls ? 'price not set' : fmtCost(r.cost)), extra ? h('td', { 'data-label': 'Price / 1M' }, extra(r.key)) : null)))) : h('p', { class: 'small muted' }, 'Nothing in this period.'));
   const priceEditor = (ref) => {
     const [prov] = ref.split(':');
     if (sum?.plans?.[prov]) return h('span', { class: 'pill ok' }, sum.plans[prov]);
     if (/:free$/.test(ref)) return h('span', { class: 'pill ok' }, 'free');
     const cur = sum?.prices?.[ref];
-    const i = h('input', { type: 'number', step: '0.01', min: 0, value: cur?.in ?? '', placeholder: 'in', style: 'width:76px' });
-    const o = h('input', { type: 'number', step: '0.01', min: 0, value: cur?.out ?? '', placeholder: 'out', style: 'width:76px' });
+    const i = h('input', { type: 'number', step: '0.01', min: 0, value: cur?.in ?? '', placeholder: 'in', 'aria-label': `Input price per 1M tokens for ${ref}`, style: 'flex:0 1 76px;min-width:0' });
+    const o = h('input', { type: 'number', step: '0.01', min: 0, value: cur?.out ?? '', placeholder: 'out', 'aria-label': `Output price per 1M tokens for ${ref}`, style: 'flex:0 1 76px;min-width:0' });
     return can('admin') ? h('div', { class: 'row nowrap', style: 'gap:6px' }, i, o, h('button', { class: 'btn small', onclick: () => tryApi(async () => { await api('PUT', '/api/usage/prices', { model: ref, input: i.value, output: o.value }); usageCache = null; renderUsage(); }, 'Price saved') }, 'Save'))
       : h('span', { class: 'small muted' }, cur ? `$${cur.in} · $${cur.out}` : '—');
   };
@@ -959,9 +1031,11 @@ const serverConfig = (s) => (s.type === 'local'
 function toolGrid(box, tools, rules) {
   const on = { participant: new Set(tools.filter((t) => rules.has('participant', t.name)).map((t) => t.name)), organizer: new Set(tools.filter((t) => rules.has('organizer', t.name)).map((t) => t.name)) };
   const set = (role, name, v) => { if (v) on[role].add(name); else on[role].delete(name); rules.write(role, tools.filter((t) => on[role].has(t.name)).map((t) => t.name), tools); };
-  box.replaceChildren(h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, `${tools.length} tools`), h('th', { class: 'c' }, 'Participants'), h('th', { class: 'c' }, 'Organizers'))),
-    h('tbody', {}, tools.map((t) => h('tr', {}, h('td', {}, h('b', {}, t.name), h('div', { class: 'small muted' }, t.description)),
-      ...['participant', 'organizer'].map((role) => h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: on[role].has(t.name), disabled: !can('admin'), onchange: (e) => set(role, t.name, e.target.checked) }))))))));
+  box.replaceChildren(h('div', { class: 'small muted phone-only', style: 'margin-top:8px' }, `${tools.length} tools`),
+    h('table', { class: 'stack flat' }, h('thead', {}, h('tr', {}, h('th', {}, `${tools.length} tools`), h('th', { class: 'c' }, 'Participants'), h('th', { class: 'c' }, 'Organizers'))),
+      h('tbody', {}, tools.map((t) => h('tr', {}, h('td', { 'data-label': '' }, h('b', {}, t.name), h('div', { class: 'small muted' }, t.description)),
+        ...['participant', 'organizer'].map((role) => h('td', { class: 'c', 'data-label': role === 'participant' ? 'Participants' : 'Organizers' },
+          h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: on[role].has(t.name), disabled: !can('admin'), 'aria-label': `${t.name}: ${role}s`, onchange: (e) => set(role, t.name, e.target.checked) })))))))));
 }
 /**
  * One tool service as a fieldset. o: { base (API prefix with /probe, /discover, /connections, /local), conns, locals,
@@ -1004,7 +1078,7 @@ function toolServiceEditor(s, o) {
   const creds = s.auth === 'oauth'
     ? h('div', { style: 'margin-top:8px' }, h('div', { class: 'small muted' }, 'Sign in on the service for each role. You will come back here when done.'), connRow('organizer'), connRow('participant'))
     : s.auth === 'token' ? h('div', {}, field('Organizer credential (secret reference)', org), field('Participant credential (optional; least privilege)', part)) : null;
-  const typeSel = h('select', { style: 'max-width:230px', disabled: !o.isOwner && s.type === 'local', onchange: (e) => { s.type = e.target.value; o.redraw(); } },
+  const typeSel = h('select', { style: 'max-width:230px;min-width:180px', 'aria-label': 'Kind of tool service', disabled: !o.isOwner && s.type === 'local', onchange: (e) => { s.type = e.target.value; o.redraw(); } },
     [['remote', 'Remote (URL)'], ['local', 'Local (npm or GitHub package)']].map(([v, l]) => h('option', { value: v, selected: s.type === v }, l)));
   const ta = (prop, ph, rows = 2) => h('textarea', { value: s[prop], placeholder: ph, style: `min-height:${rows * 22 + 16}px`, oninput: (e) => (s[prop] = e.target.value) });
   const redirectUri = `${location.origin}/oauth/mcp/callback`;
@@ -1093,10 +1167,10 @@ async function renderAgentEditor(id) {
       pp.groups.length ? pp.groups.map((g) => h('div', { class: 'number-card' },
         h('div', { class: 'row spread' }, h('b', {}, g.name), h('span', { class: 'pill' }, `${g.members.length} members`)),
         g.error ? h('div', { class: 'small', style: 'color:var(--bad)' }, g.error) : null,
-        h('table', {}, h('tbody', {}, g.members.map((m) => h('tr', {},
-          h('td', {}, h('b', {}, m.name || (m.phone ? `+${m.phone}` : 'Unknown member')), m.admin ? h('span', { class: 'pill info', style: 'margin-left:6px' }, 'group admin') : null,
+        h('table', { class: 'stack flat' }, h('tbody', {}, g.members.map((m) => h('tr', {},
+          h('td', { 'data-label': '' }, h('b', {}, m.name || (m.phone ? `+${m.phone}` : 'Unknown member')), m.admin ? h('span', { class: 'pill info', style: 'margin-left:6px' }, 'group admin') : null,
             h('div', { class: 'small muted' }, m.phone && m.name ? `+${m.phone}` : '')),
-          h('td', { style: 'text-align:right' }, roleSeg(m)))))))) : h('p', { class: 'small muted' }, 'Bind this agent to a group on the Chats page to pick people from its members.'));
+          h('td', { 'data-label': '', style: 'text-align:right' }, roleSeg(m)))))))) : h('p', { class: 'small muted' }, 'Bind this agent to a group on the Chats page to pick people from its members.'));
   }).catch((e) => peopleBox.replaceChildren(h('p', { class: 'small muted' }, `Could not load members: ${e.message}`)));
   // Tool services: the agent's own, and the global ones (035) it uses unless switched off here.
   const servers = Object.entries(c.mcpServers || {}).map(([key, sv]) => serverState(key, sv));
@@ -1246,8 +1320,9 @@ async function renderAgentEditor(id) {
   };
   loadSharedMem();
   $('#main').replaceChildren(
-    h('div', { class: 'row spread', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: () => { location.hash = 'agents'; } }, '← All agents'),
-      h('div', { class: 'row' },
+    h('div', { class: 'row spread editor-bar', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: () => { location.hash = 'agents'; } }, '← All agents'),
+      h('div', { class: 'row actions' },
+        h('a', { class: 'btn phone-only', href: '#test-console', onclick: (e) => { e.preventDefault(); $('#test-console')?.scrollIntoView({ behavior: 'smooth' }); } }, 'Test ↓'),
         h('a', { class: 'btn', href: `/api/agents/${encodeURIComponent(id)}/export`, download: `${id}.agent.json` }, 'Export'),
         h('button', { class: 'btn mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/agents/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openAgent(r.id); } }, 'Duplicate'),
         h('button', { class: 'btn danger mut', onclick: async () => { if (confirm(`Delete “${c.name}”? Its group bindings are removed; chat memory stays until erased.`) && await tryApi(() => api('DELETE', `/api/agents/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'agents'; } } }, 'Delete'),
@@ -1255,7 +1330,7 @@ async function renderAgentEditor(id) {
     can('admin') ? await aiHelper({ agentId: id, title: [h('span', { class: 'ai-chip' }, 'AI'), 'Change this agent with AI'], applyLabel: 'Apply & save',
       placeholder: 'What should change? e.g. “Make the replies shorter and friendlier”, “Let participants also see the shopping list”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',
       onApply: async (r) => { const patch = Object.fromEntries(r.changes.map((ch) => [ch.field, ch.after])); if (await tryApi(() => api('PUT', `/api/agents/${encodeURIComponent(id)}`, patch), 'Saved')) renderAgentEditor(id); } }) : null,
-    h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(340px,1fr));align-items:start' },
+    h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));align-items:start' },
       h('div', { class: 'card' },
         b.needs.length ? h('div', { class: 'note warn' }, `Set these under Secrets: ${b.needs.join(', ')}`) : null,
         h('fieldset', {}, h('legend', {}, 'General'),
@@ -1290,7 +1365,7 @@ async function renderAgentEditor(id) {
           plugins.length ? field('Plugins', h('div', {}, F.plugins)) : null,
           field('Timezone', F.timezone), h('div', { class: 'row' }, field('Recent messages in context', F.historySize), field('Max reply tokens', F.maxTokens))),
         h('div', { class: 'row mut' }, h('button', { class: 'btn primary', onclick: save }, 'Save'))),
-      h('div', { class: 'card', style: 'position:sticky;top:110px' }, h('h2', {}, 'Test console'),
+      h('div', { class: 'card', id: 'test-console', style: 'position:sticky;top:110px;scroll-margin-top:110px' }, h('h2', {}, 'Test console'),
         h('p', { class: 'small muted' }, 'Uses real tools and the saved settings; nothing is posted to WhatsApp.'), log, testForm)));
 }
 
@@ -1340,18 +1415,18 @@ async function renderChats() {
   const list = h('div', {});
   const draw = () => {
     const shown = chats.filter((c) => chatsFilter === 'all' || (chatsFilter === 'groups' ? c.isGroup : !c.isGroup));
-    list.replaceChildren(shown.length ? h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'On'), h('th', {}, 'Chat'), h('th', {}, 'Agent'), h('th', {}, 'Model'), h('th', {}, 'Activity log'))),
+    list.replaceChildren(shown.length ? h('table', { class: 'stack' }, h('thead', {}, h('tr', {}, h('th', {}, 'On'), h('th', {}, 'Chat'), h('th', {}, 'Agent'), h('th', {}, 'Model'), h('th', {}, 'Activity log'))),
       h('tbody', {}, shown.map((c) => h('tr', { style: c.enabled ? '' : 'opacity:.78' },
-        h('td', { style: 'width:52px' }, toggle(c.enabled, (v) => tryApi(async () => { await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, { enabled: v }); c.enabled = v; c.ignored = 0; draw(); }, v ? 'On — agents may answer here' : 'Off — agents ignore this chat'), !can('admin'))),
-        h('td', {}, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, c.name || c.id), h('span', { class: `pill ${c.isGroup ? 'info' : ''}` }, c.isGroup ? 'group' : 'person'), multi ? h('span', { class: 'pill' }, c.numberLabel) : null),
+        h('td', { style: 'width:52px', 'data-label': 'On' }, toggle(c.enabled, (v) => tryApi(async () => { await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, { enabled: v }); c.enabled = v; c.ignored = 0; draw(); }, v ? 'On — agents may answer here' : 'Off — agents ignore this chat'), !can('admin'))),
+        h('td', { 'data-label': '' }, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, c.name || c.id), h('span', { class: `pill ${c.isGroup ? 'info' : ''}` }, c.isGroup ? 'group' : 'person'), multi ? h('span', { class: 'pill' }, c.numberLabel) : null),
           h('div', { class: 'small muted' }, c.isGroup ? `${c.size || 0} members` : c.phone ? `+${c.phone}` : '', c.lastAt ? ` · last message ${ago(c.lastAt)} ago` : ''),
           us?.chat?.[c.id] ? h('div', { class: 'small muted num' }, `30 days: ${usageLine(us.chat[c.id])}`) : null,
           !c.enabled ? h('div', { class: 'small', style: 'color:var(--warn)' }, `Off — ignored${c.ignored ? ` (${c.ignored} message${c.ignored > 1 ? 's' : ''} since restart)` : ''}`) : null,
           h('button', { class: 'btn small', style: 'margin-top:6px', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory')),
-        h('td', { style: 'min-width:170px' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, agent: e.target.value || null }); c.agent = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
+        h('td', { style: 'min-width:170px', 'data-label': 'Agent' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, agent: e.target.value || null }); c.agent = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
           h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),
-        h('td', { style: 'min-width:200px' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) })),
-        h('td', { style: 'min-width:130px' }, h('select', { disabled: !can('admin'), onchange: (e) => savePrefs(c, { logging: e.target.value }) },
+        h('td', { style: 'min-width:200px', 'data-label': 'Model' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) })),
+        h('td', { style: 'min-width:130px', 'data-label': 'Logging' }, h('select', { disabled: !can('admin'), onchange: (e) => savePrefs(c, { logging: e.target.value }) },
           [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message an agent number.' : 'No chats yet (or WhatsApp is not connected).'));
   };
   const seg = h('div', { class: 'seg' }, [['all', 'All'], ['groups', 'Groups'], ['people', 'People']].map(([v, l]) => h('button', { class: chatsFilter === v ? 'on' : '', onclick: (e) => { chatsFilter = v; seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === e.target)); draw(); } }, l)));
@@ -1879,9 +1954,9 @@ async function renderPending() {
   const rows = await api('GET', '/api/pending');
   $('#main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Pending confirmations'),
     h('p', { class: 'small muted' }, 'Changes an organizer asked for, waiting for “confirm CODE”. You can apply or cancel them here too.'),
-    rows.length ? h('table', {}, h('tbody', {}, rows.map((p) => h('tr', {},
-      h('td', {}, h('b', {}, p.code), h('div', { class: 'small muted' }, `${p.agent} · ${p.tool} · expires in ${Math.max(0, Math.round((p.expires - Date.now()) / 60000))} min`), h('pre', {}, p.summary)),
-      h('td', { style: 'white-space:nowrap' }, h('button', { class: 'btn primary mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/pending/${p.code}/apply`)); if (r) toast(r.result); renderPending(); } }, 'Apply'), ' ',
+    rows.length ? h('table', { class: 'stack' }, h('tbody', {}, rows.map((p) => h('tr', {},
+      h('td', { 'data-label': '' }, h('b', {}, p.code), h('div', { class: 'small muted' }, `${p.agent} · ${p.tool} · expires in ${Math.max(0, Math.round((p.expires - Date.now()) / 60000))} min`), h('pre', {}, p.summary)),
+      h('td', { style: 'white-space:nowrap', 'data-label': '' }, h('button', { class: 'btn primary mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/pending/${p.code}/apply`)); if (r) toast(r.result); renderPending(); } }, 'Apply'), ' ',
         h('button', { class: 'btn mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/pending/${p.code}`); renderPending(); }) }, 'Cancel')))))) : h('p', { class: 'muted' }, 'Nothing pending.')));
 }
 
@@ -1891,10 +1966,10 @@ async function renderSecrets() {
   const name = h('input', { placeholder: 'NAME_LIKE_THIS' }); const val = h('input', { type: 'password', placeholder: 'value' });
   $('#main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Secrets'),
     h('p', { class: 'small muted' }, 'API keys and tokens, stored encrypted on the server and never shown again. Agents reference them as ${NAME}. Save an empty value to remove.'),
-    h('table', {}, h('tbody', {}, rows.map((n) => { const v = h('input', { type: 'password', placeholder: 'new value' });
-      return h('tr', {}, h('td', {}, h('code', {}, n.name), n.usedByAgents ? h('div', { class: 'small muted' }, 'used by an agent') : null),
-        h('td', {}, h('span', { class: `pill ${n.set ? 'ok' : 'bad'}` }, n.set ? 'set' : 'missing')),
-        h('td', {}, h('form', { class: 'row mut', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name: n.name, value: v.value }), v.value ? 'Saved' : 'Removed')) renderSecrets(); } }, v, h('button', { class: 'btn' }, 'Save')))); }))),
+    h('table', { class: 'stack' }, h('tbody', {}, rows.map((n) => { const v = h('input', { type: 'password', placeholder: 'new value', 'aria-label': `New value for ${n.name}` });
+      return h('tr', {}, h('td', { 'data-label': '' }, h('code', {}, n.name), n.usedByAgents ? h('div', { class: 'small muted' }, 'used by an agent') : null),
+        h('td', { 'data-label': 'Status' }, h('span', { class: `pill ${n.set ? 'ok' : 'bad'}` }, n.set ? 'set' : 'missing')),
+        h('td', { 'data-label': '' }, h('form', { class: 'row nowrap mut', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name: n.name, value: v.value }), v.value ? 'Saved' : 'Removed')) renderSecrets(); } }, v, h('button', { class: 'btn' }, 'Save')))); }))),
     h('div', { class: 'mut' }, h('label', {}, 'Add a secret'), h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name: name.value.trim(), value: val.value }), 'Saved')) renderSecrets(); } }, name, val, h('button', { class: 'btn primary' }, 'Add')))));
 }
 
@@ -2000,11 +2075,11 @@ function assistantsCard(a) {
     h('div', { class: 'note' }, h('b', {}, `With your ${S.user.role} account an assistant can: `), a.abilities.join('. '), '. ',
       S.user.role === 'viewer' ? '' : 'Risky actions (deleting an agent, erasing memory, changing secrets or users, restoring a backup, updates, restarts) always ask for a second confirmation.'),
     h('h3', {}, 'Connected'),
-    a.grants.length ? h('table', {}, h('tbody', {}, a.grants.map((g) => h('tr', {},
-      h('td', {}, h('b', {}, g.clientName), g.redirectHost ? h('div', { class: 'small muted' }, g.redirectHost) : null),
-      others ? h('td', {}, g.username, ' ', h('span', { class: 'pill' }, g.role)) : null,
-      h('td', { class: 'small muted' }, `connected ${ago(g.connectedAt)} ago`, h('br'), g.lastUsedAt ? `last used ${ago(g.lastUsedAt)} ago` : 'not used yet'),
-      h('td', { style: 'text-align:right' }, h('button', { class: 'btn small danger', onclick: () => revoke(g) }, 'Disconnect'))))))
+    a.grants.length ? h('table', { class: 'stack' }, h('tbody', {}, a.grants.map((g) => h('tr', {},
+      h('td', { 'data-label': '' }, h('b', {}, g.clientName), g.redirectHost ? h('div', { class: 'small muted' }, g.redirectHost) : null),
+      others ? h('td', { 'data-label': 'User' }, g.username, ' ', h('span', { class: 'pill' }, g.role)) : null,
+      h('td', { class: 'small muted', 'data-label': '' }, `connected ${ago(g.connectedAt)} ago`, h('br'), g.lastUsedAt ? `last used ${ago(g.lastUsedAt)} ago` : 'not used yet'),
+      h('td', { style: 'text-align:right', 'data-label': '' }, h('button', { class: 'btn small danger', onclick: () => revoke(g) }, 'Disconnect'))))))
       : h('p', { class: 'small muted' }, 'No AI assistants connected yet. Follow the steps above; it takes about a minute.'));
 }
 
@@ -2043,10 +2118,10 @@ function mobileCard(m) {
         h('p', { class: 'small muted' }, 'In the app tap ', h('b', {}, 'Scan the panel’s QR code'), ', or type this address:'),
         h('div', { class: 'row nowrap' }, h('input', { value: m.serverUrl, readonly: true, 'aria-label': 'Server address for the app', onfocus: (e) => e.target.select() }), copyButton(m.serverUrl)))),
     h('h3', {}, 'Signed-in phones'),
-    m.devices.length ? h('table', {}, h('tbody', {}, m.devices.map((g) => h('tr', {},
-      h('td', {}, h('b', {}, g.userId === m.you ? 'Your phone' : 'Phone'), others ? [' · ', g.username, ' ', h('span', { class: 'pill' }, g.role)] : null),
-      h('td', { class: 'small muted' }, `signed in ${ago(g.connectedAt)} ago`, h('br'), g.lastUsedAt ? `last used ${ago(g.lastUsedAt)} ago` : 'not used yet'),
-      h('td', { style: 'text-align:right' }, h('button', { class: 'btn small danger', onclick: () => signOut(g) }, 'Sign out'))))))
+    m.devices.length ? h('table', { class: 'stack' }, h('tbody', {}, m.devices.map((g) => h('tr', {},
+      h('td', { 'data-label': '' }, h('b', {}, g.userId === m.you ? 'Your phone' : 'Phone'), others ? [' · ', g.username, ' ', h('span', { class: 'pill' }, g.role)] : null),
+      h('td', { class: 'small muted', 'data-label': '' }, `signed in ${ago(g.connectedAt)} ago`, h('br'), g.lastUsedAt ? `last used ${ago(g.lastUsedAt)} ago` : 'not used yet'),
+      h('td', { style: 'text-align:right', 'data-label': '' }, h('button', { class: 'btn small danger', onclick: () => signOut(g) }, 'Sign out'))))))
       : h('p', { class: 'small muted' }, 'No phone signed in yet. Follow the three steps above.'));
 }
 
@@ -2093,12 +2168,12 @@ function usersCard(users, inv, signin) {
   const days = (ts) => Math.max(0, Math.ceil((ts - Date.now()) / 86400000));
   return h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Users'),
     h('p', { class: 'small muted' }, 'Owners manage everything incl. users, backups and updates. Admins manage agents, chats, models and memory. Viewers can only look.'),
-    h('div', { style: 'overflow-x:auto' }, h('table', {}, h('tbody', {}, users.map((u) => h('tr', {},
-      h('td', {}, h('b', {}, u.username), ' ', u.google ? h('span', { class: 'pill info', title: 'Signs in with Google' }, gLogo(), 'Google') : null,
+    h('div', { class: 'tscroll' }, h('table', { class: 'stack' }, h('tbody', {}, users.map((u) => h('tr', {},
+      h('td', { 'data-label': '' }, h('b', {}, u.username), ' ', u.google ? h('span', { class: 'pill info', title: 'Signs in with Google' }, gLogo(), 'Google') : null,
         h('div', { class: 'small muted' }, [u.email, !u.hasPassword ? 'no password' : ''].filter(Boolean).join(' · '))),
-      h('td', {}, h('select', { style: 'min-width:110px', onchange: (e) => tryApi(() => api('PUT', `/api/users/${u.id}`, { role: e.target.value }), 'Role changed').then((r) => r || renderSettings()) },
+      h('td', { 'data-label': 'Role' }, h('select', { style: 'min-width:110px', 'aria-label': `Role of ${u.username}`, onchange: (e) => tryApi(() => api('PUT', `/api/users/${u.id}`, { role: e.target.value }), 'Role changed').then((r) => r || renderSettings()) },
         ['owner', 'admin', 'viewer'].map((r) => h('option', { value: r, selected: u.role === r }, r)))),
-      h('td', { style: 'white-space:nowrap;text-align:right' }, u.id === S.user.id ? h('span', { class: 'small muted' }, 'you') : [
+      h('td', { style: 'white-space:nowrap;text-align:right', 'data-label': '' }, u.id === S.user.id ? h('span', { class: 'small muted' }, 'you') : [
         u.google && u.hasPassword ? h('button', { class: 'btn small', onclick: () => confirm(`Unlink Google from ${u.username}? They then sign in with their password.`) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}/google`); renderSettings(); }, 'Unlinked') }, 'Unlink Google') : null, ' ',
         h('button', { class: 'btn small danger', onclick: () => confirm(`Remove ${u.username}? They can no longer sign in.`) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}`); renderSettings(); }, 'Removed') }, 'Remove')])))))),
     h('h3', {}, 'Invite someone with Google'),
@@ -2190,7 +2265,7 @@ function webAccessCard(initial) {
     const showCheck = (r) => {
       useBtn.disabled = !r.ok || r.domain === w.current.host;
       dnsBox.replaceChildren(h('div', { class: `note ${r.ok ? 'ok' : 'warn'}`, style: 'margin-top:8px' }, r.ok ? h('b', {}, '✓ ') : null, r.text),
-        r.ok ? null : h('div', { style: 'overflow-x:auto;margin-top:6px' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Type'), h('th', {}, 'Name'), h('th', {}, 'Value'))),
+        r.ok ? null : h('div', { class: 'tscroll', style: 'margin-top:6px' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Type'), h('th', {}, 'Name'), h('th', {}, 'Value'))),
           h('tbody', {}, h('tr', {}, h('td', {}, h('code', {}, r.record.type)), h('td', {}, h('code', {}, r.record.name), ' ', copyBtn(r.record.name)), h('td', {}, h('code', {}, r.record.value), ' ', r.serverIp ? copyBtn(r.record.value) : null))))),
         r.ok ? null : h('p', { class: 'small muted' }, 'At your DNS provider (e.g. Cloudflare, your registrar): add the record, keep the TTL on automatic, wait a minute, then check again. Using Cloudflare: “DNS only” (grey cloud) until the certificate works.'));
     };
@@ -2237,11 +2312,11 @@ function webAccessCard(initial) {
     card.replaceChildren(
       h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Web address & access'), h('span', { class: `pill ${restricted ? 'info' : ''}` }, accessLabel)),
       h('p', { class: 'small muted' }, 'Choose the address people use to open this panel, and who may open it at all.'),
-      h('table', {}, h('tbody', {},
+      h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {},
         h('tr', {}, h('td', { class: 'muted small' }, 'Address'), h('td', {}, w.current.url ? h('a', { href: w.current.url, target: '_blank', rel: 'noopener' }, w.current.url) : h('span', { class: 'muted' }, 'none (only on the server)'))),
         h('tr', {}, h('td', { class: 'muted small' }, 'HTTPS'), h('td', {}, certLine)),
         h('tr', {}, h('td', { class: 'muted small' }, 'Access'), h('td', {}, restricted ? `Restricted: ${accessLabel}` : 'Open to everyone')),
-        h('tr', {}, h('td', { class: 'muted small' }, 'You'), h('td', {}, `${w.you.ip || 'unknown'}${w.you.viaCloudflare ? ' · through Cloudflare' : ''}`)))),
+        h('tr', {}, h('td', { class: 'muted small' }, 'You'), h('td', {}, `${w.you.ip || 'unknown'}${w.you.viaCloudflare ? ' · through Cloudflare' : ''}`))))),
       statusBox,
       av.ok ? [
         h('h3', {}, 'Your own domain'),
