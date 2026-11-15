@@ -74,3 +74,6 @@ setting are in [docs/configuration.md](docs/configuration.md).
 
 > Use a dedicated WhatsApp number: Duniya links as a normal linked device (via
 > [Baileys](https://github.com/WhiskeySockets/Baileys)), and unofficial clients can be banned.
+>
+> Duniya is an independent open-source project, not affiliated with, endorsed by or sponsored by WhatsApp or Meta.
+> WhatsApp is a trademark of its owner.
