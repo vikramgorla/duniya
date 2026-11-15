@@ -8,6 +8,10 @@
       "data": "migrated",
       "docs": "docs/agents.md#which-name-is-shown"
     },
+    "2.17.1": {
+      "breaking": false,
+      "title": "Activity log names only the agent settings that actually changed (old → new for short values)"
+    },
     "2.17.0": {
       "breaking": false,
       "title": "Small server mode in Settings → Server; local tool services refused on small servers everywhere; the maintenance helper updates itself",
