@@ -1,5 +1,15 @@
 // OpenAI Chat Completions adapter: used for OpenAI API keys and any OpenAI-compatible endpoint.
 // Internal message format is Anthropic-style blocks; this converts both ways.
+// Photos & voice (043): image/document blocks become content parts; OpenAI and OpenRouter adapters also carry
+// transcribe / speak / createImage for their documented audio and image endpoints (other endpoints: none).
+
+const dataUrl = (src) => `data:${src.media_type};base64,${src.data}`;
+/** Anthropic-style image/document blocks → Chat Completions content parts (null for blocks that are not media). */
+export function mediaPart(b) {
+  if (b.type === 'image' && b.source?.type === 'base64') return { type: 'image_url', image_url: { url: dataUrl(b.source) } };
+  if (b.type === 'document' && b.source?.type === 'base64') return { type: 'file', file: { filename: b.title || 'document.pdf', file_data: dataUrl(b.source) } };
+  return null;
+}
 
 export function toChatMessages(system, messages) {
   const out = system ? [{ role: 'system', content: system }] : [];
@@ -18,7 +28,9 @@ export function toChatMessages(system, messages) {
         out.push({ role: 'tool', tool_call_id: r.tool_use_id, content: r.is_error ? `ERROR: ${content}` : content });
       }
       const text = blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-      if (text) out.push({ role: 'user', content: text });
+      const media = blocks.map(mediaPart).filter(Boolean);
+      if (media.length) out.push({ role: 'user', content: [...(text ? [{ type: 'text', text }] : []), ...media] });
+      else if (text) out.push({ role: 'user', content: text });
     }
   }
   return out;
@@ -42,13 +54,15 @@ export function fromChatResponse(json) {
   return { content, stop_reason: stop, usage: { input_tokens: json.usage?.prompt_tokens || 0, output_tokens: json.usage?.completion_tokens || 0 } };
 }
 
-async function request(url, key, body) {
+async function request(url, key, body, { raw = false, timeout = 120000 } = {}) {
+  const form = body instanceof FormData;
   const res = await fetch(url, {
     method: body ? 'POST' : 'GET',
-    headers: { ...(key ? { authorization: `Bearer ${key}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(120000),
+    headers: { ...(key ? { authorization: `Bearer ${key}` } : {}), ...(body && !form ? { 'content-type': 'application/json' } : {}) },
+    body: body ? (form ? body : JSON.stringify(body)) : undefined,
+    signal: AbortSignal.timeout(timeout),
   });
+  if (raw && res.ok) return { buffer: Buffer.from(await res.arrayBuffer()), type: String(res.headers.get('content-type') || '').split(';')[0].trim() };
   const text = await res.text();
   let json; try { json = JSON.parse(text); } catch { json = null; }
   if (!res.ok) {
@@ -60,17 +74,87 @@ async function request(url, key, body) {
   return json;
 }
 
+/** Which documented media endpoints a base URL has: OpenAI's own API, OpenRouter, or none. */
+export function mediaFlavor(baseUrl, official) {
+  if (official) return 'openai';
+  const host = (u) => { try { return new URL(u).host.toLowerCase(); } catch { return ''; } };
+  const h = host(baseUrl);
+  return /(^|\.)openrouter\.ai$/.test(h) || (process.env.OPENROUTER_API_BASE && h === host(process.env.OPENROUTER_API_BASE)) ? 'openrouter' : '';
+}
+const AUDIO_FORMAT = { 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/aac': 'aac', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/webm': 'webm', 'audio/flac': 'flac' };
+const usageOf = (u = {}) => ({ input_tokens: u.input_tokens ?? u.prompt_tokens ?? 0, output_tokens: u.output_tokens ?? u.completion_tokens ?? 0, ...(u.seconds ? { seconds: u.seconds } : {}) });
+const costOf = (u) => (u && Number.isFinite(Number(u.cost)) && u.cost !== null && u.cost !== '' ? Number(u.cost) : undefined);
+
+/**
+ * Media endpoints (043). OpenAI: /audio/transcriptions (multipart), /audio/speech, /images/generations|edits.
+ * OpenRouter: /audio/transcriptions (JSON input_audio), /audio/speech, /images (input_references for edits).
+ * Each returns usage and, where the provider reports it (OpenRouter), the cost in USD.
+ */
+function mediaMethods(base, key, flavor) {
+  if (!flavor) return {};
+  return {
+    media: flavor,
+    /** OpenRouter lists image models separately (/images/models); OpenAI's are in /models (gpt-image-*). */
+    ...(flavor === 'openrouter' ? { async listImageModels() {
+      const json = await request(`${base}/images/models`, key());
+      return (json?.data || []).filter((m) => m?.id).map((m) => ({ id: m.id, label: m.name || m.id, inputs: m.architecture?.input_modalities || ['text'] }));
+    } } : {}),
+    async transcribe({ model, buffer, mimetype = 'audio/ogg', language }) {
+      const format = AUDIO_FORMAT[mimetype] || 'ogg';
+      let json;
+      if (flavor === 'openai') {
+        const form = new FormData();
+        form.append('model', model);
+        form.append('file', new Blob([buffer], { type: mimetype }), `voice.${format}`);
+        if (language) form.append('language', language);
+        json = await request(`${base}/audio/transcriptions`, key(), form);
+      } else {
+        json = await request(`${base}/audio/transcriptions`, key(), { model, input_audio: { data: Buffer.from(buffer).toString('base64'), format }, ...(language ? { language } : {}) });
+      }
+      return { text: String(json?.text || '').trim(), usage: usageOf(json?.usage), cost: costOf(json?.usage) };
+    },
+    async speak({ model, voice = 'alloy', text, format = flavor === 'openai' ? 'opus' : 'mp3', instructions }) {
+      const got = await request(`${base}/audio/speech`, key(), { model, voice, input: text, response_format: format, ...(instructions ? { instructions } : {}) }, { raw: true });
+      return { buffer: got.buffer, mimetype: format === 'opus' ? 'audio/ogg' : format === 'mp3' ? 'audio/mpeg' : got.type };
+    },
+    async createImage({ model, prompt, size, image }) {
+      let json;
+      if (flavor === 'openai') {
+        if (image) {
+          const form = new FormData();
+          form.append('model', model); form.append('prompt', prompt);
+          if (size) form.append('size', size);
+          form.append('image[]', new Blob([image.buffer], { type: image.mimetype }), `photo.${(image.mimetype.split('/')[1] || 'png')}`);
+          json = await request(`${base}/images/edits`, key(), form, { timeout: 300000 });
+        } else {
+          json = await request(`${base}/images/generations`, key(), { model, prompt, n: 1, ...(size ? { size } : {}) }, { timeout: 300000 });
+        }
+      } else {
+        json = await request(`${base}/images`, key(), { model, prompt, n: 1, ...(size ? { size } : {}),
+          ...(image ? { input_references: [{ image_url: `data:${image.mimetype};base64,${Buffer.from(image.buffer).toString('base64')}` }] } : {}) }, { timeout: 300000 });
+      }
+      const d = json?.data?.[0] || {};
+      if (!d.b64_json) throw Object.assign(new Error('The provider returned no image'), { code: 'no_image' });
+      return { buffer: Buffer.from(d.b64_json, 'base64'), mimetype: d.media_type || `image/${json?.output_format || 'png'}`, usage: usageOf(json?.usage), cost: costOf(json?.usage),
+        revisedPrompt: d.revised_prompt || '' };
+    },
+  };
+}
+
 /** Create an adapter for a base URL ("https://api.openai.com/v1", "https://openrouter.ai/api/v1", …). */
 export function chatCompletionsProvider({ baseUrl, key, official = false }) {
   const base = baseUrl.replace(/\/+$/, '');
   return {
+    ...mediaMethods(base, key, mediaFlavor(base, official)),
     async listModels() {
       const json = await request(`${base}/models`, key());
       // OpenRouter-style listings publish prices (USD per token): keep them as USD per 1M tokens for usage costs.
       const per1M = (v) => (v === undefined || v === null || v === '' || Number.isNaN(Number(v)) || Number(v) < 0 ? undefined : Number(v) * 1e6);
       return (json.data || json.models || []).map((m) => {
         const pin = per1M(m.pricing?.prompt); const pout = per1M(m.pricing?.completion);
-        return { id: m.id || m.slug, label: m.name || m.display_name || m.id || m.slug, ...(pin !== undefined && pout !== undefined ? { price: { in: pin, out: pout } } : {}) };
+        const ins = m.architecture?.input_modalities; const outs = m.architecture?.output_modalities;
+        return { id: m.id || m.slug, label: m.name || m.display_name || m.id || m.slug, ...(pin !== undefined && pout !== undefined ? { price: { in: pin, out: pout } } : {}),
+          ...(Array.isArray(ins) ? { inputs: ins } : {}), ...(Array.isArray(outs) ? { outputs: outs } : {}) };
       }).filter((m) => m.id);
     },
     async chat({ model, system, messages, tools, maxTokens }) {

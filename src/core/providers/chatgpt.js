@@ -167,6 +167,10 @@ export function toResponsesInput(messages) {
         input.push(m.role === 'assistant'
           ? { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: b.text }] }
           : { type: 'message', role: 'user', content: [{ type: 'input_text', text: b.text }] });
+      } else if ((b.type === 'image' || b.type === 'document') && b.source?.type === 'base64' && m.role !== 'assistant') {
+        // Photos & voice (043): "text, images, and files are supported if the selected model accepts them" (SIWC preview).
+        const url = `data:${b.source.media_type};base64,${b.source.data}`;
+        input.push({ type: 'message', role: 'user', content: [b.type === 'image' ? { type: 'input_image', image_url: url } : { type: 'input_file', filename: b.title || 'document.pdf', file_data: url }] });
       } else if (b.type === 'tool_use') {
         input.push({ type: 'function_call', call_id: b.id, name: b.name, arguments: JSON.stringify(b.input ?? {}) });
       } else if (b.type === 'tool_result') {

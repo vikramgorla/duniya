@@ -12,6 +12,7 @@ import { toolsFor, matchesAny, organizerConnection } from './tools.js';
 import { checkBudget } from './budget.js';
 import { silenceReason } from './silences.js';
 import { countStat } from './stats.js';
+import { planAttachments } from './media-ai.js';
 
 const MAX_TOOL_ROUNDS = 8;
 
@@ -20,6 +21,9 @@ const MAX_TOOL_ROUNDS = 8;
 const WA_READ_ONLY = new Set(['whatsapp:poll_results', 'whatsapp:group_info', 'whatsapp:profile_info']);
 async function runTool(run, m, call, ctx) {
   const fq = m?.fq || '';
+  if (ctx.source === 'panel' && fq.startsWith('media:')) { // 043: no pictures are made (or paid for) from the test console
+    return { isError: false, text: JSON.stringify({ testConsole: true, notSent: true, note: `Test console: ${fq} was not carried out; in WhatsApp the picture would be created and sent.`, input: call.input }) };
+  }
   if (ctx.source !== 'panel' || !fq.startsWith('whatsapp:')) return run(call.name, call.input, { ...ctx, toolName: call.name });
   if (WA_READ_ONLY.has(fq)) return run(call.name, call.input, { ...ctx, chat: ctx.contextChat || ctx.chat, toolName: call.name });
   return { isError: false, text: JSON.stringify({ testConsole: true, notSent: true, note: `Test console: ${fq} was not carried out; in WhatsApp it would run with this input.`, input: call.input }) };
@@ -99,9 +103,15 @@ export async function runAgent(ctx) {
   for (const err of meta.get('__errors') || []) activity('error', { agent: agent.id, chat, summary: err });
 
   const memory = buildContext({ agent, chat: ctx.contextChat || chat, excludeId: ctx.msgRowId || 0 });
+  // Photos & voice (043): photos / PDFs go as image / document blocks to a model that can see them (or the vision
+  // fallback model); otherwise a note asks the model to say kindly that it can't look at them.
+  const plan = await planAttachments(model, ctx.attachments || []);
+  model = plan.model;
+  const notes = [ctx.mediaNote, plan.note].filter(Boolean).join('\n');
+  const turnText = `${memory ? `${memory}\n\n` : ''}New message from ${senderName} (${role}):\n${text}${notes ? `\n${notes}` : ''}`;
   const messages = [{
     role: 'user',
-    content: `${memory ? `${memory}\n\n` : ''}New message from ${senderName} (${role}):\n${text}`,
+    content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText,
   }];
 
   const codes = [];

@@ -49,6 +49,9 @@ import { baseUrl, minuteLimiter } from './http-util.js';
 import { mobileRoutes } from './routes/mobile.js';
 import { toolServiceRoutes } from './routes/tool-services.js';
 import { ownerAlertRoutes } from './routes/owner-alerts.js';
+import { mediaRoutes } from './routes/media.js';
+import { serverSize } from '../core/resources.js';
+import { queueStats } from '../core/media-queue.js';
 import { insightRoutes } from './routes/insights.js';
 import { globalServers } from '../core/global-mcp.js';
 import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES, GLOBAL_SCOPE } from '../core/mcp-oauth.js';
@@ -180,6 +183,8 @@ export function startPanel({ channel, extend = [] }) {
     version: await gitVersion(),
     uptimeSec: Math.round((Date.now() - startedAt) / 1000),
     memoryMb: Math.round(process.memoryUsage().rss / 1048576),
+    server: serverSize(), // small-server guardrails (043): size class, RAM, free memory, CPUs
+    mediaQueue: queueStats(),
     node: process.version,
     agents: listAgents().map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })),
     pending: listPending().length,
@@ -584,6 +589,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
 
   // ---------- spending caps (040) and owner alerts / weekly summary (041) ----------
   ownerAlertRoutes(route, { channel });
+  mediaRoutes(route); // photos & voice (043)
 
   // ---------- mobile app (027): Settings → Mobile app ----------
   mobileRoutes(route);

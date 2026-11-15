@@ -12,8 +12,11 @@ import { activity } from './core/events.js';
 import { startMetrics } from './core/system.js';
 import { startRuntimeFile } from './core/runtime.js';
 import { startWebAccess } from './core/webaccess.js';
+import { startResourceWatch, serverSize } from './core/resources.js';
 
 await loadAgents();
+{ const s = serverSize(); console.log(`Server: ${s.size} (${s.effectiveMb} MB RAM${s.cgroupLimitMb ? ' container limit' : ''}, ${s.cpus} CPU)`); }
+startResourceWatch();
 console.log(`Agents: ${listAgents().map((b) => `${b.id}${b.enabled ? '' : ' (disabled)'}`).join(', ') || 'none'}`);
 
 const whatsapp = createChannelRegistry();

@@ -26,6 +26,8 @@ export const SILENCE_REASONS = Object.freeze({
   model_error: { label: 'model error', explain: 'The AI model or its provider failed.', fix: 'models' },
   no_reply: { label: 'empty answer', explain: 'The model returned an empty answer.', fix: 'models' },
   budget: { label: 'budget cap reached', explain: 'The usage cap for this agent or chat is reached.', fix: 'usage' },
+  overloaded: { label: 'server busy', explain: 'Too many photos and voice notes were waiting; the sender was asked to send it again in a few minutes.', fix: 'server' },
+  stale: { label: 'waited too long', explain: 'A photo or voice note waited longer than 15 minutes in the queue; the sender got a short apology instead of a late answer.', fix: 'server' },
 });
 
 const HOUR = 3600000;

@@ -26,12 +26,14 @@ export const AGENT_DEFAULTS = Object.freeze({
   globalMcp: { disabled: [] },
   plugins: [],
   timezone: '',
+  // Photos & voice (043): what the agent does with photos, PDFs and voice notes, and when it answers with voice.
+  media: { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', createImages: { organizer: true, participant: false } },
 });
 
 export const AGENT_ID_RE = /^[a-z0-9][a-z0-9-]{1,40}$/;
 export const SERVER_KEY_RE = /^[a-z][a-z0-9_]{0,30}$/;
 /** Rule prefixes of built-in tools: a tool service may not use these names. */
-export const RESERVED_SERVER_KEYS = ['local', 'memory', 'contacts', 'whatsapp'];
+export const RESERVED_SERVER_KEYS = ['local', 'memory', 'contacts', 'whatsapp', 'media'];
 const TOOL_GLOB_RE = /^[\w*?.-]+$/;
 const RULE_RE = /^(local|memory|[a-z][a-z0-9_]*):[\w*?.-]+$/;
 const SECRET_REF_RE = /^\$\{[A-Z][A-Z0-9_]{1,63}\}$/;
@@ -206,6 +208,14 @@ export function validateAgentConfig(input) {
   const off = list(c.globalMcp?.disabled, 'globalMcp.disabled');
   for (const k of off) if (!SERVER_KEY_RE.test(k)) fail('globalMcp.disabled', `"${k}" is not a tool service name`);
   out.globalMcp = { disabled: [...new Set(off)] };
+  const md = c.media && typeof c.media === 'object' ? c.media : {};
+  const mdef = AGENT_DEFAULTS.media;
+  const flag = (k) => (md[k] === undefined ? mdef[k] : !!md[k]);
+  const voiceReply = md.voiceReply ?? mdef.voiceReply;
+  if (!['never', 'voice', 'always'].includes(voiceReply)) fail('media.voiceReply', 'must be never, voice or always');
+  out.media = { photos: flag('photos'), documents: flag('documents'), stickers: flag('stickers'), voiceNotes: flag('voiceNotes'), voiceReply,
+    createImages: { organizer: md.createImages?.organizer === undefined ? mdef.createImages.organizer : !!md.createImages.organizer,
+      participant: md.createImages?.participant === undefined ? mdef.createImages.participant : !!md.createImages.participant } };
   out.plugins = [...new Set(list(c.plugins, 'plugins'))];
   for (const p of out.plugins) if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(p)) fail('plugins', `"${p}" is not a valid plugin name`);
   return { config: out, warnings };

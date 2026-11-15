@@ -27,6 +27,8 @@
 - **Any model.** Sign in with ChatGPT, GitHub Copilot, OpenRouter (free models), Anthropic or OpenAI keys,
   Ollama and other compatible endpoints, or *Auto*; per agent and per chat. Several accounts per provider, and
   automatic fallback to the next model when one hits a usage limit, is down or its sign-in expired.
+- **Photos & voice.** Agents look at photos and PDFs, listen to voice notes, create pictures and answer with voice
+  notes when a connected provider can (OpenAI, OpenRouter, Claude for photos), or with optional on-server speech.
 - **Real tools via MCP.** Remote servers with OAuth sign-in or tokens, or local ones from npm/GitHub; per agent or
   once for all agents (each agent can opt out); per-role allow lists and a `confirm CODE` step for changes. WhatsApp actions too: media, reactions, polls, group admin.
 - **Manage it from ChatGPT or Claude.** The app is an MCP server with OAuth 2.1, your panel role and confirmations.
@@ -36,7 +38,8 @@
   look up); notes per chat and shared across an agent's chats.
 - **Secure by default.** Google-only sign-in, your own domain with an IP allow-list (e.g. only Cloudflare), a
   `duniya` command line for recovery, and a native iOS/Android app (preview, Expo Go).
-- **Free to host.** One click on Oracle Cloud or Google Cloud free tiers; about 180 MB of RAM.
+- **Free to host.** One click on Oracle Cloud or Google Cloud free tiers; about 180 MB of RAM. Small 1 GB servers get
+  guardrails: a photo & voice queue (nobody has to resend), memory checks, no heavy add-ons.
 
 ## Quick start
 

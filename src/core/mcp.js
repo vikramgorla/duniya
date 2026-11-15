@@ -5,6 +5,8 @@ import { launchSpec } from './mcp-local.js';
 import { onSecretChange } from './store.js';
 import { onOAuthChange } from './mcp-oauth.js';
 import { onGlobalMcpChange } from './global-mcp.js';
+import { maxLocalServices } from './resources.js';
+import { activity } from './events.js';
 
 /** Pool of MCP connections keyed by url + credential (token, or an OAuth sign-in identity). */
 class McpConnection {
@@ -23,6 +25,7 @@ class McpConnection {
   async connect() {
     let transport;
     if (this.local) {
+      await makeRoomForLocal(this);
       const l = await launchSpec(this.local);
       transport = new StdioClientTransport({ command: l.command, args: l.args, env: l.env, cwd: l.cwd, stderr: 'pipe' });
       transport.stderr?.on('data', (d) => { this.stderr = (this.stderr + d).slice(-2000); });
@@ -35,7 +38,10 @@ class McpConnection {
     this.client = client;
   }
 
+  touch() { this.usedAt = Date.now(); }
+
   async listTools() {
+    this.touch();
     if (this.tools && Date.now() - this.toolsAt < 10 * 60 * 1000) return this.tools;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
@@ -55,6 +61,7 @@ class McpConnection {
   }
 
   async call(name, args) {
+    this.touch();
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         if (!this.client) await this.connect();
@@ -72,6 +79,20 @@ class McpConnection {
 }
 
 const pool = new Map();
+
+/**
+ * Small servers (043): only maxLocalServices() local tool services (stdio processes) run at once (2 on a small
+ * server). Starting another stops the one used least recently; it starts again on its next use.
+ */
+async function makeRoomForLocal(starting) {
+  const running = [...pool.values()].filter((c) => c !== starting && c.local && c.client).sort((a, b) => (a.usedAt || 0) - (b.usedAt || 0));
+  const max = maxLocalServices();
+  while (running.length >= max) {
+    const victim = running.shift();
+    activity('system', { summary: `Stopped local tool service ${victim.local.spec} to make room (this server runs at most ${max} at once); it starts again when needed` });
+    await victim.close();
+  }
+}
 
 /**
  * mcpConnection(url, token) or mcpConnection(url, { authProvider, identity }) for OAuth sign-ins

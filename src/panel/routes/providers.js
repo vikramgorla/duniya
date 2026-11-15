@@ -1,4 +1,5 @@
 // Panel routes for model providers (006).
+import { heavyCheck } from '../../core/resources.js';
 import { status, allModels, addCompatible, removeCompatible, clearModelCache, resolveModel, addOpenRouter, setFreeOnly, testProvider, clearCopilotExtras, providerModels, providers, OPENROUTER_ID,
   addAccount, renameAccount, removeAccount, newAccountId, secretFor, accountById, fallbackSettings, setFallbackSettings, strategies, setStrategy } from '../../core/providers/index.js';
 import * as breaker from '../../core/providers/breaker.js';
@@ -40,6 +41,8 @@ export function providerRoutes(route) {
   // body.label (042): connect another Copilot account with its own token; body.account: replace that account's token.
   route('POST', '/api/providers/copilot', async (req, res, body, q, p, user) => {
     const token = copilot.checkToken(body.token);
+    // Small servers (043): the Copilot helper is a ~400 MB download running its own process; refuse it below 2 GB.
+    if (!copilot.sdkInstalled()) { const heavy = heavyCheck('GitHub Copilot'); if (!heavy.ok) return [400, { error: heavy.reason, field: 'token' }]; }
     const existing = body.account ? accountById(String(body.account)) : null;
     if (body.account && existing?.type !== 'copilot') return [404, { error: 'No such Copilot account' }];
     const label = String(body.label || '').trim();

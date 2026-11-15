@@ -1,7 +1,7 @@
 import makeWASocket, {
   useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion,
   normalizeMessageContent, isJidGroup, isPnUser, isLidUser, jidNormalizedUser, Browsers,
-  decryptPollVote, BufferJSON, sha256,
+  decryptPollVote, BufferJSON, sha256, downloadMediaMessage,
 } from 'baileys';
 import pino from 'pino';
 import QRCode from 'qrcode';
@@ -9,7 +9,7 @@ import { rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DATA_DIR, digits } from '../core/config.js';
 import { activity } from '../core/events.js';
-import { loadMedia } from '../core/media.js';
+import { loadMedia, MAX_MEDIA_BYTES } from '../core/media.js';
 import { savePoll, getPoll } from '../core/db.js';
 import { syncWhatsAppContacts } from '../core/contacts.js';
 
@@ -146,6 +146,29 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     return '';
   }
 
+  /**
+   * Photos & voice (043): what an inbound media message is, without downloading it. `size` is WhatsApp's declared
+   * size, so oversized files are refused before any download.
+   */
+  function mediaInfoOf(c) {
+    const num = (v) => (v == null ? 0 : Number(typeof v === 'object' && v.low !== undefined ? v.low + (v.high || 0) * 2 ** 32 : v));
+    const doc = c.documentMessage || c.documentWithCaptionMessage?.message?.documentMessage;
+    if (c.imageMessage) return { type: 'image', mimetype: c.imageMessage.mimetype || 'image/jpeg', size: num(c.imageMessage.fileLength) };
+    if (c.stickerMessage) return { type: 'sticker', mimetype: c.stickerMessage.mimetype || 'image/webp', size: num(c.stickerMessage.fileLength) };
+    if (c.audioMessage) return { type: 'audio', mimetype: String(c.audioMessage.mimetype || 'audio/ogg').split(';')[0], size: num(c.audioMessage.fileLength), seconds: num(c.audioMessage.seconds), ptt: !!c.audioMessage.ptt };
+    if (doc) return { type: 'document', mimetype: doc.mimetype || '', size: num(doc.fileLength), fileName: doc.fileName || '' };
+    return null;
+  }
+  /** Only what a later download needs (key + media message), serialisable, so a queued job survives a restart. */
+  const mediaRefOf = (msg) => JSON.stringify({ key: msg.key, message: msg.message }, BufferJSON.replacer);
+  async function downloadRef(ref, declared = 0) {
+    if (declared > MAX_MEDIA_BYTES) throw Object.assign(new Error('Media is too large'), { status: 413 });
+    const m = typeof ref === 'string' ? JSON.parse(ref, BufferJSON.reviver) : ref;
+    const buf = await downloadMediaMessage(m, 'buffer', {}, { logger, reuploadRequest: sock.updateMediaMessage });
+    if (buf.length > MAX_MEDIA_BYTES) throw Object.assign(new Error('Media is too large'), { status: 413 });
+    return buf;
+  }
+
   async function phoneOf(jid, alt) {
     for (const j of [alt, jid]) if (isPnUser(j)) return digits(jidNormalizedUser(j).split('@')[0]);
     if (isLidUser(jid)) {
@@ -230,8 +253,10 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     const quotedMsg = ctx?.quotedMessage ? normalizeMessageContent(ctx.quotedMessage) : null;
     const quoted = quotedMsg ? (textOf(quotedMsg) || describe(quotedMsg)).slice(0, 500) : '';
     const selfIds = [sock.user?.id, sock.user?.lid].filter(Boolean).map(jidNormalizedUser);
+    const mediaInfo = includeOwn ? null : mediaInfoOf(c);
+    const media = mediaInfo ? { mediaInfo, mediaRef: mediaRefOf(msg), fetchMedia: () => downloadRef(msg, mediaInfo.size) } : {};
     return {
-      ...base, kind: 'text', text, quoted, media: !!describe(c), caption: describe(c) ? textOf(c) : '',
+      ...base, ...media, kind: 'text', text, quoted, media: !!describe(c), caption: describe(c) ? textOf(c) : '',
       mentioned: (ctx?.mentionedJid || []).some((j) => selfIds.includes(jidNormalizedUser(j))),
       replyToAgent: !!ctx?.participant && selfIds.includes(jidNormalizedUser(ctx.participant)),
     };
@@ -280,6 +305,8 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
 
   return {
     id: 'whatsapp', number, label,
+    /** Download the media of a message from its stored reference (043: queued photo / voice-note jobs). */
+    async downloadMedia(jid, ref, declared = 0) { ready(); return downloadRef(ref, declared); },
     /** Send media from { url } or { base64, mimetype }. kind: image | gif | video | sticker | audio | document. */
     async sendMedia(jid, { kind, url, base64, mimetype, caption = '', fileName = '', voiceNote = true, quote } = {}) {
       const s = ready();
