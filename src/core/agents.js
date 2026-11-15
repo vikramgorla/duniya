@@ -62,6 +62,23 @@ export async function createAgent({ id, config, by = '' }) {
   return { agent: await refresh(agentId), warnings };
 }
 
+// #109: the panel sends the whole agent, so name only the fields whose value changed (old → new when both are short).
+const SHORT = 60;
+const shortText = (v) => {
+  if (v === undefined || v === null || v === '') return '(none)';
+  if (Array.isArray(v) && v.every((x) => typeof x === 'string' || typeof x === 'number')) return v.length ? v.join(', ') : '(none)';
+  return typeof v === 'object' ? null : String(v);
+};
+export function changeSummary(before = {}, after = {}) {
+  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])];
+  const changed = keys.filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
+  if (!changed.length) return 'Saved without changes';
+  return `Updated ${changed.map((k) => {
+    const a = shortText(before[k]); const b = shortText(after[k]);
+    return a !== null && b !== null && a.length <= SHORT && b.length <= SHORT ? `${k}: ${a} → ${b}` : k;
+  }).join('; ')}`;
+}
+
 export async function updateAgent(id, patch, by = '') {
   const row = getAgentRow(id);
   if (!row) throw Object.assign(new Error(`Unknown agent ${id}`), { status: 404 });
@@ -69,7 +86,7 @@ export async function updateAgent(id, patch, by = '') {
   guardLocalSmall(row.config.mcpServers, clean.mcpServers);
   if (patch.chats) releaseChats(clean.chats, id, by);
   saveAgentRow(id, clean, by);
-  activity('agent.updated', { agent: id, summary: `Updated ${Object.keys(patch).join(', ')}${by ? ` by ${by}` : ''}`, detail: { warnings } });
+  activity('agent.updated', { agent: id, summary: `${changeSummary(row.config, clean)}${by ? ` by ${by}` : ''}`, detail: { warnings } });
   return { agent: await refresh(id), warnings };
 }
 

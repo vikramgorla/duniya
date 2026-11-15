@@ -1,6 +1,10 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.17.1": {
+      "breaking": false,
+      "title": "Activity log names only the agent settings that actually changed (old → new for short values)"
+    },
     "2.17.0": {
       "breaking": false,
       "title": "Small server mode in Settings → Server; local tool services refused on small servers everywhere; the maintenance helper updates itself",
