@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # the docs-freshness hint compares with the base branch
+          fetch-depth: 0 # docs-freshness hint (base branch) and the releases.json check (latest release tag)
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -35,7 +35,7 @@ jobs:
         run: npm run lint
       - name: Panel script parses
         run: npm run check:panel
-      - name: Version consistency and docs freshness
+      - name: Version consistency, releases.json and docs freshness
         run: node scripts/ci-checks.mjs
       - name: Dependency audit (production, high+)
         run: npm audit --omit=dev --audit-level=high

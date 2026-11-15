@@ -245,6 +245,11 @@ function newConfirm(c) {
   return code;
 }
 
+// Other features hand out their own codes through the assistant's chat (045: breaking updates). A handler returns
+// reply text, or undefined when the code is not its own.
+const confirmHandlers = [];
+export function registerConfirmHandler(fn) { if (!confirmHandlers.includes(fn)) confirmHandlers.push(fn); }
+
 /**
  * "confirm XXXX" / "cancel XXXX" from a user on a surface ("whatsapp:<chat>" or "panel"). Returns reply text, or
  * undefined when the code isn't the owner assistant's.
@@ -252,7 +257,11 @@ function newConfirm(c) {
 export async function resolveConfirm({ user, code, cancel = false, surface }) {
   const key = String(code || '').trim().toUpperCase();
   const c = confirms.get(key);
-  if (!c || c.expires < Date.now()) { confirms.delete(key); return undefined; }
+  if (!c || c.expires < Date.now()) {
+    confirms.delete(key);
+    for (const h of confirmHandlers) { const out = await h({ user, code: key, cancel, surface }); if (out !== undefined) return out; }
+    return undefined;
+  }
   if (c.userId !== user.id) return 'This code belongs to another person.';
   if (c.surface !== surface) return c.surface === 'panel' ? 'Confirm this change in the panel, where it was asked.' : 'Confirm this change in WhatsApp, where it was asked.';
   confirms.delete(key);

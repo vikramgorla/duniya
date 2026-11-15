@@ -44,6 +44,8 @@ requirements and plan cover the steps every change in this repository must compl
 - [ ] CHK### Are privacy requirements stated (chat allow-list, message contents in logs, privacy notice)?
 - [ ] CHK### Is the impact on a 1 GB / 1 vCPU server specified (memory, CPU, downloads, degraded behaviour)?
 - [ ] CHK### Are the documentation updates named (docs/, README, website docs/site + screenshots, mobile/README, admin MCP, DESIGN.md)?
+- [ ] CHK### If anything is not backward compatible: is a migration considered first, and otherwise a major bump with a
+      `releases.json` entry (`breaking: true`, actions for the owner) planned?
 - [ ] CHK### Is the version bump (semver) and the issue/PR flow (labels, comments, Closes #N, no push to main) planned?
 
 ## Notes

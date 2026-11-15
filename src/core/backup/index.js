@@ -83,13 +83,21 @@ function stampName(d = new Date()) {
 
 export function listLocal() {
   if (!existsSync(LOCAL_DIR)) return [];
+  const pre = new Set(preUpdateFiles());
   return readdirSync(LOCAL_DIR).filter((f) => FILE_RE.test(f)).sort().reverse()
-    .map((f) => ({ file: f, size: statSync(resolve(LOCAL_DIR, f)).size }));
+    .map((f) => ({ file: f, size: statSync(resolve(LOCAL_DIR, f)).size, ...(pre.has(f) ? { preUpdate: true } : {}) }));
 }
 
+// Pre-update backups (045): local only, kept apart from the normal retention (the last `keepPreUpdate` are kept).
+const preUpdateFiles = () => { try { return JSON.parse(kvGet('backup:preUpdate') || '[]').filter((f) => FILE_RE.test(f)); } catch { return []; } };
+export const listPreUpdate = () => preUpdateFiles().filter((f) => existsSync(resolve(LOCAL_DIR, f)));
+
 let running = null;
-/** Make a backup now. Returns { file, size, results: { local, github?, s3? } } */
-export function runBackup({ reason = 'manual', appVersion = '' } = {}) {
+/**
+ * Make a backup now. Returns { file, size, results: { local, github?, s3? } }.
+ * preUpdate: a local-only backup before an update; the last `keepPreUpdate` of these are kept.
+ */
+export function runBackup({ reason = 'manual', appVersion = '', preUpdate = false, keepPreUpdate = 3 } = {}) {
   if (running) return running;
   running = (async () => {
     await null; // always async, so the guard below is set before the work starts
@@ -98,20 +106,31 @@ export function runBackup({ reason = 'manual', appVersion = '' } = {}) {
       const pass = getSecret('BACKUP_PASSPHRASE');
       if (!pass) throw bad('passphrase', 'set a backup passphrase first');
       const buf = encryptBundle(createBundle({ includeWhatsApp: s.includeWhatsApp, appVersion }), pass);
-      const file = stampName();
+      let file = stampName();
+      // two backups in the same second (e.g. a scheduled one right before an update): wait for the next stamp
+      while (existsSync(resolve(LOCAL_DIR, file))) { await new Promise((r) => setTimeout(r, 250)); file = stampName(); }
       const results = {};
       mkdirSync(LOCAL_DIR, { recursive: true, mode: 0o700 });
       writeFileSync(resolve(LOCAL_DIR, file), buf, { mode: 0o600 });
-      for (const old of listLocal().slice(s.keep)) rmSync(resolve(LOCAL_DIR, old.file), { force: true });
+      let pre = preUpdateFiles();
+      if (preUpdate) {
+        pre = [...pre, file];
+        const keepN = Math.max(1, Number(keepPreUpdate) || 3);
+        for (const old of pre.slice(0, Math.max(0, pre.length - keepN))) rmSync(resolve(LOCAL_DIR, old), { force: true });
+        pre = pre.slice(-keepN);
+        kvSet('backup:preUpdate', JSON.stringify(pre));
+      } else {
+        for (const old of listLocal().filter((b) => !pre.includes(b.file)).slice(s.keep)) rmSync(resolve(LOCAL_DIR, old.file), { force: true });
+      }
       results.local = 'ok';
-      if (s.github.enabled) {
+      if (s.github.enabled && !preUpdate) {
         try {
           if (!ghToken()) throw new Error('GitHub is not connected');
           const r = await gh.upload(ghToken(), s.github, file, buf, s.keep);
           results.github = r.pruned.length ? `ok (pruned ${r.pruned.length})` : 'ok';
         } catch (e) { results.github = `error: ${e.message}`; }
       }
-      if (s.s3.enabled) {
+      if (s.s3.enabled && !preUpdate) {
         try {
           const c = s3For(s);
           await c.put(`${s.s3.prefix}${file}`, buf);
@@ -124,7 +143,7 @@ export function runBackup({ reason = 'manual', appVersion = '' } = {}) {
       kvSet('backup:last', JSON.stringify(last));
       const failed = Object.entries(results).filter(([, v]) => v.startsWith('error'));
       activity(failed.length ? 'error' : 'backup.done', {
-        summary: `Backup ${file} (${Math.round(buf.length / 1024)} KB): ${Object.entries(results).map(([k, v]) => `${k} ${v}`).join(', ')}`,
+        summary: `${preUpdate ? 'Pre-update backup' : 'Backup'} ${file} (${Math.round(buf.length / 1024)} KB): ${Object.entries(results).map(([k, v]) => `${k} ${v}`).join(', ')}`,
       });
       return last;
     }

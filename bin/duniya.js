@@ -40,7 +40,8 @@ ${bold('Server')}
   backup-now                              Make an encrypted backup now (to every place set up under Backups)
   restart                                 Restart the service (agents are offline for a few seconds)
   logs [-f]                               Show the service log (-f keeps following it)
-  update [--check]                        Update to the newest release (--check only looks)
+  update [--check] [--breaking]           Update to the newest release that needs no decision (--check only looks;
+                                          --breaking also installs a breaking release). Backup first when set up
   open-access                             Remove the IP allow-list (if it locked you out of the panel)
 
 Examples
@@ -247,12 +248,19 @@ const commands = {
     const st = await u.checkForUpdate();
     if (!st.available) { out(green(`✓ Up to date: ${st.current}${st.channel === 'main' ? ' (main)' : ''}`)); process.exitCode = f.check ? 0 : 3; return; }
     out(`Update available: ${bold(st.latest)} · running ${st.current}`);
-    if (f.check) { out('Install it with: sudo duniya update'); return; }
-    out(`Updating to ${st.target}…`);
-    const r = await u.applyUpdate({ target: st.target });
+    for (const s of st.steps || []) {
+      out(`${bold(`⚠ v${s.version} is a breaking release`)}: ${s.title}`);
+      if (s.summary) out(`  ${s.summary}`);
+      for (const a of s.actions) out(`  - ${a}`);
+    }
+    const target = st.breaking && !f.breaking ? st.safeTarget : st.target;
+    if (f.check) { out(st.breaking ? `Install ${st.safeTarget || 'nothing safe yet'} with: sudo duniya update · the breaking release with: sudo duniya update --breaking` : 'Install it with: sudo duniya update'); return; }
+    if (!target) { out(`Nothing to install without a decision. Read the notes above, then: sudo duniya update --breaking`); process.exitCode = 3; return; }
+    out(`Updating to ${target}${u.backupConfigured() ? ' (local backup first)' : ''}…`);
+    const r = await u.applyUpdate({ target, by: 'command line' });
     process.stdout.write(r.log.endsWith('\n') ? r.log : `${r.log}\n`);
     if (r.code !== 0) fail('Update failed; the previous version is kept.');
-    out(green(`✓ Updated to ${st.target}.`) + (process.env.DUNIYA_WRAPPER ? ' Restarting…' : ' Now restart: sudo duniya restart'));
+    out(green(`✓ Updated to ${target}.`) + (process.env.DUNIYA_WRAPPER ? ' Restarting…' : ' Now restart: sudo duniya restart'));
   },
 
   async 'open-access'() {

@@ -23,6 +23,13 @@ const { values: opt } = parseArgs({ options: {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- screens and states ----------
+// 045: pretend v3.0.0 (breaking) is available, with v2.10.0 still safe to install.
+const UPDATE_DECISION = `const f0 = window.fetch; window.fetch = async (u, o) => { const r = await f0(u, o);
+  if (String(u) === '/api/updates' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json();
+    const steps = [{ version: '3.0.0', title: 'New memory format (fresh memory)', summary: 'Chat memory moves to a new format. Running summaries start fresh; messages and agents stay.', actions: ['Check the running summaries of your main chats after the update.', 'Re-run the installer once so the maintenance helper knows the new options.'], data: 'not-migrated', docs: 'docs/upgrading.md' }];
+    return new Response(JSON.stringify({ ...j, status: { ...j.status, available: true, latest: 'v3.0.0', target: 'v3.0.0', breaking: true, steps, safeTarget: 'v2.10.0', decisionVersion: '3.0.0' },
+      decision: { version: 'v3.0.0', target: 'v3.0.0', current: j.status?.current || 'v2.9.0', steps, safeTarget: 'v2.10.0', notifiedAt: Date.now() - 3600000, snoozedUntil: null, dismissed: false, show: true, backup: true, docker: false } })); }
+  return r; };`;
 // js runs in the page after the screen loaded; T.* helpers are defined in PRELUDE.
 const STATES = [
   { name: 'login', hash: '', js: "await fetch('/api/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); await renderLogin();", relogin: true },
@@ -30,6 +37,9 @@ const STATES = [
   { name: 'setup-restore', hash: '', js: "clearInterval(statusTimer); S.tab = ''; renderSetup(document.querySelector('#app'), () => []); await T.click('Restore a backup');" },
   { name: 'overview', hash: 'overview' },
   { name: 'overview-checklist', hash: 'overview', js: "drawChecklist(document.querySelector('#ov-checklist'), { done: 2, total: 5, complete: false, dismissed: false, steps: [['provider', 'Connect an AI model provider', true, '#models'], ['whatsapp', 'Link a WhatsApp number', true, '#overview/whatsapp'], ['agent', 'Create an agent', false, '#agents'], ['chat', 'Switch a chat on', false, '#chats'], ['reply', 'Get a first reply', false, '#agents']].map(([id, title, done, href]) => ({ id, title, done, href, hint: 'Every chat starts Off. Switch on the groups and people your agent should answer.' })) });" },
+  // 045: a breaking release waits for the owner (banner on Overview, the dialog with release notes)
+  { name: 'overview-update-decision', hash: 'overview', before: UPDATE_DECISION, wait: 1500 },
+  { name: 'update-decision-dialog', hash: 'overview', before: UPDATE_DECISION, wait: 1500, js: "await T.click('Review update', 'button', 600);" },
   { name: 'activity', hash: 'activity', js: "document.querySelector('#feed li')?.click();" },
   { name: 'agents', hash: 'agents' },
   { name: 'agents-ai-draft', hash: 'agents', js: "const ta = document.querySelector('#main textarea'); ta.value = 'A helper for our running club'; await T.click('Draft', 'button', 2500);" },

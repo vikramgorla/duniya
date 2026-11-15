@@ -7,7 +7,7 @@ import { providerRoutes } from './panel/routes/providers.js';
 import { backupRoutes } from './panel/routes/backups.js';
 import { startBackupScheduler } from './core/backup/index.js';
 import { updateRoutes } from './panel/routes/updates.js';
-import { startUpdateScheduler } from './core/updates.js';
+import { startUpdateScheduler } from './core/update-decision.js';
 import { activity } from './core/events.js';
 import { startMetrics } from './core/system.js';
 import { startRuntimeFile } from './core/runtime.js';

@@ -13,7 +13,7 @@ service runs.
 | `show-setup-code` | the one-time code that creates the first owner |
 | `status` | version, uptime, WhatsApp numbers, agents, last backup |
 | `doctor` | checks DNS, HTTPS, ports, disk, memory, swap and prints fixes |
-| `backup-now`, `restart`, `logs [-f]`, `update [--check]` | maintenance |
+| `backup-now`, `restart`, `logs [-f]`, `update [--check] [--breaking]` | maintenance (`update` installs the newest release that needs no decision, backup first; `--breaking` also crosses a breaking release) |
 | `open-access` | remove the IP allow-list if it locked you out of the panel |
 
 ---

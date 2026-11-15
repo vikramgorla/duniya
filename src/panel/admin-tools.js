@@ -336,17 +336,27 @@ export const TOOLS = [
     run: (a, x) => x.call('PUT', '/api/logging', { level: a.level, categories: a.categories, retentionDays: a.retention_days, maxEntries: a.max_entries }) },
 
   // ---------- updates ----------
-  { name: 'get_update_status', readOnly: true, calls: [['GET', '/api/updates']], description: 'Running version, last update check, whether an update is available or running.', input: {},
+  { name: 'get_update_status', readOnly: true, calls: [['GET', '/api/updates']],
+    description: 'Running version, last update check, whether an update is available or running. When a breaking release is waiting: breaking, steps (title, summary, actions the owner must take), safeTarget (newest release that needs no decision) and decision.', input: {},
     run: (a, x) => x.call('GET', '/api/updates') },
   { name: 'check_for_updates', calls: [['POST', '/api/updates/check']], description: 'Check GitHub for a newer version now.', input: {},
     run: (a, x) => x.call('POST', '/api/updates/check') },
-  { name: 'apply_update', risky: true, calls: [['POST', '/api/updates/apply']], description: 'Install the available update and restart. Needs confirm_action.', input: {},
+  { name: 'apply_update', risky: true, calls: [['POST', '/api/updates/apply']],
+    description: 'Install an update and restart; a local backup is made first when a backup passphrase is set. By default installs the newest release that needs no decision. breaking: true also crosses a breaking release (show its steps to the owner first). Needs confirm_action.',
+    input: { breaking: bool('Also install a breaking release (owner decision)'), backup: bool('Make a backup first (default true)') },
     preview: async (a, x) => {
       const st = await x.call('POST', '/api/updates/check');
       if (!st.available) throw Object.assign(new Error(`Already up to date (${st.current || 'current version'})`), { status: 400 });
-      return `Update from ${st.current} to ${st.target || st.latest}. The app restarts: agents are offline for 1–2 minutes.`;
+      const target = st.breaking && !a.breaking ? st.safeTarget : st.target || st.latest;
+      if (!target) throw Object.assign(new Error(`Version v${st.decisionVersion} is a breaking release: call again with breaking: true after the owner read its steps`), { status: 409 });
+      const steps = a.breaking && st.breaking ? ` BREAKING: ${st.steps.map((s) => `v${s.version} ${s.title}${s.actions.length ? ` (you must: ${s.actions.join(' ')})` : ''}`).join('; ')}.` : '';
+      return `Update from ${st.current} to ${target}.${steps}${a.backup === false ? ' No backup first.' : ''} The app restarts: agents are offline for 1–2 minutes.`;
     },
-    run: (a, x) => x.call('POST', '/api/updates/apply') },
+    run: (a, x) => x.call('POST', '/api/updates/apply', { breaking: a.breaking === true, backup: a.backup !== false }) },
+  { name: 'snooze_update_decision', calls: [['POST', '/api/updates/decision']],
+    description: 'A breaking release waits for the owner: snooze the reminder for 7 days (action snooze) or dismiss it until a newer breaking release (action dismiss).',
+    input: { action: { type: 'string', enum: ['snooze', 'dismiss'], description: 'snooze or dismiss' } }, required: ['action'],
+    run: (a, x) => x.call('POST', '/api/updates/decision', { action: a.action }) },
 
   // ---------- server ----------
   { name: 'get_server_metrics', readOnly: true, calls: [['GET', '/api/system']], description: 'Server CPU, memory, disk, load and uptime right now.', input: {},

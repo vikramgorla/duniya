@@ -60,7 +60,7 @@ export function weeklyData(now = Date.now()) {
     heldByBudget: sum('budget'),
     capsReached: listCaps().map((c) => capStatus(c, month)).filter((s) => s.used >= 1).length,
     pending: listPending().length,
-    update: up?.available ? { latest: up.latest, current: up.current } : null,
+    update: up?.available ? { latest: up.latest, current: up.current, decision: up.breaking && up.decisionVersion ? `v${up.decisionVersion}` : null } : null,
     backups: { failures: backupFailures, lastFailed: !!lb && Object.values(lb.results || {}).some((v) => String(v).startsWith('error')) },
   };
 }
@@ -82,7 +82,7 @@ export function weeklyText(d = weeklyData()) {
   if (d.heldByBudget || d.capsReached) lines.push(`Spending caps: ${plural(d.capsReached, 'cap')} reached${d.heldByBudget ? `, ${plural(d.heldByBudget, 'reply', 'replies')} held back` : ''}.`);
   const todo = [];
   if (d.pending) todo.push(`${plural(d.pending, 'change')} waiting for confirmation`);
-  if (d.update) todo.push(`update available: ${d.update.latest} (running ${d.update.current})`);
+  if (d.update) todo.push(d.update.decision ? `update ${d.update.decision} needs your decision (breaking release; running ${d.update.current})` : `update available: ${d.update.latest} (running ${d.update.current})`);
   if (d.backups.failures || d.backups.lastFailed) todo.push(d.backups.failures ? `${plural(d.backups.failures, 'backup')} failed` : 'the last backup failed');
   lines.push(todo.length ? `Needs you: ${todo.join('; ')}. Open the panel to sort it out.` : 'Nothing needs you right now.');
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();

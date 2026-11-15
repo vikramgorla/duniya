@@ -48,7 +48,7 @@
 - **Your domain behind any proxy.** Automatic HTTPS, a two-step address switch that never locks you out, an IP
   allow-list, or no open ports with Cloudflare Tunnel or Tailscale. Google-only sign-in.
   [Domains & access](docs/domains-and-access.md)
-- **Run it without SSH.** Server health, OS and app updates, encrypted backups to GitHub, S3 or a download, a
+- **Run it without SSH.** Server health, OS and app updates (breaking releases wait for your OK, on the panel or WhatsApp), encrypted backups to GitHub, S3 or a download, a
   `duniya` CLI for recovery, and a native mobile app (preview, Expo Go). [Backups & updates](docs/backups-and-updates.md)
 - **Free to host.** Oracle Cloud or Google Cloud free tiers; ~180 MB of RAM. 1 GB servers get guardrails: a photo &
   voice queue (nobody resends), memory checks, no heavy add-ons. [Small servers](docs/small-servers.md)
