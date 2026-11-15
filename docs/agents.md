@@ -6,7 +6,7 @@
 
 **In 30 seconds**
 - Template or plain words; every change comes back as a visual diff.
-- Tools are allowed per role **in code**; changes need an organizer's `confirm CODE`.
+- Tools are allowed per role **in code**; changes need an organizer's `confirm CODE` (kept across restarts until it expires).
 - Memory per chat and shared across chats; export/import agents as JSON.
 
 ![Agents page](site/img/agents-desktop.webp)

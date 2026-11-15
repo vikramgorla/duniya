@@ -310,8 +310,22 @@ export async function planAttachments(modelRef, attachments = []) {
   const fb = mediaSettings().visionFallback;
   const fbp = fb && accountById(parseRef(fb)?.provider || '');
   if (fbp?.configured && await modelSeesImages(fb)) return { model: fb, attachments, note: '', viaFallback: true };
+  return { model: modelRef, attachments: [], note: noVisionNote(attachments) };
+}
+
+/** The note for a model that gets the turn without its photos / files. */
+export function noVisionNote(attachments = []) {
   const what = attachments.some((b) => b.type === 'image') ? 'a photo' : 'a file';
-  return { model: modelRef, attachments: [], note: `(They sent ${what}, but your current model cannot look at photos or files. Say so kindly in one short sentence — an admin can choose a model that sees images — and answer any text they wrote.)` };
+  return `(They sent ${what}, but your current model cannot look at photos or files. Say so kindly in one short sentence — an admin can choose a model that sees images — and answer any text they wrote.)`;
+}
+
+/**
+ * Model-call options for a turn that carries photos / files (#67): fallback skips accounts that cannot see them
+ * (e.g. Copilot) and tries the vision fallback model (Settings) after the chain.
+ */
+export function visionCallOptions() {
+  const fb = mediaSettings().visionFallback;
+  return { accept: (ref) => modelSeesImages(ref), lastResort: fb ? [fb] : [] };
 }
 
 // ---------- create images ----------

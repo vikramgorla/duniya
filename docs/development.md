@@ -41,7 +41,8 @@ Process: [AGENTS.md](../AGENTS.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) · 
 
 ## Releases
 
-1. Bump the version in `package.json`, `package-lock.json` and `infra/oci/schema.yaml` (CI checks they match).
+1. Bump the version in `package.json`, `package-lock.json` and `infra/oci/schema.yaml` (CI checks they match) and add
+   an entry for it to `releases.json` (a one-line `title` is enough; CI fails without one).
 2. Merge to `main` (or push a `vX.Y.Z` tag, or run the workflow by hand).
 3. The release workflow creates the tag and GitHub release, attaches the OCI stack zip and publishes
    `ghcr.io/vikramgorla/whatsapp-agent-duniya`.

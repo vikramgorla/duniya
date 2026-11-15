@@ -46,7 +46,7 @@ requirements and plan cover the steps every change in this repository must compl
 - [ ] CHK### Are the documentation updates named (docs/, README, website docs/site + screenshots, mobile/README, admin MCP, DESIGN.md)?
 - [ ] CHK### If anything is not backward compatible: is a migration considered first, and otherwise a major bump with a
       `releases.json` entry (`breaking: true`, actions for the owner) planned?
-- [ ] CHK### Is the version bump (semver) and the issue/PR flow (labels, comments, Closes #N, no push to main) planned?
+- [ ] CHK### Is the version bump (semver) with its `releases.json` entry (every version) and the issue/PR flow (labels, comments, Closes #N, no push to main) planned?
 
 ## Notes
 

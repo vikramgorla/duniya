@@ -96,6 +96,52 @@ test('model that cannot see images: polite note, or the vision fallback model (S
   await setAgent({ model: 'claude-sonnet-5-5' });
 });
 
+test('#67: fallback on a photo turn skips models that cannot see it; vision fallback next; else answered without it, kindly', async () => {
+  const breaker = await import('../src/core/providers/breaker.js');
+  const hasImage = (body) => body.messages.some((m) => Array.isArray(m.content) && m.content.some((p) => p.type === 'image_url'));
+  const fail = () => { breaker.reset(); t.claudeFail.length = 0; t.claudeFail.push({ status: 429, retryAfter: 120, message: 'rate limited' }); };
+  await setAgent({ model: 'anthropic:claude-sonnet-5-5' });
+
+  // 1. the chain's text-only model (like Copilot) is skipped; the next model that sees images answers with the photo
+  await t.api(owner, 'PUT', '/api/fallback', { enabled: true, chain: ['openai:gpt-3.5-turbo', 'openai:gpt-4o'] });
+  fail(); oa.script.push({ content: 'A temple hall (gpt-4o).' });
+  await route(groupPhoto());
+  assert.deepEqual(oa.reqs.map((r) => r.body.model), ['gpt-4o'], 'gpt-3.5-turbo is never asked to look at the photo');
+  assert.ok(hasImage(oa.reqs[0].body));
+  assert.equal(lastSent(), 'A temple hall (gpt-4o).');
+
+  // 2. only text-only models left: the vision fallback model (Settings) is tried after the chain
+  oa.reqs.length = 0;
+  await t.api(owner, 'PUT', '/api/fallback', { enabled: true, chain: ['openai:gpt-3.5-turbo'] });
+  media.setMediaSettings({ visionFallback: 'openai:gpt-4o' });
+  fail(); oa.script.push({ content: 'A temple hall (vision fallback).' });
+  await route(groupPhoto());
+  assert.deepEqual(oa.reqs.map((r) => r.body.model), ['gpt-4o']);
+  assert.ok(hasImage(oa.reqs[0].body));
+
+  // 3. no model that sees images can answer: the text-only model answers without the photo and says so
+  oa.reqs.length = 0;
+  media.setMediaSettings({ visionFallback: '' });
+  fail(); oa.script.push({ content: 'Sorry, I can’t look at photos right now.' });
+  await route(groupPhoto());
+  assert.deepEqual(oa.reqs.map((r) => r.body.model), ['gpt-3.5-turbo']);
+  const user = oa.reqs[0].body.messages.find((x) => x.role === 'user');
+  assert.equal(typeof user.content, 'string', 'no image parts sent to the text-only model');
+  assert.match(user.content, /cannot look at photos/);
+  assert.equal(lastSent(), 'Sorry, I can’t look at photos right now.');
+  assert.ok(t.db.listActivity({ limit: 50 }).some((a) => a.type === 'model.fallback' && /without the photo/.test(a.summary)));
+
+  // text turns are unaffected: the text-only model in the chain answers as before
+  oa.reqs.length = 0;
+  fail(); oa.script.push({ content: 'Puja at 10.' });
+  await route(t.msg({ phone: ORG, text: '!panduga when is the puja?' }));
+  assert.deepEqual(oa.reqs.map((r) => r.body.model), ['gpt-3.5-turbo']);
+
+  breaker.reset(); t.claudeFail.length = 0;
+  await t.api(owner, 'PUT', '/api/fallback', { enabled: true, chain: [] });
+  await setAgent({ model: 'claude-sonnet-5-5' });
+});
+
 test('OpenAI-compatible adapters get image_url parts; ChatGPT gets input_image; PDFs become file parts', async () => {
   await setAgent({ model: 'openai:gpt-4o' });
   oa.script.push({ content: 'A hall.' });

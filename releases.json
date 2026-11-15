@@ -1,6 +1,12 @@
 {
-  "$comment": "Release notes the app reads (045). One entry per version that needs the owner's attention; other versions are optional. breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
+  "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.10.0": {
+      "breaking": false,
+      "title": "Confirm codes and provider pauses survive restarts; photos never go to a model that can't see them",
+      "summary": "Pending confirm codes (owner assistant, admin MCP) and provider pauses are kept across restarts and updates. When a model fails on a photo, fallback only moves to models that can see images (then the vision fallback model); otherwise the agent answers without the photo and says so.",
+      "data": "unchanged"
+    },
     "2.9.0": {
       "breaking": false,
       "title": "Breaking releases need your confirmation",

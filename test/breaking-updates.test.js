@@ -76,7 +76,9 @@ test('045: CI rule and release notes', () => {
   assert.deepEqual(rel.releaseCheck({ version: '3.0.0', previous: 'v2.9.0', releases }).errors, []);
   assert.match(rel.releaseCheck({ version: '4.0.0', previous: 'v3.0.0', releases }).errors[0], /new major version/);
   assert.match(rel.releaseCheck({ version: '3.0.0', previous: 'v2.9.0', releases: rel.normalizeReleases({ versions: { '3.0.0': { breaking: true } } }) }).errors[0], /no actions/);
-  assert.match(rel.releaseCheck({ version: '2.9.1', previous: 'v2.9.0', releases }).warnings[0], /no entry/);
+  assert.match(rel.releaseCheck({ version: '2.9.1', previous: 'v2.9.0', releases }).errors[0], /no entry/, 'every version needs an entry (#71)');
+  assert.match(rel.releaseCheck({ version: '2.9.1', previous: '', releases }).errors[0], /no entry/, 'also without a release tag');
+  assert.match(rel.releaseCheck({ version: '2.9.1', previous: 'v2.9.0', releases: rel.normalizeReleases({ versions: { '2.9.1': { breaking: false } } }) }).errors[0], /no title/);
   assert.deepEqual(rel.releaseCheck({ version: '2.9.0', previous: 'v2.8.2', releases }), { errors: [], warnings: [] });
   assert.match(rel.releaseNotes(releases, 'v3.0.0'), /Breaking release[\s\S]*### Big[\s\S]*- Do X/);
   assert.equal(rel.releaseNotes(releases, 'v1.0.0'), '');

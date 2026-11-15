@@ -1,6 +1,7 @@
 // Small CI checks (quality job), also runnable locally: `node scripts/ci-checks.mjs [base-ref]`.
 //  1. Version consistency (fails): package.json, package-lock.json and infra/oci/schema.yaml carry the same version.
-//  2. Breaking releases (045): a major bump over the latest release tag fails without a breaking releases.json entry
+//  2. Releases (045, #71): every version needs a releases.json entry with a title; a major bump over the latest
+//     release tag fails without a breaking entry with actions
 //     (with actions); a version without an entry warns. Needs tags (checkout with fetch-depth: 0).
 //  3. Doc links (fails, #68): relative links, images and #anchors in README.md and docs/**/*.md exist
 //     (scripts/check-doc-links.mjs), also GitHub links into docs/ from the website, the panel and releases.json.
@@ -30,7 +31,7 @@ if (off.length) {
   for (const [f, v] of off) console.log(`::error file=${f.split(' ')[0]}::Version ${v ?? '(missing)'} in ${f} differs from package.json ${pkg}. Bump all three files together (see AGENTS.md).`);
 } else console.log(`Versions match: ${pkg}`);
 
-// 2. breaking releases need a releases.json entry
+// 2. every version needs a releases.json entry; breaking releases need breaking: true + actions
 {
   let releases = null;
   try { releases = normalizeReleases(JSON.parse(read('releases.json'))); } catch (e) { failed = true; console.log(`::error file=releases.json::releases.json is missing or not valid JSON: ${e.message}`); }

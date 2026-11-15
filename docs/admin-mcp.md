@@ -26,7 +26,7 @@ Then a Duniya page opens: sign in (if asked), check what the assistant may do, *
 
 1. ChatGPT or Claude calls a risky tool, for example `delete_agent`.
 2. Duniya answers with a preview and a code; nothing has changed yet.
-3. The assistant calls `confirm_action` with that code.
+3. The assistant calls `confirm_action` with that code (single use, 10 minutes; a restart does not lose it).
 4. Duniya does it and logs it in Activity.
 
 </details>

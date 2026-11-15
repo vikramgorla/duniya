@@ -15,7 +15,9 @@ import { getChatPrefs, enabledChats, privateChats, seenChats } from './chat-pref
 import { activity } from './events.js';
 import { chat as modelChat, fallbackSettings } from './providers/index.js';
 import { friendlyModelError } from './runner.js';
+import { randomInt } from 'node:crypto';
 import { humanCode, sha256 } from './crypto.js';
+import { putTtl, getTtl, takeTtl } from './ttl-store.js';
 import { whatsappChannel } from './whatsapp-tools.js';
 
 const ROLE_RANK = { viewer: 1, admin: 2, owner: 3 };
@@ -235,13 +237,13 @@ async function runReadTool(tool, args, user) {
 }
 
 // ---------------------------------------------------------------- confirmations
-const confirms = new Map(); // code -> { userId, surface, tool, args, preview, expires }
+// Stored in SQLite (#64) so a restart does not lose a code the user is about to confirm.
+const CONFIRM_KIND = 'owner-confirm'; // code -> { userId, surface, tool, args, preview }
 function newConfirm(c) {
-  for (const [k, v] of confirms) if (v.expires < Date.now()) confirms.delete(k);
   let code;
-  do code = Array.from({ length: 4 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
-  while (confirms.has(code) || peekPending(code));
-  confirms.set(code, { ...c, expires: Date.now() + CONFIRM_TTL });
+  do code = Array.from({ length: 4 }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
+  while (getTtl(CONFIRM_KIND, code) || peekPending(code));
+  putTtl(CONFIRM_KIND, code, c, Date.now() + CONFIRM_TTL);
   return code;
 }
 
@@ -256,15 +258,14 @@ export function registerConfirmHandler(fn) { if (!confirmHandlers.includes(fn)) 
  */
 export async function resolveConfirm({ user, code, cancel = false, surface }) {
   const key = String(code || '').trim().toUpperCase();
-  const c = confirms.get(key);
-  if (!c || c.expires < Date.now()) {
-    confirms.delete(key);
+  const c = getTtl(CONFIRM_KIND, key);
+  if (!c) {
     for (const h of confirmHandlers) { const out = await h({ user, code: key, cancel, surface }); if (out !== undefined) return out; }
     return undefined;
   }
   if (c.userId !== user.id) return 'This code belongs to another person.';
   if (c.surface !== surface) return c.surface === 'panel' ? 'Confirm this change in the panel, where it was asked.' : 'Confirm this change in WhatsApp, where it was asked.';
-  confirms.delete(key);
+  if (!takeTtl(CONFIRM_KIND, key)) return `Change ${key} has expired or was already used: ask me again.`; // single use
   if (cancel) { activity('owner.action', { summary: `Owner assistant: ${user.username} cancelled ${key} (${c.preview})`.slice(0, 480) }); return `Cancelled ${key}.`; }
   const tool = toolsFor(user).find((t) => t.name === c.tool);
   if (!tool) return `Your role no longer allows ${c.tool}.`;

@@ -9,6 +9,7 @@ import { db } from './db.js';
 import { TENANT, onUserDeleted } from './store.js';
 import { newToken, sha256, humanCode } from './crypto.js';
 import { activity } from './events.js';
+import { putTtl, getTtl, takeTtl } from './ttl-store.js';
 
 export const ACCESS_TTL = 3600 * 1000;
 export const REFRESH_TTL = 30 * 24 * 3600 * 1000;
@@ -219,22 +220,21 @@ export function revokeGrant(userId, clientId) {
   return had;
 }
 
-// ---------- confirm codes for risky tools (in memory, single-use, 10 min) ----------
-const confirms = new Map();
+// ---------- confirm codes for risky tools (SQLite, survive a restart (#64); single-use, 10 min) ----------
+const CONFIRM_KIND = 'admin-mcp-confirm';
 export const argsHash = (args) => sha256(JSON.stringify(args ?? {}));
 export function createConfirm({ userId, clientId, tool, args, preview }) {
-  for (const [k, v] of confirms) if (v.expires < Date.now()) confirms.delete(k);
   const code = humanCode(8);
-  confirms.set(code, { userId, clientId, tool, args, hash: argsHash(args), preview, expires: Date.now() + CONFIRM_TTL });
+  putTtl(CONFIRM_KIND, code, { userId, clientId, tool, args, hash: argsHash(args), preview }, Date.now() + CONFIRM_TTL);
   return code;
 }
 /** Takes (and removes) a confirm code for this user and assistant. Throws with a plain-language reason. */
 export function takeConfirm(code, { userId, clientId }) {
   const key = String(code || '').trim().toUpperCase();
-  const c = confirms.get(key);
-  if (!c || c.expires < Date.now()) { confirms.delete(key); throw Object.assign(new Error('This confirm code is unknown, expired (10 minutes) or was already used. Start the action again.'), { status: 404 }); }
+  const c = getTtl(CONFIRM_KIND, key);
+  if (!c) { throw Object.assign(new Error('This confirm code is unknown, expired (10 minutes) or was already used. Start the action again.'), { status: 404 }); }
   if (c.userId !== userId || c.clientId !== clientId) throw Object.assign(new Error('This confirm code belongs to another user or assistant.'), { status: 403 });
-  confirms.delete(key);
+  if (!takeTtl(CONFIRM_KIND, key)) throw Object.assign(new Error('This confirm code was already used. Start the action again.'), { status: 404 });
   if (argsHash(c.args) !== c.hash) throw Object.assign(new Error('The action changed after it was previewed.'), { status: 409 });
   return c;
 }

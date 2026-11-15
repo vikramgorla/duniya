@@ -16,7 +16,8 @@ people and AI agents alike). In short:
 - **Docs are part of the change.** Update `docs/`, `README.md`, the website `docs/site/` (retake screenshots with
   `npm run site:shots` when the UI changed) and `mobile/README.md` where relevant. The PR template has the checklist.
 - **Releases.** Bump the version in `package.json`, `package-lock.json` and `infra/oci/schema.yaml` in the PR (minor
-  for features, patch for fixes, major for breaking changes); merging to `main` creates the tag, release, OCI stack zip
+  for features, patch for fixes, major for breaking changes) and add a `releases.json` entry for it (every version,
+  one-line title at least); merging to `main` creates the tag, release, OCI stack zip
   and Docker image.
 
 ## Repository settings (one-time, owner)

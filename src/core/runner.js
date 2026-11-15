@@ -13,7 +13,7 @@ import { toolsFor, matchesAny, organizerConnection } from './tools.js';
 import { checkBudget } from './budget.js';
 import { silenceReason } from './silences.js';
 import { countStat } from './stats.js';
-import { planAttachments } from './media-ai.js';
+import { planAttachments, visionCallOptions, noVisionNote } from './media-ai.js';
 
 const MAX_TOOL_ROUNDS = 8;
 
@@ -124,15 +124,25 @@ export async function runAgent(ctx) {
   const fallback = effectiveFallback({ agent, chatPrefs: getChatPrefs(ctx.contextChat || chat) });
   const turn = { ref: '' };
   const failed = [];
+  // #67: while the turn carries photos / files, fallback only moves to models that can see them (then the vision
+  // fallback model). If none can answer, the turn is asked again without them and the model says so kindly.
+  let vision = plan.attachments.length ? visionCallOptions() : null;
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     let res;
     try {
       res = await modelChat({
         model, purpose: 'agent', maxTokens: agent.maxTokens, usage: { agent: agent.id, chat, kind: ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : 'reply' },
-        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName }), tools: defs, messages, fallback, turn,
+        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName }), tools: defs, messages, fallback, turn, ...(vision || {}),
       });
     } catch (e) {
+      if (vision && e.skipped?.length) {
+        vision = null;
+        messages[0] = { role: 'user', content: `${turnText}\n${noVisionNote(plan.attachments)}` };
+        activity('model.fallback', { agent: agent.id, chat, summary: `No model that sees photos could answer; asked ${e.skipped.map((s) => s.name).join(', ')} without the photo`, detail: { skipped: e.skipped.map((s) => s.ref) } });
+        round--;
+        continue;
+      }
       if (e.failures?.length) ctx.fallback = { answeredBy: '', failed: [...failed, ...e.failures.filter((f) => f.reason !== 'unavailable').map(({ ref, name, reason }) => ({ ref, name, reason }))] };
       const friendly = friendlyModelError(e);
       if (!friendly) throw e;

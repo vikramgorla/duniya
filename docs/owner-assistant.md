@@ -7,7 +7,7 @@
 **In 30 seconds**
 - Built in (not an agent): your DMs to any agent number, the **Ask** box, the mobile app.
 - Sees only chats that are on and not **Private to members**; never answers in groups.
-- Changes need `confirm CODE`. Alerts and a weekly summary (counts only) go to your WhatsApp.
+- Changes need `confirm CODE` (valid 10 minutes, also across a restart). Alerts and a weekly summary (counts only) go to your WhatsApp.
 
 ![Ask box on Overview](site/img/card-ask.webp)
 

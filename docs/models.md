@@ -43,7 +43,8 @@
 - **Models → When a model fails** sets the chain. Default: any other connected provider's *Auto*. Per agent and per
   chat: inherit / switch / don't switch, or an own chain.
 - A failing account is paused (1 min, doubling to 30 min; usage limits until the provider's reset time), shown as
-  "Paused until 14:20 — usage limit reached".
+  "Paused until 14:20 — usage limit reached". Pauses and "reconnect" marks survive a restart or update.
+- Photo turns only fall back to models that can see images (then the vision fallback model).
 - The owner gets a WhatsApp alert after 15 minutes or when no provider can answer.
 - Several accounts per provider with a label (model refs `openai-work:gpt-…`), used *in order* (failover) or
   *spread* (least recently used).
@@ -85,7 +86,9 @@ no paid media calls.
 
 - **Photos in** (and PDFs, stickers optional): only in chats that are on and when the agent is addressed (a caption
   with the trigger, a mention, a reply to the agent, or a direct message). A model that can't see images uses the
-  **vision fallback model** (Settings) or kindly says it can't look at photos. Photos are temp files under
+  **vision fallback model** (Settings) or kindly says it can't look at photos. When fallback moves a photo turn to
+  another model, models that can't see images (e.g. GitHub Copilot) are skipped; the vision fallback model is tried
+  last; if none can answer, the turn is answered without the photo and says so. Photos are temp files under
   `DATA_DIR/media-tmp` (deleted after 15 minutes); the history keeps only `[image: caption]`.
 - **Voice notes in**: transcribed (OpenAI → OpenRouter → on-server engine), then handled like text; stored and shown as
   `🎤 transcript`. In groups a voice note counts as addressed when it replies to or mentions the agent. Longest: 5

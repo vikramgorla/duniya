@@ -14,6 +14,8 @@
 - [X] T008 Panel: Overview Ask card, Settings cards (Owner assistant, Privacy notice), Chats ticks; mobile Ask card
 - [X] T009 Tests `test/owner-assistant.test.js`; harness option `privacyNotice`
 - [X] T010 Docs (`docs/configuration.md`), version 2.8.0
+- [X] T011 (#64) Owner-assistant and admin-MCP confirm codes stored in `ttl_state` (encrypted, expiry, single use);
+  `test/restart-state.test.js`
 
 ## Follow-ups (not in this release)
 
