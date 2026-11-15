@@ -9,6 +9,8 @@ import { maybeSummarize } from './memory.js';
 import { setWhatsAppChannel } from './whatsapp-tools.js';
 import { countStat } from './stats.js';
 import { silenceReason } from './silences.js';
+import { handleOwnerMessage } from './owner-assistant.js';
+import { dmNoticeOnce } from './privacy-notice.js';
 import { inboundKind, prepareInbound, wantsVoice, speak, createImage } from './media-ai.js';
 import { enqueue, registerJobHandler, setQueueChannel, startQueue } from './media-queue.js';
 import { readFileSync, rmSync } from 'node:fs';
@@ -148,6 +150,8 @@ export function createRouter(channel) {
   return async function onMessage(msg) {
     // Reactions and poll votes: recorded only for chats that are on (#10).
     if (msg.kind && msg.kind !== 'text') { if (isChatEnabled(msg.chat)) recordEvent(msg); return; }
+    // Owner assistant (044): link codes and linked panel users' direct messages (unless they start with an agent trigger).
+    if (!msg.isGroup && await handleOwnerMessage(msg, channel)) return;
     // A media caption can address the agent ("!panduga what is this?"); the stored text is the placeholder.
     const wake = msg.caption || msg.text;
     const lower = wake.trim().toLowerCase();
@@ -270,6 +274,8 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
     const v = await speak(text, { agent, chat: msg.chat }).catch(() => null);
     if (v) {
       const sent = await channel.sendMedia(msg.chat, { kind: 'audio', base64: v.buffer.toString('base64'), mimetype: 'audio/ogg', voiceNote: true, ...(quoteOf(msg).quote ? { quote: quoteOf(msg).quote } : {}) });
+      const notice = !msg.isGroup ? dmNoticeOnce(msg.phone || msg.chat) : null; // 044: once per person
+      if (notice) await channel.send(msg.chat, `_${notice}_`).catch(() => {});
       countStat('reply', { agent: agent.id });
       logMessage({ channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
       activity('message.out', { agent: agent.id, chat: msg.chat, summary: `🔊 ${text}`, detail: { voice: v.by } });
@@ -282,6 +288,7 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
       return;
     } catch { /* queue full: send it as text */ }
   }
+  if (!msg.isGroup) { const notice = dmNoticeOnce(msg.phone || msg.chat); if (notice) text = `${text}\n\n_${notice}_`; } // 044: once per person
   const sent = await channel.send(msg.chat, text, quoteOf(msg));
   countStat('reply', { agent: agent.id });
   logMessage({

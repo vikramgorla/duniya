@@ -1,10 +1,11 @@
 // Overview: the status console (DESIGN.md) — one sentence about the state, LEDs for WhatsApp, agents and waiting
 // changes, the WhatsApp numbers, live agents. Refreshes every 10 s while open, and on pull.
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Alert, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Logo } from '@/components/Logo';
-import { Body, Button, Card, Divider, H2, Label, Led, LedLabel, ListRow, Loading, Mono, Pill, Row, Screen, Spread, Title, Toggle } from '@/components/ui';
+import { Body, Button, Card, Divider, Field, H2, Label, Led, LedLabel, ListRow, Loading, Mono, Note, Pill, Row, Screen, Spread, Title, Toggle } from '@/components/ui';
 import { can, useAuth } from '@/lib/auth';
 import { ago, duration } from '@/lib/format';
 import { headline, numbersOf, numberState, numberTone } from '@/lib/status';
@@ -39,6 +40,7 @@ export default function Overview() {
         {!st ? <Loading /> : <Console st={st} canAdmin={can(user, 'admin')} onPause={setPaused} onPending={() => router.push('/pending')} />}
         {st ? (
           <>
+            <Ask />
             <Card>
               <Spread><H2>WhatsApp numbers</H2><Pill>{`${numbersOf(st).filter((n) => n.status === 'open').length}/${numbersOf(st).length} connected`}</Pill></Spread>
               {numbersOf(st).map((n, i) => (
@@ -90,6 +92,48 @@ function Console({ st, canAdmin, onPause, onPending }: { st: Status; canAdmin: b
         <View style={{ flex: 1 }}><Body style={{ fontWeight: '600' }}>Pause all agents</Body><Body small muted>{canAdmin ? 'Stops every reply right away; resume any time.' : 'Only admins can pause.'}</Body></View>
         <Toggle label="Pause all agents" value={!!st.settings.paused} onChange={onPause} disabled={!canAdmin} />
       </Spread>
+    </Card>
+  );
+}
+
+/** Ask (044): the owner assistant, same API as the panel's Ask box. Changes need Confirm. */
+type Held = { code: string; preview: string };
+function Ask() {
+  const { api } = useAuth();
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [reply, setReply] = useState('');
+  const [held, setHeld] = useState<Held[]>([]);
+  const send = async () => {
+    if (!q.trim() || busy) return;
+    setBusy(true); setReply(''); setHeld([]);
+    try {
+      const r = await api!.post<{ reply: string; confirms: Held[] }>('/api/owner/ask', { question: q });
+      setReply(r.reply); setHeld(r.confirms || []); setQ('');
+    } catch (e) { Alert.alert('No answer', (e as Error).message); }
+    setBusy(false);
+  };
+  const decide = async (c: Held, cancel: boolean) => {
+    try { const r = await api!.post<{ reply: string }>('/api/owner/ask/confirm', { code: c.code, cancel }); setReply((x) => `${x}\n\n${r.reply}`.trim()); }
+    catch (e) { Alert.alert('Not changed', (e as Error).message); }
+    setHeld((h) => h.filter((x) => x !== c));
+  };
+  return (
+    <Card>
+      <H2>Ask</H2>
+      <Body small muted>Looks across the chats that are on (not those private to members). Changes need your Confirm.</Body>
+      <Field label="Your question" placeholder="What did the families decide this week?" value={q} onChangeText={setQ} multiline style={{ minHeight: 70 }} />
+      <Button kind="primary" title="Ask" busy={busy} disabled={!q.trim()} onPress={send} />
+      {reply ? <Note><Body selectable>{reply}</Body></Note> : null}
+      {held.map((c) => (
+        <Note key={c.code} tone="warn">
+          <Body>{c.preview}</Body>
+          <Row gap={8} style={{ marginTop: 8 }}>
+            <Button small kind="primary" title="Confirm" onPress={() => decide(c, false)} />
+            <Button small title="Cancel" onPress={() => decide(c, true)} />
+          </Row>
+        </Note>
+      ))}
     </Card>
   );
 }

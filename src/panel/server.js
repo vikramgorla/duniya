@@ -53,6 +53,10 @@ import { mediaRoutes } from './routes/media.js';
 import { serverSize } from '../core/resources.js';
 import { queueStats } from '../core/media-queue.js';
 import { insightRoutes } from './routes/insights.js';
+import { ownerAssistantRoutes } from './routes/owner-assistant.js';
+import { setOwnerToolRunner } from '../core/owner-assistant.js';
+import { maybePostNotice, setChatNoticeOff, noticePostedAt } from '../core/privacy-notice.js';
+import { TOOLS as ADMIN_TOOLS } from './admin-tools.js';
 import { globalServers } from '../core/global-mcp.js';
 import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES, GLOBAL_SCOPE } from '../core/mcp-oauth.js';
 
@@ -403,14 +407,24 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     return [...groups, ...people, ...missing].map((c) => {
       const number = c.number || (c.id.includes('#') ? c.id.split('#')[0] : 'main');
       return { ...c, number, numberLabel: numbers.get(number) || number, agent: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit',
-        fallback: prefs[c.id]?.fallback || { mode: 'inherit', chain: [] }, enabled: !!prefs[c.id]?.enabled, ignored: ignoredCounts.get(c.id) || 0 };
+        fallback: prefs[c.id]?.fallback || { mode: 'inherit', chain: [] }, enabled: !!prefs[c.id]?.enabled, ignored: ignoredCounts.get(c.id) || 0,
+        private: !!prefs[c.id]?.private, noticeOff: !!prefs[c.id]?.noticeOff, noticePostedAt: c.isGroup ? noticePostedAt(c.id) : null };
     });
   });
   route('PUT', '/api/chats/:chat/prefs', async (req, res, body, q, p, user) => {
     const chat = decodeURIComponent(p.chat);
+    const wasOn = isChatEnabled(chat);
+    // 044: "private to members" and the privacy-notice opt-out are recorded like every chat setting.
+    if (body.noticeOff !== undefined) setChatNoticeOff(chat, !!body.noticeOff, user.username);
+    if (body.private !== undefined) {
+      setChatPrefs(chat, { private: !!body.private });
+      activity('config', { chat, summary: `Chat ${body.private ? 'marked private to members — hidden from the owner assistant' : 'no longer private to members'} (${user.username})` });
+    }
     const out = setChatPrefs(chat, { model: body.model, logging: body.logging, enabled: body.enabled, fallback: body.fallback });
-    if (body.enabled !== undefined) { ignoredCounts.delete(chat); activity('config', { chat, summary: `Chat switched ${out.enabled ? 'ON — agents may answer here' : 'OFF — agents ignore it'} (${user.username})` }); }
-    else activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging}, fallback ${out.fallback.mode}${out.fallback.chain.length ? ` (${out.fallback.chain.join(' → ')})` : ''} (${user.username})` });
+    if (body.enabled !== undefined) {
+      ignoredCounts.delete(chat); activity('config', { chat, summary: `Chat switched ${out.enabled ? 'ON — agents may answer here' : 'OFF — agents ignore it'} (${user.username})` });
+      if (out.enabled && !wasOn) await maybePostNotice(chat, channel); // privacy notice (044): groups only, once
+    } else if (body.private !== undefined || body.noticeOff !== undefined) { /* recorded above */ } else activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging}, fallback ${out.fallback.mode}${out.fallback.chain.length ? ` (${out.fallback.chain.join(' → ')})` : ''} (${user.username})` });
     return out;
   });
   // ---------- activity logging settings (011) ----------
@@ -586,6 +600,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
   // ---------- global tool services (035): Settings → Tool services ----------
   toolServiceRoutes(route);
   insightRoutes(route, { channel }); // silences (#34), first-run checklist (#36), test tools (#37)
+  ownerAssistantRoutes(route, { channel }); // owner assistant, Ask box, privacy notice (044)
 
   // ---------- spending caps (040) and owner alerts / weekly summary (041) ----------
   ownerAlertRoutes(route, { channel });
@@ -630,6 +645,7 @@ ${ok ? `<script>setTimeout(function(){location.replace(${JSON.stringify(back)})}
     return out ?? { ok: true };
   }
   const adminMcp = createAdminMcp({ invoke, routeRole });
+  setOwnerToolRunner({ invoke, routeRole, tools: ADMIN_TOOLS }); // the owner assistant runs the same tools in-process (044)
   adminMcp.panelRoutes(route);
 
   const server = http.createServer(async (req, res) => {

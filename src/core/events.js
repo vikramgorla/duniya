@@ -24,8 +24,9 @@ export const LOG_CATEGORIES = {
   schedules: 'Scheduled posts', backups: 'Backups', system: 'System (start, updates, maintenance)', mcp: 'AI assistants (MCP)',
   whatsapp: 'WhatsApp actions', media: 'Photos & voice (transcripts, created pictures)', silences: 'Why agents stayed silent (at most hourly per chat)',
 };
-// Always recorded, whatever the settings: errors, confirmations of changes, configuration changes, channel status.
-const ALWAYS = new Set(['errors', 'confirmations', 'config', 'channel']);
+// Always recorded, whatever the settings: errors, confirmations of changes, configuration changes, channel status, and
+// the owner assistant's audit trail (044: every question and action).
+const ALWAYS = new Set(['errors', 'confirmations', 'config', 'channel', 'owner']);
 export const LOGGING_DEFAULTS = Object.freeze({ level: 'normal', categories: Object.fromEntries(Object.keys(LOG_CATEGORIES).map((k) => [k, true])), retentionDays: 30, maxEntries: 5000 });
 
 export function categoryOf(type) {
@@ -44,6 +45,7 @@ export function categoryOf(type) {
   if (type === 'whatsapp.action') return 'whatsapp';
   if (type === 'whatsapp.reaction' || type === 'whatsapp.vote') return 'messages';
   if (type === 'silence') return 'silences';
+  if (type.startsWith('owner.')) return 'owner';
   if (type.startsWith('media.')) return 'media';
   return 'system';
 }

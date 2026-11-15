@@ -262,6 +262,24 @@ Admin panel (localhost:8080 behind Caddy / Cloudflare Tunnel / SSH) · SQLite ·
   messages handled, replies and cost per agent this week vs last, ignored chats, pending confirmations, update available,
   backup failures — counts only, never message contents. **Send now** sends it at once. Admin MCP tools:
   `get_owner_alerts`, `set_owner_alerts`, `preview_weekly_summary`, `send_weekly_summary`.
+- **Owner assistant** (044, #50): a built-in assistant (not an agent) for panel users. **Settings → Owner assistant →
+  Link my WhatsApp** shows a one-time message (`link CODE`, valid 10 minutes); send it from your phone to any agent
+  number, then confirm "Linked +41…" in the panel. From then on your direct messages to an agent number go to the owner
+  assistant ("what did the families decide this week?", "why is the carpool group quiet?", "turn off the helper agent"),
+  unless they start with an agent's trigger (`!family …` still reaches that agent; so does `confirm CODE` for a change
+  an agent prepared). It never answers in groups or anyone who is not linked. Tools: the admin MCP tools with your
+  panel role (viewers read-only and without message contents; tools that take keys or passwords stay in the panel) plus
+  `list_visible_chats`, `search_messages` (who said what) and `chat_recap`. Every change needs `confirm CODE` in
+  WhatsApp (or **Confirm** in the panel). It sees only chats that are on; chats marked **Private to members** (Chats)
+  are invisible to it and the **Ask** box on Overview (same assistant, also in the mobile app). Its conversation is
+  stored separately, never in chat memory. Every question and action is in Activity (`owner.*`, always recorded). Model:
+  the default model with fallback, or one chosen in the same card. Admin MCP tools: `get_owner_assistant`,
+  `set_chat_private`.
+- **Privacy notice** (044, on by default): when a group is switched on, the number posts once "Messages in this group
+  are stored so the assistant has context…" (text editable under **Settings → Privacy notice**). It is posted again
+  after the group was off only if the text changed or after 90 days; per-group opt-out on Chats (recorded). Direct
+  messages get a line in the agent's first reply, once per person (can be switched off). Admin MCP tools:
+  `get_privacy_notice`, `set_privacy_notice`, `set_chat_privacy_notice`.
 - **Plugins** (`plugins/<name>/index.js`) add local tools or commands for advanced cases; see `plugins/example-dice`.
 - **Agent templates** (`templates/`): New agent, School friends, Family, Car pooling, Office colleagues, Event planning,
   Neighbours. Agents themselves are data in the app (export/import as JSON).
