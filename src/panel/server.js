@@ -1,11 +1,11 @@
 import http from 'node:http';
-import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { env, ROOT, DATA_DIR, digits } from '../core/config.js';
 import {
   listSecrets, setSecret, getSettings, updateSettings, interpolate, countUsers, createUser, listUsers, updateUser,
-  deleteUser, authenticate, sessionUser, deleteSession, getUser,
+  deleteUser, authenticate, sessionUser, deleteSession,
 } from '../core/store.js';
 import {
   listAgents, getAgent, agentView, createAgent, updateAgent, deleteAgent, bindChat, loadAgents, agentForChat,
@@ -47,9 +47,6 @@ import { webRoutes } from './routes/web.js';
 import { domainCheckResponse } from '../core/webaccess.js';
 import { passwordLoginAllowed } from '../core/google-signin.js';
 import { createAdminMcp } from './admin-mcp.js';
-import { validateAccess } from '../core/admin-oauth.js';
-import { baseUrl, minuteLimiter } from './http-util.js';
-import { mobileRoutes } from './routes/mobile.js';
 import { toolServiceRoutes } from './routes/tool-services.js';
 import { ownerAlertRoutes } from './routes/owner-alerts.js';
 import { directChatRoutes } from './routes/direct-chats.js';
@@ -110,21 +107,8 @@ const gitVersion = () => (versionOnce ||= new Promise((r) => execFile('git', ['l
 const loginLimit = limiter(5);
 const rateLimitLogin = (ip) => loginLimit(ip);
 
-// ---------- who is calling: session cookie (panel) or OAuth bearer token (mobile app, 027) ----------
-// A bearer token must be one issued for this server's /api resource (not the admin MCP's /mcp); it acts as the panel
-// user who approved it, with that user's current role. When an Authorization header is sent, only the token counts.
-const bearerOf = (req) => (/^Bearer\s+(\S+)\s*$/i.exec(String(req.headers.authorization || '')) || [])[1];
-const bearerLimit = minuteLimiter(300);
-export function requestUser(req) {
-  const token = bearerOf(req);
-  if (token) {
-    const a = validateAccess(token, `${baseUrl(req)}/api`);
-    const user = a && getUser(a.user.id);
-    return user ? { user, via: 'bearer', client: a.client, tokenHash: a.tokenHash } : { invalid: true, via: 'bearer' };
-  }
-  const user = sessionUser(cookie(req, 'duniya_session'));
-  return user ? { user, via: 'session' } : { via: 'none' };
-}
+/** The signed-in panel user (session cookie), or null. */
+const requestUser = (req) => sessionUser(cookie(req, 'duniya_session'));
 
 export function startPanel({ channel, extend = [] }) {
   bootstrapAuth();
@@ -132,16 +116,15 @@ export function startPanel({ channel, extend = [] }) {
   const routes = [];
   /** opts.role: minimum role (default: viewer for GET, admin otherwise). opts.public: no auth. */
   /** opts.raw: the handler reads the (binary) request body itself; see uploadAllowed() for the CSRF guard. */
-  /** opts.bearer: false = panel session only (not the mobile app's token); raw uploads are always session only. */
   const route = (method, pattern, handler, opts = {}) => routes.push({
-    method, handler, public: !!opts.public, raw: !!opts.raw, bearer: opts.bearer !== false && !opts.raw,
+    method, handler, public: !!opts.public, raw: !!opts.raw,
     role: opts.role || (method === 'GET' ? 'viewer' : 'admin'),
     re: new RegExp(`^${pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)')}$`),
   });
 
   // ---------- session / setup ----------
   route('GET', '/api/session', async (req) => {
-    const { user = null } = requestUser(req);
+    const user = requestUser(req);
     return { authed: !!user, user, needsSetup: countUsers() === 0, google: googleReady(), passwordLogin: passwordLoginAllowed() };
   }, { public: true });
   route('POST', '/api/setup', async (req, res, body) => {
@@ -175,7 +158,7 @@ export function startPanel({ channel, extend = [] }) {
     updateUser(user.id, { password: String(body.next || '') });
     activity('system', { summary: `Password changed: ${user.username}` });
     return { ok: true };
-  }, { role: 'viewer', bearer: false });
+  }, { role: 'viewer' });
 
   // ---------- Sign in with Google, invites (019) ----------
   googleRoutes(route);
@@ -714,9 +697,6 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
   directChatRoutes(route, { channel }); // prepared direct chats + intro (049)
   mediaRoutes(route); // photos & voice (043)
 
-  // ---------- mobile app (027): Settings → Mobile app ----------
-  mobileRoutes(route);
-
   // Other features (providers, backups, updates) add their routes with the same role gates.
   for (const fn of [].concat(extend)) fn(route, { channel });
 
@@ -757,8 +737,11 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
   adminMcp.panelRoutes(route);
 
   // The static panel shell and its scripts: from memory, compressed, ETag/304 (058).
-  const scripts = Object.fromEntries(['qr.js', 'diff.js'].map((f) => [`/${f}`, staticFile(readFileSync(resolve(PUBLIC, f)), { 'content-type': 'text/javascript; charset=utf-8' })]));
-  const shellHtml = readFileSync(resolve(PUBLIC, 'index.html'), 'utf8').replace(/<script src="(\/[a-z]+\.js)"><\/script>/g, (m, f) => (scripts[f] ? `<script src="${f}?v=${scripts[f].version}"></script>` : m));
+  // 061: the web app manifest and home-screen icons make the panel installable on a phone (no service worker needed).
+  const TYPES = { js: 'text/javascript; charset=utf-8', webmanifest: 'application/manifest+json', png: 'image/png' };
+  const files = ['diff.js', 'manifest.webmanifest', ...readdirSync(resolve(PUBLIC, 'icons')).map((f) => `icons/${f}`)];
+  const assets = Object.fromEntries(files.map((f) => [`/${f}`, staticFile(readFileSync(resolve(PUBLIC, f)), { 'content-type': TYPES[f.split('.').pop()] })]));
+  const shellHtml = readFileSync(resolve(PUBLIC, 'index.html'), 'utf8').replace(/ (src|href)="(\/[a-z0-9/-]+\.[a-z]+)"/g, (m, attr, f) => (assets[f] ? ` ${attr}="${f}?v=${assets[f].version}"` : m));
   const shell = staticFile(Buffer.from(shellHtml), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
@@ -772,20 +755,13 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
         const r = domainCheckResponse(url, req);
         return send(res, r.status, r.body, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
       }
-      if (req.method === 'GET' && Object.hasOwn(scripts, url.pathname)) return scripts[url.pathname](req, res, url);
+      if (req.method === 'GET' && Object.hasOwn(assets, url.pathname)) return assets[url.pathname](req, res, url);
       if (await adminMcp.handle(req, res, url)) return;
       const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));
       if (!r) return send(res, 404, { error: 'Not found' });
       let user = null;
       if (!r.public) {
-        const who = requestUser(req);
-        if (who.via === 'bearer') {
-          const meta = `${baseUrl(req)}/.well-known/oauth-protected-resource/api`;
-          if (who.invalid) return send(res, 401, { error: 'Sign in again (the app\'s access expired or was revoked)' }, { 'www-authenticate': `Bearer resource_metadata="${meta}", error="invalid_token"`, 'cache-control': 'no-store' });
-          if (!r.bearer) return send(res, 403, { error: 'Do this in the web panel' });
-          if (bearerLimit(who.tokenHash)) return send(res, 429, { error: 'Too many requests, wait a moment' }, { 'retry-after': '20' });
-        }
-        user = who.user;
+        user = requestUser(req);
         if (!user) return send(res, 401, { error: 'Login required' });
         if (ROLE_RANK[user.role] < ROLE_RANK[r.role]) {
           return send(res, 403, { error: user.role === 'viewer' ? 'Read-only account' : `Requires ${r.role} role` });

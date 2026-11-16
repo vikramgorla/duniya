@@ -11,7 +11,6 @@ import { clientIp, limiter, setSessionCookie } from '../http.js';
 import { baseUrl } from '../http-util.js';
 
 const OWNER = { role: 'owner' };
-const PANEL = { role: 'admin', bearer: false }; // a panel session only: the mobile app's token cannot use these links
 const signupLimit = limiter(10);
 const KEY_TYPES = ['anthropic', 'openai', 'openrouter', 'compatible'];
 const GONE = 'This link was used or has expired. Ask for a new one.';
@@ -55,7 +54,7 @@ export function linkRoutes(route, { invoke }) {
   route('POST', '/api/secret-links/open', async (req, res, body) => {
     const d = peekLink('secret', String(body.token || ''));
     return d ? { for: d.label, askedBy: d.byName, expiresAt: d.expiresAt } : [404, { error: GONE }];
-  }, PANEL);
+  }, { role: 'admin' });
   route('POST', '/api/secret-links/use', async (req, res, body, q, p, user) => {
     const token = String(body.token || '');
     const d = peekLink('secret', token);
@@ -68,7 +67,7 @@ export function linkRoutes(route, { invoke }) {
     activity('system', { summary: `${d.label} saved through a one-time link by ${user.username} (asked by ${d.byName})` });
     if (d.notify) await tellUser(d.by, `Saved ${d.label}${user.id === d.by ? '' : ` (entered by ${user.username})`}. The value never passed through this chat.`).catch(() => {});
     return { ok: true, saved: d.label };
-  }, PANEL);
+  }, { role: 'admin' });
 
   // ---------- sign-up links for new users ----------
   route('POST', '/api/users', async (req, res, body, q, p, user) => {

@@ -3,7 +3,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-  { ignores: ['node_modules/**', 'mobile/**', 'data/**', 'coverage/**', 'src/panel/public/**'] },
+  { ignores: ['node_modules/**', 'data/**', 'coverage/**', 'src/panel/public/**'] },
   js.configs.recommended,
   {
     files: ['**/*.js', '**/*.mjs'],

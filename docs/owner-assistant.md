@@ -7,7 +7,7 @@ your groups after you confirm.**
 character.
 
 **In 30 seconds**
-- A built-in agent: your DMs to any agent number, the **Ask** box, the mobile app. Always there, cannot be deleted.
+- A built-in agent: your DMs to any agent number, the **Ask** box (also on your phone). Always there, cannot be deleted.
 - Everything an agent can have: tool services (e.g. GIF search), WhatsApp actions, photos, PDFs, voice notes, voice
   replies, pictures, memory, schedules — set in the normal agent editor.
 - Sees only chats that are on and not **Private to members**; never answers in groups.
@@ -87,7 +87,7 @@ setup, test console — try it in the Ask box instead). The AI helper and its vi
 | | |
 |---|---|
 | **Photos & voice notes** | go through the media queue like agents' (one at a time on a small server, picked up after a restart); only `[image] caption` or `🎤 transcript` is kept |
-| **Ask box** | the answer streams in: each step shows as it happens (✓ looked up, ⏸ change held, ✕ failed; tool names only) and the text appears word by word; changes wait for **Confirm** (panel and mobile app). WhatsApp replies stay whole |
+| **Ask box** | the answer streams in: each step shows as it happens (✓ looked up, ⏸ change held, ✕ failed; tool names only) and the text appears word by word; changes wait for **Confirm**. WhatsApp replies stay whole |
 | **Storage** | its conversation and notes are stored separately, never in chat memory |
 | **Audit** | every question and action is in Activity (`owner.*`, `whatsapp.action`, always recorded) |
 | **API** | `POST /api/owner/ask` (whole answer) or `POST /api/owner/ask/stream` (newline-delimited JSON: `step`, `delta`, `restarted`, `text`, `done`, `error`; see below); the record is `GET`/`PUT /api/agents/owner-assistant` |

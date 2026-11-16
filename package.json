@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-agent-duniya",
-  "version": "2.21.0",
+  "version": "2.22.0",
   "private": true,
   "description": "Self-hosted WhatsApp agent platform: AI agents for your groups and chats, any model, MCP tools, admin panel.",
   "type": "module",
@@ -11,7 +11,6 @@
     "lint": "eslint .",
     "check:panel": "node -e \"const s=require('fs').readFileSync('src/panel/public/index.html','utf8');const m=[...s.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)].pop();require('fs').writeFileSync('/tmp/panel-check.mjs',m[1])\" && node --check /tmp/panel-check.mjs",
     "check:responsive": "node --disable-warning=ExperimentalWarning scripts/check-responsive.mjs",
-    "mobile": "npm --prefix mobile install --no-audit --no-fund && npm --prefix mobile start",
     "site:shots": "node --disable-warning=ExperimentalWarning scripts/site-shots.mjs",
     "docs:diagrams": "node --disable-warning=ExperimentalWarning scripts/render-diagrams.mjs",
     "knip": "knip",

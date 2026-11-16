@@ -25,7 +25,7 @@ description: "Task list template for feature implementation"
 - **Web app**: `backend/src/`, `frontend/src/`
 - **Mobile**: `api/src/`, `ios/src/` or `android/src/`
 - Paths shown below assume single project - adjust based on plan.md structure
-- **This repository**: `src/core/`, `src/channels/`, `src/panel/` (UI in `src/panel/public/index.html`), `test/*.test.js`, `docs/`, `docs/site/`, `mobile/` (see the architecture map in `AGENTS.md`)
+- **This repository**: `src/core/`, `src/channels/`, `src/panel/` (UI in `src/panel/public/index.html`), `test/*.test.js`, `docs/`, `docs/site/` (see the architecture map in `AGENTS.md`)
 
 <!--
   ============================================================================
@@ -178,7 +178,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX No chores for the owner: what the server can do or retry itself is automatic (shared upkeep tick, no new timers); buttons optional
 - [ ] TXXX Lean code: what this change replaces is deleted; no compatibility layer or one-time migration left after its release; existing resolvers/tick/switches/helpers reused; `node scripts/ci-checks.mjs` passes (knip, jscpd, panel size budget); tests check behaviour, not internals; UI: no new polling (live data over `/api/events`)
 - [ ] TXXX Admin MCP tools in `src/panel/admin-tools.js` for new panel functionality (risky actions confirm)
-- [ ] TXXX Docs: `docs/` topic pages (+ `docs/README.md` index), `README.md` highlights, `mobile/README.md`, `docs/admin-mcp.md`, `DESIGN.md` if visual; diagrams as `docs/diagrams/*.mmd` rendered with `npm run docs:diagrams` (never ```mermaid blocks)
+- [ ] TXXX Docs: `docs/` topic pages (+ `docs/README.md` index), `README.md` highlights, `docs/admin-mcp.md`, `DESIGN.md` if visual; diagrams as `docs/diagrams/*.mmd` rendered with `npm run docs:diagrams` (never ```mermaid blocks)
 - [ ] TXXX Website: section/tile in `docs/site/index.html`; screenshots/videos retaken with `npm run site:shots` when the UI changed; checked at 375 / 393 / 1440 and dark mode
 - [ ] TXXX Version bump (semver) in `package.json`, `package-lock.json`, `infra/oci/schema.yaml`
 - [ ] TXXX `releases.json` entry for the new version (every version, one-line title at least; CI fails without it); breaking change → major version + `"breaking": true` with

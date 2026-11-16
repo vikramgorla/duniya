@@ -19,15 +19,15 @@ export function ownerAssistantRoutes(route, { channel }) {
   }), { role: 'viewer' });
   // 059: the weekly summary as its schedule would send it now (counts and costs only); "Run now" sends it.
   route('GET', '/api/owner-assistant/weekly-preview', async () => ({ text: weeklyText(), data: weeklyData() }));
-  route('POST', '/api/owner-assistant/link', async (req, res, body, q, p, user) => startLink(user), { role: 'viewer', bearer: false });
-  route('POST', '/api/owner-assistant/link/confirm', async (req, res, body, q, p, user) => confirmLink(user), { role: 'viewer', bearer: false });
+  route('POST', '/api/owner-assistant/link', async (req, res, body, q, p, user) => startLink(user), { role: 'viewer' });
+  route('POST', '/api/owner-assistant/link/confirm', async (req, res, body, q, p, user) => confirmLink(user), { role: 'viewer' });
   route('DELETE', '/api/owner-assistant/link', async (req, res, body, q, p, user) => ({ ok: unlink(user.id, user.username) }), { role: 'viewer' });
   route('DELETE', '/api/owner-assistant/links/:userId', async (req, res, body, q, p, user) => {
     if (!unlink(Number(p.userId), user.username)) return [404, { error: 'Not linked' }];
     return { ok: true };
   }, { role: 'owner' });
 
-  // Ask box (Overview, mobile app): same assistant and tools, with the panel user's role. Changes need the Confirm button.
+  // Ask box (Overview): same assistant and tools, with the panel user's role. Changes need the Confirm button.
   route('POST', '/api/owner/ask', async (req, res, body, q, p, user) => ask({ user, text: body.question, source: 'panel', surface: 'panel' }), { role: 'viewer' });
   // #66: the same question, answered as a stream of newline-delimited JSON events (fetch + ReadableStream in the panel,
   // expo/fetch in the app): { type: 'step' | 'text' | 'done' | 'error' | 'ping', … }. POST + JSON keeps the CSRF guard;

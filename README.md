@@ -47,13 +47,13 @@
 <tr>
 <td valign="top"><a href="docs/domains-and-access.md"><img src="docs/img/thumb-web-access.webp" alt="Web address and access settings" width="100%"></a><br><b>Your domain, any proxy</b><br>Automatic HTTPS, a switch that never locks you out.</td>
 <td valign="top"><a href="docs/backups-and-updates.md"><img src="docs/img/thumb-backups.webp" alt="Backups page" width="100%"></a><br><b>Backups &amp; updates</b><br>Encrypted to GitHub or S3; updates wait for your OK when breaking; no SSH needed, even for the root helper.</td>
-<td valign="top"><a href="docs/admin-mcp.md"><img src="docs/img/thumb-assistants.webp" alt="Connected AI assistants card" width="100%"></a><br><b>Run it from ChatGPT or Claude</b><br>The app is an MCP server too.</td>
+<td valign="top"><a href="docs/admin-mcp.md"><img src="docs/img/thumb-assistants.webp" alt="Connected AI assistants card" width="100%"></a><br><b>From ChatGPT, Claude or your phone</b><br>The app is an MCP server too, and the panel <a href="docs/phone.md">installs on your home screen</a>.</td>
 </tr>
 </table>
 
 ## How it works
 
-<p align="center"><img src="docs/diagrams/overview.svg" alt="How a message flows: WhatsApp, the chat allow-list (chats that are off are dropped and never stored), the router, the agent, its model with fallback and its tools, with changes confirmed by an organizer; the owner manages agents from the panel, the phone app or ChatGPT/Claude" width="612"></p>
+<p align="center"><img src="docs/diagrams/overview.svg" alt="How a message flows: WhatsApp, the chat allow-list (chats that are off are dropped and never stored), the router, the agent, its model with fallback and its tools, with changes confirmed by an organizer; the owner manages agents from the panel (also on a phone) or ChatGPT/Claude" width="612"></p>
 
 <details><summary>Diagram as text</summary>
 
@@ -63,7 +63,7 @@
 4. The agent (stored in the app) answers with its model, which falls back to another one if needed.
 5. The agent can use tools: MCP services, WhatsApp actions and memory.
 6. Tools that change something wait until an organizer replies `confirm CODE`.
-7. The owner manages agents from the panel, the phone app or ChatGPT/Claude.
+7. The owner manages agents from the panel (installable on a phone) or ChatGPT/Claude.
 
 </details>
 
@@ -103,7 +103,7 @@ a release needs a step: [Upgrading](docs/upgrading.md).
 
 ---
 
-<sub>[Mobile app](mobile/README.md) · [Feature specs](specs) · [Design language](DESIGN.md) ·
+<sub>[Feature specs](specs) · [Design language](DESIGN.md) ·
 [AGENTS.md](AGENTS.md) (working rules, Definition of Done) · [Security policy](SECURITY.md)</sub>
 
 > [!WARNING]

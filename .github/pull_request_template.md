@@ -31,7 +31,6 @@ Tick each item or write "n/a – reason".
 - [ ] `docs/` pages (+ `docs/README.md` index)
 - [ ] `README.md` highlights
 - [ ] Website `docs/site/` (sections/tiles; screenshots/videos retaken with `npm run site:shots` if UI changed)
-- [ ] `mobile/README.md`
 - [ ] Admin MCP tools + `docs/admin-mcp.md`
 - [ ] `DESIGN.md` (visual changes)
 

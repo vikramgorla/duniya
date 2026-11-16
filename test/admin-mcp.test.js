@@ -343,3 +343,17 @@ test('admins do not get owner-only tools; rate limit is 60 calls per minute per 
   for (let i = 0; i < 62; i++) last = await rawMcp(s.tokens.access_token);
   assert.equal(last.status, 429);
 });
+
+test('061: an assistant token only opens /mcp; the mobile app client, its /api resource and app redirects are gone', async () => {
+  const { tokens } = await tokensFor(owner, { name: 'Scope check' });
+  const api = await fetch(`${t.base}/api/status`, { headers: { authorization: `Bearer ${tokens.access_token}` } });
+  assert.equal(api.status, 401, 'the panel API takes the session cookie only');
+  assert.equal((await fetch(`${t.base}/.well-known/oauth-protected-resource/api`)).status, 404);
+  assert.equal((await fetch(`${t.base}/oauth/authorize?client_id=duniya-mobile&redirect_uri=duniya%3A%2F%2Foauth&response_type=code`)).status, 400);
+  for (const uri of ['duniya://oauth', 'exp://192.168.1.20:8081/--/oauth']) {
+    const r = await fetch(`${t.base}/oauth/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'App', redirect_uris: [uri] }) });
+    assert.equal(r.status, 400, uri);
+  }
+  assert.equal((await t.api(owner, 'GET', '/api/mobile')).status, 404);
+  assert.ok((await t.api(owner, 'GET', '/api/assistants')).body.grants.every((g) => g.clientId !== 'duniya-mobile'));
+});

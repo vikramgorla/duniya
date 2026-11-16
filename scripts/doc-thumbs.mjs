@@ -11,7 +11,7 @@ const THUMBS = {
   'photos-voice': 'card-photos-voice', usage: 'usage-desktop', quiet: 'card-quiet', mcp: 'card-mcp',
   'wa-group': 'card-wa-group', 'web-access': 'card-web-access', backups: 'backups-desktop',
   'small-server': 'card-small-server', assistants: 'card-assistants', checklist: 'card-checklist',
-  overview: 'overview-desktop',
+  overview: 'overview-desktop', phone: 'overview-mobile',
 };
 const BG = '0xf1f2eb';
 

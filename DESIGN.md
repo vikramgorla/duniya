@@ -23,6 +23,8 @@ add or change UI, check it against the principles and the checklist at the end.
 7. **Works on a phone and an iPad.** Down to 375 px wide (iPhone SE; iPhone 15 is 393 px): touch targets ≥ 40 px
    and text ≥ 13 px on phones, no page wider than the screen (only the tab bar, code and `.tscroll` boxes scroll
    sideways), wide tables become cards (`table.stack`), long ids and URLs wrap, no hover-only affordances.
+   Installed on the home screen it must feel like an app: form fields are 16 px on phones (no zoom on focus), the
+   header and sides keep clear of notches (`env(safe-area-inset-*)`), floating actions sit above the home indicator.
 
 ## Visual language — "Constellation" (since v1.7)
 
@@ -35,11 +37,13 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
   short antenna with a ball, an ink visor with two smiling lime (`--signal #c6f432`) arc eyes.
   - **Files:** master `docs/site/img/logo.svg` (64-unit grid, transparent); small variant
     `docs/site/img/logo-small.svg` for 16–32 px (no helmet rim, no antenna ball, bigger visor and eyes). The same
-    geometry is in `logo()` (panel), `Logo.tsx` (mobile), the consent pages (`admin-mcp.js`) and the install progress
-    page (`infra/oci/bootstrap.sh`). Mobile PNGs in `mobile/assets` are rendered from the master.
+    geometry is in `logo()` (panel), the consent pages (`admin-mcp.js`) and the install progress page
+    (`infra/oci/bootstrap.sh`). Home-screen icons in `src/panel/public/icons/` are rendered from the master:
+    `icon-192/512.png` and `apple-touch-icon.png` (mark at 80 % on porcelain `#f2f1ec`) and `maskable-512.png` (mark
+    at 50 %, so Android's circle and squircle masks never cut the tail).
   - **Colours are fixed** in light and dark mode; the solid bubble and white helmet read on both grounds.
   - **Sizes:** small variant at 16–32 px (favicons); master from 30 px up (header 30–32 px, sign-in 76 px, consent
-    page 40 px). App icons: mark at 80 % of the canvas on porcelain (iOS); 50 % on the adaptive-icon foreground so the
+    page 40 px). Home-screen icons: mark at 80 % of the canvas on porcelain; 50 % on the maskable icon so the
     tail stays inside Android's safe zone.
   - **Clear space:** at least ⅛ of the mark on every side; never crop the tail.
   - **Don't:** recolour the bubble or the robot, add gradients, shadows or outlines, stretch or rotate it, put it in

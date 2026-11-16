@@ -27,5 +27,6 @@ See [docs/upgrading.md](docs/upgrading.md).
 - Chats are off by default; off chats are never stored or sent to a model. Tool permissions are enforced in code per
   role, and changes go through a human `confirm CODE` step the model never sees.
 - Local tool services (npm/GitHub) are owner-only and run with a scrubbed environment.
-- The admin MCP server and the mobile app use OAuth 2.1 with PKCE and resource-bound tokens.
+- The admin MCP server uses OAuth 2.1 with PKCE and resource-bound tokens; its tokens only open `/mcp`. The panel API
+  accepts only the panel's session cookie (HttpOnly, SameSite=Strict).
 - CI runs CodeQL, `npm audit` (production, high+), Dependabot and secret scanning with push protection.

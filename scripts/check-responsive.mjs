@@ -44,6 +44,8 @@ const STATES = [
   { name: 'setup', hash: '', js: "clearInterval(statusTimer); S.tab = ''; renderSetup(document.querySelector('#app'), () => []);" },
   { name: 'setup-restore', hash: '', js: "clearInterval(statusTimer); S.tab = ''; renderSetup(document.querySelector('#app'), () => []); await T.click('Restore a backup');" },
   { name: 'overview', hash: 'overview' },
+  // 061: the install hint without the browser's install prompt (iPhone, Firefox): the manual steps instead of a button
+  { name: 'overview-install-steps', hash: 'overview', js: "S.installPrompt = null; localStorage.removeItem('duniya.installHint'); drawInstallHint();" },
   { name: 'overview-checklist', hash: 'overview', js: "drawChecklist(document.querySelector('#ov-checklist'), { done: 2, total: 5, complete: false, dismissed: false, steps: [['provider', 'Connect an AI model provider', true, '#models'], ['whatsapp', 'Link a WhatsApp number', true, '#overview/whatsapp'], ['agent', 'Create an agent', false, '#agents'], ['chat', 'Switch a chat on', false, '#chats'], ['reply', 'Get a first reply', false, '#agents']].map(([id, title, done, href]) => ({ id, title, done, href, hint: 'Every chat starts Off. Switch on the groups and people your agent should answer.' })) });" },
   // 045: a breaking release waits for the owner (banner on Overview, the dialog with release notes)
   { name: 'overview-update-decision', hash: 'overview', before: UPDATE_DECISION, wait: 1500 },
