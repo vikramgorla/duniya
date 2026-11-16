@@ -8,7 +8,7 @@
 
 ## Phase 2: Member tags
 - [x] T005 Store per chat + member (chats on only, newest wins, removal, erase with memory)
-- [x] T006 Read from message contextInfo, tag-change messages, Baileys event, history participants, raw member list
+- [x] T006 Read from message contextInfo, tag-change messages, Baileys event, history participants (raw member list removed in #117: it carries no tags)
 - [x] T007 Names-only diagnostic of member-list fields (#62)
 - [x] T008 Tags in the panel (pills) and in the agent's context
 

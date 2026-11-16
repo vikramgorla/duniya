@@ -3,10 +3,9 @@ import makeWASocket, {
   normalizeMessageContent, isJidGroup, isPnUser, isLidUser, jidNormalizedUser, Browsers,
   decryptPollVote, BufferJSON, sha256, downloadMediaMessage, proto,
 } from 'baileys';
-import { extractGroupMetadata } from 'baileys/lib/Socket/groups.js';
 import pino from 'pino';
 import QRCode from 'qrcode';
-import { rmSync, readFileSync } from 'node:fs';
+import { rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DATA_DIR, digits } from '../core/config.js';
 import { activity, bus } from '../core/events.js';
@@ -17,7 +16,6 @@ import { syncWhatsAppContacts, mapLid, unmappedLids } from '../core/contacts.js'
 const logger = pino({ level: process.env.BAILEYS_LOG || 'warn' });
 // 057: address-book names live in the app-state collection "critical_unblock_low" (contactAction / lidContactAction).
 const CONTACTS_COLLECTION = 'critical_unblock_low';
-const APP_VERSION = (() => { try { return JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version; } catch { return 'dev'; } })();
 const NAMES_SCHEMA = '057'; // bump to make every number take one fresh contacts snapshot after an update
 const NAMES_FIRST_MS = Number(process.env.NAMES_REFRESH_FIRST_MS ?? 30000);
 const NAMES_EVERY_MS = 24 * 3600000;
@@ -132,7 +130,7 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     sock.ev.on('group-participants.update', async ({ id, participants, action }) => {
       if (mySock !== sock || !isJidGroup(id)) return;
       groupCache.delete(id);
-      safe(() => onGroupChange({ chat: id, action })); // 057: member list (tags, LIDs) refreshes on the next upkeep tick
+      safe(() => onGroupChange({ chat: id, action })); // 057: member list (LID↔phone pairs) refreshes on the next upkeep tick
       if (!['add', 'invite', 'join'].includes(action)) return;
       const meUser = sock.user?.id ? jidNormalizedUser(sock.user.id).split('@')[0] : '';
       const meLid = sock.user?.lid ? jidNormalizedUser(sock.user.lid).split('@')[0] : '';
@@ -452,62 +450,10 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
   async function groupMeta(jid) {
     const hit = groupCache.get(jid);
     if (hit && Date.now() - hit.at < 10 * 60000) return hit.meta;
-    const meta = await fetchGroupMeta(jid);
+    const meta = await sock.groupMetadata(jid);
     groupCache.set(jid, { at: Date.now(), meta });
     return meta;
   }
-  /**
-   * 057: the same query Baileys' groupMetadata() sends, so the raw <participant> nodes can be read too: Baileys keeps
-   * only known attributes, and WhatsApp may list member tags there. Parsed defensively (several likely names), plain
-   * text, capped. The attribute and child names seen are reported once per version (names only, never values).
-   */
-  async function fetchGroupMeta(jid) {
-    if (typeof sock.query !== 'function') return sock.groupMetadata(jid); // fakes / other socket builds
-    const result = await sock.query({ tag: 'iq', attrs: { type: 'get', xmlns: 'w:g2', to: jid }, content: [{ tag: 'query', attrs: { request: 'interactive' } }] });
-    const meta = extractGroupMetadata(result);
-    const group = (Array.isArray(result?.content) ? result.content : []).find((n) => n?.tag === 'group');
-    const nodes = (Array.isArray(group?.content) ? group.content : []).filter((n) => n?.tag === 'participant');
-    noteParticipantShape(nodes);
-    const now = Date.now();
-    for (const n of nodes) {
-      const label = participantLabel(n);
-      if (label === null) continue;
-      const a = n.attrs || {};
-      const alt = isLidUser(a.jid) ? a.phone_number : a.jid;
-      if (isLidUser(a.jid) && isPnUser(a.phone_number)) safe(() => mapLid(jidNormalizedUser(a.jid), pnOf(a.phone_number)));
-      emitTag(meta.id, a.lid && isPnUser(a.jid) ? a.lid : a.jid, alt, label, now);
-    }
-    return meta;
-  }
-  const textOfNode = (n) => (typeof n?.content === 'string' ? n.content : Buffer.isBuffer(n?.content) || n?.content instanceof Uint8Array ? Buffer.from(n.content).toString('utf8') : '');
-  /** A member tag from a raw <participant> node, or null when the node carries none. */
-  function participantLabel(n) {
-    const a = n?.attrs || {};
-    for (const k of ['label', 'member_label', 'tag', 'member_tag']) if (typeof a[k] === 'string') return cleanLabel(a[k]);
-    for (const c of Array.isArray(n?.content) ? n.content : []) {
-      if (!['label', 'member_label', 'member_tag', 'tag'].includes(c?.tag)) continue;
-      if (typeof c.attrs?.label === 'string') return cleanLabel(c.attrs.label);
-      if (typeof c.attrs?.text === 'string') return cleanLabel(c.attrs.text);
-      return cleanLabel(textOfNode(c));
-    }
-    return null;
-  }
-  const cleanLabel = (v) => [...String(v || '')].filter((ch) => ch.charCodeAt(0) >= 32 && ch !== '\u007f' && ch !== '<' && ch !== '>').join('').replace(/\s+/g, ' ').trim().slice(0, 30);
-  /** #62 diagnostic: which attribute / child names <participant> nodes have (names only), once per app version. */
-  function noteParticipantShape(nodes) {
-    if (!nodes.length) return;
-    const key = `groupParticipantShape:${APP_VERSION}`;
-    if (kvGet(key)) return;
-    const attrs = new Set(); const kids = new Set();
-    for (const n of nodes.slice(0, 50)) {
-      for (const k of Object.keys(n.attrs || {})) attrs.add(k);
-      for (const c of Array.isArray(n.content) ? n.content : []) if (c?.tag) kids.add(String(c.tag));
-    }
-    const shape = { attrs: [...attrs].sort(), children: [...kids].sort() };
-    kvSet(key, JSON.stringify(shape));
-    activity('system', { summary: `WhatsApp group member list fields (diagnostic, names only): attributes ${shape.attrs.join(', ') || 'none'}; child nodes ${shape.children.join(', ') || 'none'}` });
-  }
-
   // ---------- helpers for the WhatsApp actions (026) ----------
   const ready = () => { if (state.status !== 'open' || !sock) throw Object.assign(new Error('WhatsApp is not connected'), { status: 409 }); return sock; };
   const needGroup = (jid) => { if (!isJidGroup(jid)) throw Object.assign(new Error('This only works in a group'), { status: 400 }); };
@@ -660,7 +606,7 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     /** 057: refresh address-book names now (also runs by itself after connect and daily, from the upkeep tick). */
     async refreshNames(opts = {}) { return refreshNames({ ...opts, force: true }); },
     upkeep,
-    /** 057: re-read a group's member list (tags, LID↔phone pairs); called by the upkeep tick for chats that are on. */
+    /** 057: re-read a group's member list (LID↔phone pairs); called by the upkeep tick for chats that are on. */
     async refreshGroup(jid) { needGroup(jid); ready(); invalidate(jid); const meta = await groupMeta(jid); for (const p of meta.participants || []) await participantPhone(p); return { members: meta.participants?.length || 0 }; },
     async start(handler, { onHistory: historyHandler, onJoin: joinHandler, onMemberTag: tagHandler, onPhoneActive: activeHandler, onGroupChange: groupHandler } = {}) {
       if (groupHandler) onGroupChange = groupHandler;

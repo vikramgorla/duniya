@@ -186,7 +186,7 @@ remove entries.
 Wherever the panel shows a person (agent page people list, Chats, a group's members, stored messages, Activity, the
 owner assistant, the mobile app), one rule picks the name:
 
-<p align="center"><img src="diagrams/contact-names.svg" alt="Which name is shown: for a hidden id (LID) the number WhatsApp shared is looked up first; then the first known of: the name you set in Duniya, the phone contact name from your address book, the business name, the profile name the person chose, else +number or Unknown (hidden number). Member tags come per group from each message the person sends, tag changes, loaded history and the group member list" width="483"></p>
+<p align="center"><img src="diagrams/contact-names.svg" alt="Which name is shown: for a hidden id (LID) the number WhatsApp shared is looked up first; then the first known of: the name you set in Duniya, the phone contact name from your address book, the business name, the profile name the person chose, else +number or Unknown (hidden number). Member tags come per group from each message the person sends, tag changes and loaded history" width="483"></p>
 
 <details><summary>Diagram as text</summary>
 
@@ -195,8 +195,8 @@ owner assistant, the mobile app), one rule picks the name:
 2. Use the first name known: the name you set in Duniya, then the phone contact name (your address book), then a
    WhatsApp Business name, then the profile name the person chose.
 3. Otherwise show `+number`, or *Unknown (hidden number)* when WhatsApp hides it.
-4. Member tags are kept per group (chats that are on only), from each message the person sends, tag changes, loaded
-   history and the group member list.
+4. Member tags are kept per group (chats that are on only), from each message the person sends, tag changes and
+   loaded history.
 
 </details>
 
@@ -218,14 +218,13 @@ tag and shows it next to their name (agent page, group members, stored messages)
 is speaking: *New message from Priya (tag: Driver)*, and in the recent messages.
 
 - A tag shows up as soon as the person writes in the group (WhatsApp sends it with each message), when it changes,
-  from history loaded from your phone, and from the group member list (read when the chat is switched on, after
-  members change and every 12 hours).
+  and from history loaded from your phone. WhatsApp's group member list does not include tags.
 - Removed tags disappear; the newest information wins.
 - Chats that are off: no tags are stored. Erasing a chat's memory erases its tags.
 
 > [!NOTE]
-> WhatsApp has no documented way to ask for every member's tag. Members who have not written since the group was
-> switched on may show no tag until they do (or until the member list carries it).
+> WhatsApp has no way to ask for every member's tag. Members who have not written since the group was switched on
+> (and are not in the loaded history) show no tag until they do.
 
 ## Several WhatsApp numbers and direct messages
 

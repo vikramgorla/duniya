@@ -13,12 +13,12 @@ const owner = await t.login();
 after(() => t.close());
 const c = await import('../src/core/contacts.js');
 const tags = await import('../src/core/member-tags.js');
-const { upkeepTick, markGroupDue, resetUpkeep } = await import('../src/core/upkeep.js');
+const { upkeepTick, resetUpkeep } = await import('../src/core/upkeep.js');
 const baileys = await import('baileys');
 const enc = encodeURIComponent;
 const wait = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
-/** A fake Baileys socket with what 057 uses: app-state resync, auth keys, LID mapping, raw group query. */
+/** A fake Baileys socket with what 057 uses: app-state resync, auth keys, LID mapping, group metadata. */
 function fakeSocket(log) {
   return () => {
     const sock = { ev: new EventEmitter(), user: { id: '41790000099:3@s.whatsapp.net', lid: '99999@lid' } };
@@ -30,13 +30,12 @@ function fakeSocket(log) {
         sock.ev.emit('contacts.upsert', [{ id: '41790000204@s.whatsapp.net', name: 'Meera (phone)', lid: '204@lid' }]);
       },
       signalRepository: { lidMapping: { getPNForLID: async (lid) => lids.get(lid) || null } },
-      query: async (node) => {
-        log.push({ fn: 'query', to: node.attrs.to });
-        return { tag: 'iq', attrs: {}, content: [{ tag: 'group', attrs: { id: node.attrs.to.split('@')[0], subject: 'Trip', creation: '1', size: '3' }, content: [
-          { tag: 'participant', attrs: { jid: '555@lid', phone_number: '41790000201@s.whatsapp.net', type: 'admin', label: 'Driver', secret_value: 'x' } },
-          { tag: 'participant', attrs: { jid: '41790000202@s.whatsapp.net' }, content: [{ tag: 'member_label', attrs: {}, content: Buffer.from('Cook') }] },
-          { tag: 'participant', attrs: { jid: '41790000203@s.whatsapp.net' } },
-        ] }] };
+      groupMetadata: async (jid) => {
+        log.push({ fn: 'groupMetadata', to: jid });
+        return { id: jid, subject: 'Trip', participants: [
+          { id: '555@lid', phoneNumber: '41790000201@s.whatsapp.net', admin: 'admin' },
+          { id: '41790000202@s.whatsapp.net' }, { id: '41790000203@s.whatsapp.net' },
+        ] };
       },
       sendPresenceUpdate: async () => {}, end: () => {}, logout: async () => {},
     });
@@ -117,8 +116,8 @@ test('names refresh automatically on the shared tick: one snapshot of the contac
   assert.equal(c.personInfo({ jid: '888@lid' }).name, 'Lata Book');
 });
 
-test('member tags: from each message\'s own contextInfo, tag changes, history and the group member list — chats that are on only', async () => {
-  const { ch, sock, got } = await channel();
+test('member tags: from each message\'s own contextInfo, tag changes and history — chats that are on only', async () => {
+  const { ch, sock, got, log } = await channel();
   const ts = Math.floor(Date.now() / 1000);
   const msg = (chat, participant, message, extra = {}) => ({ key: { remoteJid: chat, id: `M${Math.random()}`, participant, participantAlt: extra.alt, fromMe: false }, message, pushName: 'Anu', messageTimestamp: extra.ts || ts });
   sock.ev.emit('messages.upsert', { type: 'notify', messages: [
@@ -150,23 +149,16 @@ test('member tags: from each message\'s own contextInfo, tag changes, history an
   sock.ev.emit('messaging-history.set', { messages: [], contacts: [], chats: [{ id: 'g4@g.us', participant: [{ userJid: '41790000006@s.whatsapp.net', memberLabel: { label: 'Treasurer', labelTimestamp: ts } }] }] });
   await wait();
   assert.equal(tags.memberTag('g4@g.us', { phone: '41790000006' }), 'Treasurer');
-  // the group member list (raw participant nodes): read on the upkeep tick for chats that are on, a few per tick
+  // the group member list: read on the upkeep tick for chats that are on, a few per tick. It carries no member tags
+  // (#117, checked on a real server), but it tells us which number a hidden id (LID) belongs to.
   resetUpkeep();
   const before = got.groups.length;
   sock.ev.emit('group-participants.update', { id: 'g9@g.us', participants: ['41790000203@s.whatsapp.net'], action: 'remove' });
   assert.equal(got.groups.length, before + 1, 'a member change marks the group for a refresh');
   for (let i = 0; i < 6; i++) await upkeepTick(ch);
-  assert.equal(tags.memberTag('g9@g.us', { phone: '41790000201' }), 'Driver');
-  assert.equal(tags.memberTag('g9@g.us', { jid: '555@lid' }), 'Driver');
-  assert.equal(tags.memberTag('g9@g.us', { phone: '41790000202' }), 'Cook');
+  assert.ok(log.some((x) => x.fn === 'groupMetadata' && x.to === 'g9@g.us'), 'member list refreshed on the tick');
   assert.equal(c.lidPhone('555@lid'), '41790000201');
-  const diag = t.db.listActivity({ limit: 50 }).find((a) => /group member list fields/.test(a.summary));
-  assert.ok(diag, 'diagnostic recorded once');
-  assert.match(diag.summary, /attributes jid, label, phone_number, secret_value, type; child nodes member_label/);
-  assert.ok(!/41790000201|555|Driver|Cook/.test(diag.summary), 'names only, never values or ids');
-  markGroupDue('g9@g.us');
-  await upkeepTick(ch);
-  assert.equal(t.db.listActivity({ limit: 80 }).filter((a) => /group member list fields/.test(a.summary)).length, 1, 'once per version');
+  assert.equal(tags.memberTag('g9@g.us', { phone: '41790000201' }), '');
 });
 
 test('the panel and the agent use the resolver and tags', async () => {

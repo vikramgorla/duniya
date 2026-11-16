@@ -1,6 +1,10 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.19.2": {
+      "breaking": false,
+      "title": "Member tags no longer looked for in the group member list (WhatsApp does not put them there); smaller WhatsApp code"
+    },
     "2.19.1": {
       "breaking": false,
       "title": "Faster panel (compressed page, live status instead of polling, quicker screen switches) and a leaner code base",
