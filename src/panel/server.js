@@ -20,7 +20,7 @@ import { stripTriggers } from '../core/router.js';
 import { builtinAnswer, todayText } from '../core/quick.js';
 import { runSchedule } from '../core/scheduler.js';
 import { resetMcpPool, mcpConnection } from '../core/mcp.js';
-import { listContacts, saveContact, removeContact, getContact, personInfo, contactSummary, chatTitle } from '../core/contacts.js';
+import { listContacts, saveContact, removeContact, getContact, personInfo, contactSummary, chatTitle, contactNamesForAgents, setContactNamesForAgents } from '../core/contacts.js';
 import { tagsInChat, memberTag } from '../core/member-tags.js';
 import { memoryView, maybeSummarize, eraseChatMemory } from '../core/memory.js';
 import { humanCode } from '../core/crypto.js';
@@ -577,8 +577,15 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
   route('GET', '/api/contacts/summary', async () => {
     const numbers = ((await channel.status()).numbers || [{ id: 'main' }]).map((n) => n.id);
     const at = numbers.map((n) => Number(kvGet(`contactsRefreshedAt:${n}`)) || 0).filter(Boolean);
-    return { ...contactSummary(), refreshedAt: at.length ? Math.max(...at) : null, automatic: true };
+    return { ...contactSummary(), refreshedAt: at.length ? Math.max(...at) : null, automatic: true, namesForAgents: contactNamesForAgents() };
   });
+  // #113: may agents see the names from the owner's phone contacts? (default yes; profile names are often incomplete)
+  route('PUT', '/api/contacts/agent-names', async (req, res, body, q, p, user) => {
+    if (typeof body.enabled !== 'boolean') return [400, { error: 'enabled must be true or false', field: 'enabled' }];
+    const on = setContactNamesForAgents(body.enabled);
+    activity('config', { summary: `Phone contact names for agents ${on ? 'on' : 'off'} by ${user.username}` });
+    return { namesForAgents: on };
+  }, { role: 'owner' });
   // Optional extra: refresh now (the server also does it by itself). At most every 10 minutes per number.
   route('POST', '/api/contacts/refresh', async (req, res, body, q, p, user) => {
     if (typeof channel.refreshNames !== 'function') return [501, { error: 'Not available' }];

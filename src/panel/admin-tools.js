@@ -258,6 +258,14 @@ export const TOOLS = [
     run: (a, x) => x.call('GET', `/api/contacts?q=${enc(a.query || '')}${a.shared_only ? '&shared=1' : ''}`) },
   { name: 'contact_names_status', readOnly: true, calls: [['GET', '/api/contacts/summary']], description: 'How many contact names of each kind are known (address book, business, profile, own), how many people WhatsApp shows only by a hidden number, and when names were last refreshed. Names refresh by themselves after WhatsApp connects and daily.',
     input: {}, run: (a, x) => x.call('GET', '/api/contacts/summary') },
+  { name: 'set_contact_names_for_agents', risky: true, calls: [['GET', '/api/contacts/summary'], ['PUT', '/api/contacts/agent-names']],
+    description: 'Owner only: whether agents may use the names from the owner\'s phone contacts (on by default, because WhatsApp profile names are often incomplete). Off: agents see business or profile names. Needs confirm_action.',
+    input: { enabled: bool('true = agents may use phone contact names') }, required: ['enabled'],
+    preview: async (a, x) => {
+      const cur = await x.call('GET', '/api/contacts/summary');
+      return `${a.enabled ? 'Let agents use' : 'Stop agents using'} the names from your phone contacts (now ${cur.namesForAgents === false ? 'off' : 'on'}).${a.enabled ? ' A private label you saved for someone can then appear in agent replies.' : ' Agents then see business or profile names.'}`;
+    },
+    run: (a, x) => x.call('PUT', '/api/contacts/agent-names', { enabled: !!a.enabled }) },
   { name: 'refresh_contact_names', calls: [['POST', '/api/contacts/refresh']], description: 'Optional: ask WhatsApp for address-book names now (the server also does this by itself after connecting and daily). Changes nothing in WhatsApp.',
     input: {}, run: (a, x) => x.call('POST', '/api/contacts/refresh') },
   { name: 'save_contact', calls: [['PUT', '/api/contacts/x']], description: 'Add or change a contact: phone with country code, name, note, shared (participants may look it up).',

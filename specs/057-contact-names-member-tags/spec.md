@@ -41,7 +41,7 @@ of it: **no chores for the owner** — what the server can do or retry itself ha
   LID store (`getPNForLID`, up to 300 unmapped per pass). When a pair arrives, the LID's names move to the phone row.
 - **FR-003** One resolver `personInfo({ phone, jid, fallbackName })` → `{ phone, name, label, source, hidden }`;
   `chatTitle(chat)` for 1:1 chat titles. All panel/owner views use it. A fallback that is only the number is no name.
-- **FR-004** Agents never receive address-book names: the model sees the name seen in the chat (profile name).
+- **FR-004** (changed by #113, owner decision) Agents see the same name as the panel, phone contact names included, because profile names are often incomplete. The owner can switch phone contact names off for agents on the Contacts page (`PUT /api/contacts/agent-names`, owner only; admin MCP `set_contact_names_for_agents` with confirm); then the model sees business or profile names.
 - **FR-005** Names refresh: `resyncAppState(['critical_unblock_low'])` when due (30 s after connect, then every 24 h,
   at most every 10 min); the first time per number (and when `NAMES_SCHEMA` changes) the collection's stored version
   is cleared so WhatsApp sends a snapshot. Failures are logged and retried at the next due time.
@@ -71,4 +71,4 @@ of it: **no chores for the owner** — what the server can do or retry itself ha
 
 ## Out of scope
 
-Showing address-book names to agents; editing member tags from Duniya (Baileys has `updateMemberLabel`, not exposed).
+Editing member tags from Duniya (Baileys has `updateMemberLabel`, not exposed).

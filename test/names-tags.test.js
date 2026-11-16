@@ -202,15 +202,25 @@ test('the panel and the agent use the resolver and tags', async () => {
   const row = rows.find((m) => m.text === 'hello all');
   assert.equal(row.name, 'Chitra Book');
   assert.ok(!('senderJid' in row));
-  // the agent sees the profile name (never the address-book name) with the member tag
+  // #113: by default the agent sees the name the owner knows them by (phone contact name), with the member tag
   tags.saveMemberTag({ chat: 'g1@g.us', participant: '41790000002@s.whatsapp.net', phone: '41790000002', label: 'Driver' });
   c.syncWhatsAppContacts([{ id: '41790000002@s.whatsapp.net', name: 'Anu Private Book Name' }]);
   t.script.push([{ type: 'text', text: 'ok' }]);
   await t.route(t.msg({ chat: 'g1@g.us', text: '!panduga who drives?' }));
-  const turn = t.userTurn(t.claudeReqs.length - 1);
+  let turn = t.userTurn(t.claudeReqs.length - 1);
+  assert.match(turn, /New message from Anu Private Book Name \(tag: Driver\) \(participant\)/);
+  assert.match(turn, /Chitra Book: hello all/, 'history lines use the same names');
+  // switched off on the Contacts page (owner only): agents get profile names, never the phone contact names
+  assert.equal((await t.api(owner, 'PUT', '/api/contacts/agent-names', { enabled: 'yes' })).status, 400);
+  assert.equal((await t.api(owner, 'PUT', '/api/contacts/agent-names', { enabled: false })).body.namesForAgents, false);
+  assert.equal((await t.api(owner, 'GET', '/api/contacts/summary')).body.namesForAgents, false);
+  t.script.push([{ type: 'text', text: 'ok' }]);
+  await t.route(t.msg({ chat: 'g1@g.us', text: '!panduga who drives?' }));
+  turn = t.userTurn(t.claudeReqs.length - 1);
   assert.match(turn, /New message from Anu \(tag: Driver\) \(participant\)/);
-  assert.match(turn, /chitra_p: hello all/, 'history lines keep the names seen in the chat');
-  assert.ok(!/Anu Private Book Name|Chitra Book/.test(turn), 'address-book names never reach a model');
+  assert.match(turn, /chitra_p: hello all/);
+  assert.ok(!/Anu Private Book Name|Chitra Book/.test(turn), 'switched off: phone contact names never reach a model');
+  await t.api(owner, 'PUT', '/api/contacts/agent-names', { enabled: true });
   // Activity names the sender as the panel knows them
   assert.ok(t.db.listActivity({ limit: 20 }).some((a) => /^Anu Private Book Name \(participant\)/.test(a.summary)));
   // a chat switched off: tags not used

@@ -1,6 +1,6 @@
 import { isChatEnabled, ignoredCounts, noteLatestKeys } from './chat-prefs.js';
 import { storeLoadedBatch, setHistoryChannel, historyChatActive } from './history-load.js';
-import { personInfo } from './contacts.js';
+import { personInfo, agentName } from './contacts.js';
 import { memberTag } from './member-tags.js';
 import { env } from './config.js';
 import { getSettings } from './store.js';
@@ -406,8 +406,9 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
       if (!text) return;
       await channel.typing?.(msg.chat);
       const ctx = {
-        agent, role, chat: msg.chat, senderName: msg.senderName, requester: msg.phone,
-        // 057: the sender's group member tag (chats that are on only); agents get profile names, never address-book names
+        // #113: the name the owner knows them by (phone contact name unless switched off on the Contacts page)
+        agent, role, chat: msg.chat, senderName: agentName({ phone: msg.phone, jid: msg.senderJid, fallbackName: msg.senderName }) || msg.senderName, requester: msg.phone,
+        // 057: the sender's group member tag (chats that are on only)
         senderTag: msg.isGroup ? memberTag(msg.chat, { phone: msg.phone, jid: msg.senderJid }) : '',
         text, isGroup: msg.isGroup, source: msg.channel, msgRowId: rowId, msgId: msg.msgId, senderJid: msg.senderJid,
         chatName: msg.isGroup ? await channel.chatName?.(msg.chat) : '',
