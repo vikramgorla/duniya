@@ -1,5 +1,11 @@
 <!--
-Sync Impact Report (1.4.1 → 1.4.2, PATCH)
+Sync Impact Report (1.4.2 → 1.4.3, PATCH)
+- Principle IX clarified: "Lean code" (#115). Delete what a change replaces; no compatibility layers or one-time
+  migrations after the release that needed them; one way to do each thing; knip, jscpd and the panel size budget run
+  in CI; tests check behaviour; the panel adds no polling (live data over server-sent events). Templates: plan, tasks
+  and checklist templates (both copies) got the matching item; AGENTS.md Definition of Done has it. Follow-up: none.
+
+Previous (1.4.1 → 1.4.2, PATCH)
 - Principle VIII clarified: "No chores for the owner" (#110). Anything the server can do or retry itself happens
   automatically; buttons are optional extras, never required steps; if something needs the owner, say exactly why.
   Background work rides on one shared tick, not new timers. Templates: tasks and checklist templates (both copies)
@@ -125,7 +131,9 @@ progress and done comments; Spec Kit artifacts for features; tests with fakes; `
 impact considered; **documentation updated in the same change** — `docs/`, `README.md`, the website `docs/site/`
 (with screenshots and videos retaken from the demo panel when the UI changed), `mobile/README.md`, admin MCP tools and
 `DESIGN.md` where relevant; and the version bumped in `package.json`, `package-lock.json` and
-`infra/oci/schema.yaml` (semver). Plans MUST list these as final tasks; the Spec Kit templates do so.
+`infra/oci/schema.yaml` (semver). Code MUST stay lean: what a change replaces is deleted in the same change, no
+compatibility layer or one-time migration outlives the release that needed it, and `knip`, `jscpd` and the panel size
+budget pass in CI. Plans MUST list these as final tasks; the Spec Kit templates do so.
 
 *Rationale*: features that are not documented, shown or versioned are invisible to the owners, and rules that live
 in one harness's file are missed by every other agent.
@@ -181,4 +189,4 @@ principle removed or redefined; MINOR: principle or section added or materially 
 clarification), and reviewed in a pull request. Reviewers verify constitution compliance for every
 change.
 
-**Version**: 1.4.2 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-15
+**Version**: 1.4.3 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-16

@@ -40,7 +40,7 @@ function guardLocal(user, before, after) {
   }
 }
 import {
-  CSP, clientIp, isHttps, cookie, send, setSessionCookie, limiter, uploadAllowed, setSetupCode, checkSetupCode,
+  CSP, clientIp, isHttps, cookie, send, staticFile, setSessionCookie, limiter, uploadAllowed, setSetupCode, checkSetupCode,
 } from './http.js';
 import { googleRoutes, googleReady } from './routes/google.js';
 import { webRoutes } from './routes/web.js';
@@ -103,7 +103,9 @@ async function readBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 const PKG_VERSION = (() => { try { return `v${JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')).version}`; } catch { return ''; } })();
-const gitVersion = () => new Promise((r) => execFile('git', ['log', '-1', '--format=%h'], { cwd: ROOT }, (e, out) => r([PKG_VERSION, e ? '' : out.trim()].filter(Boolean).join(' · ') || 'unknown')));
+// The running version cannot change without a restart: ask git once, not on every status (058).
+let versionOnce = null;
+const gitVersion = () => (versionOnce ||= new Promise((r) => execFile('git', ['log', '-1', '--format=%h'], { cwd: ROOT }, (e, out) => r([PKG_VERSION, e ? '' : out.trim()].filter(Boolean).join(' · ') || 'unknown'))));
 const loginLimit = limiter(5);
 const rateLimitLogin = (ip) => loginLimit(ip);
 
@@ -192,7 +194,7 @@ export function startPanel({ channel, extend = [] }) {
   }, { role: 'owner' });
 
   // ---------- overview ----------
-  route('GET', '/api/status', async (req, res, body, q, p, user) => ({
+  const statusFor = async (user) => ({
     user, enabledChats: enabledChats().length,
     channel: await channel.status(),
     settings: getSettings(),
@@ -206,7 +208,8 @@ export function startPanel({ channel, extend = [] }) {
     pending: listPending().length,
     // #96: Server tab badge — only updates that will install now (from the last check; never runs apt here)
     osUpdates: ['admin', 'owner'].includes(user?.role) ? { ...(osUpdatesCached() || { count: 0, security: 0, at: null }), restart: rebootStatus().required } : null,
-  }));
+  });
+  route('GET', '/api/status', async (req, res, body, q, p, user) => statusFor(user));
   // 055: Small server mode — one server-wide switch for heavier features on a small server (owner only).
   route('GET', '/api/server/small-mode', async () => smallModeView());
   route('PUT', '/api/server/small-mode', async (req, res, body, q, p, user) => {
@@ -227,14 +230,30 @@ export function startPanel({ channel, extend = [] }) {
 
   // ---------- activity ----------
   route('GET', '/api/activity', async (req, res, body, q) => listActivity({ limit: q.get('limit'), agent: q.get('agent') || '', chat: q.get('chat') || '', before: Number(q.get('before') || 0) }));
-  route('GET', '/api/events', async (req, res) => {
+  // Live panel (058): activity entries as plain messages, and the status (what GET /api/status returns) as `status`
+  // events: shortly after anything changed (activity or a channel state change such as a new QR) and with the
+  // keep-alive every 25 s (uptime, memory). Unchanged status is not sent again, except with the keep-alive.
+  route('GET', '/api/events', async (req, res, body, q, p, user) => {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive', 'x-accel-buffering': 'no' });
     res.write('retry: 3000\n\n');
-    const onAct = (a) => res.write(`data: ${JSON.stringify(a)}\n\n`);
-    const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+    let last = ''; let soon = null; let closed = false;
+    const pushStatus = async (always) => {
+      soon = null;
+      const st = await statusFor(user).catch(() => null);
+      if (!st || closed) return;
+      const { uptimeSec, memoryMb, ...rest } = st;
+      const sig = JSON.stringify(rest);
+      if (!always && sig === last) return;
+      last = sig;
+      res.write(`event: status\ndata: ${JSON.stringify(st)}\n\n`);
+    };
+    const changed = () => { if (!soon) soon = setTimeout(pushStatus, 250); };
+    const onAct = (a) => { res.write(`data: ${JSON.stringify(a)}\n\n`); changed(); };
+    const ping = setInterval(() => pushStatus(true), 25000);
     bus.on('activity', onAct);
-    req.on('close', () => { bus.off('activity', onAct); clearInterval(ping); });
-    return null;
+    bus.on('status', changed);
+    req.on('close', () => { closed = true; bus.off('activity', onAct); bus.off('status', changed); clearInterval(ping); clearTimeout(soon); });
+    return null; // the panel loads the status itself when it opens or reconnects the stream
   });
 
   // ---------- agents ----------
@@ -736,11 +755,15 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
   setOwnerToolRunner({ invoke, routeRole, tools: ADMIN_TOOLS }); // the owner assistant runs the same tools in-process (044)
   adminMcp.panelRoutes(route);
 
+  // The static panel shell and its scripts: from memory, compressed, ETag/304 (058).
+  const scripts = Object.fromEntries(['qr.js', 'diff.js'].map((f) => [`/${f}`, staticFile(readFileSync(resolve(PUBLIC, f)), { 'content-type': 'text/javascript; charset=utf-8' })]));
+  const shellHtml = readFileSync(resolve(PUBLIC, 'index.html'), 'utf8').replace(/<script src="(\/[a-z]+\.js)"><\/script>/g, (m, f) => (scripts[f] ? `<script src="${f}?v=${scripts[f].version}"></script>` : m));
+  const shell = staticFile(Buffer.from(shellHtml), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     try {
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-        return send(res, 200, readFileSync(resolve(PUBLIC, 'index.html')), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
+        return shell(req, res);
       }
       if (url.pathname === '/healthz') return send(res, 200, 'ok');
       // 036: domain reachability proof + Caddy's on-demand TLS "ask" (public, answers only one-time tokens).
@@ -748,9 +771,7 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
         const r = domainCheckResponse(url, req);
         return send(res, r.status, r.body, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
       }
-      if (req.method === 'GET' && (url.pathname === '/qr.js' || url.pathname === '/diff.js')) {
-        return send(res, 200, readFileSync(resolve(PUBLIC, url.pathname.slice(1))), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=3600' });
-      }
+      if (req.method === 'GET' && Object.hasOwn(scripts, url.pathname)) return scripts[url.pathname](req, res, url);
       if (await adminMcp.handle(req, res, url)) return;
       const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));
       if (!r) return send(res, 404, { error: 'Not found' });

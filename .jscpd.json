@@ -1,0 +1,10 @@
+{
+  "minLines": 8,
+  "format": ["javascript"],
+  "path": ["src", "bin", "scripts", "deploy", "test"],
+  "ignore": ["**/node_modules/**", "src/panel/public/**"],
+  "threshold": 0.5,
+  "reporters": ["console"],
+  "absolute": false,
+  "gitignore": true
+}

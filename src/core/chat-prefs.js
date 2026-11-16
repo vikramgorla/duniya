@@ -1,38 +1,31 @@
 // Per-chat preferences (013/011): model choice and activity logging level for a single chat (group or person).
 // The agent a chat talks to stays in the agent's `chats` list (one source of truth for bindings).
 import { db } from './db.js';
-import { cleanOverride } from './providers/fallback-config.js';
+import { cleanOverride, REF_RE } from './providers/fallback-config.js';
 
 const TENANT = 'default';
 db.exec(`
   CREATE TABLE IF NOT EXISTS chat_prefs (
     tenant_id TEXT NOT NULL, chat TEXT NOT NULL, model TEXT NOT NULL DEFAULT 'inherit', logging TEXT NOT NULL DEFAULT 'inherit',
-    enabled INTEGER NOT NULL DEFAULT 0, updated_at INTEGER, PRIMARY KEY (tenant_id, chat)
+    enabled INTEGER NOT NULL DEFAULT 0, updated_at INTEGER, fallback TEXT NOT NULL DEFAULT '',
+    private INTEGER NOT NULL DEFAULT 0, notice_off INTEGER NOT NULL DEFAULT 0, welcome TEXT NOT NULL DEFAULT 'inherit',
+    PRIMARY KEY (tenant_id, chat)
   );
   CREATE TABLE IF NOT EXISTS chats_seen (
     tenant_id TEXT NOT NULL, chat TEXT NOT NULL, number TEXT NOT NULL DEFAULT 'main', is_group INTEGER NOT NULL,
-    name TEXT, phone TEXT, last_at INTEGER, PRIMARY KEY (tenant_id, chat)
+    name TEXT, phone TEXT, last_at INTEGER, last_msg_id TEXT, last_from_me INTEGER, last_participant TEXT, last_msg_at INTEGER,
+    PRIMARY KEY (tenant_id, chat)
   );
 `);
-// 042: per-chat fallback override (JSON { mode, chain }). Added in place so an update keeps chat settings.
-if (!db.prepare('PRAGMA table_info(chat_prefs)').all().some((c) => c.name === 'fallback')) db.exec("ALTER TABLE chat_prefs ADD COLUMN fallback TEXT NOT NULL DEFAULT ''");
-// 044: "private to members" (hidden from the owner assistant's cross-chat tools and the Ask box) and the per-chat
-// privacy-notice opt-out.
-for (const col of ['private', 'notice_off']) {
-  if (!db.prepare('PRAGMA table_info(chat_prefs)').all().some((c) => c.name === col)) db.exec(`ALTER TABLE chat_prefs ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`);
-}
-// #91: the newest message key and time per chat (any chat, also chats that are off): what WhatsApp needs to send
-// earlier messages on demand once a chat is switched on. Never message text or sender names.
-for (const [col, type] of [['last_msg_id', 'TEXT'], ['last_from_me', 'INTEGER'], ['last_participant', 'TEXT'], ['last_msg_at', 'INTEGER']]) {
-  if (!db.prepare('PRAGMA table_info(chats_seen)').all().some((c) => c.name === col)) db.exec(`ALTER TABLE chats_seen ADD COLUMN ${col} ${type}`);
-}
-// 054: per-chat "Welcome new members" override: inherit (the agent's setting) | on | off.
-if (!db.prepare('PRAGMA table_info(chat_prefs)').all().some((c) => c.name === 'welcome')) db.exec("ALTER TABLE chat_prefs ADD COLUMN welcome TEXT NOT NULL DEFAULT 'inherit'");
+// chat_prefs: fallback = per-chat fallback override (JSON { mode, chain }, 042); private = hidden from the owner
+// assistant's cross-chat tools and the Ask box, notice_off = privacy-notice opt-out (044); welcome = "Welcome new
+// members" override inherit | on | off (054). chats_seen.last_*: the newest message key and time per chat (any chat,
+// also chats that are off): what WhatsApp needs to send earlier messages on demand (#91). Never text or names.
 export const WELCOME_MODES = ['inherit', 'on', 'off'];
 const parseFallback = (v) => { try { return v ? cleanOverride(JSON.parse(v)) : { mode: 'inherit', chain: [] }; } catch { return { mode: 'inherit', chain: [] }; } };
 
 export const LOGGING_LEVELS = ['inherit', 'off', 'minimal', 'normal', 'verbose'];
-const MODEL_RE = /^(inherit|auto|[a-z][a-z0-9-]{1,30}:[A-Za-z0-9._:/@+-]{1,120})$/;
+const validModel = (v) => v === 'inherit' || v === 'auto' || REF_RE.test(v);
 
 // 032 (issue #10): chats are OFF until an admin switches them on. Messages from chats that are off are never stored
 // or sent to a model (chat_prefs.enabled).
@@ -51,7 +44,7 @@ export function setChatPrefs(chat, { model, logging, enabled, fallback, private:
     fallback: fallback === undefined ? cur.fallback : cleanOverride(fallback, 'fallback'),
     private: priv === undefined ? cur.private : !!priv, noticeOff: noticeOff === undefined ? cur.noticeOff : !!noticeOff,
     welcome: welcome ?? cur.welcome };
-  if (!MODEL_RE.test(next.model)) throw Object.assign(new Error('model must be inherit, auto, provider:auto or provider:model'), { status: 400, field: 'model' });
+  if (!validModel(next.model)) throw Object.assign(new Error('model must be inherit, auto, provider:auto or provider:model'), { status: 400, field: 'model' });
   if (!WELCOME_MODES.includes(next.welcome)) throw Object.assign(new Error('welcome must be inherit, on or off'), { status: 400, field: 'welcome' });
   if (!LOGGING_LEVELS.includes(next.logging)) throw Object.assign(new Error(`logging must be one of ${LOGGING_LEVELS.join(', ')}`), { status: 400, field: 'logging' });
   const fb = next.fallback.mode === 'inherit' && !next.fallback.chain.length ? '' : JSON.stringify(next.fallback);

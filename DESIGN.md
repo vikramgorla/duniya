@@ -18,7 +18,7 @@ add or change UI, check it against the principles and the checklist at the end.
    ("Advanced", "More", "Update settings"). Logs and raw output are collapsible.
 5. **Safe by design.** Destructive or disruptive actions are red outline buttons and always confirm in plain words
    with the consequence ("Agents are offline for 1–2 minutes"). Owner-only actions are hidden or explained for others.
-6. **Stable screens.** Nothing flickers: periodic refreshes update values in place and only redraw when something
+6. **Stable screens.** Nothing flickers: live updates (server-sent events, no polling) update values in place and only redraw when something
    visible changed; inputs being typed in are never replaced.
 7. **Works on a phone and an iPad.** Down to 375 px wide (iPhone SE; iPhone 15 is 393 px): touch targets ≥ 40 px
    and text ≥ 13 px on phones, no page wider than the screen (only the tab bar, code and `.tscroll` boxes scroll
@@ -92,4 +92,4 @@ user-written text with a live *Preview* filled with sample values; rows stack on
 - [ ] Destructive actions confirm with the consequence.
 - [ ] Looks right in light and dark mode, on a phone and an iPad; `npm run check:responsive` passes (375 / 393 /
   1440 px).
-- [ ] No flicker on the 5-second refresh.
+- [ ] No flicker when live updates arrive (status and activity over `/api/events`); no new polling.

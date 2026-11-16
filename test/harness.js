@@ -96,6 +96,35 @@ async function sendChatStream(req, res, message, { usage, includeUsage, fail }) 
 }
 
 /**
+ * A channel-registry factory of fake WhatsApp numbers: each session lands in `sessions[number]` with the texts it sent.
+ * `extra(session)` overrides or adds channel methods.
+ */
+export const fakeNumbers = (sessions, extra = () => ({})) => ({ number, label }) => {
+  const s = { number, label, handler: null, sent: [] };
+  sessions[number] = s;
+  return {
+    number, label, async start(h) { s.handler = h; },
+    async send(jid, text) { s.sent.push({ jid, text }); return { msgId: `o-${number}-${s.sent.length}` }; },
+    async typing() {}, async chatName() { return ''; }, async listChats() { return []; }, async isMember() { return false; },
+    async status() { return { status: 'open', me: '41790000099:1@s.whatsapp.net', since: 1 }; },
+    ...extra(s),
+  };
+};
+
+/**
+ * Answer one MCP request (streamable HTTP, JSON responses) with a fresh fake server: `tools` are names,
+ * `call(name)` returns the text result. For tests that host MCP next to their own OAuth endpoints.
+ */
+export async function serveFakeMcp(req, res, raw, { name = 'fake', tools = [], call = () => 'ok' } = {}) {
+  const s = new Server({ name, version: '1' }, { capabilities: { tools: {} } });
+  s.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools.map((n) => ({ name: n, description: n, inputSchema: { type: 'object', properties: {} } })) }));
+  s.setRequestHandler(CallToolRequestSchema, async (r) => ({ content: [{ type: 'text', text: call(r.params.name) }] }));
+  const tr = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+  await s.connect(tr);
+  return tr.handleRequest(req, res, raw ? JSON.parse(raw) : undefined);
+}
+
+/**
  * A fake OpenAI-compatible provider. Every request is recorded with its key; `fail[key]` holds failures for that key
  * (or `fail['*']` for any key), shifted one per chat request; `script` holds assistant replies (Chat Completions
  * `message` objects), shifted per successful chat request; otherwise it answers "<name> (<key>) says hi".
@@ -280,13 +309,13 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
     t.store.setSecret('PANDUGA_MCP_URL', `http://127.0.0.1:${t.mcpHttp.address().port}/mcp`);
     t.store.setSecret('PANDUGA_TOKEN_ORGANIZER', 'org');
     await t.agents.createAgent({ id: 'panduga', config: {
-      ...JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures/panduga-agent.json'), 'utf8')), name: 'Panduga', model: 'claude-sonnet-5-5',
+      ...JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures/panduga-agent.json'), 'utf8')), name: 'Panduga', model: 'anthropic:claude-sonnet-5-5',
       // token-based service (OAuth sign-in has its own test, mcp-oauth.test.js)
       mcpServers: { panduga: { url: '${PANDUGA_MCP_URL}', tokens: { organizer: '${PANDUGA_TOKEN_ORGANIZER}', participant: '${PANDUGA_TOKEN_MEMBER}' } } },
       chats: ['g1@g.us'], organizers: ['+41 79 000 00 01'], ...(bindings.panduga || {}),
     } });
     await t.agents.createAgent({ id: 'helper', config: {
-      name: 'Helper', prompt: 'You help.', model: 'claude-sonnet-5-5', triggers: ['!help'], dm: 'organizers',
+      name: 'Helper', prompt: 'You help.', model: 'anthropic:claude-sonnet-5-5', triggers: ['!help'], dm: 'organizers',
       chats: ['g2@g.us'], organizers: ['41790000001'], ...(bindings.helper || {}),
     } });
   }

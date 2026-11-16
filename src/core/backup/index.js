@@ -58,7 +58,7 @@ export const githubClientId = () => getBackupSettings().githubClientId || proces
 export const APP_KEY_SECRET = 'GITHUB_APP_PRIVATE_KEY';
 let instToken = null; // { installationId, token, expiresAt }
 /** An installation token for the backup GitHub App, refreshed 5 minutes before it expires. */
-export async function appInstallationToken() {
+async function appInstallationToken() {
   const app = getBackupSettings().githubApp;
   const pem = getSecret(APP_KEY_SECRET);
   if (!app?.installationId || !pem) throw Object.assign(new Error('The GitHub app is not installed yet'), { status: 400 });
@@ -69,7 +69,7 @@ export async function appInstallationToken() {
 }
 export const resetAppToken = () => { instToken = null; };
 /** How backups reach GitHub: the installed GitHub App when there is one, else the saved token (or null). */
-export function githubAuth() {
+function githubAuth() {
   if (getBackupSettings().githubApp?.installationId && getSecret(APP_KEY_SECRET)) return appInstallationToken;
   return getSecret('GITHUB_BACKUP_TOKEN') || null;
 }

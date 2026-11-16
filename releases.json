@@ -1,6 +1,11 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.19.1": {
+      "breaking": false,
+      "title": "Faster panel (compressed page, live status instead of polling, quicker screen switches) and a leaner code base",
+      "summary": "The panel page is sent compressed and cached, the status arrives live instead of every 5 seconds, and switching screens reuses what was just loaded. Old upgrade code from earlier versions was removed: agent models must be named with their account (auto or account:model), as the panel always does."
+    },
     "2.19.0": {
       "breaking": false,
       "title": "Agents use the names from your phone contacts (profile names are often incomplete); owner can switch this off on the Contacts page"

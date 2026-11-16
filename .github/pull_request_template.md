@@ -22,6 +22,11 @@ Tick each item or write "n/a – reason".
 **Small servers**
 - [ ] Impact on a 1 GB / 1 vCPU VM considered (memory, CPU, downloads, queue/timeouts)
 
+**Lean code**
+- [ ] What the change replaces is deleted; no compatibility layer or one-time migration left after its release; existing helpers reused
+- [ ] `node scripts/ci-checks.mjs` passes (knip, jscpd, panel size budget); tests check behaviour, not internals
+- [ ] UI: no new polling (live data over `/api/events`)
+
 **Docs**
 - [ ] `docs/` pages (+ `docs/README.md` index)
 - [ ] `README.md` highlights

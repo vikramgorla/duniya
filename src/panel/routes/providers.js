@@ -5,8 +5,8 @@ import { status, allModels, addCompatible, removeCompatible, clearModelCache, re
 import * as breaker from '../../core/providers/breaker.js';
 import * as chatgpt from '../../core/providers/chatgpt.js';
 import * as copilot from '../../core/providers/copilot.js';
-import { setSecret, getSecret } from '../../core/store.js';
-import { getSettings, updateSettings } from '../../core/store.js';
+import { setSecret, getSecret, getSettings, updateSettings } from '../../core/store.js';
+import { REF_RE } from '../../core/providers/fallback-config.js';
 import { activity } from '../../core/events.js';
 
 export function providerRoutes(route) {
@@ -168,7 +168,7 @@ export function providerRoutes(route) {
     for (const k of ['defaultModel', 'backgroundModel']) {
       if (k in body) {
         const v = String(body[k] || 'auto');
-        if (v !== 'auto' && !/^[a-z][a-z0-9-]*:.+$/.test(v)) return [400, { error: `${k} must be "auto" or provider:model`, field: k }];
+        if (v !== 'auto' && !REF_RE.test(v)) return [400, { error: `${k} must be "auto" or provider:model`, field: k }];
         patch[k] = v;
       }
     }

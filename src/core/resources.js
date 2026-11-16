@@ -100,19 +100,10 @@ export const SMALL_MODE_HEADROOM_MB = 150; // free memory kept beyond what the e
 // ---------- Small server mode (055): one server-wide switch ----------
 /**
  * Owner's opt-in (Settings → Server → Small server mode) to allow heavier features on a small server anyway: on-server
- * speech and local tool services, each with its own extra guards. One setting for every path. Before 2.17 the switch
- * lived in Settings → Photos & voice (media.local.smallServer); that value is still read until the new one is saved.
+ * speech and local tool services, each with its own extra guards. One setting for every path.
  */
 export const SMALL_MODE_HINT = 'or switch on Small server mode in Settings → Server';
-export function smallServerMode() {
-  try {
-    const v = getSetting('smallServerMode', null);
-    if (v !== null) return !!v;
-    const old = !!getSetting('media', {})?.local?.smallServer; // carried over once from the Photos & voice switch
-    updateSettings({ smallServerMode: old });
-    return old;
-  } catch { return false; }
-}
+export const smallServerMode = () => { try { return !!getSetting('smallServerMode', false); } catch { return false; } };
 export const setSmallServerMode = (on) => updateSettings({ smallServerMode: !!on }).smallServerMode;
 /**
  * The shared small-server gate: { ok, small, mode, code, reason }. Not small → ok. Small → ok only with Small server

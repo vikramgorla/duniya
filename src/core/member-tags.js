@@ -6,9 +6,8 @@
 import { db } from './db.js';
 import { digits } from './config.js';
 import { isChatEnabled } from './chat-prefs.js';
-import { mapLid } from './contacts.js';
+import { mapLid, bareJid as bare } from './contacts.js';
 
-const bare = (j) => { const s = String(j || ''); const at = s.indexOf('@'); return at < 0 ? '' : `${s.slice(0, at).split(':')[0]}${s.slice(at)}`; };
 const up = db.prepare(`INSERT INTO member_tags (chat, member, phone, label, ts) VALUES (?, ?, ?, ?, ?)
   ON CONFLICT (chat, member) DO UPDATE SET label = excluded.label, ts = excluded.ts, phone = COALESCE(NULLIF(excluded.phone, ''), member_tags.phone)
   WHERE excluded.ts >= member_tags.ts`);

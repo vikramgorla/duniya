@@ -6,7 +6,7 @@ import { activity } from './events.js';
 import { oidcDiscovery, verifyIdToken } from './providers/jwt.js';
 import { sha256 } from './crypto.js';
 
-export const GOOGLE_SECRET = 'GOOGLE_CLIENT_SECRET';
+const GOOGLE_SECRET = 'GOOGLE_CLIENT_SECRET';
 const ISSUER = () => (process.env.GOOGLE_OIDC_ISSUER || 'https://accounts.google.com').replace(/\/+$/, '');
 const CLIENT_ID_RE = /^[\w.-]{6,120}\.apps\.googleusercontent\.com$/;
 const PENDING_TTL = 10 * 60 * 1000;

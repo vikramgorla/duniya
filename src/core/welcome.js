@@ -12,6 +12,7 @@ import { activity } from './events.js';
 import { countStat } from './stats.js';
 import { recordUsage } from './usage.js';
 import { fillPlaceholders, todayText, DEFAULT_WELCOME } from './quick.js';
+import { isGroup } from './config.js';
 
 db.exec(`CREATE TABLE IF NOT EXISTS welcome_seen (tenant_id TEXT NOT NULL, key TEXT NOT NULL, ts INTEGER NOT NULL, PRIMARY KEY (tenant_id, key))`);
 
@@ -20,18 +21,17 @@ const MAX_NAMED = 20;
 const delayMs = () => Number(process.env.WELCOME_DELAY_MS ?? 5000); // collect joins that arrive together
 const gapMs = () => Number(process.env.WELCOME_GAP_MS ?? 60000); // at most one welcome per chat in this time
 
-const isGroup = (chat) => String(chat).endsWith('@g.us');
 const keyOf = (chat, p) => sha256(`${chat}|${p.phone || p.jid}`);
 const seen = (key) => !!db.prepare('SELECT 1 FROM welcome_seen WHERE tenant_id = ? AND key = ?').get(TENANT, key);
 
 /** Is the welcome on for this chat? The chat's override (on / off) wins over the agent's setting. */
-export function welcomeOn(agent, chat) {
+function welcomeOn(agent, chat) {
   const mode = getChatPrefs(chat).welcome;
   return mode === 'on' ? true : mode === 'off' ? false : !!agent?.welcome?.enabled;
 }
 
 /** Would a join in this chat be welcomed now? { ok, reason, agent }. */
-export function welcomeDecision(chat) {
+function welcomeDecision(chat) {
   if (!isGroup(chat)) return { ok: false, reason: 'not a group' };
   if (!getChatPrefs(chat).enabled) return { ok: false, reason: 'chat is off' };
   const agent = agentForChat(chat);
@@ -43,7 +43,7 @@ export function welcomeDecision(chat) {
 }
 
 /** The welcome text for these people: {name} = their @mentions, {group}, {rules}, {date}. */
-export function welcomeText(agent, people, { group = '', now = Date.now() } = {}) {
+function welcomeText(agent, people, { group = '', now = Date.now() } = {}) {
   const tags = people.slice(0, MAX_NAMED).map((p) => `@${String(p.jid).split('@')[0].split(':')[0]}`);
   const extra = people.length - tags.length;
   const names = extra > 0 ? `${tags.join(', ')} and ${extra} other${extra === 1 ? '' : 's'}`
@@ -101,9 +101,4 @@ async function flush(channel, chat) {
   countStat('reply', { agent: agent.id });
   recordUsage({ agent: agent.id, chat, provider: 'built-in', model: 'welcome', kind: 'welcome', cost: 0, priced: 'free' });
   activity('message.out', { agent: agent.id, chat, summary: `Welcome posted for ${people.length} new member${people.length === 1 ? '' : 's'}` });
-}
-
-/** Tests: send queued welcomes now. */
-export async function flushWelcomes(channel) {
-  for (const [chat, e] of [...pending]) { clearTimeout(e.timer); await flush(channel, chat); }
 }

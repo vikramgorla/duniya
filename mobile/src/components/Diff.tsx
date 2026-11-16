@@ -37,7 +37,7 @@ function Folded({ lines }: { lines: ViewLine[] }) {
 }
 
 /** Word diff of a text field; for long instructions a switch: Changes / Before / After (whole texts). */
-export function TextDiffView({ diff, switcher }: { diff: TextDiff; switcher: boolean }) {
+function TextDiffView({ diff, switcher }: { diff: TextDiff; switcher: boolean }) {
   const [view, setView] = useState<TextView>('changes');
   const blocks = textBlocks(diff, view === 'after' ? 'whole' : view, { context: view === 'changes' ? 2 : 1e9 });
   return (
@@ -71,7 +71,7 @@ function Chips({ title, items, kind }: { title: string; items: string[]; kind: '
   );
 }
 /** "Before → after" in one line, both sides marked. */
-export function Arrow({ before, after, what }: { before: string; after: string; what?: string }) {
+function Arrow({ before, after, what }: { before: string; after: string; what?: string }) {
   const t = useTheme();
   return (
     <Text style={{ color: t.ink, fontSize: 14, lineHeight: 21 }}>

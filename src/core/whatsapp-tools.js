@@ -2,7 +2,7 @@
 // Role rules are code (constitution III): participants get the send/react/poll-type tools by default, organizers all;
 // powerful actions (people, group settings, block, delete) are organizer-only whatever the rules say, and are applied
 // immediately (owner decision on issue #2: no confirm code). Every action is logged as `whatsapp.action`.
-import { digits } from './config.js';
+import { digits, clip } from './config.js';
 import { tagsInChat, memberTag } from './member-tags.js';
 import {
   logMessage, messageByMsgId, lastAgentMessage, setMessageText, searchMessages, namesInChat, getPoll, latestPoll, recentPolls, pollTally,
@@ -15,13 +15,12 @@ export const setWhatsAppChannel = (ch) => { channel = ch; };
 export const whatsappChannel = () => channel;
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
-const clip = (s, n = 120) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
 const jidOf = (chat) => { const i = String(chat).indexOf('#'); return i > 0 ? chat.slice(i + 1) : String(chat); };
 export const isGroupChat = (chat) => jidOf(chat).endsWith('@g.us');
 const isWhatsAppChat = (chat) => /@(g\.us|s\.whatsapp\.net|lid)$/.test(jidOf(chat || ''));
 
-export const WHATSAPP_PARTICIPANT_DEFAULT = ['send_media', 'send_location', 'react', 'reply', 'create_poll', 'poll_results', 'group_info', 'profile_info'];
-export const WHATSAPP_DEFAULT_ALLOW = {
+const WHATSAPP_PARTICIPANT_DEFAULT = ['send_media', 'send_location', 'react', 'reply', 'create_poll', 'poll_results', 'group_info', 'profile_info'];
+const WHATSAPP_DEFAULT_ALLOW = {
   organizer: ['whatsapp:*'],
   participant: WHATSAPP_PARTICIPANT_DEFAULT.map((n) => `whatsapp:${n}`),
 };
@@ -333,7 +332,6 @@ export const whatsappTools = DEFS.map((d) => ({
     }
   },
 }));
-export const WHATSAPP_TOOL_NAMES = whatsappTools.map((t) => t.name);
 /** For the agent editor: name, description, which roles may have it and the participant default. */
 export const whatsappToolCatalog = () => whatsappTools.map((t) => ({ name: t.name, description: t.description, organizerOnly: !t.roles.includes('participant'),
   participantDefault: WHATSAPP_PARTICIPANT_DEFAULT.includes(t.name) }));

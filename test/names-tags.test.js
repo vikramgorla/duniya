@@ -6,7 +6,6 @@ import { EventEmitter } from 'node:events';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { setup } from './harness.js';
 
 const t = await setup({ env: { NAMES_REFRESH_FIRST_MS: '0' } });
@@ -84,21 +83,6 @@ test('LID-only address-book entries wait for the mapping; raw LIDs are never sho
   // contact with both lid and phone: mapping stored right away
   c.syncWhatsAppContacts([{ id: '41790000106@s.whatsapp.net', name: 'Asha', lid: '606@lid' }]);
   assert.equal(c.lidPhone('606@lid'), '41790000106');
-});
-
-test('the old single wa_name column migrates to profile names', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'duniya-mig-'));
-  const code = `
-    import { DatabaseSync } from 'node:sqlite';
-    const d = new DatabaseSync(process.env.DATA_DIR + '/duniya.sqlite');
-    d.exec("CREATE TABLE contacts (tenant_id TEXT NOT NULL, phone TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', wa_name TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', shared INTEGER NOT NULL DEFAULT 0, own INTEGER NOT NULL DEFAULT 0, updated_at INTEGER, PRIMARY KEY (tenant_id, phone))");
-    d.exec("INSERT INTO contacts (tenant_id, phone, wa_name) VALUES ('default', '41790000301', 'Old Name')");
-    d.close();
-    const c = await import(${JSON.stringify(new URL('../src/core/contacts.js', import.meta.url).href)});
-    console.log(JSON.stringify(c.getContact('41790000301')));`;
-  const out = execFileSync(process.execPath, ['--disable-warning=ExperimentalWarning', '--input-type=module', '-e', code], { env: { ...process.env, DATA_DIR: dir }, encoding: 'utf8' });
-  const r = JSON.parse(out.trim().split('\n').pop());
-  assert.deepEqual([r.name, r.profileName, r.bookName], ['Old Name', 'Old Name', '']);
 });
 
 test('names refresh automatically on the shared tick: one snapshot of the contacts collection, then light updates', async () => {

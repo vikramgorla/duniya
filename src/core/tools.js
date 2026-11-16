@@ -10,7 +10,7 @@ import { whatsappTools, whatsappRules, whatsappChannel } from './whatsapp-tools.
 import { mediaTools, imageToolAllowed } from './media-ai.js';
 
 /** "panduga:*_preview" style globs. */
-export function globToRegex(glob) {
+function globToRegex(glob) {
   const esc = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
   return new RegExp(`^${esc}$`);
 }
@@ -79,7 +79,7 @@ function connectionFor(agent, serverKey, role) {
 }
 
 /** The allow rules of a role for one service: for a global service without explicit "<key>:" rules, its defaults. */
-export function serverAllow(srv, key, allow, role) {
+function serverAllow(srv, key, allow, role) {
   if (!srv?.global) return allow;
   const explicit = allow.filter((r) => r.startsWith(`${key}:`));
   return explicit.length ? explicit : (srv.defaults?.[role] || []).map((g) => `${key}:${g}`);
@@ -124,54 +124,30 @@ export async function toolsFor(agent, role) {
     }
   }
 
-  if (memoryEnabled(agent)) {
-    const memAllow = [...allow, ...(MEMORY_DEFAULT_ALLOW[role] || [])];
-    for (const t of memoryTools) {
-      const fq = `memory:${t.name}`;
-      if (!t.roles.includes(role) || !matchesAny(fq, memAllow) || matchesAny(fq, deny)) continue;
-      const name = exposedName('memory', t.name);
+  // Built-in tools of one kind for this role: allowed by `allowRules` (null = no allow list) and never on the deny list.
+  const addLocal = (kind, tools, allowRules) => {
+    for (const t of tools) {
+      const fq = `${kind}:${t.name}`;
+      if (!t.roles.includes(role) || (allowRules && !matchesAny(fq, allowRules)) || matchesAny(fq, deny)) continue;
+      const name = exposedName(kind, t.name);
       defs.push({ name, description: t.description, input_schema: t.input_schema });
       meta.set(name, { kind: 'local', fq, tool: t });
     }
-  }
+  };
+
+  if (memoryEnabled(agent)) addLocal('memory', memoryTools, [...allow, ...(MEMORY_DEFAULT_ALLOW[role] || [])]);
 
   // Contacts (#11): every agent can look people up; the role's explicit contacts: rules win over the defaults.
-  {
-    const explicit = allow.filter((r) => r.startsWith('contacts:'));
-    const cAllow = explicit.length ? explicit : CONTACTS_DEFAULT_ALLOW[role] || [];
-    for (const t of contactsTools) {
-      const fq = `contacts:${t.name}`;
-      if (!t.roles.includes(role) || !matchesAny(fq, cAllow) || matchesAny(fq, deny)) continue;
-      const name = exposedName('contacts', t.name);
-      defs.push({ name, description: t.description, input_schema: t.input_schema });
-      meta.set(name, { kind: 'local', fq, tool: t });
-    }
-  }
+  const contactRules = allow.filter((r) => r.startsWith('contacts:'));
+  addLocal('contacts', contactsTools, contactRules.length ? contactRules : CONTACTS_DEFAULT_ALLOW[role] || []);
 
   // WhatsApp actions (026): role defaults unless the role has explicit whatsapp: rules; organizer-only tools never
   // reach participants (t.roles), and the deny list always wins.
-  if (whatsappChannel()) {
-    const waAllow = whatsappRules(agent, role);
-    for (const t of whatsappTools) {
-      const fq = `whatsapp:${t.name}`;
-      if (!t.roles.includes(role) || !matchesAny(fq, waAllow) || matchesAny(fq, deny)) continue;
-      const name = exposedName('whatsapp', t.name);
-      defs.push({ name, description: t.description, input_schema: t.input_schema });
-      meta.set(name, { kind: 'local', fq, tool: t });
-    }
-  }
+  if (whatsappChannel()) addLocal('whatsapp', whatsappTools, whatsappRules(agent, role));
 
   // Photos & voice (043): create_image only when a connected provider can make pictures and the agent allows it for
   // this role (organizers on, participants off by default); the deny list always wins.
-  if (whatsappChannel() && await imageToolAllowed(agent, role).catch(() => false)) {
-    for (const t of mediaTools) {
-      const fq = `media:${t.name}`;
-      if (!t.roles.includes(role) || matchesAny(fq, deny)) continue;
-      const name = exposedName('media', t.name);
-      defs.push({ name, description: t.description, input_schema: t.input_schema });
-      meta.set(name, { kind: 'local', fq, tool: t });
-    }
-  }
+  if (whatsappChannel() && await imageToolAllowed(agent, role).catch(() => false)) addLocal('media', mediaTools, null);
 
   async function run(name, input, ctx) {
     const m = meta.get(name);

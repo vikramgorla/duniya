@@ -8,6 +8,7 @@ import { getChatPrefs, setChatPrefs } from './chat-prefs.js';
 import { agentForChat } from './agents.js';
 import { activity } from './events.js';
 import { sha256 } from './crypto.js';
+import { bad, isGroup } from './config.js';
 
 export const DEFAULT_GROUP_TEXT = 'Messages in this group are stored so the assistant has context. The group\'s organiser can review them. Ask an organiser if you have questions.';
 export const DEFAULT_DM_TEXT = 'Messages in this chat are stored so the assistant has context. The organiser can review them.';
@@ -32,7 +33,6 @@ export function noticeSettings() {
     dmText: String(s.dmText || '').trim() || DEFAULT_DM_TEXT,
   };
 }
-const bad = (message, field) => Object.assign(new Error(message), { status: 400, field });
 export function setNoticeSettings({ enabled, text, dmFirstReply, dmText } = {}, by = '') {
   const cur = noticeSettings();
   const clean = (v, field) => {
@@ -51,7 +51,6 @@ export function setNoticeSettings({ enabled, text, dmFirstReply, dmText } = {}, 
   return next;
 }
 
-const isGroup = (chat) => String(chat).endsWith('@g.us');
 const lastPost = (chat) => db.prepare('SELECT text_hash, posted_at FROM privacy_notices WHERE tenant_id = ? AND chat = ?').get(TENANT, chat) || null;
 
 /** Why the notice would (not) be posted in a chat now: { post, reason }. */

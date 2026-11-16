@@ -10,7 +10,7 @@ import { sha256 } from './crypto.js';
 import { activity } from './events.js';
 import { smallServerCheck } from './resources.js';
 
-export const LOCAL_ROOT = resolve(DATA_DIR, 'mcp-local');
+const LOCAL_ROOT = resolve(DATA_DIR, 'mcp-local');
 const NPM_SPEC_RE = /^(@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*(@[A-Za-z0-9._^~<>=*|+ -]{1,60})?$/;
 const GITHUB_SPEC_RE = /^github:[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}(#[A-Za-z0-9_./-]{1,100})?$/;
 

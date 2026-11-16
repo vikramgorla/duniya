@@ -4,10 +4,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { setup } from './harness.js';
+import { setup, serveFakeMcp } from './harness.js';
 
 const FIXTURE = `file:${resolve(import.meta.dirname, 'fixtures/tiny-mcp')}`;
 const seen = { headers: [], tokenAuth: [], registerCalls: 0 };
@@ -15,14 +12,7 @@ let BASE = '';
 const b64url = (buf) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const codes = new Map();
 
-const mcpHandler = async (req, res, raw) => {
-  const s = new Server({ name: 'hdr', version: '1' }, { capabilities: { tools: {} } });
-  s.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [{ name: 'ping_me', description: 'p', inputSchema: { type: 'object', properties: {} } }] }));
-  s.setRequestHandler(CallToolRequestSchema, async () => ({ content: [{ type: 'text', text: 'pong' }] }));
-  const tr = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  await s.connect(tr);
-  return tr.handleRequest(req, res, raw ? JSON.parse(raw) : undefined);
-};
+const mcpHandler = (req, res, raw) => serveFakeMcp(req, res, raw, { name: 'hdr', tools: ['ping_me'], call: () => 'pong' });
 
 const fake = http.createServer(async (req, res) => {
   const url = new URL(req.url, BASE);
@@ -66,7 +56,7 @@ t.store.setSecret('KEYED_API_KEY', 'k-123');
 t.store.setSecret('OWN_CLIENT_SECRET', 's3cret');
 after(() => { fake.close(); t.close(); });
 
-const base = { name: 'More', prompt: 'You help.', model: 'claude-sonnet-5-5', triggers: ['!m'], dm: 'organizers', organizers: ['41790000001'],
+const base = { name: 'More', prompt: 'You help.', model: 'anthropic:claude-sonnet-5-5', triggers: ['!m'], dm: 'organizers', organizers: ['41790000001'],
   tools: { participant: ['tiny:echo'], organizer: ['tiny:*', 'keyed:*', 'secure:*'], deny: [] } };
 const localSrv = { type: 'local', package: FIXTURE, args: ['--hello'], env: { GREETING: '${TINY_GREETING}' } };
 

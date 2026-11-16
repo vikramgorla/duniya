@@ -59,6 +59,7 @@ Always include, for this repository:
 | Security | [secrets, TLS, shell input, untrusted text, permissions in code, CodeQL] |
 | Privacy | [allow-list, logging of contents, privacy notice] |
 | Small servers | [memory / CPU / downloads on a 1 GB VM; queue, timeouts, refusal below 2 GB] |
+| Lean code | [what this replaces and deletes; helpers/resolvers reused; knip + jscpd + panel size budget; no new polling] |
 | Admin MCP | [new or changed tools in `src/panel/admin-tools.js`, or n/a] |
 | Docs | [`docs/*.md` pages, `docs/README.md`, `README.md` highlights, `mobile/README.md`, `DESIGN.md`, diagrams in `docs/diagrams/` (`npm run docs:diagrams`)] |
 | Website | [section/tile in `docs/site/index.html`; shots to retake with `npm run site:shots`] |

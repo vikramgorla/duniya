@@ -1,12 +1,12 @@
 // Panel API client core (027): OAuth token exchange, refresh with rotation, Bearer requests. Pure TypeScript with an
 // injected fetch so it can be unit-tested with node; the React side (auth.tsx) stores tokens in the secure store.
 
-export const CLIENT_ID = 'duniya-mobile';
+const CLIENT_ID = 'duniya-mobile';
 export const SCOPE = 'duniya';
 
 export interface Tokens { accessToken: string; refreshToken: string; expiresAt: number }
 export interface Session extends Tokens { server: string }
-export interface Endpoints { authorization: string; token: string; revocation?: string; clientId: string; resource: string }
+interface Endpoints { authorization: string; token: string; revocation?: string; clientId: string; resource: string }
 
 export class ApiError extends Error {
   status: number; field?: string;
@@ -50,7 +50,7 @@ async function tokenCall(server: string, body: Record<string, string>, fetchFn: 
 export function exchangeCode(server: string, { code, codeVerifier, redirectUri, clientId = CLIENT_ID }: { code: string; codeVerifier: string; redirectUri: string; clientId?: string }, fetchFn: Fetch, now = Date.now) {
   return tokenCall(server, { grant_type: 'authorization_code', client_id: clientId, code, code_verifier: codeVerifier, redirect_uri: redirectUri, resource: `${server}/api` }, fetchFn, now);
 }
-export function refreshTokens(server: string, refreshToken: string, fetchFn: Fetch, now = Date.now) {
+function refreshTokens(server: string, refreshToken: string, fetchFn: Fetch, now = Date.now) {
   return tokenCall(server, { grant_type: 'refresh_token', client_id: CLIENT_ID, refresh_token: refreshToken, resource: `${server}/api` }, fetchFn, now);
 }
 export async function revoke(server: string, token: string, fetchFn: Fetch) {

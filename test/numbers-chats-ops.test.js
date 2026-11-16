@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { setup } from './harness.js';
+import { setup, fakeNumbers } from './harness.js';
 
 const ops = mkdtempSync(join(tmpdir(), 'duniya-ops-'));
 mkdirSync(join(ops, 'req')); mkdirSync(join(ops, 'state'));
@@ -17,21 +17,14 @@ after(() => t.close());
 
 // Fake sessions for the registry: one per number.
 const sessions = {};
-const fakeFactory = ({ number, label }) => {
-  const s = { number, label, handler: null, sent: [] };
-  sessions[number] = s;
-  return {
-    number, label,
-    async start(h) { s.handler = h; },
-    async send(jid, text) { s.sent.push({ jid, text }); return { msgId: `o-${s.sent.length}` }; },
-    async typing() {}, async chatName() { return `${label} group`; },
-    async listChats() { return [{ id: `g-${number}@g.us`, name: `${label} group`, size: 3 }]; },
-    async isMember() { return false; },
-    async status() { return { status: 'open', me: `4179000${number.length}:1@s.whatsapp.net`, since: 1 }; },
-    async pair() { return 'ABCD-1234'; }, async logout() {}, async restart() {}, async remove() { s.removed = true; },
-  };
-};
-const { createChannelRegistry, splitChat, chatKey } = await import('../src/channels/registry.js');
+const fakeFactory = fakeNumbers(sessions, (s) => ({
+  async chatName() { return `${s.label} group`; },
+  async listChats() { return [{ id: `g-${s.number}@g.us`, name: `${s.label} group`, size: 3 }]; },
+  async status() { return { status: 'open', me: `4179000${s.number.length}:1@s.whatsapp.net`, since: 1 }; },
+  async pair() { return 'ABCD-1234'; }, async logout() {}, async restart() {}, async remove() { s.removed = true; },
+}));
+const { createChannelRegistry } = await import('../src/channels/registry.js');
+const { splitChat, chatKey } = await import('../src/core/direct-chats.js');
 const reg = createChannelRegistry({ factory: fakeFactory });
 const msg = (o) => ({ channel: 'whatsapp', raw: {}, isGroup: false, chat: '41790000555@s.whatsapp.net', phone: '41790000555', senderJid: 'x', senderName: 'Stranger', mentioned: false, replyToAgent: false, quoted: '', msgId: `m${Math.random()}`, ts: Date.now(), ...o });
 

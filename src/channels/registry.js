@@ -6,24 +6,18 @@ import { DATA_DIR } from '../core/config.js';
 import { getSetting, updateSettings } from '../core/store.js';
 import { activity } from '../core/events.js';
 import { noteChat } from '../core/chat-prefs.js';
-import { resolveDirectChat } from '../core/direct-chats.js';
+import { resolveDirectChat, MAIN, chatKey, splitChat } from '../core/direct-chats.js';
 import { createWhatsAppChannel } from './whatsapp.js';
 
-export const MAIN = 'main';
 const NUMBER_ID_RE = /^[a-z][a-z0-9-]{1,23}$/;
-export const chatKey = (number, jid) => (number === MAIN ? jid : `${number}#${jid}`);
-export function splitChat(chat) {
-  const i = String(chat).indexOf('#');
-  return i > 0 ? { number: chat.slice(0, i), jid: chat.slice(i + 1) } : { number: MAIN, jid: chat };
-}
 
 /** WhatsApp actions (026) that act on one chat: registry.<name>(chat, ...args) → session.<name>(jid, ...args). */
-export const CHAT_ACTIONS = ['sendMedia', 'sendLocation', 'sendContact', 'react', 'editMessage', 'deleteMessage', 'markRead', 'presence', 'sendPoll',
+const CHAT_ACTIONS = ['sendMedia', 'sendLocation', 'sendContact', 'react', 'editMessage', 'deleteMessage', 'markRead', 'presence', 'sendPoll',
   'downloadMedia', 'fetchHistory', 'groupInfo', 'groupInviteLink', 'groupRevokeInvite', 'groupParticipants', 'groupSubject', 'groupDescription', 'groupPicture', 'groupSettings', 'groupLeave'];
 /** Actions of the number itself: registry.<name>(chat, ...args) → session.<name>(...args) on the chat's number. */
-export const NUMBER_ACTIONS = ['profile', 'block', 'unblock', 'setProfileName', 'setProfileStatus'];
+const NUMBER_ACTIONS = ['profile', 'block', 'unblock', 'setProfileName', 'setProfileStatus'];
 
-export const numbersSetting = () => {
+const numbersSetting = () => {
   const list = getSetting('whatsappNumbers', null);
   return Array.isArray(list) && list.length ? list : [{ id: MAIN, label: 'Main' }];
 };

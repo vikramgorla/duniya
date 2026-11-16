@@ -8,7 +8,6 @@ db.exec(`
     PRIMARY KEY (day, kind, agent, chat)
   );
 `);
-export const STAT_KINDS = ['handled', 'reply', 'ignored', 'budget'];
 export const dayOf = (ts) => Math.floor(ts / 86400000);
 const up = db.prepare(`INSERT INTO daily_stats (day, kind, agent, chat, n) VALUES (?, ?, ?, ?, 1)
   ON CONFLICT(day, kind, agent, chat) DO UPDATE SET n = n + 1`);

@@ -1,6 +1,6 @@
 // Weekly summary to the owner on WhatsApp (041, issue #38). Counts and costs only — never message contents. Runs from
 // the scheduler at the owner's day and time (server timezone); on by default once an alert number is known.
-import { env } from './config.js';
+import { env, bad, plural } from './config.js';
 import { db, kvGet, kvSet, listPending } from './db.js';
 import { getSetting, updateSettings } from './store.js';
 import { listAgents } from './agents.js';
@@ -13,7 +13,6 @@ import { rebootStatus } from './system.js';
 
 export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DEFAULTS = { enabled: null, day: 'mon', at: '09:00' };
-const bad = (message, field) => Object.assign(new Error(message), { status: 400, field });
 
 /** { enabled (null = default), day, at, active } — active: it will actually be sent. */
 export function getWeeklySettings() {
@@ -35,7 +34,6 @@ const fmtUsd = (c) => (c === 0 ? '$0' : c < 0.01 ? '<$0.01' : `$${c < 10 ? c.toF
 const usageBetween = (from, to) => Object.fromEntries(db.prepare(`SELECT agent, SUM(cost) AS cost, SUM(input + output) AS tokens, COUNT(*) AS calls,
   SUM(CASE WHEN priced IS NULL THEN 1 ELSE 0 END) AS unpriced FROM usage WHERE ts >= ? AND ts < ? GROUP BY agent`).all(from, to).map((r) => [r.agent, r]));
 const costText = (u) => (!u?.calls ? '$0' : u.unpriced === u.calls ? 'price not set' : `${fmtUsd(u.cost || 0)}${u.unpriced ? '+' : ''}`);
-const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /** The numbers behind the summary (also returned by the API for the preview). */
 export function weeklyData(now = Date.now()) {

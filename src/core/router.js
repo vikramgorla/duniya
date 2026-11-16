@@ -2,7 +2,7 @@ import { isChatEnabled, ignoredCounts, noteLatestKeys } from './chat-prefs.js';
 import { storeLoadedBatch, setHistoryChannel, historyChatActive } from './history-load.js';
 import { personInfo, agentName } from './contacts.js';
 import { memberTag } from './member-tags.js';
-import { env } from './config.js';
+import { env, clip } from './config.js';
 import { getSettings } from './store.js';
 import { listAgents, getAgent, agentForChat, roleIn } from './agents.js';
 import { runAgent, handleConfirmCommand } from './runner.js';
@@ -168,7 +168,6 @@ export function createHistoryHandler() {
   };
 }
 
-const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
 /** 057: how the panel (Activity, why-quiet) names a sender: the one resolver, so known contacts show their name. */
 const whoOf = (msg) => personInfo({ phone: msg.phone, jid: msg.senderJid, fallbackName: msg.senderName }).label;
 

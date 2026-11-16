@@ -4,9 +4,9 @@
 export const QUICK_WHO = ['everyone', 'organizers'];
 export const FAQ_STRICTNESS = ['strict', 'normal'];
 /** Score an FAQ entry needs (0–1): strict = the whole question or every keyword; normal = most of it. */
-export const FAQ_THRESHOLD = { strict: 0.95, normal: 0.6 };
+const FAQ_THRESHOLD = { strict: 0.95, normal: 0.6 };
 /** The FAQ given to the model as reference context is capped (characters) so it stays a small part of the prompt. */
-export const FAQ_CONTEXT_MAX = 1500;
+const FAQ_CONTEXT_MAX = 1500;
 export const DEFAULT_WELCOME = 'Welcome {name} to {group}! 👋';
 
 // Small words that say nothing about the topic (English, French, German, Italian): ignored when comparing questions.
@@ -19,7 +19,7 @@ der die das ein eine einen dem den des und oder ist sind wann wo wer wie warum w
 für auf nicht bitte danke hallo il lo gli una di da che chi come quando dove perche io tu lui lei noi voi loro`.split(/\s+/));
 
 /** Lowercase, accents removed, only letters and digits (word separators collapsed to one space). */
-export function normalizeText(s) {
+function normalizeText(s) {
   return String(s ?? '').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 const contentWords = (norm) => norm.split(' ').filter((w) => w && !STOP.has(w));
@@ -50,7 +50,7 @@ function leadingWord(text) {
  * The quick reply a message asks for, or null. `texts` = the message as written and without a leading trigger
  * ("!carpool !rides"). Returns { item, allowed } — allowed is false when the command is for organizers only.
  */
-export function findQuickReply(agent, texts, role) {
+function findQuickReply(agent, texts, role) {
   const list = agent?.quickReplies || [];
   if (!list.length) return null;
   for (const t of texts) {
@@ -63,7 +63,7 @@ export function findQuickReply(agent, texts, role) {
 }
 
 /** The built-in "!help" text: the agent's quick replies this person may use and how to wake the agent. */
-export function helpText(agent, role) {
+function helpText(agent, role) {
   const cmds = (agent.quickReplies || []).filter((q) => q.who !== 'organizers' || role === 'organizer');
   const lines = [`*${agent.name}*${agent.description ? ` — ${agent.description}` : ''}`];
   if (cmds.length) lines.push('', 'Quick commands:', ...cmds.map((q) => `- ${q.command}${q.who === 'organizers' ? ' (organizers)' : ''}`));
@@ -74,7 +74,7 @@ export function helpText(agent, role) {
 }
 
 /** Score one FAQ entry for a normalised message (0–1). */
-export function faqScore(item, norm) {
+function faqScore(item, norm) {
   if (!norm) return 0;
   const words = new Set(contentWords(norm));
   let best = 0;
@@ -95,7 +95,7 @@ export function faqScore(item, norm) {
 }
 
 /** The best FAQ entry for a message, or null: { item, score }. */
-export function matchFaq(agent, text) {
+function matchFaq(agent, text) {
   const items = agent?.faq?.items || [];
   if (!items.length) return null;
   const norm = normalizeText(text);

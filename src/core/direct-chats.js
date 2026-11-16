@@ -5,7 +5,7 @@
 // prepared chat by phone (or by the LID WhatsApp told us when the chat was prepared) and keeps an alias, so replies,
 // memory and later lookups all use one chat id. Only settings are stored here, never message text.
 import { db, logMessage } from './db.js';
-import { digits } from './config.js';
+import { digits, bad } from './config.js';
 import { TENANT, getSetting } from './store.js';
 import { getAgent, bindChat, agentForChat } from './agents.js';
 import { getChatPrefs, setChatPrefs, seenChats } from './chat-prefs.js';
@@ -27,12 +27,12 @@ db.exec(`
   );
 `);
 
-const MAIN = 'main';
+/** Chat ids across numbers: chats on the first number ("main") keep their plain WhatsApp id, others are "<number>#<jid>". */
+export const MAIN = 'main';
 const INTRO_KIND = 'dm-intro';
 const INTRO_TTL = 10 * 60000;
-const bad = (message, field, status = 400) => Object.assign(new Error(message), { status, ...(field ? { field } : {}) });
-const chatKey = (number, jid) => (number === MAIN ? jid : `${number}#${jid}`);
-const splitChat = (chat) => { const i = String(chat).indexOf('#'); return i > 0 ? { number: chat.slice(0, i), jid: chat.slice(i + 1) } : { number: MAIN, jid: String(chat) }; };
+export const chatKey = (number, jid) => (number === MAIN ? jid : `${number}#${jid}`);
+export const splitChat = (chat) => { const i = String(chat).indexOf('#'); return i > 0 ? { number: chat.slice(0, i), jid: chat.slice(i + 1) } : { number: MAIN, jid: String(chat) }; };
 const isDirect = (chat) => /@(s\.whatsapp\.net|lid)$/.test(splitChat(chat).jid);
 
 /** A phone number in E.164 form (+41 79 123 45 67, 0041…, spaces/dashes allowed) → digits; throws a 400 otherwise. */
@@ -79,8 +79,6 @@ function addAlias(alias, chat, why) {
   activity('config', { chat, summary: `Direct chat: WhatsApp's private id for this person now maps to the prepared chat (${why})` });
 }
 
-/** All alias ids (LID forms) that map to another chat — hidden from chat lists. */
-export const chatAliases = () => new Map(load().aliases);
 export const isChatAlias = (chat) => load().aliases.has(chat);
 
 /**

@@ -32,7 +32,7 @@ export function isBlockedAddress(ip) {
 }
 
 /** Media kinds and the content types each accepts. */
-export const MEDIA_KINDS = {
+const MEDIA_KINDS = {
   image: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
   gif: ['video/mp4', 'image/gif'],
   video: ['video/mp4', 'video/3gpp', 'video/quicktime'],

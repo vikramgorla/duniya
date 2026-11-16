@@ -489,7 +489,25 @@ function toast(msg) {
   let box = $('#toasts'); if (!box) { box = h('div', { id: 'toasts', class: 'toasts', role: 'status', 'aria-live': 'polite' }); document.body.append(box); }
   const t = h('div', { class: 'toast' }, msg); box.append(t); setTimeout(() => t.remove(), 3500);
 }
+// Screen data cache (058): switching screens reuses what was just loaded. Any change made here and anything the live
+// stream reports (activity, a changed status) drops it; entries also expire after 60 s. Only lists that screens load
+// on open are cached, never live views (status, system, activity, updates).
+const CACHED = /^\/api\/(agents|templates|chats|providers|budget|media|backups|pending|secrets|logging|assistants|mobile|alerts|owner-assistant|privacy-notice|contacts|usage|silences|session)(\/|\?|$)/;
+const apiCache = new Map(); // path -> { at, p }
+const dropCache = () => apiCache.clear();
 async function api(method, path, body) {
+  if (method === 'GET' && CACHED.test(path)) {
+    const c = apiCache.get(path);
+    if (c && Date.now() - c.at < 60000) return structuredClone(await c.p);
+    const p = fetchJson(method, path);
+    apiCache.set(path, { at: Date.now(), p });
+    p.catch(() => apiCache.delete(path));
+    return structuredClone(await p);
+  }
+  if (method !== 'GET') dropCache();
+  return fetchJson(method, path, body);
+}
+async function fetchJson(method, path, body) {
   const opts = { method, headers: {} };
   if (method !== 'GET') { opts.headers['content-type'] = 'application/json'; opts.body = JSON.stringify(body ?? {}); }
   const res = await fetch(path, opts);
@@ -500,6 +518,7 @@ async function api(method, path, body) {
 }
 /** POST answered with newline-delimited JSON events (#66 Ask box). onEvent gets 'step' / 'delta' / 'restarted' / 'text'; returns the 'done' event. */
 async function apiStream(path, body, onEvent) {
+  dropCache();
   const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/x-ndjson' }, body: JSON.stringify(body ?? {}) });
   if (res.status === 401) { renderLogin(); throw new Error('Please sign in'); }
   if (!res.ok) { const data = await res.json().catch(() => ({})); throw Object.assign(new Error(data.error || res.statusText), { status: res.status }); }
@@ -520,6 +539,12 @@ async function apiStream(path, body, onEvent) {
   return done;
 }
 const tryApi = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message); return undefined; } };
+/** A simple switch (058): the screen shows the new state at once; the server's answer (and the live status) confirms it,
+ * a refusal puts the real state back. */
+const optimistic = async (apply, call, okMsg) => {
+  apply(); applyStatus(S.status);
+  if (await tryApi(call, okMsg) === undefined) refreshStatus();
+};
 /** 057: a member tag (WhatsApp's per-group label) as a small pill; text only. */
 const tagPill = (t) => (t ? h('span', { class: 'pill', style: 'margin-left:6px', title: 'Member tag in this WhatsApp group' }, t) : null);
 /** 057: a person's name line — the server's resolver decides the name; a hidden number is never shown as digits. */
@@ -559,6 +584,7 @@ function gLogo() {
 }
 /** Upload a file as a raw stream (the panel's upload routes), with progress. Resolves with the JSON answer. */
 function uploadFile(url, file, headers, onProgress) {
+  dropCache();
   return new Promise((resolve, reject) => {
     const x = new XMLHttpRequest();
     x.open('POST', url);
@@ -677,7 +703,7 @@ function renderSetup(app, brand) {
 }
 
 // ---------- shell ----------
-let statusTimer = null;
+let statusTimer = null; // slow fallback poll, only while the live stream is down
 async function boot() {
   const app = $('#app'); app.replaceChildren();
   document.body.classList.toggle('readonly', !can('admin'));
@@ -692,11 +718,14 @@ async function boot() {
     h('main', { id: 'main' }));
   connectEvents();
   await refreshStatus();
-  clearInterval(statusTimer); statusTimer = setInterval(refreshStatus, 5000);
   show((location.hash.slice(1) || 'overview').split('/')[0]);
 }
+/** Status on demand (first paint, after a change made here); the live stream pushes it otherwise (058). */
 async function refreshStatus() {
-  try { S.status = await api('GET', '/api/status'); } catch { return; }
+  try { applyStatus(await api('GET', '/api/status')); } catch { /* signed out or offline: the stream retries */ }
+}
+function applyStatus(next) {
+  S.status = next;
   const st = S.status.channel.status;
   const dot = $('#wa-dot'); if (dot) dot.className = `dot ${st === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(st) ? 'warn' : 'bad'}`;
   const sub = $('#brand-sub'); if (sub) sub.textContent = S.status.settings.paused ? 'paused' : `${S.status.agents.filter((b) => b.enabled).length} agents live`;
@@ -733,15 +762,27 @@ function show(tab) {
     if ((S.renderDone || 0) > seq && S.tab) show(S.tab);
   });
 }
+// Live stream (058): activity entries and the status (no polling). While it is down, a slow poll keeps the status
+// fresh; EventSource reconnects by itself.
 function connectEvents() {
   S.es?.close();
   S.es = new EventSource('/api/events');
+  const slowPoll = (on) => { clearInterval(statusTimer); statusTimer = on ? setInterval(refreshStatus, 30000) : null; };
+  S.es.onopen = () => { if (statusTimer) refreshStatus(); slowPoll(false); }; // back after an outage: catch up once
+  S.es.onerror = () => { if (!statusTimer) slowPoll(true); };
+  S.es.addEventListener('status', (e) => {
+    const next = JSON.parse(e.data);
+    const { uptimeSec, memoryMb, ...rest } = next;
+    const sig = JSON.stringify(rest);
+    if (sig !== S.statusSig) { if (S.statusSig) dropCache(); S.statusSig = sig; }
+    applyStatus(next);
+  });
   S.es.onmessage = (e) => {
     const a = JSON.parse(e.data);
+    dropCache();
     S.feed.unshift(a); S.feed.length = Math.min(S.feed.length, 500);
     if (S.tab === 'activity' && (!S.feedAgent || a.agent === S.feedAgent)) $('#feed')?.prepend(feedItem(a));
     if (S.tab === 'overview') { const r = $('#recent'); if (r) { r.prepend(feedItem(a)); while (r.children.length > 8) r.lastChild.remove(); } }
-    if (a.type === 'channel.status') refreshStatus();
   };
 }
 
@@ -792,10 +833,10 @@ async function renderOverview(soft) {
       h('div', { class: 'row' }, newLabel, h('button', { class: 'btn primary', onclick: () => tryApi(async () => { await api('POST', '/api/whatsapp/numbers', { label: newLabel.value }); overviewBusy = false; await refreshStatus(); renderOverview(); }, 'Added — scan its QR') }, 'Add number'))) : null);
   const control = h('div', { class: 'card' }, h('h2', {}, 'Control'),
     h('div', { class: 'row spread nowrap' }, h('div', {}, h('b', {}, 'Pause all agents'), h('div', { class: 'small muted' }, 'Stops all replies and scheduled posts')),
-      toggle(st.settings.paused, (v) => tryApi(async () => { await api('POST', '/api/settings', { paused: v }); refreshStatus(); }, v ? 'Paused' : 'Resumed'))),
+      toggle(st.settings.paused, (v) => optimistic(() => { st.settings.paused = v; }, () => api('POST', '/api/settings', { paused: v }), v ? 'Paused' : 'Resumed'))),
     h('div', { class: 'tscroll' }, h('table', { style: 'margin-top:10px' }, h('tbody', {}, st.agents.length ? st.agents.map((b) => h('tr', {},
       h('td', {}, h('b', {}, b.name), h('div', { class: 'small muted' }, `${b.chats} chat(s)`)),
-      h('td', { style: 'text-align:right' }, toggle(b.enabled, (v) => tryApi(async () => { await api('PUT', `/api/agents/${b.id}`, { enabled: v }); refreshStatus(); }, `${b.name} ${v ? 'on' : 'off'}`))))) : h('tr', {}, h('td', { class: 'muted' }, 'No agents yet — create one under Agents.'))))),
+      h('td', { style: 'text-align:right' }, toggle(b.enabled, (v) => optimistic(() => { b.enabled = v; }, () => api('PUT', `/api/agents/${b.id}`, { enabled: v }), `${b.name} ${v ? 'on' : 'off'}`))))) : h('tr', {}, h('td', { class: 'muted' }, 'No agents yet — create one under Agents.'))))),
     st.pending ? h('p', {}, h('span', { class: 'pill warn' }, `${st.pending} pending confirmation(s)`)) : null);
   const reusedUpdates = soft && $('#updates-box')?.childElementCount ? $('#updates-box') : null;
   const updateBanner = (reusedUpdates && $('#ov-update-banner')) || h('div', { id: 'ov-update-banner' });
@@ -975,7 +1016,8 @@ function drawUpdateBanner(u, after) {
       h('button', { class: 'btn mut', onclick: () => tryApi(async () => { await api('POST', '/api/updates/decision', { action: 'dismiss' }); after?.(); }, 'Dismissed') }, 'Dismiss'))));
 }
 async function renderUpdates(box, note = '') {
-  const u = await api('GET', '/api/updates').catch(() => null); if (!u || !box) return;
+  const seq = (S.updatesSeq = (S.updatesSeq || 0) + 1);
+  const u = await api('GET', '/api/updates').catch(() => null); if (!u || !box || seq !== S.updatesSeq) return; // a newer draw is on its way
   const st = u.status || {};
   const d = u.decision;
   const lr = st.lastResult;
@@ -3868,6 +3910,10 @@ function loggingCard({ settings, categories }) {
 }
 
 window.addEventListener('hashchange', () => { if (S.user) show(location.hash.slice(1).split('/')[0] || 'overview'); });
+// Leaving the page closes the live stream, so a page kept in the back/forward cache holds no connection; coming back
+// opens it again and catches up (058).
+window.addEventListener('pagehide', () => { S.es?.close(); S.es = null; });
+window.addEventListener('pageshow', (e) => { if (e.persisted && S.user) { connectEvents(); refreshStatus(); } });
 renderLogin();
 </script>
 </body>

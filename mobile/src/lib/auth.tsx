@@ -38,7 +38,7 @@ async function saveTokens(t: Tokens) {
   await store.set(KEY, JSON.stringify(holder.current));
 }
 
-export type AuthState = 'loading' | 'signedOut' | 'locked' | 'ready';
+type AuthState = 'loading' | 'signedOut' | 'locked' | 'ready';
 interface Ctx {
   state: AuthState;
   api: ApiClient | null;

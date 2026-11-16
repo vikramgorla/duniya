@@ -5,7 +5,7 @@ import { activity } from '../../core/events.js';
 import { baseUrl } from '../http-util.js';
 
 /** Links Expo Go can open: a dev server (exp://host:port), an EAS Update (exp://u.expo.dev/…) or an expo.dev page. */
-export function validExpoUrl(u) {
+function validExpoUrl(u) {
   if (!u) return true;
   let url; try { url = new URL(String(u)); } catch { return false; }
   if (url.username || url.password || String(u).length > 300) return false;

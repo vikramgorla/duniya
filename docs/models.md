@@ -52,7 +52,8 @@
 - The Ask box streams the answer word by word: a stream that fails before its first word falls back as usual; one
   that breaks half-way is dropped and asked again once without streaming ([details](owner-assistant.md#owner-assistant-and-the-ask-box)).
 - The owner gets a WhatsApp alert after 15 minutes or when no provider can answer.
-- Several accounts per provider with a label (model refs `openai-work:gpt-…`), used *in order* (failover) or
+- A model is always named with its account: `auto`, `anthropic:claude-…`, `openai:auto`. Several accounts per
+  provider get a label (model refs `openai-work:gpt-…`), used *in order* (failover) or
   *spread* (least recently used).
 
 > [!WARNING]

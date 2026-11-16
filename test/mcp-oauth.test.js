@@ -3,10 +3,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { createHash } from 'node:crypto';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { setup } from './harness.js';
+import { setup, serveFakeMcp } from './harness.js';
 
 const as = { valid: new Set(), refreshes: 0, refuseRefresh: false, bearers: [], registered: [], challenge: '', codes: new Map(), tokenReqs: [] };
 // Fake tokens contain '-', which never occurs in the base64 ciphertext, so "not in the stored blob" checks cannot
@@ -53,13 +50,7 @@ const fake = http.createServer(async (req, res) => {
     const bearer = String(req.headers.authorization || '').replace(/^Bearer /, '');
     if (!as.valid.has(bearer)) return json(401, { error: 'invalid_token' }, { 'www-authenticate': `Bearer resource_metadata="${BASE}/.well-known/oauth-protected-resource/mcp"` });
     as.bearers.push(bearer);
-    const s = new Server({ name: 'fake-oauth', version: '1' }, { capabilities: { tools: {} } });
-    const tool = (name) => ({ name, description: name, inputSchema: { type: 'object', properties: {} } });
-    s.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: ['whoami', 'agenda_list', 'room_assign_preview'].map(tool) }));
-    s.setRequestHandler(CallToolRequestSchema, async (r) => ({ content: [{ type: 'text', text: r.params.name === 'agenda_list' ? 'Puja 10:00' : 'ok' }] }));
-    const tr = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-    await s.connect(tr);
-    return tr.handleRequest(req, res, raw ? JSON.parse(raw) : undefined);
+    return serveFakeMcp(req, res, raw, { name: 'fake-oauth', tools: ['whoami', 'agenda_list', 'room_assign_preview'], call: (n) => (n === 'agenda_list' ? 'Puja 10:00' : 'ok') });
   }
   res.writeHead(404); res.end();
 }).listen(0);
@@ -72,7 +63,7 @@ const { decrypt } = await import('../src/core/crypto.js');
 after(() => { fake.close(); t.close(); });
 
 await t.agents.createAgent({ id: 'oauthagent', config: {
-  name: 'OAuth agent', prompt: 'You help.', model: 'claude-sonnet-5-5', triggers: ['!o'], dm: 'organizers', organizers: ['41790000001'],
+  name: 'OAuth agent', prompt: 'You help.', model: 'anthropic:claude-sonnet-5-5', triggers: ['!o'], dm: 'organizers', organizers: ['41790000001'],
   mcpServers: { svc: { url: `${BASE}/mcp`, auth: 'oauth' } },
   tools: { participant: ['svc:agenda_list'], organizer: ['svc:*'], deny: [] },
 } });

@@ -8,15 +8,11 @@ import { getSetting, updateSettings } from './store.js';
 db.exec(`
   CREATE TABLE IF NOT EXISTS usage (
     id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, agent TEXT, chat TEXT, provider TEXT, model TEXT, kind TEXT,
-    input INTEGER, output INTEGER, cost REAL, priced TEXT
+    input INTEGER, output INTEGER, cost REAL, priced TEXT,
+    account TEXT, fallback TEXT -- the account that answered and why the call switched (042)
   );
   CREATE INDEX IF NOT EXISTS usage_ts ON usage(ts);
 `);
-// 042: the account that answered and why the call switched (fallback). Added in place so an update keeps usage.
-for (const [col, type] of [['account', 'TEXT'], ['fallback', 'TEXT']]) {
-  if (!db.prepare('PRAGMA table_info(usage)').all().some((c) => c.name === col)) db.exec(`ALTER TABLE usage ADD COLUMN ${col} ${type}`);
-}
-
 export const PLAN_PROVIDERS = { chatgpt: 'ChatGPT plan', copilot: 'Copilot allowance' };
 const priceSetting = () => getSetting('modelPrices', {}) || {};
 

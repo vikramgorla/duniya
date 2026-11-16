@@ -5,8 +5,8 @@
 export type OpType = 'eq' | 'add' | 'del';
 export interface Op { type: OpType; text: string }
 export interface Segment { type: OpType; text: string; newline?: boolean }
-export type Line = Segment[];
-export type Hunk = { type: 'lines' | 'skip'; lines: Line[] };
+type Line = Segment[];
+type Hunk = { type: 'lines' | 'skip'; lines: Line[] };
 export interface TextDiff { ops: Op[]; mode: 'words' | 'lines'; added: number; removed: number; changed: boolean }
 
 /** Words, runs of whitespace and single punctuation marks; joining the tokens gives the text back. */
@@ -162,7 +162,7 @@ export function diffKeys(before: unknown, after: unknown) {
 
 /** A line of the "Changes only" / "Side by side" / "Whole new text" views: marker and kept segments. */
 export interface ViewLine { mark: '' | '+' | '−' | '±'; segs: Segment[] }
-export type ViewBlock = { type: 'lines'; lines: ViewLine[] } | { type: 'skip'; lines: ViewLine[] };
+type ViewBlock = { type: 'lines'; lines: ViewLine[] } | { type: 'skip'; lines: ViewLine[] };
 export type TextView = 'changes' | 'before' | 'after' | 'whole';
 
 const markOf = (segs: Segment[]): ViewLine['mark'] => {

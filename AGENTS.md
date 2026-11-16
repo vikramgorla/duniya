@@ -47,6 +47,18 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 - [ ] Anything the server can do or retry itself happens automatically (refresh, reload, sync, retry, re-check);
       buttons are optional extras, never required steps; if something needs the owner, the panel says exactly why.
 
+**Lean code** (see `docs/development.md#lean-code`)
+- [ ] Delete before you add: search for what the change replaces (functions, settings, wording, tests) and remove it.
+- [ ] No compatibility layers or one-time migrations kept after the release that needed them; schema lives in
+      `CREATE TABLE` and a fresh install works.
+- [ ] One way to do each thing: reuse the resolvers (models, names), the scheduler tick, the small-server switch and
+      the shared helpers in `src/core/config.js` instead of a local copy.
+- [ ] `node scripts/ci-checks.mjs` passes: knip (no unused files, exports or dependencies), jscpd (no duplication over
+      its threshold), the `src/panel/public/index.html` size budget (raise it only with a reason in the PR).
+- [ ] Tests check behaviour (panel API, router, fakes), not internals; nothing is exported only for a test.
+- [ ] UI changes keep the panel snappy: no new polling (status and activity come over `/api/events`), screens load
+      through `api()` and its cache, simple switches update at once.
+
 **Documentation** (the part most often forgotten)
 - [ ] `docs/` topic pages updated (and `docs/README.md` index if a page was added).
 - [ ] `README.md` highlights updated when a user-visible feature was added or changed.
@@ -98,7 +110,7 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
   `/speckit-analyze` → `/speckit-implement` → `/speckit-converge`. The templates in `.specify/templates/` end every
   task list with the Definition-of-Done tasks above; keep them.
 - **No backward-compatibility layers** for old data unless an issue asks for it: deployments are single-owner and
-  reinstall freely (see `docs/upgrading.md`).
+  reinstall freely (see `docs/upgrading.md`). A migration a release needs is removed in the next release.
 - **Ruleset file mirrors the live ruleset:** `.github/rulesets/main-protection.json` must match GitHub → Settings →
   Rules. When one changes, change the other in the same week.
 - **Dependencies:** runtime deps are limited (Baileys, Anthropic SDK, MCP SDK, pino, qrcode); a new one needs a stated
@@ -129,7 +141,7 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 | `templates/` | Agent templates (JSON) |
 | `mobile/` | Expo app (own `package.json`, not installed on servers) |
 | `test/` | `node:test` e2e tests with fakes (`harness.js`) |
-| `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `ci-checks.mjs`, `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails), `render-diagrams.mjs` (`npm run docs:diagrams`: docs/diagrams/*.mmd → SVG) |
+| `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `ci-checks.mjs` (versions, releases, docs, knip, jscpd, panel size), `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails), `render-diagrams.mjs` (`npm run docs:diagrams`: docs/diagrams/*.mmd → SVG) |
 | `docs/` | Reference docs (`docs/README.md` index), deploy guides, diagrams (`docs/diagrams/`), the website `docs/site/` |
 | `specs/`, `.specify/` | Spec Kit: one folder per feature; constitution and templates |
 

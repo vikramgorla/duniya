@@ -26,10 +26,10 @@ import {
   normalizeDomain, parseCidr, ipInRanges, validateWebConfig, renderCaddyfile, CLOUDFLARE_V4, CLOUDFLARE_V6, isIp, PROVIDERS,
 } from '../../deploy/ops/webconfig.mjs';
 
-export { normalizeDomain, parseCidr, ipInRanges, PROVIDERS };
+export { PROVIDERS };
 const fail = (message, status = 400, extra = {}) => Object.assign(new Error(message), { status, ...extra });
 const readJson = (f) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return null; } };
-export const TRIAL_MS = Number(process.env.DUNIYA_ACCESS_TRIAL_MS || 10 * 60000);
+const TRIAL_MS = Number(process.env.DUNIYA_ACCESS_TRIAL_MS || 10 * 60000);
 
 // ---------- settings ----------
 // ranges: { <provider>: { list, at } } downloaded address lists; customRanges: the owner's own proxy ranges;
@@ -63,7 +63,7 @@ async function download(u, kind) {
   return j;
 }
 /** The address list for a provider: downloaded (daily), Cloudflare's built-in until then, or the owner's own. */
-export function proxyRanges(id) {
+function proxyRanges(id) {
   const s = webSettings();
   if (id === 'custom') return s.customRanges || [];
   const r = s.ranges?.[id]?.list;
@@ -93,11 +93,10 @@ export function providerOf(ip) {
   for (const id of Object.keys(PROVIDERS)) { const r = proxyRanges(id); if (r.length && ipInRanges(ip, r)) return id; }
   return null;
 }
-export const isCloudflareIp = (ip) => ipInRanges(ip, proxyRanges('cloudflare'));
 
 // ---------- where are we ----------
-export const exposure = () => process.env.DUNIYA_EXPOSURE || (/\.sslip\.io$/.test(currentHost()) ? 'ip' : currentHost() ? 'domain' : 'local');
-export function currentHost() {
+const exposure = () => process.env.DUNIYA_EXPOSURE || (/\.sslip\.io$/.test(currentHost()) ? 'ip' : currentHost() ? 'domain' : 'local');
+function currentHost() {
   try { return new URL(String(process.env.PUBLIC_URL || '')).hostname; } catch { return ''; }
 }
 let ipCache = null;
@@ -206,7 +205,7 @@ async function follow(start, token, proof) {
   return { ok: false, error: 'too many redirects' };
 }
 /** Does the public domain lead to this server, whatever DNS says? Tries https first (to spot an unencrypted proxy). */
-export async function reachability(domain) {
+async function reachability(domain) {
   const token = randomBytes(16).toString('hex');
   const proof = randomBytes(24).toString('hex');
   checks.set(token, { proof, host: domain, exp: Date.now() + 60000 });
@@ -244,7 +243,7 @@ export async function checkDomain(input) {
 
 // ---------- certificate ----------
 /** The certificate this server presents for `host` (asks the local web server on 443). */
-export function certInfo(host, { port = Number(process.env.DUNIYA_TLS_PORT || 443), timeout = 4000 } = {}) {
+function certInfo(host, { port = Number(process.env.DUNIYA_TLS_PORT || 443), timeout = 4000 } = {}) {
   if (!host) return Promise.resolve({ state: 'none' });
   return new Promise((res) => {
     // Verified handshake only: a certificate that does not validate for `host` is reported as invalid with the reason.
@@ -280,7 +279,7 @@ export function certInfo(host, { port = Number(process.env.DUNIYA_TLS_PORT || 44
  * Why Let's Encrypt has not issued a certificate for `host` yet (behind a proxy), from the web server's log, with the
  * fix in plain words. null when the log shows no recent failure.
  */
-export async function acmeProblem(host) {
+async function acmeProblem(host) {
   const text = process.env.DUNIYA_FAKE_CADDY_LOG !== undefined ? (() => { try { return readFileSync(process.env.DUNIYA_FAKE_CADDY_LOG, 'utf8'); } catch { return ''; } })()
     : await new Promise((res) => execFile('journalctl', ['-u', 'caddy', '-n', '400', '--since', '-6h', '--no-pager', '-o', 'cat'], { timeout: 8000, maxBuffer: 4 << 20 }, (e, out) => res(String(out || ''))));
   let last = null;
@@ -309,14 +308,14 @@ export async function acmeProblem(host) {
 
 
 // ---------- status of the last apply (written by the helper) ----------
-export const webStatus = () => readJson(`${OPS_STATE_DIR}/web-status.json`);
-export const appliedConfig = () => readJson(`${OPS_STATE_DIR}/web-applied.json`);
+const webStatus = () => readJson(`${OPS_STATE_DIR}/web-status.json`);
+const appliedConfig = () => readJson(`${OPS_STATE_DIR}/web-applied.json`);
 let syncedAt = 0;
 /**
  * After the helper finished: use the new address in this process (app.env has it after a restart), and move the
  * domain switch / access trial on (or back, when the helper rolled back).
  */
-export function syncFromHelper() {
+function syncFromHelper() {
   const st = webStatus();
   if (!st?.at || st.at <= syncedAt || ['running', 'waiting'].includes(st.state)) return false;
   syncedAt = st.at;
@@ -355,7 +354,7 @@ export function current() {
   return { host: currentHost(), aliases: [], redirectHosts: [], proxiedHosts: [], access: { proxy: null, allow: [] } };
 }
 /** The request for the helper from a target state. Throws (400, field) when something is invalid. */
-export function makeDoc(t, { by = '' } = {}) {
+function makeDoc(t, { by = '' } = {}) {
   const proxy = t.access?.proxy || null;
   const doc = {
     version: 1, host: t.host, aliases: t.aliases || [], redirectHosts: t.redirectHosts || [], proxiedHosts: t.proxiedHosts || [],
@@ -558,7 +557,7 @@ export function startWebAccess() {
 }
 
 /** Did this request come through the proxy the panel is locked to (or any known proxy)? */
-export function requestViaProxy(req) {
+function requestViaProxy(req) {
   const hops = String(req.headers['x-forwarded-for'] || '').split(',').map((x) => x.trim()).filter(Boolean);
   const edge = hops.at(-1);
   if (!edge) return null;

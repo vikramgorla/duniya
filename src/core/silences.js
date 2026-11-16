@@ -91,4 +91,4 @@ export function clearSilences({ chat = '', agent = '', reason = '' } = {}) {
 }
 
 /** Old rows go after 90 days. */
-export const pruneSilences = () => db.prepare('DELETE FROM silences WHERE last_ts < ?').run(Date.now() - 90 * 86400000);
+const pruneSilences = () => db.prepare('DELETE FROM silences WHERE last_ts < ?').run(Date.now() - 90 * 86400000);

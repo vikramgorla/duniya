@@ -30,5 +30,7 @@ jobs:
         run: npm run lint
       - name: Unit tests
         run: npm test
+      - name: No unused files, exports or dependencies (knip)
+        run: npm run knip
       - name: Expo config is valid
         run: npx expo config --type public > /dev/null

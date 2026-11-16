@@ -239,7 +239,7 @@ test('several accounts per provider: labels, failover in order, spread, usage by
   assert.ok(!t.store.getSecret('PROVIDER_OPENAI_WORK_KEY'), 'its key is deleted');
   await t.api(owner, 'PUT', '/api/fallback/strategy', { group: 'openai', strategy: 'order' });
   t.store.setSecret('OPENAI_API_KEY', '');
-  await t.agents.updateAgent('helper', { model: 'claude-sonnet-5-5' });
+  await t.agents.updateAgent('helper', { model: 'anthropic:claude-sonnet-5-5' });
 });
 
 test('per agent and per chat override: off, own chain; the chat wins over the agent', async () => {

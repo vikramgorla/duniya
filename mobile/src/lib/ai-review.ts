@@ -3,7 +3,7 @@
 import { diffText, listChange, type ListItem, type TextDiff } from './diff.ts';
 import type { ModelList } from './types.ts';
 
-export const FIELD_LABEL: Record<string, string> = {
+const FIELD_LABEL: Record<string, string> = {
   name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', dm: 'Who may message it directly',
   organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', globalMcp: 'Global tool services', tools: 'Tool rules', confirm: 'Confirmation',
   schedules: 'Scheduled posts', memory: 'Group memory', model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens',
@@ -15,7 +15,7 @@ const SECTIONS: [string, string[]][] = [['General', ['name', 'description', 'ena
   ['Quick replies, welcome & FAQ', ['quickReplies', 'help', 'welcome', 'faq']], ['People & roles', ['organizers', 'participants']], ['Tool services', ['mcpServers', 'globalMcp', 'tools']], ['Photos & voice', ['media']], ['Changes need confirmation', ['confirm']],
   ['Scheduled posts', ['schedules']], ['Advanced', ['timezone', 'historySize', 'maxTokens']]];
 const ORDER = SECTIONS.flatMap(([, f]) => f);
-export const sectionOf = (f: string) => (SECTIONS.find(([, fs]) => fs.includes(f)) || ['Other'])[0];
+const sectionOf = (f: string) => (SECTIONS.find(([, fs]) => fs.includes(f)) || ['Other'])[0];
 const DM_LABEL: Record<string, string> = { none: 'Nobody', organizers: 'Organizers only', members: 'Members of its groups', anyone: 'Anyone' };
 const DAY_LABEL: Record<string, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
 export const daysLabel = (d: unknown) => (!d || d === 'daily' ? 'every day' : d === 'mon,tue,wed,thu,fri' ? 'weekdays' : d === 'sat,sun' ? 'weekends'
@@ -23,7 +23,7 @@ export const daysLabel = (d: unknown) => (!d || d === 'daily' ? 'every day' : d 
 export const trunc = (s: unknown, n: number) => { const t = String(s || '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-export interface Ctx { names?: Record<string, string>; models?: ModelList | null }
+interface Ctx { names?: Record<string, string>; models?: ModelList | null }
 type Any = any;
 
 export function modelLabel(ref: unknown, models?: ModelList | null) {
@@ -36,9 +36,9 @@ export function modelLabel(ref: unknown, models?: ModelList | null) {
   return id === 'auto' ? `${pl} · Auto` : `${pl} · ${id}`;
 }
 const personLabel = (p: unknown, names?: Record<string, string>) => { const d = String(p).replace(/\D/g, ''); return names?.[d] ? `${names[d]} (+${d})` : `+${d}`; };
-export const ruleLabel = (r: unknown) => { const [srv, tool] = String(r).split(':'); if (!tool) return String(r); if (tool === '*') return `everything in ${srv}`; if (tool === '-') return `nothing from ${srv}`; return `${tool.replace(/\*/g, '…').replace(/_/g, ' ')} (${srv})`; };
+const ruleLabel = (r: unknown) => { const [srv, tool] = String(r).split(':'); if (!tool) return String(r); if (tool === '*') return `everything in ${srv}`; if (tool === '-') return `nothing from ${srv}`; return `${tool.replace(/\*/g, '…').replace(/_/g, ' ')} (${srv})`; };
 const serverLabel = (k: string, s: Any) => { let host = ''; try { host = s?.url ? new URL(String(s.url).replace(/\$\{[^}]+\}/g, 'x')).host : ''; } catch { host = ''; } return host ? `${k} · ${host}` : s?.type === 'local' ? `${k} · on this server` : k; };
-export const schedLabel = (s: Any) => `${s?.at || '?'} ${daysLabel(s?.days)}${s?.enabled === false ? ' (paused)' : ''} — ${trunc(s?.prompt, 70)}`;
+const schedLabel = (s: Any) => `${s?.at || '?'} ${daysLabel(s?.days)}${s?.enabled === false ? ' (paused)' : ''} — ${trunc(s?.prompt, 70)}`;
 
 /** One plain value as a short sentence part ("on", "Organizers only", "Claude Sonnet 5.5"). */
 export function scalar(field: string, v: Any, ctx: Ctx = {}): string {
@@ -56,7 +56,7 @@ export function scalar(field: string, v: Any, ctx: Ctx = {}): string {
 }
 
 /** List-like fields as [{ k: key, l: readable label, v: value for "changed" checks }]. */
-export const LISTS: Record<string, (v: Any, ctx: Ctx) => ListItem[]> = {
+const LISTS: Record<string, (v: Any, ctx: Ctx) => ListItem[]> = {
   triggers: (v) => (v || []).map((x: string) => ({ k: x, l: x })),
   names: (v) => (v || []).map((x: string) => ({ k: x, l: x })),
   quickReplies: (v) => (v || []).map((q: Any) => ({ k: q.command, l: `${q.command}${q.who === 'organizers' ? ' (organizers)' : ''} → ${trunc(q.text, 70)}`, v: q })),
