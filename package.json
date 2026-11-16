@@ -13,7 +13,9 @@
     "check:responsive": "node --disable-warning=ExperimentalWarning scripts/check-responsive.mjs",
     "mobile": "npm --prefix mobile install --no-audit --no-fund && npm --prefix mobile start",
     "site:shots": "node --disable-warning=ExperimentalWarning scripts/site-shots.mjs",
-    "docs:diagrams": "node --disable-warning=ExperimentalWarning scripts/render-diagrams.mjs"
+    "docs:diagrams": "node --disable-warning=ExperimentalWarning scripts/render-diagrams.mjs",
+    "knip": "knip",
+    "jscpd": "jscpd"
   },
   "engines": {
     "node": ">=22.13"

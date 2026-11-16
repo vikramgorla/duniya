@@ -9,9 +9,11 @@
 //     without a source, no ```mermaid blocks in README.md or docs/ (scripts/render-diagrams.mjs, npm run docs:diagrams).
 //  5. Docs freshness (warns only): the panel UI changed but no docs/ or README.md file did. Needs the base branch
 //     (GITHUB_BASE_REF on pull requests, or an argument); skipped when it can't be compared.
+//  6. Lean code (fails, 058): knip finds no unused files, exports or dependencies (knip.json); jscpd finds no
+//     duplication above its threshold (.jscpd.json); the panel file stays within its size budget.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, statSync } from 'node:fs';
+import { resolve, join } from 'node:path';
 import { normalizeReleases, releaseCheck } from '../src/core/releases.js';
 import { checkDocLinks } from './check-doc-links.mjs';
 import { checkDiagrams } from './render-diagrams.mjs';
@@ -74,5 +76,25 @@ if (base) {
   else if (files.includes('src/panel/public/index.html') && !files.some((f) => f.startsWith('docs/') || f === 'README.md')) {
     console.log('::warning file=src/panel/public/index.html::The panel UI changed but no docs/ or README.md file did. Update docs, the website (docs/site, screenshots via npm run site:shots) and README if users see the change (Definition of Done in AGENTS.md).');
   } else console.log('Docs check: ok');
+}
+// 6. lean code: no dead code, no copy-paste, no silent growth of the one-file panel
+{
+  for (const [name, args] of [['knip', []], ['jscpd', ['--silent']]]) {
+    try {
+      execFileSync(join(root, 'node_modules', '.bin', name), args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      console.log(`${name}: ok`);
+    } catch (e) {
+      failed = true;
+      console.log(`::error::${name} found ${name === 'knip' ? 'unused files, exports or dependencies' : 'duplicated code'}. Delete or reuse instead of adding (AGENTS.md, Lean code). Run \`npm run ${name}\` for details.`);
+      console.log(String(e.stdout || '') + String(e.stderr || e.message));
+    }
+  }
+  // Budget: the size when 058 set it plus ~10 %. Raising it is a decision: say why in the PR.
+  const PANEL_BUDGET = 430_000;
+  const size = statSync(resolve(root, 'src/panel/public/index.html')).size;
+  if (size > PANEL_BUDGET) {
+    failed = true;
+    console.log(`::error file=src/panel/public/index.html::The panel is ${size} bytes, over its ${PANEL_BUDGET}-byte budget. Remove what your change replaces, reuse existing helpers, or raise PANEL_BUDGET in scripts/ci-checks.mjs with a reason in the PR.`);
+  } else console.log(`Panel size: ok (${size} of ${PANEL_BUDGET} bytes)`);
 }
 process.exit(failed ? 1 : 0);

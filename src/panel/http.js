@@ -1,6 +1,8 @@
 // Small HTTP helpers shared by the panel router and feature routes (sign-in pages, uploads).
 import { createWriteStream, mkdirSync, rmSync, renameSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { gzipSync, brotliCompressSync, constants as zc } from 'node:zlib';
 import { env, DATA_DIR } from '../core/config.js';
 import { createSession } from '../core/store.js';
 import { newToken } from '../core/crypto.js';
@@ -31,6 +33,25 @@ export function send(res, status, body, headers = {}) {
     'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', ...headers,
   });
   res.end(isObj ? JSON.stringify(body) : body);
+}
+/**
+ * A static panel file (058): compressed once (gzip + brotli, ~0.1 s), then served from memory with an ETag, so a
+ * repeat load is a 304. A request for `?v=<version>` (how the panel shell links its scripts) is cached for good: a new
+ * file has a new version. Only for files without user data or secrets (the panel shell and its two scripts).
+ */
+export function staticFile(body, headers) {
+  const version = createHash('sha256').update(body).digest('base64url').slice(0, 16);
+  const etag = `"${version}"`;
+  const br = brotliCompressSync(body, { params: { [zc.BROTLI_PARAM_QUALITY]: 9, [zc.BROTLI_PARAM_SIZE_HINT]: body.length } });
+  const gz = gzipSync(body, { level: 9 });
+  const serve = (req, res, url) => {
+    const base = { ...headers, etag, vary: 'accept-encoding', 'cache-control': url?.searchParams.get('v') === version ? 'public, max-age=31536000, immutable' : 'no-cache' };
+    if (String(req.headers['if-none-match'] || '').split(/\s*,\s*/).includes(etag)) return send(res, 304, '', base);
+    const accept = String(req.headers['accept-encoding'] || '');
+    const [data, enc] = /\bbr\b/.test(accept) ? [br, 'br'] : /\bgzip\b/.test(accept) ? [gz, 'gzip'] : [body, null];
+    return send(res, 200, data, { ...base, ...(enc ? { 'content-encoding': enc } : {}), 'content-length': data.length });
+  };
+  return Object.assign(serve, { version });
 }
 export function setSessionCookie(req, res, userId) {
   const { token, maxAge } = createSession(userId, clientIp(req));

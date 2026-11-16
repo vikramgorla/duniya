@@ -9,7 +9,7 @@ import QRCode from 'qrcode';
 import { rmSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DATA_DIR, digits } from '../core/config.js';
-import { activity } from '../core/events.js';
+import { activity, bus } from '../core/events.js';
 import { loadMedia, MAX_MEDIA_BYTES } from '../core/media.js';
 import { savePoll, getPoll, kvGet, kvSet } from '../core/db.js';
 import { syncWhatsAppContacts, mapLid, unmappedLids } from '../core/contacts.js';
@@ -61,6 +61,7 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
       state.since = Date.now();
       activity('channel.status', { summary: `WhatsApp${number === 'main' ? '' : ` (${label})`}: ${patch.status}`, detail: { number, me: state.me, error: state.lastError } });
     }
+    bus.emit('status'); // live panel (058): a new QR or pairing code shows without polling
   };
 
   async function connect() {

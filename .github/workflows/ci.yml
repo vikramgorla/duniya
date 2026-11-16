@@ -35,7 +35,7 @@ jobs:
         run: npm run lint
       - name: Panel script parses
         run: npm run check:panel
-      - name: Version consistency, releases.json and docs freshness
+      - name: Version consistency, releases.json, docs and lean code (knip, jscpd, panel size)
         run: node scripts/ci-checks.mjs
       - name: Dependency audit (production, high+)
         run: npm audit --omit=dev --audit-level=high
