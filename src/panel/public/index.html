@@ -624,10 +624,13 @@ async function renderLogin() {
   const app = $('#app'); app.replaceChildren();
   let info = {}; try { info = await (await fetch('/api/session')).json(); } catch {}
   S.google = !!info.google;
-  if (info.authed) { S.user = info.user; return boot(); }
-  const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:20px;margin-top:6px' });
   const brand = () => [h('div', { style: 'display:flex;justify-content:center;margin:4px 0 6px' }, Object.assign(logo(), { style: 'width:76px;height:76px' })),
     h('h2', { style: 'text-align:center;font-size:24px;margin-bottom:2px' }, 'Duniya')];
+  const signup = /^#signup=([a-f0-9]{64})$/.exec(location.hash);
+  if (signup) return renderSignup(app, brand, signup[1]);
+  if (/^#secret=/.test(location.hash)) sessionStorage.setItem('duniya.link', location.hash); // survives Sign in with Google
+  if (info.authed) { S.user = info.user; return boot(); }
+  const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:20px;margin-top:6px' });
   if (info.needsSetup) return renderSetup(app, brand);
   if (info.google && info.passwordLogin === false) { // 028: the owner allows only Sign in with Google
     app.append(h('div', { class: 'center' }, h('div', { class: 'card', style: 'width:min(360px,92vw)' }, brand(),
@@ -648,6 +651,50 @@ async function renderLogin() {
     field('Username', user), field('Password', pw), err,
     h('button', { class: `btn ${info.google ? '' : 'primary'}`, style: 'width:100%;margin-top:10px;justify-content:center' }, 'Sign in'))));
   if (!info.google) pw.focus();
+}
+
+/** 060: a new user's one-time sign-up link (/#signup=…): they choose their own password and are signed in. */
+async function renderSignup(app, brand, token) {
+  const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:20px;margin-top:6px' });
+  const card = h('form', { class: 'card', style: 'width:min(380px,92vw)' }, brand());
+  app.append(h('div', { class: 'center' }, card));
+  const done = () => { history.replaceState(null, '', location.pathname); renderLogin(); };
+  let u;
+  try { u = await api('POST', '/api/signup/open', { token }); } catch (x) {
+    return card.append(h('p', { class: 'small', style: 'text-align:center' }, x.message), h('button', { class: 'btn', type: 'button', style: 'width:100%;justify-content:center', onclick: done }, 'Go to sign-in'));
+  }
+  const pw = h('input', { type: 'password', placeholder: '12+ characters', autocomplete: 'new-password' });
+  const pw2 = h('input', { type: 'password', placeholder: 'the same again', autocomplete: 'new-password' });
+  card.onsubmit = async (e) => {
+    e.preventDefault(); err.textContent = '';
+    if (pw.value !== pw2.value) return (err.textContent = 'The two passwords differ');
+    try { const r = await api('POST', '/api/signup', { token, password: pw.value }); S.user = r.user; history.replaceState(null, '', location.pathname); boot(); } catch (x) { err.textContent = x.message; }
+  };
+  card.append(h('p', { class: 'small muted', style: 'text-align:center;margin:0 0 6px' }, `Welcome, ${u.username}! Choose your password for this panel (${u.role}).`),
+    h('input', { type: 'text', value: u.username, autocomplete: 'username', hidden: true }), field('Password', pw), field('Password again', pw2), err,
+    h('button', { class: 'btn primary', style: 'width:100%;margin-top:10px;justify-content:center' }, 'Set password and sign in'),
+    h('p', { class: 'small muted', style: 'text-align:center;margin:10px 0 0' }, 'This link works once.'));
+  pw.focus();
+}
+
+/** 060: a one-time secret link (/#secret=…): a signed-in owner or admin pastes a key; it never passes through a chat. */
+async function renderSecretLink(token) {
+  history.replaceState(null, '', '#secrets'); // the token leaves the address bar and the history
+  const main = $('#main');
+  const card = h('form', { class: 'card', style: 'max-width:520px;margin:0 auto' }, h('h2', {}, 'Enter a secret'));
+  main.replaceChildren(card);
+  const back = h('button', { class: 'btn', type: 'button', onclick: () => show('secrets') }, 'Back to the panel');
+  let d;
+  try { d = await api('POST', '/api/secret-links/open', { token }); } catch (x) { return card.append(h('p', { class: 'small' }, x.message), back); }
+  const val = h('input', { type: 'password', placeholder: 'paste the value', autocomplete: 'off', spellcheck: 'false', 'aria-label': `Value for ${d.for}` });
+  const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:18px;margin-top:6px' });
+  card.onsubmit = async (e) => {
+    e.preventDefault(); err.textContent = '';
+    try { await api('POST', '/api/secret-links/use', { token, value: val.value }); card.replaceChildren(h('h2', {}, 'Saved ✓'), h('p', { class: 'small muted' }, `${d.for} is stored encrypted on the server. You can close this page.`), back); } catch (x) { err.textContent = x.message; }
+  };
+  card.append(h('p', { class: 'small muted', style: 'margin-top:0' }, `Asked by ${d.askedBy}. The value goes straight to the server, encrypted, and is never shown again. This link works once, until ${new Date(d.expiresAt).toLocaleTimeString()}.`),
+    field(d.for, val), err, h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn primary' }, 'Save'), back));
+  val.focus();
 }
 
 /** First run: create the owner, or move in from another server by restoring a backup file. */
@@ -718,6 +765,9 @@ async function boot() {
     h('main', { id: 'main' }));
   connectEvents();
   await refreshStatus();
+  const link = /^#secret=([a-f0-9]{64})$/.exec(location.hash || sessionStorage.getItem('duniya.link') || '');
+  sessionStorage.removeItem('duniya.link');
+  if (link && can('admin')) return renderSecretLink(link[1]);
   show((location.hash.slice(1) || 'overview').split('/')[0]);
 }
 /** Status on demand (first paint, after a change made here); the live stream pushes it otherwise (058). */
@@ -2972,7 +3022,7 @@ function restoreCard(b, s) {
   const modes = [['local', 'This server'], s.github.enabled && ['github', 'GitHub'], s.s3.enabled && ['s3', 'S3'], ['upload', 'A file']].filter(Boolean);
   if (!modes.some(([v]) => v === restoreMode)) restoreMode = 'local';
   const seg = h('div', { class: 'seg', style: 'margin-bottom:8px;flex-wrap:wrap' }, modes.map(([v, l]) => h('button', { class: v === restoreMode ? 'on' : '', onclick: (e) => { restoreMode = v; seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); err.textContent = ''; draw(); } }, l)));
-  const rpass = h('input', { type: 'password', placeholder: 'Backup passphrase', autocomplete: 'off' });
+  const rpass = h('input', { type: 'password', placeholder: b.passphraseSet ? 'Backup passphrase (empty: this server’s)' : 'Backup passphrase', autocomplete: 'off' });
   const confirmText = (what) => `Restore ${what}? Agents, users, settings, secrets, memory and the WhatsApp link are replaced by the backup and the server restarts (1–2 minutes). The current data is kept aside on the server.`;
   function draw() {
     if (restoreMode === 'upload') {
@@ -2982,7 +3032,7 @@ function restoreCard(b, s) {
       const go = h('button', { class: 'btn danger', style: 'margin-top:8px', onclick: async () => {
         err.textContent = ''; const f = file.files[0];
         if (!f) return (err.textContent = 'Choose a backup file (.dbk) first');
-        if (!rpass.value) return (err.textContent = 'Enter the passphrase the backup was made with');
+        if (!rpass.value && !b.passphraseSet) return (err.textContent = 'Enter the passphrase the backup was made with');
         if (!confirm(confirmText(f.name))) return;
         go.disabled = true; prog.classList.remove('hide');
         try {
@@ -3594,19 +3644,23 @@ function signinCard(st) {
 function usersCard(users, inv, signin) {
   const un = h('input', { placeholder: 'username' }); const ue = h('input', { placeholder: 'email (optional, lets them use Google)' });
   const roleSel = (val) => h('select', {}, h('option', { value: 'admin', selected: val === 'admin' }, 'Admin'), h('option', { value: 'viewer', selected: val === 'viewer' }, 'Viewer (read-only)'), h('option', { value: 'owner', selected: val === 'owner' }, 'Owner'));
-  const ur = roleSel('admin'); const up = h('input', { type: 'password', placeholder: 'initial password (12+)' });
+  const ur = roleSel('admin'); const up = h('input', { type: 'password', placeholder: 'password (12+), or empty for a sign-up link', autocomplete: 'new-password' });
+  const signup = (r) => { S.signupLink = r; renderSettings(); };
   const ie = h('input', { type: 'email', placeholder: 'their.name@gmail.com', autocomplete: 'off' }); const ir = roleSel('admin');
   const mail = (i) => `mailto:${encodeURIComponent(i.email)}?subject=${encodeURIComponent('Your invite to the Duniya admin panel')}&body=${encodeURIComponent(inviteMessage(i, inv.panelUrl))}`;
   const days = (ts) => Math.max(0, Math.ceil((ts - Date.now()) / 86400000));
+  const sl = S.signupLink;
   return h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Users'),
     h('p', { class: 'small muted' }, 'Owners manage everything incl. users, backups and updates. Admins manage agents, chats, models and memory. Viewers can only look.'),
+    sl ? h('div', { class: 'note' }, `Send this to ${sl.username} only: they set their own password (works once, 48 hours). `, h('code', { class: 'small', style: 'word-break:break-all' }, sl.link), ' ', copyBtn(sl.link), ' ', h('button', { class: 'btn small', onclick: () => { S.signupLink = null; renderSettings(); } }, 'Done')) : null,
     h('div', { class: 'tscroll' }, h('table', { class: 'stack' }, h('tbody', {}, users.map((u) => h('tr', {},
       h('td', { 'data-label': '' }, h('b', {}, u.username), ' ', u.google ? h('span', { class: 'pill info', title: 'Signs in with Google' }, gLogo(), 'Google') : null,
-        h('div', { class: 'small muted' }, [u.email, !u.hasPassword ? 'no password' : ''].filter(Boolean).join(' · '))),
+        h('div', { class: 'small muted' }, [u.email, !u.hasPassword ? (u.google ? 'no password' : 'waiting for sign-up') : ''].filter(Boolean).join(' · '))),
       h('td', { 'data-label': 'Role' }, h('select', { style: 'min-width:110px', 'aria-label': `Role of ${u.username}`, onchange: (e) => tryApi(() => api('PUT', `/api/users/${u.id}`, { role: e.target.value }), 'Role changed').then((r) => r || renderSettings()) },
         ['owner', 'admin', 'viewer'].map((r) => h('option', { value: r, selected: u.role === r }, r)))),
       h('td', { style: 'white-space:nowrap;text-align:right', 'data-label': '' }, u.id === S.user.id ? h('span', { class: 'small muted' }, 'you') : [
         u.google && u.hasPassword ? h('button', { class: 'btn small', onclick: () => confirm(`Unlink Google from ${u.username}? They then sign in with their password.`) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}/google`); renderSettings(); }, 'Unlinked') }, 'Unlink Google') : null, ' ',
+        signin?.active ? null : h('button', { class: 'btn small', title: 'A one-time link (48 h) where they set their own password', onclick: () => (u.hasPassword ? confirm(`Make a link where ${u.username} sets a new password? Send it to them only.`) : true) && tryApi(() => api('POST', `/api/users/${u.id}/signup-link`)).then((r) => r && signup(r)) }, u.hasPassword ? 'Password link' : 'Sign-up link'), ' ',
         h('button', { class: 'btn small danger', onclick: () => confirm(`Remove ${u.username}? They can no longer sign in.`) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}`); renderSettings(); }, 'Removed') }, 'Remove')])))))),
     h('h3', {}, 'Invite someone with Google'),
     inv.googleReady
@@ -3622,8 +3676,8 @@ function usersCard(users, inv, signin) {
         copyBtn(() => inviteMessage(i, inv.panelUrl), 'Copy message'),
         h('button', { class: 'btn small', title: 'Give them 14 more days', onclick: () => tryApi(async () => { await api('POST', `/api/invites/${i.id}/renew`); renderSettings(); }, 'Invite renewed for 14 days') }, 'Resend'),
         h('button', { class: 'btn small danger', onclick: () => confirm(`Revoke the invite for ${i.email}? They can no longer sign in with it.`) && tryApi(async () => { await api('DELETE', `/api/invites/${i.id}`); renderSettings(); }, 'Invite revoked') }, 'Revoke'))))) : null,
-    signin?.active ? null : h('details', { style: 'margin-top:12px' }, h('summary', { class: 'small muted' }, 'Add a user with a password instead'),
-      h('form', { class: 'row', style: 'margin-top:10px', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('POST', '/api/users', { username: un.value, email: ue.value, role: ur.value, password: up.value }), 'User added')) renderSettings(); } },
+    signin?.active ? null : h('details', { style: 'margin-top:12px' }, h('summary', { class: 'small muted' }, 'Add a user with a password or a sign-up link instead'),
+      h('form', { class: 'row', style: 'margin-top:10px', onsubmit: async (e) => { e.preventDefault(); const r = await tryApi(() => api('POST', '/api/users', { username: un.value, email: ue.value, role: ur.value, password: up.value }), 'User added'); if (r) signup(r.signup || null); } },
         un, ue, ur, up, h('button', { class: 'btn primary' }, 'Add user'))));
 }
 

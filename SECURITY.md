@@ -20,6 +20,10 @@ See [docs/upgrading.md](docs/upgrading.md).
   login rate limiting, a restrictive Content-Security-Policy, optional IP allow-list.
 - Secrets are stored encrypted in the data directory (mode 0600) and never returned by any API; backups are encrypted
   with the owner's passphrase before they leave the server.
+- Secrets never pass through WhatsApp, the owner assistant or AI assistants: keys are entered on one-time panel links
+  (256-bit token in the URL fragment, only its hash stored, single use, 15 minutes, panel sign-in as owner or admin);
+  new users set their own password on a one-time sign-up link (48 hours, rate limited); restores from chat use the
+  stored passphrase. Messages that look like keys are not stored or sent to a model.
 - Chats are off by default; off chats are never stored or sent to a model. Tool permissions are enforced in code per
   role, and changes go through a human `confirm CODE` step the model never sees.
 - Local tool services (npm/GitHub) are owner-only and run with a scrubbed environment.

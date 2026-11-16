@@ -177,6 +177,11 @@ export async function fetchBackup(source, file) {
   throw bad('source', 'local, github or s3');
 }
 
+/** Fetch and decrypt a backup without restoring it (060: the restore preview checks that it opens). */
+export async function openBackup({ source, file, passphrase }) {
+  const bundle = decryptBundle(await fetchBackup(source, file), passphrase);
+  return { files: Object.keys(bundle.files || {}).length, createdAt: bundle.createdAt };
+}
 /** Decrypt and stage; caller restarts the process. */
 export async function restoreBackup({ source, file, passphrase }) {
   return restoreBuffer(await fetchBackup(source, file), passphrase, { source, file });

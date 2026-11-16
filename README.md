@@ -32,7 +32,7 @@
 <tr>
 <td width="33%" valign="top"><a href="docs/agents.md"><img src="docs/img/thumb-agents.webp" alt="AI helper showing a visual diff of an agent change" width="100%"></a><br><b>Agents in plain words</b><br>Templates or describe it; review a visual diff. Quick replies, welcomes and FAQ answers without AI.</td>
 <td width="33%" valign="top"><a href="docs/privacy.md"><img src="docs/img/thumb-privacy.webp" alt="Privacy notice settings" width="100%"></a><br><b>Silent by default</b><br>Chats are off until you switch them on; then recent messages load from your phone (retried by itself). Set up a person's chat before they write.</td>
-<td width="33%" valign="top"><a href="docs/owner-assistant.md"><img src="docs/img/thumb-ask.webp" alt="Ask box with a weekly recap" width="100%"></a><br><b>Your own super agent</b><br>Recaps, GIFs, voice and pictures in your own WhatsApp chat; posts into your groups after you confirm.</td>
+<td width="33%" valign="top"><a href="docs/owner-assistant.md"><img src="docs/img/thumb-ask.webp" alt="Ask box with a weekly recap" width="100%"></a><br><b>Your own super agent</b><br>Recaps, GIFs, voice and pictures in your own WhatsApp chat; posts into your groups after you confirm. Keys and passwords never go through the chat: one-time links instead.</td>
 </tr>
 <tr>
 <td valign="top"><a href="docs/models.md"><img src="docs/img/thumb-fallback.webp" alt="When a model fails: fallback settings" width="100%"></a><br><b>Any model, with a backup</b><br>ChatGPT, Copilot, OpenRouter, keys, Ollama.</td>

@@ -32,8 +32,20 @@ Then a Duniya page opens: sign in (if asked), check what the assistant may do, *
 </details>
 
 > [!IMPORTANT]
-> Viewers stay read-only; owner-only actions stay owner-only. Risky: deleting an agent, erasing memory, secrets,
-> users, WhatsApp numbers, restoring backups, updates, restarts.
+> Viewers stay read-only; owner-only actions stay owner-only. Risky: deleting an agent, erasing memory, removing
+> secrets or users, sign-up links, WhatsApp numbers, restoring backups, updates, restarts.
+
+## No secrets through the assistant
+
+The assistant never sees a key, password or passphrase (spec
+[`060`](../specs/060-secretless-links/spec.md)):
+
+| Tool | What happens |
+|---|---|
+| `set_secret` { `name` or `account` } | Returns a one-time link (15 minutes, single use). A signed-in owner or admin opens it and pastes the value in the panel; it goes straight to the server. `list_secrets` / `list_model_accounts` then show it as set. A `value` sent anyway is refused |
+| `add_user` { `username`, `role` } | Creates the user without a password and returns a one-time sign-up link (48 hours) for that person only: they choose their own password and are signed in |
+| `send_signup_link` { `user_id` } | A new sign-up link (expired link, forgotten password); older links stop working. Needs `confirm_action` |
+| `restore_backup` { `source`, `file` } | Uses the backup passphrase stored on this server; the preview opens the backup and shows its date. A backup that does not open with it (another server, an older passphrase) is refused with a link to **Backups → Restore** in the panel |
 
 > [!TIP]
 > Behind a proxy set `TRUST_PROXY=1`, or `PUBLIC_URL=https://your-host` so the OAuth issuer and MCP address are fixed
@@ -49,7 +61,7 @@ rotation). Spec: [`specs/017-admin-mcp/`](../specs/017-admin-mcp/spec.md).
 
 ## Tools
 
-96 tools cover the panel:
+97 tools cover the panel:
 
 | Area | Covers |
 |---|---|
