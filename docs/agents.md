@@ -18,6 +18,11 @@
 > triggers appear, the first one in the message wins. In your own direct chat with the owner assistant, a trigger only
 > hands the message to that agent when the message *starts* with it, so you can talk *about* agents freely.
 
+> [!NOTE]
+> **The Owner assistant is an agent too** (built in, always there): your own agent in your own WhatsApp chat. Its
+> editor has the parts that apply to it — character, model, tools, photos & voice, memory, alerts and scheduled
+> messages to you (the weekly summary is one). See [Owner assistant](owner-assistant.md).
+
 ## Create and change agents
 
 | Way | How |

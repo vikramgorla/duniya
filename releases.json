@@ -1,6 +1,12 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.20.0": {
+      "breaking": false,
+      "title": "The owner assistant is your own super agent: a built-in agent with its own editor, tools, GIFs, photos & voice, and sends into your chats after you confirm",
+      "summary": "In your own WhatsApp chat the owner assistant now has everything an agent has: global tool services (\"send me a gif\"), WhatsApp actions, photos, PDFs and voice notes, voice replies, pictures and memory. Owners and admins can have it send messages, GIFs, polls and more into chats that are on, always after confirm CODE. It is a built-in agent (Agents → Owner assistant): give it a character, choose its tools and model, and add scheduled messages to you. The weekly summary is now one of its schedules and the alert number is in its Alerts section: enter the number there again, and set the model again if you had chosen one.",
+      "docs": "docs/owner-assistant.md"
+    },
     "2.19.2": {
       "breaking": false,
       "title": "Member tags no longer looked for in the group member list (WhatsApp does not put them there); smaller WhatsApp code"

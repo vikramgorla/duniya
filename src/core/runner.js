@@ -20,7 +20,7 @@ const MAX_TOOL_ROUNDS = 8;
 
 // Test console (#37): WhatsApp actions are never carried out from the panel. Read-only ones look at the chat being
 // tested; every other one returns what it would have done.
-const WA_READ_ONLY = new Set(['whatsapp:poll_results', 'whatsapp:group_info', 'whatsapp:profile_info']);
+export const WA_READ_ONLY = new Set(['whatsapp:poll_results', 'whatsapp:group_info', 'whatsapp:profile_info']);
 async function runTool(run, m, call, ctx) {
   const fq = m?.fq || '';
   if (ctx.source === 'panel' && fq.startsWith('media:')) { // 043: no pictures are made (or paid for) from the test console

@@ -19,13 +19,18 @@ const agents: Agent[] = [
   { id: 'neighbours', name: 'Neighbours', description: 'Building notices, parcels and the shared garden.', enabled: false, needs: [], updatedAt: now - 9 * 86400_000,
     config: { name: 'Neighbours', description: 'Building notices, parcels and the shared garden.', model: 'auto', enabled: false, triggers: ['!house'], dm: 'off', prompt: 'You help neighbours in one building.', tools: { participant: [], organizer: [], deny: [] }, organizers: [], chats: [], memory: { enabled: false } } },
 ];
+// 059: the built-in owner assistant is an agent record too
+agents.push({ id: 'owner-assistant', name: 'Owner assistant', description: 'Built-in: answers you in your own WhatsApp chat and in the Ask box.', enabled: true, needs: [], updatedAt: now - 86400_000, builtin: true,
+  config: { name: 'Owner assistant', description: 'Built-in: answers you in your own WhatsApp chat and in the Ask box.', model: 'auto', enabled: true, triggers: [], dm: 'none',
+    prompt: 'Be brief, friendly and practical. Call me Vik.', tools: { participant: [], organizer: [], deny: [] }, organizers: [], chats: [], memory: { enabled: true },
+    schedules: [{ id: 'weekly-summary', kind: 'weekly-summary', at: '09:00', days: 'mon', enabled: true, prompt: '' }] } });
 const chats: Chat[] = [
   { id: 'g1@g.us', name: 'Gorla family', size: 23, isGroup: true, number: 'main', numberLabel: 'Main', agent: 'family', model: 'inherit', logging: 'inherit' },
   { id: 'g2@g.us', name: 'School carpool', size: 8, isGroup: true, number: 'main', numberLabel: 'Main', agent: 'carpool', model: 'inherit', logging: 'inherit', fallback: { mode: 'on', chain: ['openai:auto', 'anthropic:auto'] }, private: false, noticeOff: false },
   { id: 'g3@g.us', name: 'Building Rue du Midi', size: 31, isGroup: true, number: 'main', numberLabel: 'Main', agent: '', model: 'inherit', logging: 'inherit' },
   { id: '41790000003@s.whatsapp.net', name: 'Anu', isGroup: false, phone: '41790000003', number: 'main', numberLabel: 'Main', agent: '', model: 'inherit', logging: 'inherit', lastAt: now - 40 * min },
 ];
-let ownerInfo: OwnerAssistantInfo = { settings: { model: 'auto' }, role: 'owner', link: { status: 'linked', phone: '41790000001', linkedAt: now - 3 * 86400_000 }, sendTo: [{ id: 'main', label: 'Main', phone: '41790000099' }] };
+let ownerInfo: OwnerAssistantInfo = { agent: 'owner-assistant', role: 'owner', link: { status: 'linked', phone: '41790000001', linkedAt: now - 3 * 86400_000 }, sendTo: [{ id: 'main', label: 'Main', phone: '41790000099' }] };
 let pending: Pending[] = [
   { code: 'K7Q2', agent: 'carpool', tool: 'calendar:event_update', chat: 'g2@g.us', requester: 'Anu', summary: 'Move Thursday football pickup from 17:00 to 17:30 and make Rupa the driver', expires: now + 7 * min },
 ];
@@ -101,7 +106,6 @@ async function route(method: string, path: string, body: any): Promise<unknown> 
   }
   if (method === 'GET' && p === '/api/owner-assistant') return ownerInfo;
   if (method === 'DELETE' && p === '/api/owner-assistant/link') { ownerInfo = { ...ownerInfo, link: { status: 'none' } }; return { ok: true }; }
-  if (method === 'PUT' && p === '/api/owner-assistant/settings') { ownerInfo = { ...ownerInfo, settings: { model: body.model || 'auto' } }; return ownerInfo.settings; }
   if ((m = /^\/api\/pending\/([^/]+)(\/apply)?$/.exec(p))) { pending = pending.filter((x) => x.code !== m![1]); return m[2] ? { result: 'Applied (demo)' } : { ok: true }; }
   if (method === 'POST' && p === '/api/updates/apply') { updateRunning = { target: 'v1.9.1', startedAt: Date.now() }; setTimeout(() => { updateRunning = null; }, 8000); return { started: true, running: updateRunning }; }
   if (method === 'POST' && p === '/api/updates/check') return { current: 'v1.9.0', latest: 'v1.9.1', available: true };

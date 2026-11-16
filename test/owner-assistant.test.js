@@ -251,12 +251,13 @@ test('044: privacy notice — posted once when a group is switched on; text chan
   assert.equal(sentTo('g9@g.us').length, 0, 'notice off');
 });
 
-test('044: admin MCP tools, owner settings and unlinking', async () => {
+test('044/059: admin MCP tools, its model (the built-in agent record) and unlinking', async () => {
   const names = TOOLS.map((x) => x.name);
   for (const n of ['get_owner_assistant', 'set_chat_private', 'get_privacy_notice', 'set_privacy_notice', 'set_chat_privacy_notice']) assert.ok(names.includes(n), n);
-  assert.equal((await t.api(viewer, 'PUT', '/api/owner-assistant/settings', { model: 'auto' })).status, 403);
-  assert.equal((await t.api(admin, 'PUT', '/api/owner-assistant/settings', { model: 'nope' })).status, 400);
-  assert.equal((await t.api(admin, 'PUT', '/api/owner-assistant/settings', { model: 'anthropic:claude-haiku-5-5' })).body.model, 'anthropic:claude-haiku-5-5');
+  assert.equal((await t.api(viewer, 'PUT', '/api/agents/owner-assistant', { model: 'auto' })).status, 403);
+  assert.equal((await t.api(admin, 'PUT', '/api/agents/owner-assistant', { model: 'nope' })).status, 400);
+  assert.equal((await t.api(admin, 'PUT', '/api/agents/owner-assistant', { model: 'anthropic:claude-haiku-5-5' })).body.config.model, 'anthropic:claude-haiku-5-5');
+  assert.equal((await t.api(owner, 'GET', '/api/owner-assistant')).body.agent, 'owner-assistant');
   t.script.push([{ type: 'text', text: 'haiku here' }]);
   await t.api(admin, 'POST', '/api/owner/ask', { question: 'which model?' });
   assert.equal(t.claudeReqs.at(-1).model, 'claude-haiku-5-5');

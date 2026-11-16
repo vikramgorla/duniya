@@ -11,6 +11,28 @@ import { deleteAgentConnections } from './mcp-oauth.js';
 import { globalServers } from './global-mcp.js';
 import { guardLocalSmall } from './mcp-local.js';
 
+// ---------- the built-in owner assistant (059) ----------
+// The owner assistant is an agent record with a reserved id, always present and not deletable. The owner edits its
+// character, model, tools, photos & voice and schedules in the normal agent editor; how it is reached (the linked
+// users' own chats and the Ask box), its permissions and its confirm gate are code (owner-assistant.js), so the
+// fields below are fixed whatever is saved.
+export const OWNER_AGENT_ID = 'owner-assistant';
+export const isBuiltin = (a) => (typeof a === 'string' ? a : a?.id) === OWNER_AGENT_ID;
+const OWNER_FIXED = Object.freeze({ enabled: true, chats: [], triggers: [], respondToMentions: false, dm: 'none', organizers: [], participants: [], confirm: null,
+  quickReplies: [], help: false, welcome: { enabled: false, text: '', rules: '' }, faq: { items: [], strictness: 'normal', wholeGroup: false } });
+const ownerConfig = (config) => validateAgentConfig({ ...config, ...structuredClone(OWNER_FIXED) });
+/** Every other agent: no alert number and no weekly-summary schedule (those belong to the owner assistant). */
+const agentConfig = (config) => validateAgentConfig({ ...config, alerts: { to: '' },
+  ...(Array.isArray(config?.schedules) ? { schedules: config.schedules.filter((x) => (x?.kind ?? 'prompt') === 'prompt') } : {}) });
+function ensureOwnerAgent() {
+  if (getAgentRow(OWNER_AGENT_ID)) return;
+  saveAgentRow(OWNER_AGENT_ID, ownerConfig({ name: 'Owner assistant', description: 'Built-in: answers linked panel users in their own WhatsApp chat and in the Ask box.',
+    prompt: 'Be brief, friendly and practical.', maxTokens: 1500, historySize: 10,
+    // 041 → 059: the weekly summary is a schedule of the owner assistant (counts and costs only, weekly.js)
+    schedules: [{ id: 'weekly-summary', kind: 'weekly-summary', at: '09:00', days: 'mon', enabled: true }] }).config, 'system');
+}
+const builtinError = (what) => Object.assign(new Error(`The owner assistant is built in: it ${what}`), { status: 400 });
+
 let agents = new Map();
 function toRuntime(row) {
   return { ...row.config, id: row.id, updatedAt: row.updatedAt };
@@ -18,6 +40,7 @@ function toRuntime(row) {
 
 // ---------- registry ----------
 export async function loadAgents() {
+  ensureOwnerAgent();
   const next = new Map();
   for (const row of listAgentRows()) next.set(row.id, toRuntime(row));
   agents = next;
@@ -47,7 +70,7 @@ function releaseChats(chats, exceptId, by) {
 }
 
 export async function createAgent({ id, config, by = '' }) {
-  const { config: clean, warnings } = validateAgentConfig(config);
+  const { config: clean, warnings } = agentConfig(config);
   guardLocalSmall({}, clean.mcpServers); // 055: no new local tool services on small servers (every path ends here)
   let agentId = id ? String(id).toLowerCase() : slugify(clean.name);
   if (!AGENT_ID_RE.test(agentId)) throw new ValidationError('id', 'must be 2–41 lowercase letters, digits or -');
@@ -82,7 +105,7 @@ export function changeSummary(before = {}, after = {}) {
 export async function updateAgent(id, patch, by = '') {
   const row = getAgentRow(id);
   if (!row) throw Object.assign(new Error(`Unknown agent ${id}`), { status: 404 });
-  const { config: clean, warnings } = validateAgentConfig({ ...row.config, ...patch });
+  const { config: clean, warnings } = (isBuiltin(id) ? ownerConfig : agentConfig)({ ...row.config, ...patch });
   guardLocalSmall(row.config.mcpServers, clean.mcpServers);
   if (patch.chats) releaseChats(clean.chats, id, by);
   saveAgentRow(id, clean, by);
@@ -91,6 +114,7 @@ export async function updateAgent(id, patch, by = '') {
 }
 
 export function deleteAgent(id, by = '') {
+  if (isBuiltin(id)) throw builtinError('cannot be deleted');
   if (!deleteAgentRow(id)) throw Object.assign(new Error(`Unknown agent ${id}`), { status: 404 });
   agents.delete(id);
   deleteAgentConnections(id);
@@ -102,6 +126,7 @@ export async function bindChat(chat, agentId, by = '') {
     if (b.chats.includes(chat) && b.id !== agentId) await updateAgent(b.id, { chats: b.chats.filter((c) => c !== chat) }, by);
   }
   if (agentId) {
+    if (isBuiltin(agentId)) throw builtinError('answers its linked users in their own chats, not in assigned chats');
     const b = getAgent(agentId);
     if (!b) throw Object.assign(new Error(`Unknown agent ${agentId}`), { status: 404 });
     if (!b.chats.includes(chat)) await updateAgent(agentId, { chats: [...b.chats, chat] }, by);
@@ -144,7 +169,7 @@ export function agentView(agent) {
   delete config.id; delete config.updatedAt;
   const needs = referencedSecrets(agent).filter((s) => !getSecret(s));
   return {
-    id: agent.id, name: agent.name, description: agent.description, enabled: agent.enabled, config, needs,
+    id: agent.id, name: agent.name, description: agent.description, enabled: agent.enabled, config, needs, ...(isBuiltin(agent) ? { builtin: true } : {}),
     updatedAt: agent.updatedAt,
     // Global tool services (035): on = used by this agent; replaced = the agent has its own service with that name.
     globalTools: Object.entries(globalServers()).map(([name, g]) => ({

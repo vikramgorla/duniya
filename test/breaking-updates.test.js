@@ -13,7 +13,6 @@ const u = await import('../src/core/updates.js');
 const dec = await import('../src/core/update-decision.js');
 const rel = await import('../src/core/releases.js');
 const backup = await import('../src/core/backup/index.js');
-const { setOwnerNumber } = await import('../src/core/owner-alerts.js');
 const owner = await t.login();
 
 const gitEnv = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
@@ -94,7 +93,7 @@ test('045: auto mode installs the safe release (backup first), announces the bre
   const { app } = makeRepos();
   u._setAppRoot(app, { running: 'v1.0.0' });
   backup.setPassphrase('pre-update passphrase 123');
-  setOwnerNumber(`+${ALERT_PHONE}`);
+  await t.agents.updateAgent('owner-assistant', { alerts: { to: `+${ALERT_PHONE}` } }); // 059: Agents → Owner assistant → Alerts
   // the owner linked the owner assistant; an admin too (admins never get update codes)
   await import('../src/core/owner-assistant.js');
   t.store.createUser({ username: 'ada', role: 'admin', password: 'admin password 123' });

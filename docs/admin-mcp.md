@@ -49,14 +49,14 @@ rotation). Spec: [`specs/017-admin-mcp/`](../specs/017-admin-mcp/spec.md).
 
 ## Tools
 
-95 tools cover the panel:
+96 tools cover the panel:
 
 | Area | Covers |
 |---|---|
 | Overview | status, activity |
-| Agents | create, update, draft with AI, test (`test_agent` says which path answered: quick reply, FAQ or model), export, enable, built-in answers without AI (`set_agent_quick_answers`: quick replies, `!help`, welcome, FAQ) |
+| Agents | create, update (also the built-in `owner-assistant`: character, model, tools, photos & voice, schedules incl. the weekly summary, `alerts.to` — owner only; it is marked `builtin` and cannot be deleted or assigned), draft with AI, test (`test_agent` says which path answered: quick reply, FAQ or model), export, enable, built-in answers without AI (`set_agent_quick_answers`: quick replies, `!help`, welcome, FAQ) |
 | Chats | assign, settings (model, fallback mode and chain, logging, welcome new members), private, privacy notice, stored messages, `load_chat_history` (Load recent messages from the phone, optional: unanswered loads retry by themselves; the owner assistant runs it without a confirm code), `set_history_on_switch_on`, prepare a direct chat before the person writes (`prepare_direct_chat`; confirmed when `send_intro` is set), first message by the agent (`send_chat_intro`, confirmed) |
-| Money | usage, prices, spending caps, owner alerts, weekly summary |
+| Money | usage, prices, spending caps, weekly summary preview (alerts number and schedule: `update_agent` on `owner-assistant`) |
 | People & memory | contacts (`contact_names_status`; `refresh_contact_names`, `set_contact_names_for_agents`, optional — names refresh by themselves), memory, WhatsApp groups, WhatsApp numbers, users |
 | Models | models, accounts, fallback, photos & voice |
 | Tools | global tool services, browse and add from the MCP Registry (`search_mcp_registry`, `add_tool_service_from_registry`), secrets, confirmations, logging |

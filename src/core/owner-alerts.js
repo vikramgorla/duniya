@@ -1,19 +1,13 @@
 // Owner alerts on WhatsApp (040/041, issues #35 and #38). The app has no phone number for panel users, so the owner
-// enters one under Settings → Owner alerts ("Alerts go to"). Without one, alerts are only recorded in Activity.
-import { digits, bad } from './config.js';
-import { getSetting, updateSettings } from './store.js';
+// enters one in the owner assistant's editor (Agents → Owner assistant → Alerts, 059: alerts are messages of the
+// built-in owner assistant). Without one, alerts are only recorded in Activity. Alerts stay event-driven.
+import { digits } from './config.js';
+import { getAgent, OWNER_AGENT_ID } from './agents.js';
 import { activity } from './events.js';
 import { whatsappChannel } from './whatsapp-tools.js';
 
-
 /** The owner's alert number (digits with country code) or ''. */
-export const ownerNumber = () => digits(getSetting('alertsTo', ''));
-export function setOwnerNumber(value) {
-  const d = digits(value);
-  if (d && (d.length < 8 || d.length > 15)) throw bad('Enter the number with its country code, e.g. +41 79 123 45 67', 'alertsTo');
-  updateSettings({ alertsTo: d });
-  return d;
-}
+export const ownerNumber = () => digits(getAgent(OWNER_AGENT_ID)?.alerts?.to || '');
 /** The chat id alerts go to (always the first WhatsApp number's session). */
 const ownerChat = () => (ownerNumber() ? `${ownerNumber()}@s.whatsapp.net` : '');
 
@@ -21,7 +15,7 @@ const ownerChat = () => (ownerNumber() ? `${ownerNumber()}@s.whatsapp.net` : '')
 export async function sendOwnerAlert(text, { kind = 'alert' } = {}) {
   const to = ownerChat();
   if (!to) {
-    activity('system', { summary: `Owner alert not sent (no number under Settings → Owner alerts): ${text}`, detail: { kind } });
+    activity('system', { summary: `Owner alert not sent (no number under Agents → Owner assistant → Alerts): ${text}`, detail: { kind } });
     return { sent: false, to: '', reason: 'No alert number set' };
   }
   const ch = whatsappChannel();

@@ -35,7 +35,7 @@ beforeEach(async () => {
   breaker.reset(); breaker.resetSwitches(); breaker.resetAllFailedAlert();
   t.claudeFail.length = 0; t.claudeStreamFail.length = 0; t.script.length = 0;
   Object.assign(alpha, { fail: {}, streamFail: [], refuseStream: false }); alpha.script.length = 0;
-  await t.api(owner, 'PUT', '/api/owner-assistant/settings', { model: 'auto' });
+  await t.api(owner, 'PUT', '/api/agents/owner-assistant', { model: 'auto' });
 });
 
 async function stream(question) {
@@ -124,7 +124,7 @@ test('047: mid-stream error event, and the retry fails too: the chain continues 
 });
 
 test('047: OpenAI-compatible SSE: tool calls joined from chunks, text streamed, usage from the last chunk', async () => {
-  await t.api(owner, 'PUT', '/api/owner-assistant/settings', { model: 'alpha:fake-large' });
+  await t.api(owner, 'PUT', '/api/agents/owner-assistant', { model: 'alpha:fake-large' });
   const before = usageRows().length;
   alpha.script.push(
     { content: 'Checking.', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'list_visible_chats', arguments: '{"days":7}' } }] },
@@ -141,7 +141,7 @@ test('047: OpenAI-compatible SSE: tool calls joined from chunks, text streamed, 
 });
 
 test('047: OpenAI-compatible mid-stream drop restarts on the same account; a server without streaming answers whole', async () => {
-  await t.api(owner, 'PUT', '/api/owner-assistant/settings', { model: 'alpha:fake-large' });
+  await t.api(owner, 'PUT', '/api/agents/owner-assistant', { model: 'alpha:fake-large' });
   alpha.streamFail.push({ after: 1, network: true });
   alpha.script.push({ content: 'first try that breaks' }, { content: 'second try, whole' });
   const ev = await stream('again?');

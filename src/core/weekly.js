@@ -1,34 +1,14 @@
-// Weekly summary to the owner on WhatsApp (041, issue #38). Counts and costs only — never message contents. Runs from
-// the scheduler at the owner's day and time (server timezone); on by default once an alert number is known.
-import { env, bad, plural } from './config.js';
-import { db, kvGet, kvSet, listPending } from './db.js';
-import { getSetting, updateSettings } from './store.js';
+// Weekly summary (041, issue #38): the text of the owner assistant's "weekly-summary" schedule (059: day, time and
+// on/off are that schedule in the agent editor; owner-assistant.js sends it). Counts and costs only — never message
+// contents.
+import { env, plural } from './config.js';
+import { db, listPending } from './db.js';
 import { listAgents } from './agents.js';
 import { statsBetween, dayOf } from './stats.js';
-import { ownerNumber, sendOwnerAlert } from './owner-alerts.js';
 import { updateStatus } from './updates.js';
 import { lastBackup } from './backup/index.js';
 import { listCaps, capStatus, monthOf } from './budget.js';
 import { rebootStatus } from './system.js';
-
-export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-const DEFAULTS = { enabled: null, day: 'mon', at: '09:00' };
-
-/** { enabled (null = default), day, at, active } — active: it will actually be sent. */
-export function getWeeklySettings() {
-  const s = { ...DEFAULTS, ...(getSetting('weekly', {}) || {}) };
-  const on = s.enabled === null ? true : !!s.enabled;
-  return { ...s, active: on && !!ownerNumber(), last: Number(kvGet('weekly:last') || 0) || null };
-}
-export function setWeeklySettings(patch = {}) {
-  const cur = { ...DEFAULTS, ...(getSetting('weekly', {}) || {}) };
-  const next = { ...cur };
-  if ('enabled' in patch) next.enabled = patch.enabled === null ? null : !!patch.enabled;
-  if ('day' in patch) { if (!WEEKDAYS.includes(patch.day)) throw bad('Day must be mon … sun', 'day'); next.day = patch.day; }
-  if ('at' in patch) { if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(patch.at))) throw bad('Time must be HH:MM', 'at'); next.at = patch.at; }
-  updateSettings({ weekly: next });
-  return getWeeklySettings();
-}
 
 const fmtUsd = (c) => (c === 0 ? '$0' : c < 0.01 ? '<$0.01' : `$${c < 10 ? c.toFixed(2) : Math.round(c)}`);
 const usageBetween = (from, to) => Object.fromEntries(db.prepare(`SELECT agent, SUM(cost) AS cost, SUM(input + output) AS tokens, COUNT(*) AS calls,
@@ -88,31 +68,4 @@ export function weeklyText(d = weeklyData()) {
   if (d.restart) todo.push(`the server has waited ${d.restart.days} days for a restart to finish OS updates${d.restart.kernel ? ' (new kernel)' : ''} (Server → Restart server)`);
   lines.push(todo.length ? `Needs you: ${todo.join('; ')}. Open the panel to sort it out.` : 'Nothing needs you right now.');
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-}
-
-/** Send the summary now (Settings → "Send now", or the scheduler). */
-export async function sendWeekly({ reason = 'manual' } = {}) {
-  const text = weeklyText();
-  const r = await sendOwnerAlert(text, { kind: reason === 'schedule' ? 'weekly summary' : 'weekly summary (sent now)' });
-  if (r.sent) kvSet('weekly:last', String(Date.now()));
-  return { ...r, text };
-}
-
-function nowParts(tz) {
-  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short' })
-    .formatToParts(new Date()).map((x) => [x.type, x.value]));
-  return { date: `${p.year}-${p.month}-${p.day}`, hhmm: `${p.hour === '24' ? '00' : p.hour}:${p.minute}`, day: p.weekday.slice(0, 3).toLowerCase() };
-}
-
-/** Called by the scheduler every 30 s: sends once on the chosen day, at or after the chosen time. */
-export async function weeklyTick() {
-  const s = getWeeklySettings();
-  if (!s.active) return false;
-  const { date, hhmm, day } = nowParts(env.timezone);
-  if (day !== s.day || hhmm < s.at) return false;
-  const key = `weekly:slot:${date}`;
-  if (kvGet(key)) return false;
-  kvSet(key, '1');
-  await sendWeekly({ reason: 'schedule' });
-  return true;
 }

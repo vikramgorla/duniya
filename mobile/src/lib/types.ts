@@ -21,7 +21,7 @@ export interface AgentConfig {
   mcpServers?: Record<string, { type?: string; url?: string; auth?: string; package?: string }>;
   tools?: { participant?: string[]; organizer?: string[]; deny?: string[] };
   organizers?: string[]; participants?: string[]; chats?: string[];
-  schedules?: { id: string; at: string; days?: string; enabled?: boolean; prompt?: string }[];
+  schedules?: { id: string; at: string; days?: string; enabled?: boolean; prompt?: string; kind?: string }[];
   memory?: { enabled?: boolean };
   globalMcp?: { disabled?: string[] };
   /** 054: built-in answers (no AI) — edited in the web panel. */
@@ -34,7 +34,7 @@ export interface AgentConfig {
 export interface GlobalTool { name: string; type: string; on: boolean; replaced: boolean; defaults?: { organizer?: string[]; participant?: string[] } }
 export interface Agent {
   id: string; name: string; description?: string; enabled: boolean; config: AgentConfig; needs: string[];
-  updatedAt?: number; globalTools?: GlobalTool[];
+  updatedAt?: number; globalTools?: GlobalTool[]; builtin?: boolean;
 }
 
 export interface Chat {
@@ -47,7 +47,7 @@ export interface Chat {
 }
 /** Settings → Owner assistant (044), as GET /api/owner-assistant returns it. */
 export interface OwnerAssistantInfo {
-  settings: { model: string }; role: string;
+  agent: string; role: string; // 059: the built-in agent record (model, character, tools …)
   link: { status: 'none' | 'code' | 'pending' | 'linked'; phone?: string; expiresAt?: number | null; linkedAt?: number | null };
   sendTo: { id: string; label: string; phone: string }[];
   links?: { userId: number; username: string; phone: string; linkedAt: number }[];

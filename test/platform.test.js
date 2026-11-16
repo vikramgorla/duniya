@@ -8,7 +8,7 @@ before(async () => { t = await setup(); });
 after(() => t.close());
 
 test('001/US3 + 005: agents load from the app store', () => {
-  assert.deepEqual(t.agents.listAgents().map((b) => b.id).sort(), ['helper', 'panduga']);
+  assert.deepEqual(t.agents.listAgents().map((b) => b.id).sort(), ['helper', 'owner-assistant', 'panduga']);
 });
 
 test('001/US1: group message without trigger is stored but not answered', async () => {

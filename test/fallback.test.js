@@ -288,7 +288,7 @@ test('per agent and per chat override: off, own chain; the chat wins over the ag
 });
 
 test('owner alerts: an account failing for more than 15 minutes, and all providers failing (deduplicated)', async () => {
-  assert.equal((await t.api(owner, 'PUT', '/api/alerts', { alertsTo: '+41 79 111 22 33' })).status, 200);
+  assert.equal((await t.api(owner, 'PUT', '/api/agents/owner-assistant', { alerts: { to: '+41 79 111 22 33' } })).status, 200);
   const toOwner = () => t.sent.filter((m) => m.chat === '41791112233@s.whatsapp.net');
   const n = toOwner().length;
   t.claudeFail.push({ status: 401, message: 'invalid x-api-key' });
@@ -315,7 +315,7 @@ test('owner alerts: an account failing for more than 15 minutes, and all provide
   await new Promise((r) => setTimeout(r, 50));
   assert.equal(toOwner().length, c, 'at most one "all failed" alert per hour');
   await t.agents.updateAgent('helper', { fallback: { mode: 'inherit' } });
-  await t.api(owner, 'PUT', '/api/alerts', { alertsTo: '' });
+  await t.api(owner, 'PUT', '/api/agents/owner-assistant', { alerts: { to: '' } });
 });
 
 test('background summaries and the admin MCP tools use the same fallback', async () => {

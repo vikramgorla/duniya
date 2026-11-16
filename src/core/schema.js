@@ -34,7 +34,11 @@ export const AGENT_DEFAULTS = Object.freeze({
   help: false,
   welcome: { enabled: false, text: '', rules: '' },
   faq: { items: [], strictness: 'normal', wholeGroup: false },
+  // 059: where owner alerts go (the built-in owner assistant only; empty for every other agent).
+  alerts: { to: '' },
 });
+/** Kinds of schedule entries: a prompt the agent answers, or (built-in owner assistant only) the weekly summary. */
+const SCHEDULE_KINDS = ['prompt', 'weekly-summary'];
 
 export const AGENT_ID_RE = /^[a-z0-9][a-z0-9-]{1,40}$/;
 export const SERVER_KEY_RE = /^[a-z][a-z0-9_]{0,30}$/;
@@ -205,8 +209,10 @@ export function validateAgentConfig(input) {
     const id = str(s.id || `s${i + 1}`, `${f}.id`, { min: 1, max: 40 });
     if (ids.has(id)) fail(`${f}.id`, 'must be unique');
     ids.add(id);
+    const kind = s.kind ?? 'prompt';
+    if (!SCHEDULE_KINDS.includes(kind)) fail(`${f}.kind`, `must be ${SCHEDULE_KINDS.join(' or ')}`);
     return {
-      id, at: s.at, days, prompt: str(s.prompt, `${f}.prompt`, { min: 1, max: 4000 }),
+      id, at: s.at, days, kind, prompt: kind === 'prompt' ? str(s.prompt, `${f}.prompt`, { min: 1, max: 4000 }) : '',
       chats: s.chats === 'all' || !s.chats ? 'all' : list(s.chats, `${f}.chats`), enabled: s.enabled !== false,
     };
   });
@@ -223,6 +229,9 @@ export function validateAgentConfig(input) {
   out.media = { photos: flag('photos'), documents: flag('documents'), stickers: flag('stickers'), voiceNotes: flag('voiceNotes'), voiceReply,
     createImages: { organizer: md.createImages?.organizer === undefined ? mdef.createImages.organizer : !!md.createImages.organizer,
       participant: md.createImages?.participant === undefined ? mdef.createImages.participant : !!md.createImages.participant } };
+  const to = digits(c.alerts?.to || '');
+  if (to && (to.length < 8 || to.length > 15)) fail('alerts.to', 'enter the number with its country code, e.g. +41 79 123 45 67');
+  out.alerts = { to };
   Object.assign(out, builtins(c));
   return { config: out, warnings };
 }

@@ -120,7 +120,7 @@ export async function toolsFor(agent, role) {
         description: (t.description || '').slice(0, 1000),
         input_schema: t.inputSchema || { type: 'object', properties: {} },
       });
-      meta.set(name, { kind: 'mcp', server: serverKey, tool: t.name, fq, conn, global: !!srv.global });
+      meta.set(name, { kind: 'mcp', server: serverKey, tool: t.name, fq, conn, global: !!srv.global, annotations: t.annotations || {} });
     }
   }
 

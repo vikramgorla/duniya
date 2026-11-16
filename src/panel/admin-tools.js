@@ -58,7 +58,7 @@ export const TOOLS = [
     } },
 
   // ---------- agents ----------
-  { name: 'list_agents', readOnly: true, calls: [['GET', '/api/agents']], description: 'All agents with their settings (enabled, chats, triggers, model, tool services, schedules).', input: {},
+  { name: 'list_agents', readOnly: true, calls: [['GET', '/api/agents']], description: 'All agents with their settings (enabled, chats, triggers, model, tool services, schedules). The built-in owner assistant (id owner-assistant, builtin: true) is listed too: its character, model, tools, photos & voice, schedules (incl. the weekly summary) and alerts number are edited with update_agent; it cannot be deleted or assigned to chats.', input: {},
     run: (a, x) => x.call('GET', '/api/agents') },
   { name: 'get_agent', readOnly: true, calls: [['GET', '/api/agents/x']], description: 'One agent with its full configuration.', input: { agent_id: str('Agent id') }, required: ['agent_id'],
     run: (a, x) => x.call('GET', `/api/agents/${enc(a.agent_id)}`) },
@@ -69,7 +69,7 @@ export const TOOLS = [
     input: { id: str('New agent id (lowercase letters, digits, -). Optional: derived from the name'), template: str('Template id (optional)'), config: obj('Configuration fields (optional, override the template)') },
     run: (a, x) => x.call('POST', '/api/agents', { id: a.id, template: a.template, config: a.config || {} }) },
   { name: 'update_agent', calls: [['PUT', '/api/agents/x']],
-    description: 'Change fields of an agent (only the fields given change), e.g. { "prompt": "…", "triggers": ["!help"], "model": "auto" } or { "fallback": { "mode": "off" } } (model fallback: inherit | on | off, optional "chain"). Returns the agent and any warnings.',
+    description: 'Change fields of an agent (only the fields given change), e.g. { "prompt": "…", "triggers": ["!help"], "model": "auto" } or { "fallback": { "mode": "off" } } (model fallback: inherit | on | off, optional "chain"). Returns the agent and any warnings. For owner-assistant, how it is reached and its permissions are fixed in code (chats, triggers, people, confirm, quick answers are ignored); alerts: { to: "+41…" } sets where owner alerts go (owner only).',
     input: { agent_id: str('Agent id'), changes: obj('Fields to change') }, required: ['agent_id', 'changes'],
     run: (a, x) => x.call('PUT', `/api/agents/${enc(a.agent_id)}`, a.changes || {}) },
   // 054: built-in answers without AI (quick replies, !help, welcome, FAQ).
@@ -110,7 +110,7 @@ export const TOOLS = [
     input: { agent_id: str('Agent id') }, required: ['agent_id'],
     preview: async (a, x) => `Delete the agent ${await agentName(x, a.agent_id)}. Its chats stop getting replies and its settings are gone (export it first to keep a copy). This cannot be undone.`,
     run: (a, x) => x.call('DELETE', `/api/agents/${enc(a.agent_id)}`) },
-  { name: 'run_schedule_now', calls: [['POST', '/api/agents/x/schedules/y/run']], description: 'Run one of an agent\'s scheduled posts now (it posts to the chat as it would on schedule).',
+  { name: 'run_schedule_now', calls: [['POST', '/api/agents/x/schedules/y/run']], description: 'Run one of an agent\'s scheduled posts now (it posts to the chat as it would on schedule). For owner-assistant the result goes to every linked owner and admin in their own chat (weekly-summary = the weekly summary).',
     input: { agent_id: str('Agent id'), schedule_id: str('Schedule id (see get_agent → schedules)') }, required: ['agent_id', 'schedule_id'],
     run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/schedules/${enc(a.schedule_id)}/run`) },
   { name: 'test_agent', calls: [['POST', '/api/agents/x/test']],
@@ -192,7 +192,7 @@ export const TOOLS = [
     } },
   // ---------- owner assistant and privacy (044) ----------
   { name: 'get_owner_assistant', readOnly: true, calls: [['GET', '/api/owner-assistant']],
-    description: 'The built-in owner assistant: its model, whether your WhatsApp number is linked (status none, code, pending or linked, and the number), and for owners every linked panel user. Linking itself is done in the panel (Settings → Owner assistant).',
+    description: 'The built-in owner assistant: whether your WhatsApp number is linked (status none, code, pending or linked, and the number), and for owners every linked panel user. Linking itself is done in the panel (Settings → Owner assistant). Its character, model, tools, photos & voice and schedules are the built-in agent owner-assistant: use get_agent / update_agent.',
     input: {}, run: (a, x) => x.call('GET', '/api/owner-assistant') },
   { name: 'set_chat_private', calls: [['PUT', '/api/chats/x/prefs']],
     description: 'Mark a chat "private to members" (true) or not (false). Private chats keep working with their agent but are hidden from the owner assistant\'s cross-chat tools and the Ask box.',
@@ -231,28 +231,10 @@ export const TOOLS = [
     input: { scope: { type: 'string', enum: ['agent', 'chat'], description: 'agent or chat' }, id: str('Agent id or chat id'), cost_usd: { type: 'number', description: 'Monthly cost cap in USD (optional)' },
       tokens: int('Monthly token cap (optional, at least 1000)'), fallback_model: str('Cheaper model (provider:model) to use at 100% instead of staying quiet (optional)') }, required: ['scope', 'id'],
     run: (a, x) => x.call('PUT', `/api/budget/${enc(a.scope)}/${enc(a.id)}`, { cost: a.cost_usd ?? null, tokens: a.tokens ?? null, fallback: a.fallback_model || '' }) },
-  { name: 'get_owner_alerts', readOnly: true, calls: [['GET', '/api/alerts']],
-    description: 'Where owner alerts go on WhatsApp (alertsTo) and the weekly summary settings (day, time, whether it is active).',
+  { name: 'preview_weekly_summary', readOnly: true, calls: [['GET', '/api/owner-assistant/weekly-preview']],
+    description: 'The weekly summary text as it would be sent now (counts and costs only, no message contents). It is the owner assistant\'s schedule "weekly-summary": change its day, time or on/off with update_agent on owner-assistant, and send it now with run_schedule_now (agent owner-assistant, schedule weekly-summary).',
     input: {},
-    run: (a, x) => x.call('GET', '/api/alerts') },
-  { name: 'set_owner_alerts', calls: [['PUT', '/api/alerts']],
-    description: 'Owner only. Set the WhatsApp number owner alerts and the weekly summary go to (with country code; empty = none), and the weekly summary: enabled, day (mon…sun), at (HH:MM, server time).',
-    input: { alerts_to: str('Phone number with country code (optional)'), weekly_enabled: bool('Weekly summary on or off (optional)'), weekly_day: { type: 'string', enum: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] }, weekly_at: str('HH:MM (optional)') },
-    run: (a, x) => {
-      const weekly = {};
-      if (a.weekly_enabled !== undefined) weekly.enabled = a.weekly_enabled;
-      if (a.weekly_day) weekly.day = a.weekly_day;
-      if (a.weekly_at) weekly.at = a.weekly_at;
-      return x.call('PUT', '/api/alerts', { ...(a.alerts_to !== undefined ? { alertsTo: a.alerts_to } : {}), ...(Object.keys(weekly).length ? { weekly } : {}) });
-    } },
-  { name: 'preview_weekly_summary', readOnly: true, calls: [['GET', '/api/alerts/weekly/preview']],
-    description: 'The weekly summary text as it would be sent now (counts and costs only, no message contents).',
-    input: {},
-    run: async (a, x) => (await x.call('GET', '/api/alerts/weekly/preview')).text },
-  { name: 'send_weekly_summary', calls: [['POST', '/api/alerts/weekly/send']],
-    description: 'Owner only. Send the weekly summary to the owner\'s WhatsApp now.',
-    input: {},
-    run: (a, x) => x.call('POST', '/api/alerts/weekly/send') },
+    run: async (a, x) => (await x.call('GET', '/api/owner-assistant/weekly-preview')).text },
   { name: 'list_contacts', readOnly: true, calls: [['GET', '/api/contacts']], description: 'Contacts (WhatsApp names synced from the phone + own entries). Each has bookName (the phone\'s address book), businessName, profileName (chosen by the person) and ownName; name is the one shown (own > address book > business > profile > number). Shared ones can be looked up by participants through agents.',
     input: { query: str('Name, note or number to filter by (optional)'), shared_only: { type: 'boolean' } },
     run: (a, x) => x.call('GET', `/api/contacts?q=${enc(a.query || '')}${a.shared_only ? '&shared=1' : ''}`) },

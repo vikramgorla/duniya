@@ -19,6 +19,8 @@ const jidOf = (chat) => { const i = String(chat).indexOf('#'); return i > 0 ? ch
 export const isGroupChat = (chat) => jidOf(chat).endsWith('@g.us');
 const isWhatsAppChat = (chat) => /@(g\.us|s\.whatsapp\.net|lid)$/.test(jidOf(chat || ''));
 
+// 059: the actions the built-in owner assistant may ever use (messaging, no group administration).
+export const OWNER_WA_TOOLS = ['send_media', 'send_location', 'send_contact', 'react', 'reply', 'edit_message', 'delete_message', 'create_poll', 'poll_results', 'group_info', 'profile_info'];
 const WHATSAPP_PARTICIPANT_DEFAULT = ['send_media', 'send_location', 'react', 'reply', 'create_poll', 'poll_results', 'group_info', 'profile_info'];
 const WHATSAPP_DEFAULT_ALLOW = {
   organizer: ['whatsapp:*'],
@@ -74,9 +76,13 @@ function findMessage(chat, message, fallback) {
 const current = (chat, ctx) => () => (ctx.msgId ? messageByMsgId(chat, ctx.msgId) || (chat === ctx.chat
   ? { msg_id: ctx.msgId, from_agent: 0, sender_jid: ctx.senderJid || '', text: ctx.text || '' } : null) : null);
 
-/** The agent's own sends are stored like its replies (context, edit/delete later). */
-function remember(ctx, chat, msgId, text) {
-  logMessage({ chat, agent: ctx.agent.id, msgId: msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
+/**
+ * The agent's own sends are stored like its replies (context, edit/delete later). Not in the owner assistant's own
+ * chat (059): that conversation lives in owner_messages, never in chat memory.
+ */
+function remember(ctx, chat, msgId, text, quoted = '') {
+  if (ctx.ownerChat && chat === ctx.ownerChat) return;
+  logMessage({ chat, agent: ctx.agent.id, msgId: msgId || null, sender: 'agent', name: 'Assistant', text, ...(quoted ? { quoted } : {}), fromAgent: true });
 }
 function people(input) {
   const list = Array.isArray(input.people) ? input.people : String(input.people || '').split(/[,\n]/);
@@ -154,7 +160,7 @@ const DEFS = [
       const chat = await targetChat(input, ctx);
       const ref = findMessage(chat, input.message, current(chat, ctx));
       const r = await need().send(chat, String(input.text), { quote: ref });
-      logMessage({ chat, agent: ctx.agent.id, msgId: r?.msgId || null, sender: 'agent', name: 'Assistant', text: String(input.text), quoted: ref.text, fromAgent: true });
+      remember(ctx, chat, r?.msgId, String(input.text), ref.text);
       return { chat, result: { sent: true, msgId: r?.msgId || null }, summary: `Replied to "${clip(ref.text, 60)}": ${clip(input.text, 120)}` };
     } },
   { name: 'edit_message', roles: ['organizer', 'participant'],
@@ -334,4 +340,4 @@ export const whatsappTools = DEFS.map((d) => ({
 }));
 /** For the agent editor: name, description, which roles may have it and the participant default. */
 export const whatsappToolCatalog = () => whatsappTools.map((t) => ({ name: t.name, description: t.description, organizerOnly: !t.roles.includes('participant'),
-  participantDefault: WHATSAPP_PARTICIPANT_DEFAULT.includes(t.name) }));
+  participantDefault: WHATSAPP_PARTICIPANT_DEFAULT.includes(t.name), owner: OWNER_WA_TOOLS.includes(t.name) }));

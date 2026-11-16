@@ -492,7 +492,7 @@ function toast(msg) {
 // Screen data cache (058): switching screens reuses what was just loaded. Any change made here and anything the live
 // stream reports (activity, a changed status) drops it; entries also expire after 60 s. Only lists that screens load
 // on open are cached, never live views (status, system, activity, updates).
-const CACHED = /^\/api\/(agents|templates|chats|providers|budget|media|backups|pending|secrets|logging|assistants|mobile|alerts|owner-assistant|privacy-notice|contacts|usage|silences|session)(\/|\?|$)/;
+const CACHED = /^\/api\/(agents|templates|chats|providers|budget|media|backups|pending|secrets|logging|assistants|mobile|owner-assistant|privacy-notice|contacts|usage|silences|session)(\/|\?|$)/;
 const apiCache = new Map(); // path -> { at, p }
 const dropCache = () => apiCache.clear();
 async function api(method, path, body) {
@@ -1354,7 +1354,7 @@ async function renderUsage() {
     caps ? h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Monthly spending caps'),
       caps.caps.length ? h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px' }, caps.caps.map((c) => capBar(c)))
         : h('p', { class: 'small muted' }, 'No caps yet. Set one on an agent’s page (Monthly spending cap) or for a chat under Chats → Spending cap.'),
-      caps.caps.length && !caps.alertsTo ? h('div', { class: 'note warn', style: 'margin-top:10px' }, 'Cap alerts can’t reach you on WhatsApp yet: add your number under Settings → Owner alerts.') : null) : null,
+      caps.caps.length && !caps.alertsTo ? h('div', { class: 'note warn', style: 'margin-top:10px' }, 'Cap alerts can’t reach you on WhatsApp yet: add your number under Agents → Owner assistant → Alerts.') : null) : null,
     h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Per day'), days.length ? chart : h('p', { class: 'small muted' }, 'Nothing in this period.')),
     h('div', { class: 'grid', style: 'margin-top:16px;align-items:start' },
       table('By agent', byAgent, (k) => agentName[k] || k || '(no agent)'),
@@ -1483,17 +1483,17 @@ async function renderAgents() {
   tpl.onchange = () => { create.lastChild.textContent = templates.find((t) => t.id === tpl.value)?.description || ''; };
   const cards = agents.map((b) => h('div', { class: 'card' },
     h('div', { class: 'row spread nowrap', style: 'align-items:flex-start' }, h('div', { style: 'flex:1;min-width:0' }, h('h2', { style: 'margin:0' }, b.name), h('div', { class: 'small muted' }, b.description || b.id)),
-      toggle(b.enabled, (v) => tryApi(() => api('PUT', `/api/agents/${b.id}`, { enabled: v }), `${b.name} ${v ? 'on' : 'off'}`))),
+      b.builtin ? null : toggle(b.enabled, (v) => tryApi(() => api('PUT', `/api/agents/${b.id}`, { enabled: v }), `${b.name} ${v ? 'on' : 'off'}`))),
     h('div', { class: 'row small', style: 'margin:10px 0' },
       h('span', { class: 'pill info' }, b.config.model === 'auto' ? 'model: auto' : b.config.model),
-      h('span', { class: 'pill' }, `${b.config.chats.length} chat(s)`), h('span', { class: 'pill' }, `${b.config.organizers.length} organizer(s)`),
+      b.builtin ? h('span', { class: 'pill ok' }, 'built in · your own chat') : [h('span', { class: 'pill' }, `${b.config.chats.length} chat(s)`), h('span', { class: 'pill' }, `${b.config.organizers.length} organizer(s)`)],
       Object.keys(b.config.mcpServers || {}).map((k) => h('span', { class: 'pill' }, `tools: ${k}`)),
       (b.globalTools || []).filter((g) => g.on).map((g) => h('span', { class: 'pill' }, `tools: ${g.name} (global)`)),
       b.config.confirm ? h('span', { class: 'pill warn' }, 'changes need confirm') : null,
       b.config.memory?.enabled !== false ? h('span', { class: 'pill ok' }, 'memory') : null),
     h('div', { class: 'small muted num' }, h('a', { href: '#usage' }, '30 days: '), usageLine(us?.agent?.[b.id])),
     b.needs.length ? h('div', { class: 'note warn' }, `Needs secrets: ${b.needs.join(', ')}`) : null,
-    h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => openAgent(b.id) }, can('admin') ? 'Edit & test' : 'View & test'))));
+    h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => openAgent(b.id) }, b.builtin ? (can('admin') ? 'Edit' : 'View') : can('admin') ? 'Edit & test' : 'View & test'))));
   const aiCreate = can('admin') ? await aiHelper({ title: [h('span', { class: 'ai-chip' }, 'AI'), 'Create an agent with AI'], applyLabel: 'Create this agent',
     placeholder: 'Describe the agent in your own words, e.g. “An assistant for our family festival group: answers agenda and menu questions from panduga, replies in English or Telugu, posts tomorrow’s agenda every evening at 8.”',
     onApply: async (r) => { const res = await tryApi(() => api('POST', '/api/agents', { config: r.proposed }), 'Agent created'); if (res) openAgent(res.id); } }) : null;
@@ -1624,6 +1624,8 @@ async function renderAgentEditor(id) {
   const mediaCaps = await api('GET', '/api/media').catch(() => null);
   const registry = can('admin') ? await api('GET', '/api/tool-services/registry/settings').catch(() => null) : null; // 052: Browse
   const c = structuredClone(b.config);
+  const bi = !!b.builtin; // 059: the built-in owner assistant — fields about chats and people don't apply
+  if (bi) waTools.splice(0, waTools.length, ...waTools.filter((t) => t.owner));
   const F = {};
   const inp = (key, attrs = {}) => (F[key] = h('input', { value: c[key] ?? '', ...attrs }));
   // General
@@ -1762,12 +1764,16 @@ async function renderAgentEditor(id) {
         h('input', { value: s.at || '08:00', placeholder: 'HH:MM', style: 'max-width:90px', oninput: (e) => (s.at = e.target.value) }),
         h('input', { value: s.days || 'daily', placeholder: 'daily or mon,wed', style: 'max-width:160px', oninput: (e) => (s.days = e.target.value) }),
         h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.enabled !== false, onchange: (e) => (s.enabled = e.target.checked) }), 'on')),
-      h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', value: s.prompt || '', placeholder: 'What to post, e.g. a short summary of today’s agenda', oninput: (e) => (s.prompt = e.target.value) }),
+      s.kind === 'weekly-summary' ? h('div', { class: 'small muted', style: 'margin-top:6px' }, 'The weekly summary: messages, replies and costs per agent, ignored chats, caps and what needs you. Counts only, never message contents.')
+        : h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', value: s.prompt || '', placeholder: bi ? 'What to send you, e.g. a morning brief: what happened overnight in my groups' : 'What to post, e.g. a short summary of today’s agenda', oninput: (e) => (s.prompt = e.target.value) }),
       h('div', { class: 'row', style: 'margin-top:6px' },
-        h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${r.length} chat(s)` : 'No chats bound'); }) }, 'Run now'),
+        h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${r.length} chat(s)` : bi ? 'Nobody to send it to: link your WhatsApp under Settings → Owner assistant' : 'No chats bound'); }) }, 'Run now'),
+        s.kind === 'weekly-summary' ? h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('GET', '/api/owner-assistant/weekly-preview'); schedOut.replaceChildren(h('pre', { class: 'small' }, r.text)); }) }, 'Preview') : null,
         h('button', { class: 'btn small danger mut', onclick: () => { scheds.splice(i, 1); drawScheds(); } }, 'Remove')))));
   }
+  const schedOut = h('div', {});
   drawScheds();
+  F.alertsTo = h('input', { type: 'tel', inputmode: 'tel', value: c.alerts?.to ? `+${c.alerts.to}` : '', placeholder: '+41 79 123 45 67', 'aria-label': 'Alerts go to', disabled: S.user?.role !== 'owner' });
   F.timezone = h('input', { value: c.timezone || '', placeholder: 'Europe/Zurich (default)' });
   // Photos & voice (043)
   const md = { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', ...(c.media || {}), createImages: { organizer: true, participant: false, ...(c.media?.createImages || {}) } };
@@ -1798,7 +1804,7 @@ async function renderAgentEditor(id) {
       tools: { participant: splitLines(rulesBox.participant.value), organizer: splitLines(rulesBox.organizer.value), deny: splitLines(rulesBox.deny.value) },
       confirm: F.confirmOn.checked ? { preview: F.cPreview.value.trim(), tool: F.cTool.value.trim(), idField: F.cId.value.trim(), ttlMinutes: Number(F.cTtl.value) } : null,
       schedules: scheds,
-      media: md, ...quickBox.value(),
+      media: md, ...quickBox.value(), ...(bi ? { alerts: { to: F.alertsTo.value } } : {}),
     };
     try {
       const r = await api('PUT', `/api/agents/${encodeURIComponent(id)}`, config);
@@ -1839,7 +1845,7 @@ async function renderAgentEditor(id) {
         : r.error ? null : h('p', { class: 'muted' }, `No tools: ${who} only get answers from the instructions and memory.`),
       h('p', { class: 'muted', style: 'margin-bottom:0' }, 'WhatsApp actions are not carried out here: the test shows what the agent would do.'));
   }
-  loadTools();
+  if (!bi) loadTools();
   const input = h('input', { placeholder: 'Ask the agent something…' });
   const testForm = h('form', { class: 'row mut', onsubmit: async (e) => {
     e.preventDefault(); const text = input.value.trim(); if (!text) return;
@@ -1869,14 +1875,14 @@ async function renderAgentEditor(id) {
       notes.length ? h('ul', { class: 'small' }, notes.map((n) => h('li', { style: 'margin:6px 0' }, n.text, h('span', { class: 'muted' }, ` — ${n.author || '?'}, ${time(n.ts)} `),
         can('admin') ? h('button', { class: 'btn small mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/notes/${n.id}`); loadSharedMem(); }, 'Note deleted') }, 'Delete') : null))) : h('p', { class: 'small muted' }, 'No shared notes yet.'));
   };
-  loadSharedMem();
+  if (!bi) loadSharedMem(); // 059: the owner assistant's notes are per user (private), not shared notes
   $('#main').replaceChildren(
     h('div', { class: 'row spread editor-bar', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: () => { location.hash = 'agents'; } }, '← All agents'),
       h('div', { class: 'row actions' },
         h('a', { class: 'btn phone-only', href: '#test-console', onclick: (e) => { e.preventDefault(); $('#test-console')?.scrollIntoView({ behavior: 'smooth' }); } }, 'Test ↓'),
         h('a', { class: 'btn', href: `/api/agents/${encodeURIComponent(id)}/export`, download: `${id}.agent.json` }, 'Export'),
-        h('button', { class: 'btn mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/agents/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openAgent(r.id); } }, 'Duplicate'),
-        h('button', { class: 'btn danger mut', onclick: async () => { if (confirm(`Delete “${c.name}”? Its group bindings are removed; chat memory stays until erased.`) && await tryApi(() => api('DELETE', `/api/agents/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'agents'; } } }, 'Delete'),
+        bi ? null : h('button', { class: 'btn mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/agents/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openAgent(r.id); } }, 'Duplicate'),
+        bi ? null : h('button', { class: 'btn danger mut', onclick: async () => { if (confirm(`Delete “${c.name}”? Its group bindings are removed; chat memory stays until erased.`) && await tryApi(() => api('DELETE', `/api/agents/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'agents'; } } }, 'Delete'),
         h('button', { class: 'btn primary mut', onclick: save }, 'Save'))),
     can('admin') ? await aiHelper({ agentId: id, title: [h('span', { class: 'ai-chip' }, 'AI'), 'Change this agent with AI'], applyLabel: 'Apply & save',
       placeholder: 'What should change? e.g. “Make the replies shorter and friendlier”, “Let participants also see the shopping list”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',
@@ -1886,15 +1892,16 @@ async function renderAgentEditor(id) {
         b.needs.length ? h('div', { class: 'note warn' }, `Set these under Secrets: ${b.needs.join(', ')}`) : null,
         h('fieldset', {}, h('legend', {}, 'General'),
           field('Name', inp('name')), field('Description', inp('description')),
-          h('div', { class: 'row', style: 'margin-top:8px' }, h('label', { class: 'inline' }, F.enabled, 'Enabled'), h('label', { class: 'inline' }, F.memory, 'Group memory'), h('label', { class: 'inline' }, F.respondToMentions, 'Reply when @mentioned')),
+          bi ? h('div', { class: 'note', style: 'margin-top:8px' }, 'Built in: it answers linked panel users in their own WhatsApp chat and in the Ask box on Overview (link your number under ', h('a', { href: '#settings' }, 'Settings → Owner assistant'), '). Owners and admins get the organizer tools, viewers the participant tools. Its built-in instructions, permissions and confirm codes stay in code; what you set here is added.') : null,
+          h('div', { class: 'row', style: 'margin-top:8px' }, bi ? null : h('label', { class: 'inline' }, F.enabled, 'Enabled'), h('label', { class: 'inline' }, F.memory, bi ? 'Memory (notes it saves when asked)' : 'Group memory'), bi ? null : h('label', { class: 'inline' }, F.respondToMentions, 'Reply when @mentioned')),
           field('Model', modelSel, models.problem || 'Auto uses the default model set under Models.'),
           field('When the model is unavailable', fbPick.el, 'Usage limit, outage or expired sign-in: answer with another model instead of failing. Refused requests never switch, and tools never run twice.'),
-          field('Triggers', F.triggers, 'A message containing one of these words (anywhere, as a whole word) wakes the agent, e.g. mochi or !panduga'),
-          field('Who may message it directly', F.dm)),
-        h('fieldset', {}, h('legend', {}, 'Instructions'), F.prompt),
-        quickBox.el,
-        sharedMemBox,
-        h('fieldset', {}, h('legend', {}, 'People & roles'),
+          bi ? null : field('Triggers', F.triggers, 'A message containing one of these words (anywhere, as a whole word) wakes the agent, e.g. mochi or !panduga'),
+          bi ? null : field('Who may message it directly', F.dm)),
+        h('fieldset', {}, h('legend', {}, bi ? 'Character' : 'Instructions'), bi ? h('p', { class: 'small muted', style: 'margin-top:0' }, 'Tone, language and habits, e.g. “Answer in English, short; call me Vik; start mornings with the weather in Aigle.” Added to the built-in instructions; it never widens what it may do.') : null, F.prompt),
+        bi ? null : quickBox.el,
+        bi ? null : sharedMemBox,
+        bi ? null : h('fieldset', {}, h('legend', {}, 'People & roles'),
           h('p', { class: 'small muted', style: 'margin-top:0' }, 'Organizers can use organizer tools and confirm changes. Everyone else in the agent’s groups is a participant.'),
           peopleBox,
           h('details', { style: 'margin-top:8px' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'People outside these groups'),
@@ -1909,21 +1916,25 @@ async function renderAgentEditor(id) {
           h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted' }, 'Advanced: tool rules'),
             field('Participant rules', rulesBox.participant), field('Organizer rules', rulesBox.organizer), field('Never allowed', rulesBox.deny))),
         waTools.length ? h('fieldset', {}, h('legend', {}, 'WhatsApp actions'),
-          h('p', { class: 'small muted', style: 'margin-top:0' }, 'What the agent may do in WhatsApp besides answering: send pictures and files, react, post polls, manage the group. Actions marked “organizers only” happen right away when an organizer asks — no confirm code — so give the agent’s number group-admin rights only where you want that. Every action is recorded in Activity.'),
+          bi ? h('p', { class: 'small muted', style: 'margin-top:0' }, 'What it may do in WhatsApp besides answering (owners & admins = organizer, viewers = participant). In your own chat it acts right away; anything sent into another chat waits for your “confirm CODE”. Group administration stays with the admin tools.') : h('p', { class: 'small muted', style: 'margin-top:0' }, 'What the agent may do in WhatsApp besides answering: send pictures and files, react, post polls, manage the group. Actions marked “organizers only” happen right away when an organizer asks — no confirm code — so give the agent’s number group-admin rights only where you want that. Every action is recorded in Activity.'),
           h('details', {}, h('summary', { class: 'small', style: 'cursor:pointer;min-height:36px' }, `Choose actions per role (${waTools.length})`), waBox)) : null,
         mediaBox,
-        h('fieldset', {}, h('legend', {}, 'Changes need confirmation'),
+        bi ? null : h('fieldset', {}, h('legend', {}, 'Changes need confirmation'),
           h('label', { class: 'inline' }, F.confirmOn, 'Hold changes until an organizer replies “confirm CODE”'),
           h('div', { class: 'row' }, field('Preview tools', F.cPreview), field('Confirm tool', F.cTool)),
           h('div', { class: 'row' }, field('Confirmation id field', F.cId), field('Valid for (minutes)', F.cTtl))),
+        bi ? h('fieldset', { id: 'alerts' }, h('legend', {}, 'Alerts'),
+          h('p', { class: 'small muted', style: 'margin-top:0' }, 'Spending-cap, model-provider and update alerts are sent as they happen to this WhatsApp number. Without a number they are only written to Activity.'),
+          field('Alerts go to', F.alertsTo, S.user?.role === 'owner' ? 'With country code. Save to apply.' : 'Only the owner can change this.')) : null,
         h('fieldset', {}, h('legend', {}, 'Monthly spending cap'), await capEditor('agent', id, models)),
-        h('fieldset', {}, h('legend', {}, 'Scheduled posts'), schedBox, h('button', { class: 'btn small mut', onclick: () => { scheds.push({ id: `s${scheds.length + 1}`, at: '08:00', days: 'daily', prompt: '', chats: 'all', enabled: true }); drawScheds(); } }, '+ Add schedule')),
+        h('fieldset', {}, h('legend', {}, bi ? 'Scheduled messages to you' : 'Scheduled posts'), bi ? h('p', { class: 'small muted', style: 'margin-top:0' }, 'Sent to every linked owner and admin in their own chat (with nobody linked, the weekly summary goes to the Alerts number). They run even while agents are paused.') : null, schedBox, schedOut, h('button', { class: 'btn small mut', onclick: () => { scheds.push({ id: `s${scheds.length + 1}`, at: '08:00', days: 'daily', prompt: '', chats: 'all', enabled: true }); drawScheds(); } }, '+ Add schedule')),
         h('fieldset', {}, h('legend', {}, 'Advanced'),
           field('Timezone', F.timezone), h('div', { class: 'row' }, field('Recent messages in context', F.historySize), field('Max reply tokens', F.maxTokens))),
         h('div', { class: 'row mut' }, h('button', { class: 'btn primary', onclick: save }, 'Save'))),
-      h('div', { class: 'card', id: 'test-console', style: 'position:sticky;top:110px;scroll-margin-top:110px' }, h('h2', {}, 'Test console'),
-        h('p', { class: 'small muted' }, 'Uses real tools and the saved settings; nothing is posted to WhatsApp. Pick a role and a chat to see what each person would get.'),
-        testAs, hintBox, toolsBox, log, testForm)));
+      bi ? h('div', { class: 'card', id: 'test-console' }, h('h2', {}, 'Try it'), h('p', { class: 'small muted' }, 'Ask it in the Ask box on ', h('a', { href: '#overview' }, 'Overview'), ' or in your WhatsApp chat with an agent number; it uses what you saved here.'))
+        : h('div', { class: 'card', id: 'test-console', style: 'position:sticky;top:110px;scroll-margin-top:110px' }, h('h2', {}, 'Test console'),
+          h('p', { class: 'small muted' }, 'Uses real tools and the saved settings; nothing is posted to WhatsApp. Pick a role and a chat to see what each person would get.'),
+          testAs, hintBox, toolsBox, log, testForm)));
   // Deep links: #agents/<id>/test, /triggers, /dm (first-run checklist, quiet reasons)
   const sub = location.hash.split('/')[2];
   const target = { test: $('#test-console'), triggers: F.triggers, dm: F.dm }[sub];
@@ -2209,7 +2220,7 @@ function addDirectChatCard(agents, { pre = null, onDone, onClose } = {}) {
       list.length ? null : h('span', { class: 'small muted' }, 'No contact matches.'));
   }, 250); };
   const number = h('select', { 'aria-label': 'WhatsApp number' }, numbers.map((n) => h('option', { value: n.id }, n.label || n.id)));
-  const agent = h('select', { 'aria-label': 'Agent' }, h('option', { value: '' }, '— no agent yet —'), agents.map((b) => h('option', { value: b.id }, b.name + (b.enabled ? '' : ' (off)'))));
+  const agent = h('select', { 'aria-label': 'Agent' }, h('option', { value: '' }, '— no agent yet —'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id }, b.name + (b.enabled ? '' : ' (off)'))));
   const on = h('input', { type: 'checkbox', checked: true }); const priv = h('input', { type: 'checkbox' });
   const status = h('div', { class: 'small', style: 'min-height:1.2em;margin-top:4px' });
   const check = () => tryApi(async () => {
@@ -2314,7 +2325,7 @@ async function renderChats() {
               h('select', { class: 'small', disabled: !can('admin'), 'aria-label': `Welcome new members in ${c.name || c.id}`, onchange: (e) => savePrefs(c, { welcome: e.target.value }) },
                 [['inherit', `As the agent (${agents.find((x) => x.id === c.agent)?.config?.welcome?.enabled ? 'on' : 'off'})`], ['on', 'On'], ['off', 'Off']].map(([v, l]) => h('option', { value: v, selected: (c.welcome || 'inherit') === v }, l)))) : null)),
         h('td', { style: 'min-width:170px', 'data-label': 'Agent' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, agent: e.target.value || null }); c.agent = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
-          h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),
+          h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),
         h('td', { style: 'min-width:200px', 'data-label': 'Model' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) }),
           // 042 / #65: per-chat fallback, edited in a card below (same picker and chain editor as agents)
           h('div', { class: 'small muted', style: 'margin-top:6px;overflow-wrap:anywhere' }, chatFallbackLine(c.fallback, models)),
@@ -3029,8 +3040,8 @@ async function renderSecrets() {
 
 // ---------- settings ----------
 async function renderSettings() {
-  const [agents, lg, ai, sess, mob, alerts] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null), api('GET', '/api/mobile').catch(() => null), api('GET', '/api/alerts').catch(() => null)]);
-  const [oa, notice, models] = await Promise.all([api('GET', '/api/owner-assistant').catch(() => null), api('GET', '/api/privacy-notice').catch(() => null), loadModels().catch(() => ({ models: [] }))]);
+  const [agents, lg, ai, sess, mob] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null), api('GET', '/api/mobile').catch(() => null)]);
+  const [oa, notice] = await Promise.all([api('GET', '/api/owner-assistant').catch(() => null), api('GET', '/api/privacy-notice').catch(() => null)]);
   if (sess?.user) { S.user = sess.user; S.google = !!sess.google; }
   const me = S.user;
   const tools = await toolServicesCard().catch((e) => h('div', { class: 'card' }, h('h2', {}, 'Tool services for all agents'), h('p', { class: 'small muted' }, `Could not load: ${e.message}`)));
@@ -3043,10 +3054,9 @@ async function renderSettings() {
     S.google || me.google ? myGoogleCard(me) : null,
     h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default agent for DMs without a trigger'),
       h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmAgent: e.target.value }), 'Saved') },
-        h('option', { value: '' }, '— first agent that accepts the sender —'), agents.map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmAgent === b.id }, b.name)))),
-    oa ? ownerAssistantCard(oa, models) : null,
+        h('option', { value: '' }, '— first agent that accepts the sender —'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmAgent === b.id }, b.name)))),
+    oa ? ownerAssistantCard(oa) : null,
     notice ? privacyNoticeCard(notice) : null,
-    alerts ? ownerAlertsCard(alerts) : null,
     await photosVoiceCard().catch((e) => h('div', { class: 'card' }, h('h2', {}, 'Photos & voice'), h('p', { class: 'small muted' }, `Could not load: ${e.message}`))),
     mob ? mobileCard(mob) : null,
     ai ? assistantsCard(ai) : null,
@@ -3078,8 +3088,8 @@ function smallModeCard(sv) {
     !can('owner') ? h('div', { class: 'small muted', style: 'margin-top:6px' }, 'Only the owner can change this.') : null);
 }
 
-// ---------- Settings → Owner assistant (044): link your WhatsApp number, model ----------
-function ownerAssistantCard(o, models) {
+// ---------- Settings → Owner assistant (044): link your WhatsApp number; 059: the rest is its agent editor ----------
+function ownerAssistantCard(o) {
   const l = o.link;
   const box = h('div', {});
   const reload = () => renderSettings();
@@ -3105,13 +3115,11 @@ function ownerAssistantCard(o, models) {
     box.replaceChildren(h('div', { class: 'note' }, h('div', {}, `From your own phone, send this message to ${sendTo} on WhatsApp (valid 10 minutes):`), copyRow(r.message)),
       h('button', { class: 'btn', onclick: reload }, 'I sent it — check'));
   }
-  const model = modelSelect(models, o.settings.model, { autoLabel: 'Default model (with fallback)', disabled: !can('admin'), 'aria-label': 'Owner assistant model',
-    onchange: (e) => tryApi(() => api('PUT', '/api/owner-assistant/settings', { model: e.target.value }), 'Model saved') });
   return h('div', { class: 'card' }, h('h2', {}, 'Owner assistant'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Ask about all chats from your private WhatsApp chat with an agent number, or from the Ask box on Overview: recaps, who said what, quiet chats, usage, waiting changes. It only answers linked panel users, never in groups, and sees only chats that are on and not private to members. Changes always need “confirm CODE”. Start a message with an agent’s trigger (e.g. “!family …”) to talk to that agent instead.'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Your own agent in your private WhatsApp chat with an agent number (and the Ask box on Overview): recaps, who said what, usage and changes, plus GIFs, pictures, voice, polls and tools — and it can send into chats that are on after you confirm. It only answers linked panel users, never in groups, and sees only chats that are on and not private to members. Changes always need “confirm CODE”. Start a message with an agent’s trigger (e.g. “!family …”) to talk to that agent instead.'),
     h('p', { class: 'small muted' }, o.role === 'viewer' ? 'Your account is read-only: the assistant can look things up for you but not change anything or read messages.' : o.role === 'admin' ? 'As an admin, the assistant can do what you can do in the panel, except owner-only settings.' : 'As an owner, the assistant can do everything you can do here; tools that need keys or passwords stay in the panel.'),
     state, box,
-    field('Model', model, 'Default: the default model, with automatic fallback.'),
+    h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn', onclick: () => openAgent(o.agent) }, 'Character, tools, voice, schedules & alerts →')),
     o.links?.length ? h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small', style: 'cursor:pointer' }, `Linked people (${o.links.length})`),
       h('ul', { class: 'small' }, o.links.map((x) => h('li', {}, `${x.username} · +${x.phone} `, h('button', { class: 'btn small danger', onclick: () => confirm(`Unlink ${x.username} (+${x.phone})?`) && tryApi(async () => { await api('DELETE', `/api/owner-assistant/links/${x.userId}`); reload(); }, 'Unlinked') }, 'Unlink'))))) : null);
 }
@@ -3253,38 +3261,6 @@ async function photosVoiceCard() {
     !allowed ? h('div', { class: 'note warn' }, m.localAllowed.reason) : m.server?.size !== 'large' ? h('div', { class: 'note' }, `Each engine needs about 300–400 MB of free memory while it works; this server has ${m.server.availableMb} MB free now. If memory is short at that moment, the provider is used or the agent asks for text.`) : null,
     engines.map(engineRow));
   return card;
-}
-
-// ---------- Settings → Owner alerts (040/041): where cap alerts and the weekly summary go ----------
-const DAY_NAMES = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
-function ownerAlertsCard(a) {
-  const own = can('owner');
-  const w = a.weekly;
-  const num = h('input', { type: 'tel', inputmode: 'tel', value: a.alertsTo ? `+${a.alertsTo}` : '', placeholder: '+41 79 123 45 67', 'aria-label': 'Alerts go to', disabled: !own });
-  const day = h('select', { 'aria-label': 'Day', disabled: !own }, Object.entries(DAY_NAMES).map(([v, l]) => h('option', { value: v, selected: w.day === v }, l)));
-  const at = h('input', { type: 'time', value: w.at, 'aria-label': 'Time', disabled: !own });
-  const on = w.enabled === null ? true : w.enabled;
-  const out = h('div', {});
-  const state = !a.alertsTo ? h('div', { class: 'note warn' }, 'No number yet: spending-cap alerts and the weekly summary are only written to Activity. Add the number that should get them.')
-    : w.active ? h('div', { class: 'note ok' }, `✓ Alerts go to +${a.alertsTo}. Weekly summary every ${DAY_NAMES[w.day]} at ${w.at}${w.last ? ` · last sent ${ago(w.last)} ago` : ''}.`)
-      : h('div', { class: 'note' }, `Alerts go to +${a.alertsTo}. Weekly summary is off.`);
-  const save = (body, msg) => tryApi(async () => { await api('PUT', '/api/alerts', body); renderSettings(); }, msg);
-  return h('div', { class: 'card' }, h('h2', {}, 'Owner alerts on WhatsApp'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'The agents’ WhatsApp number messages you here when a spending cap reaches 80% or 100%, and once a week with a short summary: messages handled, replies, cost, ignored chats and anything waiting for you. Never message contents.'),
-    state,
-    field('Alerts go to', h('div', { class: 'row nowrap', style: 'gap:8px' }, num, own ? h('button', { class: 'btn', type: 'button', onclick: () => save({ alertsTo: num.value }, num.value ? 'Number saved' : 'Number removed') }, 'Save') : null),
-      'Your own WhatsApp number with country code. Use a different number than the agents’ one.'),
-    h('div', { class: 'row', style: 'margin-top:12px;gap:10px' }, h('label', { class: 'inline' }, toggle(on, (v) => save({ weekly: { enabled: v } }, v ? 'Weekly summary on' : 'Weekly summary off'), !own), 'Weekly summary')),
-    h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px' }, field('Day', day), field('Time (server time)', at)),
-    own ? h('div', { class: 'row', style: 'margin-top:10px;gap:8px' },
-      h('button', { class: 'btn', type: 'button', onclick: () => save({ weekly: { day: day.value, at: at.value } }, 'Schedule saved') }, 'Save schedule'),
-      h('button', { class: 'btn primary', type: 'button', onclick: async (e) => {
-        const b = e.currentTarget; b.disabled = true;
-        const r = await tryApi(() => api('POST', '/api/alerts/weekly/send'));
-        b.disabled = false;
-        if (r) { toast(r.sent ? `Sent to +${a.alertsTo}` : `Not sent: ${r.reason}`); out.replaceChildren(h('label', {}, r.sent ? 'Sent just now:' : 'Preview (not sent):'), h('pre', { class: 'small' }, r.text)); }
-      } }, 'Send now')) : h('p', { class: 'small muted' }, 'Only the owner can change these.'),
-    out);
 }
 
 // ---------- Browse tool services (052): search the MCP Registry, add in one step ----------

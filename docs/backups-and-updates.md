@@ -65,7 +65,7 @@ A jump is *breaking* when the major version grows or a release in between is mar
 (read from the release itself with git).
 
 1. You are told **once**: **Overview** banner ("Version 3.0.0 needs your decision"), Updates card, Activity, the
-   owner alert number (**Settings → Owner alerts**), and a code to every owner linked to the
+   owner alert number (**Agents → Owner assistant → Alerts**), and a code to every owner linked to the
    [owner assistant](owner-assistant.md).
 2. **Review update**: what changes, what to do, a docs link, *Make a backup first* (on by default).
 3. **Update to vX**, or on WhatsApp reply `confirm ABCD` (backup, update, result reported after the restart).
