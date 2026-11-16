@@ -1226,6 +1226,9 @@ async function renderContacts() {
       h('p', { class: 'small muted' }, 'Names from your linked WhatsApp phone appear here automatically, plus the people you add. Agents can look up numbers: organizers see everyone, participants only contacts marked Shared. Nothing is shared until you tick it.'),
       sum ? h('p', { class: 'small muted', role: 'status' }, `Names refresh from your phone by themselves (after it connects and once a day)${sum.refreshedAt ? `, last ${ago(sum.refreshedAt)} ago` : ''}: ${sum.book} phone contact${sum.book === 1 ? '' : 's'}, ${sum.profile} profile name${sum.profile === 1 ? '' : 's'}${sum.hiddenNumbers ? `, ${sum.hiddenNumbers} waiting for WhatsApp to share their number` : ''}.`,
         edit ? [' ', h('button', { class: 'btn small mut', title: 'Optional: the server also does this by itself', onclick: () => tryApi(async () => { await api('POST', '/api/contacts/refresh'); setTimeout(renderContacts, 4000); }, 'Asked WhatsApp for names') }, 'Refresh now')] : null) : null,
+      sum ? h('label', { class: 'tick small' }, h('input', { type: 'checkbox', checked: sum.namesForAgents !== false, disabled: !can('owner'),
+        onchange: (e) => tryApi(async () => { await api('PUT', '/api/contacts/agent-names', { enabled: e.target.checked }); }, e.target.checked ? 'Agents use your contact names' : 'Agents use profile names') }),
+        ' Agents may use the names from your phone contacts (profile names are often incomplete). Turn off to keep your contact names to yourself.') : null,
       list.length ? h('table', { class: 'stack' }, h('thead', {}, h('tr', {}, ['Name', 'Number', 'Source', 'Shared', ''].map((x) => h('th', {}, x)))), h('tbody', {}, list.map(row)))
         : h('p', { class: 'muted' }, contactsQuery ? 'No contact matches.' : 'No contacts yet. They appear once WhatsApp syncs your phone’s address book, or add one below.')),
     add);

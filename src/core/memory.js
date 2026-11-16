@@ -8,6 +8,7 @@ import {
 import { chat as modelChat } from './providers/index.js';
 import { activity } from './events.js';
 import { tagsInChat } from './member-tags.js';
+import { agentName } from './contacts.js';
 
 export const DEFAULT_WINDOW = 30;
 export const memoryEnabled = (agent) => agent?.memory?.enabled !== false;
@@ -19,7 +20,7 @@ function stamp(ts, tz = env.timezone) {
 }
 export function formatMessage(m, tz, tags = null) {
   const tag = !m.from_agent && tags?.size ? tags.get(m.sender) || tags.get(m.sender_jid) || '' : '';
-  const who = (m.from_agent ? 'Assistant' : m.name || m.sender || 'someone') + (tag ? ` (tag: ${tag})` : '');
+  const who = (m.from_agent ? 'Assistant' : agentName({ phone: m.sender, jid: m.sender_jid, fallbackName: m.name }) || m.sender || 'someone') + (tag ? ` (tag: ${tag})` : '');
   const q = m.quoted ? ` (replying to "${clip(m.quoted, 200)}")` : '';
   return `[${stamp(m.ts, tz)}] ${who}${q}: ${clip(m.text, 500)}`;
 }
@@ -271,7 +272,7 @@ export const memoryTools = [
       if (String(query || '').trim().length < 2) throw new Error('query too short');
       const tz = ctx.agent?.timezone || env.timezone;
       return searchMessages(ctx.chat, String(query).trim(), limit).map((m) => ({
-        date: stamp(m.ts, tz), name: m.from_agent ? 'Assistant' : m.name || m.sender, text: clip(m.text, 500),
+        date: stamp(m.ts, tz), name: m.from_agent ? 'Assistant' : agentName({ phone: m.sender, jid: m.sender_jid, fallbackName: m.name }) || m.sender, text: clip(m.text, 500),
       }));
     },
   },

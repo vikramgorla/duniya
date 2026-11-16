@@ -206,8 +206,10 @@ owner assistant, the mobile app), one rule picks the name:
 - A profile-name change never replaces the name from your address book (both are kept; the row says which one is shown).
 - People WhatsApp shows only by a hidden id are listed as *Unknown (hidden number)* (or their profile name) until
   WhatsApp shares the number; roles need a number.
-- **Agents never see your address-book names**: they see the profile name people chose (or what they were called in the
-  chat), so a private label in your phone cannot leak into a group.
+- **Agents use the same name you see**, including the name from your phone contacts, because WhatsApp profile names are
+  often incomplete. If your contacts hold private labels ("Raj plumber, don't answer"), switch off *Agents may use the
+  names from your phone contacts* on the Contacts page (owner only; admin MCP: `set_contact_names_for_agents`); agents
+  then see business or profile names.
 
 ### Group member tags
 

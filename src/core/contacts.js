@@ -13,6 +13,7 @@
 import { db } from './db.js';
 import { digits } from './config.js';
 import { activity } from './events.js';
+import { getSettings, updateSettings } from './store.js';
 
 const TENANT = 'default';
 db.exec(`
@@ -118,7 +119,7 @@ export const unmappedLids = (limit = 500) => db.prepare("SELECT lid FROM contact
  * The one resolver for showing a person (057). Give what you know: phone digits, the WhatsApp jid (PN or LID) and a
  * fallback name (e.g. the profile name seen with a message). Returns { phone, name, label, source, hidden }:
  * name '' when nothing is known; label is what to show (name, else +number, else "Unknown (hidden number)").
- * source: own | book | business | profile | seen | ''. Address-book names stay in the panel: agents get profile names.
+ * source: own | book | business | profile | seen | ''. What agents see: agentName() (#113).
  */
 export function personInfo({ phone = '', jid = '', fallbackName = '' } = {}) {
   const j = bareJid(jid);
@@ -131,6 +132,21 @@ export function personInfo({ phone = '', jid = '', fallbackName = '' } = {}) {
     .find(([, v]) => v);
   const name = pick?.[1] || '';
   return { phone: p, name, label: name || (p ? `+${p}` : HIDDEN_NUMBER), source: pick?.[0] || '', hidden: !p };
+}
+/**
+ * The name an agent sees for a person (#113). By default the same choice as the panel (own > phone contact > business >
+ * profile), because profile names are often incomplete; the owner can switch phone-contact names off for agents
+ * (Contacts page), then agents get own > business > profile. Never a number or a hidden id: '' when nothing is known.
+ */
+export const contactNamesForAgents = () => getSettings().contactNamesForAgents !== false;
+export function setContactNamesForAgents(on) { updateSettings({ contactNamesForAgents: !!on }); return contactNamesForAgents(); }
+export function agentName({ phone = '', jid = '', fallbackName = '' } = {}) {
+  const info = personInfo({ phone, jid, fallbackName });
+  if (info.source !== 'book' || contactNamesForAgents()) return info.name || clean(fallbackName);
+  const j = bareJid(jid);
+  const r = info.phone ? getRow.get(TENANT, info.phone) : null;
+  const l = isLid(j) ? getLid.get(TENANT, j) : null;
+  return r?.biz_name || l?.biz_name || r?.push_name || l?.push_name || clean(fallbackName);
 }
 /** Label for a chat seen by the app (1:1: the person; groups: their subject). `c`: { id, phone, name, isGroup }. */
 export function chatTitle(c) {
