@@ -1875,7 +1875,7 @@ async function renderAgentEditor(id) {
       notes.length ? h('ul', { class: 'small' }, notes.map((n) => h('li', { style: 'margin:6px 0' }, n.text, h('span', { class: 'muted' }, ` — ${n.author || '?'}, ${time(n.ts)} `),
         can('admin') ? h('button', { class: 'btn small mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/notes/${n.id}`); loadSharedMem(); }, 'Note deleted') }, 'Delete') : null))) : h('p', { class: 'small muted' }, 'No shared notes yet.'));
   };
-  loadSharedMem();
+  if (!bi) loadSharedMem(); // 059: the owner assistant's notes are per user (private), not shared notes
   $('#main').replaceChildren(
     h('div', { class: 'row spread editor-bar', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: () => { location.hash = 'agents'; } }, '← All agents'),
       h('div', { class: 'row actions' },
@@ -1900,7 +1900,7 @@ async function renderAgentEditor(id) {
           bi ? null : field('Who may message it directly', F.dm)),
         h('fieldset', {}, h('legend', {}, bi ? 'Character' : 'Instructions'), bi ? h('p', { class: 'small muted', style: 'margin-top:0' }, 'Tone, language and habits, e.g. “Answer in English, short; call me Vik; start mornings with the weather in Aigle.” Added to the built-in instructions; it never widens what it may do.') : null, F.prompt),
         bi ? null : quickBox.el,
-        sharedMemBox,
+        bi ? null : sharedMemBox,
         bi ? null : h('fieldset', {}, h('legend', {}, 'People & roles'),
           h('p', { class: 'small muted', style: 'margin-top:0' }, 'Organizers can use organizer tools and confirm changes. Everyone else in the agent’s groups is a participant.'),
           peopleBox,
