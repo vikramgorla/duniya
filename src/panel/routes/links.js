@@ -51,18 +51,20 @@ export function linkRoutes(route, { invoke }) {
     activity('system', { summary: `One-time link to enter ${target.label} made by ${user.username}` });
     return { for: target.label, link: linkUrl(baseUrl(req), 'secret', token), expiresAt };
   });
-  route('GET', '/api/secret-links/:token', async (req, res, body, q, p) => {
-    const d = peekLink('secret', p.token);
+  // Tokens travel in the request body, never in a URL path (no access logs, no URL built from user input).
+  route('POST', '/api/secret-links/open', async (req, res, body) => {
+    const d = peekLink('secret', String(body.token || ''));
     return d ? { for: d.label, askedBy: d.byName, expiresAt: d.expiresAt } : [404, { error: GONE }];
   }, PANEL);
-  route('POST', '/api/secret-links/:token', async (req, res, body, q, p, user) => {
-    const d = peekLink('secret', p.token);
+  route('POST', '/api/secret-links/use', async (req, res, body, q, p, user) => {
+    const token = String(body.token || '');
+    const d = peekLink('secret', token);
     if (!d) return [404, { error: GONE }];
     const value = String(body.value || '').trim();
     if (!value) return [400, { error: 'Paste the value first', field: 'value' }];
     if (d.account) await invoke(user, 'PUT', `/api/accounts/${encodeURIComponent(d.account)}/key`, { key: value });
     else await invoke(user, 'PUT', '/api/secrets', { name: d.name, value });
-    takeLink('secret', p.token); // single use, after a successful save (a failed save can be tried again)
+    takeLink('secret', token); // single use, after a successful save (a failed save can be tried again)
     activity('system', { summary: `${d.label} saved through a one-time link by ${user.username} (asked by ${d.byName})` });
     if (d.notify) await tellUser(d.by, `Saved ${d.label}${user.id === d.by ? '' : ` (entered by ${user.username})`}. The value never passed through this chat.`).catch(() => {});
     return { ok: true, saved: d.label };
@@ -83,18 +85,20 @@ export function linkRoutes(route, { invoke }) {
     if (u.disabled) return [400, { error: `${u.username} is disabled: enable the account first` }];
     return signupLink(req, u, user);
   }, OWNER);
-  route('GET', '/api/signup/:token', async (req, res, body, q, p) => {
+  route('POST', '/api/signup/open', async (req, res, body) => {
     if (signupLimit(clientIp(req))) return [429, { error: 'Too many attempts, wait a minute' }];
-    const u = signupUser(p.token);
-    return u ? { username: u.username, role: u.role, expiresAt: peekLink('signup', p.token).expiresAt } : [404, { error: GONE }];
+    const token = String(body.token || '');
+    const u = signupUser(token);
+    return u ? { username: u.username, role: u.role, expiresAt: peekLink('signup', token).expiresAt } : [404, { error: GONE }];
   }, { public: true });
-  route('POST', '/api/signup/:token', async (req, res, body, q, p) => {
+  route('POST', '/api/signup', async (req, res, body) => {
+    const token = String(body.token || '');
     if (signupLimit(clientIp(req))) return [429, { error: 'Too many attempts, wait a minute' }];
     if (!passwordLoginAllowed()) return [403, { error: 'Password sign-in is switched off. Use Sign in with Google.' }];
-    const u = signupUser(p.token);
+    const u = signupUser(token);
     if (!u) return [404, { error: GONE }];
     updateUser(u.id, { password: String(body.password || '') }); // strength checked here; the link stays usable on error
-    takeLink('signup', p.token);
+    takeLink('signup', token);
     setSessionCookie(req, res, u.id);
     activity('system', { summary: `${u.username} set their password with a sign-up link` });
     return { ok: true, user: getUser(u.id) };

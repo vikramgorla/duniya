@@ -28,12 +28,12 @@ and from AI assistants, without a secret ever passing through a chat or a model.
   stored (`ttl_state`, encrypted data, expiry), single use, no timers (expired rows swept by the TTL store).
 - FR-2 Links put the token in the URL fragment (`/#secret=…`, `/#signup=…`) so it never reaches server or proxy logs.
 - FR-3 Secret entry: `POST /api/secret-links` (admin) for a secret name or an API-key model account; the page calls
-  `GET`/`POST /api/secret-links/:token` with a panel session (admin+, not the mobile token). The value is saved through
+  `POST /api/secret-links/open` / `use` (token in the body, never in a URL path) with a panel session (admin+, not the mobile token). The value is saved through
   the existing routes (`PUT /api/secrets`, `PUT /api/accounts/:id/key`), so validation and logging stay one way.
   When asked from the owner assistant in WhatsApp, "saved" is sent to the asker's own owner-assistant chat.
 - FR-4 Sign-up: `POST /api/users` without a password creates the user without one and returns a sign-up link (owner,
   password sign-in must be on, as today). `POST /api/users/:id/signup-link` makes a new link (older ones stop
-  working). Public `GET`/`POST /api/signup/:token` (rate limited) sets the password and signs the person in. A
+  working). Public `POST /api/signup/open` and `POST /api/signup` (token in the body) (rate limited) sets the password and signs the person in. A
   disabled or deleted user's link does nothing.
 - FR-5 Restore: `POST /api/backups/restore` without a passphrase uses the stored one; `check: true` opens the backup
   without restoring (for the preview). A backup that does not open answers with the Backups page link.

@@ -660,7 +660,7 @@ async function renderSignup(app, brand, token) {
   app.append(h('div', { class: 'center' }, card));
   const done = () => { history.replaceState(null, '', location.pathname); renderLogin(); };
   let u;
-  try { u = await api('GET', `/api/signup/${token}`); } catch (x) {
+  try { u = await api('POST', '/api/signup/open', { token }); } catch (x) {
     return card.append(h('p', { class: 'small', style: 'text-align:center' }, x.message), h('button', { class: 'btn', type: 'button', style: 'width:100%;justify-content:center', onclick: done }, 'Go to sign-in'));
   }
   const pw = h('input', { type: 'password', placeholder: '12+ characters', autocomplete: 'new-password' });
@@ -668,7 +668,7 @@ async function renderSignup(app, brand, token) {
   card.onsubmit = async (e) => {
     e.preventDefault(); err.textContent = '';
     if (pw.value !== pw2.value) return (err.textContent = 'The two passwords differ');
-    try { const r = await api('POST', `/api/signup/${token}`, { password: pw.value }); S.user = r.user; history.replaceState(null, '', location.pathname); boot(); } catch (x) { err.textContent = x.message; }
+    try { const r = await api('POST', '/api/signup', { token, password: pw.value }); S.user = r.user; history.replaceState(null, '', location.pathname); boot(); } catch (x) { err.textContent = x.message; }
   };
   card.append(h('p', { class: 'small muted', style: 'text-align:center;margin:0 0 6px' }, `Welcome, ${u.username}! Choose your password for this panel (${u.role}).`),
     h('input', { type: 'text', value: u.username, autocomplete: 'username', hidden: true }), field('Password', pw), field('Password again', pw2), err,
@@ -685,12 +685,12 @@ async function renderSecretLink(token) {
   main.replaceChildren(card);
   const back = h('button', { class: 'btn', type: 'button', onclick: () => show('secrets') }, 'Back to the panel');
   let d;
-  try { d = await api('GET', `/api/secret-links/${token}`); } catch (x) { return card.append(h('p', { class: 'small' }, x.message), back); }
+  try { d = await api('POST', '/api/secret-links/open', { token }); } catch (x) { return card.append(h('p', { class: 'small' }, x.message), back); }
   const val = h('input', { type: 'password', placeholder: 'paste the value', autocomplete: 'off', spellcheck: 'false', 'aria-label': `Value for ${d.for}` });
   const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:18px;margin-top:6px' });
   card.onsubmit = async (e) => {
     e.preventDefault(); err.textContent = '';
-    try { await api('POST', `/api/secret-links/${token}`, { value: val.value }); card.replaceChildren(h('h2', {}, 'Saved ✓'), h('p', { class: 'small muted' }, `${d.for} is stored encrypted on the server. You can close this page.`), back); } catch (x) { err.textContent = x.message; }
+    try { await api('POST', '/api/secret-links/use', { token, value: val.value }); card.replaceChildren(h('h2', {}, 'Saved ✓'), h('p', { class: 'small muted' }, `${d.for} is stored encrypted on the server. You can close this page.`), back); } catch (x) { err.textContent = x.message; }
   };
   card.append(h('p', { class: 'small muted', style: 'margin-top:0' }, `Asked by ${d.askedBy}. The value goes straight to the server, encrypted, and is never shown again. This link works once, until ${new Date(d.expiresAt).toLocaleTimeString()}.`),
     field(d.for, val), err, h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn primary' }, 'Save'), back));

@@ -39,19 +39,19 @@ test('060: secret link — admin+ only, single use, 15 min expiry, value saved a
   assert.ok(token, r.link);
   assert.ok(!JSON.stringify(t.db.db.prepare('SELECT * FROM ttl_state').all()).includes(token), 'only a hash is stored');
   // the page needs a panel session of an owner or admin
-  assert.equal((await anon('GET', `/api/secret-links/${token}`)).status, 401);
-  assert.equal((await t.api(viewer, 'GET', `/api/secret-links/${token}`)).status, 403);
-  assert.equal((await t.api(owner, 'GET', `/api/secret-links/${token}`)).body.askedBy, 'ada');
-  assert.equal((await t.api(owner, 'POST', `/api/secret-links/${token}`, { value: '  ' })).status, 400);
-  assert.equal((await t.api(owner, 'POST', `/api/secret-links/${token}`, { value: 'sk-very-secret-value-123' })).body.saved, 'NEW_KEY');
+  assert.equal((await anon('POST', '/api/secret-links/open', { token: token })).status, 401);
+  assert.equal((await t.api(viewer, 'POST', '/api/secret-links/open', { token: token })).status, 403);
+  assert.equal((await t.api(owner, 'POST', '/api/secret-links/open', { token: token })).body.askedBy, 'ada');
+  assert.equal((await t.api(owner, 'POST', '/api/secret-links/use', { token: token, value: '  ' })).status, 400);
+  assert.equal((await t.api(owner, 'POST', '/api/secret-links/use', { token: token, value: 'sk-very-secret-value-123' })).body.saved, 'NEW_KEY');
   assert.equal(t.store.getSecret('NEW_KEY'), 'sk-very-secret-value-123');
-  assert.equal((await t.api(owner, 'POST', `/api/secret-links/${token}`, { value: 'again' })).status, 404, 'single use');
-  assert.equal((await t.api(owner, 'GET', `/api/secret-links/${'0'.repeat(64)}`)).status, 404, 'unknown token');
+  assert.equal((await t.api(owner, 'POST', '/api/secret-links/use', { token: token, value: 'again' })).status, 404, 'single use');
+  assert.equal((await t.api(owner, 'POST', '/api/secret-links/open', { token: '0'.repeat(64) })).status, 404, 'unknown token');
   assert.ok(!activityText().includes('sk-very-secret-value-123'), 'never logged');
   // expiry
   const old = tokenOf((await t.api(admin, 'POST', '/api/secret-links', { name: 'OTHER_KEY' })).body.link, 'secret');
   expireAll('secret');
-  assert.equal((await t.api(admin, 'POST', `/api/secret-links/${old}`, { value: 'late-value-123' })).status, 404);
+  assert.equal((await t.api(admin, 'POST', '/api/secret-links/use', { token: old, value: 'late-value-123' })).status, 404);
   assert.equal(t.store.getSecret('OTHER_KEY'), '');
 });
 
@@ -59,7 +59,7 @@ test('060: secret link for a model account key goes through the account key rout
   assert.equal((await t.api(admin, 'POST', '/api/secret-links', { account: 'nope' })).status, 404);
   const r = (await t.api(admin, 'POST', '/api/secret-links', { account: 'anthropic' })).body;
   assert.match(r.for, /API key of Anthropic/);
-  await t.api(admin, 'POST', `/api/secret-links/${tokenOf(r.link, 'secret')}`, { value: 'sk-ant-new-key-0001' });
+  await t.api(admin, 'POST', '/api/secret-links/use', { token: tokenOf(r.link, 'secret'), value: 'sk-ant-new-key-0001' });
   assert.equal(t.store.getSecret('ANTHROPIC_API_KEY'), 'sk-ant-new-key-0001');
   t.store.setSecret('ANTHROPIC_API_KEY', 'test');
 });
@@ -71,7 +71,7 @@ test('060: owner assistant — set_secret gives the link verbatim, runs without 
   const url = /https:\/\/panel\.example\.test\/#secret=[a-f0-9]{64}/.exec(reply)?.[0];
   assert.ok(url, reply);
   assert.doesNotMatch(reply, /confirm [A-Z2-9]{4}/);
-  await t.api(owner, 'POST', `/api/secret-links/${tokenOf(url, 'secret')}`, { value: 'sk-proj-abcdef0123456789' });
+  await t.api(owner, 'POST', '/api/secret-links/use', { token: tokenOf(url, 'secret'), value: 'sk-proj-abcdef0123456789' });
   assert.equal(t.store.getSecret('OPENAI_API_KEY'), 'sk-proj-abcdef0123456789');
   assert.equal(lastTo(ownerDm), 'Saved OPENAI_API_KEY. The value never passed through this chat.');
   assert.ok(!JSON.stringify(t.claudeReqs).includes('sk-proj-abcdef0123456789'), 'the value never reached a model');
@@ -110,14 +110,14 @@ test('060: add_user without a password — sign-up link through confirm, single 
   assert.equal(anu.role, 'admin');
   assert.equal(anu.hasPassword, false);
 
-  const look = await anon('GET', `/api/signup/${token}`);
+  const look = await anon('POST', '/api/signup/open', { token: token });
   assert.deepEqual([look.body.username, look.body.role], ['anu', 'admin']);
   assert.ok(look.body.expiresAt - Date.now() > 47 * 3600000);
-  assert.equal((await anon('POST', `/api/signup/${token}`, { password: 'short' })).status, 400);
-  const ok = await anon('POST', `/api/signup/${token}`, { password: 'anu chose this one' });
+  assert.equal((await anon('POST', '/api/signup', { token: token, password: 'short' })).status, 400);
+  const ok = await anon('POST', '/api/signup', { token: token, password: 'anu chose this one' });
   assert.equal(ok.status, 200);
   assert.equal((await t.api(ok.cookie, 'GET', '/api/session')).body.user.username, 'anu', 'signed in');
-  assert.equal((await anon('POST', `/api/signup/${token}`, { password: 'someone else 12345' })).status, 404, 'single use');
+  assert.equal((await anon('POST', '/api/signup', { token: token, password: 'someone else 12345' })).status, 404, 'single use');
   assert.ok(await t.login('anu', 'anu chose this one'));
   assert.ok(!activityText().includes('anu chose this one'));
 });
@@ -127,14 +127,14 @@ test('060: sign-up links — owner only, a new link replaces the old, expiry, de
   const r = (await t.api(owner, 'POST', '/api/users', { username: 'bo', role: 'viewer', noPassword: false })).body;
   const first = tokenOf(r.signup.link, 'signup');
   const second = tokenOf((await t.api(owner, 'POST', `/api/users/${r.id}/signup-link`)).body.link, 'signup');
-  assert.equal((await anon('GET', `/api/signup/${first}`)).status, 404, 'older link stops working');
-  assert.equal((await anon('GET', `/api/signup/${second}`)).status, 200);
+  assert.equal((await anon('POST', '/api/signup/open', { token: first })).status, 404, 'older link stops working');
+  assert.equal((await anon('POST', '/api/signup/open', { token: second })).status, 200);
   expireAll('signup');
-  assert.equal((await anon('GET', `/api/signup/${second}`)).status, 404, 'expired');
+  assert.equal((await anon('POST', '/api/signup/open', { token: second })).status, 404, 'expired');
   // deleted user: the link does nothing
   const third = tokenOf((await t.api(owner, 'POST', `/api/users/${r.id}/signup-link`)).body.link, 'signup');
   await t.api(owner, 'DELETE', `/api/users/${r.id}`);
-  assert.equal((await anon('POST', `/api/signup/${third}`, { password: 'a long password 1' })).status, 404);
+  assert.equal((await anon('POST', '/api/signup', { token: third, password: 'a long password 1' })).status, 404);
   // with a password the old way still works (panel)
   assert.equal((await t.api(owner, 'POST', '/api/users', { username: 'cy', role: 'viewer', password: 'cy password 12345' })).body.signup, undefined);
   // admins do not get the user tools in the owner assistant
