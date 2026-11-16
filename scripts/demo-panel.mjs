@@ -364,12 +364,13 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     }
   }
   store.updateSettings({ modelPrices: { 'anthropic:claude-haiku-5-5': { in: 1, out: 5 }, 'anthropic:claude-sonnet-5-5': { in: 3, out: 15 } } });
-  // spending caps (040), owner alerts and weekly counters (041)
+  // spending caps (040), owner alerts and weekly counters (041); 059: the alert number and character are the owner assistant's
   const budget = await imp('src/core/budget.js'); const stats = await imp('src/core/stats.js');
   budget.setCap('agent', 'carpool', { cost: 2 });
   budget.setCap('agent', 'school', { cost: 1.5, fallback: 'anthropic:claude-haiku-5-5' });
   budget.setCap('chat', G(4), { tokens: 400000 });
-  store.updateSettings({ alertsTo: P(1) });
+  await agents.updateAgent('owner-assistant', { alerts: { to: P(1) }, prompt: 'Call me Vik. Short answers in English; French is fine too.\n- Start with what needs me.\n- GIFs welcome when I ask for fun.',
+    schedules: [{ id: 'weekly-summary', kind: 'weekly-summary', at: '09:00', days: 'mon' }, { id: 'morning-brief', at: '07:30', days: 'mon,tue,wed,thu,fri', prompt: 'A short morning brief: what happened overnight in my groups and what needs me today.' }] }, 'admin');
   for (let day = 13; day >= 0; day--) {
     for (const [agent, n] of [['carpool', 6], ['school', 3], ['family', 4], ['football', 2]]) {
       for (let k = 0; k < Math.round(n * (0.5 + rnd())); k++) { stats.countStat('handled', { agent }, now - day * D); stats.countStat('reply', { agent }, now - day * D); }

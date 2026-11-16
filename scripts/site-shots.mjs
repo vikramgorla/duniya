@@ -72,6 +72,7 @@ const CARDS = [
   ['card-fallback', 'models', 'T.openAll(document.querySelector("#fallback"));', '#fallback', 1100],
   ['card-chat-fallback', 'chats', "[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);", '#chat-fallback', 600],
   ['card-owner-assistant', 'settings', 'T.openAll(T.box("Owner assistant"));', 'box:Owner assistant', 900],
+  ['card-owner-agent', 'agents/owner-assistant', '', 'box:Character', 900], // 059: the owner assistant's own editor
   ['card-privacy', 'settings', '', 'box:Privacy notice', 900],
   ['card-web-access', 'settings', '', 'box:Web address & access', 900],
   ['card-small-server', 'server', '', 'box:This server', 1100],

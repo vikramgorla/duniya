@@ -2,14 +2,14 @@ import http from 'node:http';
 import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execFile } from 'node:child_process';
-import { env, ROOT, DATA_DIR } from '../core/config.js';
+import { env, ROOT, DATA_DIR, digits } from '../core/config.js';
 import {
   listSecrets, setSecret, getSettings, updateSettings, interpolate, countUsers, createUser, listUsers, updateUser,
   deleteUser, authenticate, sessionUser, deleteSession, getUser,
 } from '../core/store.js';
 import {
   listAgents, getAgent, agentView, createAgent, updateAgent, deleteAgent, bindChat, loadAgents, agentForChat,
-  listTemplates, templateConfig, exportAgent, importAgent,
+  listTemplates, templateConfig, exportAgent, importAgent, isBuiltin,
 } from '../core/agents.js';
 import { referencedSecrets } from '../core/schema.js';
 import { listActivity, listPending, dropPending, takePending, deleteNote, getNote, namesInChat, listMessages, listNotes, kvGet } from '../core/db.js';
@@ -204,7 +204,7 @@ export function startPanel({ channel, extend = [] }) {
     server: { ...serverSize(), smallMode: smallServerMode() }, // small-server guardrails (043, 055): size, RAM, CPUs, switch
     mediaQueue: queueStats(),
     node: process.version,
-    agents: listAgents().map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })),
+    agents: listAgents().filter((b) => !isBuiltin(b)).map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })), // 059: chat agents
     pending: listPending().length,
     // #96: Server tab badge — only updates that will install now (from the last check; never runs apt here)
     osUpdates: ['admin', 'owner'].includes(user?.role) ? { ...(osUpdatesCached() || { count: 0, security: 0, at: null }), restart: rebootStatus().required } : null,
@@ -275,6 +275,8 @@ export function startPanel({ channel, extend = [] }) {
   route('PUT', '/api/agents/:id', async (req, res, body, q, p, user) => {
     const before = getAgent(p.id);
     if (body.mcpServers !== undefined) guardLocal(user, before, body);
+    // 059: where owner alerts go is the owner's choice (as under the old Settings → Owner alerts)
+    if (body.alerts !== undefined && user.role !== 'owner' && digits(body.alerts?.to || '') !== (before?.alerts?.to || '')) return [403, { error: 'Only the owner can change where alerts go', field: 'alerts.to' }];
     const { agent, warnings } = await updateAgent(p.id, body, user.username);
     return { ...agentView(agent), warnings };
   });
@@ -419,6 +421,7 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
   route('POST', '/api/agents/:id/test', async (req, res, body, q, p) => {
     const agent = getAgent(p.id);
     if (!agent) return [404, { error: 'Not found' }];
+    if (isBuiltin(agent)) return [400, { error: 'Try the owner assistant in the Ask box on Overview or in your WhatsApp chat' }]; // 059
     const role = body.role === 'organizer' ? 'organizer' : 'participant';
     // #37 "Test as…": a chat of this agent (its memory, type and model) or a new direct chat; never sent to WhatsApp.
     const pick = body.chat && body.chat !== 'new' ? String(body.chat) : '';

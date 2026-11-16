@@ -380,7 +380,7 @@ async function queueImage(input, ctx) {
   const { enqueue } = await import('./media-queue.js');
   try {
     enqueue({ kind: 'image', chat, msgId: ctx.msgId || '', senderJid: ctx.senderJid || '', agent: agent.id,
-      payload: { agent: agent.id, chat, input: { prompt: input.prompt, size: input.size, caption: input.caption, edit_of: input.edit_of }, imageFile, mimetype: imageFile ? `image/${imageFile.split('.').pop()}` : '' } });
+      payload: { agent: agent.id, ...(ctx.ownerChat === chat ? { owner: true } : {}), chat, input: { prompt: input.prompt, size: input.size, caption: input.caption, edit_of: input.edit_of }, imageFile, mimetype: imageFile ? `image/${imageFile.split('.').pop()}` : '' } });
   } catch (e) {
     if (imageFile) rmSync(imageFile, { force: true });
     if (e.code === 'overloaded') throw new Error('Too many pictures and voice notes are waiting right now; ask them to try again in a few minutes.', { cause: e });

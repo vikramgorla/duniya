@@ -1,13 +1,18 @@
 # Owner assistant, alerts and weekly summary
 
-**Ask about all your chats from your own WhatsApp or the Ask box: recaps, who said what, why a group is quiet.**
+**Your own agent in your own WhatsApp chat: recaps of all your chats, GIFs and pictures, voice notes, and messages into
+your groups after you confirm.**
 
-**Do it:** panel → **Settings → Owner assistant → Link my WhatsApp**.
+**Do it:** panel → **Settings → Owner assistant → Link my WhatsApp**, then **Agents → Owner assistant** to give it a
+character.
 
 **In 30 seconds**
-- Built in (not an agent): your DMs to any agent number, the **Ask** box, the mobile app.
+- A built-in agent: your DMs to any agent number, the **Ask** box, the mobile app. Always there, cannot be deleted.
+- Everything an agent can have: tool services (e.g. GIF search), WhatsApp actions, photos, PDFs, voice notes, voice
+  replies, pictures, memory, schedules — set in the normal agent editor.
 - Sees only chats that are on and not **Private to members**; never answers in groups.
-- Changes need `confirm CODE` (valid 10 minutes, also across a restart). Alerts and a weekly summary (counts only) go to your WhatsApp.
+- Changes, and anything sent into another chat, need `confirm CODE` (valid 10 minutes, also across a restart).
+- Alerts and the weekly summary (counts only) are its messages too.
 
 ![Ask box on Overview](site/img/card-ask.webp)
 
@@ -16,8 +21,8 @@
 1. **Settings → Owner assistant → Link my WhatsApp** shows a one-time message `link CODE` (valid 10 minutes).
 2. Send it from your phone to any agent number.
 3. Confirm "Linked +41…" in the panel.
-4. Message an agent number: "what did the families decide this week?", "why is the carpool group quiet?", "turn off
-   the helper agent".
+4. Message an agent number: "what did the families decide this week?", "send me a dancing GIF", "post a poll in
+   Carpool: pizza or dosa?", "turn off the helper agent".
 
 <p align="center"><img src="diagrams/owner-dm-routing.svg" alt="Your DM to an agent number goes to that agent when it starts with an agent trigger or confirm CODE; otherwise to the owner assistant with your panel role, whose changes need confirm CODE" width="415"></p>
 
@@ -30,16 +35,55 @@
 
 </details>
 
+## Its editor: character, tools, voice, schedules, alerts
+
+**Agents → Owner assistant** (or **Settings → Owner assistant → Character, tools, voice, schedules & alerts**) is the
+normal agent editor without the parts that do not apply (chats, triggers, people, quick replies, welcome, confirmation
+setup, test console — try it in the Ask box instead). The AI helper and its visual diff work here too.
+
+| Section | What it does |
+|---|---|
+| **Character** | Tone, language and habits ("call me Vik, short answers"). Added to the built-in instructions; it never widens what the assistant may do |
+| **Model** | Model and fallback, recent turns in context, max reply tokens, timezone (Advanced) |
+| **Memory** | Notes it saves when you ask ("remember Vedika likes ILLIT"): per person, never in a chat's memory |
+| **Tool services** | Global services are on by default (switch one off here); it can have its own services too. Each service's role defaults decide its tools |
+| **WhatsApp actions** | Send pictures, GIFs, files, locations, contact cards, polls, reactions, replies. Group administration stays with the admin tools |
+| **Photos & voice** | Look at photos and PDFs, listen to voice notes, answer with voice, create pictures (in your own chat) |
+| **Alerts** | The number spending-cap, model-provider and update alerts go to. Only the owner can change it |
+| **Scheduled messages to you** | The **weekly summary** (on, Monday 09:00) and your own, e.g. a morning brief. Sent to every linked owner and admin in their own chat; they run even while agents are paused |
+| **Monthly spending cap** | Like any agent |
+
+![The owner assistant's editor](site/img/card-owner-agent.webp)
+
+## What it may do (decided in code)
+
+| | Owners and admins | Viewers |
+|---|---|---|
+| Admin tools | with their panel role; changes need `confirm CODE` | read-only, without message contents |
+| Tool services | the services' organizer defaults | the services' participant defaults |
+| WhatsApp actions in their own chat | right away | right away (participant set) |
+| Sending into another chat | `send_message` or a WhatsApp action with the chat's name; always `confirm CODE` | never |
+| Pictures | as set under Photos & voice | as set (participants) |
+
+- **Other chats:** only chats that are on and not private, by group name, contact name or id. A chat switched off
+  before you confirm gets nothing. A person who never saw the privacy line gets it once with the first message.
+- **Tool services:** a tool called `confirm` (or `…_confirm`, `confirm_…`) or marked destructive is held for your code.
+- **Not included:** asking another agent to act in its chat (its own tools would run without a preview), and
+  forwarding a photo you just sent into another chat.
+
+> [!NOTE]
+> It never answers in groups or anyone who is not linked. `!family …` still reaches that agent, and so does
+> `confirm CODE` for a change an agent prepared.
+
 | | |
 |---|---|
-| **Tools** | the admin MCP tools with your panel role (viewers read-only, without message contents; tools that take keys or passwords stay in the panel), plus `list_visible_chats`, `search_messages`, `chat_recap` |
-| **Ask box** | the answer streams in: each step shows as it happens (✓ looked up, ⏸ change held, ✕ failed; tool names only) and the assistant's text appears word by word (Anthropic, OpenAI, OpenRouter, other endpoints, ChatGPT; GitHub Copilot shows it after each step); changes still wait for **Confirm** (panel and mobile app). WhatsApp replies stay whole |
-| **Model** | the default model with fallback, or one chosen in the same card |
-| **Storage** | its conversation is stored separately, never in chat memory |
-| **Audit** | every question and action is in Activity (`owner.*`, always recorded) |
-| **API** | `POST /api/owner/ask` (whole answer) or `POST /api/owner/ask/stream` (newline-delimited JSON: `step`, `delta`, `restarted`, `text`, `done`, `error`; see below) |
-| **Admin MCP** | `get_owner_assistant`, `set_chat_private` |
-| **People who never wrote** | "assign Mochi to Vedika" works in one go: it looks up the contact and prepares the direct chat (`prepare_direct_chat`, see [Agents](agents.md#set-up-a-direct-chat-before-the-person-writes)); you confirm once. Add "and say hi" to let the agent write first in the same confirmation |
+| **Photos & voice notes** | go through the media queue like agents' (one at a time on a small server, picked up after a restart); only `[image] caption` or `🎤 transcript` is kept |
+| **Ask box** | the answer streams in: each step shows as it happens (✓ looked up, ⏸ change held, ✕ failed; tool names only) and the text appears word by word; changes wait for **Confirm** (panel and mobile app). WhatsApp replies stay whole |
+| **Storage** | its conversation and notes are stored separately, never in chat memory |
+| **Audit** | every question and action is in Activity (`owner.*`, `whatsapp.action`, always recorded) |
+| **API** | `POST /api/owner/ask` (whole answer) or `POST /api/owner/ask/stream` (newline-delimited JSON: `step`, `delta`, `restarted`, `text`, `done`, `error`; see below); the record is `GET`/`PUT /api/agents/owner-assistant` |
+| **Admin MCP** | `get_owner_assistant` (link), `get_agent` / `update_agent` / `run_schedule_now` with `owner-assistant`, `preview_weekly_summary`, `set_chat_private` |
+| **People who never wrote** | "assign Mochi to Vedika" works in one go: it looks up the contact and prepares the direct chat (`prepare_direct_chat`, see [Agents](agents.md#set-up-a-direct-chat-before-the-person-writes)); you confirm once |
 
 <details>
 <summary>Streamed answers: the events</summary>
@@ -56,21 +100,20 @@
 
 </details>
 
-> [!NOTE]
-> It never answers in groups or anyone who is not linked. `!family …` still reaches that agent, and so does
-> `confirm CODE` for a change an agent prepared.
-
 ![Owner assistant settings](site/img/card-owner-assistant.webp)
 
 ## Owner alerts and weekly summary
 
-**Settings → Owner alerts on WhatsApp**: enter your number.
+**Agents → Owner assistant → Alerts**: enter your number.
 
-- **Cap alerts** go there ([spending caps](spending.md)).
-- **Weekly summary** (on by default once a number is set; day and time configurable): messages handled, replies and
-  cost per agent this week vs last, ignored chats, pending confirmations, update available, backup failures, a server
-  restart waiting more than 7 days to finish OS updates. **Send now** sends it at once.
-- Admin MCP: `get_owner_alerts`, `set_owner_alerts`, `preview_weekly_summary`, `send_weekly_summary`.
+- **Cap alerts** and model-provider alerts go there as they happen ([spending caps](spending.md)).
+- **Weekly summary**: the owner assistant's `weekly-summary` schedule (on, Monday 09:00; change day, time or switch it
+  off in **Scheduled messages to you**). Messages handled, replies and cost per agent this week vs last, ignored
+  chats, pending confirmations, update available, backup failures, a server restart waiting more than 7 days to
+  finish OS updates. **Run now** sends it at once, **Preview** shows it. It goes to linked owners and admins; with
+  nobody linked, to the Alerts number.
+- Admin MCP: `preview_weekly_summary`; `run_schedule_now` (owner-assistant, weekly-summary); `update_agent` for the
+  alert number (`alerts: { to }`) and the schedule.
 
 > [!IMPORTANT]
 > Counts only, never message contents.
@@ -80,4 +123,4 @@ gets a code: `confirm ABCD` backs up, updates, restarts and reports the result; 
 Only owners can confirm. [Backups and updates](backups-and-updates.md#updates)
 
 ---
-**Next:** [Admin MCP](admin-mcp.md) · [Privacy](privacy.md) · [Docs index](README.md)
+**Next:** [Agents](agents.md) · [Admin MCP](admin-mcp.md) · [Privacy](privacy.md) · [Docs index](README.md)

@@ -65,7 +65,7 @@ test('a global service is added once and every agent gets its tools by the defau
   });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.equal(r.body.config.tokens.organizer, '${SHARED_TOKEN}', 'secret references, never values');
-  assert.deepEqual(r.body.agents.using.sort(), ['helper', 'panduga']);
+  assert.deepEqual(r.body.agents.using.sort(), ['helper', 'owner-assistant', 'panduga'], 'the owner assistant uses global services too');
   const list = await t.api(viewer, 'GET', '/api/tool-services');
   assert.equal(list.status, 200);
   assert.deepEqual(list.body.map((g) => g.name), ['shared']);
@@ -98,7 +98,7 @@ test('an agent can opt out of a global service; an own service with the same nam
   assert.deepEqual(off.body.config.globalMcp, { disabled: ['shared'] });
   assert.ok(!(await offered('helper', 'organizer')).some((n) => n.startsWith('shared__')));
   const g = (await t.api(owner, 'GET', '/api/tool-services')).body[0];
-  assert.deepEqual([g.agents.using, g.agents.optedOut], [['panduga'], ['helper']]);
+  assert.deepEqual([g.agents.using, g.agents.optedOut], [['owner-assistant', 'panduga'], ['helper']]);
   await t.api(admin, 'PUT', '/api/agents/helper', { globalMcp: { disabled: [] } });
   assert.ok((await offered('helper', 'organizer')).includes('shared__whoami'));
   // own "shared" service (tools only via the agent's explicit rules) replaces the global one for this agent
@@ -190,12 +190,12 @@ test('admin MCP tools list, add and remove global services (same routes and role
   const as = (cookie) => ({ call: async (method, path, body) => { const r = await t.api(cookie, method, path, body); if (r.status >= 400) throw Object.assign(new Error(r.body.error), { status: r.status }); return r.body; } });
   const x = as(admin);
   const args = { name: 'notes', config: { url: FAKE(), auth: 'none', defaults: { participant: ['whoami'] } } };
-  assert.match(await tool('add_global_tool_service').preview(args, x), /Add the global tool service notes: .* available to 2 agents/);
+  assert.match(await tool('add_global_tool_service').preview(args, x), /Add the global tool service notes: .* available to 3 agents/);
   await tool('add_global_tool_service').run(args, x);
   const listed = await tool('list_global_tool_services').run({}, as(viewer));
   assert.deepEqual(listed.find((g) => g.name === 'notes').config.defaults, { organizer: ['*'], participant: ['whoami'] });
   await assert.rejects(tool('add_global_tool_service').run({ name: 'loc', config: { type: 'local', package: 'some-mcp@1.0.0' } }, x), /Only the owner/);
-  assert.match(await tool('remove_global_tool_service').preview({ name: 'notes' }, x), /2 agents \((helper, panduga|panduga, helper)\) lose its tools/);
+  assert.match(await tool('remove_global_tool_service').preview({ name: 'notes' }, x), /3 agents \(owner-assistant, (helper, panduga|panduga, helper)\) lose its tools/);
   await tool('remove_global_tool_service').run({ name: 'notes' }, x);
   await assert.rejects(tool('remove_global_tool_service').preview({ name: 'notes' }, x), /No global tool service/);
 });

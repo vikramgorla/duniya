@@ -1,11 +1,11 @@
 import { isChatEnabled } from './chat-prefs.js';
 import { env } from './config.js';
 import { getSettings } from './store.js';
-import { listAgents } from './agents.js';
+import { listAgents, isBuiltin } from './agents.js';
 import { runAgent } from './runner.js';
 import { kvGet, kvSet, logMessage } from './db.js';
 import { activity } from './events.js';
-import { weeklyTick } from './weekly.js';
+import { runOwnerSchedule } from './owner-assistant.js';
 import { upkeepTick } from './upkeep.js';
 
 function nowParts(tz) {
@@ -21,9 +21,10 @@ const dayMatches = (days, day) => !days || days === 'daily' || days.split(',').m
 
 /** Run one schedule now. Returns [{chat, reply}] */
 export async function runSchedule(agent, sched, channel, { force = false } = {}) {
+  const { date } = nowParts(agent.timezone || env.timezone);
+  if (isBuiltin(agent)) return runOwnerSchedule(sched, { date, force }); // 059: to linked owners and admins
   const chats = sched.chats === 'all' ? agent.chats : sched.chats;
   const results = [];
-  const { date } = nowParts(agent.timezone || env.timezone);
   for (const chat of chats) {
     if (!isChatEnabled(chat)) continue; // #10: never post into chats that are off
     const key = `sched:${agent.id}:${sched.id}:${chat}:${date}`;
@@ -51,11 +52,10 @@ export async function runSchedule(agent, sched, channel, { force = false } = {})
 
 export function startScheduler(channel) {
   setInterval(async () => {
-    try { await weeklyTick(); } catch (e) { activity('error', { summary: `Weekly summary failed: ${e.message}` }); } // 041: owner summary, even while paused
     upkeepTick(channel).catch(() => {}); // 057: names, member lists, history retries — bounded, never blocks schedules
-    if (getSettings().paused) return;
+    const paused = getSettings().paused;
     for (const agent of listAgents()) {
-      if (!agent.enabled) continue;
+      if (!agent.enabled || (paused && !isBuiltin(agent))) continue; // 059: the owner assistant's schedules run even while paused
       const { hhmm, day } = nowParts(agent.timezone || env.timezone);
       for (const s of agent.schedules || []) {
         if (s.enabled === false || s.at !== hhmm || !dayMatches(s.days, day)) continue;

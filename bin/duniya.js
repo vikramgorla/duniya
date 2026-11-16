@@ -198,7 +198,7 @@ const commands = {
     const nums = rt?.numbers || [];
     if (!nums.length) line('WhatsApp', dim('no numbers yet'));
     nums.forEach((n, i) => line(i ? '' : 'WhatsApp', `${n.label}: ${n.status === 'open' ? green(`connected${n.me ? ` as +${n.me}` : ''}`) : yellow(n.status === 'qr' ? 'waiting for the QR scan / pairing code' : n.status)}${rt.running ? '' : dim(' (last known)')}`));
-    const agents = s.listAgentRows();
+    const agents = s.listAgentRows().filter((b) => b.id !== 'owner-assistant'); // 059: chat agents (the built-in owner assistant is not one)
     line('Agents', agents.length ? `${agents.filter((b) => b.config.enabled).length} on, ${agents.filter((b) => !b.config.enabled).length} off` : dim('none yet (Agents → New agent in the panel)'));
     for (const b of agents) line('', `${b.config.enabled ? green('●') : dim('○')} ${b.config.name || b.id} ${dim(`· ${(b.config.chats || []).length} chat${(b.config.chats || []).length === 1 ? '' : 's'}`)}`);
     line('Accounts', `${s.listUsers().length} · sign-in: ${!passwordLoginAllowed() ? 'Google only' : googleReady() ? 'Google and password' : 'password'}`);

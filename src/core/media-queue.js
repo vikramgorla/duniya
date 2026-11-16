@@ -57,9 +57,22 @@ export function queueStats() {
   return { queued: by.queued?.n || 0, running: by.running?.n || 0, oldest: Math.min(by.queued?.oldest || Infinity, by.running?.oldest || Infinity) === Infinity ? null : Math.min(by.queued?.oldest || Infinity, by.running?.oldest || Infinity), ...queueLimits() };
 }
 
+/** What a queued turn needs to run later, even after a restart (no media bytes, no raw message object). */
+export const packMsg = (m) => ({ channel: m.channel, chat: m.chat, number: m.number, isGroup: m.isGroup, phone: m.phone, senderJid: m.senderJid, senderName: m.senderName,
+  msgId: m.msgId, ts: m.ts, text: m.text, caption: m.caption || '', quoted: m.quoted || '', mentioned: !!m.mentioned, replyToAgent: !!m.replyToAgent,
+  mediaInfo: m.mediaInfo || null, mediaRef: m.mediaRef || '' });
+export function unpackMsg(ch, p) {
+  return { ...p, raw: null, fetchMedia: () => ch.downloadMedia(p.chat, p.mediaRef, p.mediaInfo?.size || 0) };
+}
+/** How a reply quotes the message it answers: the raw message when we have it, else its key (queued turns). */
+export const quoteOf = (msg) => (msg.raw ? { quoted: msg.raw } : msg.msgId ? { quote: { msgId: msg.msgId, fromMe: false, participant: msg.isGroup ? msg.senderJid : undefined, text: msg.text } } : {});
+
 const del = (id) => db.prepare('DELETE FROM media_jobs WHERE id = ?').run(id);
 const parse = (job) => { try { return JSON.parse(job.payload); } catch { return {}; } };
 const ref = (job) => ({ msgId: job.msg_id, fromMe: false, participant: job.sender_jid || undefined });
+// Jobs run only for chats that are on, except jobs for the owner assistant's own chat (059, payload.owner): it answers
+// its linked user whether that chat is on or off, like its text replies.
+const chatOk = (job, payload = parse(job)) => !!payload.owner || isChatEnabled(job.chat);
 
 async function finish(job) {
   if (job.signaled >= 1 && job.msg_id) await channel?.react?.(job.chat, ref(job), '').catch(() => {}); // take the ⏳ back
@@ -69,7 +82,7 @@ async function runOne(job) {
   const h = handlers.get(job.kind);
   const payload = parse(job);
   try {
-    if (!h || !isChatEnabled(job.chat)) { del(job.id); await finish(job); return; } // chat switched off meanwhile: drop quietly
+    if (!h || !chatOk(job, payload)) { del(job.id); await finish(job); return; } // chat switched off meanwhile: drop quietly
     if (Date.now() - job.created_at > timing.maxAgeMs) {
       del(job.id);
       await finish(job);
@@ -109,7 +122,7 @@ async function signals() {
   if (!channel) return;
   const now = Date.now();
   for (const job of db.prepare("SELECT * FROM media_jobs WHERE tenant_id = ? AND state = 'queued' AND signaled < 2 AND created_at <= ? ORDER BY id LIMIT 50").all(TENANT, now - timing.signalMs)) {
-    if (!isChatEnabled(job.chat)) continue;
+    if (!chatOk(job)) continue;
     if (job.signaled === 0) {
       db.prepare('UPDATE media_jobs SET signaled = 1 WHERE id = ?').run(job.id);
       if (job.msg_id) await channel.react?.(job.chat, ref(job), '⏳').catch(() => {});

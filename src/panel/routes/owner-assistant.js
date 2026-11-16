@@ -1,19 +1,24 @@
-// Owner assistant (044): Settings → Owner assistant (link per signed-in user, model), the Ask box on Overview, and the
+// Owner assistant (044): Settings → Owner assistant (link per signed-in user; 059: everything else is the built-in
+// agent record, edited in the agent editor), the Ask box on Overview, and the
 // privacy notice settings.
 import {
-  ownerSettings, setOwnerSettings, linkStatus, listLinks, startLink, confirmLink, unlink, ask, resolveConfirm, ownerHistory,
+  linkStatus, listLinks, startLink, confirmLink, unlink, ask, resolveConfirm, ownerHistory,
 } from '../../core/owner-assistant.js';
 import { noticeSettings, setNoticeSettings } from '../../core/privacy-notice.js';
+import { OWNER_AGENT_ID } from '../../core/agents.js';
+import { weeklyText, weeklyData } from '../../core/weekly.js';
 
 export function ownerAssistantRoutes(route, { channel }) {
   const numbers = async () => (((await channel.status?.()) || {}).numbers || []).filter((n) => n.me)
     .map((n) => ({ id: n.id, label: n.label, phone: String(n.me).split(/[:@]/)[0] }));
 
   route('GET', '/api/owner-assistant', async (req, res, body, q, p, user) => ({
-    settings: ownerSettings(), link: linkStatus(user.id), role: user.role,
+    agent: OWNER_AGENT_ID, link: linkStatus(user.id), role: user.role,
     sendTo: await numbers().catch(() => []),
     ...(user.role === 'owner' ? { links: listLinks() } : {}),
   }), { role: 'viewer' });
+  // 059: the weekly summary as its schedule would send it now (counts and costs only); "Run now" sends it.
+  route('GET', '/api/owner-assistant/weekly-preview', async () => ({ text: weeklyText(), data: weeklyData() }));
   route('POST', '/api/owner-assistant/link', async (req, res, body, q, p, user) => startLink(user), { role: 'viewer', bearer: false });
   route('POST', '/api/owner-assistant/link/confirm', async (req, res, body, q, p, user) => confirmLink(user), { role: 'viewer', bearer: false });
   route('DELETE', '/api/owner-assistant/link', async (req, res, body, q, p, user) => ({ ok: unlink(user.id, user.username) }), { role: 'viewer' });
@@ -21,7 +26,6 @@ export function ownerAssistantRoutes(route, { channel }) {
     if (!unlink(Number(p.userId), user.username)) return [404, { error: 'Not linked' }];
     return { ok: true };
   }, { role: 'owner' });
-  route('PUT', '/api/owner-assistant/settings', async (req, res, body, q, p, user) => setOwnerSettings({ model: body.model }, user.username), { role: 'admin' });
 
   // Ask box (Overview, mobile app): same assistant and tools, with the panel user's role. Changes need the Confirm button.
   route('POST', '/api/owner/ask', async (req, res, body, q, p, user) => ask({ user, text: body.question, source: 'panel', surface: 'panel' }), { role: 'viewer' });

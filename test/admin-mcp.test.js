@@ -186,7 +186,7 @@ test('tools via the SDK client: read and write as the approving user, logged as 
   assert.equal(del.annotations.destructiveHint, true);
 
   const agents = JSON.parse(text(await c.callTool({ name: 'list_agents', arguments: {} })));
-  assert.deepEqual(agents.map((b) => b.id).sort(), ['helper', 'panduga']);
+  assert.deepEqual(agents.map((b) => b.id).sort(), ['helper', 'owner-assistant', 'panduga']);
   const ov = JSON.parse(text(await c.callTool({ name: 'get_overview', arguments: {} })));
   assert.equal(ov.you.username, 'admin');
 

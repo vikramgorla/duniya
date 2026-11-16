@@ -53,10 +53,12 @@ export default function AgentDetail() {
     <Screen onRefresh={refresh} refreshing={refreshing} stale={stale}>
       <Stack.Screen options={{ title: agent.name }} />
       <Card>
-        <Spread>
-          <Row style={{ flex: 1 }}><Led tone={agent.enabled ? 'ok' : 'off'} size={11} /><H2 style={{ flex: 1 }}>{agent.enabled ? 'On — answers in its chats' : 'Off — stays silent'}</H2></Row>
-          <Toggle label="Agent on or off" value={agent.enabled} onChange={toggle} disabled={!admin} />
-        </Spread>
+        {agent.builtin ? <Note>Built in: it answers linked panel users in their own WhatsApp chat and in the Ask box (059).</Note> : (
+          <Spread>
+            <Row style={{ flex: 1 }}><Led tone={agent.enabled ? 'ok' : 'off'} size={11} /><H2 style={{ flex: 1 }}>{agent.enabled ? 'On — answers in its chats' : 'Off — stays silent'}</H2></Row>
+            <Toggle label="Agent on or off" value={agent.enabled} onChange={toggle} disabled={!admin} />
+          </Spread>
+        )}
         <Row wrap gap={8}><Label>{`${c.chats?.length || 0} chats`}</Label><Label>{`model ${c.model || 'auto'}`}</Label>{agent.updatedAt ? <Label>{`changed ${ago(agent.updatedAt)} ago`}</Label> : null}</Row>
         {agent.needs.length ? <Note tone="warn">{`Missing secret${agent.needs.length > 1 ? 's' : ''}: ${agent.needs.join(', ')}. Add ${agent.needs.length > 1 ? 'them' : 'it'} in the web panel → Secrets.`}</Note> : null}
         {admin ? <Button kind="primary" title="Change with AI" icon={<Icon name="ai" color={t.onPrimary} size={18} />} onPress={() => router.push({ pathname: '/ai/[id]', params: { id: agent.id } })}
@@ -114,7 +116,7 @@ export default function AgentDetail() {
           {c.schedules.map((s) => (
             <View key={s.id} style={{ gap: 2 }}>
               <Row><Led tone={s.enabled ? 'ok' : 'off'} /><Mono>{`${s.at} · ${s.days || 'daily'}`}</Mono></Row>
-              <Body small muted numberOfLines={2}>{s.prompt}</Body>
+              <Body small muted numberOfLines={2}>{s.kind === 'weekly-summary' ? 'Weekly summary (counts and costs only)' : s.prompt}</Body>
             </View>
           ))}
         </Card>

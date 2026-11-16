@@ -4,7 +4,7 @@ import { personInfo, agentName } from './contacts.js';
 import { memberTag } from './member-tags.js';
 import { env, clip } from './config.js';
 import { getSettings } from './store.js';
-import { listAgents, getAgent, agentForChat, roleIn } from './agents.js';
+import { listAgents as allAgents, getAgent, agentForChat, roleIn, isBuiltin } from './agents.js';
 import { runAgent, handleConfirmCommand } from './runner.js';
 import { logMessage, messageByMsgId, saveReaction, savePollVote, pollTally, setMessageText } from './db.js';
 import { activity } from './events.js';
@@ -16,11 +16,14 @@ import { handleOwnerMessage } from './owner-assistant.js';
 import { dmNoticeOnce } from './privacy-notice.js';
 import { resolveDirectChat } from './direct-chats.js';
 import { inboundKind, prepareInbound, wantsVoice, speak, createImage } from './media-ai.js';
-import { enqueue, registerJobHandler, setQueueChannel, startQueue } from './media-queue.js';
+import { enqueue, registerJobHandler, setQueueChannel, startQueue, packMsg, unpackMsg, quoteOf } from './media-queue.js';
 import { readFileSync, rmSync } from 'node:fs';
 import { builtinAnswer, todayText, fillPlaceholders } from './quick.js';
 import { recordUsage } from './usage.js';
 import { noteJoin } from './welcome.js';
+
+// 059: the built-in owner assistant is reached through the owner hand-off only, never by routing.
+const listAgents = () => allAgents().filter((b) => !isBuiltin(b));
 
 export { silenceReason }; // #34: other modules (usage caps) report why an agent stayed silent, e.g. silenceReason('budget', …)
 
@@ -340,14 +343,6 @@ export function createJoinHandler(channel) {
 }
 
 const overloadedAt = new Map();
-/** What a queued turn needs to run later, even after a restart (no media bytes, no raw message object). */
-const packMsg = (m) => ({ channel: m.channel, chat: m.chat, number: m.number, isGroup: m.isGroup, phone: m.phone, senderJid: m.senderJid, senderName: m.senderName,
-  msgId: m.msgId, ts: m.ts, text: m.text, caption: m.caption || '', quoted: m.quoted || '', mentioned: !!m.mentioned, replyToAgent: !!m.replyToAgent,
-  mediaInfo: m.mediaInfo || null, mediaRef: m.mediaRef || '' });
-function unpackMsg(channel, p) {
-  return { ...p, raw: null, fetchMedia: () => channel.downloadMedia(p.chat, p.mediaRef, p.mediaInfo?.size || 0) };
-}
-const quoteOf = (msg) => (msg.raw ? { quoted: msg.raw } : msg.msgId ? { quote: { msgId: msg.msgId, fromMe: false, participant: msg.isGroup ? msg.senderJid : undefined, text: msg.text } } : {});
 
 /** Send a reply (as a voice note when the agent's setting asks for it) and remember it. */
 async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false, textOnly = false } = {}) {
@@ -451,7 +446,7 @@ function registerMediaHandlers(channel) {
   });
   registerJobHandler('image', {
     async run(p) {
-      const agent = getAgent(p.agent);
+      const agent = p.owner ? { id: p.agent } : getAgent(p.agent); // 059: the owner assistant is not a stored agent
       if (!agent) return;
       let image = null;
       if (p.imageFile) {

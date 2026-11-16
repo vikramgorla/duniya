@@ -8,8 +8,8 @@ Native iOS and Android app for owners and admins of a Duniya server: status cons
 assistant: questions about your chats, changes with Confirm; steps and text stream in word by word through
 `expo/fetch`), agents (on/off, edit basics, "Change with AI" with the same friendly diff as the panel: word-level
 changes, Changes / Before / After, added and removed chips), chats (assign agent, model, what happens when the model
-is unavailable, private to members, privacy notice, stored messages), the owner assistant (your WhatsApp link, its
-model, linked people), activity, usage, server health and updates, and changes waiting for confirmation. One codebase: React Native with [Expo](https://expo.dev) (SDK 58, TypeScript,
+is unavailable, private to members, privacy notice, stored messages), the owner assistant (your WhatsApp link,
+linked people; its model and character are the built-in agent "Owner assistant", opened from there), activity, usage, server health and updates, and changes waiting for confirmation. One codebase: React Native with [Expo](https://expo.dev) (SDK 58, TypeScript,
 expo-router). Spec: [`specs/027-mobile-app`](../specs/027-mobile-app/spec.md).
 
 This folder is **not** part of the server install: it has its own `package.json`, the server's `npm ci` never sees
