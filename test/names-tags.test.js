@@ -13,7 +13,7 @@ const owner = await t.login();
 after(() => t.close());
 const c = await import('../src/core/contacts.js');
 const tags = await import('../src/core/member-tags.js');
-const { upkeepTick, markGroupDue, resetUpkeep } = await import('../src/core/upkeep.js');
+const { upkeepTick, resetUpkeep } = await import('../src/core/upkeep.js');
 const baileys = await import('baileys');
 const enc = encodeURIComponent;
 const wait = (ms = 30) => new Promise((r) => setTimeout(r, ms));
