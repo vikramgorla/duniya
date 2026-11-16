@@ -46,7 +46,7 @@ export function staticFile(body, headers) {
   const gz = gzipSync(body, { level: 9 });
   const serve = (req, res, url) => {
     const base = { ...headers, etag, vary: 'accept-encoding', 'cache-control': url?.searchParams.get('v') === version ? 'public, max-age=31536000, immutable' : 'no-cache' };
-    if (String(req.headers['if-none-match'] || '').split(/\s*,\s*/).includes(etag)) return send(res, 304, '', base);
+    if (String(req.headers['if-none-match'] || '').slice(0, 512).split(',').some((t) => t.trim() === etag)) return send(res, 304, '', base);
     const accept = String(req.headers['accept-encoding'] || '');
     const [data, enc] = /\bbr\b/.test(accept) ? [br, 'br'] : /\bgzip\b/.test(accept) ? [gz, 'gzip'] : [body, null];
     return send(res, 200, data, { ...base, ...(enc ? { 'content-encoding': enc } : {}), 'content-length': data.length });
