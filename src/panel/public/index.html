@@ -1016,7 +1016,8 @@ function drawUpdateBanner(u, after) {
       h('button', { class: 'btn mut', onclick: () => tryApi(async () => { await api('POST', '/api/updates/decision', { action: 'dismiss' }); after?.(); }, 'Dismissed') }, 'Dismiss'))));
 }
 async function renderUpdates(box, note = '') {
-  const u = await api('GET', '/api/updates').catch(() => null); if (!u || !box) return;
+  const seq = (S.updatesSeq = (S.updatesSeq || 0) + 1);
+  const u = await api('GET', '/api/updates').catch(() => null); if (!u || !box || seq !== S.updatesSeq) return; // a newer draw is on its way
   const st = u.status || {};
   const d = u.decision;
   const lr = st.lastResult;
@@ -3909,6 +3910,10 @@ function loggingCard({ settings, categories }) {
 }
 
 window.addEventListener('hashchange', () => { if (S.user) show(location.hash.slice(1).split('/')[0] || 'overview'); });
+// Leaving the page closes the live stream, so a page kept in the back/forward cache holds no connection; coming back
+// opens it again and catches up (058).
+window.addEventListener('pagehide', () => { S.es?.close(); S.es = null; });
+window.addEventListener('pageshow', (e) => { if (e.persisted && S.user) { connectEvents(); refreshStatus(); } });
 renderLogin();
 </script>
 </body>

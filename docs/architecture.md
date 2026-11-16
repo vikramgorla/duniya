@@ -6,7 +6,8 @@ top.**
 **In 30 seconds**
 - Off chats are dropped first; agents are data; tools are allowed per role in code.
 - Panel on `localhost:8080` behind Caddy, a tunnel, Tailscale or SSH. Roles: owner, admin (agents, chats, models,
-  memory), viewer (read-only).
+  memory), viewer (read-only). The panel is one compressed page with an ETag (a repeat visit is a 304); status and
+  activity arrive live over server-sent events, so nothing polls.
 
 <p align="center"><img src="diagrams/architecture.svg" alt="Architecture: WhatsApp linked devices feed the allow-list (off chats are dropped), then the router (owner DMs go to the owner assistant; quick-reply commands and FAQ matches are answered without AI), then the agent, which uses a model provider with fallback, MCP tools behind the confirm gate, WhatsApp actions and memory; the agent and the panel, app and admin MCP use SQLite with encrypted secrets" width="720"></p>
 

@@ -15,7 +15,8 @@ npm install && ADMIN_PASSWORD=dev-password-123 npm start     # panel on http://1
 | `npm test` | e2e tests with fakes |
 | `npm run lint` | ESLint |
 | `npm run check:panel` | the panel's inline script parses |
-| `node scripts/ci-checks.mjs` | versions match, breaking-release entries, **doc links** (`scripts/check-doc-links.mjs`) |
+| `node scripts/ci-checks.mjs` | versions match, breaking-release entries, **doc links** (`scripts/check-doc-links.mjs`), diagrams, **lean code** (knip, jscpd, panel size budget) |
+| `npm run knip` / `npm run jscpd` | unused files, exports and dependencies / duplicated code ([Lean code](#lean-code)) |
 | `node scripts/demo-panel.mjs` | seeded demo panel on :8099 (admin / demo-password-123), no network |
 | `npm run check:responsive` | every screen at 375 / 393 / 1440 px, light + dark (needs Chrome) |
 | `npm run site:shots` | retake the website screenshots and videos (needs Chrome + ffmpeg) |
@@ -38,6 +39,27 @@ every feature under [`specs/`](../specs).
 </details>
 
 Process: [AGENTS.md](../AGENTS.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) · design: [DESIGN.md](../DESIGN.md).
+
+## Lean code
+
+The owner runs the latest version on one server, so the code carries nothing for older ones. Before adding, delete:
+
+1. **Search for what your change replaces** and remove it in the same PR (old function, setting, wording, test).
+2. **No compatibility layers or one-time migrations** after the release that needed them: schema changes go into
+   `CREATE TABLE`; owners reinstall or restore a backup ([upgrading](upgrading.md)).
+3. **One way to do each thing:** reuse the resolvers (`resolveModel`, the name resolver), the scheduler tick
+   (`src/core/upkeep.js`), the small-server switch and the shared helpers in `src/core/config.js` (`clip`, `bad`,
+   `plural`, `isGroup`) instead of a local copy.
+4. **CI checks it** (`node scripts/ci-checks.mjs`, quality job): `knip` (config `knip.json`) fails on unused files,
+   exports and dependencies, `jscpd` (`.jscpd.json`, 8 lines) on duplication, and `src/panel/public/index.html` has a
+   size budget (`PANEL_BUDGET`; raising it needs a reason in the PR). The mobile app runs `npm run knip` in its own
+   workflow.
+5. **Test behaviour, not internals:** tests go through the panel API, the router and the fakes in `test/harness.js`;
+   export something only when the app uses it.
+6. **Keep the panel snappy:** no new polling. The status and activity arrive over `/api/events` (server-sent events);
+   screens load through `api()`, whose screen-data cache is dropped by any change or live event. Simple switches update
+   the screen at once and put the old state back when the server refuses. The shell and its scripts are served from
+   memory, compressed, with ETag/304.
 
 ## Releases
 
