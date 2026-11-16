@@ -13,7 +13,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { startDemo, DEMO_PASSWORD } from './demo-panel.mjs';
+import { startDemo, DEMO_PASSWORD, fakeChecklist } from './demo-panel.mjs';
 import { launch, newPage } from './cdp.mjs';
 
 const { values: opt } = parseArgs({ options: {
@@ -46,7 +46,13 @@ const STATES = [
   { name: 'overview', hash: 'overview' },
   // 061: the install hint without the browser's install prompt (iPhone, Firefox): the manual steps instead of a button
   { name: 'overview-install-steps', hash: 'overview', js: "S.installPrompt = null; localStorage.removeItem('duniya.installHint'); drawInstallHint();" },
-  { name: 'overview-checklist', hash: 'overview', js: "drawChecklist(document.querySelector('#ov-checklist'), { done: 2, total: 5, complete: false, dismissed: false, steps: [['provider', 'Connect an AI model provider', true, '#models'], ['whatsapp', 'Link a WhatsApp number', true, '#overview/whatsapp'], ['agent', 'Create an agent', false, '#agents'], ['chat', 'Switch a chat on', false, '#chats'], ['reply', 'Get a first reply', false, '#agents']].map(([id, title, done, href]) => ({ id, title, done, href, hint: 'Every chat starts Off. Switch on the groups and people your agent should answer.' })) });" },
+  // 062: Getting started, each step open in place (as on a fresh install), and the closing card
+  ...['provider', 'agent', 'chat', 'reply'].map((step) => ({ name: `overview-start-${step}`, hash: 'overview', before: fakeChecklist(step), wait: 2000 })),
+  { name: 'overview-start-done', hash: 'overview', before: fakeChecklist('', { done: true }), wait: 2000 },
+  // 062: Find anything (/ or ⌘K), empty and with a query
+  { name: 'find', hash: 'overview', js: 'await openPalette(); await T.wait(600);' },
+  { name: 'find-query', hash: 'chats', js: "await openPalette(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'gen'; i.dispatchEvent(new Event('input')); await T.wait(200);" },
+  { name: 'chats-find', hash: 'chats', js: "const i = document.querySelector('input.chat-find'); i.value = 'car'; i.dispatchEvent(new Event('input')); await T.wait(200);" },
   // 045: a breaking release waits for the owner (banner on Overview, the dialog with release notes)
   { name: 'overview-update-decision', hash: 'overview', before: UPDATE_DECISION, wait: 1500 },
   { name: 'update-decision-dialog', hash: 'overview', before: UPDATE_DECISION, wait: 1500, js: "await T.click('Review update', 'button', 600);" },
@@ -98,7 +104,7 @@ const STATES = [
       return r; };`, js: "T.openAll(); document.getElementById('helper-update')?.scrollIntoView(); await T.wait(300);" },
   { name: 'backups', hash: 'backups', js: 'T.openAll();' },
   { name: 'pending', hash: 'pending' },
-  { name: 'secrets', hash: 'secrets' },
+  { name: 'settings-secrets', hash: 'secrets' }, // 062: #secrets opens Settings → Secrets
   // 060: one-time links — enter a secret (signed in), a new user's sign-up page (before sign-in), the link in Users.
   { name: 'secret-link', hash: 'secrets', js: "const r = await (await fetch('/api/secret-links', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'OPENAI_API_KEY' }) })).json(); await renderSecretLink(r.link.split('=')[1]);" },
   { name: 'signup-link', hash: '', js: "const r = await (await fetch('/api/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: `lea${Date.now() % 1e6}`, role: 'admin' }) })).json(); clearInterval(statusTimer); S.tab = ''; S.es?.close(); const app = document.querySelector('#app'); app.replaceChildren(); await renderSignup(app, () => [], r.signup.link.split('=')[1]);" },

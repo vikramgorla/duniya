@@ -18,6 +18,7 @@ npm install && ADMIN_PASSWORD=dev-password-123 npm start     # panel on http://1
 | `node scripts/ci-checks.mjs` | versions match, breaking-release entries, **doc links** (`scripts/check-doc-links.mjs`), diagrams, **lean code** (knip, jscpd, panel size budget) |
 | `npm run knip` / `npm run jscpd` | unused files, exports and dependencies / duplicated code ([Lean code](#lean-code)) |
 | `node scripts/demo-panel.mjs` | seeded demo panel on :8099 (admin / demo-password-123), no network |
+| `DEMO_EMPTY=1 node scripts/demo-panel.mjs` | a fresh install (no provider, no agent, WhatsApp waiting for a scan; *Get code* links it): check the first run |
 | `npm run check:responsive` | every screen at 375 / 393 / 1440 px, light + dark (needs Chrome) |
 | `npm run site:shots` | retake the website screenshots and videos (needs Chrome + ffmpeg) |
 

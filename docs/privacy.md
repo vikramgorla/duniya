@@ -2,7 +2,8 @@
 
 **Nothing is stored or sent to a model until you switch a chat on, and groups are told once.**
 
-**Do it:** panel → **Chats** → switch only the chats you want **on**.
+**Do it:** panel → **Chats** → switch only the chats you want **on** (choosing an agent for a chat that is off
+switches it on too, as does **Switch on** in Getting started).
 
 **In 30 seconds**
 - Off chats are dropped before storage and before any model call (only the id and time of the newest message are

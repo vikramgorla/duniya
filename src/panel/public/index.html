@@ -389,7 +389,7 @@
   @media (display-mode: standalone) { html, body { overscroll-behavior-y: none; } }
   .install-hint { margin-bottom: 16px; } .install-hint .logo { flex: none; }
   main > * { scroll-margin-top: 120px; }
-  /* Wide screens: the tab bar may run past the content column so every tab fits (12 tabs need ~1240 px). */
+  /* Wide screens: the tab bar may run past the content column so every tab fits. */
   @media (min-width: 1200px) { nav { max-width: none; margin: 0; padding-left: max(16px, calc((100% - 1160px) / 2 + 16px)); } }
   /* Phones (iPhone 15 = 393 px, SE = 375 px): 40 px touch targets, nothing under 13 px, nothing wider than the screen. */
   @media (max-width: 640px) {
@@ -432,6 +432,30 @@
     .phead h2 { flex: 1 1 140px; overflow-wrap: anywhere; }
     .stat { font-size: 28px; }
   }
+  /* 062: Getting started steps open in place; Find anything; Settings index; jump targets flash once. */
+  .checklist-steps li.skipped b { color: var(--muted); font-weight: 500; }
+  .checklist-steps .ck-do { flex: 1 1 100%; margin: 4px 0 4px 40px; min-width: 0; }
+  .checklist-steps .ck-do .qr { max-width: 220px; }
+  .tpl-chips { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .tpl-chips .choice span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .chat-mini { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .quick-chats > .row { padding: 8px 0; border-bottom: 1px dashed var(--line); } .quick-chats > .row:last-child { border-bottom: 0; }
+  .search-btn { display: inline-flex; align-items: center; gap: 6px; margin-right: 10px; } .search-btn svg { width: 16px; height: 16px; }
+  .search-btn kbd { font: 600 11px var(--mono); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; color: var(--muted); }
+  dialog.palette { padding: 10px; width: min(620px, calc(100vw - 24px)); margin-top: 12vh; }
+  dialog.palette input { width: 100%; font-size: 16px; }
+  .pal-list { list-style: none; margin: 8px 0 0 !important; padding: 0 !important; max-height: min(420px, 60vh); overflow: auto; }
+  .pal-list li { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; min-height: 40px; }
+  .pal-list li.on { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .pal-list li svg { width: 16px; height: 16px; flex: none; opacity: .7; }
+  .pal-list .pal-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pal-list .pal-label small { font-size: 13px; }
+  .pal-help { margin-top: 8px; text-align: right; }
+  .jumpbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; padding: 12px; }
+  .chat-find { margin: 0 0 10px; }
+  [data-jump] { scroll-margin-top: 130px; }
+  .flash { outline: 2px solid var(--signal); outline-offset: 3px; transition: outline-color 1.5s; }
+  @media (max-width: 640px) { .tpl-chips { grid-template-columns: 1fr 1fr; } .tpl-chips .choice span { -webkit-line-clamp: 2; } .desk-only { display: none !important; } .search-btn { margin-right: 6px; } .checklist-steps .ck-do { margin-left: 0; } dialog.palette { margin-top: 8px; } }
 </style>
 </head>
 <body>
@@ -468,6 +492,7 @@ const ICONS = {
   contacts: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3.5 19a5.5 5.5 0 0 1 11 0M16 7.5h5M16 11h5M17.5 14.5H21',
   server: 'M5 5h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM5 13h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zM8 8h.01M8 16h.01',
   backups: 'M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9a4.5 4.5 0 0 1 .5 9zM12 11v5M9.5 13.5 12 11l2.5 2.5',
+  search: 'M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zM15.5 15.5 20 20',
   pending: 'M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 8v4.5l3 2',
   secrets: 'M14.5 4a5.5 5.5 0 1 1-4.9 8L4 17.6V20h2.5v-2h2v-2h2l.9-.9A5.5 5.5 0 0 1 14.5 4zM15.5 8.5h.01',
   settings: 'M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-1.9 1.1L15 20.5h-4l-.3-2a7 7 0 0 1-1.9-1.1l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-3l-1.6-1.2 2-3.4 1.9.7a7 7 0 0 1 1.9-1.1L11 3.5h4l.3 2a7 7 0 0 1 1.9 1.1l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 3z',
@@ -624,8 +649,11 @@ const meterEl = () => { const i = h('i', { style: 'width:0%' }); const m = h('di
 const S = { tab: 'overview', user: null, status: null, feed: [], feedAgent: '', es: null, editing: null };
 const RANK = { viewer: 1, admin: 2, owner: 3 };
 const can = (role) => S.user && RANK[S.user.role] >= RANK[role];
-const TABS = () => [['overview', 'Overview'], ['activity', 'Activity'], ['agents', 'Agents'], ['chats', 'Chats'], ['contacts', 'Contacts'], ['models', 'Models'],
-  ['server', 'Server'], ['usage', 'Usage'], can('owner') && ['backups', 'Backups'], ['pending', 'Pending'], ['secrets', 'Secrets'], ['settings', 'Settings']].filter(Boolean);
+// 062: everyday screens first; Pending only while something waits; Secrets live in Settings.
+const TABS = () => [['overview', 'Overview'], ['chats', 'Chats'], ['agents', 'Agents'], ['activity', 'Activity'], ['usage', 'Usage'], ['models', 'Models'], ['contacts', 'Contacts'],
+  S.status?.pending ? ['pending', 'Pending'] : null, ['server', 'Server'], can('owner') && ['backups', 'Backups'], ['settings', 'Settings']].filter(Boolean);
+/** Old addresses that moved (062): #secrets is a section of Settings now. */
+const MOVED = { secrets: 'settings/secrets' };
 
 // ---------- login & first-run setup ----------
 async function renderLogin() {
@@ -688,11 +716,11 @@ async function renderSignup(app, brand, token) {
 
 /** 060: a one-time secret link (/#secret=…): a signed-in owner or admin pastes a key; it never passes through a chat. */
 async function renderSecretLink(token) {
-  history.replaceState(null, '', '#secrets'); // the token leaves the address bar and the history
+  history.replaceState(null, '', '#settings/secrets'); // the token leaves the address bar and the history
   const main = $('#main');
   const card = h('form', { class: 'card', style: 'max-width:520px;margin:0 auto' }, h('h2', {}, 'Enter a secret'));
   main.replaceChildren(card);
-  const back = h('button', { class: 'btn', type: 'button', onclick: () => show('secrets') }, 'Back to the panel');
+  const back = h('button', { class: 'btn', type: 'button', onclick: () => show('settings') }, 'Back to the panel');
   let d;
   try { d = await api('POST', '/api/secret-links/open', { token }); } catch (x) { return card.append(h('p', { class: 'small' }, x.message), back); }
   const val = h('input', { type: 'password', placeholder: 'paste the value', autocomplete: 'off', spellcheck: 'false', 'aria-label': `Value for ${d.for}` });
@@ -765,15 +793,16 @@ async function boot() {
   document.body.classList.toggle('readonly', !can('admin'));
   const nav = h('nav', { onwheel: (e) => { // a mouse wheel scrolls the tab bar sideways when it does not fit
     if (nav.scrollWidth > nav.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { nav.scrollLeft += e.deltaY; e.preventDefault(); }
-  } }, TABS().map(([id, label]) => h('button', { 'data-tab': id, onclick: () => (location.hash === `#${id}` ? show(id) : (location.hash = id)) }, icon(id), label,
-    id === 'server' ? h('span', { class: 'nbadge', id: 'server-badge' }) : null)));
+  } });
   app.append(
     h('header', {}, h('div', { class: 'bar' }, h('div', { class: 'brand' }, logo(), 'Duniya', h('span', { class: 'dot', id: 'wa-dot', title: 'WhatsApp' }), h('small', { id: 'brand-sub' }, 'agents')),
-      h('div', { style: 'flex:1' }), h('span', { class: 'small muted', title: `${S.user.username} · ${S.user.role}` }, S.user.username, h('span', { class: 'who-role' }, ` · ${S.user.role}`)),
+      h('div', { style: 'flex:1' }), h('button', { class: 'btn small search-btn', title: 'Find anything (/ or ⌘K)', 'aria-label': 'Find anything', onclick: openPalette }, icon('search'), h('span', { class: 'desk-only' }, 'Find'), h('kbd', { class: 'desk-only' }, '/')),
+      h('span', { class: 'small muted', title: `${S.user.username} · ${S.user.role}` }, S.user.username, h('span', { class: 'who-role' }, ` · ${S.user.role}`)),
       h('button', { class: 'btn small', onclick: async () => { await api('POST', '/api/logout').catch(() => {}); S.user = null; renderLogin(); } }, 'Sign out')), nav),
     h('main', { id: 'main' }));
   connectEvents();
   await refreshStatus();
+  drawNav();
   const link = /^#secret=([a-f0-9]{64})$/.exec(location.hash || sessionStorage.getItem('duniya.link') || '');
   sessionStorage.removeItem('duniya.link');
   if (link && can('admin')) return renderSecretLink(link[1]);
@@ -783,8 +812,21 @@ async function boot() {
 async function refreshStatus() {
   try { applyStatus(await api('GET', '/api/status')); } catch { /* signed out or offline: the stream retries */ }
 }
+/** The tab bar; drawn again only when the set of tabs changes (Pending comes and goes). */
+function drawNav() {
+  const nav = $('header nav'); if (!nav) return;
+  const tabs = TABS(); const sig = tabs.map(([id]) => id).join();
+  if (nav.dataset.sig === sig) return;
+  nav.dataset.sig = sig;
+  nav.replaceChildren(...tabs.map(([id, label]) => h('button', { 'data-tab': id, onclick: () => (location.hash === `#${id}` ? show(id) : (location.hash = id)) }, icon(id), label,
+    id === 'server' ? h('span', { class: 'nbadge', id: 'server-badge' }) : id === 'pending' ? h('span', { class: 'nbadge' }, String(S.status?.pending || '')) : null)));
+  nav.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.tab === S.tab));
+  serverBadge(S.status?.osUpdates);
+}
 function applyStatus(next) {
+  const pendingWas = S.status?.pending;
   S.status = next;
+  if (pendingWas !== next.pending && $('header nav')) { $('header nav').dataset.sig = ''; drawNav(); }
   const st = S.status.channel.status;
   const dot = $('#wa-dot'); if (dot) dot.className = `dot ${st === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(st) ? 'warn' : 'bad'}`;
   const sub = $('#brand-sub'); if (sub) sub.textContent = S.status.settings.paused ? 'paused' : `${S.status.agents.filter((b) => b.enabled).length} agents live`;
@@ -799,7 +841,8 @@ function serverBadge(o) {
   b.title = !o ? '' : [o.count ? `${o.count} OS update${o.count > 1 ? 's' : ''} to install` : '', o.restart ? 'Restart needed to finish updates' : ''].filter(Boolean).join(' · ');
 }
 function show(tab) {
-  if (!TABS().some(([id]) => id === tab)) tab = 'overview';
+  if (Object.hasOwn(MOVED, tab)) { history.replaceState(null, '', `#${MOVED[tab]}`); tab = MOVED[tab].split('/')[0]; }
+  if (!TABS().some(([id]) => id === tab) && !(tab === 'pending' && can('viewer'))) tab = 'overview';
   S.tab = tab;
   if (location.hash.slice(1).split('/')[0] !== tab) history.replaceState(null, '', `#${tab}`);
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
@@ -812,14 +855,22 @@ function show(tab) {
   const seq = (S.renderSeq = (S.renderSeq || 0) + 1);
   const main = $('#main');
   const slow = setTimeout(() => { if (S.renderSeq === seq) main?.classList.add('loading'); }, 120);
-  const RENDER = { overview: renderOverview, server: renderServer, usage: renderUsage, activity: renderActivity, agents: renderAgents, chats: renderChats, contacts: renderContacts, models: renderModels, backups: renderBackups, pending: renderPending, secrets: renderSecrets, settings: renderSettings };
+  const RENDER = { overview: renderOverview, server: renderServer, usage: renderUsage, activity: renderActivity, agents: renderAgents, chats: renderChats, contacts: renderContacts, models: renderModels, backups: renderBackups, pending: renderPending, settings: renderSettings };
   const r = Object.hasOwn(RENDER, tab) ? RENDER[tab] : null;
   Promise.resolve(r?.()).catch((e) => toast(e.message)).finally(() => {
     clearTimeout(slow);
-    if (S.renderSeq === seq) { main?.classList.remove('loading'); S.renderDone = seq; return; }
+    if (S.renderSeq === seq) { main?.classList.remove('loading'); S.renderDone = seq; jumpToSub(); return; }
     // A slower, older tab finished after a newer one and drew over it: draw the current tab again.
     if ((S.renderDone || 0) > seq && S.tab) show(S.tab);
   });
+}
+/** 062: #tab/<section> scrolls to the element marked data-jump="<section>" (a settings card, a provider, a chat). */
+function jumpToSub() {
+  const sub = decodeURIComponent(location.hash.split('/')[1] || '');
+  const el = sub && document.querySelector(`[data-jump="${CSS.escape(sub)}"]`);
+  if (!el) return;
+  el.scrollIntoView({ block: 'start' });
+  el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1800);
 }
 // Live stream (058): activity entries and the status (no polling). While it is down, a slow poll keeps the status
 // fresh; EventSource reconnects by itself.
@@ -866,25 +917,22 @@ async function renderOverview(soft) {
   const pillFor = (x) => h('span', { class: `pill ${x.status === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(x.status) ? 'warn' : 'bad'}` }, x.status === 'open' ? 'connected' : x.status === 'qr' ? 'waiting for scan' : x.status.replace('_', ' '));
   const numberBlock = (n) => {
     const body = { number: n.id };
-    const phone = h('input', { placeholder: 'This number, e.g. 41791234567', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
-    const dmSel = h('select', { disabled: !can('admin'), style: 'max-width:260px', onchange: (e) => tryApi(() => api('PUT', `/api/whatsapp/numbers/${n.id}`, { dmAgent: e.target.value }), 'Saved') },
-      h('option', { value: '' }, 'Default (Settings)'), st.agents.map((b) => h('option', { value: b.id, selected: n.dmAgent === b.id }, b.name)));
+    const linked = n.status === 'open';
+    const dmSel = h('select', { disabled: !can('admin'), style: 'max-width:260px', 'aria-label': `Direct messages to ${n.label} go to`, onchange: (e) => tryApi(() => api('PUT', `/api/whatsapp/numbers/${n.id}`, { dmAgent: e.target.value }), 'Saved') },
+      h('option', { value: '' }, 'Default agent (see Settings)'), st.agents.map((b) => h('option', { value: b.id, selected: n.dmAgent === b.id }, b.name)));
     return h('div', { class: 'number-card' },
-      h('div', { class: 'row spread' }, h('div', {}, h('b', {}, n.label), n.status === 'open' ? h('span', { class: 'muted small num' }, `  +${(n.me || '').split(':')[0].split('@')[0]}`) : null), pillFor(n)),
-      n.status === 'open' ? h('div', { class: 'small muted' }, `Connected since ${time(n.since)}`) : null,
-      n.qrDataUrl && can('admin') ? h('div', {}, h('p', { class: 'small muted' }, 'On this phone: WhatsApp → Settings → Linked devices → Link a device, then scan:'), h('img', { class: 'qr', src: n.qrDataUrl, alt: 'WhatsApp QR code' })) : null,
-      n.status !== 'open' && can('admin') ? h('div', {}, h('label', {}, 'Or link with a pairing code'), h('div', { class: 'row' }, phone,
-        h('button', { class: 'btn', onclick: () => tryApi(async () => { const r = await api('POST', '/api/whatsapp/pair', { ...body, phone: phone.value }); overviewBusy = false; toast(`Pairing code: ${r.code}`); refreshStatus(); }) }, 'Get code'))) : null,
-      n.pairingCode ? h('p', {}, 'Pairing code: ', h('span', { class: 'code' }, n.pairingCode)) : null,
-      n.lastError && n.status !== 'open' ? h('p', { class: 'small', style: 'color:var(--bad)' }, n.lastError) : null,
-      h('label', {}, 'Direct messages to this number go to'), dmSel,
+      h('div', { class: 'row spread' }, h('div', {}, h('b', {}, n.label), linked ? h('span', { class: 'muted small num' }, `  +${(n.me || '').split(':')[0].split('@')[0]}`) : null), pillFor(n)),
+      linked ? h('div', { class: 'small muted' }, `Connected since ${time(n.since)}`) : null,
+      !linked && can('admin') ? (checklistNext() === 'whatsapp' ? h('p', { class: 'small muted' }, 'Waiting for the scan: the QR code is in ', h('a', { href: '#overview/start', onclick: goTo('#overview/start') }, 'Getting started'), ' above.') : linkNumberBox(n)) : null,
+      n.lastError && !linked ? h('p', { class: 'small', style: 'color:var(--bad)' }, n.lastError) : null,
+      linked ? [h('label', {}, 'Direct messages to this number go to'), dmSel] : null,
       h('div', { class: 'row mut', style: 'margin-top:10px' },
-        h('button', { class: 'btn small', onclick: () => tryApi(() => api('POST', '/api/whatsapp/restart', body), 'Reconnecting…') }, 'Reconnect'),
-        h('button', { class: 'btn small danger', onclick: () => confirm(`Unlink ${n.label}? You will need to scan a new QR.`) && tryApi(() => api('POST', '/api/whatsapp/logout', body), 'Unlinked') }, 'Unlink'),
+        h('button', { class: 'btn small', onclick: () => tryApi(() => api('POST', '/api/whatsapp/restart', body), 'Reconnecting…') }, linked ? 'Reconnect' : 'New QR code'),
+        linked ? h('button', { class: 'btn small danger', onclick: () => confirm(`Unlink ${n.label}? Agents stop answering on it until you scan a new QR code.`) && tryApi(() => api('POST', '/api/whatsapp/logout', body), 'Unlinked') }, 'Unlink') : null,
         n.id !== 'main' && can('owner') ? h('button', { class: 'btn small danger', onclick: () => confirm(`Remove the number “${n.label}”? Its chats keep their memory; agents bound to them stop answering there.`) && tryApi(async () => { await api('DELETE', `/api/whatsapp/numbers/${n.id}`); refreshStatus(); }, 'Removed') }, 'Remove') : null));
   };
   const newLabel = h('input', { placeholder: 'Name, e.g. Shop', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
-  const wa = h('div', { class: 'card', id: 'ov-whatsapp' },
+  const wa = h('div', { class: 'card', id: 'ov-whatsapp', 'data-jump': 'whatsapp' },
     h('div', { class: 'row spread' }, h('h2', {}, 'WhatsApp numbers'), h('span', { class: 'pill' }, `${numbers.filter((n) => n.status === 'open').length}/${numbers.length} connected`)),
     numbers.map(numberBlock),
     can('owner') ? h('details', { class: 'mut' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, '+ Add another number'),
@@ -895,7 +943,7 @@ async function renderOverview(soft) {
       toggle(st.settings.paused, (v) => optimistic(() => { st.settings.paused = v; }, () => api('POST', '/api/settings', { paused: v }), v ? 'Paused' : 'Resumed'))),
     h('div', { class: 'tscroll' }, h('table', { style: 'margin-top:10px' }, h('tbody', {}, st.agents.length ? st.agents.map((b) => h('tr', {},
       h('td', {}, h('b', {}, b.name), h('div', { class: 'small muted' }, `${b.chats} chat(s)`)),
-      h('td', { style: 'text-align:right' }, toggle(b.enabled, (v) => optimistic(() => { b.enabled = v; }, () => api('PUT', `/api/agents/${b.id}`, { enabled: v }), `${b.name} ${v ? 'on' : 'off'}`))))) : h('tr', {}, h('td', { class: 'muted' }, 'No agents yet — create one under Agents.'))))),
+      h('td', { style: 'text-align:right' }, toggle(b.enabled, (v) => optimistic(() => { b.enabled = v; }, () => api('PUT', `/api/agents/${b.id}`, { enabled: v }), `${b.name} ${v ? 'on' : 'off'}`))))) : h('tr', {}, h('td', { class: 'muted' }, 'No agents yet. ', h('a', { href: '#agents' }, 'Create one')))))),
     st.pending ? h('p', {}, h('span', { class: 'pill warn' }, `${st.pending} pending confirmation(s)`)) : null);
   const reusedUpdates = soft && $('#updates-box')?.childElementCount ? $('#updates-box') : null;
   const updateBanner = (reusedUpdates && $('#ov-update-banner')) || h('div', { id: 'ov-update-banner' });
@@ -910,17 +958,22 @@ async function renderOverview(soft) {
   const live = st.agents.filter((b) => b.enabled).length; const open = numbers.filter((n) => n.status === 'open').length;
   const allGood = !st.settings.paused && open === numbers.length && live > 0;
   const led = (label, ok, value) => h('div', { class: 'led' }, h('span', { class: `dot ${ok === true ? 'ok' : ok === false ? 'bad' : 'warn'}` }), label, h('b', {}, value));
+  // 062: the first thing that is missing, in the order Getting started asks for it
+  const noModel = S.checklist?.steps?.find((x) => x.id === 'provider')?.done === false;
+  const headline = st.settings.paused ? 'All agents are paused' : !open ? 'Link your WhatsApp number to begin' : noModel ? 'Connect an AI model so agents can answer'
+    : !st.agents.length ? 'Create your first agent' : st.enabledChats === 0 ? 'No chat is switched on — agents stay silent' : allGood ? 'Everything is running'
+      : open < numbers.length ? 'A WhatsApp number needs attention' : live ? 'Running, with something to check' : 'No agent is switched on yet';
   const hero = h('div', { class: 'card console' },
     h('div', {}, h('div', { class: 'eyebrow' }, `${hello} · ${S.user.username}`),
-      h('h2', {}, st.settings.paused ? 'All agents are paused' : st.enabledChats === 0 ? 'No chat is switched on — agents stay silent' : allGood ? 'Everything is running' : open < numbers.length ? 'A WhatsApp number needs attention' : live ? 'Running, with something to check' : 'No agent is switched on yet')),
+      h('h2', {}, headline)),
     h('div', { class: 'leds' },
       led('WhatsApp', open === numbers.length ? true : open ? null : false, `${open}/${numbers.length}`),
       led('Agents', st.settings.paused ? false : live ? true : null, st.settings.paused ? 'paused' : `${live} live`),
       led('Chats on', st.enabledChats ? true : null, String(st.enabledChats ?? 0)),
       led('Waiting', st.pending ? null : true, String(st.pending || 0))),
-    st.enabledChats === 0 ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
-  const silencesSlot = h('div', { id: 'ov-silences-slot', style: `grid-column:1/-1${S.silences?.length ? '' : ';display:none'}` }, S.silences?.length ? silencesCard(S.silences, refreshSilences) : null);
-  $('#main').replaceChildren(hero, updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, askCard(), wa, control, server, silencesSlot, recent));
+    st.enabledChats === 0 && open && st.agents.length && !checklistActive() ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
+  const silencesSlot = h('div', { id: 'ov-silences-slot', 'data-jump': 'quiet', style: `grid-column:1/-1${S.silences?.length ? '' : ';display:none'}` }, S.silences?.length ? silencesCard(S.silences, refreshSilences) : null);
+  $('#main').replaceChildren(hero, updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), wa, control, server, silencesSlot, recent));
   refreshSilences();
   if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
@@ -933,7 +986,7 @@ addEventListener('appinstalled', () => { S.installPrompt = null; localStorage.se
 /** Phones and tablets only, never once installed or hidden on this device. Returns the box. */
 function drawInstallHint(box = $('#ov-install')) {
   if (!box) return box;
-  if (installed() || !matchMedia('(pointer: coarse)').matches || localStorage.getItem(INSTALL_KEY)) return box.replaceChildren(), box;
+  if (installed() || !matchMedia('(pointer: coarse)').matches || localStorage.getItem(INSTALL_KEY) || checklistActive()) return box.replaceChildren(), box; // 062: not during Getting started
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const hide = () => { localStorage.setItem(INSTALL_KEY, 'hidden'); box.replaceChildren(); };
   const install = async () => {
@@ -953,24 +1006,139 @@ function drawInstallHint(box = $('#ov-install')) {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && S.user && S.es && S.es.readyState !== EventSource.OPEN) { connectEvents(); refreshStatus(); }
 });
-// ---------- first-run checklist (#36) ----------
-const CHECK_ACTION = { provider: 'Connect a provider', whatsapp: 'Link WhatsApp', agent: 'Create an agent', chat: 'Open Chats', reply: 'Open test console' };
+// ---------- Getting started (#36, 062): a guided first run. The next step opens in place with its action ----------
+const CHECK_ACTION = { whatsapp: 'Link WhatsApp', provider: 'Connect a model', agent: 'Create an agent', chat: 'Open Chats', reply: 'Open test console' };
 function goTo(href) {
   return (e) => { // links inside Overview scroll instead of reloading the page
-    if (!href.startsWith('#overview/')) return;
-    e.preventDefault(); document.getElementById(`ov-${href.split('/')[1]}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!href.startsWith('#overview/') || S.tab !== 'overview') return;
+    e.preventDefault(); history.replaceState(null, '', href); jumpToSub();
   };
 }
-function drawChecklist(box, c) {
+const checklistActive = () => !!S.checklist && !S.checklist.complete && !S.checklist.dismissed;
+const checklistNext = () => (checklistActive() ? S.checklist.steps.find((x) => !x.done && !x.skipped)?.id : '');
+/** Redraw Getting started after an action in it, and say so when the last step is done. */
+async function checklistStep(okMsg, last = null) {
+  if (okMsg) toast(okMsg);
+  dropCache(); modelsCache = null;
+  S.checklistDone = last ? { last } : { last: null }; // shown once if this was the last step (not kept over a reload)
+  await refreshChecklist();
+  if (!S.checklist?.complete) S.checklistDone = null;
+}
+/** The end of Getting started: what the test answered and where everyday things are. Closes for good. */
+function doneCard(box, c) {
+  const a = c.agent;
+  return h('div', { class: 'card checklist', id: 'ov-start', 'data-jump': 'start' },
+    h('div', { class: 'row spread nowrap' }, h('div', {}, h('div', { class: 'eyebrow' }, 'Getting started'), h('h2', { style: 'margin:2px 0 0' }, 'All set: your agent is live')),
+      h('button', { class: 'btn small', onclick: () => { S.checklistDone = null; box.replaceChildren(); } }, 'Close')),
+    S.checklistDone.last ? h('div', { class: 'ck-do', style: 'margin:12px 0 0' }, S.checklistDone.last) : null,
+    h('p', { class: 'small', style: 'margin-bottom:6px' }, a?.trigger ? ['Try it in WhatsApp: start a message with ', h('code', {}, a.trigger), ' in the group you switched on.'] : 'Try it in WhatsApp in the group you switched on.'),
+    h('div', { class: 'row small', style: 'gap:8px' }, a ? h('a', { class: 'btn small primary', href: `#agents/${encodeURIComponent(a.id)}` }, `Edit ${a.name}`) : null,
+      h('a', { class: 'btn small', href: '#chats' }, 'Switch on more chats'), h('button', { class: 'btn small', onclick: openPalette }, 'Find anything (/)')));
+}
+/** Link a WhatsApp number: QR to scan, or a pairing code (Overview number cards and Getting started share it). */
+function linkNumberBox(n) {
+  const phone = h('input', { placeholder: 'This number, e.g. 41791234567', inputmode: 'tel', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false), 'aria-label': 'Phone number to link' });
+  return h('div', {},
+    n.qrDataUrl ? h('div', {}, h('p', { class: 'small muted' }, 'On the phone of this number: WhatsApp → Settings → Linked devices → Link a device, then scan:'), h('img', { class: 'qr', src: n.qrDataUrl, alt: 'WhatsApp QR code' }))
+      : h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Getting a QR code from WhatsApp…'),
+    h('label', {}, 'Scanning is hard on the same phone? Link with a pairing code'), h('div', { class: 'row', style: 'max-width:460px' }, phone,
+      h('button', { class: 'btn', onclick: () => tryApi(async () => { const r = await api('POST', '/api/whatsapp/pair', { number: n.id, phone: phone.value }); overviewBusy = false; toast(`Pairing code: ${r.code}`); refreshStatus(); }) }, 'Get code')),
+    n.pairingCode ? h('p', {}, 'In WhatsApp → Linked devices → Link with phone number instead, enter ', h('span', { class: 'code' }, n.pairingCode)) : null);
+}
+/** 062: one box for any key: OpenRouter, Anthropic, OpenAI or a GitHub token for Copilot, recognised by how it starts. */
+const KEY_KINDS = [
+  [/^sk-or-/, 'OpenRouter (free models)', (key) => api('POST', '/api/providers/openrouter', { key, freeOnly: true })],
+  [/^sk-ant-/, 'Anthropic (Claude)', (key) => saveSecretKey('ANTHROPIC_API_KEY')(key)],
+  [/^github_pat_/, 'GitHub Copilot', (token) => api('POST', '/api/providers/copilot', { token })],
+  [/^sk-/, 'OpenAI', (key) => saveSecretKey('OPENAI_API_KEY')(key)],
+];
+function quickProviderBox() {
+  const key = h('input', { type: 'password', placeholder: 'sk-or-…, sk-ant-…, sk-… or github_pat_…', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'API key', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
+  const msg = h('div', { class: 'small', style: 'min-height:1.2em;margin-top:4px' });
+  const go = h('button', { class: 'btn primary' }, 'Connect');
+  const connect = async (e) => {
+    e.preventDefault(); const v = key.value.trim();
+    const kind = KEY_KINDS.find(([re]) => re.test(v));
+    if (!kind) { msg.textContent = v ? 'That is not a key Duniya recognises. OpenRouter keys start with sk-or-, Claude keys with sk-ant-, OpenAI keys with sk-. Other providers: Models.' : 'Paste a key first.'; return; }
+    go.disabled = true; msg.replaceChildren(h('span', { class: 'spinner' }), ` Checking the ${kind[1]} key…`);
+    try { await kind[2](v); overviewBusy = false; await checklistStep(`Connected: ${kind[1]}`); } catch (x) { msg.textContent = x.message; go.disabled = false; }
+  };
+  return h('div', {},
+    h('form', { class: 'row', onsubmit: connect }, key, go), msg,
+    h('div', { class: 'row small', style: 'gap:8px' }, h('span', { class: 'muted' }, 'No key yet?'),
+      extLink(LINKS.openrouterKeys, 'Free key from OpenRouter'), h('a', { class: 'btn small', href: '#models/chatgpt' }, 'Use my ChatGPT plan'), h('a', { class: 'btn small', href: '#models' }, 'All options')));
+}
+async function quickAgentBox() {
+  const templates = (await api('GET', '/api/templates').catch(() => [])).filter((t) => t.id !== 'blank');
+  const make = (t) => tryApi(async () => { await api('POST', '/api/agents', { template: t.id, config: {} }); await checklistStep(`Created “${t.name}”`); });
+  const ai = await aiHelper({ bare: true, title: '', applyLabel: 'Create this agent', placeholder: 'Or describe it in your own words, e.g. “Helps our running club: keeps the weekly run schedule and answers where we meet.”',
+    onApply: (r) => tryApi(async () => { await api('POST', '/api/agents', { config: r.proposed }); await checklistStep('Agent created'); }) });
+  return h('div', {}, h('div', { class: 'tpl-chips' }, templates.map((t) => h('button', { class: 'choice', onclick: () => make(t) }, h('b', {}, t.name), h('span', {}, t.description || '')))),
+    h('div', { style: 'margin-top:12px' }, ai));
+}
+async function quickChatBox(agent) {
+  const chats = (await api('GET', '/api/chats').catch(() => [])).filter((c) => c.isGroup && c.size && !c.enabled);
+  if (!chats.length) return h('p', { class: 'small muted' }, 'No groups yet. Your groups appear here once WhatsApp is linked; for a person, use ', h('a', { href: '#chats' }, 'Chats → Add a direct chat'), '.');
+  const list = h('div', { class: 'quick-chats' });
+  const draw = (q = '') => list.replaceChildren(...chats.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())).slice(0, 6).map((c) => h('div', { class: 'row spread nowrap' },
+    h('div', { style: 'min-width:0' }, h('b', {}, c.name), h('div', { class: 'small muted' }, `${c.size} members`)),
+    h('button', { class: 'btn small primary', onclick: () => tryApi(async () => {
+      await api('POST', '/api/chats/bind', { chat: c.id, agent: agent.id, enable: true });
+      refreshStatus(); await checklistStep(`${c.name} is on: ${agent.name} answers there`);
+    }) }, 'Switch on'))));
+  draw();
+  return h('div', {}, h('p', { class: 'small', style: 'margin-top:0' }, `${agent.name} will answer in the group you choose. Members get a short privacy notice once.`),
+    chats.length > 6 ? h('input', { type: 'search', placeholder: 'Find a group', 'aria-label': 'Find a group', oninput: (e) => draw(e.target.value), onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) }) : null, list);
+}
+function quickTestBox(agent) {
+  const q = h('input', { placeholder: `Ask ${agent.name} something, e.g. “What can you do?”`, 'aria-label': 'Test message', onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
+  const out = h('div', {});
+  const send = h('button', { class: 'btn primary' }, 'Send');
+  const go = async (e) => {
+    e.preventDefault(); const text = q.value.trim() || 'What can you do?';
+    send.disabled = true; out.replaceChildren(h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ` ${agent.name} is thinking…`));
+    try {
+      const r = await api('POST', `/api/agents/${encodeURIComponent(agent.id)}/test`, { text });
+      const talk = () => h('div', { class: 'chat-mini' }, h('div', { class: 'bubble me' }, text), h('div', { class: 'bubble agent' }, r.reply || '(no reply)'));
+      out.replaceChildren(talk());
+      overviewBusy = false; await checklistStep('', talk());
+    } catch (x) { out.replaceChildren(h('div', { class: 'note bad' }, x.message)); }
+    send.disabled = false;
+  };
+  return h('div', {}, h('form', { class: 'row', onsubmit: go }, q, send), out,
+    agent.trigger ? h('p', { class: 'small muted', style: 'margin-bottom:0' }, 'In WhatsApp, start a message with ', h('code', {}, agent.trigger), ' or mention the agent’s number.') : null);
+}
+async function stepBody(s, c) {
+  const n = (S.status?.channel?.numbers || []).find((x) => x.status !== 'open');
+  switch (s.id) {
+    case 'whatsapp': return n ? linkNumberBox(n) : null;
+    case 'provider': return quickProviderBox();
+    case 'agent': return quickAgentBox();
+    case 'chat': return c.agent ? quickChatBox(c.agent) : null;
+    case 'reply': return c.agent ? quickTestBox(c.agent) : null;
+    default: return null;
+  }
+}
+async function drawChecklist(box, c) {
+  const seq = (box.seq = (box.seq || 0) + 1); // a newer draw wins over a slower older one
+  if (c?.complete && S.checklistDone) return box.replaceChildren(doneCard(box, c));
   if (!c || c.complete || c.dismissed) return box.replaceChildren();
-  const next = c.steps.find((s) => !s.done);
-  box.replaceChildren(h('div', { class: 'card checklist' },
-    h('div', { class: 'row spread' }, h('div', {}, h('div', { class: 'eyebrow' }, 'Get started'), h('h2', { style: 'margin:2px 0 0' }, `${c.done} of ${c.total} steps done`)),
-      can('admin') ? h('button', { class: 'btn small', title: 'Hide this checklist', onclick: () => tryApi(async () => { S.checklist = await api('PUT', '/api/checklist', { dismissed: true }); drawChecklist(box, S.checklist); }, 'Checklist hidden') }, 'Hide') : null),
-    h('ol', { class: 'checklist-steps' }, c.steps.map((s, i) => h('li', { class: s.done ? 'done' : s === next ? 'next' : '' },
+  const next = c.steps.find((s) => !s.done && !s.skipped);
+  const put = (body, msg) => tryApi(async () => { S.checklist = await api('PUT', '/api/checklist', body); drawChecklist(box, S.checklist); }, msg);
+  const body = can('admin') && next ? await stepBody(next, c).catch(() => null) : null;
+  if (box.seq !== seq) return;
+  box.replaceChildren(h('div', { class: 'card checklist', id: 'ov-start', 'data-jump': 'start' },
+    h('div', { class: 'row spread nowrap' }, h('div', {}, h('div', { class: 'eyebrow' }, 'Getting started'), h('h2', { style: 'margin:2px 0 0' }, `${c.done} of ${c.total} done`)),
+      can('admin') ? h('button', { class: 'btn small', title: 'Hide Getting started; it stays hidden', onclick: () => put({ dismissed: true }, 'Hidden. Settings → Getting started brings it back.') }, 'Hide') : null),
+    h('div', { class: 'meter', style: 'margin-top:10px' }, h('i', { style: `width:${Math.round((c.done / c.total) * 100)}%` })),
+    h('ol', { class: 'checklist-steps' }, c.steps.map((s, i) => h('li', { class: s.done ? 'done' : s === next ? 'next' : s.skipped ? 'skipped' : '' },
       h('span', { class: 'ck', 'aria-label': s.done ? 'done' : `step ${i + 1}` }, s.done ? '✓' : String(i + 1)),
-      h('div', { class: 'ck-body' }, h('b', {}, s.title), s.done ? null : h('div', { class: 'small muted' }, s.hint)),
-      s.done ? h('span', { class: 'pill ok' }, 'done') : h('a', { class: `btn small${s === next ? ' primary' : ''}`, href: s.href, onclick: goTo(s.href) }, CHECK_ACTION[s.id] || 'Open'))))));
+      h('div', { class: 'ck-body' }, h('b', {}, s.title), s === next ? h('div', { class: 'small muted' }, s.hint) : null),
+      s.done ? h('span', { class: 'pill ok' }, 'done')
+        : s.skipped ? h('button', { class: 'btn small', title: 'Bring this step back', onclick: () => put({ unskip: s.id }) }, 'Skipped · undo')
+          : s === next ? (can('admin') ? h('button', { class: 'btn small', title: 'Skip this step for now', onclick: () => put({ skip: s.id }) }, 'Skip') : h('a', { class: 'btn small primary', href: s.href, onclick: goTo(s.href) }, CHECK_ACTION[s.id] || 'Open'))
+            : h('a', { class: 'btn small', href: s.href, onclick: goTo(s.href) }, CHECK_ACTION[s.id] || 'Open'),
+      s === next && body ? h('div', { class: 'ck-do' }, body) : null)))));
 }
 function checklistBox() {
   const box = h('div', { id: 'ov-checklist' });
@@ -982,9 +1150,89 @@ async function refreshChecklist(box = $('#ov-checklist')) {
   S.checklistAt = Date.now();
   const c = await api('GET', '/api/checklist').catch(() => null);
   if (!c || !box) return;
-  if (JSON.stringify(c) === JSON.stringify(S.checklist) && box.childElementCount === (c.complete || c.dismissed ? 0 : 1)) return; // nothing changed: no redraw
-  S.checklist = c; drawChecklist(box, c);
+  if (JSON.stringify(c) === JSON.stringify(S.checklist) && box.childElementCount === ((c.complete && !S.checklistDone) || c.dismissed ? 0 : 1)) return; // nothing changed: no redraw
+  if (box.contains(document.activeElement) && document.activeElement.matches('input,textarea') && document.activeElement.value) return; // never under typing
+  const shape = (x) => JSON.stringify([x?.complete, x?.dismissed, x?.steps?.find((y) => y.id === 'provider')?.done, checklistNext()]);
+  const before = shape(S.checklist);
+  S.checklist = c;
+  if (S.tab === 'overview' && before !== shape(c) && !S.ask?.busy) return renderOverview(); // the hero, Ask and the number card follow it
+  await drawChecklist(box, c);
 }
+
+// ---------- Find anything (062): / or ⌘K (Ctrl+K), or the search button: jump to a screen, agent, chat, setting or action ----------
+/** Everything the Find box can open. Agents and chats come from the status and the cached chat list. */
+async function paletteItems() {
+  const items = TABS().map(([id, label]) => ({ kind: 'Screen', label, go: `#${id}`, icon: id }));
+  const agents = await api('GET', '/api/agents').catch(() => []);
+  for (const a of agents) {
+    items.push({ kind: 'Agent', label: a.name, hint: a.builtin ? 'built in' : a.description || '', go: `#agents/${encodeURIComponent(a.id)}`, icon: 'agents' });
+    if (!a.builtin) items.push({ kind: 'Test', label: `Test ${a.name}`, go: `#agents/${encodeURIComponent(a.id)}/test`, icon: 'agents' });
+  }
+  const names = new Map(agents.map((a) => [a.id, a.name]));
+  for (const c of await api('GET', '/api/chats').catch(() => [])) {
+    items.push({ kind: c.isGroup ? 'Group' : 'Person', label: c.name || (c.phone ? `+${c.phone}` : c.id), hint: c.enabled ? `on · ${names.get(c.agent) || 'no agent'}` : 'off', go: `#chats/${encodeURIComponent(c.id)}`, icon: 'chats' });
+  }
+  for (const [id, title, words] of SETTINGS_SECTIONS) items.push({ kind: 'Setting', label: title, words, go: `#settings/${id}`, icon: 'settings' });
+  for (const p of [['openrouter', 'OpenRouter'], ['anthropic', 'Anthropic (Claude)'], ['openai', 'OpenAI'], ['chatgpt', 'ChatGPT plan'], ['copilot', 'GitHub Copilot']]) items.push({ kind: 'Model', label: p[1], words: 'provider key connect', go: `#models/${p[0]}`, icon: 'models' });
+  const admin = can('admin');
+  const act = (label, words, run) => items.push({ kind: 'Action', label, words, run });
+  if (admin) {
+    act(S.status?.settings?.paused ? 'Resume all agents' : 'Pause all agents', 'stop silence', () => optimistic(() => { S.status.settings.paused = !S.status.settings.paused; }, () => api('POST', '/api/settings', { paused: S.status.settings.paused }), S.status.settings.paused ? 'Paused' : 'Resumed'));
+    act('New agent', 'create template ai draft', () => { location.hash = 'agents'; });
+    act('Add a direct chat', 'person phone dm', () => { dmPrefill = {}; location.hash = 'chats'; });
+    if (S.checklist?.dismissed && !S.checklist.complete) act('Show Getting started', 'checklist setup first run', () => tryApi(async () => { S.checklist = await api('PUT', '/api/checklist', { dismissed: false }); location.hash = 'overview'; show('overview'); }));
+  }
+  if (can('owner')) act('Back up now', 'backup download', () => { location.hash = 'backups'; });
+  act('Why agents stayed quiet', 'silent silence not answering', () => { location.hash = 'overview/quiet'; });
+  act('Sign out', 'logout', async () => { await api('POST', '/api/logout').catch(() => {}); S.user = null; renderLogin(); });
+  return items;
+}
+/** Lower score is better; null when a word does not match. Word starts in the name count most, then anywhere else. */
+function paletteScore(it, words) {
+  const toks = (x) => String(x || '').toLowerCase().split(/[^\p{L}\p{N}!@#.+]+/u).filter(Boolean);
+  const name = toks(it.label); const rest = toks(`${it.kind} ${it.hint || ''} ${it.words || ''}`);
+  let score = 0;
+  for (const w of words) {
+    if (name.some((t) => t.startsWith(w))) continue;
+    if (rest.some((t) => t.startsWith(w))) score += 2;
+    else if (it.label.toLowerCase().includes(w)) score += 3;
+    else return null;
+  }
+  return score + (it.kind === 'Screen' ? 0 : 0.5);
+}
+async function openPalette() {
+  if ($('#palette')) return;
+  const input = h('input', { type: 'search', placeholder: 'Find an agent, chat, setting or action', 'aria-label': 'Find anything', autocomplete: 'off', spellcheck: 'false' });
+  const list = h('ul', { class: 'pal-list', role: 'listbox' });
+  const dlg = h('dialog', { class: 'dlg palette', id: 'palette', 'aria-label': 'Find anything' }, input, list,
+    h('div', { class: 'small muted pal-help desk-only' }, '↑ ↓ to move · Enter to open · Esc to close'));
+  document.body.append(dlg);
+  dlg.addEventListener('close', () => dlg.remove());
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // a tap on the backdrop closes it
+  dlg.showModal(); input.focus();
+  const items = await paletteItems();
+  let hits = []; let sel = 0;
+  const open = (it) => { dlg.close(); if (it.run) it.run(); else if (location.hash === it.go) { show(it.go.slice(1).split('/')[0]); } else location.hash = it.go.slice(1); };
+  const draw = () => {
+    const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+    hits = (words.length ? items.map((it) => [paletteScore(it, words), it]).filter(([sc]) => sc !== null).sort((a, b) => a[0] - b[0]).map(([, it]) => it) : [...items.filter((it) => it.kind === 'Action'), ...items.filter((it) => it.kind === 'Screen')]).slice(0, 14);
+    sel = Math.min(sel, Math.max(0, hits.length - 1));
+    list.replaceChildren(...hits.map((it, i) => h('li', { role: 'option', 'aria-selected': String(i === sel), class: i === sel ? 'on' : '', onclick: () => open(it), onmousemove: () => { if (sel !== i) { sel = i; draw(); } } },
+      icon(it.icon || 'search'), h('span', { class: 'pal-label' }, it.label, it.hint ? h('small', { class: 'muted' }, ` · ${it.hint}`) : null), h('span', { class: 'pill' }, it.kind))),
+    hits.length ? null : h('li', { class: 'muted small' }, 'Nothing found. Try a group, an agent or a word like “backup”.'));
+  };
+  input.oninput = () => { sel = 0; draw(); };
+  input.onkeydown = (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + hits.length) % Math.max(1, hits.length); draw(); list.children[sel]?.scrollIntoView({ block: 'nearest' }); }
+    if (e.key === 'Enter' && hits[sel]) { e.preventDefault(); open(hits[sel]); }
+  };
+  draw();
+}
+document.addEventListener('keydown', (e) => {
+  if (!S.user || $('#palette')) return;
+  const typing = e.target.closest?.('input, textarea, select, [contenteditable]');
+  if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey)) { e.preventDefault(); openPalette(); }
+});
 
 // ---------- why agents stayed silent (#34) ----------
 /** One-click fix for a silence, or null. `after` runs once fixed (the record is cleared). */
@@ -1976,7 +2224,7 @@ async function renderAgentEditor(id) {
       onApply: async (r) => { const patch = Object.fromEntries(r.changes.map((ch) => [ch.field, ch.after])); if (await tryApi(() => api('PUT', `/api/agents/${encodeURIComponent(id)}`, patch), 'Saved')) renderAgentEditor(id); } }) : null,
     h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));align-items:start' },
       h('div', { class: 'card' },
-        b.needs.length ? h('div', { class: 'note warn' }, `Set these under Secrets: ${b.needs.join(', ')}`) : null,
+        b.needs.length ? h('div', { class: 'note warn' }, `Set these in Settings → Secrets: ${b.needs.join(', ')}`) : null,
         h('fieldset', {}, h('legend', {}, 'General'),
           field('Name', inp('name')), field('Description', inp('description')),
           bi ? h('div', { class: 'note', style: 'margin-top:8px' }, 'Built in: it answers linked panel users in their own WhatsApp chat and in the Ask box on Overview (link your number under ', h('a', { href: '#settings' }, 'Settings → Owner assistant'), '). Owners and admins get the organizer tools, viewers the participant tools. Its built-in instructions, permissions and confirm codes stay in code; what you set here is added.') : null,
@@ -2266,7 +2514,7 @@ function newAgentReview(r, ctx) {
     rows, h('p', { class: 'small muted' }, 'Everything else uses the defaults; you can change any of it in the editor afterwards.'));
 }
 /** "Describe it → AI drafts → review the changes → apply". onApply(result) does the saving. */
-async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply }) {
+async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply, bare = false }) {
   const models = await loadModels().catch(() => ({ models: [] }));
   const ask = h('textarea', { class: 'prose', style: 'min-height:90px', placeholder });
   const model = modelSelect(models, 'auto', { autoLabel: `Default model${models.resolvedDefault ? ` (${models.resolvedDefault})` : ''}` });
@@ -2286,11 +2534,12 @@ async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply 
     } catch (e) { out.replaceChildren(h('div', { class: 'note bad' }, e.message)); }
     go.disabled = false;
   } }, 'Draft');
-  return h('div', { class: 'card', style: 'margin-bottom:16px' }, h('h2', {}, title), ask,
-    h('div', { class: 'row', style: 'margin-top:8px' }, h('div', { style: 'flex:2' }, model), go), out);
+  const parts = [ask, h('div', { class: 'row', style: 'margin-top:8px' }, h('div', { style: 'flex:2' }, model), go), out];
+  return bare ? h('div', {}, parts) : h('div', { class: 'card', style: 'margin-bottom:16px' }, h('h2', {}, title), parts);
 }
 
 let chatsFilter = 'all';
+let chatsQuery = ''; // 062: Find a chat
 let dmPrefill = null; // 049: Contacts → "Set up chat" opens Chats → "Add a direct chat" with this contact
 /** 049 (#92): set up a direct chat by phone number (or a contact) before the person writes. */
 function addDirectChatCard(agents, { pre = null, onDone, onClose } = {}) {
@@ -2383,9 +2632,10 @@ async function renderChats() {
   const savePrefs = (c, patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, patch)); return true; }, 'Saved');
   const list = h('div', {});
   const draw = () => {
-    const shown = chats.filter((c) => chatsFilter === 'all' || (chatsFilter === 'groups' ? c.isGroup : !c.isGroup));
+    const q = chatsQuery.trim().toLowerCase();
+    const shown = chats.filter((c) => (chatsFilter === 'all' || (chatsFilter === 'groups' ? c.isGroup : !c.isGroup)) && (!q || `${c.name} ${c.phone || ''} ${agents.find((b) => b.id === c.agent)?.name || ''}`.toLowerCase().includes(q)));
     list.replaceChildren(shown.length ? h('table', { class: 'stack' }, h('thead', {}, h('tr', {}, h('th', {}, 'On'), h('th', {}, 'Chat'), h('th', {}, 'Agent'), h('th', {}, 'Model'), h('th', {}, 'Activity log'))),
-      h('tbody', {}, shown.map((c) => h('tr', { style: c.enabled ? '' : 'opacity:.78' },
+      h('tbody', {}, shown.map((c) => h('tr', { style: c.enabled ? '' : 'opacity:.78', 'data-jump': c.id },
         h('td', { style: 'width:52px', 'data-label': 'On' }, toggle(c.enabled, (v) => tryApi(async () => { const r = await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, { enabled: v }); c.enabled = v; c.ignored = 0; if (r.history) c.history = r.history; draw(); watchHistory(c); }, v ? 'On — agents may answer here' : 'Off — agents ignore this chat'), !can('admin'))),
         h('td', { 'data-label': '' }, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, c.name || c.id), h('span', { class: `pill ${c.isGroup ? 'info' : ''}` }, c.isGroup ? 'group' : 'person'), multi ? h('span', { class: 'pill' }, c.numberLabel) : null,
             c.waiting ? h('span', { class: 'pill warn', title: 'Set up before this person wrote; their first message goes to the agent chosen here' }, 'Waiting for the first message') : null),
@@ -2411,14 +2661,22 @@ async function renderChats() {
             c.isGroup ? h('label', { class: 'tick small welcome-pick', title: 'Greet people who join this group (once per person), with the agent’s welcome text' }, 'Welcome new members',
               h('select', { class: 'small', disabled: !can('admin'), 'aria-label': `Welcome new members in ${c.name || c.id}`, onchange: (e) => savePrefs(c, { welcome: e.target.value }) },
                 [['inherit', `As the agent (${agents.find((x) => x.id === c.agent)?.config?.welcome?.enabled ? 'on' : 'off'})`], ['on', 'On'], ['off', 'Off']].map(([v, l]) => h('option', { value: v, selected: (c.welcome || 'inherit') === v }, l)))) : null)),
-        h('td', { style: 'min-width:170px', 'data-label': 'Agent' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/chats/bind', { chat: c.id, agent: e.target.value || null }); c.agent = e.target.value; }, e.target.value ? 'Assigned' : 'Unassigned') },
+        h('td', { style: 'min-width:170px', 'data-label': 'Agent' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => {
+          // 062: choosing an agent for a chat that is Off switches it on too (one step instead of two)
+          const agent = e.target.value; const r = await api('POST', '/api/chats/bind', { chat: c.id, agent: agent || null, enable: true }); c.agent = agent;
+          const name = agents.find((b) => b.id === agent)?.name;
+          if (agent && !c.enabled && r.enabled) { c.enabled = true; c.ignored = 0; if (r.history) c.history = r.history; refreshStatus(); draw(); watchHistory(c); return toast(`${c.name || 'Chat'} is on: ${name} answers there`); }
+          toast(agent ? `${name} answers in ${c.name || 'this chat'}` : 'No agent here now');
+        }) },
           h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),
         h('td', { style: 'min-width:200px', 'data-label': 'Model' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) }),
           // 042 / #65: per-chat fallback, edited in a card below (same picker and chain editor as agents)
           h('div', { class: 'small muted', style: 'margin-top:6px;overflow-wrap:anywhere' }, chatFallbackLine(c.fallback, models)),
           h('button', { class: 'btn small', style: 'margin-top:4px', 'aria-label': `Model fallback for ${c.name || c.id}`, onclick: () => openFallback(c) }, can('admin') ? 'Fallback…' : 'Fallback')),
         h('td', { style: 'min-width:130px', 'data-label': 'Logging' }, h('select', { disabled: !can('admin'), onchange: (e) => savePrefs(c, { logging: e.target.value }) },
-          [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message an agent number, or add one with “Add a direct chat”.' : 'No chats yet (or WhatsApp is not connected).'));
+          [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : q ? h('p', { class: 'muted' }, `No chat matches “${chatsQuery}”.`)
+      : !(S.status?.channel?.numbers || []).some((n) => n.status === 'open') ? h('div', { class: 'note warn' }, 'WhatsApp is not linked yet, so there are no chats to show. ', h('a', { href: '#overview/whatsapp' }, 'Link WhatsApp on Overview'), '.')
+        : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message an agent number, or add one with “Add a direct chat”.' : 'No chats yet. Groups appear here once the linked number is in them.'));
   };
   // #91: what the phone sent when a chat was switched on / "Load recent messages" (polled while loading; only the
   // status line and the button are redrawn, so a select someone is using is left alone)
@@ -2449,8 +2707,10 @@ async function renderChats() {
   const seg = h('div', { class: 'seg' }, [['all', 'All'], ['groups', 'Groups'], ['people', 'People']].map(([v, l]) => h('button', { class: chatsFilter === v ? 'on' : '', onclick: (e) => { chatsFilter = v; seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === e.target)); draw(); } }, l)));
   draw();
   const addBtn = can('admin') ? h('button', { class: 'btn small primary', onclick: () => openAdd() }, '+ Add a direct chat') : null;
+  const find = chats.length > 6 ? h('input', { type: 'search', class: 'chat-find', value: chatsQuery, placeholder: 'Find a chat, person or agent', 'aria-label': 'Find a chat', oninput: (e) => { chatsQuery = e.target.value; draw(); } }) : null;
   $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Chats'), h('div', { class: 'row', style: 'gap:8px' }, addBtn, seg)),
-    h('p', { class: 'small muted' }, 'Agents only talk in chats that are switched On. A chat that is Off is ignored completely: no message is stored (only the id and time of its newest one) and no model is called. When you switch a chat on, its recent messages are loaded from your phone. For each chat that is on, choose the agent and optionally a model or logging level. (An agent set to answer “Anyone” also answers people whose chat is off.)'),
+    h('p', { class: 'small muted' }, 'Agents only answer in chats that are On. A chat that is Off is ignored completely: nothing is stored (only the time of its newest message) and no model is called. Choosing an agent for a chat switches it on. (An agent set to answer “Anyone” also answers people whose chat is off.)'),
+    find,
     h('label', { class: 'small muted row', style: 'gap:6px;margin:-4px 0 10px;flex-wrap:wrap' }, 'When a chat is switched on, load its last',
       h('select', { style: 'width:auto;flex:0 0 auto;min-width:96px', disabled: !can('admin'), 'aria-label': 'Messages to load when a chat is switched on', onchange: (e) => tryApi(async () => { await api('POST', '/api/settings', { historyLoadCount: Number(e.target.value) }); refreshStatus(); }, 'Saved') },
         [0, 25, 50, 100, 200].map((n) => h('option', { value: n, selected: Number(S.status?.settings?.historyLoadCount ?? 50) === n }, n ? String(n) : 'no'))),
@@ -2610,7 +2870,7 @@ function providerCard({ id, mark, title, cost, tag, p, steps, form, connected, e
     : isOn ? h('span', { class: 'pill ok' }, `✓ Connected · ${p.models} model${p.models === 1 ? '' : 's'}`)
     : p?.error ? h('span', { class: 'pill bad' }, 'Needs attention') : h('span', { class: 'pill' }, 'Not connected');
   const t = isOn ? testBox(id) : null;
-  return h('div', { class: `card pcard${isOn ? ' on' : ''}`, id: `prov-${id}` },
+  return h('div', { class: `card pcard${isOn ? ' on' : ''}`, id: `prov-${id}`, 'data-jump': id },
     h('div', { class: 'phead' }, h('span', { class: `pmark ${mark}` }, title[0]), h('h2', {}, title), pill),
     h('div', { class: 'small muted pcost' }, cost),
     u ? h('div', { class: 'small num', style: 'margin-top:6px' }, h('a', { href: '#usage' }, 'Last 30 days: '), usageLine(u)) : null,
@@ -3113,50 +3373,87 @@ async function renderPending() {
 }
 
 // ---------- secrets ----------
-async function renderSecrets() {
+/** Settings → Secrets (062: was its own tab). Redraws itself after a change. */
+async function secretsCard() {
   const rows = await api('GET', '/api/secrets');
-  const name = h('input', { placeholder: 'NAME_LIKE_THIS' }); const val = h('input', { type: 'password', placeholder: 'value' });
-  $('#main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Secrets'),
+  const redraw = async () => card.replaceWith(await secretsCard());
+  const name = h('input', { placeholder: 'NAME_LIKE_THIS', 'aria-label': 'Secret name' }); const val = h('input', { type: 'password', placeholder: 'value', 'aria-label': 'Secret value' });
+  const card = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Secrets'),
     h('p', { class: 'small muted' }, 'API keys and tokens, stored encrypted on the server and never shown again. Agents reference them as ${NAME}. Save an empty value to remove.'),
-    h('table', { class: 'stack' }, h('tbody', {}, rows.map((n) => { const v = h('input', { type: 'password', placeholder: 'new value', 'aria-label': `New value for ${n.name}` });
+    rows.length ? h('table', { class: 'stack' }, h('tbody', {}, rows.map((n) => { const v = h('input', { type: 'password', placeholder: 'new value', 'aria-label': `New value for ${n.name}` });
       return h('tr', {}, h('td', { 'data-label': '' }, h('code', {}, n.name), n.usedByAgents ? h('div', { class: 'small muted' }, 'used by an agent') : null),
         h('td', { 'data-label': 'Status' }, h('span', { class: `pill ${n.set ? 'ok' : 'bad'}` }, n.set ? 'set' : 'missing')),
-        h('td', { 'data-label': '' }, h('form', { class: 'row nowrap mut', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name: n.name, value: v.value }), v.value ? 'Saved' : 'Removed')) renderSecrets(); } }, v, h('button', { class: 'btn' }, 'Save')))); }))),
-    h('div', { class: 'mut' }, h('label', {}, 'Add a secret'), h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name: name.value.trim(), value: val.value }), 'Saved')) renderSecrets(); } }, name, val, h('button', { class: 'btn primary' }, 'Add')))));
+        h('td', { 'data-label': '' }, h('form', { class: 'row nowrap mut', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name: n.name, value: v.value }), v.value ? 'Saved' : 'Removed')) redraw(); } }, v, h('button', { class: 'btn' }, 'Save')))); })))
+      : h('p', { class: 'small muted' }, 'No secrets yet. Model keys are added under Models; tool services ask for theirs when you add them.'),
+    h('div', { class: 'mut' }, h('label', {}, 'Add a secret'), h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/secrets', { name: name.value.trim(), value: val.value }), 'Saved')) redraw(); } }, name, val, h('button', { class: 'btn primary' }, 'Add'))));
+  return card;
 }
 
 // ---------- settings ----------
+/** 062: Settings sections in page order: [id, title, words people search for]. The index at the top of Settings and the
+ *  Find box (/ or ⌘K) both use it; each card carries data-jump="<id>" (#settings/<id> opens it). */
+const SETTINGS_SECTIONS = [
+  ['tool-services', 'Tool services for all agents', 'mcp tools weather calendar registry browse'],
+  ['owner-assistant', 'Owner assistant', 'my own chat alerts weekly summary character'],
+  ['direct-messages', 'Direct messages', 'dm default agent private'],
+  ['privacy-notice', 'Privacy notice', 'notice group members opt-out'],
+  ['photos-voice', 'Photos & voice', 'images voice notes transcription speech pictures'],
+  ['secrets', 'Secrets', 'keys tokens api key password'],
+  ['users', 'Users', 'people admin viewer invite sign-up link'],
+  ['sign-in', 'Sign-in', 'password login google only'],
+  ['google', 'Sign in with Google', 'google oauth client'],
+  ['web-access', 'Web address & access', 'domain https proxy ip allow-list certificate'],
+  ['assistants', 'Connected AI assistants', 'chatgpt claude mcp admin'],
+  ['password', 'Your password', 'change password account'],
+  ['my-google', 'Your Google account', 'google link'],
+  ['logging', 'Activity log', 'logging retention verbose minimal'],
+  ['small-mode', 'Server size', 'small server mode 1 gb memory'],
+  ['getting-started', 'Getting started', 'checklist first run setup guide'],
+  ['whatsapp-helpers', 'WhatsApp helpers', 'groupid groups commands'],
+];
 async function renderSettings() {
   const [agents, lg, ai, sess] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null)]);
   const [oa, notice] = await Promise.all([api('GET', '/api/owner-assistant').catch(() => null), api('GET', '/api/privacy-notice').catch(() => null)]);
   if (sess?.user) { S.user = sess.user; S.google = !!sess.google; }
   const me = S.user;
-  const tools = await toolServicesCard().catch((e) => h('div', { class: 'card' }, h('h2', {}, 'Tool services for all agents'), h('p', { class: 'small muted' }, `Could not load: ${e.message}`)));
   const cur = h('input', { type: 'password', placeholder: 'current', autocomplete: 'current-password' });
   const next = h('input', { type: 'password', placeholder: 'new (12+ characters)', autocomplete: 'new-password' });
-  const cards = [
-    h('div', { class: 'card' }, h('h2', {}, me.hasPassword ? 'Your password' : 'Add a password'),
-      me.hasPassword ? [cur, h('div', { style: 'height:8px' })] : h('p', { class: 'small muted', style: 'margin-top:0' }, 'You sign in with Google. A password is a fallback for when Google sign-in is off.'), next,
-      h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => tryApi(async () => { await api('POST', '/api/password', { current: cur.value, next: next.value }); cur.value = next.value = ''; renderSettings(); }, me.hasPassword ? 'Password changed' : 'Password added') }, me.hasPassword ? 'Change password' : 'Add password')),
-    S.google || me.google ? myGoogleCard(me) : null,
-    h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default agent for DMs without a trigger'),
+  const loadErr = (title) => (e) => h('div', { class: 'card' }, h('h2', {}, title), h('p', { class: 'small muted' }, `Could not load: ${e.message}`));
+  const owner = can('owner') ? await Promise.all([api('GET', '/api/users'), api('GET', '/api/invites'), api('GET', '/api/auth/google'), api('GET', '/api/auth/signin').catch(() => null), api('GET', '/api/web').catch(() => null)]) : null;
+  const [users, inv, gcfg, signin, web] = owner || [];
+  const checklist = S.checklist || await api('GET', '/api/checklist').catch(() => null);
+  const by = {
+    'tool-services': await toolServicesCard().catch(loadErr('Tool services for all agents')),
+    'owner-assistant': oa ? ownerAssistantCard(oa) : null,
+    'direct-messages': h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default agent for direct messages without a trigger'),
       h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmAgent: e.target.value }), 'Saved') },
         h('option', { value: '' }, '— first agent that accepts the sender —'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmAgent === b.id }, b.name)))),
-    oa ? ownerAssistantCard(oa) : null,
-    notice ? privacyNoticeCard(notice) : null,
-    await photosVoiceCard().catch((e) => h('div', { class: 'card' }, h('h2', {}, 'Photos & voice'), h('p', { class: 'small muted' }, `Could not load: ${e.message}`))),
-    ai ? assistantsCard(ai) : null,
-    lg ? loggingCard(lg) : null,
-    h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any agent can send:'),
+    'privacy-notice': notice ? privacyNoticeCard(notice) : null,
+    'photos-voice': await photosVoiceCard().catch(loadErr('Photos & voice')),
+    secrets: can('admin') ? await secretsCard().catch(loadErr('Secrets')) : null,
+    users: owner ? usersCard(users, inv, signin) : null,
+    'sign-in': owner && signin ? signinCard(signin) : null,
+    google: owner ? googleSetupCard(gcfg) : null,
+    'web-access': owner && web ? webAccessCard(web) : null,
+    assistants: ai ? assistantsCard(ai) : null,
+    password: h('div', { class: 'card' }, h('h2', {}, me.hasPassword ? 'Your password' : 'Add a password'),
+      me.hasPassword ? [cur, h('div', { style: 'height:8px' })] : h('p', { class: 'small muted', style: 'margin-top:0' }, 'You sign in with Google. A password is a fallback for when Google sign-in is off.'), next,
+      h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => tryApi(async () => { await api('POST', '/api/password', { current: cur.value, next: next.value }); cur.value = next.value = ''; renderSettings(); }, me.hasPassword ? 'Password changed' : 'Password added') }, me.hasPassword ? 'Change password' : 'Add password')),
+    'my-google': S.google || me.google ? myGoogleCard(me) : null,
+    logging: lg ? loggingCard(lg) : null,
+    'small-mode': smallModeCard(S.status?.server),
+    'getting-started': can('admin') && checklist ? h('div', { class: 'card' }, h('h2', {}, 'Getting started'),
+      h('p', { class: 'small muted', style: 'margin-top:0' }, checklist.complete ? `All ${checklist.total} steps are done.` : checklist.dismissed ? `Hidden from Overview, ${checklist.done} of ${checklist.total} steps done.` : `On Overview, ${checklist.done} of ${checklist.total} steps done.`),
+      checklist.dismissed && !checklist.complete ? h('button', { class: 'btn', onclick: () => tryApi(async () => { S.checklist = await api('PUT', '/api/checklist', { dismissed: false }); location.hash = 'overview'; }) }, 'Show on Overview again') : null) : null,
+    'whatsapp-helpers': h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any agent can send:'),
       h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups'))),
-  ];
-  cards.push(smallModeCard(S.status?.server));
-  if (can('owner')) {
-    const [users, inv, gcfg, signin, web] = await Promise.all([api('GET', '/api/users'), api('GET', '/api/invites'), api('GET', '/api/auth/google'), api('GET', '/api/auth/signin').catch(() => null), api('GET', '/api/web').catch(() => null)]);
-    cards.unshift(usersCard(users, inv, signin), signin ? signinCard(signin) : null, googleSetupCard(gcfg), web ? webAccessCard(web) : null);
-  }
-  cards.unshift(tools); // Tool services for all agents (035) first: they affect every agent
-  $('#main').replaceChildren(h('div', { class: 'grid' }, cards));
+  };
+  const shown = SETTINGS_SECTIONS.filter(([id]) => by[id]);
+  for (const [id] of shown) by[id].dataset.jump = id;
+  const index = h('nav', { class: 'jumpbar card', 'aria-label': 'Settings sections' }, shown.map(([id, title]) => h('a', { class: 'btn small', href: `#settings/${id}`, onclick: (e) => {
+    e.preventDefault(); history.replaceState(null, '', `#settings/${id}`); jumpToSub();
+  } }, title)));
+  $('#main').replaceChildren(index, h('div', { class: 'grid', style: 'align-items:start' }, shown.map(([id]) => by[id])));
 }
 
 // ---------- Settings → Server: Small server mode (055), one switch for heavier features on a small server ----------
@@ -3166,7 +3463,7 @@ function smallModeCard(sv) {
   const small = sv.size === 'small';
   const ram = sv.effectiveMb >= 1024 ? `${(sv.effectiveMb / 1024).toFixed(1)} GB` : `${sv.effectiveMb} MB`;
   const flip = (v) => tryApi(async () => { await api('PUT', '/api/server/small-mode', { enabled: v }); S.status = await api('GET', '/api/status'); renderSettings(); }, v ? 'Small server mode on' : 'Small server mode off');
-  return h('div', { class: 'card', id: 'small-mode' }, h('h2', {}, 'Server'),
+  return h('div', { class: 'card', id: 'small-mode' }, h('h2', {}, 'Server size'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, `${SIZE_LABEL[sv.size]}: ${ram} memory, ${sv.cpus} CPU${sv.cpus > 1 ? 's' : ''}.`),
     h('label', { class: 'inline' }, toggle(on, flip, !can('owner')), h('b', {}, 'Small server mode: allow heavier features on this server')),
     h('div', { class: 'small', style: 'margin-top:6px' }, 'On a small server (under 2 GB or 1 CPU), allows on-server speech and local tool services anyway. Caveats: slower; one job at a time and at most 2 local tool services; they start only when enough memory is free and are stopped when memory gets tight (the agent then answers without them). GitHub Copilot sign-in is not covered: it needs 2 GB.'),
@@ -3555,7 +3852,7 @@ async function toolServicesCard() {
           h('span', { class: 'pill ok' }, `used by ${g.agents.using.length} agent${g.agents.using.length === 1 ? '' : 's'}`),
           g.agents.optedOut.length ? h('span', { class: 'pill' }, `switched off in ${g.agents.optedOut.join(', ')}`) : null,
           g.agents.replacedBy.length ? h('span', { class: 'pill warn' }, `replaced by own service in ${g.agents.replacedBy.join(', ')}`) : null,
-          g.needs?.length ? h('span', { class: 'pill warn' }, `set under Secrets: ${g.needs.join(', ')}`) : null) : null;
+          g.needs?.length ? h('span', { class: 'pill warn' }, `set in Settings → Secrets: ${g.needs.join(', ')}`) : null) : null;
         const canEdit = can('admin') && (isOwner || it.s.savedType !== 'local');
         const extra = h('div', {}, status,
           h('div', { class: 'small muted' }, `Defaults: organizers ${sum(it.s, 'organizer')}; participants ${sum(it.s, 'participant')}. Discover tools to change them.`),

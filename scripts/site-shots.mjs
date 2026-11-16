@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { startDemo, DEMO_PASSWORD } from './demo-panel.mjs';
+import { startDemo, DEMO_PASSWORD, fakeChecklist } from './demo-panel.mjs';
 import { launch, newPage } from './cdp.mjs';
 
 const { values: opt } = parseArgs({ options: {
@@ -44,7 +44,7 @@ const PRELUDE = `const T = {
 const ASK = `S.ask = { q: '', busy: false, reply: 'This week in your chats:\\n• Morges ↔ Geneva rides: Marc drives Fridays at 07:40 (2 seats left); Sophie gets a lift back with Mia on Thursday.\\n• Class 4B parents: museum trip forms are due Monday 24 Nov; Lea can drive 3 children.\\n• Family ❤️: Diwali dinner Saturday 19:00 at Ravi & Priya’s.\\nThe Book club and Rue du Midi neighbours chats are off, so I can’t see them.',
   confirms: [{ code: 'H4M9', preview: 'Turn off the agent “Office colleagues” (1 chat). It stops answering until you switch it on again.' }],
   steps: [{ step: 'thinking' }, { step: 'tool', tool: 'list_visible_chats', ok: true }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'tool', tool: 'search_messages', ok: true }, { step: 'held', tool: 'set_agent_enabled', ok: true }] };`;
-const CHECKLIST = "drawChecklist(document.querySelector('#ov-checklist'), { done: 3, total: 5, complete: false, dismissed: false, steps: [['provider', 'Connect an AI model provider', true, '#models', 'OpenRouter, ChatGPT, Copilot, Anthropic…'], ['whatsapp', 'Link a WhatsApp number', true, '#overview/whatsapp', 'Scan the QR code with a spare number.'], ['agent', 'Create an agent', true, '#agents', 'Start from a template or describe it.'], ['chat', 'Switch a chat on', false, '#chats', 'Every chat starts Off. Switch on the groups and people your agent should answer.'], ['reply', 'Get a first reply', false, '#agents', 'Write the trigger in the group, or try the test console.']].map(([id, title, done, href, hint]) => ({ id, title, done, href, hint })) });";
+const START = (step) => `${fakeChecklist(step)} show(S.tab); await T.wait(1500);`; // 062: Getting started, one step open
 const AI_DIFF = "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies, make Lea an organizer, weather before rides'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); document.querySelector('.dskip')?.click(); await T.wait(400);";
 const TEST_AS = "const sel = document.querySelector('select[aria-label=\"Test as role\"]'); sel.value = 'organizer'; sel.dispatchEvent(new Event('change')); await T.wait(1200); const i = document.querySelector('#test-console input[placeholder^=\"Ask the\"]'); if (i) { i.value = 'Who drives to Geneva on Friday?'; await T.click('Send', 'button', 1800); }";
 
@@ -64,7 +64,10 @@ const PAGES = [
 const CARDS = [
   ['card-ask', 'overview', ASK + ' show(S.tab); await T.wait(600);', '#ov-ask', 1100],
   ['card-quiet', 'overview', '', '#ov-silences', 1100],
-  ['card-checklist', 'overview', CHECKLIST + ' await T.wait(300);', '#ov-checklist', 1100],
+  ['card-checklist', 'overview', START('chat'), '#ov-checklist', 1100],
+  ['card-start-model', 'overview', START('provider'), '#ov-checklist', 1100],
+  ['card-start-agent', 'overview', START('agent'), '#ov-checklist', 1100],
+  ['card-find', 'chats', "await openPalette(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'ge'; i.dispatchEvent(new Event('input')); await T.wait(200);", '#palette', 1100],
   ['card-ai-diff', 'agents/carpool', AI_DIFF, '.dreview', 1100],
   ['card-test-as', 'agents/carpool/test', TEST_AS, '#test-console', 1100],
   ['card-caps', 'usage', '', 'box:Monthly spending caps', 1100],
@@ -146,8 +149,8 @@ for (const width of [...new Set(CARDS.map((c) => c[4]))]) {
 const VIDEOS = [
   ['tour', 'overview', `for (const t of ['overview', 'chats', 'agents', 'models', 'usage', 'server', 'activity']) { location.hash = t; await T.wait(2100); }`, 15500],
   ['chat-on', 'chats', `const row = () => [...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Book club'));
-    row().scrollIntoView({ block: 'center' }); await T.wait(1200); row().querySelector('input[type=checkbox]').click(); await T.wait(1500);
-    const sel = row()?.querySelector('select'); if (sel) { sel.focus(); await T.wait(600); sel.value = [...sel.options].find((o) => /family/i.test(o.textContent))?.value || sel.value; sel.dispatchEvent(new Event('change', { bubbles: true })); }`, 6500],
+    row().scrollIntoView({ block: 'center' }); await T.wait(1200);
+    const sel = row()?.querySelector('td[data-label="Agent"] select'); if (sel) { sel.focus(); await T.wait(600); sel.value = [...sel.options].find((o) => /family/i.test(o.textContent))?.value || sel.value; sel.dispatchEvent(new Event('change', { bubbles: true })); }`, 6500],
   ['ai-create', 'agents', `const ta = document.querySelector('#main textarea'); await T.wait(500);
     await T.type(ta, 'A helper for our running club that posts Sunday’s run every Saturday evening');
     await T.click('Draft', 'button', 200); await T.until('.dreview, .note.bad'); await T.wait(900);

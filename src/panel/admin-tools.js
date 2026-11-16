@@ -36,14 +36,15 @@ async function numbers(x) {
 /** @type {Array<{name, description, input, required?, calls, risky?, readOnly?, noConfirm?, run, preview?}>} noConfirm: the owner assistant runs it without a confirm code (logged). */
 export const TOOLS = [
   // ---------- overview & activity ----------
-  { name: 'get_overview', readOnly: true, calls: [['GET', '/api/status']],
-    description: 'Overview of the app: version, uptime, memory, whether agents are paused, WhatsApp connection per number, agents, and how many changes wait for confirmation.',
+  { name: 'get_overview', readOnly: true, calls: [['GET', '/api/status'], ['GET', '/api/checklist']],
+    description: 'Overview of the app: version, uptime, memory, whether agents are paused, WhatsApp connection per number, agents, how many changes wait for confirmation, and the Getting started steps still open (link WhatsApp, connect a model, create an agent, switch a chat on, send a test).',
     input: {},
     run: async (a, x) => {
-      const s = await x.call('GET', '/api/status');
+      const [s, c] = await Promise.all([x.call('GET', '/api/status'), x.call('GET', '/api/checklist').catch(() => null)]);
       return { you: { username: s.user.username, role: s.user.role }, version: s.version, uptimeSec: s.uptimeSec, memoryMb: s.memoryMb, node: s.node,
         agentsPaused: !!s.settings?.paused, whatsapp: (s.channel?.numbers || [s.channel]).map((n) => ({ id: n.id, label: n.label, status: n.status, me: n.me })),
-        agents: s.agents, pendingConfirmations: s.pending };
+        agents: s.agents, pendingConfirmations: s.pending,
+        gettingStarted: c && !c.complete ? { done: c.done, total: c.total, open: c.steps.filter((st) => !st.done && !st.skipped).map((st) => ({ step: st.id, title: st.title, hint: st.hint })) } : 'done' };
     } },
   { name: 'list_activity', readOnly: true, calls: [['GET', '/api/activity']],
     description: 'Recent activity log entries (newest first): messages, replies, tool calls, confirmations, configuration changes, errors. Filter by agent or chat.',
@@ -136,9 +137,9 @@ export const TOOLS = [
     } },
   { name: 'list_chats', readOnly: true, calls: [['GET', '/api/chats']], description: 'WhatsApp groups and 1:1 chats the numbers know, with their agent, model and logging settings.', input: {},
     run: (a, x) => x.call('GET', '/api/chats') },
-  { name: 'assign_chat', calls: [['POST', '/api/chats/bind']], description: 'Choose which agent answers in a chat. Empty agent_id removes the agent from the chat.',
-    input: { chat: str('Chat id (see list_chats)'), agent_id: str('Agent id, or empty to unassign') }, required: ['chat'],
-    run: (a, x) => x.call('POST', '/api/chats/bind', { chat: a.chat, agent: a.agent_id || null }) },
+  { name: 'assign_chat', calls: [['POST', '/api/chats/bind']], description: 'Choose which agent answers in a chat. Empty agent_id removes the agent from the chat. A chat that is off stays off unless switch_on is true (as in the panel, where choosing an agent switches the chat on).',
+    input: { chat: str('Chat id (see list_chats)'), agent_id: str('Agent id, or empty to unassign'), switch_on: bool('Also switch the chat on if it is off (posts the privacy notice once in groups)') }, required: ['chat'],
+    run: (a, x) => x.call('POST', '/api/chats/bind', { chat: a.chat, agent: a.agent_id || null, enable: !!a.switch_on }) },
   { name: 'set_chat_settings', calls: [['PUT', '/api/chats/x/prefs'], ['GET', '/api/chats']],
     description: 'Per-chat model, model fallback and activity logging (the panel\'s Chats page: Model, Fallback…, Logging). model: inherit | auto | provider:auto | provider:model. fallback_mode: inherit | on | off (use other models when this one fails with a limit, outage or expired sign-in); fallback_chain: models to try in order (empty list = the agent\'s or the Models setting). Giving only one of fallback_mode / fallback_chain keeps the other as it is. logging: inherit | off | minimal | normal | verbose. welcome: inherit | on | off — "Welcome new members" in this group (inherit = the agent\'s setting).',
     input: { chat: str('Chat id'), model: str('Model (optional)'), logging: { type: 'string', enum: ['inherit', 'off', 'minimal', 'normal', 'verbose'], description: 'Logging level (optional)' },

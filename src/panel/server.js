@@ -462,6 +462,15 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
         private: !!prefs[c.id]?.private, noticeOff: !!prefs[c.id]?.noticeOff, welcome: prefs[c.id]?.welcome || 'inherit', noticePostedAt: c.isGroup ? noticePostedAt(c.id) : null, history: historyStatus(c.id) };
     });
   });
+  /** Switch a chat on or off: recorded, the privacy notice (044) and the phone's recent messages (#91) when it goes on. */
+  const afterSwitch = async (chat, on, wasOn, user) => {
+    ignoredCounts.delete(chat); activity('config', { chat, summary: `Chat switched ${on ? 'ON — agents may answer here' : 'OFF — agents ignore it'} (${user.username})` });
+    if (!on || wasOn) return;
+    await maybePostNotice(chat, channel); // groups only, once
+    if (historyLoadCount() > 0) { // nothing was stored while the chat was off: ask the phone (answered later)
+      try { await loadChatHistory(chat, { by: user.username, reason: 'switch_on' }); } catch (e) { activity('memory.history', { chat, summary: `Could not ask the phone for earlier messages: ${e.message}` }); }
+    }
+  };
   route('PUT', '/api/chats/:chat/prefs', async (req, res, body, q, p, user) => {
     const chat = decodeURIComponent(p.chat);
     const wasOn = isChatEnabled(chat);
@@ -476,14 +485,8 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
       activity('config', { chat, summary: `Welcome new members: ${body.welcome === 'inherit' ? 'as the agent is set' : body.welcome} for this chat (${user.username})` });
     }
     const out = setChatPrefs(chat, { model: body.model, logging: body.logging, enabled: body.enabled, fallback: body.fallback });
-    if (body.enabled !== undefined) {
-      ignoredCounts.delete(chat); activity('config', { chat, summary: `Chat switched ${out.enabled ? 'ON — agents may answer here' : 'OFF — agents ignore it'} (${user.username})` });
-      if (out.enabled && !wasOn) await maybePostNotice(chat, channel); // privacy notice (044): groups only, once
-      // #91: nothing was stored while the chat was off: ask the phone for its recent messages (answered later).
-      if (out.enabled && !wasOn && historyLoadCount() > 0) {
-        try { await loadChatHistory(chat, { by: user.username, reason: 'switch_on' }); } catch (e) { activity('memory.history', { chat, summary: `Could not ask the phone for earlier messages: ${e.message}` }); }
-      }
-    } else if (body.private !== undefined || body.noticeOff !== undefined || body.welcome !== undefined) { /* recorded above */ } else activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging}, fallback ${out.fallback.mode}${out.fallback.chain.length ? ` (${out.fallback.chain.join(' → ')})` : ''} (${user.username})` });
+    if (body.enabled !== undefined) await afterSwitch(chat, out.enabled, wasOn, user);
+    else if (body.private !== undefined || body.noticeOff !== undefined || body.welcome !== undefined) { /* recorded above */ } else activity('config', { chat, summary: `Chat settings: model ${out.model}, logging ${out.logging}, fallback ${out.fallback.mode}${out.fallback.chain.length ? ` (${out.fallback.chain.join(' → ')})` : ''} (${user.username})` });
     return { ...out, history: historyStatus(chat) };
   });
   // #91: "Load recent messages": ask the linked phone for earlier messages of a chat that is on (status by polling).
@@ -508,7 +511,15 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
     activity('config', { summary: `Activity logging: ${next.level}, keep ${next.retentionDays} days / ${next.maxEntries} entries (${user.username})` });
     return next;
   });
-  route('POST', '/api/chats/bind', async (req, res, body, q, p, user) => { await bindChat(String(body.chat), body.agent || null, user.username); return { ok: true }; });
+  // 062: `enable: true` also switches the chat on (choosing an agent for a chat means it should answer there).
+  route('POST', '/api/chats/bind', async (req, res, body, q, p, user) => {
+    const chat = String(body.chat);
+    await bindChat(chat, body.agent || null, user.username);
+    if (!body.enable || !body.agent || isChatEnabled(chat)) return { ok: true, enabled: isChatEnabled(chat) };
+    setChatPrefs(chat, { enabled: true });
+    await afterSwitch(chat, true, false, user);
+    return { ok: true, enabled: true, history: historyStatus(chat) };
+  });
   // Stored messages of a chat (024): admins and owners only; each look is recorded.
   route('GET', '/api/chats/:chat/messages', async (req, res, body, q, p, user) => {
     const chat = decodeURIComponent(p.chat);
