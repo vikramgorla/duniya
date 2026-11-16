@@ -65,7 +65,6 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 - [ ] Website `docs/site/index.html` updated for new features, and **screenshots/videos retaken** when the UI
       changed: `npm run site:shots` (demo panel + headless Chrome; fake numbers only, WebP, H.264 `-preset veryfast`),
       checked at 375 / 393 / 1440 px and in dark mode, no external requests.
-- [ ] `mobile/README.md` updated when the mobile app or its connect flow changed.
 - [ ] Admin MCP tools (`src/panel/admin-tools.js`) cover new panel functionality, with confirmations for risky
       actions, and `docs/admin-mcp.md` mentions them.
 - [ ] `DESIGN.md` updated when the visual language changed.
@@ -134,12 +133,11 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 | `src/core/backup/`, `updates.js`, `system.js`, `webaccess.js` | Backups (GitHub, S3), updates, server metrics, domains & access |
 | `src/core/store.js`, `db.js` | Settings, users, secrets; SQLite (`node:sqlite`) |
 | `src/panel/server.js`, `http.js`, `routes/` | Panel HTTP API |
-| `src/panel/public/index.html` | The whole panel UI (one file; `npm run check:panel` parses its script) |
+| `src/panel/public/index.html` | The whole panel UI (one file; `npm run check:panel` parses its script); `manifest.webmanifest` and `icons/` make it installable on phones |
 | `src/panel/admin-mcp.js`, `admin-tools.js`, `src/core/admin-oauth.js` | Admin MCP server and its OAuth 2.1 |
 | `bin/duniya.js`, `deploy/duniya` | `duniya` CLI |
 | `install.sh`, `deploy/`, `infra/oci/`, `infra/gcp/`, `Dockerfile` | Installer, root maintenance helper (`deploy/ops/`), OCI stack, GCP script, Docker |
 | `templates/` | Agent templates (JSON) |
-| `mobile/` | Expo app (own `package.json`, not installed on servers) |
 | `test/` | `node:test` e2e tests with fakes (`harness.js`) |
 | `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `ci-checks.mjs` (versions, releases, docs, knip, jscpd, panel size), `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails), `render-diagrams.mjs` (`npm run docs:diagrams`: docs/diagrams/*.mmd → SVG) |
 | `docs/` | Reference docs (`docs/README.md` index), deploy guides, diagrams (`docs/diagrams/`), the website `docs/site/` |

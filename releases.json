@@ -1,6 +1,11 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.22.0": {
+      "breaking": false,
+      "title": "The panel is your phone app: install it on the home screen; the preview mobile app (Expo Go) is gone",
+      "summary": "Open the panel on your phone and add it to the home screen (Overview shows how, or an Install button): it opens full screen with the Duniya icon, live status, Ask and confirmations, and form fields no longer zoom on iPhone. The preview mobile app that ran in Expo Go was removed with Settings → Mobile app; phones that were signed in to it are signed out, and the panel API now accepts only the panel's own sign-in. Connected AI assistants (ChatGPT, Claude) are not affected. Nothing to do on your server."
+    },
     "2.21.0": {
       "breaking": false,
       "title": "No secrets in chats: keys are entered on one-time panel links, new users set their own password, restores use the stored passphrase",

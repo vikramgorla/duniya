@@ -52,8 +52,7 @@ The owner runs the latest version on one server, so the code carries nothing for
    `plural`, `isGroup`) instead of a local copy.
 4. **CI checks it** (`node scripts/ci-checks.mjs`, quality job): `knip` (config `knip.json`) fails on unused files,
    exports and dependencies, `jscpd` (`.jscpd.json`, 8 lines) on duplication, and `src/panel/public/index.html` has a
-   size budget (`PANEL_BUDGET`; raising it needs a reason in the PR). The mobile app runs `npm run knip` in its own
-   workflow.
+   size budget (`PANEL_BUDGET`; raising it needs a reason in the PR).
 5. **Test behaviour, not internals:** tests go through the panel API, the router and the fakes in `test/harness.js`;
    export something only when the app uses it.
 6. **Keep the panel snappy:** no new polling. The status and activity arrive over `/api/events` (server-sent events);

@@ -18,7 +18,7 @@ top.**
 3. Router: triggers, roles and rate limits; owner DMs go to the owner assistant; a quick-reply command or a clear FAQ match is answered right away from the owner's text (no AI, no tokens).
 4. The agent (stored in the app) uses a model provider with fallback, MCP tools with per-role allow lists, WhatsApp actions, memory (messages, summary, notes, search).
 5. Preview tools go through the confirm gate: an organizer replies `confirm CODE`.
-6. The agent, the panel, the mobile app and the admin MCP use SQLite with encrypted secrets and backups.
+6. The agent, the panel and the admin MCP use SQLite with encrypted secrets and backups.
 
 </details>
 

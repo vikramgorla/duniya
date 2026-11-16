@@ -29,8 +29,8 @@ test('058: the panel shell is compressed, keeps its security headers and holds n
   assert.equal(br.headers['cache-control'], 'no-cache');
   assert.equal(br.headers.vary, 'accept-encoding');
   const html = brotliDecompressSync(br.body).toString('utf8');
-  // the same bytes as the file (nothing inlined: no user data, no secrets), except the versioned script links
-  assert.equal(html.replace(/\.js\?v=[A-Za-z0-9_-]+"/g, '.js"'), shellFile);
+  // the same bytes as the file (nothing inlined: no user data, no secrets), except the versioned script/asset links
+  assert.equal(html.replace(/\?v=[A-Za-z0-9_-]{16}"/g, '"'), shellFile);
 
   const gz = await get('/', { 'accept-encoding': 'gzip' });
   assert.equal(gz.headers['content-encoding'], 'gzip');
@@ -50,18 +50,43 @@ test('058: a repeat load is a 304 without a body; a changed ETag gets the page a
   assert.equal((await get('/', { 'if-none-match': '"other"' })).status, 200);
 });
 
-test('058: scripts are linked by version and cached for good under that version only', async () => {
+test('058/061: scripts, the web app manifest and icons are linked by version and cached for good under that version only', async () => {
   const html = (await get('/')).body.toString('utf8');
-  for (const name of ['qr.js', 'diff.js']) {
-    const v = html.match(new RegExp(`<script src="/${name.replace('.', '\\.')}\\?v=([A-Za-z0-9_-]+)"></script>`))?.[1];
+  const files = { 'diff.js': 'text/javascript; charset=utf-8', 'manifest.webmanifest': 'application/manifest+json', 'icons/apple-touch-icon.png': 'image/png' };
+  for (const [name, type] of Object.entries(files)) {
+    const v = html.match(new RegExp(` (?:src|href)="/${name.replace(/\./g, '\\.')}\\?v=([A-Za-z0-9_-]+)"`))?.[1];
     assert.ok(v, `${name} linked with a version`);
     const pinned = await get(`/${name}?v=${v}`, { 'accept-encoding': 'br' });
     assert.equal(pinned.headers['cache-control'], 'public, max-age=31536000, immutable');
-    assert.equal(pinned.headers['content-type'], 'text/javascript; charset=utf-8');
-    assert.equal(brotliDecompressSync(pinned.body).toString('utf8'), readFileSync(resolve(import.meta.dirname, `../src/panel/public/${name}`), 'utf8'));
+    assert.equal(pinned.headers['content-type'], type);
+    assert.deepEqual(brotliDecompressSync(pinned.body), readFileSync(resolve(import.meta.dirname, `../src/panel/public/${name}`)));
     assert.equal((await get(`/${name}?v=old`)).headers['cache-control'], 'no-cache');
     assert.equal((await get(`/${name}`, { 'if-none-match': pinned.headers.etag })).status, 304);
   }
+  assert.equal((await get('/qr.js')).status, 404, 'the mobile app QR encoder is gone');
+});
+
+test('061: the panel is an installable web app: manifest, icons that exist, iOS tags, no service worker', async () => {
+  const html = (await get('/')).body.toString('utf8');
+  const m = JSON.parse((await get('/manifest.webmanifest')).body.toString('utf8'));
+  assert.equal(m.display, 'standalone');
+  assert.equal(m.short_name, 'Duniya');
+  assert.equal(m.scope, '/');
+  assert.match(m.start_url, /^\//);
+  assert.match(m.theme_color, /^#[0-9a-f]{6}$/);
+  assert.match(m.background_color, /^#[0-9a-f]{6}$/);
+  assert.ok(m.icons.some((i) => i.sizes === '192x192') && m.icons.some((i) => i.sizes === '512x512' && i.purpose === 'any'));
+  assert.ok(m.icons.some((i) => i.purpose === 'maskable'), 'a maskable icon for Android');
+  for (const i of m.icons) {
+    const r = await get(i.src);
+    assert.equal(r.status, 200, i.src);
+    assert.equal(r.body.subarray(1, 4).toString(), 'PNG');
+    assert.equal(`${r.body.readUInt32BE(16)}x${r.body.readUInt32BE(20)}`, i.sizes, `${i.src} has the size the manifest says`);
+  }
+  assert.match(html, /<link rel="apple-touch-icon" href="\/icons\/apple-touch-icon\.png\?v=/);
+  assert.match(html, /name="apple-mobile-web-app-capable" content="yes"/);
+  assert.match(html, /viewport-fit=cover/);
+  assert.doesNotMatch(html, /serviceWorker/, 'no service worker: nothing is cached offline');
 });
 
 /** Read server-sent events from /api/events until `until(events)` holds. */

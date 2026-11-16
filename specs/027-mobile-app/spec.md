@@ -1,5 +1,7 @@
 # Feature Specification: Native Mobile App (iOS and Android)
 
+> **Removed in 2.22.0** ([061](../061-panel-pwa/spec.md)): the app was deleted; the panel installs on the home screen instead.
+
 **Feature Branch**: `feat/i3-mobile-app` (issue #3)
 
 **Created**: 2026-11-15

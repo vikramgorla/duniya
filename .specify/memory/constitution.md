@@ -129,7 +129,7 @@ it and MUST NOT contradict it. No change is done until every applicable item hol
 progress and done comments; Spec Kit artifacts for features; tests with fakes; `npm test`, `npm run lint` and
 `npm run check:panel` green (`npm run check:responsive` for UI); a security and privacy review; the small-server
 impact considered; **documentation updated in the same change** — `docs/`, `README.md`, the website `docs/site/`
-(with screenshots and videos retaken from the demo panel when the UI changed), `mobile/README.md`, admin MCP tools and
+(with screenshots and videos retaken from the demo panel when the UI changed), admin MCP tools and
 `DESIGN.md` where relevant; and the version bumped in `package.json`, `package-lock.json` and
 `infra/oci/schema.yaml` (semver). Code MUST stay lean: what a change replaces is deleted in the same change, no
 compatibility layer or one-time migration outlives the release that needed it, and `knip`, `jscpd` and the panel size

@@ -5,7 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Duniya · WhatsApp agents</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%27http%3A//www.w3.org/2000/svg%27%20viewBox=%270%200%2064%2064%27%3E%3Cpath%20d=%27M23%205H41A17%2017%200%200%201%2058%2022V44L59.5%2059.5L44%2055H23A17%2017%200%200%201%206%2038V22A17%2017%200%200%201%2023%205Z%27%20fill=%27%234d9b00%27%20stroke=%27%234d9b00%27%20stroke-width=%274%27%20stroke-linejoin=%27round%27/%3E%3Cg%20fill=%27%23101216%27%3E%3Crect%20x=%2710.5%27%20y=%2728%27%20width=%2743%27%20height=%2714%27%20rx=%275%27/%3E%3Cpath%20d=%27M32%2021V11%27%20stroke=%27%23101216%27%20stroke-width=%274%27%20stroke-linecap=%27round%27/%3E%3C/g%3E%3Crect%20x=%2716.5%27%20y=%2720%27%20width=%2731%27%20height=%2730%27%20rx=%2714%27%20fill=%27%23fff%27/%3E%3Crect%20x=%2719.5%27%20y=%2728%27%20width=%2725%27%20height=%2714%27%20rx=%277%27%20fill=%27%23101216%27/%3E%3Cpath%20d=%27M22.6%2037.8a3.6%203.6%200%200%201%207.2%200M34.2%2037.8a3.6%203.6%200%200%201%207.2%200%27%20fill=%27none%27%20stroke=%27%23c6f432%27%20stroke-width=%273.2%27%20stroke-linecap=%27round%27/%3E%3C/svg%3E">
-<meta name="theme-color" content="#f2f1ec">
+<meta name="theme-color" content="#f2f1ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0c0f" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Duniya">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
   /* Duniya design language — see DESIGN.md. Base tokens; the Aurora layer at the end overrides them. */
   :root {
@@ -100,10 +107,6 @@
   .toggle input:checked + span { background: var(--accent); } .toggle input:checked + span::after { transform: translateX(18px); }
   .toggle input:disabled + span { opacity: .5; cursor: default; }
   .qr { background: #fff; padding: 10px; border-radius: var(--radius-s); width: 220px; max-width: 100%; }
-  svg.qr { display: block; height: auto; padding: 6px; border: 1px solid var(--line); }
-  .mobile-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 10px 0 4px; }
-  .mobile-step { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 12px 14px; min-width: 0; }
-  .mobile-step svg.qr { width: 180px; margin: 6px 0; }
   .center { min-height: 80vh; display: grid; place-items: center; padding: 24px 0; }
   /* toasts stack above each other instead of on top of each other */
   .toasts { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; max-width: 90vw; pointer-events: none; }
@@ -380,6 +383,11 @@
   label.check input { width: 18px; height: 18px; margin: 0; }
   label.tick { display: inline-flex; align-items: center; justify-content: center; margin: 0; cursor: pointer; }
   .phone-only { display: none !important; }
+  /* Installed web app (061): keep clear of notches and the home indicator; no rubber-band behind the header. */
+  header { padding-top: env(safe-area-inset-top); }
+  body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  @media (display-mode: standalone) { html, body { overscroll-behavior-y: none; } }
+  .install-hint { margin-bottom: 16px; } .install-hint .logo { flex: none; }
   main > * { scroll-margin-top: 120px; }
   /* Wide screens: the tab bar may run past the content column so every tab fits (12 tabs need ~1240 px). */
   @media (min-width: 1200px) { nav { max-width: none; margin: 0; padding-left: max(16px, calc((100% - 1160px) / 2 + 16px)); } }
@@ -399,6 +407,8 @@
     .toggle { height: 40px; } .toggle span { inset: 8px 0; }
     input, select { min-height: 40px; }
     input[type=checkbox], input[type=radio] { min-height: 0; width: 18px; height: 18px; }
+    /* 16 px form fields: iOS zooms into anything smaller when it gets focus (061) */
+    input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 16px; }
     .pill, .eyebrow, legend, th, .led, .feed .meta, pre, .steps code, .ptags code, .copyrow code, .toast, .brand small,
     table.stack td[data-label]:not([data-label=""])::before { font-size: 13px; }
     .pill { letter-spacing: .02em; white-space: normal; overflow-wrap: anywhere; }
@@ -426,7 +436,6 @@
 </head>
 <body>
 <div id="app"></div>
-<script src="/qr.js"></script>
 <script src="/diff.js"></script>
 <script>
 'use strict';
@@ -492,7 +501,7 @@ function toast(msg) {
 // Screen data cache (058): switching screens reuses what was just loaded. Any change made here and anything the live
 // stream reports (activity, a changed status) drops it; entries also expire after 60 s. Only lists that screens load
 // on open are cached, never live views (status, system, activity, updates).
-const CACHED = /^\/api\/(agents|templates|chats|providers|budget|media|backups|pending|secrets|logging|assistants|mobile|owner-assistant|privacy-notice|contacts|usage|silences|session)(\/|\?|$)/;
+const CACHED = /^\/api\/(agents|templates|chats|providers|budget|media|backups|pending|secrets|logging|assistants|owner-assistant|privacy-notice|contacts|usage|silences|session)(\/|\?|$)/;
 const apiCache = new Map(); // path -> { at, p }
 const dropCache = () => apiCache.clear();
 async function api(method, path, body) {
@@ -911,11 +920,39 @@ async function renderOverview(soft) {
       led('Waiting', st.pending ? null : true, String(st.pending || 0))),
     st.enabledChats === 0 ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
   const silencesSlot = h('div', { id: 'ov-silences-slot', style: `grid-column:1/-1${S.silences?.length ? '' : ';display:none'}` }, S.silences?.length ? silencesCard(S.silences, refreshSilences) : null);
-  $('#main').replaceChildren(hero, updateBanner, checklistBox(), h('div', { class: 'grid' }, askCard(), wa, control, server, silencesSlot, recent));
+  $('#main').replaceChildren(hero, updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, askCard(), wa, control, server, silencesSlot, recent));
   refreshSilences();
   if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
 }
+// ---------- install on your phone (061): the panel is an installable web app ----------
+const INSTALL_KEY = 'duniya.installHint';
+const installed = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); S.installPrompt = e; drawInstallHint(); }); // Chrome, Edge, Samsung
+addEventListener('appinstalled', () => { S.installPrompt = null; localStorage.setItem(INSTALL_KEY, 'installed'); drawInstallHint(); });
+/** Phones and tablets only, never once installed or hidden on this device. Returns the box. */
+function drawInstallHint(box = $('#ov-install')) {
+  if (!box) return box;
+  if (installed() || !matchMedia('(pointer: coarse)').matches || localStorage.getItem(INSTALL_KEY)) return box.replaceChildren(), box;
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const hide = () => { localStorage.setItem(INSTALL_KEY, 'hidden'); box.replaceChildren(); };
+  const install = async () => {
+    const p = S.installPrompt; S.installPrompt = null; p.prompt();
+    if ((await p.userChoice.catch(() => null))?.outcome === 'accepted') hide(); else drawInstallHint(box);
+  };
+  box.replaceChildren(h('div', { class: 'card install-hint' },
+    h('div', { class: 'row nowrap' }, logo(), h('div', { style: 'flex:1;min-width:0' }, h('div', { class: 'eyebrow' }, 'Install on your phone'), h('h2', { style: 'margin:2px 0 0' }, 'Duniya on your home screen')),
+      h('button', { class: 'btn small', title: 'Hide this hint on this device', onclick: hide }, 'Hide')),
+    h('p', { class: 'small muted' }, 'Opens full screen like an app, with live status, Ask and confirmations. Nothing to download from a store.'),
+    S.installPrompt ? h('button', { class: 'btn primary', onclick: install }, 'Install')
+      : ios ? h('p', { class: 'small', style: 'margin-bottom:0' }, 'Tap ', h('b', {}, 'Share'), ' (the square with the arrow), then ', h('b', {}, 'Add to Home Screen'), '.')
+        : h('p', { class: 'small', style: 'margin-bottom:0' }, 'Open the browser menu (⋮) and choose ', h('b', {}, 'Install app'), ' or ', h('b', {}, 'Add to Home screen'), '.')));
+  return box;
+}
+// Back from the background (phones suspend the live stream): reconnect at once instead of waiting for its retry.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.user && S.es && S.es.readyState !== EventSource.OPEN) { connectEvents(); refreshStatus(); }
+});
 // ---------- first-run checklist (#36) ----------
 const CHECK_ACTION = { provider: 'Connect a provider', whatsapp: 'Link WhatsApp', agent: 'Create an agent', chat: 'Open Chats', reply: 'Open test console' };
 function goTo(href) {
@@ -3090,7 +3127,7 @@ async function renderSecrets() {
 
 // ---------- settings ----------
 async function renderSettings() {
-  const [agents, lg, ai, sess, mob] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null), api('GET', '/api/mobile').catch(() => null)]);
+  const [agents, lg, ai, sess] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null)]);
   const [oa, notice] = await Promise.all([api('GET', '/api/owner-assistant').catch(() => null), api('GET', '/api/privacy-notice').catch(() => null)]);
   if (sess?.user) { S.user = sess.user; S.google = !!sess.google; }
   const me = S.user;
@@ -3108,7 +3145,6 @@ async function renderSettings() {
     oa ? ownerAssistantCard(oa) : null,
     notice ? privacyNoticeCard(notice) : null,
     await photosVoiceCard().catch((e) => h('div', { class: 'card' }, h('h2', {}, 'Photos & voice'), h('p', { class: 'small muted' }, `Could not load: ${e.message}`))),
-    mob ? mobileCard(mob) : null,
     ai ? assistantsCard(ai) : null,
     lg ? loggingCard(lg) : null,
     h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any agent can send:'),
@@ -3203,7 +3239,7 @@ function askSteps(a) {
 function askCard() {
   const a = S.ask || (S.ask = { q: '', reply: '', confirms: [], busy: false, steps: [] });
   a.steps ||= [];
-  const q = h('textarea', { placeholder: 'Ask about your chats, e.g. “What did the families decide this week?”', 'aria-label': 'Ask the owner assistant', style: 'min-height:56px', maxlength: 4000,
+  const q = h('textarea', { placeholder: 'Ask about your chats, e.g. “What did the families decide this week?”', 'aria-label': 'Ask the owner assistant', style: 'min-height:72px;font-family:inherit', maxlength: 4000,
     oninput: (e) => { a.q = e.target.value; }, onfocus: () => (overviewBusy = true), onblur: () => (overviewBusy = false) });
   q.value = a.q;
   const out = h('div', { 'aria-live': 'polite', 'aria-busy': String(!!a.busy) });
@@ -3542,7 +3578,6 @@ function copyButton(text) {
   } }, 'Copy');
 }
 function assistantsCard(a) {
-  a = { ...a, grants: a.grants.filter((g) => g.kind !== 'app') }; // phones are listed under Mobile app
   const url = h('input', { value: a.mcpUrl, readonly: true, 'aria-label': 'Address for AI assistants', onfocus: (e) => e.target.select() });
   const steps = (title, items) => h('details', {}, h('summary', { style: 'cursor:pointer;font-weight:600;margin:10px 0 4px' }, title), h('ol', { class: 'small', style: 'margin:6px 0 0;padding-left:20px' }, items.map((x) => h('li', { style: 'margin:3px 0' }, x))));
   const others = a.grants.some((g) => g.userId !== a.you);
@@ -3563,48 +3598,6 @@ function assistantsCard(a) {
       h('td', { class: 'small muted', 'data-label': '' }, `connected ${ago(g.connectedAt)} ago`, h('br'), g.lastUsedAt ? `last used ${ago(g.lastUsedAt)} ago` : 'not used yet'),
       h('td', { style: 'text-align:right', 'data-label': '' }, h('button', { class: 'btn small danger', onclick: () => revoke(g) }, 'Disconnect'))))))
       : h('p', { class: 'small muted' }, 'No AI assistants connected yet. Follow the steps above; it takes about a minute.'));
-}
-
-// ---------- Mobile app (027) ----------
-/** QR code drawn in the browser (qr.js); nothing is sent to another service. */
-function qrSvg(text, label) {
-  if (!window.DuniyaQR) return h('p', { class: 'small muted' }, 'QR code unavailable — reload the page.');
-  const ns = 'http://www.w3.org/2000/svg'; const el = (t, a) => { const e = document.createElementNS(ns, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); return e; };
-  const { d, viewBox } = DuniyaQR.svgPath(DuniyaQR.encode(text, 'M'));
-  const svg = el('svg', { viewBox, class: 'qr', role: 'img', 'aria-label': label, 'shape-rendering': 'crispEdges' });
-  svg.append(el('rect', { width: '100%', height: '100%', fill: '#fff' }), el('path', { d, fill: '#101216' }));
-  return svg;
-}
-function mobileCard(m) {
-  const step = (n, title, ...body) => h('div', { class: 'mobile-step' }, h('div', { class: 'eyebrow', style: 'font-family:var(--mono)' }, `Step ${n}`), h('h3', { style: 'margin:2px 0 6px' }, title), ...body);
-  const expo = h('input', { value: m.expoUrl, placeholder: 'exp://u.expo.dev/… or exp://192.168.1.20:8081', 'aria-label': 'Expo link' });
-  const signOut = (g) => confirm(`Sign out the Duniya app of ${g.userId === m.you ? 'your phone' : g.username}? It stops working right away; signing in again takes a minute.`)
-    && tryApi(async () => { await api('DELETE', `/api/assistants/${g.userId}/${encodeURIComponent(g.clientId)}`); renderSettings(); }, 'Signed out');
-  const others = m.devices.some((g) => g.userId !== m.you);
-  return h('div', { class: 'card', style: 'grid-column:1/-1' },
-    h('div', { class: 'row spread' }, h('h2', {}, 'Mobile app'), h('span', { class: 'pill info' }, 'Preview · Expo Go')),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Run Duniya from your phone: status, agents, chats, usage, server updates and waiting confirmations. The app signs in with your panel account and can do exactly what your account can do here.'),
-    m.https ? null : h('div', { class: 'note warn' }, 'Your phone can only reach this app at its public https address. Set up internet access first (Caddy or Cloudflare, see the install guide), open the panel at that address and come back here.'),
-    h('div', { class: 'mobile-steps' },
-      step(1, 'Install Expo Go', h('p', { class: 'small' }, 'The free Expo Go app runs Duniya while it is in preview (store versions come later).'),
-        h('div', { class: 'row' }, h('a', { class: 'btn small', href: 'https://apps.apple.com/app/expo-go/id982107779', target: '_blank', rel: 'noopener' }, 'App Store'),
-          h('a', { class: 'btn small', href: 'https://play.google.com/store/apps/details?id=host.exp.exponent', target: '_blank', rel: 'noopener' }, 'Google Play'))),
-      step(2, 'Open the Duniya app',
-        m.expoUrl ? [qrSvg(m.expoUrl, 'QR code that opens the Duniya app in Expo Go'), h('p', { class: 'small muted' }, 'iPhone: scan with the Camera. Android: open Expo Go → Scan QR code.')]
-          : h('p', { class: 'small' }, 'No app link yet. Whoever looks after this server starts the app from the repository (', h('code', {}, 'npm run mobile'), ', see ', h('code', {}, 'mobile/README.md'), ') and scans the QR code it prints, or publishes it with ', h('code', {}, 'eas update'), ' and pastes the link below.'),
-        can('owner') ? h('details', { open: !m.expoUrl }, h('summary', { style: 'cursor:pointer;font-weight:600;margin:6px 0' }, 'Expo link'),
-          h('form', { class: 'row nowrap', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/mobile', { expoUrl: expo.value }), expo.value ? 'Link saved' : 'Link removed')) renderSettings(); } },
-            expo, h('button', { class: 'btn' }, 'Save')),
-          h('p', { class: 'small muted' }, 'Paste the exp:// link from ', h('code', {}, 'npx expo start'), ' (same Wi-Fi only) or from ', h('code', {}, 'eas update'), ' (works anywhere).')) : null),
-      step(3, 'Connect to this server', qrSvg(m.connectUrl, 'QR code with this server address for the Duniya app'),
-        h('p', { class: 'small muted' }, 'In the app tap ', h('b', {}, 'Scan the panel’s QR code'), ', or type this address:'),
-        h('div', { class: 'row nowrap' }, h('input', { value: m.serverUrl, readonly: true, 'aria-label': 'Server address for the app', onfocus: (e) => e.target.select() }), copyButton(m.serverUrl)))),
-    h('h3', {}, 'Signed-in phones'),
-    m.devices.length ? h('table', { class: 'stack' }, h('tbody', {}, m.devices.map((g) => h('tr', {},
-      h('td', { 'data-label': '' }, h('b', {}, g.userId === m.you ? 'Your phone' : 'Phone'), others ? [' · ', g.username, ' ', h('span', { class: 'pill' }, g.role)] : null),
-      h('td', { class: 'small muted', 'data-label': '' }, `signed in ${ago(g.connectedAt)} ago`, h('br'), g.lastUsedAt ? `last used ${ago(g.lastUsedAt)} ago` : 'not used yet'),
-      h('td', { style: 'text-align:right', 'data-label': '' }, h('button', { class: 'btn small danger', onclick: () => signOut(g) }, 'Sign out'))))))
-      : h('p', { class: 'small muted' }, 'No phone signed in yet. Follow the three steps above.'));
 }
 
 function myGoogleCard(me) {
