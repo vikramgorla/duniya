@@ -24,12 +24,12 @@
 | Item | This change |
 |------|-------------|
 | Issue & labels | #121, type: feature, area: security / whatsapp / panel / tools-mcp / backups, priority: high, status: in progress, spec: 060 |
-| Tests (fakes) | `test/secretless-links.test.js` (new); `owner-assistant`, `admin-mcp` updated |
+| Tests (fakes) | `test/secretless-links.test.js` (new: expiry, single use, roles, account keys, pasted keys, sign-up, restore); `owner-assistant` (no tool takes a secret argument), `admin-mcp` updated |
 | Checks | `npm test`, `npm run lint`, `npm run check:panel`, `npm run check:responsive`, `node scripts/ci-checks.mjs` |
 | Security | tokens 256-bit, hashed at rest, fragment only, single use, short expiry; secret page needs a panel session (admin+); sign-up rate limited; values never returned or logged; restore keeps preview + confirm |
 | Privacy | pasted secrets never stored, logged or sent to a model; "saved" messages carry names only |
 | Small servers | no timers (TTL store sweeps on write); restore check decrypts once in memory like a restore |
-| Lean code | removed: secret-argument filter, `set_secret` value path, `add_user` password from tools, `restore_backup` passphrase arg |
+| Lean code | removed: owner-assistant secret-argument filter (replaced by a test), `set_secret` value path, `add_user` password from tools, `restore_backup` passphrase arg; `POST /api/users` moved (not copied) to `routes/links.js` |
 | Admin MCP | `set_secret`, `add_user`, `send_signup_link`, `restore_backup`; `docs/admin-mcp.md` |
-| Docs | owner-assistant, admin-mcp, security, backups-and-updates, users page docs; README highlight; website line |
+| Docs | `docs/owner-assistant.md`, `docs/admin-mcp.md` (new section, 97 tools), `docs/privacy.md`, `docs/backups-and-updates.md`, `docs/google-sign-in.md` (sign-up links), `SECURITY.md`; README highlight; website line |
 | Version | 2.21.0 in `package.json`, `package-lock.json`, `infra/oci/schema.yaml`; `releases.json` entry |
