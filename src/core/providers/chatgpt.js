@@ -5,7 +5,6 @@ import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { getSecret, setSecret, getSetting, updateSettings } from '../store.js';
 import { verifyIdToken } from './jwt.js';
 
-export const id = 'chatgpt';
 const AUTH_BASE = () => (process.env.OPENAI_AUTH_BASE || 'https://auth.openai.com').replace(/\/+$/, '');
 const ISSUER = () => process.env.OPENAI_AUTH_ISSUER || 'https://auth.openai.com';
 const API_BASE = () => (process.env.OPENAI_API_BASE || 'https://api.openai.com/v1').replace(/\/+$/, '');
@@ -280,5 +279,3 @@ export const chatgptAdapter = (secret = CRED) => ({
   listModels: () => listModelsFor(secret),
   chat: (args) => chatFor(secret, args),
 });
-export const listModels = () => listModelsFor(CRED);
-export const chat = (args) => chatFor(CRED, args);

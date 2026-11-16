@@ -5,7 +5,7 @@
 // alert. Months follow the server's timezone; alerts are remembered per scope and month, so they reset monthly.
 import { db, kvGet, kvSet } from './db.js';
 import './usage.js'; // creates the usage table this module indexes
-import { env } from './config.js';
+import { env, bad } from './config.js';
 import { activity } from './events.js';
 import { sendOwnerAlert } from './owner-alerts.js';
 
@@ -23,7 +23,6 @@ export const CURRENCY = 'USD';
 export const SCOPES = ['agent', 'chat'];
 export const ALERT_AT = 0.8;
 const MODEL_RE = /^[a-z][a-z0-9-]{1,30}:[A-Za-z0-9._:/@+-]{1,120}$/;
-const bad = (message, field) => Object.assign(new Error(message), { status: 400, field });
 
 // ---------- months in the server's timezone ----------
 function zoneParts(ts, tz) {

@@ -14,6 +14,7 @@ import { chatCompletionsProvider } from './openai-chat.js';
 import { classify, REASON_TEXT } from './errors.js';
 import * as breaker from './breaker.js';
 import { REF_RE, cleanChain } from './fallback-config.js';
+import { bad } from '../config.js';
 
 export { REF_RE, FALLBACK_MODES, cleanChain, cleanOverride } from './fallback-config.js';
 
@@ -21,7 +22,6 @@ const RESERVED = new Set(['anthropic', 'openai', 'chatgpt', 'copilot', 'auto', '
 export const COMPAT_ID_RE = /^[a-z][a-z0-9-]{1,30}$/;
 const keySecretFor = (id) => `PROVIDER_${id.toUpperCase().replace(/-/g, '_')}_KEY`;
 const OPENAI_BASE = () => (process.env.OPENAI_API_BASE || 'https://api.openai.com/v1');
-const bad = (message, field, status = 400) => Object.assign(new Error(message), { status, field });
 
 export const compatibleList = () => getSetting('providers', []) || [];
 
@@ -273,12 +273,11 @@ export async function allModels({ refresh = false } = {}) {
   return out;
 }
 
-/** "auto" | "account:model" | legacy bare Claude id → { provider (account id), model, ref } */
+/** "auto" | "account:model" → { provider (account id), model, ref }; "auto" (or anything without an account) → null */
 export function parseRef(ref) {
   const s = String(ref || 'auto');
-  if (s === 'auto') return null;
   const i = s.indexOf(':');
-  if (i < 0) return { provider: 'anthropic', model: s, ref: `anthropic:${s}` };
+  if (i < 0) return null;
   return { provider: s.slice(0, i), model: s.slice(i + 1), ref: s };
 }
 

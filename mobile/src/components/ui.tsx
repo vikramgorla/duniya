@@ -222,7 +222,7 @@ export function Screen({ children, onRefresh, refreshing = false, error, stale }
     </View>
   );
 }
-export function OfflineBanner({ stale }: { stale?: boolean }) {
+function OfflineBanner({ stale }: { stale?: boolean }) {
   const t = useTheme();
   const net = useNetInfo();
   const offline = net.isConnected === false;

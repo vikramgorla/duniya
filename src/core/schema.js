@@ -1,7 +1,7 @@
 // Agent configuration: defaults, validation and normalisation (005). Single source of truth for agent shape.
 import { validPackageSpec } from './mcp-local.js';
 import { digits } from './config.js';
-import { cleanOverride } from './providers/fallback-config.js';
+import { cleanOverride, REF_RE } from './providers/fallback-config.js';
 import { QUICK_WHO, FAQ_STRICTNESS } from './quick.js';
 
 export const AGENT_DEFAULTS = Object.freeze({
@@ -103,7 +103,7 @@ function tokenRef(v, field) {
 }
 
 /** Validate one tool service (MCP server) definition: remote (URL + token/OAuth/none) or local (npm/GitHub package). */
-export function validateServer(key, srv, f = key) {
+function validateServer(key, srv, f = key) {
   if (!SERVER_KEY_RE.test(key)) fail(f, 'name must be lowercase letters, digits or _');
   if (RESERVED_SERVER_KEYS.includes(key)) fail(f, `"${key}" is the name of built-in tools; choose another name`);
   const tokens = srv?.tokens || {};
@@ -135,14 +135,11 @@ export function validateServer(key, srv, f = key) {
  * Validate and normalise a full agent config. Unknown fields are dropped and reported in `warnings`.
  * Returns { config, warnings }.
  */
-/** Fields that older versions stored (#101: code plugins were removed): dropped quietly, no warning on every save. */
-const REMOVED_FIELDS = ['plugins'];
-
 export function validateAgentConfig(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) fail('config', 'must be an object');
   const warnings = [];
   for (const k of Object.keys(input)) {
-    if (!(k in AGENT_DEFAULTS) && k !== 'id' && !REMOVED_FIELDS.includes(k)) warnings.push(`Ignored unknown field "${k}"`);
+    if (!(k in AGENT_DEFAULTS) && k !== 'id') warnings.push(`Ignored unknown field "${k}"`);
   }
   const c = { ...structuredClone(AGENT_DEFAULTS), ...input };
   const out = {};
@@ -150,6 +147,7 @@ export function validateAgentConfig(input) {
   out.description = str(c.description, 'description', { max: 500 });
   out.enabled = !!c.enabled;
   out.model = str(c.model || 'auto', 'model', { min: 1, max: 120 });
+  if (out.model !== 'auto' && !REF_RE.test(out.model)) fail('model', 'must be "auto" or "account:model"');
   out.maxTokens = int(c.maxTokens, 'maxTokens', 64, 8192);
   try { out.fallback = cleanOverride(c.fallback, 'fallback'); } catch (e) { fail(e.field || 'fallback', e.message); }
   out.historySize = int(c.historySize, 'historySize', 0, 200);

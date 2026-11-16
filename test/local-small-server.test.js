@@ -117,13 +117,8 @@ test('already configured on a small server: not started, the reason is listed, i
 // ---------- Small server mode: the one switch ----------
 const viewer = await (async () => { t.store.createUser({ username: 'vic', role: 'admin', password: 'admin password 1234' }); return t.login('vic', 'admin password 1234'); })();
 
-test('small server mode: owner-only switch, carried over once from the old Photos & voice switch, shown in status', async () => {
-  const { updateSettings } = await import('../src/core/store.js');
-  updateSettings({ smallServerMode: null, media: { local: { listen: false, speak: false, smallServer: true } } });
-  assert.equal(smallServerMode(), true, 'the old switch is read once');
-  updateSettings({ media: { local: { listen: false, speak: false } } });
-  assert.equal(smallServerMode(), true, 'and kept as the server-wide setting');
-  setSmallServerMode(false);
+test('small server mode: owner-only switch, off by default, shown in status', async () => {
+  assert.equal(smallServerMode(), false);
   assert.equal((await t.api(viewer, 'PUT', '/api/server/small-mode', { enabled: true })).status, 403);
   assert.equal((await t.api(owner, 'PUT', '/api/server/small-mode', { enabled: 'yes' })).status, 400);
   const on = await t.api(owner, 'PUT', '/api/server/small-mode', { enabled: true });

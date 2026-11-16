@@ -1,5 +1,5 @@
 // Backup bundle: consistent snapshot → gzip JSON → passphrase encryption (scrypt + AES-256-GCM).
-import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync, mkdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, relative } from 'node:path';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
@@ -10,7 +10,7 @@ import { keyFromPassphrase } from '../crypto.js';
 
 const MAGIC = 'DUNIYA1\n';
 // 2 = Duniya 2.0 data (bots renamed to agents, #7). Older bundles cannot be restored.
-export const BUNDLE_VERSION = 2;
+const BUNDLE_VERSION = 2;
 const KDF = { kdf: 'scrypt', N: 32768, r: 8, p: 1 };
 
 function walk(dir, base = dir) {
@@ -86,4 +86,3 @@ export function stageRestore(bundle, source = '', dataDir = DATA_DIR) {
   return names;
 }
 
-export const fileSize = (p) => (existsSync(p) ? statSync(p).size : 0);

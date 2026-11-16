@@ -1,7 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { getSecret, onSecretChange } from '../store.js';
 
-export const id = 'anthropic';
 export const SECRET = 'ANTHROPIC_API_KEY';
 export const RECOMMENDED = { agent: 'claude-sonnet-5-5', background: 'claude-haiku-5-5' };
 
@@ -42,8 +41,3 @@ export function anthropicAdapter(secret = SECRET) {
     },
   };
 }
-
-const primary = anthropicAdapter(SECRET);
-export const configured = primary.configured;
-export const listModels = primary.listModels;
-export const chat = primary.chat;

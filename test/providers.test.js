@@ -227,7 +227,7 @@ test('US3: Sign in with ChatGPT — connect, list plan models, tool call over Re
   await t.api(owner, 'DELETE', '/api/providers/chatgpt');
   assert.equal(au.revoked.at(-1).token, 'r2');
   assert.equal(t.store.getSecret('CHATGPT_CREDENTIALS'), '');
-  await t.agents.updateAgent('panduga', { model: 'claude-sonnet-5-5' });
+  await t.agents.updateAgent('panduga', { model: 'anthropic:claude-sonnet-5-5' });
 });
 
 test('#77: the pasted ChatGPT sign-in address is read forgivingly', async () => {

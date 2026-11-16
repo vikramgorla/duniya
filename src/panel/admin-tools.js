@@ -2,6 +2,7 @@
 // panel user, so role gates, validation and activity logging are exactly the panel's. `calls` names the routes a
 // tool uses: the minimum role to see and run the tool is the highest role those routes require.
 // Risky tools never run directly: they return a plain-language preview and a confirm code for confirm_action.
+const iso = (ts) => (ts ? new Date(ts).toISOString() : null); // no imports: tests and the admin MCP load this catalog statically
 
 const enc = encodeURIComponent;
 const str = (description, extra = {}) => ({ type: 'string', description, ...extra });
@@ -18,7 +19,6 @@ export function scrub(v) {
   }
   return v;
 }
-const iso = (ts) => (ts ? new Date(ts).toISOString() : null);
 
 async function agentName(x, id) {
   const b = await x.call('GET', `/api/agents/${enc(id)}`);

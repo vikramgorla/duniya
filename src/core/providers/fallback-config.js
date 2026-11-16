@@ -1,7 +1,7 @@
 // Fallback chain values (042), validated without touching providers (used by agent config and chat prefs too).
+import { bad } from '../config.js';
 export const REF_RE = /^[a-z][a-z0-9-]{1,30}:[A-Za-z0-9._:/@+-]{1,120}$/;
 export const FALLBACK_MODES = ['inherit', 'on', 'off'];
-const bad = (message, field) => Object.assign(new Error(message), { status: 400, field });
 
 /** Validate a chain of model refs ("account:model" or "account:auto"; max 10, no duplicates). */
 export function cleanChain(chain, field = 'chain') {

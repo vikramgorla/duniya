@@ -44,6 +44,13 @@ export const env = {
 };
 
 export const digits = (s) => String(s ?? '').replace(/\D/g, '');
+/** One line of at most `n` characters (whitespace collapsed, "…" when cut). */
+export const clip = (s, n = 120) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
+/** A 400-style error the panel shows next to `field`. */
+export const bad = (message, field, status = 400) => Object.assign(new Error(message), { status, ...(field ? { field } : {}) });
+export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+export const iso = (ts) => (ts ? new Date(ts).toISOString() : null);
+export const isGroup = (chat) => String(chat).endsWith('@g.us');
 
 /** Small JSON file store with atomic writes. */
 export function readJson(file, fallback) {
@@ -58,5 +65,4 @@ export function writeJson(file, value, mode = 0o600) {
   renameSync(`${p}.tmp`, p);
 }
 
-// Secrets and settings live in the database since 005 (see store.js). Re-exported here for convenience.
 export const TEMPLATES_DIR = resolve(ROOT, process.env.TEMPLATES_DIR || 'templates');

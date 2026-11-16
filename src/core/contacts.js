@@ -29,19 +29,8 @@ db.exec(`
     PRIMARY KEY (tenant_id, lid)
   );
 `);
-// 057 migration: one wa_name column → separate names. We cannot tell which kind an old wa_name was, so it becomes the
-// profile name; the first address-book refresh after the update fills in the book names again.
-{
-  const cols = db.prepare('PRAGMA table_info(contacts)').all().map((c) => c.name);
-  for (const c of ['book_name', 'biz_name', 'push_name']) if (!cols.includes(c)) db.exec(`ALTER TABLE contacts ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`);
-  if (cols.includes('wa_name')) {
-    db.exec("UPDATE contacts SET push_name = wa_name WHERE push_name = '' AND wa_name <> ''");
-    db.exec('ALTER TABLE contacts DROP COLUMN wa_name');
-  }
-}
-
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
-export const HIDDEN_NUMBER = 'Unknown (hidden number)';
+const HIDDEN_NUMBER = 'Unknown (hidden number)';
 const synced = (r) => r.book_name || r.biz_name || r.push_name || '';
 const view = (r) => ({
   phone: r.phone, name: r.name || synced(r) || `+${r.phone}`, ownName: r.name, whatsappName: synced(r),
@@ -55,8 +44,8 @@ const normPhone = (p) => {
 };
 const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, 100);
 /** user part of a jid without device: "123:4@lid" → "123@lid". */
-const bareJid = (j) => { const s = String(j || ''); const at = s.indexOf('@'); return at < 0 ? '' : `${s.slice(0, at).split(':')[0]}${s.slice(at)}`; };
-export const isLid = (j) => /@(lid|hosted\.lid)$/.test(String(j || ''));
+export const bareJid = (j) => { const s = String(j || ''); const at = s.indexOf('@'); return at < 0 ? '' : `${s.slice(0, at).split(':')[0]}${s.slice(at)}`; };
+const isLid = (j) => /@(lid|hosted\.lid)$/.test(String(j || ''));
 const isPn = (j) => /@(s\.whatsapp\.net|c\.us|hosted)$/.test(String(j || ''));
 const pnDigits = (j) => (isPn(j) ? digits(String(j).split('@')[0].split(':')[0]) : '');
 
@@ -206,7 +195,6 @@ export function removeContact(phone, by = 'panel') {
   return true;
 }
 
-export const contactCounts = () => db.prepare('SELECT COUNT(*) total, SUM(shared) shared, SUM(own) own FROM contacts WHERE tenant_id = ?').get(TENANT);
 
 // ---------- agent tools (exposed as contacts__<name>) ----------
 export const CONTACTS_DEFAULT_ALLOW = { organizer: ['contacts:*'], participant: ['contacts:find_contact'] };

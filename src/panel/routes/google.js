@@ -17,10 +17,10 @@ const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 export const CALLBACK_PATH = '/auth/google/callback';
 export const GOOGLE_CREDENTIALS_URL = 'https://console.cloud.google.com/apis/credentials';
 /** #77: Google wants the origin exactly: scheme://host[:port], never a trailing slash or a path. */
-export const originOf = (base) => new URL(base).origin;
+const originOf = (base) => new URL(base).origin;
 const HOST_RE = /^(?:[a-z\d](?:[a-z\d-]{0,62}[a-z\d])?(?:\.[a-z\d](?:[a-z\d-]{0,62}[a-z\d])?)*|\[[\da-f:.]+\])(?::\d{1,5})?$/;
 /** The Host the browser used, lower-cased, or '' when it is not a plain host name (never shown or linked as is). */
-export const requestHost = (req) => { const h = String(req.headers.host || '').trim().toLowerCase(); return h.length <= 260 && HOST_RE.test(h) ? h : ''; };
+const requestHost = (req) => { const h = String(req.headers.host || '').trim().toLowerCase(); return h.length <= 260 && HOST_RE.test(h) ? h : ''; };
 const bareHost = (h) => String(h || '').replace(/:\d+$/, '');
 
 /**
@@ -49,7 +49,7 @@ export function panelAddresses(req) {
  * holds the binding cookie; anything else (unknown or odd Host headers) falls back to the main address (PUBLIC_URL).
  * Only the Host header is read (as the web server forwards it); X-Forwarded-Host is never trusted here.
  */
-export function redirectUriFor(req) {
+function redirectUriFor(req) {
   const addrs = panelAddresses(req);
   const here = requestHost(req);
   const hit = here && (addrs.find((a) => a.host === here) || addrs.find((a) => !a.main && a.host === bareHost(here)));
@@ -57,7 +57,7 @@ export function redirectUriFor(req) {
 }
 
 /** What Google needs registered for this panel, and what would stop it working. */
-export function googleUrls(req) {
+function googleUrls(req) {
   const base = publicBase(req).replace(/\/+$/, '');
   const u = new URL(base);
   const host = u.hostname.replace(/^\[|\]$/g, '');
@@ -195,7 +195,7 @@ export function googleRoutes(route) {
  * registered one, where the browser-binding cookie of the other address is missing), or when that cookie is missing.
  * Returns { kind, startHost, thisHost } or null. Hosts are only kept when they are addresses of this panel.
  */
-export function addressProblem(req, e, { googleError, bindingCookie }) {
+function addressProblem(req, e, { googleError, bindingCookie }) {
   const known = new Set(panelAddresses(req).map((a) => a.host));
   const thisHost = requestHost(req);
   const startHost = e.startHost && known.has(e.startHost) ? e.startHost : known.has(bareHost(e.startHost)) ? bareHost(e.startHost) : '';
@@ -207,7 +207,7 @@ export function addressProblem(req, e, { googleError, bindingCookie }) {
 }
 
 /** The friendly page: what happened, the exact values for Google Cloud (copy buttons), and safe ways on. Text only. */
-export function addressHelpPage(req, res, { kind, startHost, thisHost, mode, message }) {
+function addressHelpPage(req, res, { kind, startHost, thisHost, mode, message }) {
   const addrs = panelAddresses(req);
   const pwOk = passwordLoginAllowed();
   const link = mode === 'link';

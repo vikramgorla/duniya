@@ -1,5 +1,5 @@
 // Small HTTP helpers shared by the panel router and feature routes (sign-in pages, uploads).
-import { createWriteStream, mkdirSync, rmSync, renameSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { createWriteStream, mkdirSync, rmSync, renameSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { env, DATA_DIR } from '../core/config.js';
 import { createSession } from '../core/store.js';
@@ -82,7 +82,7 @@ export function uploadAllowed(req) {
   return true;
 }
 
-export const UPLOAD_DIR = resolve(DATA_DIR, 'uploads');
+const UPLOAD_DIR = resolve(DATA_DIR, 'uploads');
 export const UPLOAD_MAX = Number(process.env.BACKUP_UPLOAD_MAX_MB || 200) * 1024 * 1024;
 const UPLOAD_ID_RE = /^[a-f0-9]{32}$/;
 export const uploadPath = (id) => {
@@ -128,10 +128,8 @@ export async function receiveUpload(req, { magic = '', max = UPLOAD_MAX } = {}) 
   }
 }
 export const dropUpload = (id) => { try { rmSync(uploadPath(id), { force: true }); } catch { /* invalid id */ } };
-export const uploadExists = (id) => { try { return existsSync(uploadPath(id)); } catch { return false; } };
 
 // ---------- first-run setup code (shared with the restore-on-fresh-install routes) ----------
 let setupCode = null;
-export const getSetupCode = () => setupCode;
 export const setSetupCode = (c) => { setupCode = c; };
 export const checkSetupCode = (c) => !!setupCode && String(c || '').trim().toUpperCase() === setupCode;

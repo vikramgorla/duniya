@@ -2,7 +2,7 @@
 // any WhatsApp number) goes to the prepared agent with the prepared settings; optional intro behind a confirm.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setup } from './harness.js';
+import { setup, fakeNumbers } from './harness.js';
 
 const t = await setup({ privacyNotice: true, chatsOn: true, env: { RATE_LIMIT_PER_MIN: '100' } });
 const owner = await t.login();
@@ -23,16 +23,7 @@ t.channel.lookupNumber = async (number, phone) => {
 
 // A registry with two fake numbers, to send messages through the real multi-number path.
 const sessions = {};
-const fakeFactory = ({ number, label }) => {
-  const s = { number, label, handler: null, sent: [] };
-  sessions[number] = s;
-  return {
-    number, label, async start(h) { s.handler = h; },
-    async send(jid, text) { s.sent.push({ jid, text }); return { msgId: `o-${number}-${s.sent.length}` }; },
-    async typing() {}, async chatName() { return ''; }, async listChats() { return []; }, async isMember() { return false; },
-    async status() { return { status: 'open', me: '41790000099:1@s.whatsapp.net', since: 1 }; },
-  };
-};
+const fakeFactory = fakeNumbers(sessions);
 const { createChannelRegistry } = await import('../src/channels/registry.js');
 const reg = createChannelRegistry({ factory: fakeFactory });
 await reg.start(t.router.createRouter(reg), { onHistory: async () => {} });
@@ -176,7 +167,7 @@ test('049: the intro needs the preview\'s confirm token, the chat on and an agen
 });
 
 test('049: owner assistant — "assign Mochi to Vedika" in one go, held for confirm; intro only with confirm', async () => {
-  await t.agents.createAgent({ id: 'mochi', config: { name: 'Mochi', prompt: 'You are Mochi.', model: 'claude-sonnet-5-5', description: 'Helps with homework' } });
+  await t.agents.createAgent({ id: 'mochi', config: { name: 'Mochi', prompt: 'You are Mochi.', model: 'anthropic:claude-sonnet-5-5', description: 'Helps with homework' } });
   await t.api(owner, 'PUT', '/api/contacts/41790000709', { name: 'Vedika' });
   t.script.push([{ type: 'text', text: 'ok' }]);
   await t.api(owner, 'POST', '/api/owner/ask', { question: 'hi' });

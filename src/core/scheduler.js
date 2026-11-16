@@ -8,8 +8,6 @@ import { activity } from './events.js';
 import { weeklyTick } from './weekly.js';
 import { upkeepTick } from './upkeep.js';
 
-const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-
 function nowParts(tz) {
   const fmt = new Intl.DateTimeFormat('en-CA', {
     timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -67,4 +65,3 @@ export function startScheduler(channel) {
   }, 30 * 1000).unref();
 }
 
-export { DAYS };

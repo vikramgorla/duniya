@@ -65,14 +65,21 @@ test('001/US2: "no idea" style replies are not treated as commands', async () =>
   assert.equal(t.sent.length, 0);
 });
 
-test('#101: code plugins are gone: an old "plugins" field is dropped quietly, no plugin tools', async () => {
+test('#101: code plugins are gone: a "plugins" field is an unknown field like any other, no plugin tools', async () => {
   t.claudeReqs.length = 0;
   const { agent, warnings } = await t.agents.updateAgent('helper', { plugins: ['example-dice'] });
   assert.equal(agent.plugins, undefined);
-  assert.deepEqual(warnings, []);
+  assert.deepEqual(warnings, ['Ignored unknown field "plugins"']);
   t.script.push([{ type: 'text', text: 'Hi.' }]);
   await t.route(t.msg({ chat: 'g2@g.us', phone: '41790000003', text: '!help roll a die' }));
   assert.ok(!t.toolNames(0).some((n) => n.startsWith('local__')));
+});
+
+test('058: an agent model is "auto" or "account:model"; a bare model id is refused', async () => {
+  await assert.rejects(t.agents.updateAgent('helper', { model: 'claude-sonnet-5-5' }), /account:model/);
+  const { agent } = await t.agents.updateAgent('helper', { model: 'anthropic:auto' });
+  assert.equal(agent.model, 'anthropic:auto');
+  await t.agents.updateAgent('helper', { model: 'auto' });
 });
 
 test('001/US4: DM routing: group member reaches panduga; strangers get nothing', async () => {

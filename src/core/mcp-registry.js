@@ -10,7 +10,7 @@ import { getSetting, updateSettings, getSecret } from './store.js';
 import { SERVER_KEY_RE, RESERVED_SERVER_KEYS } from './schema.js';
 import { validPackageSpec, localServiceCheck } from './mcp-local.js';
 
-export const REGISTRY_DEFAULT = 'https://registry.modelcontextprotocol.io';
+const REGISTRY_DEFAULT = 'https://registry.modelcontextprotocol.io';
 const TIMEOUT_MS = 8000;
 const MAX_BYTES = 1024 * 1024;
 const CACHE_MS = 5 * 60 * 1000;
@@ -53,7 +53,6 @@ export function saveRegistrySettings({ enabled, baseUrl } = {}) {
 
 // ---------- fetching ----------
 const cache = new Map(); // url → { at, data }
-export const clearRegistryCache = () => cache.clear();
 
 async function readCapped(res) {
   const len = Number(res.headers.get('content-length') || 0);

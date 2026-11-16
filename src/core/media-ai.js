@@ -13,7 +13,7 @@
 import { mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { DATA_DIR } from './config.js';
+import { DATA_DIR, bad, clip } from './config.js';
 import { getSetting, updateSettings } from './store.js';
 import { providers, providerModels, resolveModel, parseRef, accountById, warmModels } from './providers/index.js';
 import { recordUsage, priceFor } from './usage.js';
@@ -26,8 +26,6 @@ import { whatsappChannel } from './whatsapp-tools.js';
 
 const TMP = join(DATA_DIR, 'media-tmp');
 const LAST_PHOTO_MS = 15 * 60000;
-const bad = (message, field) => Object.assign(new Error(message), { status: 400, field });
-const clip = (s, n = 120) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
 
 // ---------- agent settings ----------
 export const MEDIA_DEFAULTS = Object.freeze({
@@ -39,7 +37,7 @@ export const agentMedia = (agent) => ({ ...MEDIA_DEFAULTS, ...(agent?.media || {
 
 // ---------- server settings ----------
 export const VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar'];
-const SETTINGS_DEFAULTS = { visionFallback: '', voice: 'alloy', maxVoiceSeconds: 300, imageModel: '', imagePrices: {}, local: { listen: false, speak: false } }; // Small server mode moved to Settings → Server (055)
+const SETTINGS_DEFAULTS = { visionFallback: '', voice: 'alloy', maxVoiceSeconds: 300, imageModel: '', imagePrices: {}, local: { listen: false, speak: false } };
 export function mediaSettings() {
   const s = getSetting('media', {}) || {};
   return { ...SETTINGS_DEFAULTS, ...s, imagePrices: { ...(s.imagePrices || {}) }, local: { ...SETTINGS_DEFAULTS.local, ...(s.local || {}) } };

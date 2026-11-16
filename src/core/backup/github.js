@@ -29,7 +29,7 @@ export async function devicePoll(clientId, deviceCode) {
   return { status: { authorization_pending: 'pending', slow_down: 'pending', expired_token: 'expired', access_denied: 'denied' }[r.error] || 'error', error: r.error_description };
 }
 
-export async function api(token, method, path, body) {
+async function api(token, method, path, body) {
   const tok = typeof token === 'function' ? await token() : token;
   const res = await fetch(`${API()}${path}`, {
     method,

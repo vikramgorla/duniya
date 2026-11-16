@@ -5,10 +5,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { setup } from './harness.js';
+import { setup, serveFakeMcp } from './harness.js';
 import { TOOLS } from '../src/panel/admin-tools.js';
 
 // ---------- fake OAuth-protected tool service (dynamic registration, PKCE) ----------
@@ -36,12 +33,7 @@ const fake = http.createServer(async (req, res) => {
     const bearer = String(req.headers.authorization || '').replace(/^Bearer /, '');
     if (!as.valid.has(bearer)) return json(401, { error: 'invalid_token' }, { 'www-authenticate': `Bearer resource_metadata="${BASE}/.well-known/oauth-protected-resource/mcp"` });
     as.bearers.push(bearer);
-    const s = new Server({ name: 'cal', version: '1' }, { capabilities: { tools: {} } });
-    s.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [{ name: 'cal_list', description: 'calendar', inputSchema: { type: 'object', properties: {} } }] }));
-    s.setRequestHandler(CallToolRequestSchema, async () => ({ content: [{ type: 'text', text: 'Mon: puja' }] }));
-    const tr = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-    await s.connect(tr);
-    return tr.handleRequest(req, res, raw ? JSON.parse(raw) : undefined);
+    return serveFakeMcp(req, res, raw, { name: 'cal', tools: ['cal_list'], call: () => 'Mon: puja' });
   }
   res.writeHead(404); res.end();
 }).listen(0);

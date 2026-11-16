@@ -11,15 +11,15 @@ import { newToken, sha256, humanCode } from './crypto.js';
 import { activity } from './events.js';
 import { putTtl, getTtl, takeTtl } from './ttl-store.js';
 
-export const ACCESS_TTL = 3600 * 1000;
-export const REFRESH_TTL = 30 * 24 * 3600 * 1000;
-export const CODE_TTL = 5 * 60 * 1000;
-export const CONFIRM_TTL = 10 * 60 * 1000;
+const ACCESS_TTL = 3600 * 1000;
+const REFRESH_TTL = 30 * 24 * 3600 * 1000;
+const CODE_TTL = 5 * 60 * 1000;
+const CONFIRM_TTL = 10 * 60 * 1000;
 export const SCOPE = 'duniya';
 const MAX_CLIENTS = 300;
 export const MOBILE_CLIENT_ID = 'duniya-mobile';
-export const MOBILE_CLIENT_NAME = 'Duniya mobile app';
-export const MOBILE_REDIRECT = 'duniya://oauth';
+const MOBILE_CLIENT_NAME = 'Duniya mobile app';
+const MOBILE_REDIRECT = 'duniya://oauth';
 // Expo Go during development: exp://192.168.1.20:8081/--/oauth, exp://u.expo.dev/<id>/--/oauth, exp://abc-anon-8081.exp.direct/--/oauth
 const EXPO_GO_REDIRECT = /^exps?:\/\/[A-Za-z0-9.-]+(:\d{1,5})?(\/[A-Za-z0-9._~-]+)*\/--\/oauth$/;
 
@@ -58,7 +58,7 @@ export class OAuthError extends Error {
 // ---------- clients (RFC 7591) ----------
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
 /** https anywhere, or http on loopback (desktop apps). No fragments. */
-export function validRedirectUri(u) {
+function validRedirectUri(u) {
   let url; try { url = new URL(String(u)); } catch { return false; }
   if (url.hash || url.username || url.password) return false;
   return url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK.has(url.hostname));
@@ -109,7 +109,7 @@ export function registerClient(meta = {}) {
 const codes = new Map();
 const sweepCodes = () => { for (const [k, v] of codes) if (v.expires < Date.now()) codes.delete(k); };
 const b64url = (buf) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-export const pkceChallenge = (verifier) => b64url(createHash('sha256').update(String(verifier)).digest());
+const pkceChallenge = (verifier) => b64url(createHash('sha256').update(String(verifier)).digest());
 
 export function createCode({ clientId, userId, redirectUri, codeChallenge, resource, scope = SCOPE }) {
   sweepCodes();
@@ -222,7 +222,7 @@ export function revokeGrant(userId, clientId) {
 
 // ---------- confirm codes for risky tools (SQLite, survive a restart (#64); single-use, 10 min) ----------
 const CONFIRM_KIND = 'admin-mcp-confirm';
-export const argsHash = (args) => sha256(JSON.stringify(args ?? {}));
+const argsHash = (args) => sha256(JSON.stringify(args ?? {}));
 export function createConfirm({ userId, clientId, tool, args, preview }) {
   const code = humanCode(8);
   putTtl(CONFIRM_KIND, code, { userId, clientId, tool, args, hash: argsHash(args), preview }, Date.now() + CONFIRM_TTL);

@@ -93,7 +93,7 @@ test('model that cannot see images: polite note, or the vision fallback model (S
   const n = agentReqs().length;
   await route(groupPhoto());
   assert.ok(userContent(agentReqs()[n]).some((b) => b.type === 'image'));
-  await setAgent({ model: 'claude-sonnet-5-5' });
+  await setAgent({ model: 'anthropic:claude-sonnet-5-5' });
 });
 
 test('#67: fallback on a photo turn skips models that cannot see it; vision fallback next; else answered without it, kindly', async () => {
@@ -139,7 +139,7 @@ test('#67: fallback on a photo turn skips models that cannot see it; vision fall
 
   breaker.reset(); t.claudeFail.length = 0;
   await t.api(owner, 'PUT', '/api/fallback', { enabled: true, chain: [] });
-  await setAgent({ model: 'claude-sonnet-5-5' });
+  await setAgent({ model: 'anthropic:claude-sonnet-5-5' });
 });
 
 test('OpenAI-compatible adapters get image_url parts; ChatGPT gets input_image; PDFs become file parts', async () => {
@@ -153,7 +153,7 @@ test('OpenAI-compatible adapters get image_url parts; ChatGPT gets input_image; 
   await route(t.mediaMsg({ type: 'document', buffer: Buffer.from('%PDF-1.4 fake pdf body here'), fileName: 'menu.pdf', caption: '!panduga summarise', phone: ORG }));
   const u2 = oa.reqs.at(-1).body.messages.find((x) => x.role === 'user');
   assert.equal(u2.content.find((p) => p.type === 'file').file.filename, 'menu.pdf');
-  await setAgent({ model: 'claude-sonnet-5-5' });
+  await setAgent({ model: 'anthropic:claude-sonnet-5-5' });
   const { toResponsesInput } = await import('../src/core/providers/chatgpt.js');
   const items = toResponsesInput([{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAA' } }, { type: 'text', text: 'hi' }] }]);
   assert.deepEqual(items[0].content[0], { type: 'input_image', image_url: 'data:image/png;base64,AAA' });

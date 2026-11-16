@@ -14,7 +14,7 @@ import '../../core/usage.js'; // the usage table
 const SERVICE_NAME = { memory: 'Memory', contacts: 'Contacts', whatsapp: 'WhatsApp actions', local: 'Built-in' };
 
 /** First-run checklist (#36): live state of the five setup steps. */
-export async function checklist(channel) {
+async function checklist(channel) {
   const providers = await providerStatus().catch(() => []);
   const ch = await channel.status().catch(() => ({}));
   const numbers = ch?.numbers || (ch?.status ? [ch] : []);

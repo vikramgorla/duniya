@@ -5,13 +5,13 @@
 
 const dataUrl = (src) => `data:${src.media_type};base64,${src.data}`;
 /** Anthropic-style image/document blocks → Chat Completions content parts (null for blocks that are not media). */
-export function mediaPart(b) {
+function mediaPart(b) {
   if (b.type === 'image' && b.source?.type === 'base64') return { type: 'image_url', image_url: { url: dataUrl(b.source) } };
   if (b.type === 'document' && b.source?.type === 'base64') return { type: 'file', file: { filename: b.title || 'document.pdf', file_data: dataUrl(b.source) } };
   return null;
 }
 
-export function toChatMessages(system, messages) {
+function toChatMessages(system, messages) {
   const out = system ? [{ role: 'system', content: system }] : [];
   for (const m of messages) {
     const blocks = typeof m.content === 'string' ? [{ type: 'text', text: m.content }] : m.content;
@@ -36,11 +36,11 @@ export function toChatMessages(system, messages) {
   return out;
 }
 
-export const toChatTools = (tools = []) => tools.map((t) => ({
+const toChatTools = (tools = []) => tools.map((t) => ({
   type: 'function', function: { name: t.name, description: t.description || '', parameters: t.input_schema || { type: 'object', properties: {} } },
 }));
 
-export function fromChatResponse(json) {
+function fromChatResponse(json) {
   const choice = json.choices?.[0] || {};
   const msg = choice.message || {};
   const content = [];
@@ -138,7 +138,7 @@ async function streamRequest(url, key, body, onText, { timeout = 120000 } = {}) 
 }
 
 /** Which documented media endpoints a base URL has: OpenAI's own API, OpenRouter, or none. */
-export function mediaFlavor(baseUrl, official) {
+function mediaFlavor(baseUrl, official) {
   if (official) return 'openai';
   const host = (u) => { try { return new URL(u).host.toLowerCase(); } catch { return ''; } };
   const h = host(baseUrl);

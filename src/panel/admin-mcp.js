@@ -46,7 +46,7 @@ const SECRET_ARGS = new Set(['value', 'password', 'passphrase']);
 const redact = (args) => Object.fromEntries(Object.entries(args || {}).map(([k, v]) => [k, SECRET_ARGS.has(k) ? '•••' : v]));
 
 /** What an assistant may do, in plain words, by panel role (consent page and Settings card). */
-export const ROLE_ABILITIES = {
+const ROLE_ABILITIES = {
   viewer: ['See agents, chats, activity, models, pending changes and server status', 'Nothing can be changed: this account is read-only'],
   admin: ['See everything in the panel', 'Change agents, chats, models, memory, secrets and pending changes', 'Send test messages to agents and run scheduled posts'],
   owner: ['Everything an admin can do', 'Manage users, backups, updates, WhatsApp numbers and server maintenance'],

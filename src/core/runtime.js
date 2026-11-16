@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DATA_DIR, ROOT } from './config.js';
 
-export const RUNTIME_FILE = resolve(DATA_DIR, 'runtime.json');
+const RUNTIME_FILE = resolve(DATA_DIR, 'runtime.json');
 const version = () => { try { return `v${JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')).version}`; } catch { return 'unknown'; } };
 
 export function startRuntimeFile(channel, { everyMs = 30000 } = {}) {

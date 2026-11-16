@@ -141,7 +141,7 @@ test('OpenRouter preset: one tap, key kept secret, free-only filter, auto picks 
   assert.ok(orr.chatReqs.slice(before).every((r) => /:free$/.test(r.model)), 'never a paid model');
   assert.match(t.sent.at(-1).text, /^Hi from .+:free$/);
   t.store.setSecret('ANTHROPIC_API_KEY', keepKey);
-  await t.agents.updateAgent('helper', { model: 'claude-sonnet-5-5' });
+  await t.agents.updateAgent('helper', { model: 'anthropic:claude-sonnet-5-5' });
 });
 
 test('Test button: sends "Say hi", shows reply and latency; errors are shown, not thrown', async () => {
@@ -226,7 +226,7 @@ test('GitHub Copilot: chat round trip with a tool call through the agent (bridge
   assert.equal(t.store.getSecret('COPILOT_GITHUB_TOKEN'), '');
   assert.ok(cp.stopped >= 1, 'runtime stopped on disconnect');
   assert.equal((await t.api(owner, 'GET', '/api/providers')).body.find((p) => p.id === 'copilot').connected, false);
-  await t.agents.updateAgent('panduga', { model: 'claude-sonnet-5-5' });
+  await t.agents.updateAgent('panduga', { model: 'anthropic:claude-sonnet-5-5' });
 });
 
 test('Copilot adapter: transcript prompt and tool name mapping', () => {

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["bin/duniya.js", "scripts/*.mjs", "test/*.test.js", "deploy/ops/*.mjs", "src/core/speech-worker.cjs", "src/panel/public/*.js"],
+  "project": ["src/**/*.{js,cjs}", "bin/**/*.js", "scripts/**/*.mjs", "test/**/*.js", "deploy/**/*.mjs"],
+  "ignoreDependencies": ["@github/copilot-sdk"],
+  "ignoreBinaries": ["journalctl", "ffmpeg", "ffprobe", "caddy", "openssl"],
+  "ignoreWorkspaces": ["mobile"]
+}

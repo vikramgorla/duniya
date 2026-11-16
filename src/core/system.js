@@ -5,14 +5,14 @@
 import os from 'node:os';
 import { readFileSync, existsSync, writeFileSync, statfsSync, statSync, mkdirSync } from 'node:fs';
 import { execFile } from 'node:child_process';
-import { DATA_DIR, ROOT } from './config.js';
+import { DATA_DIR, ROOT, plural } from './config.js';
 import { getSetting, updateSettings } from './store.js';
 import { activity } from './events.js';
 
-export const OPS_REQUEST_DIR = process.env.DUNIYA_OPS_REQUEST_DIR || '/var/lib/duniya/ops-request';
+const OPS_REQUEST_DIR = process.env.DUNIYA_OPS_REQUEST_DIR || '/var/lib/duniya/ops-request';
 export const OPS_STATE_DIR = process.env.DUNIYA_OPS_STATE_DIR || '/var/lib/duniya-ops';
-export const OPS_HELPER = process.env.DUNIYA_OPS_HELPER || '/usr/local/sbin/duniya-ops';
-export const OPS_ACTIONS = {
+const OPS_HELPER = process.env.DUNIYA_OPS_HELPER || '/usr/local/sbin/duniya-ops';
+const OPS_ACTIONS = {
   'os-update': 'Install OS updates',
   'os-update-all': 'Install OS updates, including gradual ones',
   'os-cleanup': 'Remove unused packages (apt autoremove)',
@@ -24,7 +24,7 @@ export const OPS_ACTIONS = {
 };
 // 031: the root-owned copy of deploy/ops/webconfig.mjs the helper runs (present once the installer ran with 031).
 export const OPS_WEBCONFIG = process.env.DUNIYA_OPS_WEBCONFIG || '/usr/local/lib/duniya-ops/webconfig.mjs';
-export const LOG_UNITS = ['whatsapp-agent-duniya', 'caddy', 'cloudflared', 'duniya-ops'];
+const LOG_UNITS = ['whatsapp-agent-duniya', 'caddy', 'cloudflared', 'duniya-ops'];
 
 const read = (f) => { try { return readFileSync(f, 'utf8'); } catch { return ''; } };
 const run = (cmd, args, timeout = 20000) => new Promise((res) => {
@@ -236,7 +236,6 @@ export function parseAptRun(log = '') {
     rebootRequired: /A reboot is required/.test(log), phasedIncluded: /Always-Include-Phased-Updates=true/.test(log),
   };
 }
-const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /** One line for people: "Installed 3 updates · 1 rolling out gradually · restart needed". */
 export function runSummaryText(r, { rebootRequired = r?.rebootRequired } = {}) {
   if (!r || r.installed == null) return '';
@@ -303,15 +302,15 @@ export function opsAvailable() {
 }
 // #96: the installed helper says which version it is ("# duniya-ops-version: N"). The in-panel app update runs as
 // the app user and cannot replace the root-owned helper, so features that need a newer one check this first.
-export const OPS_HELPER_NEEDED = 2;
+const OPS_HELPER_NEEDED = 2;
 // 056: from this version on the helper can replace itself with the one of a release (action update-helper).
-export const OPS_HELPER_SELF_UPDATE = 3;
+const OPS_HELPER_SELF_UPDATE = 3;
 const helperVersionOf = (text) => { const m = String(text).slice(0, 4096).match(/^# duniya-ops-version: (\d+)$/m); return m ? Number(m[1]) : 0; };
-export function opsHelperVersion() {
+function opsHelperVersion() {
   return helperVersionOf(read(OPS_HELPER)) || (existsSync(OPS_HELPER) ? 1 : 0);
 }
 /** The helper version this app release ships (deploy/ops/duniya-ops in the app's checkout; read, never run). */
-export const opsHelperBundled = () => helperVersionOf(read(`${ROOT}/deploy/ops/duniya-ops`));
+const opsHelperBundled = () => helperVersionOf(read(`${ROOT}/deploy/ops/duniya-ops`));
 export const appVersion = () => { try { return `v${JSON.parse(read(`${ROOT}/package.json`)).version}`; } catch { return ''; } };
 const RELEASE_RE = /^v\d{1,4}\.\d{1,4}\.\d{1,4}$/;
 export function opsStatus() {

@@ -115,7 +115,7 @@ export async function resetMcpPool() {
 }
 
 /** 055: on a small server, memory pressure stops the running local tool services; each starts again when needed. */
-export async function stopLocalServices(reason) {
+async function stopLocalServices(reason) {
   const running = [...pool.values()].filter((c) => c.local && c.client);
   for (const c of running) await c.close();
   if (running.length) activity('system', { summary: `Stopped ${running.length} local tool service${running.length === 1 ? '' : 's'}: ${reason}` });

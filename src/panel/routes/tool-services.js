@@ -21,7 +21,7 @@ const ownerOnly = (user, ...configs) => {
 const toolList = (tools) => tools.map((t) => ({ name: t.name, description: (t.description || '').slice(0, 300) }));
 
 /** One global service as the panel and the admin tools see it (secret references, never values). */
-export function globalView(row, agents = listAgents()) {
+function globalView(row, agents = listAgents()) {
   const optedOut = agents.filter((a) => (a.globalMcp?.disabled || []).includes(row.name)).map((a) => a.id);
   const replacedBy = agents.filter((a) => a.mcpServers?.[row.name]).map((a) => a.id);
   return {

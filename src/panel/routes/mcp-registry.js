@@ -21,7 +21,7 @@ const withTimeout = (p, ms, what) => {
 const err = (status, error, extra = {}) => [status, { error, ...extra }];
 
 /** Tools with the defaults a new service gets: organizers on, participants off; risky ones flagged. */
-export const toolDefaults = (tools) => tools.map((t) => ({
+const toolDefaults = (tools) => tools.map((t) => ({
   name: t.name, description: String(t.description || '').slice(0, 300), risky: isRisky(t), organizer: true, participant: false,
 }));
 

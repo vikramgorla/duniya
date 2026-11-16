@@ -9,7 +9,7 @@
 // - Audit: every question (clipped) and every tool call or action is recorded in Activity (`owner.*`, always on).
 import { db, peekPending, getChatMemory } from './db.js';
 import { chatTitle, personInfo } from './contacts.js';
-import { env, digits } from './config.js';
+import { env, digits, clip, iso } from './config.js';
 import { getSetting, updateSettings, getUser, onUserDeleted, TENANT } from './store.js';
 import { listAgents, agentForChat } from './agents.js';
 import { getChatPrefs, enabledChats, privateChats, seenChats } from './chat-prefs.js';
@@ -48,7 +48,6 @@ onUserDeleted((id) => {
   db.prepare('DELETE FROM owner_messages WHERE tenant_id = ? AND user_id = ?').run(TENANT, id);
 });
 
-const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
 const bad = (message, status = 400) => Object.assign(new Error(message), { status });
 
 // ---------------------------------------------------------------- settings
@@ -156,7 +155,6 @@ function parseSince(v, fallbackMs = 7 * 86400000) {
   if (Number.isNaN(t)) throw bad('since: use a date (2026-11-01) or a period like 24h, 3d, 2w');
   return t;
 }
-const iso = (ts) => (ts ? new Date(ts).toISOString() : null);
 const like = (q) => `%${String(q).replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
 const msgLine = (m, names) => ({ chat: m.chat, chatName: names.get(m.chat) || m.chat, time: iso(m.ts), from: m.from_agent ? 'Assistant' : personInfo({ phone: m.sender, jid: m.sender_jid, fallbackName: m.name }).label, text: clip(m.text, 400) });
 

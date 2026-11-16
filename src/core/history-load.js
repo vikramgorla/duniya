@@ -14,9 +14,9 @@ import { agentForChat } from './agents.js';
 import { activity } from './events.js';
 import { summarizeAfterLoad } from './memory.js';
 
-export const PAGE_SIZE = 50; // WhatsApp sends at most 50 messages per on-demand request
+const PAGE_SIZE = 50; // WhatsApp sends at most 50 messages per on-demand request
 export const MAX_LOAD = 200;
-export const DEFAULT_LOAD = 50;
+const DEFAULT_LOAD = 50;
 const COOLDOWN_MS = 30000; // "Load recent messages" at most every 30 s per chat
 const waitMs = () => Number(process.env.HISTORY_WAIT_MS || 45000); // per page; the phone may be offline
 const KEEP_MS = 10 * 60000; // late chunks of a finished load still count for this long
@@ -31,7 +31,7 @@ const lastStart = new Map();
 // No timers of their own: each pending chat has a due time (kept in kv, so it survives a restart) and the shared
 // upkeep tick (upkeep.js, run by the scheduler every 30 s) runs at most RETRIES_PER_TICK due ones.
 const MIN = 60000;
-export const RETRY_BACKOFF_MS = [2 * MIN, 15 * MIN, 60 * MIN, 6 * 60 * MIN, 24 * 60 * MIN, 24 * 60 * MIN, 24 * 60 * MIN];
+const RETRY_BACKOFF_MS = [2 * MIN, 15 * MIN, 60 * MIN, 6 * 60 * MIN, 24 * 60 * MIN, 24 * 60 * MIN, 24 * 60 * MIN];
 const ONLINE_GAP_MS = 60000; // "phone seen online" makes a chat due at most once a minute
 const RETRIES_PER_TICK = 2;
 const RETRY_KEY = 'historyRetries';

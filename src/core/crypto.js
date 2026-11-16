@@ -5,7 +5,7 @@ import { DATA_DIR } from './config.js';
 
 // ---------- master key (secrets at rest) ----------
 let masterKey = null;
-export function getMasterKey() {
+function getMasterKey() {
   if (masterKey) return masterKey;
   if (process.env.MASTER_KEY) {
     masterKey = Buffer.from(process.env.MASTER_KEY, 'base64');

@@ -1,6 +1,6 @@
 // Group memory (feature 004): stored messages, rolling summary, notes, memory tools.
 import { optionalPaused } from './resources.js';
-import { env } from './config.js';
+import { env, clip } from './config.js';
 import {
   history, messagesAfter, getChatMemory, setChatMemory, addNote, listNotes, deleteNote, getNote, updateNote, searchNotes,
   searchMessages, messageCount, eraseChat, recentReactions, recentPolls, pollTally, storedSpan,
@@ -14,7 +14,6 @@ export const DEFAULT_WINDOW = 30;
 export const memoryEnabled = (agent) => agent?.memory?.enabled !== false;
 const windowFor = (agent) => agent?.historySize || DEFAULT_WINDOW;
 
-const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
 function stamp(ts, tz = env.timezone) {
   return new Date(ts).toLocaleString('en-GB', { timeZone: tz, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
@@ -93,22 +92,25 @@ export async function maybeSummarize(chat, agent, { force = false } = {}) {
   const older = messagesAfter(chat, mem.upto_id ?? 0, boundary);
   if (!older.length || (!force && older.length < env.memory.summarizeBatch)) return null;
 
+  const tz = agent?.timezone || env.timezone;
+  return summarize(chat, agent, {
+    current: mem.summary || '(empty)', note: '', messages: older.map((m) => formatMessage(m, tz)), upto: older.at(-1).id,
+    what: `${older.length} messages`,
+  });
+}
+
+/** One background summary call: fold `messages` into `current`, store it with boundary `upto`. Null when nothing came back. */
+async function summarize(chat, agent, { current, note, messages, upto, what }) {
   running.add(chat);
   try {
-    const tz = agent?.timezone || env.timezone;
     const res = await modelChat({
-      model: 'auto', purpose: 'background', usage: { agent: agent?.id || '', chat, kind: 'summary' },
-      maxTokens: 1200,
-      system: SUMMARY_SYSTEM,
-      messages: [{
-        role: 'user',
-        content: `<current_summary>\n${mem.summary || '(empty)'}\n</current_summary>\n<new_messages>\n${older.map((m) => formatMessage(m, tz)).join('\n')}\n</new_messages>`,
-      }],
+      model: 'auto', purpose: 'background', usage: { agent: agent?.id || '', chat, kind: 'summary' }, maxTokens: 1200, system: SUMMARY_SYSTEM,
+      messages: [{ role: 'user', content: `<current_summary>\n${current}\n</current_summary>\n<new_messages${note}>\n${messages.join('\n')}\n</new_messages>` }],
     });
     const summary = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
     if (!summary) return null;
-    setChatMemory(chat, summary, older.at(-1).id);
-    activity('memory.summary', { agent: agent?.id, chat, summary: `Summary updated with ${older.length} messages`, detail: { summary } });
+    setChatMemory(chat, summary, upto);
+    activity('memory.summary', { agent: agent?.id, chat, summary: `Summary updated with ${what}`, detail: { summary } });
     return summary;
   } catch (e) {
     activity('error', { agent: agent?.id, chat, summary: `Summarising failed (will retry): ${e.message}` });
@@ -129,24 +131,11 @@ export async function summarizeAfterLoad(chat, agent, rowIds = []) {
   const ids = new Set(rowIds);
   const earlier = messagesAfter(chat, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER).filter((m) => ids.has(m.id));
   if (!earlier.length) return null;
-  running.add(chat);
-  try {
-    const tz = agent?.timezone || env.timezone;
-    const res = await modelChat({
-      model: 'auto', purpose: 'background', usage: { agent: agent?.id || '', chat, kind: 'summary' }, maxTokens: 1200, system: SUMMARY_SYSTEM,
-      messages: [{ role: 'user', content: `<current_summary>\n${mem.summary}\n</current_summary>\n<new_messages note="these are EARLIER messages, from before the current summary">\n${earlier.map((m) => formatMessage(m, tz)).join('\n')}\n</new_messages>` }],
-    });
-    const summary = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
-    if (!summary) return null;
-    setChatMemory(chat, summary, mem.upto_id);
-    activity('memory.summary', { agent: agent?.id, chat, summary: `Summary updated with ${earlier.length} earlier messages`, detail: { summary } });
-    return summary;
-  } catch (e) {
-    activity('error', { agent: agent?.id, chat, summary: `Summarising failed (will retry): ${e.message}` });
-    return null;
-  } finally {
-    running.delete(chat);
-  }
+  const tz = agent?.timezone || env.timezone;
+  return summarize(chat, agent, {
+    current: mem.summary, note: ' note="these are EARLIER messages, from before the current summary"', messages: earlier.map((m) => formatMessage(m, tz)),
+    upto: mem.upto_id, what: `${earlier.length} earlier messages`,
+  });
 }
 
 /**

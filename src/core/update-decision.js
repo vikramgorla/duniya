@@ -131,7 +131,7 @@ export async function runConfirmedUpdate({ by = '', backup = true, reportTo = ''
 }
 
 /** WhatsApp "confirm ABCD" / "cancel ABCD" for an update code. Returns reply text, or undefined when not ours. */
-export async function resolveUpdateConfirm({ user, code, cancel = false, surface = '' }) {
+async function resolveUpdateConfirm({ user, code, cancel = false, surface = '' }) {
   const key = String(code || '').trim().toUpperCase();
   const c = codes().find((x) => x.code === key);
   if (!c) return undefined;

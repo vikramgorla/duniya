@@ -9,11 +9,11 @@ import { optionalPaused } from './resources.js';
 import { enabledChats } from './chat-prefs.js';
 import { historyRetryTick } from './history-load.js';
 import { activity } from './events.js';
+import { isGroup } from './config.js';
 
-export const GROUP_EVERY_MS = 12 * 3600000;
+const GROUP_EVERY_MS = 12 * 3600000;
 const GROUPS_PER_TICK = 2;
 const groupDue = new Map(); // chat -> due time (ms)
-const isGroup = (c) => /@g\.us$/.test(String(c));
 
 /** A group's member list changed (participants update): refresh it on the next tick. */
 export const markGroupDue = (chat, at = Date.now()) => { if (isGroup(chat)) groupDue.set(chat, at); };

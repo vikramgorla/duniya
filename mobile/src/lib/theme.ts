@@ -17,7 +17,7 @@ export const light = {
   // AI review diff (#63), as the panel's --add-* / --del-*: additions lime with +, removals red struck through with −
   addBg: '#e3f7a8', addInk: '#2f4d00', delBg: '#ffe1e6', delInk: '#a8183a',
 };
-export const dark: typeof light = {
+const dark: typeof light = {
   ...shared, dark: true,
   bg: '#0b0c0f', bg2: '#15171c', card: '#121419', ink: '#eceef2', muted: '#9196a1', line: '#23262e', line2: '#343844',
   primary: '#c6f432', onPrimary: '#101216', grid: 'rgba(255,255,255,0.07)',
