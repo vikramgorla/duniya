@@ -3,7 +3,7 @@
 //   - history loads the phone did not answer: up to 2 due retries (history-load.js)
 //   - address-book names: the channel refreshes a number's contact names when due (after connect, then daily)
 //   - group member lists of chats that are on: up to 2 groups whose refresh is due (on start, after a member change,
-//     then every 12 h) — reads member tags and LID↔phone pairs
+//     then every 12 h) — learns LID↔phone pairs (the member list carries no tags, #117)
 // Names and group refreshes are skipped while memory is tight (optional work, resources.js).
 import { optionalPaused } from './resources.js';
 import { enabledChats } from './chat-prefs.js';

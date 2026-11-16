@@ -66,8 +66,9 @@ of it: **no chores for the owner** — what the server can do or retry itself ha
 
 - Address-book names reach a linked device only through app-state sync; whether `critical_unblock_low` snapshots
   carry all contacts on every phone needs a real-account check (#62).
-- There is no documented query for all member tags; tags appear when a person writes, changes it, from loaded
-  history, or from the member list if WhatsApp includes it there (field name unknown; the diagnostic tells).
+- There is no query for all member tags; tags appear when a person writes, changes it, or from loaded history.
+  Checked on a real server (#117): the group member list carries only group_history_sent, jid, join_time,
+  phone_number and type, so it is read only for LID↔phone pairs; the raw-node parsing and diagnostic were removed.
 
 ## Out of scope
 
