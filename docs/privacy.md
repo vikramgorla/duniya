@@ -48,6 +48,7 @@ context…" (edit under **Settings → Privacy notice**).
 | **Summaries** | the weekly summary and *Why agents stayed quiet* keep counts only |
 | **Welcomes** | a hash of the group and the new member's id, so each person is welcomed once (no names or numbers); the activity log says how many were welcomed |
 | **Personal details** | agents don't post phone numbers, emails, health or payment details in groups |
+| **Keys and passwords** | never through a chat or a model: entered on one-time panel links; a key pasted to the owner assistant is not read, stored or logged ([Owner assistant](owner-assistant.md#what-it-may-do-decided-in-code)) |
 
 ![Logging settings](site/img/card-logging.webp)
 

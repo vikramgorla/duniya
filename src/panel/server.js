@@ -64,6 +64,7 @@ const smallModeView = () => ({ enabled: smallServerMode(), server: serverSize(),
 import { queueStats } from '../core/media-queue.js';
 import { insightRoutes } from './routes/insights.js';
 import { ownerAssistantRoutes } from './routes/owner-assistant.js';
+import { linkRoutes } from './routes/links.js';
 import { setOwnerToolRunner } from '../core/owner-assistant.js';
 import { maybePostNotice, setChatNoticeOff, noticePostedAt } from '../core/privacy-notice.js';
 import { loadChatHistory, historyStatus, historyLoadCount, MAX_LOAD } from '../core/history-load.js';
@@ -182,10 +183,7 @@ export function startPanel({ channel, extend = [] }) {
 
   // ---------- users (owner) ----------
   route('GET', '/api/users', async () => listUsers(), { role: 'owner' });
-  route('POST', '/api/users', async (req, res, body, q, p, user) => {
-    if (!passwordLoginAllowed()) return [400, { error: 'Password sign-in is switched off: invite this person with Google instead (Users → Invite).' }];
-    const u = createUser(body); activity('system', { summary: `User ${u.username} (${u.role}) added by ${user.username}` }); return u;
-  }, { role: 'owner' });
+  linkRoutes(route, { invoke }); // POST /api/users (with a password or a sign-up link), one-time links (060)
   route('PUT', '/api/users/:id', async (req, res, body, q, p, user) => {
     const u = updateUser(p.id, body); activity('system', { summary: `User ${u.username} updated by ${user.username}` }); return u;
   }, { role: 'owner' });

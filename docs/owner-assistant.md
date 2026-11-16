@@ -68,12 +68,21 @@ setup, test console — try it in the Ask box instead). The AI helper and its vi
 - **Other chats:** only chats that are on and not private, by group name, contact name or id. A chat switched off
   before you confirm gets nothing. A person who never saw the privacy line gets it once with the first message.
 - **Tool services:** a tool called `confirm` (or `…_confirm`, `confirm_…`) or marked destructive is held for your code.
+- **Secrets never pass through the chat:** "set the OpenAI key" gives you a one-time link (15 minutes) to paste it in
+  the panel; when you save, the chat says *Saved OPENAI_API_KEY*. "Add Anu as an admin" (owners) gives you, after
+  `confirm CODE`, a sign-up link (48 hours) to forward to Anu only: she chooses her own password. "Restore last
+  night's backup" uses the passphrase stored on this server; a backup made elsewhere gets a link to the panel's
+  Backups page. See [Admin MCP](admin-mcp.md#no-secrets-through-the-assistant).
 - **Not included:** asking another agent to act in its chat (its own tools would run without a preview), and
   forwarding a photo you just sent into another chat.
 
 > [!NOTE]
 > It never answers in groups or anyone who is not linked. `!family …` still reaches that agent, and so does
 > `confirm CODE` for a change an agent prepared.
+
+> [!WARNING]
+> Never paste a key or password into the chat. If a message looks like one, the assistant does not read it, store it
+> or send it to the AI, and asks you to delete it and use a link instead.
 
 | | |
 |---|---|

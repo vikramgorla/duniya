@@ -97,6 +97,10 @@ const STATES = [
   { name: 'backups', hash: 'backups', js: 'T.openAll();' },
   { name: 'pending', hash: 'pending' },
   { name: 'secrets', hash: 'secrets' },
+  // 060: one-time links — enter a secret (signed in), a new user's sign-up page (before sign-in), the link in Users.
+  { name: 'secret-link', hash: 'secrets', js: "const r = await (await fetch('/api/secret-links', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'OPENAI_API_KEY' }) })).json(); await renderSecretLink(r.link.split('=')[1]);" },
+  { name: 'signup-link', hash: '', js: "const r = await (await fetch('/api/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: `lea${Date.now() % 1e6}`, role: 'admin' }) })).json(); clearInterval(statusTimer); S.tab = ''; S.es?.close(); const app = document.querySelector('#app'); app.replaceChildren(); await renderSignup(app, () => [], r.signup.link.split('=')[1]);" },
+  { name: 'settings-signup-link', hash: 'settings', wait: 2000, js: "S.signupLink = { username: 'lea', link: `${location.origin}/#signup=${'a1'.repeat(32)}` }; await renderSettings(); document.querySelector('.note code')?.scrollIntoView(); await T.wait(300);" },
   { name: 'settings', hash: 'settings', wait: 2000, js: 'T.openAll();' },
   // 055: Settings → Server, Small server mode (one switch for heavier features on a small server)
   { name: 'settings-small-mode', hash: 'settings', wait: 2000, js: "document.getElementById('small-mode')?.scrollIntoView(); await T.wait(300);" },

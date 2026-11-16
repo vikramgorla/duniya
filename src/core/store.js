@@ -106,15 +106,16 @@ const ownersCount = () => db.prepare("SELECT COUNT(*) AS n FROM users WHERE tena
 function checkPasswordStrength(pw) {
   if (String(pw || '').length < 12) throw Object.assign(new Error('Password must be at least 12 characters'), { status: 400 });
 }
-export function createUser({ username, email = '', role = 'admin', password }) {
+/** noPassword (060): the person sets their own password with a one-time sign-up link. */
+export function createUser({ username, email = '', role = 'admin', password, noPassword = false }) {
   const name = String(username || '').trim().toLowerCase();
   if (!/^[a-z0-9][a-z0-9._-]{1,39}$/.test(name)) throw Object.assign(new Error('Username: 2–40 letters, digits, . _ -'), { status: 400 });
   if (!ROLES.includes(role)) throw Object.assign(new Error('Role must be owner, admin or viewer'), { status: 400 });
-  checkPasswordStrength(password);
+  if (!noPassword) checkPasswordStrength(password);
   if (db.prepare('SELECT 1 FROM users WHERE tenant_id = ? AND username = ?').get(TENANT, name)) {
     throw Object.assign(new Error('Username already exists'), { status: 409 });
   }
-  const { salt, hash } = hashPassword(password);
+  const { salt, hash } = noPassword ? { salt: null, hash: null } : hashPassword(password);
   const r = db.prepare('INSERT INTO users (tenant_id, username, email, role, pw_salt, pw_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(TENANT, name, String(email || ''), role, salt, hash, Date.now());
   return getUser(Number(r.lastInsertRowid));

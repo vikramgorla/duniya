@@ -397,15 +397,15 @@ export const TOOLS = [
   // ---------- secrets ----------
   { name: 'list_secrets', readOnly: true, calls: [['GET', '/api/secrets']], description: 'Names of stored secrets (API keys, tokens) and whether each is set. Values are never shown.', input: {},
     run: (a, x) => x.call('GET', '/api/secrets') },
-  { name: 'set_secret', risky: true, calls: [['PUT', '/api/secrets']],
-    description: 'Store a secret value (encrypted on the server, never shown again). Needs confirm_action. Prefer entering keys in the panel: values given here pass through the AI assistant.',
-    input: { name: str('UPPER_SNAKE_CASE name'), value: str('The value') }, required: ['name', 'value'],
-    preview: async (a, x) => {
-      if (!a.value) throw Object.assign(new Error('value is empty; use remove_secret to remove a secret'), { status: 400 });
-      const cur = (await x.call('GET', '/api/secrets')).find((s) => s.name === a.name);
-      return `${cur?.set ? 'Replace' : 'Set'} the secret ${a.name}${cur?.usedByAgents ? ' (used by an agent)' : ''}. Agents using it pick up the new value right away.`;
-    },
-    run: (a, x) => x.call('PUT', '/api/secrets', { name: a.name, value: a.value }) },
+  // 060: values never pass through an AI assistant or a chat: the user enters them on a one-time panel link.
+  { name: 'set_secret', noConfirm: true, calls: [['POST', '/api/secret-links']],
+    description: 'Set or replace a secret (API key, token) or the API key of a model account WITHOUT seeing its value: returns a one-time link (15 minutes, single use) to a panel page where a signed-in owner or admin pastes the value. Give the link to the user exactly as returned; never ask them to type a key in the chat. Afterwards list_secrets (or list_model_accounts) shows it as set. Give name (UPPER_SNAKE_CASE) or account (an API-key account id from list_model_accounts).',
+    input: { name: str('Secret name, UPPER_SNAKE_CASE (or give account)'), account: str('Model account id whose API key to set (optional, instead of name)') },
+    run: async (a, x) => {
+      if (a.value !== undefined) throw Object.assign(new Error('Secret values are never taken here: give only the name and send the user the link'), { status: 400 });
+      const r = await x.call('POST', '/api/secret-links', { name: a.name, account: a.account, notify: String(x.surface || '').startsWith('whatsapp:') });
+      return { for: r.for, link: r.link, expires: iso(r.expiresAt), note: 'One use, 15 minutes, panel sign-in (owner or admin) required. The value goes straight to the server.' };
+    } },
   { name: 'remove_secret', risky: true, calls: [['PUT', '/api/secrets']], description: 'Remove a stored secret. Needs confirm_action.',
     input: { name: str('Secret name') }, required: ['name'],
     preview: async (a, x) => {
@@ -502,19 +502,38 @@ export const TOOLS = [
   { name: 'run_backup', calls: [['POST', '/api/backups/run']], description: 'Make an encrypted backup now and send it to the configured places.', input: {},
     run: (a, x) => x.call('POST', '/api/backups/run') },
   { name: 'restore_backup', risky: true, calls: [['POST', '/api/backups/restore']],
-    description: 'Restore a backup (replaces all current data) and restart. Needs the backup passphrase and confirm_action.',
-    input: { source: { type: 'string', enum: ['local', 'github', 's3'], description: 'Where the backup is' }, file: str('Backup file name (see list_backups)'), passphrase: str('Backup passphrase') },
-    required: ['source', 'file', 'passphrase'],
-    preview: async (a) => `Restore backup ${a.file} from ${a.source}. Everything now on the server (agents, chats, memory, settings, users) is replaced by the backup, then the app restarts (agents offline 1–2 minutes).`,
-    run: (a, x) => x.call('POST', '/api/backups/restore', { source: a.source, file: a.file, passphrase: a.passphrase }) },
+    description: 'Restore a backup (replaces all current data) and restart. Uses the backup passphrase stored on this server (never ask for one); a backup made elsewhere or with another passphrase cannot be restored here: the error gives the panel link to restore it there. Needs confirm_action.',
+    input: { source: { type: 'string', enum: ['local', 'github', 's3'], description: 'Where the backup is' }, file: str('Backup file name (see list_backups)') },
+    required: ['source', 'file'],
+    preview: async (a, x) => {
+      const b = await x.call('POST', '/api/backups/restore', { source: a.source, file: a.file, check: true }); // opens it, restores nothing
+      return `Restore backup ${a.file} from ${a.source} (made ${iso(b.createdAt) || 'at an unknown time'}). Everything now on the server (agents, chats, memory, settings, users) is replaced by the backup, then the app restarts (agents offline 1–2 minutes).`;
+    },
+    run: (a, x) => x.call('POST', '/api/backups/restore', { source: a.source, file: a.file }) },
 
   // ---------- users ----------
   { name: 'list_users', readOnly: true, calls: [['GET', '/api/users']], description: 'Panel users and their roles (owner, admin, viewer).', input: {},
     run: (a, x) => x.call('GET', '/api/users') },
-  { name: 'add_user', calls: [['POST', '/api/users']], description: 'Add a panel user. role: owner | admin | viewer. Password: 12+ characters (they can change it).',
-    input: { username: str('Username'), role: { type: 'string', enum: ['owner', 'admin', 'viewer'], description: 'Role' }, password: str('Initial password'), email: str('Email (optional)') },
-    required: ['username', 'role', 'password'],
-    run: (a, x) => x.call('POST', '/api/users', { username: a.username, role: a.role, password: a.password, email: a.email }) },
+  { name: 'add_user', calls: [['POST', '/api/users']],
+    description: 'Add a panel user (role owner | admin | viewer) who sets their own password: returns a one-time sign-up link (48 hours, single use) to forward to that person only. Whoever opens it chooses the password, so never post it in a group. A new link: send_signup_link.',
+    input: { username: str('Username (2–40 letters, digits, . _ -)'), role: { type: 'string', enum: ['owner', 'admin', 'viewer'], description: 'Role' }, email: str('Email (optional)') },
+    required: ['username', 'role'],
+    run: async (a, x) => {
+      const u = await x.call('POST', '/api/users', { username: a.username, role: a.role, email: a.email });
+      return { username: u.username, role: u.role, link: u.signup.link, expires: iso(u.signup.expiresAt), note: 'Forward the link to them only: they set their own password (one use, 48 hours).' };
+    } },
+  { name: 'send_signup_link', risky: true, calls: [['GET', '/api/users'], ['POST', '/api/users/x/signup-link']],
+    description: 'A new one-time link (48 hours, single use) where a user sets their own password: for a new user whose link expired, or a forgotten password. Earlier links of that user stop working. Needs confirm_action.',
+    input: { user_id: int('User id (see list_users)') }, required: ['user_id'],
+    preview: async (a, x) => {
+      const u = (await x.call('GET', '/api/users')).find((r) => r.id === Number(a.user_id));
+      if (!u) throw Object.assign(new Error('User not found'), { status: 404 });
+      return `Make a one-time link where the ${u.role} "${u.username}" sets ${u.hasPassword ? 'a new' : 'their'} password (48 hours).${u.hasPassword ? ' Their current password keeps working until the link is used.' : ''} Whoever opens it can choose the password: send it to them only.`;
+    },
+    run: async (a, x) => {
+      const r = await x.call('POST', `/api/users/${enc(a.user_id)}/signup-link`);
+      return { username: r.username, link: r.link, expires: iso(r.expiresAt) };
+    } },
   { name: 'update_user', calls: [['PUT', '/api/users/x']], description: 'Change a user\'s role, or disable/enable their account.',
     input: { user_id: int('User id (see list_users)'), role: { type: 'string', enum: ['owner', 'admin', 'viewer'], description: 'New role (optional)' }, disabled: bool('Disable (true) or enable (false) (optional)') },
     required: ['user_id'],

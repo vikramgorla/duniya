@@ -130,7 +130,7 @@ test('044: private and switched-off chats are invisible to cross-chat tools', as
   assert.ok(!vis.some((c) => ['g2@g.us', 'g7@g.us'].includes(c.chat)));
 });
 
-test('044: tool sets follow the panel role; secret-taking tools are panel-only', async () => {
+test('044: tool sets follow the panel role; no tool takes secret values (060)', async () => {
   const toolsOf = async (cookie) => { t.script.push([{ type: 'text', text: 'hi' }]); await t.api(cookie, 'POST', '/api/owner/ask', { question: 'hi' }); return t.claudeReqs.at(-1).tools.map((x) => x.name); };
   const v = await toolsOf(viewer);
   assert.ok(v.includes('list_visible_chats') && v.includes('list_agents') && v.includes('get_usage'));
@@ -140,7 +140,9 @@ test('044: tool sets follow the panel role; secret-taking tools are panel-only',
   assert.ok(!a.includes('list_users') && !a.includes('restart_app'), 'owner-only tools');
   const o = await toolsOf(owner);
   assert.ok(o.includes('list_users') && o.includes('restart_app'));
-  for (const name of ['set_secret', 'add_user', 'restore_backup', 'confirm_action']) assert.ok(!o.includes(name), `never offered: ${name}`);
+  for (const name of ['set_secret', 'add_user', 'send_signup_link', 'restore_backup']) assert.ok(o.includes(name), `offered: ${name}`);
+  assert.ok(!o.includes('confirm_action'), 'confirmations come from the user, not the model');
+  for (const tl of TOOLS) for (const k of Object.keys(tl.input || {})) assert.ok(!['value', 'password', 'passphrase', 'key', 'token'].includes(k), `${tl.name} takes a secret: ${k}`);
   // a tool the role does not have is refused even if the model calls it
   t.script.push([{ type: 'tool_use', id: 'v1', name: 'search_messages', input: { query: 'train' } }], [{ type: 'text', text: 'no' }]);
   await t.api(viewer, 'POST', '/api/owner/ask', { question: 'search' });

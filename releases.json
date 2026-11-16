@@ -1,6 +1,11 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.21.0": {
+      "breaking": false,
+      "title": "No secrets in chats: keys are entered on one-time panel links, new users set their own password, restores use the stored passphrase",
+      "summary": "The owner assistant (WhatsApp and the Ask box) and AI assistants can now set keys, add users and restore backups without ever seeing a secret. set_secret returns a one-time link (15 minutes) where a signed-in owner or admin pastes the value; add_user creates the person with a one-time sign-up link (48 hours) where they choose their own password; restore_backup uses this server's stored backup passphrase. A key or password pasted into the owner assistant is not read, stored or sent to the AI. AI assistants that passed a value to set_secret or a password to add_user now get a link instead."
+    },
     "2.20.0": {
       "breaking": false,
       "title": "The owner assistant is your own super agent: a built-in agent with its own editor, tools, GIFs, photos & voice, and sends into your chats after you confirm",

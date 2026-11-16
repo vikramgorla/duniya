@@ -233,13 +233,13 @@ test('risky tools need confirm_action with a single-use code bound to the user',
   const acts = t.db.listActivity({ limit: 30 });
   assert.ok(acts.some((a) => a.type === 'confirm.created' && /Helper/.test(a.summary)));
   assert.ok(acts.some((a) => a.type === 'confirm.applied' && /Helper/.test(a.summary)));
-  // set_secret previews without echoing the value
+  // 060: set_secret never takes a value (one-time link instead); a value sent anyway is refused and never logged
   const sp = await c.callTool({ name: 'set_secret', arguments: { name: 'NEW_KEY', value: 'sup3r-s3cret' } });
-  assert.ok(!text(sp).includes('sup3r-s3cret'));
+  assert.ok(sp.isError && !text(sp).includes('sup3r-s3cret'));
   assert.equal(t.store.getSecret('NEW_KEY'), '');
-  await c.callTool({ name: 'confirm_action', arguments: { confirm_code: sp.structuredContent.confirm_code } });
-  assert.equal(t.store.getSecret('NEW_KEY'), 'sup3r-s3cret');
   assert.ok(!JSON.stringify(t.db.listActivity({ limit: 30 })).includes('sup3r-s3cret'), 'secret values never logged');
+  const link = await c.callTool({ name: 'set_secret', arguments: { name: 'NEW_KEY' } });
+  assert.match(JSON.parse(text(link)).link, /\/#secret=[a-f0-9]{64}$/);
   globalThis.ownerPendingCode = (await c.callTool({ name: 'delete_agent', arguments: { agent_id: 'panduga' } })).structuredContent.confirm_code;
   await c.close();
 });

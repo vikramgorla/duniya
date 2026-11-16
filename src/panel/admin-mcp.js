@@ -42,7 +42,7 @@ const CORS = {
 };
 const CORS_PATHS = new Set(['/mcp', '/oauth/token', '/oauth/register', '/oauth/revoke', '/.well-known/oauth-protected-resource',
   '/.well-known/oauth-protected-resource/mcp', '/.well-known/oauth-protected-resource/api', '/.well-known/oauth-authorization-server']);
-const SECRET_ARGS = new Set(['value', 'password', 'passphrase']);
+const SECRET_ARGS = new Set(['value', 'password', 'passphrase']); // no tool takes these (060); a client sending one anyway is not logged
 const redact = (args) => Object.fromEntries(Object.entries(args || {}).map(([k, v]) => [k, SECRET_ARGS.has(k) ? '•••' : v]));
 
 /** What an assistant may do, in plain words, by panel role (consent page and Settings card). */
@@ -181,7 +181,7 @@ code{font-size:13px}
 <p class=muted><b>${esc(chk.client.name)}</b> <span class=small>(returns to <code>${esc(host)}</code>)</span> wants to manage this Duniya app for you.</p>
 <p>It acts as <b>${esc(user.username)}</b> <span class=pill>${esc(user.role)}</span> and can:</p>
 <ul>${abilities.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
-${user.role === 'viewer' ? '' : '<div class=note>Risky actions (deleting an agent, erasing memory, changing secrets or users, removing a WhatsApp number, restoring a backup, updates and restarts) always need a second confirmation step.</div>'}
+${user.role === 'viewer' ? '' : '<div class=note>Risky actions (deleting an agent, erasing memory, removing secrets or users, removing a WhatsApp number, restoring a backup, updates and restarts) always need a second confirmation step.</div>'}
 <p class="small muted">Only approve if you just added this connector yourself. You can disconnect it any time in Settings → Connected AI assistants.</p>
 <form method=post action="/oauth/authorize" class=row>${hidden(p)}<input type=hidden name=csrf value="${csrfFor(sessionToken)}">
 <button class="btn primary" name=action value=approve>Approve</button><button class="btn danger" name=action value=deny>Deny</button></form>` });
@@ -330,7 +330,8 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
     const server = new Server({ name: 'duniya-admin', title: 'Duniya admin', version: VERSION }, {
       capabilities: { tools: {} },
       instructions: `You manage a self-hosted WhatsApp agent platform ("Duniya") as panel user ${auth.user.username} (${auth.user.role}). `
-        + 'Use the list/get tools to look before changing anything. Risky tools return a preview and a confirm_code: show the preview to the user and call confirm_action only after they agree.',
+        + 'Use the list/get tools to look before changing anything. Risky tools return a preview and a confirm_code: show the preview to the user and call confirm_action only after they agree. '
+        + 'Never ask the user for keys, passwords or passphrases: set_secret and add_user return one-time links where people enter them in the panel.',
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: toolDefs(auth.user) }));
     server.setRequestHandler(CallToolRequestSchema, async (r) => callTool(r.params.name, r.params.arguments || {}, ctx));

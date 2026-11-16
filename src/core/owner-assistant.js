@@ -39,9 +39,18 @@ const CONFIRM_TTL = 10 * 60000;
 const MAX_ROUNDS = 8;
 const CHUNK = 3000;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-// Tools that take secret values (keys, passwords, passphrases) are panel-only: values would pass through WhatsApp and
-// the model provider.
-const SECRET_ARGS = ['value', 'password', 'passphrase'];
+// 060: secret values never pass through the assistant. Admin tools take no keys, passwords or passphrases (keys are
+// entered through one-time links, new users set their own password, restores use the stored passphrase), and a
+// message that looks like a key or password is answered here, without AI: not stored, not logged, not sent to a model.
+const SECRET_PATTERNS = [
+  /\bsk-[A-Za-z0-9_-]{16,}/, /\bgh[pousr]_[A-Za-z0-9]{20,}/, /\bgithub_pat_\w{20,}/, /\bAKIA[0-9A-Z]{16}\b/, /\bxox[abpr]-[A-Za-z0-9-]{10,}/,
+  /\bAIza[0-9A-Za-z_-]{30,}/, /\bglpat-[\w-]{20,}/, /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /\b(password|passphrase|passwort|mot de passe|api[ _-]?key|token|secret)\s*(is|:|=)\s*(?=\S*\d)\S{8,}/i,
+];
+/** A key-like word: 32+ characters of letters, digits and token symbols with both letters and digits (not a link). */
+const keyLike = (w) => w.length >= 32 && /^[A-Za-z0-9_+/=.-]+$/.test(w) && /\d/.test(w) && /[A-Za-z]/.test(w) && !w.includes('/');
+const looksSecret = (text) => SECRET_PATTERNS.some((r) => r.test(text)) || text.split(/\s+/).some(keyLike);
+const SECRET_REPLY = 'That looks like a key or password, so I did not read it, store it or pass it to the AI. Please delete that message from this chat.\n\nTo save a key safely, ask me for a link (e.g. "link to set OPENAI_API_KEY"): you paste the value in the panel, never in a chat.';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS owner_links (
@@ -329,7 +338,6 @@ async function toolsFor(user, dm = {}) {
   const rank = ROLE_RANK[user.role] || 0;
   for (const t of CORE_TOOLS) if (rank >= ROLE_RANK[t.role]) out.push({ ...t, kind: 'core', ...(t.prepare ? { prepare: (a) => t.prepare(a, dm, user) } : {}) });
   for (const t of wiring?.tools || []) {
-    if (Object.keys(t.input || {}).some((k) => SECRET_ARGS.includes(k))) continue;
     const roles = t.calls.map(([m, p]) => wiring.routeRole(m, p));
     if (roles.includes(null)) continue;
     const need = roles.reduce((a, b) => (ROLE_RANK[b] > ROLE_RANK[a] ? b : a), 'viewer');
@@ -337,9 +345,12 @@ async function toolsFor(user, dm = {}) {
   }
   return [...out, ...await agentTools(user, dm).catch((e) => { activity('error', { summary: `Owner assistant: agent tools unavailable (${e.message})` }); return []; })];
 }
-const toolCtx = (user) => ({ call: (method, path, body) => wiring.invoke(user, method, path, body) });
+// surface: where the user asked ("whatsapp:<chat>" or "panel"); tools use it to tell them a result later (060).
+const toolCtx = (user, surface = '') => ({ call: (method, path, body) => wiring.invoke(user, method, path, body), surface });
 const needsConfirm = (tool, args) => (tool.confirmIf ? tool.confirmIf(args) : !tool.readOnly && !tool.noConfirm);
-const runTool = (tool, args, user) => (tool.kind === 'admin' ? tool.run(args, toolCtx(user)) : tool.run(args));
+const runTool = (tool, args, user, surface) => (tool.kind === 'admin' ? tool.run(args, toolCtx(user, surface)) : tool.run(args));
+/** 060: one-time links in a tool result, shown to the user exactly (a model may garble a long token). */
+const linkOf = (out) => (out && typeof out === 'object' && typeof out.link === 'string' ? out.link : '');
 
 async function previewOf(tool, args, user) {
   if (tool.preview) return tool.preview(args, toolCtx(user));
@@ -348,10 +359,10 @@ async function previewOf(tool, args, user) {
   return `${tool.name} — ${first}${shown ? ` (${shown})` : ''}`;
 }
 
-async function runReadTool(tool, args, user) {
+async function runReadTool(tool, args, user, surface) {
   // Agent tools check their own chat (the user's own chat may be off; other chats must be visible).
   if (tool.kind !== 'agent' && args.chat && !isVisible(String(args.chat))) throw bad('That chat is not visible to the assistant (off or private to members)', 403);
-  return hideChats(await runTool(tool, args, user), new Set(privateChats()));
+  return hideChats(await runTool(tool, args, user, surface), new Set(privateChats()));
 }
 
 // ---------------------------------------------------------------- confirmations
@@ -388,10 +399,11 @@ export async function resolveConfirm({ user, code, cancel = false, surface }) {
   const tool = (await toolsFor(user, c.dm || {})).find((t) => t.name === c.tool);
   if (!tool) return `Your role no longer allows ${c.tool}.`;
   try {
-    const out = await runTool(tool, c.args, user);
+    const out = await runTool(tool, c.args, user, surface);
     activity('confirm.applied', { summary: `${c.preview} — confirmed by ${user.username} (owner assistant)`.slice(0, 480) });
     activity('owner.action', { summary: `Owner assistant: ${user.username} confirmed ${key}: ${c.preview}`.slice(0, 480), detail: { tool: c.tool, args: c.args } });
-    return `Done (${key}). ${clip(typeof out === 'string' ? out : JSON.stringify(out ?? { ok: true }), 300)}`;
+    const link = linkOf(out); // 060: e.g. a sign-up link goes to the user only, whole (not clipped, not to the model)
+    return `Done (${key}). ${clip(typeof out === 'string' ? out : JSON.stringify(link ? { ...out, link: undefined } : out ?? { ok: true }), 300)}${link ? `\n${link}` : ''}`;
   } catch (e) {
     activity('owner.action', { summary: `Owner assistant: ${c.tool} failed for ${user.username}: ${e.message}`.slice(0, 480) });
     return `Could not apply ${key}: ${clip(e.message, 300)}`;
@@ -447,6 +459,10 @@ export async function ask({ user, text, source, surface, onEvent = null, dm = {}
   if (!wiring) throw bad('The owner assistant is not ready yet', 503);
   const question = String(text || '').trim().slice(0, 4000);
   if (!question) throw bad('Ask a question');
+  if (looksSecret(question)) {
+    activity('owner.question', { summary: `${user.username} (${source === 'panel' ? 'panel' : 'WhatsApp'}) sent what looks like a key or password: not read, not stored, not sent to a model` });
+    return { reply: SECRET_REPLY, confirms: [] };
+  }
   activity('owner.question', { summary: `${user.username} (${user.role}, ${source === 'panel' ? 'panel' : 'WhatsApp'}) asked: ${clip(question, 140)}` });
   // 059: `dm` = the WhatsApp turn ({ chat, phone, msgId, senderJid, attachments, mediaNote }); agent tools act there.
   const tools = await toolsFor(user, { ...dm, text: question });
@@ -472,6 +488,7 @@ export async function ask({ user, text, source, surface, onEvent = null, dm = {}
   remember(user.id, source, 'user', question);
 
   const held = [];
+  const links = [];
   const turn = { ref: '' };
   let reply = '';
   const fallback = effectiveFallback({ agent: rec });
@@ -524,7 +541,8 @@ export async function ask({ user, text, source, surface, onEvent = null, dm = {}
           activity('confirm.created', { summary: `${preview} — asked by ${user.username} (owner assistant), waiting for confirm ${code}`.slice(0, 480) });
           content = JSON.stringify({ status: 'held_for_confirmation', preview, note: 'Not done. The system asks the user to confirm with a code.' });
         } else {
-          const out = await runReadTool(tool, args, user);
+          const out = await runReadTool(tool, args, user, surface);
+          if (linkOf(out)) links.push(linkOf(out));
           content = typeof out === 'string' ? out : JSON.stringify(out ?? { ok: true });
         }
       } catch (e) { isError = true; content = e.message || String(e); }
@@ -538,6 +556,7 @@ export async function ask({ user, text, source, surface, onEvent = null, dm = {}
     messages.push({ role: 'user', content: results });
   }
   reply = reply || (held.length ? 'Here is what I prepared:' : 'I have no answer for that.');
+  for (const l of links) if (!reply.includes(l)) reply += `\n\n${l}`;
   if (source !== 'panel') {
     for (const h of held) reply += `\n\n*${h.preview}*\nReply *confirm ${h.code}* to apply, or *cancel ${h.code}* (valid 10 min).`;
   }
@@ -668,6 +687,15 @@ registerJobHandler('owner', {
 // ---------------------------------------------------------------- schedules (059)
 /** The chat a linked user last wrote from (their own chat on the number they use), else their number on the first one. */
 const ownChatOf = (link) => kvGet(`owner-chat:${link.userId}`) || `${link.phone}@s.whatsapp.net`;
+
+/** 060: a short note to a linked user in their own chat (e.g. "Saved OPENAI_API_KEY"). False when not linked. */
+export async function tellUser(userId, text) {
+  const link = listLinks().find((l) => l.userId === Number(userId));
+  const ch = whatsappChannel();
+  if (!link || !ch) return false;
+  await ch.send(ownChatOf(link), text);
+  return true;
+}
 
 /**
  * One schedule of the built-in agent, from the agent scheduler tick (no timer of its own): the weekly summary (counts

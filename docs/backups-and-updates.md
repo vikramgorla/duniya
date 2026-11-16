@@ -38,8 +38,10 @@ without you.**
 
 </details>
 
-Uploads up to `BACKUP_UPLOAD_MAX_MB` ([settings](settings.md)). Command line: `sudo duniya backup-now`. Admin MCP:
-`get_backup_status`, `list_backups`, `run_backup`, `restore_backup` (with confirmation).
+Uploads up to `BACKUP_UPLOAD_MAX_MB` ([settings](settings.md)). Leave the passphrase empty to use the one stored
+on this server. Command line: `sudo duniya backup-now`. Admin MCP and the owner assistant: `get_backup_status`,
+`list_backups`, `run_backup`, `restore_backup` (with confirmation; it uses the stored passphrase, and a backup made
+elsewhere is restored here in the panel).
 
 ## Updates
 

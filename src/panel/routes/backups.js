@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import {
-  getBackupSettings, updateBackupSettings, setPassphrase, runBackup, listBackups, fetchBackup, restoreBackup, restoreBuffer,
+  getBackupSettings, updateBackupSettings, setPassphrase, runBackup, listBackups, fetchBackup, openBackup, restoreBackup, restoreBuffer,
   lastBackup, listLocal, githubClientId, github, APP_KEY_SECRET, resetAppToken,
 } from '../../core/backup/index.js';
 import { getSecret, setSecret, countUsers } from '../../core/store.js';
@@ -10,6 +10,7 @@ import { activity } from '../../core/events.js';
 import {
   publicBase, resultPage, esc, send, CSP, receiveUpload, uploadPath, dropUpload, limiter, clientIp, checkSetupCode, UPLOAD_MAX,
 } from '../http.js';
+import { baseUrl } from '../http-util.js';
 
 const OWNER = { role: 'owner' };
 const MAGIC = 'DUNIYA1\n';
@@ -65,14 +66,25 @@ export function backupRoutes(route, { restart = () => setTimeout(() => process.e
     res.end(buf);
     return null;
   }, OWNER);
+  // 060: without a passphrase the server's stored one is used (the owner assistant and AI assistants never see one);
+  // check: true only opens the backup (the restore preview). A backup that does not open points to the Backups page.
   route('POST', '/api/backups/restore', async (req, res, body, q, p, user) => {
+    const stored = !body.passphrase;
+    const passphrase = String(body.passphrase || '') || getSecret('BACKUP_PASSPHRASE');
+    const panel = `${baseUrl(req)}/#backups`;
+    if (!passphrase) return [400, { error: `No backup passphrase is stored on this server. Restore it in the panel with the passphrase it was made with: ${panel}` }];
+    const wrong = (e) => (stored && e.status === 400 && /passphrase/i.test(e.message)
+      ? Object.assign(new Error(`This backup does not open with this server's backup passphrase (made on another server or with an earlier passphrase). Restore it in the panel with its passphrase: ${panel}`), { status: 400 }) : e);
+    if (body.check) return openBackup({ source: body.source, file: body.file, passphrase }).catch((e) => { throw wrong(e); });
     let r;
-    if (body.source === 'upload') {
-      r = restoreBuffer(readUpload(body.upload), String(body.passphrase || ''), { source: 'upload', file: String(body.name || 'uploaded file').slice(0, 80) });
-      dropUpload(body.upload);
-    } else {
-      r = await restoreBackup({ source: body.source, file: body.file, passphrase: String(body.passphrase || '') });
-    }
+    try {
+      if (body.source === 'upload') {
+        r = restoreBuffer(readUpload(body.upload), passphrase, { source: 'upload', file: String(body.name || 'uploaded file').slice(0, 80) });
+        dropUpload(body.upload);
+      } else {
+        r = await restoreBackup({ source: body.source, file: body.file, passphrase });
+      }
+    } catch (e) { throw wrong(e); }
     activity('backup.restore', { summary: `Restore started by ${user.username}` });
     restart();
     return { ok: true, restarting: true, ...r };

@@ -31,6 +31,12 @@
 > Google rejects an origin that ends with `/` or contains a path, and it does not accept bare IP addresses: use your
 > domain or the installer's `…sslip.io` name with HTTPS.
 
+> [!NOTE]
+> Without Google: **Settings → Users → Add a user with a password or a sign-up link**. Leave the password empty and
+> you get a one-time sign-up link (48 hours) to send to that person only; they choose their own password and are
+> signed in. **Sign-up link** / **Password link** on a user makes a new one (older links stop working). The owner
+> assistant does the same from WhatsApp ("add Anu as an admin").
+
 > [!TIP]
 > **Only allow Sign in with Google** (Settings → Sign-in) turns passwords off. Locked out? On the server run
 > `sudo duniya enable-password-login` ([command line](cli.md)).
