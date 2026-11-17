@@ -25,7 +25,7 @@ description: "Task list template for feature implementation"
 - **Web app**: `backend/src/`, `frontend/src/`
 - **Mobile**: `api/src/`, `ios/src/` or `android/src/`
 - Paths shown below assume single project - adjust based on plan.md structure
-- **This repository**: `src/core/`, `src/channels/`, `src/panel/` (UI in `src/panel/public/index.html`), `test/*.test.js`, `docs/`, `docs/site/` (see the architecture map in `AGENTS.md`)
+- **This repository**: `src/core/`, `src/channels/`, `src/panel/` (UI in `src/panel/public/app/`, one module per screen), `test/*.test.js`, `docs/`, `docs/site/` (see the architecture map in `AGENTS.md`)
 
 <!--
   ============================================================================
@@ -170,7 +170,7 @@ Examples of foundational tasks (adjust based on your project):
 
 - [ ] TXXX Issue: labels (type / area / priority / status / `spec: NNN`), plan comment posted, progress comments at milestones
 - [ ] TXXX Spec artifacts (spec.md, plan.md, tasks.md) match the code (`/speckit-analyze`, `/speckit-converge`)
-- [ ] TXXX Tests with fakes in `test/` cover the new behaviour; `npm test`, `npm run lint`, `npm run check:panel` pass
+- [ ] TXXX Tests with fakes in `test/` cover the new behaviour; `npm test`, `npm run lint`, `npm run typecheck`, `npm run check:panel` pass
 - [ ] TXXX UI: `npm run check:responsive` passes (375 / 393 / 1440, light + dark); DESIGN.md checklist met
 - [ ] TXXX Security review: no secrets, TLS never disabled, no shell with untrusted input, untrusted text rendered as text, permissions enforced in code; CodeQL clean at high / error
 - [ ] TXXX Privacy review: chat allow-list respected, no message contents in logs beyond the logging policy, privacy notice behaviour intact

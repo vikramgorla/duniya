@@ -10,7 +10,7 @@ Tick each item or write "n/a – reason".
 **Spec & tests**
 - [ ] Spec Kit artifacts (spec, plan, tasks) match the code
 - [ ] Tests with fakes cover the behaviour
-- [ ] `npm test`, `npm run lint`, `npm run check:panel` pass
+- [ ] `npm test`, `npm run lint`, `npm run typecheck`, `npm run check:panel` pass
 - [ ] UI changed: `npm run check:responsive` passes (375 / 393 / 1440, light + dark) and DESIGN.md checklist met
 
 **Security & privacy**
@@ -24,7 +24,7 @@ Tick each item or write "n/a – reason".
 
 **Lean code**
 - [ ] What the change replaces is deleted; no compatibility layer or one-time migration left after its release; existing helpers reused
-- [ ] `node scripts/ci-checks.mjs` passes (knip, jscpd, panel size budget); tests check behaviour, not internals
+- [ ] `node scripts/ci-checks.mjs` passes (knip, jscpd, panel budgets, types); tests check behaviour, not internals
 - [ ] UI: no new polling (live data over `/api/events`)
 
 **Docs**

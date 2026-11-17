@@ -1,6 +1,11 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.24.0": {
+      "breaking": false,
+      "title": "The panel opens faster: Overview first, other screens when you open them, only changed files after an update",
+      "summary": "The panel is now split into small files your browser keeps: Overview needs about half the download it did and one round trip less, so it shows up to a third sooner on a slow phone connection; each other screen loads the first time you open it, and after an update only the files that changed are downloaded again. The page also runs only scripts from your own server (a stricter browser security policy). Everything looks and works as before. Nothing to do on your server."
+    },
     "2.23.0": {
       "breaking": false,
       "title": "Getting started opens each first step right on Overview, and / finds any agent, chat or setting",

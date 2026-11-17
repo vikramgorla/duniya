@@ -41,8 +41,8 @@ const REGISTRY_ADDED = `const f1 = window.fetch; window.fetch = async (u, o) => 
 // js runs in the page after the screen loaded; T.* helpers are defined in PRELUDE.
 const STATES = [
   { name: 'login', hash: '', js: "await fetch('/api/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); await (await import('/app/login.js')).renderLogin();", relogin: true },
-  { name: 'setup', hash: '', js: "S.es?.close(); S.tab = ''; const f0 = window.fetch; window.fetch = (u, o) => (String(u) === '/api/session' ? Promise.resolve(new Response(JSON.stringify({ needsSetup: true }))) : f0(u, o)); await (await import('/app/login.js')).renderLogin();" },
-  { name: 'setup-restore', hash: '', js: "S.es?.close(); S.tab = ''; const f0 = window.fetch; window.fetch = (u, o) => (String(u) === '/api/session' ? Promise.resolve(new Response(JSON.stringify({ needsSetup: true }))) : f0(u, o)); await (await import('/app/login.js')).renderLogin(); await T.click('Restore a backup');" },
+  { name: 'setup', hash: '', js: "S.es?.close(); S.tab = ''; const f0 = window.fetch; window.fetch = (u, o) => (String(u).startsWith('/api/session') ? Promise.resolve(new Response(JSON.stringify({ needsSetup: true }))) : f0(u, o)); await (await import('/app/login.js')).renderLogin();" },
+  { name: 'setup-restore', hash: '', js: "S.es?.close(); S.tab = ''; const f0 = window.fetch; window.fetch = (u, o) => (String(u).startsWith('/api/session') ? Promise.resolve(new Response(JSON.stringify({ needsSetup: true }))) : f0(u, o)); await (await import('/app/login.js')).renderLogin(); await T.click('Restore a backup');" },
   { name: 'overview', hash: 'overview' },
   // 061: the install hint without the browser's install prompt (iPhone, Firefox): the manual steps instead of a button
   { name: 'overview-install-steps', hash: 'overview', js: "S.installPrompt = null; localStorage.removeItem('duniya.installHint'); show(S.tab); await T.wait(300);" },
