@@ -1,13 +1,13 @@
 // @ts-check
 // Backups (007): settings, run, retention per destination, schedule, list, restore staging.
-import { readFileSync, writeFileSync, readdirSync, rmSync, mkdirSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, rmSync, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DATA_DIR, env, fail } from '../config.js';
 import { getSecret, setSecret, getSetting, updateSettings } from '../store.js';
 import { kvGet, kvSet } from '../db.js';
 import { activity } from '../events.js';
 import { assertDiskRoom } from '../retention.js';
-import { createBundle, encryptBundle, decryptBundle, stageRestore } from './bundle.js';
+import { writeBackup, checkBackup, stageRestore } from './bundle.js';
 import * as gh from './github.js';
 import { s3Client } from './s3.js';
 
@@ -108,14 +108,14 @@ export function runBackup({ reason = 'manual', appVersion = '', preUpdate = fals
       const s = getBackupSettings();
       const pass = getSecret('BACKUP_PASSPHRASE');
       if (!pass) throw bad('passphrase', 'set a backup passphrase first');
-      const buf = encryptBundle(createBundle({ includeWhatsApp: s.includeWhatsApp, appVersion }), pass);
       assertDiskRoom(); // 069: never fill the last of the disk with a backup
       let file = stampName();
       // the same millisecond (a clock that went back): wait for the next stamp
       while (existsSync(resolve(LOCAL_DIR, file))) { await new Promise((r) => setTimeout(r, 5)); file = stampName(); }
       const results = {};
-      mkdirSync(LOCAL_DIR, { recursive: true, mode: 0o700 });
-      writeFileSync(resolve(LOCAL_DIR, file), buf, { mode: 0o600 });
+      // 070: streamed from disk into the file; remote copies read the finished (compressed, encrypted) file
+      const { size } = await writeBackup(resolve(LOCAL_DIR, file), pass, { includeWhatsApp: s.includeWhatsApp, appVersion });
+      const remote = (s.github.enabled || s.s3.enabled) && !preUpdate ? readFileSync(resolve(LOCAL_DIR, file)) : null;
       let pre = preUpdateFiles();
       if (preUpdate) {
         pre = [...pre, file];
@@ -130,24 +130,24 @@ export function runBackup({ reason = 'manual', appVersion = '', preUpdate = fals
       if (s.github.enabled && !preUpdate) {
         try {
           if (!ghToken()) throw new Error('GitHub is not connected');
-          const r = await gh.upload(ghToken(), s.github, file, buf, s.keep);
+          const r = await gh.upload(ghToken(), s.github, file, remote, s.keep);
           results.github = r.pruned.length ? `ok (pruned ${r.pruned.length})` : 'ok';
         } catch (e) { results.github = `error: ${e.message}`; }
       }
       if (s.s3.enabled && !preUpdate) {
         try {
           const c = s3For(s);
-          await c.put(`${s.s3.prefix}${file}`, buf);
+          await c.put(`${s.s3.prefix}${file}`, remote);
           const objs = (await c.list(s.s3.prefix)).filter((o) => FILE_RE.test(o.key.slice(s.s3.prefix.length))).sort((a, z) => z.key.localeCompare(a.key));
           for (const o of objs.slice(s.keep)) await c.del(o.key);
           results.s3 = 'ok';
         } catch (e) { results.s3 = `error: ${e.message}`; }
       }
-      const last = { at: Date.now(), file, size: buf.length, results, reason };
+      const last = { at: Date.now(), file, size, results, reason };
       kvSet('backup:last', JSON.stringify(last));
       const failed = Object.entries(results).filter(([, v]) => v.startsWith('error'));
       activity(failed.length ? 'error' : 'backup.done', {
-        summary: `${preUpdate ? 'Pre-update backup' : 'Backup'} ${file} (${Math.round(buf.length / 1024)} KB): ${Object.entries(results).map(([k, v]) => `${k} ${v}`).join(', ')}`,
+        summary: `${preUpdate ? 'Pre-update backup' : 'Backup'} ${file} (${Math.round(size / 1024)} KB): ${Object.entries(results).map(([k, v]) => `${k} ${v}`).join(', ')}`,
       });
       return last;
     }
@@ -168,13 +168,14 @@ export async function listBackups(source) {
   throw bad('source', 'local, github or s3');
 }
 
+/** A backup as a local path (read in place) or, from GitHub or S3, the downloaded file in memory. */
 export async function fetchBackup(source, file) {
   if (!FILE_RE.test(file || '')) throw bad('file', 'invalid backup file name');
   const s = getBackupSettings();
   if (source === 'local') {
     const p = resolve(LOCAL_DIR, file);
     if (!existsSync(p)) throw fail('Backup not found', 404);
-    return readFileSync(p);
+    return p;
   }
   if (source === 'github') return gh.download(ghToken(), s.github, file);
   if (source === 's3') return s3For(s).get(`${s.s3.prefix}${file}`);
@@ -183,22 +184,18 @@ export async function fetchBackup(source, file) {
 
 /** Fetch and decrypt a backup without restoring it (060: the restore preview checks that it opens). */
 export async function openBackup({ source, file, passphrase }) {
-  const bundle = decryptBundle(await fetchBackup(source, file), passphrase);
-  return { files: Object.keys(bundle.files || {}).length, createdAt: bundle.createdAt };
+  const r = await checkBackup(await fetchBackup(source, file), passphrase);
+  return { files: r.files.length, createdAt: r.createdAt };
 }
-/** Decrypt and stage; caller restarts the process. */
-export async function restoreBackup({ source, file, passphrase }) {
-  return restoreBuffer(await fetchBackup(source, file), passphrase, { source, file });
-}
-/** Decrypt an encrypted backup already in memory (e.g. an uploaded file) and stage it. */
-export function restoreBuffer(buf, passphrase, { source = 'upload', file = 'uploaded file' } = {}) {
-  const bundle = decryptBundle(buf, passphrase);
-  const names = stageRestore(bundle, `${source}:${file}`);
-  activity('backup.restore', { summary: `Restore of ${file} from ${source} staged (${names.length} files); restarting` });
-  return { files: names.length, createdAt: bundle.createdAt };
+/**
+ * Decrypt and stage a backup (local, github, s3, or `path`: an uploaded file on disk); the caller restarts.
+ */
+export async function restoreBackup({ source, file, passphrase, path = '' }) {
+  const r = await stageRestore(path || await fetchBackup(source, file), passphrase, `${source}:${file}`);
+  activity('backup.restore', { summary: `Restore of ${file} from ${source} staged (${r.files.length} files); restarting` });
+  return { files: r.files.length, createdAt: r.createdAt };
 }
 
-// ---------- schedule ----------
 function parts(date, tz) {
   const f = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short' });
   const p = Object.fromEntries(f.formatToParts(date).map((x) => [x.type, x.value]));

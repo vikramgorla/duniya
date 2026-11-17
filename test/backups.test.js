@@ -107,7 +107,7 @@ test('US1: owner only; passphrase required; encrypted file; local retention', as
   const local = (await t.api(owner, 'GET', '/api/backups/list?source=local')).body;
   assert.equal(local.length, 2, 'keeps 2');
   const buf = readFileSync(join(t.tmp, 'data', 'backups', local[0].file));
-  assert.equal(buf.subarray(0, 8).toString(), 'DUNIYA1\n');
+  assert.equal(buf.subarray(0, 8).toString(), 'DUNIYA2\n');
   for (const needle of ['Panduga', 'linked-session', 'event assistant']) assert.ok(!buf.includes(needle), `${needle} must not be readable`);
 });
 
@@ -153,6 +153,16 @@ test('US4: restore — wrong passphrase refused; round trip into a fresh data di
   assert.equal(wrong.status, 400);
   assert.match(wrong.body.error, /Wrong passphrase/);
   assert.ok(!existsSync(join(t.tmp, 'data', 'restore-pending')));
+  // 070: a changed byte anywhere (here: in the middle of the streamed data) fails the GCM check; nothing is staged
+  const local = (await t.api(owner, 'GET', '/api/backups/list?source=local')).body[0].file;
+  const path = join(t.tmp, 'data', 'backups', local);
+  const orig = readFileSync(path); const bent = Buffer.from(orig); bent[Math.floor(bent.length / 2)] ^= 1;
+  writeFileSync(path, bent);
+  const damaged = await t.api(owner, 'POST', '/api/backups/restore', { source: 'local', file: local, passphrase: 'correct horse battery staple' });
+  assert.equal(damaged.status, 400); assert.match(damaged.body.error, /Wrong passphrase \(or the file is damaged\)/);
+  assert.ok(!existsSync(join(t.tmp, 'data', 'restore-pending')), 'a damaged backup stages nothing');
+  writeFileSync(path, orig);
+  assert.equal((await t.api(owner, 'POST', '/api/backups/restore', { source: 'local', file: local, check: true })).body.files, 3, 'the restore preview (database, key, WhatsApp session) opens it with the stored passphrase');
 
   const ok = await t.api(owner, 'POST', '/api/backups/restore', { source: 's3', file: (await t.api(owner, 'GET', '/api/backups/list?source=s3')).body[0].file, passphrase: 'correct horse battery staple' });
   assert.equal(ok.status, 200); assert.equal(ok.body.restarting, true); assert.equal(t.restarts, 1);

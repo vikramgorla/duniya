@@ -1,11 +1,12 @@
 // Panel routes for backups (007). Owner only.
 import { fail, restartSoon } from '../../core/config.js';
-import { readFileSync } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import {
-  getBackupSettings, updateBackupSettings, setPassphrase, runBackup, listBackups, fetchBackup, openBackup, restoreBackup, restoreBuffer,
+  getBackupSettings, updateBackupSettings, setPassphrase, runBackup, listBackups, fetchBackup, openBackup, restoreBackup,
   lastBackup, listLocal, githubClientId, github, APP_KEY_SECRET, resetAppToken,
 } from '../../core/backup/index.js';
+import { MAGIC } from '../../core/backup/bundle.js';
 import { getSecret, setSecret, countUsers } from '../../core/store.js';
 import { activity } from '../../core/events.js';
 import {
@@ -14,16 +15,15 @@ import {
 import { baseUrl } from '../http-util.js';
 
 const OWNER = { role: 'owner' };
-const MAGIC = 'DUNIYA1\n';
 let device = null; // { clientId, deviceCode, expiresAt }
 const manifestStates = new Map(); // state -> { expires, by }
 const setupLimit = limiter(10);
 
-/** Read a finished upload; a missing or expired one gets a plain message. */
-function readUpload(id) {
-  try { return readFileSync(uploadPath(id)); } catch (e) {
-    throw fail(e.status ? e.message : 'The uploaded file is no longer here (uploads are kept for one hour). Choose the file again.');
-  }
+/** The path of a finished upload; a missing or expired one gets a plain message. */
+function uploadFile(id) {
+  const p = uploadPath(id);
+  if (!existsSync(p)) throw fail('The uploaded file is no longer here (uploads are kept for one hour). Choose the file again.');
+  return p;
 }
 const fileLabel = (req) => String(req.headers['x-file-name'] || 'uploaded file').replace(/[^\w.@ -]/g, '').slice(0, 80) || 'uploaded file';
 
@@ -62,9 +62,9 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
   route('POST', '/api/backups/run', async () => runBackup({ reason: 'manual' }), OWNER);
   route('GET', '/api/backups/list', async (req, res, body, q) => listBackups(q.get('source') || 'local'), OWNER);
   route('GET', '/api/backups/download/:file', async (req, res, body, q, p) => {
-    const buf = await fetchBackup('local', p.file);
+    const path = await fetchBackup('local', p.file);
     res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-disposition': `attachment; filename="${p.file}"`, 'cache-control': 'no-store' });
-    res.end(buf);
+    createReadStream(path).pipe(res);
     return null;
   }, OWNER);
   // 060: without a passphrase the server's stored one is used (the owner assistant and AI assistants never see one);
@@ -80,7 +80,7 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
     let r;
     try {
       if (body.source === 'upload') {
-        r = restoreBuffer(readUpload(body.upload), passphrase, { source: 'upload', file: String(body.name || 'uploaded file').slice(0, 80) });
+        r = await restoreBackup({ source: 'upload', file: String(body.name || 'uploaded file').slice(0, 80), passphrase, path: uploadFile(body.upload) });
         dropUpload(body.upload);
       } else {
         r = await restoreBackup({ source: body.source, file: body.file, passphrase });
@@ -110,7 +110,7 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
     if (countUsers() > 0) return [409, { error: 'This server is already set up. Sign in and use Backups → Restore.' }];
     if (setupLimit(clientIp(req))) return [429, { error: 'Too many attempts, wait a minute' }];
     if (!checkSetupCode(body.code)) return [403, { error: 'Wrong setup code (see the installer output or the server log)' }];
-    const r = restoreBuffer(readUpload(body.upload), String(body.passphrase || ''), { source: 'upload (first-run setup)', file: String(body.name || 'uploaded file').slice(0, 80) });
+    const r = await restoreBackup({ source: 'upload (first-run setup)', file: String(body.name || 'uploaded file').slice(0, 80), passphrase: String(body.passphrase || ''), path: uploadFile(body.upload) });
     dropUpload(body.upload);
     restart();
     return { ok: true, restarting: true, ...r };
