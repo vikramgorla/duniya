@@ -32,10 +32,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS admin_oauth_tokens_family ON admin_oauth_tokens(family);
   CREATE INDEX IF NOT EXISTS admin_oauth_tokens_user ON admin_oauth_tokens(user_id, client_id);
 `);
-// 2.22.0 only (061): the mobile app is gone; forget its built-in client, its sign-ins and its Expo link setting.
-// Remove in the next release.
-for (const t of ['admin_oauth_tokens', 'admin_oauth_grants', 'admin_oauth_clients']) db.prepare(`DELETE FROM ${t} WHERE client_id = 'duniya-mobile'`).run();
-db.prepare("DELETE FROM settings WHERE key = 'mobile'").run();
 onUserDeleted((id) => {
   db.prepare('DELETE FROM admin_oauth_grants WHERE user_id = ?').run(id);
   db.prepare('DELETE FROM admin_oauth_tokens WHERE user_id = ?').run(id);

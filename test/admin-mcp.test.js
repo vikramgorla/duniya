@@ -189,6 +189,12 @@ test('tools via the SDK client: read and write as the approving user, logged as 
   assert.deepEqual(agents.map((b) => b.id).sort(), ['helper', 'owner-assistant', 'panduga']);
   const ov = JSON.parse(text(await c.callTool({ name: 'get_overview', arguments: {} })));
   assert.equal(ov.you.username, 'admin');
+  // 062: the Getting started steps still open (no reply yet in this harness)
+  assert.deepEqual(ov.gettingStarted.open.map((x) => x.step), ['reply']);
+  // 062: assign_chat with switch_on binds and switches an Off chat on
+  const as = await c.callTool({ name: 'assign_chat', arguments: { chat: 'g-mcp@g.us', agent_id: 'helper', switch_on: true } });
+  assert.ok(!as.isError, text(as));
+  assert.equal(t.chatPrefs.isChatEnabled('g-mcp@g.us'), true);
 
   const w = await c.callTool({ name: 'set_agent_enabled', arguments: { agent_id: 'helper', enabled: false } });
   assert.ok(!w.isError, text(w));

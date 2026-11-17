@@ -56,6 +56,13 @@ export async function newPage(cdp, { width, scheme, height, scale = 1 }) {
     const { data } = await s('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width: Math.ceil(c.width), height: Math.ceil(c.height), scale: 1 } });
     writeFileSync(file, Buffer.from(data, 'base64'));
   };
-  return { evaluate, goto, shot, send: s, close: () => cdp.send('Target.closeTarget', { targetId }) };
+  /** Runs a constant function source with plain JSON arguments: data never becomes code. */
+  const call = async (fn, ...args) => {
+    const { result } = await s('Runtime.evaluate', { expression: 'window' });
+    const r = await s('Runtime.callFunctionOn', { objectId: result.objectId, functionDeclaration: fn, arguments: args.map((value) => ({ value })), awaitPromise: true, returnByValue: true });
+    if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
+    return r.result.value;
+  };
+  return { evaluate, call, goto, shot, send: s, close: () => cdp.send('Target.closeTarget', { targetId }) };
 }
 

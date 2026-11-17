@@ -12,10 +12,10 @@ after(() => t.close());
 const silences = async (q = '') => (await t.api(owner, 'GET', `/api/silences?${q}`)).body.silences;
 const silenceActs = (chat) => t.db.listActivity({ limit: 500, chat }).filter((a) => a.type === 'silence');
 
-// ---------- #36 ----------
-test('#36: checklist shows live setup state, links each step and can be dismissed (admins only)', async () => {
+// ---------- #36, 062 ----------
+test('#36/062: Getting started shows live setup state in first-run order, links each step and can be dismissed (admins only)', async () => {
   let c = (await t.api(viewer, 'GET', '/api/checklist')).body;
-  assert.deepEqual(c.steps.map((s) => s.id), ['provider', 'whatsapp', 'agent', 'chat', 'reply']);
+  assert.deepEqual(c.steps.map((s) => s.id), ['whatsapp', 'provider', 'agent', 'chat', 'reply']);
   const by = Object.fromEntries(c.steps.map((s) => [s.id, s]));
   assert.equal(by.provider.done, true, 'the fake Claude key lists models');
   assert.equal(by.whatsapp.done, true);
@@ -26,12 +26,27 @@ test('#36: checklist shows live setup state, links each step and can be dismisse
   assert.equal(by.provider.href, '#models');
   assert.equal(by.chat.href, '#chats');
   assert.match(by.reply.href, /^#agents\/[a-z-]+\/test$/);
+  assert.equal(c.agent.id, 'panduga', 'the agent the inline steps use: one with a chat that is on');
 
   // a chat switched off everywhere → the step is open again
   const on = t.chatPrefs.enabledChats();
   for (const ch of on) t.chatPrefs.setChatPrefs(ch, { enabled: false });
   assert.equal((await t.api(owner, 'GET', '/api/checklist')).body.steps.find((s) => s.id === 'chat').done, false);
   for (const ch of on) t.chatPrefs.setChatPrefs(ch, { enabled: true });
+
+  // 062: a step can be skipped (it counts) and brought back; unknown steps are refused; viewers cannot change it
+  c = (await t.api(owner, 'PUT', '/api/checklist', { skip: 'reply' })).body;
+  assert.equal(c.steps.find((s) => s.id === 'reply').skipped, true);
+  assert.equal(c.complete, true);
+  assert.equal((await t.api(owner, 'PUT', '/api/checklist', { skip: 'nope' })).status, 400);
+  assert.equal((await t.api(viewer, 'PUT', '/api/checklist', { skip: 'reply' })).status, 403);
+  c = (await t.api(owner, 'PUT', '/api/checklist', { unskip: 'reply' })).body;
+  assert.equal(c.steps.find((s) => s.id === 'reply').skipped, false);
+  assert.equal(c.complete, false);
+
+  // the owner assistant's own answers do not count as the first reply (it is built in, not "your agent")
+  t.db.logMessage({ chat: 'owner@s.whatsapp.net', agent: 'owner-assistant', msgId: 'oa1', sender: '', name: 'Owner assistant', text: 'Hi', addressed: false, fromAgent: true, ts: Date.now() });
+  assert.equal((await t.api(owner, 'GET', '/api/checklist')).body.steps.find((s) => s.id === 'reply').done, false);
 
   // a test console reply completes the last step
   t.script.push([{ type: 'text', text: 'Hello!' }]);
@@ -213,4 +228,32 @@ test('#37: "Test as" in a chat uses that chat’s memory and type, never sends t
   t.chatPrefs.setChatPrefs('g1@g.us', { enabled: true });
   assert.equal((await t.api(owner, 'POST', '/api/agents/panduga/test', { text: 'hi', chat: 'g2@g.us' })).status, 400);
   assert.equal(t.sent.length, sentBefore);
+});
+
+// Last: it removes and re-imports the agents.
+test('062: the built-in owner assistant alone is not "your first agent"; choosing an agent with enable switches the chat on', async () => {
+  const saved = t.agents.listAgents().filter((a) => a.id !== 'owner-assistant').map((a) => a.id);
+  // Without any agent of your own the step is open, even though the owner assistant exists.
+  const exported = [];
+  for (const id of saved) { exported.push((await t.api(owner, 'GET', `/api/agents/${id}/export`)).body); await t.api(owner, 'DELETE', `/api/agents/${id}`); }
+  let c = (await t.api(owner, 'GET', '/api/checklist')).body;
+  assert.equal(c.steps.find((s) => s.id === 'agent').done, false);
+  assert.equal(c.steps.find((s) => s.id === 'chat').done, false);
+  assert.equal(c.agent, null);
+  for (const e of exported) await t.api(owner, 'POST', '/api/agents/import', e);
+
+  // bind + enable: one call binds the agent and switches an Off chat on (recorded like the switch)
+  const chat = 'g-new@g.us';
+  assert.equal(t.chatPrefs.isChatEnabled(chat), false);
+  let r = (await t.api(owner, 'POST', '/api/chats/bind', { chat, agent: 'panduga', enable: true })).body;
+  assert.equal(r.enabled, true);
+  assert.equal(t.chatPrefs.isChatEnabled(chat), true);
+  assert.ok(t.db.listActivity({ limit: 50, chat }).some((a) => /Chat switched ON/.test(a.summary)));
+  // without enable an Off chat stays off
+  const other = 'g-other@g.us';
+  r = (await t.api(owner, 'POST', '/api/chats/bind', { chat: other, agent: 'panduga' })).body;
+  assert.equal(r.enabled, false);
+  assert.equal(t.chatPrefs.isChatEnabled(other), false);
+  c = (await t.api(owner, 'GET', '/api/checklist')).body;
+  assert.equal(c.steps.find((s) => s.id === 'agent').done, true);
 });

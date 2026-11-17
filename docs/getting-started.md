@@ -1,12 +1,13 @@
 # Getting started
 
-**From a fresh panel to an agent answering in your group, in five checklist steps.**
+**From a fresh panel to an agent answering in your group in about five taps, without leaving Overview.**
 
-**Do it:** open the panel → **Overview** → follow the **first-run checklist**.
+**Do it:** open the panel → **Overview** → **Getting started**: the current step opens right there.
 
 **In 30 seconds**
+- Five steps, in order: link WhatsApp, connect a model, create an agent, switch a chat on, send a test.
 - Chats are **off** until you switch them on: nothing stored, no model call.
-- Try agents in the **test console**: nothing is posted to WhatsApp.
+- Lost? Press **/** (or ⌘K, or the search button on a phone) and type what you want: an agent, a group, a setting.
 - Agent quiet? **Overview → Why agents stayed quiet** says why, with a fix.
 
 ## Where is my panel?
@@ -25,35 +26,54 @@ More per host: [Install → Where is my panel?](install.md#where-is-my-panel-fin
 
 ## First steps
 
-![First-run checklist on Overview](site/img/card-checklist.webp)
+**Setup**: enter the setup code, choose your username and password. Then **Overview → Getting started** walks you
+through five steps; the one you are on opens in place:
 
-1. **Setup**: enter the setup code, choose your username and password.
-2. **Overview**: scan the QR with the agent's WhatsApp (*Settings → Linked devices*), or use a pairing code.
-3. **Models**: connect OpenRouter in one tap, paste an Anthropic or OpenAI key, add an OpenAI-compatible endpoint,
-   *Sign in with ChatGPT*, or connect GitHub Copilot. [Models](models.md)
-4. **Agents → New agent**: pick a template (or *Create an agent with AI*), write the instructions, add organizers,
-   connect tool services, save. Try it in the **test console**. [Agents](agents.md)
-5. Add the agent's number to a WhatsApp group. **Chats** → switch the chat **on** and choose the agent. Its recent
-   messages are loaded from your phone (keep the phone online), so the agent starts with context. For one person,
-   **Chats → + Add a direct chat** works before they have written ([Agents](agents.md#set-up-a-direct-chat-before-the-person-writes)).
-6. In the group: `!yourtrigger hello` (or @mention the agent).
-7. **Backups**: set a passphrase, connect GitHub or S3, turn on the schedule. [Backups](backups-and-updates.md)
+![Getting started: switch a chat on](site/img/card-checklist.webp)
+
+1. **Link your WhatsApp number**: scan the QR code with the phone of the agents' number (*WhatsApp → Settings →
+   Linked devices → Link a device*), or get a pairing code. Use a number just for the agents.
+2. **Connect an AI model**: paste any key into the one box: Duniya recognises OpenRouter (`sk-or-`, free models
+   only), Anthropic (`sk-ant-`), OpenAI (`sk-`) and GitHub Copilot (`github_pat_`). No key yet? **Free key from
+   OpenRouter ↗**, or **Use my ChatGPT plan**. Everything else: [Models](models.md).
+3. **Create your first agent**: tap a template (Car pooling, Family, Event planning…) or describe it in your own words
+   and let the AI helper draft it. You can change everything later. [Agents](agents.md)
+4. **Switch a chat on**: tap **Switch on** next to a group. The agent is chosen for it, the group gets a short privacy
+   notice once, and its recent messages are loaded from your phone (keep the phone online).
+5. **Send a test message**: ask the agent something; the answer shows right there (nothing is posted to WhatsApp).
+   Then try it in the group: `!yourtrigger hello` or @mention the agent.
+
+![Getting started: connect a model](site/img/card-start-model.webp)
+
+When the last step is done, the card says **All set** with the test answer and disappears after **Close**. **Skip**
+leaves a step for later (**Skipped · undo** brings it back); **Hide** hides the card (bring it back under **Settings →
+Getting started**). Afterwards: **Backups** (passphrase, GitHub or S3, schedule), see [Backups](backups-and-updates.md).
 
 > [!TIP]
-> Tools every agent should have (a calendar, a shared planner) go under **Settings → Tool services** once, instead of
-> per agent. The checklist can be dismissed once you know your way around.
+> For one person instead of a group, **Chats → + Add a direct chat** works before they have written
+> ([Agents](agents.md#set-up-a-direct-chat-before-the-person-writes)). Tools every agent should have (a calendar, a
+> shared planner) go under **Settings → Tool services** once, instead of per agent.
 
-<p align="center"><img src="diagrams/first-steps.svg" alt="First steps: connect a model, link WhatsApp, create an agent, switch a chat on, get the first reply" width="182"></p>
+<p align="center"><img src="diagrams/first-steps.svg" alt="First steps: link WhatsApp, connect a model, create an agent, switch a chat on, send a test message" width="182"></p>
 
 <details><summary>Diagram as text</summary>
 
-1. Connect a model.
-2. Link WhatsApp.
+1. Link WhatsApp.
+2. Connect a model.
 3. Create an agent.
 4. Switch a chat on.
-5. Get the first reply.
+5. Send a test message.
 
 </details>
+
+## Find anything
+
+Press **/** or **⌘K** (Ctrl+K), or tap the search button in the header, and type: a group, a person, an agent
+(*Test Car pooling* opens its test console), a setting (*secrets*, *privacy*, *backup*) or an action (*pause*, *new
+agent*, *add a direct chat*). ↑ ↓ and Enter, or tap. Links like `#settings/secrets`, `#models/chatgpt` or
+`#chats/<chat id>` open the screen at that spot.
+
+![Find anything](site/img/card-find.webp)
 
 ## Trying an agent: test console and *Test as*
 

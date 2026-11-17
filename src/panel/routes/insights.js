@@ -3,7 +3,7 @@
 import { db } from '../../core/db.js';
 import { chatTitle } from '../../core/contacts.js';
 import { listSilences, clearSilences, SILENCE_REASONS } from '../../core/silences.js';
-import { listAgents, getAgent } from '../../core/agents.js';
+import { listAgents, getAgent, isBuiltin, OWNER_AGENT_ID } from '../../core/agents.js';
 import { enabledChats, seenChats } from '../../core/chat-prefs.js';
 import { getSettings, updateSettings } from '../../core/store.js';
 import { status as providerStatus } from '../../core/providers/index.js';
@@ -13,27 +13,34 @@ import '../../core/usage.js'; // the usage table
 
 const SERVICE_NAME = { memory: 'Memory', contacts: 'Contacts', whatsapp: 'WhatsApp actions', local: 'Built-in' };
 
-/** First-run checklist (#36): live state of the five setup steps. */
+/** Getting started (#36, 062): live state of the five setup steps, in the order a new owner does them. The built-in
+ *  owner assistant does not count as "an agent". `agent` is the one the inline steps use (switch a chat on, test). */
+const STEP_IDS = ['whatsapp', 'provider', 'agent', 'chat', 'reply'];
 async function checklist(channel) {
   const providers = await providerStatus().catch(() => []);
   const ch = await channel.status().catch(() => ({}));
   const numbers = ch?.numbers || (ch?.status ? [ch] : []);
-  const agents = listAgents();
-  const replied = !!db.prepare('SELECT 1 FROM messages WHERE from_agent = 1 LIMIT 1').get()
-    || !!db.prepare("SELECT 1 FROM usage WHERE kind IN ('reply', 'test') LIMIT 1").get();
-  const first = agents[0]?.id || '';
+  const agents = listAgents().filter((a) => !isBuiltin(a));
+  const on = new Set(enabledChats());
+  const replied = !!db.prepare("SELECT 1 FROM messages WHERE from_agent = 1 AND agent != ? LIMIT 1").get(OWNER_AGENT_ID)
+    || !!db.prepare("SELECT 1 FROM usage WHERE kind IN ('reply', 'test') AND agent != ? LIMIT 1").get(OWNER_AGENT_ID);
+  const pick = agents.find((a) => a.chats.some((c) => on.has(c))) || agents.at(-1);
+  const first = pick?.id || '';
+  const skipped = new Set(getSettings().checklistSkipped || []);
   const steps = [
-    { id: 'provider', title: 'Connect an AI model provider', done: providers.some((p) => p.connected), href: '#models',
-      hint: 'Agents need a model to think with. A Claude or OpenAI key, a ChatGPT plan or GitHub Copilot all work.' },
-    { id: 'whatsapp', title: 'Link a WhatsApp number', done: numbers.some((n) => n.status === 'open'), href: '#overview/whatsapp',
-      hint: 'Scan the QR code with the phone of the number your agents use (WhatsApp → Linked devices).' },
-    { id: 'agent', title: 'Create an agent', done: agents.length > 0, href: '#agents', hint: 'Start from a template; you can change everything later.' },
-    { id: 'chat', title: 'Switch a chat on', done: enabledChats().length > 0, href: '#chats', hint: 'Every chat starts Off. Switch on the groups and people your agent should answer.' },
-    { id: 'reply', title: 'Get a first reply', done: replied, href: first ? `#agents/${encodeURIComponent(first)}/test` : '#agents',
-      hint: 'Ask your agent something in the test console, or message it in a chat that is on.' },
-  ];
-  const done = steps.filter((s) => s.done).length;
-  return { steps, done, total: steps.length, complete: done === steps.length, dismissed: !!getSettings().checklistDismissed };
+    { id: 'whatsapp', title: 'Link your WhatsApp number', done: numbers.some((n) => n.status === 'open'), href: '#overview/whatsapp',
+      hint: 'Use the phone of the number your agents answer from (best a number just for them). Duniya links like WhatsApp on a computer.' },
+    { id: 'provider', title: 'Connect an AI model', done: providers.some((p) => p.connected), href: '#models',
+      hint: 'Agents need a model to think with. Paste a key, or start free with OpenRouter.' },
+    { id: 'agent', title: 'Create your first agent', done: agents.length > 0, href: '#agents', hint: 'Pick a template or describe it in your own words; you can change everything later.' },
+    { id: 'chat', title: 'Switch a chat on', done: agents.some((a) => a.chats.some((c) => on.has(c))), href: '#chats',
+      hint: 'Every chat starts Off, so agents stay silent. Choose the group your agent should answer in.' },
+    { id: 'reply', title: 'Send a test message', done: replied, href: first ? `#agents/${encodeURIComponent(first)}/test` : '#agents',
+      hint: 'Ask your agent something here, or write to it in the chat you switched on.' },
+  ].map((s) => ({ ...s, skipped: !s.done && skipped.has(s.id) }));
+  const done = steps.filter((s) => s.done || s.skipped).length;
+  return { steps, done, total: steps.length, complete: done === steps.length, dismissed: !!getSettings().checklistDismissed,
+    agent: pick ? { id: pick.id, name: pick.name, trigger: pick.triggers?.[0] || '' } : null };
 }
 
 export function insightRoutes(route, { channel }) {
@@ -61,7 +68,14 @@ export function insightRoutes(route, { channel }) {
   // ---------- first-run checklist (#36) ----------
   route('GET', '/api/checklist', async () => checklist(channel));
   route('PUT', '/api/checklist', async (req, res, body) => {
-    updateSettings({ checklistDismissed: !!body.dismissed });
+    if ('dismissed' in body) updateSettings({ checklistDismissed: !!body.dismissed });
+    if (body.skip !== undefined || body.unskip !== undefined) { // 062: a step can be skipped (and brought back)
+      const id = String(body.skip ?? body.unskip);
+      if (!STEP_IDS.includes(id)) return [400, { error: 'Unknown step', field: 'skip' }];
+      const cur = new Set(getSettings().checklistSkipped || []);
+      if (body.skip !== undefined) cur.add(id); else cur.delete(id);
+      updateSettings({ checklistSkipped: [...cur] });
+    }
     return checklist(channel);
   });
 

@@ -38,7 +38,7 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/m
 3. Follow the live progress page at `http://server-ip/`.
 4. Open the panel at `https://ip-with-dashes.sslip.io`.
 5. Sign in with the setup code or the owner password.
-6. Follow the first-run checklist.
+6. Follow **Getting started** on Overview.
 
 </details>
 

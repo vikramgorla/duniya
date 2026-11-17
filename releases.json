@@ -1,6 +1,11 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.23.0": {
+      "breaking": false,
+      "title": "Getting started opens each first step right on Overview, and / finds any agent, chat or setting",
+      "summary": "A new owner links WhatsApp, pastes any model key (it is recognised) or starts free, taps a template, switches a group on and sends a test without leaving Overview; steps can be skipped, and the card ends with the test answer. The built-in owner assistant no longer counts as your first agent. Press / or ⌘K (the search button on a phone) to jump to any agent, chat, setting or action. Tabs are in everyday order, Pending shows only while something waits, Secrets moved into Settings (old links still work), Settings has a section index, and choosing an agent for a chat that is off switches it on. Nothing to do on your server."
+    },
     "2.22.0": {
       "breaking": false,
       "title": "The panel is your phone app: install it on the home screen; the preview mobile app (Expo Go) is gone",

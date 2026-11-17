@@ -42,7 +42,7 @@
 <tr>
 <td valign="top"><a href="docs/agents.md#tool-services-mcp"><img src="docs/img/thumb-mcp.webp" alt="Adding an MCP tool service" width="100%"></a><br><b>Real tools via MCP</b><br>Browse the MCP Registry and add in one click; per-role allow lists, confirm step for changes.</td>
 <td valign="top"><a href="docs/agents.md#whatsapp-actions"><img src="docs/img/thumb-wa-group.webp" alt="WhatsApp group settings card" width="100%"></a><br><b>WhatsApp powers</b><br>Media, polls, reactions, group admin per role. Names from your phone contacts and group member tags.</td>
-<td valign="top"><a href="docs/getting-started.md#why-didnt-it-answer"><img src="docs/img/thumb-quiet.webp" alt="Why agents stayed quiet, with fixes" width="100%"></a><br><b>"Why didn't it answer?"</b><br>Reasons per chat, one-click fixes.</td>
+<td valign="top"><a href="docs/getting-started.md#why-didnt-it-answer"><img src="docs/img/thumb-quiet.webp" alt="Why agents stayed quiet, with fixes" width="100%"></a><br><b>"Why didn't it answer?"</b><br>Reasons per chat, one-click fixes. Press <b>/</b> to find anything.</td>
 </tr>
 <tr>
 <td valign="top"><a href="docs/domains-and-access.md"><img src="docs/img/thumb-web-access.webp" alt="Web address and access settings" width="100%"></a><br><b>Your domain, any proxy</b><br>Automatic HTTPS, a switch that never locks you out.</td>
@@ -80,8 +80,9 @@
 curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash
 ```
 
-Then the first-run checklist walks you through it: link a WhatsApp number, connect a model, create an agent, switch
-a chat on. [Getting started →](docs/getting-started.md)
+Then **Getting started** on Overview walks you through it in place, about five taps: link WhatsApp, paste any model
+key (or start free), tap a template, switch a group on, send a test. Afterwards press **/** to find any agent, chat or
+setting. [Getting started →](docs/getting-started.md)
 
 A free 1 GB VM is enough: heavier extras (on-server speech, local tool services) stay off there unless you switch on
 **Small server mode** in Settings → Server. [Small servers →](docs/small-servers.md)

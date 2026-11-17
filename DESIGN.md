@@ -64,7 +64,8 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
 - **Instrument details:** labels, pills, table headers and numbers in monospace (uppercase, wide tracking for
   labels); stats in large mono figures; LED dots with a glow for live state.
 - **Status console:** Overview opens with one sentence about the state ("Everything is running", "A WhatsApp
-  number needs attention") and LEDs for WhatsApp, Agents and Waiting changes.
+  number needs attention"; on a fresh install the first missing thing: "Link your WhatsApp number to begin") and LEDs
+  for WhatsApp, Agents and Waiting changes.
 - **States:** ok = deep lime, warn = amber, bad = crimson, info = indigo — soft tinted backgrounds with a left rule
   for notes.
 - **Type:** Segoe UI Variable / SF Pro / Inter for text and headings (tight tracking); SF Mono / Cascadia /
@@ -79,6 +80,20 @@ its own with a 40 px tap area), `meter`, `spark(values)`, `pill`, `note`, `seg` 
 `btn` (`primary`, `danger`, `small`), `number-card`, `feed`, `bubble` (test console), `spinner`, `modelSelect()`
 (Auto / provider · Auto / specific model), `field(label, input, hint)`, `.qa-row` + `.qa-preview` (an editable row of
 user-written text with a live *Preview* filled with sample values; rows stack on phones).
+
+## Finding your way (062)
+
+- **Tabs** in everyday order (Overview, Chats, Agents, Activity, Usage, Models, Contacts, Server, Backups, Settings).
+  A tab that is usually empty appears only when it has something (Pending, with a count). Small lists are a section of
+  a bigger screen, not a tab (Secrets lives in Settings).
+- **Find anything** (`openPalette()`): `/` or ⌘K / Ctrl+K, or the search button in the header. Every new screen,
+  Settings section (`SETTINGS_SECTIONS`) or frequent action should be findable there.
+- **Deep links**: `#tab/<section>` scrolls to the element with `data-jump="<section>"` and flashes it once. Give new
+  sections a `data-jump`; an old address that moved goes in `MOVED`.
+- **Getting started** is the one first-run guide: the current step opens in place with its action (no tab-hopping);
+  steps can be skipped; it ends with an *All set* card and then disappears. Don't add a second checklist or wizard.
+- **Empty states teach**: say what is missing and link to where it is fixed ("WhatsApp is not linked yet… Link
+  WhatsApp on Overview"), never "No data".
 
 ## Writing
 

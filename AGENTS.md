@@ -148,6 +148,7 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 ```bash
 node scripts/demo-panel.mjs            # http://127.0.0.1:8099, admin / demo-password-123; seeded data, no network
 DEMO_SMALL=1 node scripts/demo-panel.mjs   # pretend to be a 1 GB / 1 CPU server
+DEMO_EMPTY=1 node scripts/demo-panel.mjs   # a fresh install: the true first run (Getting started from step 1)
 npm run check:responsive               # every screen at 375 / 393 / 1440, light + dark (needs Chrome; CHROME_PATH)
 npm run site:shots                     # retake docs/site/img + docs/site/video (needs Chrome + ffmpeg)
 npm run site:shots -- --only card-ask,overview --no-video

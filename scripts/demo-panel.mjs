@@ -3,6 +3,8 @@
 // Used by `npm run check:responsive` and for the screenshots of the GitHub Pages site.
 //
 //   node scripts/demo-panel.mjs [port]      → http://127.0.0.1:8099, sign in as admin / demo-password-123
+//   DEMO_EMPTY=1 node scripts/demo-panel.mjs → a fresh install: no provider, no agent, WhatsApp waiting for a scan
+//                                              (“Get code” links it after a few seconds), every chat Off
 import http from 'node:http';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -142,9 +144,31 @@ async function fakeRegistry(weatherUrl) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 
+/** 062: fake /api/checklist data (install with page.call(FAKE_CHECKLIST, data)) that makes Getting started show `next` as the current step, as on a fresh
+ *  install, with Car pooling as the new agent; `done: true` shows the closing "All set" card. Screenshots only. */
+export function fakeChecklist(next, { done = false } = {}) {
+  const ids = ['whatsapp', 'provider', 'agent', 'chat', 'reply'];
+  const titles = { whatsapp: 'Link your WhatsApp number', provider: 'Connect an AI model', agent: 'Create your first agent', chat: 'Switch a chat on', reply: 'Send a test message' };
+  const hints = { whatsapp: 'Use the phone of the number your agents answer from.', provider: 'Agents need a model to think with. Paste a key, or start free with OpenRouter.',
+    agent: 'Pick a template or describe it in your own words; you can change everything later.', chat: 'Every chat starts Off, so agents stay silent. Choose the group your agent should answer in.',
+    reply: 'Ask your agent something here, or write to it in the chat you switched on.' };
+  const n = done ? ids.length : ids.indexOf(next);
+  const c = { done: n, total: ids.length, complete: done, dismissed: false, agent: { id: 'carpool', name: 'Car pooling', trigger: '!ride' },
+    steps: ids.map((id, i) => ({ id, title: titles[id], hint: hints[id], href: `#${id}`, done: i < n, skipped: false })) };
+  return c;
+}
+/** 062: installs a fakeChecklist() result in the panel (run with page.call, so the data is passed as a value, not code). */
+export const FAKE_CHECKLIST = `async function (fc) {
+  const fcf = window.fetch;
+  window.fetch = (u, o) => (String(u) === '/api/checklist' && (!o || !o.method || o.method === 'GET') ? Promise.resolve(new Response(JSON.stringify(fc))) : fcf(u, o));
+  S.checklist = null;
+  S.checklistDone = fc.complete ? { last: h('div', { class: 'chat-mini' }, h('div', { class: 'bubble me' }, 'Any seat to Geneva on Friday?'), h('div', { class: 'bubble agent' }, 'Friday 21 Nov: Marc drives from Morges station at 07:40, 2 seats left. Want me to save one for you?')) } : null;
+  show(S.tab);
+}`;
+
 /** Start the seeded demo panel. Returns { base, dataDir }. Call once per process (the app's modules are singletons). */
 /** `small: true` pretends to run on a 1 GB / 1 CPU VM (the free-tier size), so the small-server guardrails show. */
-export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(), 'duniya-demo-')), small = !!process.env.DEMO_SMALL } = {}) {
+export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(), 'duniya-demo-')), small = !!process.env.DEMO_SMALL, empty = !!process.env.DEMO_EMPTY } = {}) {
   const F = await fakeModels();
   const weatherUrl = await fakeToolService();
   const registryUrl = await fakeRegistry(weatherUrl);
@@ -190,6 +214,8 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
   const { createChannelRegistry } = await imp('src/channels/registry.js');
   const { createRouter, createHistoryHandler } = await imp('src/core/router.js');
+
+  if (empty) return startEmpty({ imp, createChannelRegistry, createRouter, createHistoryHandler });
 
   const now = Date.now(); const MIN = 60000; const H = 60 * MIN; const D = 24 * H;
   const P = (n) => `417900000${String(n).padStart(2, '0')}`; // +41 79 000 00 NN — obviously fake
@@ -411,6 +437,39 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const noise = () => db.db.prepare("DELETE FROM activity WHERE summary LIKE 'Panel login%' OR summary LIKE 'Owner \"admin\" created%' OR summary LIKE 'Backup passphrase changed%' OR summary LIKE 'User %' OR summary LIKE 'Contact %' OR summary LIKE 'Global tool service%' OR summary LIKE 'Created \"%' OR (type = 'backup.done' AND ts > ?)").run(now - 60000);
   noise(); setInterval(noise, 300).unref();
   return { base: `http://127.0.0.1:${panel.address().port}`, dataDir };
+}
+
+/** 062: a fresh install, to see the true first run. One number waiting for its QR scan; a pairing code links it after
+ *  3 s, with three groups and a direct chat. The models answer as in the full demo once a provider is connected. */
+async function startEmpty({ imp, createChannelRegistry, createRouter, createHistoryHandler }) {
+  await (await imp('src/core/agents.js')).loadAgents();
+  const QR = (await import('qrcode')).default;
+  const { bus } = await imp('src/core/events.js');
+  const qrDataUrl = await QR.toDataURL('demo-not-a-real-whatsapp-link', { margin: 1, width: 240 });
+  const P = (n) => `417900000${String(n).padStart(2, '0')}`;
+  const groups = [['120363041122330001@g.us', 'Class 4B parents', 23], ['120363041122330002@g.us', 'Family ❤️', 9], ['120363041122330003@g.us', 'Morges ↔ Geneva rides', 14]];
+  let linked = null;
+  const factory = () => ({
+    id: 'whatsapp',
+    async start() {},
+    async status() { return linked ? { status: 'open', me: `${P(99)}:1@s.whatsapp.net`, since: linked } : { status: 'qr', qrDataUrl }; },
+    async listChats() { return linked ? groups.map(([id, name, size]) => ({ id, name, size })) : []; },
+    async chatName(jid) { return groups.find((g) => g[0] === jid)?.[1] || ''; },
+    async groupMembers() { return [1, 2, 3].map((i) => ({ phone: P(i), jid: `${P(i)}@s.whatsapp.net`, admin: i === 1 })); },
+    async isMember() { return true; },
+    async send() { return { msgId: `out-${Date.now()}` }; },
+    async typing() {},
+    async lookupNumber(phone) { return { jid: `${String(phone).replace(/\D/g, '')}@s.whatsapp.net`, exists: true, lid: '' }; },
+    async pair() { setTimeout(() => { linked = Date.now(); bus.emit('status'); }, 3000).unref(); return 'DEMO-1234'; },
+    async logout() { linked = null; bus.emit('status'); }, async restart() {}, async remove() {},
+  });
+  const { providerRoutes } = await imp('src/panel/routes/providers.js');
+  const { startPanel } = await imp('src/panel/server.js');
+  const wa = createChannelRegistry({ factory });
+  const panel = startPanel({ channel: wa, extend: [providerRoutes] });
+  await new Promise((r) => (panel.listening ? r() : panel.once('listening', r)));
+  await wa.start(createRouter(wa), { onHistory: createHistoryHandler() });
+  return { base: `http://127.0.0.1:${panel.address().port}`, dataDir: process.env.DATA_DIR };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
