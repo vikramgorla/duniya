@@ -244,7 +244,10 @@ export async function status({ refresh = false } = {}) {
       const m = await providerModels(p, { refresh });
       row.connected = !m.error; row.models = m.models.length; if (m.error) row.error = m.error;
       if (row.connected && p.type === 'copilot') Object.assign(row, await copilotExtras(p, { refresh }));
-      if (row.connected) await refreshPlanUsage(p, { force: refresh });
+      if (row.connected) { // 067: a stale reading refreshes in the background (the page stays fast); the first one is awaited
+        const reading = refreshPlanUsage(p, { force: refresh });
+        if (refresh || !planUsage.endpointAt(p.id)) await reading;
+      }
       const usage = planUsage.view(p.id); // 067: { at, limits } — only what the provider reports
       if (usage) row.usage = usage;
       if (PRICED.has(p.type) && !p.freeOnly) row.spend = spendOf('account', p.id); // this month, by Duniya

@@ -19,7 +19,8 @@ Issue #135. Owner: "Wherever we can, show the usage of the plan (e.g. quota of C
   - API keys (Anthropic, OpenAI, OpenAI-compatible): `anthropic-ratelimit-*` and `x-ratelimit-*` headers as rate-limit
     headroom; plus Duniya's spend through the account this month (usage table).
 - R3 One snapshot per account (in memory + a `ttl_state` row, written at most once a minute from headers). No new
-  timers: headers update it on every answer; endpoints are read when Models opens (TTL 10 min, `refresh=1` forces)
+  timers: headers update it on every answer; endpoints are read when Models opens (TTL 10 min; a stale reading refreshes
+  in the background, the first one is awaited; `refresh=1` forces)
   and on the existing upkeep tick (one account per tick, each every 30 min, skipped while memory is tight or the
   account is paused). A window whose reset passed shows as renewed (0 %).
 - R4 Shown on: Models rows (tightest plan/credit limit, "62% of 5-hour limit" + 3 px meter); the provider page and each
