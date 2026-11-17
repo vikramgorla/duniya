@@ -441,8 +441,10 @@ function buildWelcome(x) {
 function buildTest(x) {
   if (x.bi) return { el: askCard({ id: 'test-console', title: 'Try it', wide: false }) };
   const log = h('div', { class: 'chatlog' });
-  const role = h('select', { 'aria-label': 'Test as role', onchange: () => loadTools() }, h('option', { value: 'participant' }, 'a participant'), h('option', { value: 'organizer' }, 'an organizer'));
-  const where = h('select', { 'aria-label': 'Test in chat', onchange: () => hintBox.replaceChildren(x.chats.find((ch) => ch.id === where.value && !ch.enabled) ? h('div', { class: 'small', style: 'color:var(--warn)' }, 'This chat is Off: in WhatsApp the agent stays silent there.') : null) },
+  let thread = []; // #163: sent with each message
+  const fresh = () => { thread = []; log.replaceChildren(); };
+  const role = h('select', { 'aria-label': 'Test as role', onchange: () => { fresh(); loadTools(); } }, h('option', { value: 'participant' }, 'a participant'), h('option', { value: 'organizer' }, 'an organizer'));
+  const where = h('select', { 'aria-label': 'Test in chat', onchange: () => fresh() || hintBox.replaceChildren(x.chats.find((ch) => ch.id === where.value && !ch.enabled) ? h('div', { class: 'small', style: 'color:var(--warn)' }, 'This chat is Off: in WhatsApp the agent stays silent there.') : null) },
     h('option', { value: 'new' }, 'a new direct chat'), x.chats.map((ch) => h('option', { value: ch.id }, `${ch.isGroup ? 'group' : 'chat'}: ${ch.name || ch.id}`)));
   const hintBox = h('div', {});
   const toolsBox = h('details', { class: 'small' }, h('summary', {}, 'Tools for this role…'));
@@ -467,7 +469,8 @@ function buildTest(x) {
     log.append(h('div', { class: 'bubble me', title: `as ${as}` }, text)); input.value = '';
     const wait = h('div', { class: 'bubble agent muted' }, '…'); log.append(wait); log.scrollTop = 1e9;
     try {
-      const r = await api('POST', `/api/agents/${x.enc}/test`, { text, role: as, chat: where.value });
+      const r = await api('POST', `/api/agents/${x.enc}/test`, { text, role: as, chat: where.value, thread });
+      thread.push({ from: 'me', text }, { from: 'agent', text: r.reply || '' }); thread = thread.slice(-20);
       wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); if (r.model) wait.title = `${r.answeredBy || r.model} · as ${as}`;
       const path = r.path === 'quick' ? `${r.answeredBy || 'Quick reply'} · no AI` : r.path === 'faq' ? 'FAQ answer · no AI' : r.path === 'model' ? `Model${r.model ? ` · ${modelLabel(r.answeredBy && r.answeredBy.includes(':') ? r.answeredBy : r.model, x.models)}` : ''}` : '';
       if (path) wait.after(h('div', { class: 'small muted test-path' }, path.charAt(0).toUpperCase() + path.slice(1)));
@@ -476,5 +479,6 @@ function buildTest(x) {
     } catch (err) { wait.textContent = `Error: ${err.message}`; }
     log.scrollTop = 1e9;
   } }, input, h('button', { class: 'btn primary' }, 'Send'));
-  return { el: h('div', { id: 'test-console' }, h('div', { class: 'row test-as' }, h('span', { class: 'small' }, 'As'), role, h('span', { class: 'small' }, 'in'), where), hintBox, toolsBox, log, form) };
+  const restart = h('button', { class: 'btn small ghost', type: 'button', onclick: () => { fresh(); input.focus(); } }, 'New conversation');
+  return { el: h('div', { id: 'test-console' }, h('div', { class: 'row test-as' }, h('span', { class: 'small' }, 'As'), role, h('span', { class: 'small' }, 'in'), where, restart), hintBox, toolsBox, log, form) };
 }

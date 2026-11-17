@@ -36,7 +36,9 @@ word (*Changes only*, *Side by side*, *Whole new text*). Skip any part; nothing 
 Every agent page has a **Test** section: real tools and saved settings, nothing posted to WhatsApp. **Test as** picks
 the role (participant or organizer) and the chat (one of the agent's chats or a new direct chat) and shows the tools
 that role really gets. It also says which path answered: *Quick reply !rides · no AI*, *FAQ answer · no AI* or the
-model. If the chosen chat is off, a note says the agent would stay silent there. Admin MCP: `test_agent`.
+model. The test is a conversation: the agent sees your earlier test messages, so follow-ups work; **New conversation**
+(or changing the role or chat) starts over. If the chosen chat is off, a note says the agent would stay silent there.
+Admin MCP: `test_agent`.
 
 ![Test as an organizer](site/img/card-test-as.webp)
 

@@ -257,3 +257,20 @@ test('062: the built-in owner assistant alone is not "your first agent"; choosin
   c = (await t.api(owner, 'GET', '/api/checklist')).body;
   assert.equal(c.steps.find((s) => s.id === 'agent').done, true);
 });
+
+test('#163: the test console sends its conversation so far, so a follow-up is understood', async () => {
+  t.script.push([{ type: 'text', text: 'Whom should I assign it to?' }]);
+  const thread = [{ from: 'me', text: 'Can you assign Bhogi mantalu to someone?' }, { from: 'agent', text: 'Whom should I assign it to?' }];
+  const r = await t.api(owner, 'POST', '/api/agents/panduga/test', { text: 'To Chary', role: 'organizer', thread });
+  assert.equal(r.status, 200);
+  const turn = t.userTurn(t.claudeReqs.length - 1);
+  assert.match(turn, /Earlier in this test conversation:\nPanel admin: Can you assign Bhogi mantalu to someone\?\nYou: Whom should I assign it to\?/);
+  assert.match(turn, /New message from Panel admin \(organizer\):\nTo Chary/);
+  // bounded: at most 20 earlier turns, each cut to 2000 characters
+  t.script.push([{ type: 'text', text: 'ok' }]);
+  const many = Array.from({ length: 30 }, (_, i) => ({ from: i % 2 ? 'agent' : 'me', text: `turn ${i} ${'x'.repeat(3000)}` }));
+  await t.api(owner, 'POST', '/api/agents/panduga/test', { text: 'next', thread: many });
+  const last = t.userTurn(t.claudeReqs.length - 1);
+  assert.ok(!last.includes('turn 9 ') && last.includes('turn 10 ') && last.includes('turn 29 '));
+  assert.ok(!last.includes('x'.repeat(2001)));
+});

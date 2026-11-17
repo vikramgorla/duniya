@@ -1,6 +1,14 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.35.1": {
+      "breaking": false,
+      "title": "The test console remembers the conversation",
+      "changes": [
+        { "type": "fixed", "text": "In an agent's Test, each message was answered on its own. The agent now sees the earlier messages of the test, so a follow-up like \"To Chary\" is understood." },
+        { "type": "new", "text": "New conversation starts the test over; changing who you test as or the chat also starts fresh." }
+      ]
+    },
     "2.35.0": {
       "breaking": false,
       "title": "Settings → Channels: WhatsApp has its own page, and loads only when you use it",
