@@ -65,7 +65,7 @@ export async function renderBackups() {
 
 /** Ask the server whether the GitHub app is installed yet; redraw when something changed. */
 async function checkGithubApp(quiet) {
-  const r = await api('POST', '/api/backups/github-app/check').catch((e) => { if (!quiet) toast(e.message); return null; });
+  const r = await api('POST', '/api/backups/github-app/check').catch((e) => { if (!quiet) toast(e.message, { bad: true }); return null; });
   if (r?.installed) { if (S.tab === 'backups') renderBackups(); if (!quiet) toast(r.repo ? `Installed — backing up to ${r.repo}` : 'Installed'); }
   else if (r && !quiet) toast('Not installed yet');
   return r;

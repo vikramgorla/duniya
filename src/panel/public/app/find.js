@@ -1,7 +1,6 @@
 // Find anything (062): loaded when first opened. Module of the panel (063).
 // ---------- Find anything (062): / or ⌘K (Ctrl+K), or the search button: jump to a screen, agent, chat, setting or action ----------
-import { $, S, TABS, api, can, h, icon, optimistic, show, tryApi } from './core.js';
-import { renderLogin } from './login.js';
+import { $, PRIMARY, S, TABS, api, badgeFor, can, go, h, icon, optimistic, serverBadge, show, signOut, tryApi } from './core.js';
 import { SETTINGS_SECTIONS } from './shared.js';
 /** Everything the Find box can open. Agents and chats come from the status and the cached chat list. */
 async function paletteItems() {
@@ -27,7 +26,7 @@ async function paletteItems() {
   }
   if (can('owner')) act('Back up now', 'backup download', () => { location.hash = 'backups'; });
   act('Why agents stayed quiet', 'silent silence not answering', () => { location.hash = 'overview/quiet'; });
-  act('Sign out', 'logout', async () => { await api('POST', '/api/logout').catch(() => {}); S.user = null; renderLogin(); });
+  act('Sign out', 'logout', signOut);
   return items;
 }
 /** Lower score is better; null when a word does not match. Word starts in the name count most, then anywhere else. */
@@ -70,4 +69,16 @@ export async function openPalette() {
     if (e.key === 'Enter' && hits[sel]) { e.preventDefault(); open(hits[sel]); }
   };
   draw();
+}
+/** More (064): the screens that are not in the phone tab bar, Find anything and Sign out, in a bottom sheet. */
+export function openMore() {
+  const close = () => dlg.close();
+  const dlg = h('dialog', { class: 'dlg more', 'aria-label': 'More screens', onclose: () => dlg.remove(), onclick: (e) => { if (e.target === dlg) close(); } },
+    h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'More'), h('button', { class: 'btn small', onclick: close }, 'Close')),
+    h('div', { class: 'more-list' }, TABS().filter(([id]) => !PRIMARY.includes(id)).map(([id, label]) =>
+      h('button', { class: id === S.tab ? 'on' : '', 'aria-current': id === S.tab ? 'page' : null, onclick: () => { close(); go(id); } }, icon(id), label, badgeFor(id)))),
+    h('button', { class: 'btn', style: 'width:100%', onclick: () => { close(); openPalette(); } }, icon('search'), 'Find anything'),
+    h('div', { class: 'more-foot', style: 'margin-top:12px' }, h('span', { class: 'small muted' }, `Signed in as ${S.user.username} · ${S.user.role}`), h('button', { class: 'btn small', onclick: signOut }, 'Sign out')));
+  document.body.append(dlg); dlg.showModal();
+  serverBadge(S.status?.osUpdates);
 }

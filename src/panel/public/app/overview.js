@@ -1,8 +1,8 @@
 // Overview screen (the landing screen) and the install-on-your-phone hint. Module of the panel (063).
 // ---------- overview ----------
-import { feedItem } from './activity.js';
+import { feedItem, loadChatNames } from './activity.js';
 import { askCard } from './ask.js';
-import { $, S, ago, api, can, h, logo, optimistic, refreshStatus, show, time, toggle, tryApi } from './core.js';
+import { $, S, ago, api, avatar, can, emptyState, h, logo, optimistic, plural, pulse, refreshStatus, show, time, toggle, tryApi } from './core.js';
 import { refreshSilences, silencesCard } from './quiet.js';
 import { checklistActive, checklistBox, checklistNext, goTo, linkNumberBox, refreshChecklist } from './start.js';
 import { renderUpdates } from './updates.js';
@@ -46,13 +46,17 @@ export async function renderOverview(soft) {
     can('owner') ? h('details', { class: 'mut' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, '+ Add another number'),
       h('p', { class: 'small muted' }, 'Each number is linked as its own device. Use a dedicated number for agents.'),
       h('div', { class: 'row' }, newLabel, h('button', { class: 'btn primary', onclick: () => tryApi(async () => { await api('POST', '/api/whatsapp/numbers', { label: newLabel.value }); S.overviewBusy = false; await refreshStatus(); renderOverview(); }, 'Added — scan its QR') }, 'Add number'))) : null);
+  // 064: avatars, a live pulse per agent (reading… / answered, from the activity stream) and named switches
+  const pause = (v) => optimistic(() => { st.settings.paused = v; }, () => api('POST', '/api/settings', { paused: v }), v ? 'All agents paused' : 'Agents resumed', () => pause(!v));
   const control = h('div', { class: 'card' }, h('h2', {}, 'Control'),
     h('div', { class: 'row spread nowrap' }, h('div', {}, h('b', {}, 'Pause all agents'), h('div', { class: 'small muted' }, 'Stops all replies and scheduled posts')),
-      toggle(st.settings.paused, (v) => optimistic(() => { st.settings.paused = v; }, () => api('POST', '/api/settings', { paused: v }), v ? 'Paused' : 'Resumed'))),
-    h('div', { class: 'tscroll' }, h('table', { style: 'margin-top:10px' }, h('tbody', {}, st.agents.length ? st.agents.map((b) => h('tr', {},
-      h('td', {}, h('b', {}, b.name), h('div', { class: 'small muted' }, `${b.chats} chat(s)`)),
-      h('td', { style: 'text-align:right' }, toggle(b.enabled, (v) => optimistic(() => { b.enabled = v; }, () => api('PUT', `/api/agents/${b.id}`, { enabled: v }), `${b.name} ${v ? 'on' : 'off'}`))))) : h('tr', {}, h('td', { class: 'muted' }, 'No agents yet. ', h('a', { href: '#agents' }, 'Create one')))))),
-    st.pending ? h('p', {}, h('span', { class: 'pill warn' }, `${st.pending} pending confirmation(s)`)) : null);
+      toggle(st.settings.paused, pause, false, 'Pause all agents')),
+    st.agents.length ? h('ul', { class: 'ctl-list' }, st.agents.map((b) => h('li', {},
+      avatar(b.name, b.id, b.enabled && !st.settings.paused ? '' : 'off'),
+      h('div', {}, h('b', {}, b.name), h('div', { class: 'small muted' }, plural(b.chats, 'chat'), ' ', pulse(b.id))),
+      toggle(b.enabled, (v) => optimistic(() => { b.enabled = v; }, () => api('PUT', `/api/agents/${b.id}`, { enabled: v }), `${b.name} ${v ? 'on' : 'off'}`), false, `${b.name} on`))))
+      : emptyState('agents', 'No agents yet', 'An agent answers in the chats you give it.', h('a', { class: 'btn small', href: '#agents' }, 'Create an agent')),
+    st.pending ? h('p', {}, h('a', { class: 'pill warn', href: '#pending' }, `${plural(st.pending, 'change')} waiting for a confirm`)) : null);
   const reusedUpdates = soft && $('#updates-box')?.childElementCount ? $('#updates-box') : null;
   const updateBanner = (reusedUpdates && $('#ov-update-banner')) || h('div', { id: 'ov-update-banner' });
   const server = h('div', { class: 'card' }, h('h2', {}, 'Server'),
@@ -60,7 +64,8 @@ export async function renderOverview(soft) {
       .map(([k, v, id]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', id ? { id } : {}, v)))))),
     reusedUpdates || h('div', { id: 'updates-box' }));
   const recent = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('div', { class: 'row spread' }, h('h2', {}, 'Recent activity'), h('button', { class: 'btn small', onclick: () => show('activity') }, 'All activity')),
-    h('ul', { class: 'feed', id: 'recent' }, S.feed.slice(0, 8).map(feedItem)));
+    h('ul', { class: 'feed', id: 'recent' }, S.feed.slice(0, 8).map(feedItem)),
+    S.feed.length ? null : emptyState('activity', 'Quiet so far', 'What your agents read, answer and change shows up here live.'));
   const hr = new Date().getHours();
   const hello = hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
   const live = st.agents.filter((b) => b.enabled).length; const open = numbers.filter((n) => n.status === 'open').length;
@@ -83,7 +88,9 @@ export async function renderOverview(soft) {
   const silencesSlot = h('div', { id: 'ov-silences-slot', 'data-jump': 'quiet', style: `grid-column:1/-1${S.silences?.length ? '' : ';display:none'}` }, S.silences?.length ? silencesCard(S.silences, refreshSilences) : null);
   $('#main').replaceChildren(hero, updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), wa, control, server, silencesSlot, recent));
   refreshSilences();
-  if (!S.feed.length) api('GET', '/api/activity?limit=50').then((rows) => { S.feed = rows; $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); }).catch(() => {});
+  // the feed and the chat names it shows (064) load after the first paint
+  Promise.all([S.feed.length ? S.feed : api('GET', '/api/activity?limit=50'), soft ? null : loadChatNames()])
+    .then(([rows]) => { S.feed = rows; if (rows.length) { $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); $('#recent + .empty')?.remove(); } }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
 }
 // ---------- install on your phone (061): the panel is an installable web app ----------

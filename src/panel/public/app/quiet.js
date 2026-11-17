@@ -33,8 +33,8 @@ export function silencesCard(rows, after) {
       h('td', { 'data-label': '' }, h('b', {}, s.chatName || 'Unnamed chat'), s.agentName ? h('span', { class: 'small muted' }, ` · ${s.agentName}`) : null,
         h('div', { class: `small${s.reason === 'not_addressed' ? ' muted' : ''}`, style: s.reason === 'not_addressed' ? '' : 'color:var(--warn)', title: s.explain }, quietLine(s)),
         h('div', { class: 'small muted' }, `${s.explain} Last ${ago(s.lastTs)} ago${s.sampleSender ? ` · e.g. ${s.sampleSender}` : ''}`)),
-      h('td', { 'data-label': '', style: 'text-align:right;white-space:nowrap' }, silenceFix(s, after),
-        can('admin') ? h('button', { class: 'btn small mut', title: 'Forget this record', onclick: () => tryApi(async () => { await api('DELETE', `/api/silences?chat=${encodeURIComponent(s.chat)}&reason=${s.reason}${s.agent ? `&agent=${encodeURIComponent(s.agent)}` : ''}`); after?.(); }, 'Cleared') }, 'Clear') : null))))));
+      h('td', { 'data-label': '' }, h('div', { class: 'btns', style: 'justify-content:flex-end;flex-wrap:nowrap' }, silenceFix(s, after),
+        can('admin') ? h('button', { class: 'btn small ghost mut', title: 'Forget this record', 'aria-label': `Clear: ${s.chatName || 'Unnamed chat'}, ${quietLine(s)}`, onclick: () => tryApi(async () => { await api('DELETE', `/api/silences?chat=${encodeURIComponent(s.chat)}&reason=${s.reason}${s.agent ? `&agent=${encodeURIComponent(s.agent)}` : ''}`); after?.(); }, 'Cleared') }, 'Clear') : null)))))));
 }
 export async function refreshSilences() {
   const slot = $('#ov-silences-slot'); if (!slot) return;

@@ -57,7 +57,7 @@ export function askCard() {
       });
       cancelAnimationFrame(frame); frame = 0;
       a.reply = r.reply; a.confirms = r.confirms || []; a.q = ''; q.value = '';
-    } catch (e) { toast(e.message); }
+    } catch (e) { toast(e.message, { bad: true }); }
     a.busy = false;
     a.redraw();
   }

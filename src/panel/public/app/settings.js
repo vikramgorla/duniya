@@ -1,6 +1,6 @@
 // Settings screen: every section (tool services, owner assistant, users, sign-in, web access, logging, …). Module of the panel (063).
 // ---------- secrets ----------
-import { $, S, ago, api, can, copyBtn, copyRow, extLink, field, gLogo, h, jumpToSub, splitLines, toast, toggle, tryApi } from './core.js';
+import { $, S, ago, api, can, copyBtn, copyRow, extLink, field, fieldError, gLogo, h, jumpToSub, splitLines, toast, toggle, tryApi } from './core.js';
 import { browseButton, registrySettingsBox } from './registry.js';
 import { SETTINGS_SECTIONS, SIZE_LABEL, SMALL_MODE_LINK, loadModels, modelSelect, openAgent } from './shared.js';
 import { globRe, markSaved, serverConfig, serverState, toolServiceEditor } from './tool-editor.js';
@@ -208,7 +208,7 @@ async function toolServicesCard() {
     try {
       const r = await api('PUT', `/api/tool-services/${encodeURIComponent(it.s.key)}`, { ...serverConfig(it.s), defaults: it.s.defaults });
       it.g = r; markSaved(it.s); toast(`Saved ${it.s.key}`); draw(); return true;
-    } catch (e) { toast(e.field ? `${e.field}: ${e.message.replace(/^[^:]+: /, '')}` : e.message); return false; }
+    } catch (e) { return fieldError(e); }
   }
   async function removeOne(it) {
     if (it.s.isNew) { items.splice(items.indexOf(it), 1); return draw(); }
@@ -553,7 +553,7 @@ function webAccessCard(initial) {
         toast(r.trial ? 'Trying the new rules: confirm them within 10 minutes' : 'Applying…'); reload();
       } catch (e) {
         if (e.data?.needsConfirm && confirm(`${e.message}\n\nThe change is a trial: if you do not confirm it within 10 minutes it is undone automatically. Locked out for longer? On the server run: sudo duniya open-access\n\nApply anyway?`)) return applyAccess(true);
-        if (!e.data?.needsConfirm) toast(e.message);
+        if (!e.data?.needsConfirm) toast(e.message, { bad: true });
       }
     };
     const pre = h('pre', { style: 'max-height:320px' });
