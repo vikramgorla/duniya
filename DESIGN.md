@@ -80,6 +80,10 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
   for notes.
 - **Type:** Segoe UI Variable / SF Pro / Inter for text and headings (tight tracking); SF Mono / Cascadia /
   JetBrains Mono for labels and numbers.
+- **No blur on the phone app's bars (066):** on phones and the installed app the header and tab bar are near-solid
+  (no `backdrop-filter`), the page has no `background-attachment: fixed`, screens fade in without a transform, and a
+  new screen starts at the top before its content changes. iPhone (WebKit) otherwise left the top of the screen
+  unpainted after a switch. `nav-stress` checks the scroll position and that the header is in view.
 - **Navigation never sticks (066):** an older screen that finishes after you moved on is drawn over by the current one
   again; placeholders never replace a screen that has started drawing; live updates never redraw another screen.
   `nav-stress` in `check:responsive` (run in CI) switches tabs fast on a slow network and fails on leftovers.

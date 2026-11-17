@@ -46,7 +46,7 @@
 /* ---------- base ---------- */
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--grid) 0 0 / 22px 22px fixed, var(--bg); color: var(--ink); font-size: var(--fs); line-height: 1.5;
+body { margin: 0; background: var(--grid) 0 0 / 22px 22px, var(--bg); /* 066: no background-attachment: fixed (iOS repaint bugs) */ color: var(--ink); font-size: var(--fs); line-height: 1.5;
   padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); -webkit-tap-highlight-color: transparent; }
 h1, h2, h3, .brand, .display { font-family: var(--font-display); letter-spacing: -0.02em; }
 a:not(.btn) { color: var(--accent); text-underline-offset: 2px; }
@@ -102,7 +102,15 @@ nav.tabbar { display: none; }
   nav.tabbar button.on::before { content: ""; position: absolute; top: 2px; width: 44px; height: 30px; border-radius: 15px; background: var(--signal); z-index: -1; }
   nav.tabbar button .nbadge { position: absolute; top: 0; right: calc(50% - 24px); font-size: var(--fs-s); line-height: 18px; min-width: 18px; padding: 0 4px; background: #c42443; color: #fff; }
   main { padding-bottom: calc(var(--tabbar-h) + 32px + env(safe-area-inset-bottom)) !important; }
+  /* 066: no backdrop blur on the fixed and sticky bars of the phone app: iPhone (WebKit) left the screen above the
+     content unpainted after a screen switch until the next scroll. Near-solid bars instead; screens fade in without
+     moving (no transform on the whole screen). */
+  header { backdrop-filter: none; -webkit-backdrop-filter: none; background: color-mix(in srgb, var(--bg) 97%, transparent); }
+  nav.tabbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--card); }
+  body main.enter > * { animation-name: fadein; }
+  body main.loading { opacity: 1; }
 }
+@keyframes fadein { from { opacity: 0; } }
 main { max-width: 1160px; margin: 0 auto; padding: var(--s4) var(--s5) 48px; }
 main > * { scroll-margin-top: 120px; }
 main:focus { outline: none; }

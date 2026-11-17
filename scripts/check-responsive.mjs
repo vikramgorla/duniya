@@ -41,9 +41,10 @@ const NAV_STRESS = `window.__realFetch ||= window.fetch; const { dropCache } = a
     bar.querySelector('button[data-tab="more"]').click(); await T.until('dialog.more', 3000);
     [...document.querySelectorAll('dialog.more .more-list button')].find((x) => x.textContent.toLowerCase().startsWith(id))?.click();
   };
-  for (let round = 0; round < 3; round++) for (const id of tabs) { dropCache(); await go(id); await T.wait([0, 30, 130, 260, 600][Math.floor(Math.random() * 5)]); }
+  for (let round = 0; round < 3; round++) for (const id of tabs) { dropCache(); window.scrollTo(0, 99999); const was = S.tab; await go(id); await T.wait(20); if (was !== S.tab && scrollY !== 0 && !location.hash.includes('/')) throw new Error('switching to ' + id + ' kept the page scrolled to ' + scrollY); await T.wait([0, 30, 130, 260, 600][Math.floor(Math.random() * 5)]); }
   await T.wait(3500); window.fetch = window.__realFetch;
   const main = document.getElementById('main');
+  const hd = document.querySelector('header').getBoundingClientRect(); if (hd.top < 0 || hd.bottom <= 0) throw new Error('header not in view after switching');
   if (main.querySelector('.skel') || main.classList.contains('loading')) throw new Error('stuck on placeholders on ' + S.tab);
   if (main.dataset.screen !== S.tab) throw new Error('screen ' + main.dataset.screen + ' drawn under tab ' + S.tab);
   if (S.tab === 'activity' && !document.getElementById('feed')?.isConnected) throw new Error('activity list not on screen; shown: ' + main.textContent.trim().slice(0, 60));`;
@@ -99,8 +100,9 @@ const STATES = [
   { name: 'settings-release-notes', hash: 'settings/release-notes', wait: 2000 },
   { name: 'activity', hash: 'activity', js: "document.querySelector('#feed li')?.click();" },
   { name: 'agents', hash: 'agents' },
-  // 066: fast tab switching (bottom tab bar, More sheet, top tabs), on a slow network, must always end on the chosen
-  // screen fully drawn: no placeholder cards left, no screen drawn under another tab. Throws (fails the state) otherwise.
+  // 066: fast tab switching (bottom tab bar, More sheet, top tabs), on a slow network, from deep down a long screen, must
+  // always start the new screen at the top (iPhone painted the area above blank otherwise) and end on the chosen screen
+  // fully drawn: no placeholder cards left, no screen drawn under another tab, header in view. Throws otherwise.
   { name: 'nav-stress', hash: 'overview', wait: 2000, js: NAV_STRESS },
   { name: 'load-failed', hash: 'agents', before: HANG_AGENTS, wait: 2500, js: "if (!document.querySelector('.load-failed')) throw new Error('no Retry card after a hung request'); window.fetch = window.__realFetch; S.loadTimeout = 15000;" },
   { name: 'load-retry', hash: 'agents', before: HANG_AGENTS, wait: 2500, js: "window.fetch = window.__realFetch; S.loadTimeout = 15000; await T.click('Retry', 'button', 1500); if (document.querySelector('.load-failed, .skel') || !document.querySelector('.agent-card')) throw new Error('Retry did not recover the screen');" },

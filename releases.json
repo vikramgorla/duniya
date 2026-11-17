@@ -4,7 +4,7 @@
     "2.27.0": {
       "breaking": false,
       "title": "Ask is a live conversation; Activity, Overview and the phone app are easier to read and never get stuck",
-      "summary": "Ask, on Overview and on the owner assistant's page, now works like a chat. Your question appears as a bubble, then 'Thinking…'. Each lookup shows as it runs ('Checking server metrics…') and gets a tick when done. The answer appears word by word, with lists and bold drawn properly. Stop ends an answer, Copy copies it, and you can ask a follow-up or Retry after an error. Activity is grouped by day, with one clear row per entry in plain words ('Checked maintenance status · via admin', not tool names). Overview's status reads '2 agents live', '3 chats on'. On a phone, the active tab icon is dark on lime so you can see it, and Find anything in More is a normal row. Add a provider lists providers by name (OpenRouter, Claude, OpenAI, GitHub Copilot, ChatGPT, Custom), with one line each. Switching screens quickly no longer leaves grey placeholder cards: the screen you chose always finishes drawing, a screen that cannot load says why with Retry, and you can pull down to refresh (or More → Refresh). Nothing to do on your server.",
+      "summary": "Ask, on Overview and on the owner assistant's page, now works like a chat. Your question appears as a bubble, then 'Thinking…'. Each lookup shows as it runs ('Checking server metrics…') and gets a tick when done. The answer appears word by word, with lists and bold drawn properly. Stop ends an answer, Copy copies it, and you can ask a follow-up or Retry after an error. Activity is grouped by day, with one clear row per entry in plain words ('Checked maintenance status · via admin', not tool names). Overview's status reads '2 agents live', '3 chats on'. On a phone, the active tab icon is dark on lime so you can see it, and Find anything in More is a normal row. Add a provider lists providers by name (OpenRouter, Claude, OpenAI, GitHub Copilot, ChatGPT, Custom), with one line each. Switching screens quickly no longer leaves grey placeholder cards: the screen you chose always finishes drawing, a screen that cannot load says why with Retry, and you can pull down to refresh (or More → Refresh). On iPhone, a blank top of the screen after switching screens is fixed. Nothing to do on your server.",
       "changes": [
         {
           "type": "new",
@@ -17,6 +17,10 @@
         {
           "type": "fixed",
           "text": "Switching screens quickly (Activity, More → a screen) could leave grey placeholder cards until you reopened the app. The screen you chose now always finishes drawing; one that cannot load says why with Retry."
+        },
+        {
+          "type": "fixed",
+          "text": "On iPhone, switching screens could leave the top of the screen blank (even the header) until you scrolled. A new screen now starts at the top, and the phone app's bars no longer use the blur effect that caused it."
         },
         {
           "type": "fixed",

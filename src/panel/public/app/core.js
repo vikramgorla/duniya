@@ -425,6 +425,9 @@ export function show(tab) {
   const seq = (S.renderSeq = (S.renderSeq || 0) + 1);
   const main = $('#main');
   const moved = from !== tab; // another screen: placeholder cards while it loads; the same one: dim it
+  // 066: a new screen starts at the top *before* its content changes. Left deep in a long screen, a shorter one was drawn
+  // far below the top and iPhone (WebKit) painted the area above blank, header included, until the next scroll.
+  if (moved && !location.hash.includes('/')) window.scrollTo(0, 0);
   // 066: placeholders only while nothing new is drawn. A screen that draws and then waits for more (Activity draws its
   // card, then loads the list) used to have its card replaced by the placeholders for good.
   const shown = main?.firstElementChild;
@@ -451,7 +454,7 @@ export function show(tab) {
         main.classList.remove('enter'); void main.offsetWidth; main.classList.add('enter');
         // Keyboard and screen-reader users land on the new screen, not on the tab they left (064).
         if ((document.activeElement?.closest?.('nav, dialog') || document.activeElement === document.body) && !location.hash.includes('/')) main.focus({ preventScroll: true });
-        if (!location.hash.includes('/')) window.scrollTo({ top: 0 });
+        if (!location.hash.includes('/')) { window.scrollTo(0, 0); requestAnimationFrame(() => window.scrollTo(0, 0)); }
       }
       jumpToSub(); return;
     }

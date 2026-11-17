@@ -12,6 +12,7 @@
 - [x] T010 Owner assistant *Try it* uses the Ask card; responsive states for every Ask state
 - [x] T011 Recovery: request deadlines, Retry card, sheet import guard, resume after >30 s (`recover()`), stream reconnect when it was closed on `pagehide`
 - [x] T013 Navigation races: placeholder timer only before the first draw; an older screen drawn during a newer one's load triggers a redraw; status redraw only on a finished Overview; `nav-stress` state run in CI
+- [x] T014 Blank top after a switch on iPhone: scroll to top before the swap, no blur on phone bars, no fixed background, fade without transform; scroll/header assertions in `nav-stress`
 - [x] T012 Pull to refresh (`pull.js`) and More → Refresh; responsive states `load-failed`, `load-retry` (hung request → Retry → screen), `pull-refresh`
 
 ## Definition of Done

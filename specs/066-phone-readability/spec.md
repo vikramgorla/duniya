@@ -55,6 +55,18 @@ Issue #132. The owner tested v2.25.0 on an iPhone (installed app, dark mode).
     background, recover: drop waiting requests and reconnect the stream (it also reconnects when it was closed on
     `pagehide`). Pull to refresh, and **More → Refresh**.
   - **Regression check.** `nav-stress`, `load-failed` and `load-retry` in `check:responsive` run in CI.
+- R8 (Addition) After switching screens in the installed iPhone app, the top two thirds of the screen were blank,
+  header included, until a scroll. The new screen was drawn while the page was still scrolled deep into the previous,
+  longer screen, which only reset to the top after the render. WebKit then left the composited area above unpainted;
+  the blurred (`backdrop-filter`) sticky and fixed bars and the fixed page background make this worse.
+  Fix:
+  - scroll to the top before the new screen's content changes, and once more after it is drawn
+  - no `backdrop-filter` on the phone app's bars
+  - no fixed page background
+  - phone screens fade in without a transform
+  
+  Checked in Playwright WebKit (iPhone 15 emulation, local only). `nav-stress` now fails when a switch leaves the page
+  scrolled or the header out of view.
 
 ## Out of scope
 
