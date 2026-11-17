@@ -1,6 +1,7 @@
 // Getting started (#36, 062): the guided first run on Overview. Module of the panel (063).
 // ---------- Getting started (#36, 062): a guided first run. The next step opens in place with its action ----------
 import { $, S, api, can, dropCache, extLink, h, jumpToSub, openFind, refreshStatus, toast, tryApi } from './core.js';
+import { PROVIDER_NAMES } from './names.js';
 import { renderOverview } from './overview.js';
 import { LINKS, saveSecretKey } from './shared.js';
 const CHECK_ACTION = { whatsapp: 'Link WhatsApp', provider: 'Connect a model', agent: 'Create an agent', chat: 'Open Chats', reply: 'Open test console' };
@@ -43,10 +44,10 @@ export function linkNumberBox(n) {
 }
 /** 062: one box for any key: OpenRouter, Anthropic, OpenAI or a GitHub token for Copilot, recognised by how it starts. */
 const KEY_KINDS = [
-  [/^sk-or-/, 'OpenRouter (free models)', (key) => api('POST', '/api/providers/openrouter', { key, freeOnly: true })],
-  [/^sk-ant-/, 'Anthropic (Claude)', (key) => saveSecretKey('ANTHROPIC_API_KEY')(key)],
-  [/^github_pat_/, 'GitHub Copilot', (token) => api('POST', '/api/providers/copilot', { token })],
-  [/^sk-/, 'OpenAI', (key) => saveSecretKey('OPENAI_API_KEY')(key)],
+  [/^sk-or-/, PROVIDER_NAMES.openrouter, (key) => api('POST', '/api/providers/openrouter', { key, freeOnly: true })],
+  [/^sk-ant-/, PROVIDER_NAMES.anthropic, (key) => saveSecretKey('ANTHROPIC_API_KEY')(key)],
+  [/^github_pat_/, PROVIDER_NAMES.copilot, (token) => api('POST', '/api/providers/copilot', { token })],
+  [/^sk-/, PROVIDER_NAMES.openai, (key) => saveSecretKey('OPENAI_API_KEY')(key)],
 ];
 function quickProviderBox() {
   const key = h('input', { type: 'password', placeholder: 'sk-or-…, sk-ant-…, sk-… or github_pat_…', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'API key', onfocus: () => (S.overviewBusy = true), onblur: () => (S.overviewBusy = false) });

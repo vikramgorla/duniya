@@ -1,7 +1,8 @@
 // Settings screen: every section (tool services, owner assistant, users, sign-in, web access, logging, …). Module of the panel (063).
 // ---------- secrets ----------
-import { $, S, ago, api, ask, can, copyBtn, copyRow, extLink, field, fieldError, gLogo, h, jumpToSub, splitLines, toast, toggle, tryApi } from './core.js';
+import { $, S, ago, api, ask, can, copyBtn, copyRow, extLink, field, fieldError, gLogo, h, icon, splitLines, toast, toggle, tryApi } from './core.js';
 import { browseButton, registrySettingsBox } from './registry.js';
+import { listDetail } from './listdetail.js';
 import { SETTINGS_SECTIONS, SIZE_LABEL, SMALL_MODE_LINK, loadModels, modelSelect, openAgent } from './shared.js';
 import { globRe, markSaved, serverConfig, serverState, toolServiceEditor } from './tool-editor.js';
 /** Settings → Secrets (062: was its own tab). Redraws itself after a change. */
@@ -57,13 +58,22 @@ export async function renderSettings() {
     'whatsapp-helpers': h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any agent can send:'),
       h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups'))),
   };
-  const shown = SETTINGS_SECTIONS.filter(([id]) => by[id]);
-  for (const [id] of shown) by[id].dataset.jump = id;
-  const index = h('nav', { class: 'jumpbar card', 'aria-label': 'Settings sections' }, shown.map(([id, title]) => h('a', { class: 'btn small', href: `#settings/${id}`, onclick: (e) => {
-    e.preventDefault(); history.replaceState(null, '', `#settings/${id}`); jumpToSub();
-  } }, title)));
-  $('#main').replaceChildren(index, h('div', { class: 'grid', style: 'align-items:start' }, shown.map(([id]) => by[id])));
+  // 064: grouped sections (icon · name · one line) → the section's page; two panes on wide screens, list → page on phones
+  const title = Object.fromEntries(SETTINGS_SECTIONS.map(([id, t]) => [id, t]));
+  $('#main').replaceChildren(listDetail({ screen: 'settings', title: 'Settings', page: (id) => by[id],
+    groups: SETTINGS_GROUPS.map(([g, ids]) => ({ title: g, items: ids.filter((id) => by[id]).map((id) => ({ id, name: title[id], sub: SECTION_SUB[id], mark: h('span', { class: `lmark ${SECTION_ICON[id][1]}`, 'aria-hidden': 'true' }, icon(SECTION_ICON[id][0])) })) })) }));
 }
+const SETTINGS_GROUPS = [['Agents & chats', ['tool-services', 'owner-assistant', 'direct-messages', 'privacy-notice', 'photos-voice']],
+  ['People & sign-in', ['users', 'sign-in', 'google', 'assistants', 'password', 'my-google']], ['Server', ['web-access', 'secrets', 'logging', 'small-mode']],
+  ['Help', ['getting-started', 'whatsapp-helpers']]];
+const SECTION_ICON = { 'tool-services': ['models', 'c4'], 'owner-assistant': ['agents', 'c5'], 'direct-messages': ['chats', 'c3'], 'privacy-notice': ['shield', 'c3'], 'photos-voice': ['image', 'c2'],
+  users: ['contacts', 'c4'], 'sign-in': ['lock', 'c0'], google: ['globe', 'c4'], assistants: ['agents', 'c1'], password: ['secrets', 'c0'], 'my-google': ['contacts', 'c0'],
+  'web-access': ['globe', 'c3'], secrets: ['secrets', 'c1'], logging: ['activity', 'c0'], 'small-mode': ['server', 'c0'], 'getting-started': ['overview', 'c5'], 'whatsapp-helpers': ['chats', 'c0'] };
+const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assistant': 'Your own chat, alerts, weekly summary', 'direct-messages': 'Who answers a direct message',
+  'privacy-notice': 'What groups are told', 'photos-voice': 'Pictures, voice notes, speech', users: 'Who can use this panel', 'sign-in': 'Passwords or Google only',
+  google: 'Google sign-in client', assistants: 'ChatGPT, Claude and other MCP clients', password: 'Change your password', 'my-google': 'Link your Google account',
+  'web-access': 'Domain, HTTPS, who may open the panel', secrets: 'Keys and tokens', logging: 'What is recorded, for how long', 'small-mode': 'Heavier features on a small server',
+  'getting-started': 'The first-run guide', 'whatsapp-helpers': 'Commands in WhatsApp' };
 
 // ---------- Settings → Server: Small server mode (055), one switch for heavier features on a small server ----------
 function smallModeCard(sv) {
@@ -328,7 +338,7 @@ function usersCard(users, inv, signin) {
     h('h3', {}, 'Invite someone with Google'),
     inv.googleReady
       ? h('p', { class: 'small muted', style: 'margin-top:0' }, 'They sign in with their Google account the first time — no password to share. Send them the invite by email or copy it into WhatsApp.')
-      : h('div', { class: 'note' }, 'Set up “Sign in with Google” (the card below) first. Invites only work once Google sign-in is ready.'),
+      : h('div', { class: 'note' }, 'Set up ', h('a', { href: '#settings/google' }, 'Sign in with Google'), ' first. Invites only work once Google sign-in is ready.'),
     h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); const i = await tryApi(() => api('POST', '/api/invites', { email: ie.value, role: ir.value }), 'Invite created — now send it'); if (i) renderSettings(); } },
       ie, ir, h('button', { class: 'btn primary', disabled: !inv.googleReady }, 'Invite')),
     inv.invites.length ? h('div', { style: 'margin-top:6px' }, inv.invites.map((i) => h('div', { class: 'list-row' },

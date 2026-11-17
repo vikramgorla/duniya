@@ -1,7 +1,8 @@
 // Models screen: providers, accounts, defaults, fallback, photos & voice capabilities. Module of the panel (063).
 import { $, S, api, ask, can, field, h, toast, toggle, tryApi } from './core.js';
 import { chainEditor } from './fallback.js';
-import { LINKS, loadModels, meter, modelSelect, saveSecretKey, usageLine } from './shared.js';
+import { listDetail, mark } from './listdetail.js';
+import { LINKS, loadModels, meter, modelLabel, modelSelect, plural, saveSecretKey, usageLine } from './shared.js';
 import { usageSummary } from './usage.js';
 const ext = (href, text) => h('a', { href, target: '_blank', rel: 'noopener' }, text, ' ↗');
 // Small drawings of what to look for on the other site (no images from the web).
@@ -43,11 +44,24 @@ function providerCard({ id, mark, title, cost, tag, p, steps, form, connected, e
     tag ? h('div', { class: 'ptags' }, tag) : null,
     p?.error ? h('div', { class: 'note bad' }, p.error) : null,
     healthNote(p),
+    isOn ? planUsage(p) : null,
     isOn ? h('div', {}, connected, h('div', { class: 'row', style: 'margin-top:10px' }, t.btn, extra), t.out, accounts || null)
       : ownerOnly && !can('owner') ? h('p', { class: 'small muted' }, 'Ask an owner to connect this account.')
         : h('div', {}, h('div', { class: 'eyebrow', style: 'margin-top:14px' }, 'How to connect'), stepList(steps), form));
 }
 
+/** 064: plan usage of an account as limits [{ label, used (0–100 %), resetAt?, detail? }]: what the provider reports
+ * (`p.limits`; Copilot's premium requests from its quota). Nothing is shown when the provider reports nothing. */
+const limitsOf = (p) => p?.limits || (p?.quota && !p.quota.unlimited && p.quota.remainingPercent != null
+  ? [{ label: 'premium requests', used: 100 - p.quota.remainingPercent, resetAt: p.quota.resetDate, detail: p.quota.total != null && p.quota.used != null ? `${Math.max(0, p.quota.total - p.quota.used)} of ${p.quota.total} left` : '' }] : []);
+const resetText = (t) => (t ? `resets ${new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '');
+/** The "Plan usage" section of a provider's page: a meter per limit with its reset time. */
+function planUsage(p) {
+  const ls = limitsOf(p);
+  return ls.length ? h('div', { class: 'plan-usage' }, h('h3', {}, 'Plan usage'), ls.map((l) => h('div', { class: 'limit' },
+    h('div', { class: 'row spread small' }, h('span', {}, l.label[0].toUpperCase() + l.label.slice(1)), h('b', { class: 'num' }, `${Math.round(l.used)}% used`)),
+    meter(l.used), h('div', { class: 'small muted' }, [l.detail, resetText(l.resetAt)].filter(Boolean).join(' · '))))) : null;
+}
 /** 042: "Paused until 14:20 — usage limit reached" with a "Try again now" button; nothing when the account is fine. */
 function healthNote(p) {
   const st = p?.health;
@@ -152,26 +166,13 @@ export async function renderModels() {
   providerCard.usage = us;
   const by = Object.fromEntries(provs.map((p) => [p.id, p]));
   const anyOn = provs.some((p) => p.connected);
-  const go = (id) => () => document.getElementById(`prov-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const disconnect = (what, path, consequence) => h('button', { class: 'btn small danger mut', onclick: async () => (await ask({ title: `Disconnect ${what}?`, text: consequence, ok: 'Disconnect', danger: true })) && tryApi(async () => { await api('DELETE', path); S.models = null; renderModels(); }, 'Disconnected') }, 'Disconnect');
-
-  // Start here
-  const start = anyOn
-    ? h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Models'), h('span', { class: 'pill ok' }, `${provs.filter((p) => p.connected).length} connected`)),
-      h('p', { class: 'small muted', style: 'margin:6px 0 0' }, models.resolvedDefault ? `Agents on Auto use ${models.resolvedDefault} right now. You can connect more providers below and pick per agent.` : models.problem || ''))
-    : h('div', { class: 'card start' }, h('div', { class: 'eyebrow' }, 'Start here'), h('h2', {}, 'Connect a model so your agents can answer'),
-      h('p', { class: 'small muted', style: 'margin-top:-6px' }, 'Pick one to begin. You can add more later and choose per agent.'),
-      h('div', { class: 'choices' },
-        h('button', { class: 'choice', onclick: go('openrouter') }, h('b', {}, 'Free to start'), h('span', {}, 'OpenRouter free models. No card needed, about 50 messages a day.')),
-        h('button', { class: 'choice', onclick: go('anthropic') }, h('b', {}, 'Best answers'), h('span', {}, 'Anthropic (Claude) or OpenAI API key. Pay per use.')),
-        h('button', { class: 'choice', onclick: go('chatgpt') }, h('b', {}, 'I pay for ChatGPT'), h('span', {}, 'Use your ChatGPT Plus or Pro plan.')),
-        h('button', { class: 'choice', onclick: go('copilot') }, h('b', {}, 'I have GitHub Copilot'), h('span', {}, 'Use your Copilot allowance.'))));
 
   // OpenRouter
   const or = by.openrouter;
   const freeToggle = or ? h('label', { class: 'inline' }, toggle(or.freeOnly, (on) => tryApi(async () => { await api('POST', '/api/providers/openrouter', { freeOnly: on }); S.models = null; renderModels(); }, on ? 'Free models only' : 'All models allowed')), 'Free models only') : null;
   const orCard = providerCard({
-    id: 'openrouter', mark: 'm-or', title: 'OpenRouter', p: or,
+    id: 'openrouter', mark: 'm-or', title: or?.name || 'OpenRouter', p: or,
     cost: 'Free models: 50 requests a day (1,000 a day after buying $10 of credit), 20 a minute. Paid models cost per use.',
     tag: h('span', { class: 'pill info' }, 'Zero-cost start'),
     steps: [
@@ -189,7 +190,7 @@ export async function renderModels() {
 
   // Anthropic
   const anCard = providerCard({
-    id: 'anthropic', mark: 'm-an', title: 'Anthropic (Claude)', p: by.anthropic,
+    id: 'anthropic', mark: 'm-an', title: by.anthropic?.name || 'Claude', p: by.anthropic,
     cost: 'Pay per use with prepaid credit in the Claude Console. Very good with tools.',
     steps: [
       [h('span', {}, 'Open ', ext(LINKS.anthropicKeys, 'Claude Console → API keys'), '. Sign in, and add credit under Billing if asked.')],
@@ -205,7 +206,7 @@ export async function renderModels() {
 
   // OpenAI
   const oaCard = providerCard({
-    id: 'openai', mark: 'm-oa', title: 'OpenAI (API key)', p: by.openai,
+    id: 'openai', mark: 'm-oa', title: by.openai?.name || 'OpenAI', p: by.openai,
     cost: 'Pay per use with prepaid credit on the OpenAI platform (separate from ChatGPT plans).',
     steps: [
       [h('span', {}, 'Open ', ext(LINKS.openaiKeys, 'OpenAI → API keys'), ' and sign in. Add credit under Billing if asked.')],
@@ -222,7 +223,7 @@ export async function renderModels() {
   const cg = by.chatgpt;
   const cgFlow = chatgptFlow({});
   const cgCard = providerCard({
-    id: 'chatgpt', mark: 'm-cg', title: 'ChatGPT plan', p: cg, ownerOnly: true,
+    id: 'chatgpt', mark: 'm-cg', title: cg?.name || 'ChatGPT', p: cg, ownerOnly: true,
     cost: 'Uses the usage included in your ChatGPT Plus or Pro plan. No extra cost; plan limits apply.',
     steps: [
       [h('span', {}, 'Click the button and open the sign-in.'), cgFlow.start],
@@ -240,12 +241,8 @@ export async function renderModels() {
 
   // GitHub Copilot (official SDK)
   const co = by.copilot;
-  const q = co?.quota;
-  const quotaView = q ? (q.unlimited ? h('div', { class: 'small' }, 'Premium requests: unlimited on this plan')
-    : h('div', {}, h('div', { class: 'row spread small' }, h('span', {}, 'Premium requests left'), h('b', { class: 'num' }, q.total != null && q.used != null ? `${Math.max(0, q.total - q.used)} of ${q.total}` : `${q.remainingPercent}%`)),
-      meter(100 - (q.remainingPercent ?? 0)), q.resetDate ? h('div', { class: 'small muted' }, `Resets ${new Date(q.resetDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}`) : null)) : null;
   const coCard = providerCard({
-    id: 'copilot', mark: 'm-gh', title: 'GitHub Copilot', p: co, ownerOnly: true,
+    id: 'copilot', mark: 'm-gh', title: co?.name || 'GitHub Copilot', p: co, ownerOnly: true,
     cost: 'Uses your Copilot allowance (Free, Pro or Business). Copilot Free is meant for personal use.',
     tag: h('span', { class: 'pill' }, 'Uses your Copilot allowance'),
     steps: [
@@ -256,7 +253,7 @@ export async function renderModels() {
     ],
     form: h('div', {}, keyForm({ placeholder: 'github_pat_…', busy: 'Connecting… the first time this downloads Copilot support (about 400 MB, a few minutes)', submit: (token) => api('POST', '/api/providers/copilot', { token }) }),
       h('p', { class: 'small muted' }, 'If GitHub refuses the token, open it on GitHub and switch “Copilot requests” to the other access level (Read-only ↔ Read and write), then try again. The first connection downloads GitHub’s official Copilot helper to this server (about 400 MB of disk, about 60 MB of memory while in use); nothing is downloaded if you never connect Copilot.')),
-    connected: h('div', {}, h('p', { style: 'margin:0 0 6px' }, `Signed in as ${co?.account || 'your GitHub account'}.`), quotaView),
+    connected: h('p', { style: 'margin:0 0 6px' }, `Signed in as ${co?.account || 'your GitHub account'}.`),
     accounts: accountsBox({ first: co, provs, ownerOnly: true, addForm: () => accountKeyForm({ placeholder: 'github_pat_…', keyLabel: 'Paste its GitHub token (fine-grained, with Copilot requests)', submit: (label, token) => api('POST', '/api/providers/copilot', { label, token }) }) }),
     extra: can('owner') ? [replaceKey(keyForm({ placeholder: 'github_pat_…', button: 'Save', submit: (token) => api('POST', '/api/providers/copilot', { token }) })),
       disconnect('GitHub Copilot', '/api/providers/copilot', 'Agents using Copilot models stop answering until another model is chosen.')] : null,
@@ -295,14 +292,40 @@ export async function renderModels() {
   const fallbackCard = h('div', { class: 'card', id: 'fallback' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'When a model fails'),
     h('span', { class: `pill ${troubled.length ? 'warn' : fb.enabled ? 'ok' : ''}` }, troubled.length ? `${troubled.length} paused` : fb.enabled ? 'Switching on' : 'Off')),
     h('p', { class: 'small muted' }, 'If the model an agent uses hits a usage limit, is down, times out or its sign-in expired, the agent answers with the next model below instead of failing. A paused account is skipped and tried again later (1 minute, then longer; for usage limits when the provider says it resets). Refused requests never switch, and tools never run twice.'),
-    troubled.map((p) => h('div', { class: 'row spread small', style: 'margin:4px 0' }, h('span', {}, h('b', {}, p.name), ` — ${p.health.text}`), h('a', { href: `#models`, onclick: (e) => { e.preventDefault(); document.getElementById(`prov-${p.type}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }, 'See account'))),
+    troubled.map((p) => h('div', { class: 'row spread small', style: 'margin:4px 0' }, h('span', {}, h('b', {}, p.name), ` — ${p.health.text}`), h('a', { href: `#models/${p.type}` }, 'See account'))),
     h('label', { class: 'inline', style: 'margin-top:8px' }, fbOn, 'Switch to another model automatically'),
     field('Try these, in order', fbChain.el, 'Agents and chats can have their own setting (agent page, Chats).'),
     can('admin') ? h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn primary mut', onclick: () => tryApi(async () => { await api('PUT', '/api/fallback', { enabled: fbOn.checked, chain: fbChain.value() }); S.models = null; renderModels(); }, 'Saved') }, 'Save')) : null);
 
-  const cards = [orCard, anCard, oaCard, cgCard, coCard];
-  if (anyOn) cards.sort((a, b) => b.classList.contains('on') - a.classList.contains('on')); // connected first
-  $('#main').replaceChildren(start, media && anyOn ? mediaCapsCard(media) : null, h('div', { class: 'grid pgrid' }, cards, otherCard, anyOn ? fallbackCard : null, defaults));
+  // 064: a list of providers (mark, name, health, short status) → the chosen provider's page; #models/<id>
+  const MARKS = { openrouter: ['O', 'c4'], anthropic: ['A', 'c1'], openai: ['O', 'c3'], chatgpt: ['C', 'c5'], copilot: ['G', 'c0'] };
+  const pages = { openrouter: orCard, anthropic: anCard, openai: oaCard, chatgpt: cgCard, copilot: coCard };
+  const names = Object.fromEntries(Object.entries(pages).map(([id, card]) => [id, card.querySelector('h2')?.textContent || id]));
+  const state = (p) => (!p?.connected ? (p?.error ? ['bad', 'needs attention'] : ['', 'not connected']) : p.health?.state && p.health.state !== 'ok' ? [p.health.state === 'reconnect' ? 'bad' : 'warn', p.health.text] : ['ok', `ok · ${plural(p.models, 'model')}`]);
+  const row = (id, p, name) => {
+    const [st, text] = state(p); const l = st === 'ok' ? limitsOf(p)[0] : null; // the tightest limit, when the provider reports one
+    return { id, name, mark: mark(...(MARKS[id] || [name[0], 'c0'])), status: h('span', { class: `dot ${st}`, 'aria-hidden': 'true' }),
+      sub: l ? [`${Math.round(l.used)}% of ${l.label}`, h('span', { class: `lmeter${l.used >= 85 ? ' hot' : ''}`, 'aria-hidden': 'true' }, h('i', { style: `width:${Math.min(100, Math.round(l.used))}%` }))] : text };
+  };
+  const on = Object.keys(pages).filter((id) => by[id]?.connected || by[id]?.error);
+  const off = Object.keys(pages).filter((id) => !on.includes(id));
+  for (const p of compat) pages[`x-${p.id}`] = otherCard;
+  pages.add = h('div', { class: 'card start' }, h('h2', {}, anyOn ? 'Add a provider' : 'Connect a model so your agents can answer'),
+    h('p', { class: 'small muted', style: 'margin-top:-6px' }, anyOn ? 'Pick one; you choose the model per agent.' : 'Pick one to begin. You can add more later and choose per agent.'),
+    h('div', { class: 'choices' }, [['openrouter', 'Free to start', 'OpenRouter free models. No card needed, about 50 messages a day.'], ['anthropic', 'Best answers', 'Claude API key from the Anthropic Console. Pay per use.'],
+      ['openai', 'OpenAI API key', 'Pay per use with OpenAI credit.'], ['chatgpt', 'I pay for ChatGPT', 'Use your ChatGPT Plus or Pro plan.'], ['copilot', 'I have GitHub Copilot', 'Use your Copilot allowance.']]
+      .filter(([id]) => off.includes(id)).map(([id, t, d]) => h('a', { class: 'choice', href: `#models/${id}` }, h('b', {}, t), h('span', {}, d))),
+    h('a', { class: 'choice', href: '#models/endpoints' }, h('b', {}, 'Another endpoint'), h('span', {}, 'Ollama, LM Studio, Groq, Mistral… any OpenAI-style API.'))));
+  pages.endpoints = otherCard; pages.fallback = fallbackCard; pages.defaults = defaults;
+  if (media && anyOn) pages.abilities = mediaCapsCard(media);
+  $('#main').replaceChildren(listDetail({ screen: 'models', title: 'Models', known: (id) => Object.hasOwn(pages, id), first: anyOn ? on[0] : 'add', page: (id) => pages[id] || pages.add, groups: [
+    { title: 'Providers', items: [...on.map((id) => row(id, by[id], names[id])), ...compat.map((p) => row(`x-${p.id}`, p, p.name)),
+      { id: 'add', name: anyOn ? 'Add a provider' : 'Connect a model', sub: anyOn ? `${off.length} more available` : 'Start here: free or your own plan', mark: h('span', { class: 'lmark add', 'aria-hidden': 'true' }, '+') }] },
+    { title: 'How models are used', items: [
+      { id: 'defaults', name: 'Default models', sub: models.resolvedDefault ? `Auto uses ${modelLabel(models.resolvedDefault, models)}` : 'Auto', mark: mark('D', 'c0') },
+      anyOn ? { id: 'fallback', name: 'When a model fails', sub: troubled.length ? `${troubled.length} paused` : fb.enabled ? 'Switches automatically' : 'Off', mark: mark('F', 'c0'), status: troubled.length ? h('span', { class: 'dot warn', 'aria-hidden': 'true' }) : null } : null,
+      pages.abilities ? { id: 'abilities', name: 'Photos & voice', sub: 'What each provider can do', mark: mark('P', 'c0') } : null,
+      { id: 'endpoints', name: 'Other endpoints', sub: compat.length ? plural(compat.length, 'endpoint') : 'Ollama, LM Studio…', mark: mark('E', 'c0') }].filter(Boolean) }] }));
 }
 
 // ---------- Models → Photos & voice (043): what each connected provider can do beyond text ----------

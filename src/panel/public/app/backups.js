@@ -1,6 +1,7 @@
 // Backups screen (owner): schedule, GitHub, S3, download and restore. Module of the panel (063).
 // ---------- backups (owner) ----------
-import { $, S, api, ask, extLink, field, h, kb, meterEl, time, toast, tryApi, uploadFile, waitForRestart } from './core.js';
+import { $, S, api, ask, extLink, field, h, icon, kb, meterEl, time, toast, tryApi, uploadFile, waitForRestart } from './core.js';
+import { listDetail } from './listdetail.js';
 const backupTime = (f) => { const m = f.match(/(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)/); return m ? time(Date.UTC(m[1], m[2] - 1, m[3], m[4], m[5], m[6])) : f; };
 function downloadFile(href, name) { const a = h('a', { href, download: name, class: 'hide' }); document.body.append(a); a.click(); a.remove(); }
 let ghPollTimer = null; let ghAutoChecked = 0;
@@ -59,7 +60,16 @@ export async function renderBackups() {
       h('button', { class: 'btn primary', onclick: () => saveSettings({ s3: { enabled: $('#s3on').checked, endpoint: se.value.trim(), region: sr.value.trim() || 'auto', bucket: sb.value.trim(), prefix: sp.value.trim() } }) }, 'Save'),
       h('button', { class: 'btn', onclick: async () => { const r = await api('POST', '/api/backups/test/s3'); toast(r.ok ? 'S3 OK' : r.error); } }, 'Test')));
 
-  $('#main').replaceChildren(h('div', { class: 'grid' }, scheduleCard, localCard, githubCard(b, s, saveSettings), s3Card, restoreCard(b, s)));
+  // 064: list → page, like Models and Settings: each place a backup goes, with its state on the row
+  const pages = { schedule: scheduleCard, local: localCard, github: githubCard(b, s, saveSettings), s3: s3Card, restore: restoreCard(b, s) };
+  const SCHED = { hourly: 'every hour', '6h': 'every 6 hours', daily: 'daily', weekly: 'weekly' };
+  const row = (id, name, sub, ic, cls, st = '') => ({ id, name, sub, mark: h('span', { class: `lmark ${cls}`, 'aria-hidden': 'true' }, icon(ic)), status: st ? h('span', { class: `dot ${st}`, 'aria-hidden': 'true' }) : null });
+  $('#main').replaceChildren(listDetail({ screen: 'backups', title: 'Backups', page: (id) => pages[id], groups: [
+    { title: 'Backups', items: [row('schedule', 'Schedule', !b.passphraseSet ? 'Set a passphrase first' : s.enabled ? `On · ${SCHED[s.schedule] || s.schedule}${s.schedule === 'daily' || s.schedule === 'weekly' ? ` at ${s.at}` : ''}` : 'Off', 'pending', 'c4', b.passphraseSet && s.enabled ? 'ok' : 'warn'),
+      row('local', 'This server', b.local.length ? `${b.local.length} ${b.local.length === 1 ? 'backup' : 'backups'}${last?.at ? ` · last ${time(last.at)}` : ''}` : 'No backups yet', 'server', 'c0'),
+      row('github', 'GitHub', s.github.enabled ? 'On' : 'Off', 'backups', 'c0', s.github.enabled ? 'ok' : ''),
+      row('s3', 'S3 storage', s.s3.enabled ? 'On' : 'Off', 'backups', 'c3', s.s3.enabled ? 'ok' : '')] },
+    { title: 'Restore', items: [row('restore', 'Restore a backup', 'From this server, GitHub, S3 or a file', 'back', 'c1')] }] }));
   if (b.github.app.app && !b.github.app.installed && Date.now() - ghAutoChecked > 15000) { ghAutoChecked = Date.now(); checkGithubApp(true); }
 }
 

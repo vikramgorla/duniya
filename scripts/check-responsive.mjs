@@ -77,14 +77,15 @@ const STATES = [
   // 052: Browse tool services — the search sheet, the Add form with a key, and the result with its tools
   { name: 'registry-browse', hash: 'agents/carpool', wait: 2500, js: "await T.click('Browse tool services', 'button', 1500);" },
   { name: 'registry-add', hash: 'agents/carpool', wait: 2500, js: "await T.click('Browse tool services', 'button', 1500); [...document.querySelectorAll('.reg-card')].find((c) => c.textContent.includes('Recipe box')).querySelector('button').click(); await T.until('dialog form input[type=password]'); await T.wait(300);" },
-  { name: 'registry-added', hash: 'settings', wait: 2000, before: REGISTRY_ADDED, js: "await T.click('Browse tool services', 'button', 1500); [...document.querySelectorAll('.reg-card')].find((c) => c.textContent.includes('Weather forecasts')).querySelector('button').click(); await T.until('dialog form'); await T.click('Add to all agents', 'button', 1200);" },
+  { name: 'registry-added', hash: 'settings/tool-services', wait: 2000, before: REGISTRY_ADDED, js: "await T.click('Browse tool services', 'button', 1500); [...document.querySelectorAll('.reg-card')].find((c) => c.textContent.includes('Weather forecasts')).querySelector('button').click(); await T.until('dialog form'); await T.click('Add to all agents', 'button', 1200);" },
   { name: 'chats', hash: 'chats' },
   // 064: a chat's less-used settings open in place; the phone tab bar's More sheet; toasts (undo, error)
   { name: 'chats-more-settings', hash: 'chats', js: "document.querySelectorAll('.chat-more').forEach((d, i) => { d.open = i < 2; }); await T.wait(200);" },
   { name: 'more-sheet', hash: 'overview', js: "document.querySelector('nav.tabbar button[data-tab=more]').click(); await T.until('dialog.more'); await T.wait(500);" },
   // 064: the panel's own confirmation: a normal one, a destructive one (red, Cancel focused), one with details
   { name: 'ask-dialog', hash: 'settings', wait: 2000, js: "const { ask } = await import('/app/core.js'); ask({ title: 'Add https://agents.example.org?', text: 'It is added next to the current address: both work, nothing is switched off.\\n\\nThen you open the panel at the new address and confirm it there.', ok: 'Add address' }); await T.wait(500);" },
-  { name: 'ask-danger', hash: 'overview', js: "await T.click('Unlink', 'button', 600);" },
+  { name: 'ask-danger', hash: 'overview', js: "document.querySelector('details.menu').open = true; await T.click('Unlink', 'button', 600);" },
+  { name: 'row-menu', hash: 'overview', js: "const m = document.querySelector('#ov-whatsapp details.menu'); m.open = true; m.scrollIntoView({ block: 'center' }); await T.wait(300);" },
   { name: 'ask-details', hash: 'server', wait: 2500, js: "await T.click('Install OS updates', 'button', 600);" },
   { name: 'toasts', hash: 'chats', js: "const { toast } = await import('/app/core.js'); toast('Book club off — agents ignore it', { undo: () => {} }); toast('The server did not answer. Try again.', { bad: true }); await T.wait(400);" },
   { name: 'chats-fallback', hash: 'chats', js: "[...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);" },
@@ -93,7 +94,12 @@ const STATES = [
   { name: 'chats-memory', hash: 'chats', js: "[...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button')?.click(); await T.wait(1800); T.openAll();" },
   { name: 'contacts', hash: 'contacts' },
   { name: 'models', hash: 'models', js: 'T.openAll();' },
-  { name: 'models-setup', hash: 'models', before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
+  // 064: list → page: a provider's page, the Add page, Backups → Restore, Settings sections
+  { name: 'models-provider', hash: 'models/chatgpt', js: 'T.openAll();' },
+  { name: 'models-add', hash: 'models/add' },
+  { name: 'backups-restore', hash: 'backups/restore' },
+  { name: 'settings-users', hash: 'settings/users', wait: 2000, js: 'T.openAll();' },
+  { name: 'models-setup', hash: 'models/chatgpt', before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u).startsWith('/api/providers') && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); if (Array.isArray(j)) return new Response(JSON.stringify(j.filter((x) => x.id !== 'openrouter').map((x) => ({ ...x, connected: false, models: 0 })))); }
       return r; }; S.models = null;`, js: "await T.click('Sign in with ChatGPT', 'button', 1200); T.openAll();" },
   { name: 'usage', hash: 'usage' },
@@ -118,16 +124,16 @@ const STATES = [
   // 060: one-time links — enter a secret (signed in), a new user's sign-up page (before sign-in), the link in Users.
   { name: 'secret-link', hash: 'secrets', js: "const r = await (await fetch('/api/secret-links', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'OPENAI_API_KEY' }) })).json(); await (await import('/app/login.js')).renderSecretLink(r.link.split('=')[1]);" },
   { name: 'signup-link', hash: '', js: "const r = await (await fetch('/api/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: `lea${Date.now() % 1e6}`, role: 'admin' }) })).json(); S.tab = ''; S.es?.close(); history.replaceState(null, '', `#signup=${r.signup.link.split('=')[1]}`); await (await import('/app/login.js')).renderLogin();" },
-  { name: 'settings-signup-link', hash: 'settings', wait: 2000, js: "S.signupLink = { username: 'lea', link: `${location.origin}/#signup=${'a1'.repeat(32)}` }; await (await import('/app/settings.js')).renderSettings(); document.querySelector('.note code')?.scrollIntoView(); await T.wait(300);" },
+  { name: 'settings-signup-link', hash: 'settings/users', wait: 2000, js: "S.signupLink = { username: 'lea', link: `${location.origin}/#signup=${'a1'.repeat(32)}` }; await (await import('/app/settings.js')).renderSettings(); document.querySelector('.note code')?.scrollIntoView(); await T.wait(300);" },
   { name: 'settings', hash: 'settings', wait: 2000, js: 'T.openAll();' },
   // 055: Settings → Server, Small server mode (one switch for heavier features on a small server)
-  { name: 'settings-small-mode', hash: 'settings', wait: 2000, js: "document.getElementById('small-mode')?.scrollIntoView(); await T.wait(300);" },
+  { name: 'settings-small-mode', hash: 'settings/small-mode', wait: 2000, js: "document.getElementById('small-mode')?.scrollIntoView(); await T.wait(300);" },
   // 055: Small server mode off on a small server: a saved local tool service is shown as not started, with why
   { name: 'agent-local-blocked', hash: 'agents/carpool', wait: 2000, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u) === '/api/status') { const j = await r.clone().json(); return new Response(JSON.stringify({ ...j, server: { ...j.server, size: 'small', smallMode: false } })); }
       return r; };`, js: "T.openAll(); document.getElementById('local-blocked')?.scrollIntoView(); await T.wait(300);" },
   // #77: a new domain was added while Google sign-in is on (callout with the values for Google Cloud)
-  { name: 'settings-web-google', hash: 'settings', wait: 2500, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
+  { name: 'settings-web-google', hash: 'settings/web-access', wait: 2500, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u) === '/api/web' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); const old = j.current?.host || 'agents.example.org';
         return new Response(JSON.stringify({ ...j, switch: { phase: 'added', newHost: 'duniya-panel.example.org', oldHost: old },
           google: { on: true, enabled: true, only: false, callbackPath: '/auth/google/callback', consoleUrl: 'https://console.cloud.google.com/apis/credentials', addresses: [] } })); }

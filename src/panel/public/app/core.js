@@ -30,6 +30,11 @@ const ICONS = {
   contacts: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3.5 19a5.5 5.5 0 0 1 11 0M16 7.5h5M16 11h5M17.5 14.5H21',
   server: 'M5 5h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM5 13h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zM8 8h.01M8 16h.01',
   backups: 'M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9a4.5 4.5 0 0 1 .5 9zM12 11v5M9.5 13.5 12 11l2.5 2.5',
+  back: 'M15 5l-7 7 7 7',
+  shield: 'M12 3.5l7 2.5v5.5c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6zM9 12l2 2 4-4',
+  image: 'M5 5h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM4 16l5-5 4 4 2-2 5 5M15.5 9h.01',
+  lock: 'M7 11V8a5 5 0 0 1 10 0v3M6 11h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM12 15v2',
+  globe: 'M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17zM3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z',
   more: 'M5 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM12 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM19 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z',
   search: 'M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zM15.5 15.5 20 20',
   pending: 'M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 8v4.5l3 2',
@@ -93,6 +98,15 @@ export function ask({ title, text = '', ok = 'Continue', danger = false, body = 
     (typedIn || (danger ? no : yes)).focus();
   });
 }
+/** A ⋯ menu (064): secondary actions of a row behind one button instead of a row of buttons. `label` names it for
+ * screen readers ("Actions for Home"); `items` are buttons. A click anywhere or Esc closes it. */
+export function menu(label, ...items) {
+  const d = h('details', { class: 'menu' }, h('summary', { class: 'btn small icon', 'aria-label': label, title: label }, icon('more')),
+    h('div', { class: 'menu-pop', onclick: () => { d.open = false; } }, items));
+  d.addEventListener('keydown', (e) => { if (e.key === 'Escape' && d.open) { d.open = false; d.querySelector('summary').focus(); } });
+  return d;
+}
+document.addEventListener('click', (e) => { for (const m of document.querySelectorAll('details.menu[open]')) if (!m.contains(e.target)) m.open = false; });
 /** Agent (or chat) avatar (064): initials on one of the five "people" colours, the same colour for the same id. */
 export function avatar(name, id = name, size = '') {
   const words = String(name || '?').replace(/[^\p{L}\p{N} ]/gu, ' ').trim().split(/\s+/);
@@ -118,7 +132,7 @@ export function emptyState(art, title, text, action) {
   return h('div', { class: 'empty' }, svg, h('b', {}, title), text ? h('p', {}, text) : null, action || null);
 }
 /** Placeholder cards while a screen loads for the first time (064). */
-export const skeleton = (cards = 2) => h('div', { class: 'skel', 'aria-hidden': 'true' },
+const skeleton = (cards = 2) => h('div', { class: 'skel', 'aria-hidden': 'true' },
   Array.from({ length: cards }, () => h('div', { class: 'card' }, h('i', { class: 'h' }), h('i', {}), h('i', { class: 's' }), h('i', { class: 'xs' }))));
 // Screen data cache (058): switching screens reuses what was just loaded. Any change made here and anything the live
 // stream reports (activity, a changed status) drops it; entries also expire after 60 s. Only lists that screens load

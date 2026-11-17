@@ -91,7 +91,7 @@ export function providerRoutes(route) {
     const id = meta.id || 'chatgpt';
     if (id !== 'chatgpt' && meta.label && !accountById(id)?.label) addAccount({ type: 'chatgpt', label: meta.label, id });
     clearModelCache(id); breaker.reset(id);
-    const name = accountById(id)?.name || 'ChatGPT plan';
+    const name = accountById(id)?.name || 'ChatGPT';
     activity('system', { summary: `${name} connected (${email || 'account'}) by ${user.username}` });
     const models = (await allModels({ refresh: true })).filter((m) => m.provider === id).length;
     return { ok: true, email, models, account: id };

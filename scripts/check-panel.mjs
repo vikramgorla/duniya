@@ -16,9 +16,11 @@ import { FIRST_SCREEN, staticClosure } from '../src/panel/module-graph.js';
 
 // Budgets in brotli bytes: the sizes when 063 set them plus ~10 %. 064 raised the first screen to 51 KB for what every
 // screen needs from the start: one design-token set, the phone tab bar, skeletons, empty states, avatars, the panel's
-// own confirmation dialog, and accessibility (switch roles, labelled fields, focus handling).
-const FIRST_BUDGET = 51_000;
-const TOTAL_BUDGET = 147_000;
+// own confirmation dialog, and accessibility (switch roles, labelled fields, focus handling); then 53 KB for the ⋯ row
+// menu and the display names shared with the server (names.js). The total rose to 152 KB for the list → page layout
+// (Models, Settings, Backups) and the plan-usage meters.
+const FIRST_BUDGET = 53_000;
+const TOTAL_BUDGET = 152_000;
 
 const PUBLIC = resolve(import.meta.dirname, '../src/panel/public');
 const APP = resolve(PUBLIC, 'app');

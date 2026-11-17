@@ -20,7 +20,7 @@ npm install && ADMIN_PASSWORD=dev-password-123 npm start     # panel on http://1
 | `npm run knip` / `npm run jscpd` | unused files, exports and dependencies / duplicated code ([Lean code](#lean-code)) |
 | `node scripts/demo-panel.mjs` | seeded demo panel on :8099 (admin / demo-password-123), no network |
 | `DEMO_EMPTY=1 node scripts/demo-panel.mjs` | a fresh install (no provider, no agent, WhatsApp waiting for a scan; *Get code* links it): check the first run |
-| `npm run check:responsive` | every screen at 375 / 393 / 1440 px, light + dark (needs Chrome) |
+| `npm run check:responsive` | every screen at 375 / 393 / 1440 px, light + dark: layout, tap targets, text size, and accessibility (every control named, AA contrast) (needs Chrome) |
 | `npm run site:shots` | retake the website screenshots and videos (needs Chrome + ffmpeg) |
 | `npm run measure:load` | first load of Overview in headless Chrome on slow and fast networks and a phone-speed CPU: bytes and time, cold and warm |
 
@@ -73,11 +73,12 @@ The panel is one dependency-free app in native ES modules: no framework, no bund
 |---|---|
 | `index.html` | the shell: meta tags, `app/styles.css`, `<script type="module" src="/app/main.js">` |
 | `app/main.js` | entry: page-wide listeners (keyboard, back from the background), then sign-in |
-| `app/core.js` | `h()` (untrusted text only through `textContent`), `api()` and its cache, the shared state `S`, the shell: tabs, router (`show()`), live stream |
+| `app/core.js` | `h()` (untrusted text only through `textContent`), `api()` and its cache, the shared state `S`, the shared components (`ask()` confirmation, `toast()`, `field()`, `toggle()`, `avatar()`, `emptyState()`, `skeleton()`), the shell: top tabs and the phone tab bar, router (`show()`), live stream |
 | `app/login.js` | sign-in, first-run setup, one-time sign-up and secret links |
 | `app/shared.js` | small helpers several screens use (formatting, model picker, usage line, server size, links) |
-| `app/<screen>.js` | one module per screen: `overview`, `chats`, `agents` + `agent-editor`, `activity`, `usage`, `models`, `contacts`, `pending`, `server`, `backups`, `settings`; parts: `start` (Getting started), `ask`, `quiet`, `updates`, `find`, `fallback`, `tool-editor`, `registry`, `ai-helper`, `diff` |
-| `app/styles.css` | all styles ([DESIGN.md](../DESIGN.md)) |
+| `app/<screen>.js` | one module per screen: `overview`, `chats`, `agents` + `agent-editor`, `activity`, `usage`, `models`, `contacts`, `pending`, `server`, `backups`, `settings`; parts: `start` (Getting started), `ask` (the Ask card), `quiet`, `updates`, `find` (Find anything and the phone's More sheet), `fallback`, `tool-editor`, `registry`, `ai-helper`, `diff` |
+| `app/styles.css` | all styles, one set of tokens ([DESIGN.md](../DESIGN.md#tokens-064)) |
+| `page.css`, `page.js` | the standalone server pages (sign-in results, Google address help, GitHub app hand-off): files, so their CSP needs no `'unsafe-inline'` |
 
 1. **Static imports for what a module always needs**, `import('./x.js')` for what it may need later. `core.js#show()`
    loads each screen on its first visit; Find anything and the AI helper load when first opened.
@@ -91,7 +92,8 @@ The panel is one dependency-free app in native ES modules: no framework, no bund
    release only re-downloads what changed. The import map is the shell's only inline script; its hash is in the
    Content-Security-Policy, so scripts need no `'unsafe-inline'`.
 5. **Checks:** `npm run check:panel` links every module the way the browser does (a missing export fails), checks the
-   names loaded through `import()`, and enforces the budgets. ESLint, knip and jscpd cover the modules.
+   names loaded through `import()`, refuses the browser's `confirm()`, `alert()` and `prompt()` (use `ask()`), and
+   enforces the budgets. ESLint, knip and jscpd cover the modules.
 6. **Scripts that drive the page** (`check-responsive`, `site-shots`) reach panel functions with
    `await import('/app/core.js')` (the import map makes it the page's own module); nothing is global.
 

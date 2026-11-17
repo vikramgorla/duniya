@@ -28,5 +28,5 @@
 - [x] T101 Website: n/a (no visible change)
 - [x] T102 Version 2.24.0 in three files
 - [x] T103 `releases.json` entry
-- [ ] T104 PR via REST, required checks green, squash merge
-- [ ] T105 Issue done comment and close with the release
+- [x] T104 PR via REST, required checks green, squash merge
+- [x] T105 Issue done comment and close with the release

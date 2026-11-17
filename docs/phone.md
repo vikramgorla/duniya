@@ -6,6 +6,8 @@
 
 **In 30 seconds**
 - It is the same panel, so every screen and every setting is there, live (no reload needed), in light and dark mode.
+- On a phone it has a **tab bar at the bottom**: Overview, Chats, Agents, Activity, and **More** for every other
+  screen, *Find anything* and *Sign out*. Questions ("Unlink this number?") open as a sheet from the bottom.
 - Nothing to download from a store and nothing to keep up to date: the server updates it with every release.
 - It signs in with your panel account. Nothing is stored on the phone except the sign-in cookie.
 
@@ -34,7 +36,9 @@
 | **Live** | status, activity and the Ask answer stream in; after the phone wakes up, the panel reconnects at once |
 | **Offline** | the panel needs the server: without a connection it shows the browser's offline page (no data is cached on the phone) |
 | **Alerts** | owner alerts and the weekly summary come in WhatsApp from the [owner assistant](owner-assistant.md) |
-| **Sign out** | **Sign out** in the header, as on a computer |
+| **Finding your way** | the tab bar at the bottom; **More** (with a badge when a change waits for a confirm) holds the other screens; the search button in the header finds any screen, agent, chat or setting |
+| **Undo** | switching a chat off or pausing all agents shows **Undo** for a few seconds |
+| **Sign out** | **More** → **Sign out** (on a computer: in the header) |
 
 ---
 **Next:** [Owner assistant](owner-assistant.md) · [Docs index](README.md)

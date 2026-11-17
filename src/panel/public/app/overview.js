@@ -2,7 +2,7 @@
 // ---------- overview ----------
 import { feedItem, loadChatNames } from './activity.js';
 import { askCard } from './ask.js';
-import { $, S, ago, api, ask, avatar, can, emptyState, h, logo, optimistic, pulse, refreshStatus, show, time, toggle, tryApi } from './core.js';
+import { $, S, ago, api, ask, avatar, can, emptyState, h, logo, menu, optimistic, pulse, refreshStatus, show, time, toggle, tryApi } from './core.js';
 import { plural } from './shared.js';
 import { refreshSilences, silencesCard } from './quiet.js';
 import { checklistActive, checklistBox, checklistNext, goTo, linkNumberBox, refreshChecklist } from './start.js';
@@ -30,15 +30,14 @@ export async function renderOverview(soft) {
     const dmSel = h('select', { disabled: !can('admin'), style: 'max-width:260px', 'aria-label': `Direct messages to ${n.label} go to`, onchange: (e) => tryApi(() => api('PUT', `/api/whatsapp/numbers/${n.id}`, { dmAgent: e.target.value }), 'Saved') },
       h('option', { value: '' }, 'Default agent (see Settings)'), st.agents.map((b) => h('option', { value: b.id, selected: n.dmAgent === b.id }, b.name)));
     return h('div', { class: 'number-card' },
-      h('div', { class: 'row spread' }, h('div', {}, h('b', {}, n.label), linked ? h('span', { class: 'muted small num' }, `  +${(n.me || '').split(':')[0].split('@')[0]}`) : null), pillFor(n)),
+      h('div', { class: 'row spread' }, h('div', {}, h('b', {}, n.label), linked ? h('span', { class: 'muted small num' }, `  +${(n.me || '').split(':')[0].split('@')[0]}`) : null), h('div', { class: 'btns' }, pillFor(n), can('admin') ? menu(`Actions for ${n.label}`,
+        h('button', { class: 'btn small', onclick: () => tryApi(() => api('POST', '/api/whatsapp/restart', body), 'Reconnecting…') }, linked ? 'Reconnect' : 'New QR code'),
+        linked ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Unlink ${n.label}?`, text: 'Agents stop answering on this number until you scan a new QR code with its phone.', ok: 'Unlink number', danger: true })) && tryApi(() => api('POST', '/api/whatsapp/logout', body), 'Unlinked') }, 'Unlink') : null,
+        n.id !== 'main' && can('owner') ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Remove the number “${n.label}”?`, text: 'Its chats keep their memory, but agents bound to them stop answering there.', ok: 'Remove number', danger: true })) && tryApi(async () => { await api('DELETE', `/api/whatsapp/numbers/${n.id}`); refreshStatus(); }, 'Removed') }, 'Remove') : null) : null)),
       linked ? h('div', { class: 'small muted' }, `Connected since ${time(n.since)}`) : null,
       !linked && can('admin') ? (checklistNext() === 'whatsapp' ? h('p', { class: 'small muted' }, 'Waiting for the scan: the QR code is in ', h('a', { href: '#overview/start', onclick: goTo('#overview/start') }, 'Getting started'), ' above.') : linkNumberBox(n)) : null,
       n.lastError && !linked ? h('p', { class: 'small', style: 'color:var(--bad)' }, n.lastError) : null,
-      linked ? [h('label', {}, 'Direct messages to this number go to'), dmSel] : null,
-      h('div', { class: 'row mut', style: 'margin-top:10px' },
-        h('button', { class: 'btn small', onclick: () => tryApi(() => api('POST', '/api/whatsapp/restart', body), 'Reconnecting…') }, linked ? 'Reconnect' : 'New QR code'),
-        linked ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Unlink ${n.label}?`, text: 'Agents stop answering on this number until you scan a new QR code with its phone.', ok: 'Unlink number', danger: true })) && tryApi(() => api('POST', '/api/whatsapp/logout', body), 'Unlinked') }, 'Unlink') : null,
-        n.id !== 'main' && can('owner') ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Remove the number “${n.label}”?`, text: 'Its chats keep their memory, but agents bound to them stop answering there.', ok: 'Remove number', danger: true })) && tryApi(async () => { await api('DELETE', `/api/whatsapp/numbers/${n.id}`); refreshStatus(); }, 'Removed') }, 'Remove') : null));
+      linked ? [h('label', {}, 'Direct messages to this number go to'), dmSel] : null);
   };
   const newLabel = h('input', { placeholder: 'Name, e.g. Shop', onfocus: () => (S.overviewBusy = true), onblur: () => (S.overviewBusy = false) });
   const wa = h('div', { class: 'card', id: 'ov-whatsapp', 'data-jump': 'whatsapp' },

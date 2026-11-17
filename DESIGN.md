@@ -61,8 +61,13 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
 - **Ink + one signal:** primary actions and the active tab are **ink** (`#101216`); the single signal colour is
   electric lime `--signal #c6f432`, used for "live" — the active-tab dot, LED status lights, the knob of an "on"
   toggle, focus rings, the `AI` chip. In dark mode lime becomes the primary colour.
-- **Instrument details:** labels, pills, table headers and numbers in monospace (uppercase, wide tracking for
-  labels); stats in large mono figures; LED dots with a glow for live state.
+- **Instrument details:** eyebrow labels, table headers, LED labels and numbers in monospace (uppercase, wide
+  tracking for labels); stats in large mono figures; LED dots with a glow for live state.
+- **Pills** are short states in sentence case with the text font ("Connected", "2 chats", "Memory"), never
+  `UPPERCASE` and never `(s)` plurals (`plural()` in `shared.js`). A user's own label (a member tag, a model id) keeps
+  its case: `pill raw`.
+- **Avatars** (`avatar(name, id)`): initials on one of the five "people" colours, the same colour for the same agent
+  or chat everywhere (agent cards, Overview, Chats, Activity); grey when off.
 - **Status console:** Overview opens with one sentence about the state ("Everything is running", "A WhatsApp
   number needs attention"; on a fresh install the first missing thing: "Link your WhatsApp number to begin") and LEDs
   for WhatsApp, Agents and Waiting changes.
@@ -70,19 +75,59 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
   for notes.
 - **Type:** Segoe UI Variable / SF Pro / Inter for text and headings (tight tracking); SF Mono / Cascadia /
   JetBrains Mono for labels and numbers.
-- **Motion:** colour transitions, a press scale, a spinner. Nothing else moves.
+- **Motion:** colour transitions, a press scale, a spinner, skeleton shimmer while a screen loads, a short fade-in of a
+  new screen, sheets that rise, and the live pulse on Overview. All of it stops with *reduce motion*
+  (`prefers-reduced-motion`).
+
+## Tokens (064)
+
+One set in `styles.css` `:root` (dark values in one `prefers-color-scheme: dark` block); components use tokens, never
+literal values, and there is one rule per component.
+
+| Kind | Tokens |
+|---|---|
+| Colour | `--bg --bg-2 --card --ink --muted --line --line-2`, `--signal --signal-ink --signal-deep`, `--accent --accent-ink --accent-soft`, states `--ok --warn --bad --info` with `-soft`, people `--p1…--p5`, `--focus --scrim` |
+| Shape | `--radius` 16 (cards), `--radius-s` 10 (controls), `--radius-xs` 6 (pills, notes) |
+| Space | `--s1`…`--s6` = 4, 8, 12, 16, 20, 24 px |
+| Type | `--fs-xs` 12, `--fs-s` 13, `--fs` 15, `--fs-l` 17, `--fs-xl` 26; `--font`, `--font-display`, `--mono` |
+| Motion | `--fast` .15 s, `--slow` .28 s, `--ease` |
+
+Text meets WCAG AA (4.5:1, 3:1 for large text) in both themes; `npm run check:responsive` measures it.
 
 ## Components (in `src/panel/public/app/`: `styles.css`, `core.js` helpers, screen modules)
 
-`card`, `tiles` + stat tile, `table.stack` (cards on phones; every `td` has a `data-label`, empty for a full-width
+`card`, `ask()` (the panel's own confirmation: never the browser's `confirm()`, `alert()` or `prompt()`, which
+`check:panel` refuses), `toast(msg, { bad, undo })`, `emptyState(art, title, text, action)`, `skeleton()`,
+`avatar()`, `pulse()`, `tiles` + stat tile, `table.stack` (cards on phones; every `td` has a `data-label`, empty for a full-width
 cell; `stack flat` for long lists), `.tscroll` (key/value tables that keep their columns), `label.tick` (a checkbox on
 its own with a 40 px tap area), `meter`, `spark(values)`, `pill`, `note`, `seg` (segmented control), `toggle`,
 `btn` (`primary`, `danger`, `small`), `number-card`, `feed`, `bubble` (test console), `spinner`, `modelSelect()`
 (Auto / provider · Auto / specific model), `field(label, input, hint)`, `.qa-row` + `.qa-preview` (an editable row of
 user-written text with a live *Preview* filled with sample values; rows stack on phones).
 
+## Confirmations (064)
+
+`ask({ title, text, ok, danger, body, typed })` returns a promise of true or false. The title asks the question, the
+text says what will happen, and the button names the action ("Delete agent", "Install OS updates", "Restart server",
+never "OK"). `danger` (destructive or disruptive) makes the button red and focuses Cancel, so Enter does not confirm it
+by accident; Esc, Cancel and a tap outside cancel. `body` holds details (the packages an OS update installs, the
+release notes of an update, form fields). `typed` asks to type a word first; use it only for the rare irreversible
+action that already asked for it. It is a centred dialog on wide screens and a bottom sheet on phones.
+
+## Accessibility (064)
+
+- Every control has a name: a `<label>` (`field()` connects it), visible text, or `aria-label` for icon buttons and
+  for controls without visible text. Switches are `role=switch` and take their name (`toggle(…, label)`).
+- Keyboard: everything is reachable with Tab and shows a focus ring (`:focus-visible`); *Skip to content* is the first
+  stop; after a screen change, focus moves to the screen; dialogs trap focus and return it.
+- The current tab has `aria-current="page"`; filters are buttons with `aria-pressed`; error toasts are `role=alert`.
+- `npm run check:responsive` fails on a control without a name (Chrome's accessibility tree) and on text below AA.
+
 ## Finding your way (062)
 
+- **Phones and the installed app** (064): a bottom tab bar with Overview, Chats, Agents, Activity and **More** (a sheet
+  with the other screens, Find anything and Sign out; its badge counts changes waiting for a confirm). Wide screens
+  keep the tabs at the top.
 - **Tabs** in everyday order (Overview, Chats, Agents, Activity, Usage, Models, Contacts, Server, Backups, Settings).
   A tab that is usually empty appears only when it has something (Pending, with a count). Small lists are a section of
   a bigger screen, not a tab (Secrets lives in Settings).
@@ -112,3 +157,6 @@ user-written text with a live *Preview* filled with sample values; rows stack on
 - [ ] Looks right in light and dark mode, on a phone and an iPad; `npm run check:responsive` passes (375 / 393 /
   1440 px).
 - [ ] No flicker when live updates arrive (status and activity over `/api/events`); no new polling.
+- [ ] Every control has a name, keyboard focus is visible, text meets AA in both themes (`check:responsive`).
+- [ ] Questions use `ask()` with the action named on the button; reversible switches offer Undo.
+- [ ] Empty states use `emptyState()`; first loads show `skeleton()` (the router does this for screens).
