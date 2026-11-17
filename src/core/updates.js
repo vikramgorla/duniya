@@ -10,7 +10,7 @@ import { ROOT, fail } from './config.js';
 import { getSetting, updateSettings, getSecret } from './store.js';
 import { kvGet, kvSet } from './db.js';
 import { activity } from './events.js';
-import { parseVersion, compareVersions, analyzeJump, readReleasesAt } from './releases.js';
+import { parseVersion, compareVersions, analyzeJump, readReleasesAt, normalizeReleases, releaseRange } from './releases.js';
 import { runBackup } from './backup/index.js';
 
 export { parseVersion, compareVersions };
@@ -50,13 +50,18 @@ const savedStatus = () => { try { return JSON.parse(kvGet('updates:status') || '
 const STARTED_VERSION = (() => { try { return `v${JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')).version}`; } catch { return 'unknown'; } })();
 export const RUNNING_VERSION = STARTED_VERSION;
 export const runningVersion = () => runningOverride || STARTED_VERSION;
+// 065: the release notes of the installed version (its own releases.json; read once, an update restarts the process).
+let installedOnce = null;
+export const installedReleases = () => (installedOnce ||= (() => { try { return normalizeReleases(JSON.parse(readFileSync(resolve(ROOT, 'releases.json'), 'utf8'))); } catch { return {}; } })());
 
 /** What lies between `current` and the saved check (pure on the saved data, so it stays right after a restart). */
 function withAnalysis(st, current) {
   const target = st.channel === 'main' ? st.targetVersion : st.latest;
   const a = analyzeJump({ current, target, versions: st.channel === 'main' ? (st.targetVersion ? [st.targetVersion] : []) : st.tags || [], releases: st.releases || {} });
   const safeTarget = st.channel === 'main' ? (a.breaking ? null : st.available ? 'main' : null) : a.safeTarget;
-  return { ...st, breaking: a.breaking, steps: a.steps, safeTarget, decisionVersion: a.decisionVersion };
+  // 065: every release between the running version and the target, newest first (the update dialog lists them)
+  const notes = st.available ? releaseRange(st.releases || {}, current, st.channel === 'main' ? st.targetVersion : st.latest) : [];
+  return { ...st, breaking: a.breaking, steps: a.steps, safeTarget, decisionVersion: a.decisionVersion, notes };
 }
 
 /** Last check, corrected for what is running now (a check saved before an update + restart is otherwise stale). */
@@ -101,6 +106,28 @@ export async function checkForUpdate({ root = appRoot, channel = getUpdateSettin
   if (root === appRoot) kvSet('updates:status', JSON.stringify(status));
   return withAnalysis(status, channel === 'stable' ? current : `v${pkg}`);
 }
+
+// ---------------------------------------------------------------- what's new (065)
+const SEEN = (userId) => `updates:seen:${userId}`;
+/**
+ * The versions a user has not seen yet: { from, to } when the running version is newer than the last one this user
+ * saw and the installed releases.json has notes for the range; otherwise null. A user without a record starts at the
+ * version the last update came from (when it finished in the last 14 days), else at the running version.
+ */
+export function whatsNew(user) {
+  const to = runningVersion();
+  if (!user?.id || !parseVersion(to)) return null;
+  let from = kvGet(SEEN(user.id));
+  if (!from) {
+    const lr = savedStatus()?.lastResult;
+    from = lr?.ok && parseVersion(lr.from) && Date.now() - lr.at < 14 * 86400000 ? lr.from : to;
+    kvSet(SEEN(user.id), from);
+  }
+  if (compareVersions(from, to) >= 0 || !releaseRange(installedReleases(), from, to).length) return null;
+  return { from, to };
+}
+/** The user has seen what is new up to the running version. */
+export function markSeen(user) { if (user?.id && parseVersion(runningVersion())) kvSet(SEEN(user.id), runningVersion()); return { seen: runningVersion() }; }
 
 // ---------------------------------------------------------------- pre-update backups
 /** Backups are "configured" when a backup passphrase is set (backups are always encrypted). */

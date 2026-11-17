@@ -86,12 +86,25 @@ export async function renderOverview(soft) {
       led('Waiting', st.pending ? null : true, String(st.pending || 0))),
     st.enabledChats === 0 && open && st.agents.length && !checklistActive() ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
   const silencesSlot = h('div', { id: 'ov-silences-slot', 'data-jump': 'quiet', style: `grid-column:1/-1${S.silences?.length ? '' : ';display:none'}` }, S.silences?.length ? silencesCard(S.silences, refreshSilences) : null);
-  $('#main').replaceChildren(hero, updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), wa, control, server, silencesSlot, recent));
+  $('#main').replaceChildren(hero, whatsNewBox(), updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), wa, control, server, silencesSlot, recent));
   refreshSilences();
   // the feed and the chat names it shows (064) load after the first paint
   Promise.all([S.feed.length ? S.feed : api('GET', '/api/activity?limit=50'), soft ? null : loadChatNames()])
     .then(([rows]) => { S.feed = rows; if (rows.length) { $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); $('#recent + .empty')?.remove(); } }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
+}
+// 065: release notes load on demand (./releases.js).
+/** "Updated to vX — see what's new": shown once per person after an update (the server keeps what each person saw). */
+function whatsNewBox() {
+  const w = S.status?.whatsNew;
+  if (!w) return null;
+  const box = h('div', { class: 'card whatsnew', role: 'status' });
+  const seen = () => { box.remove(); if (S.status) S.status.whatsNew = null; api('POST', '/api/releases/seen', {}).catch(() => {}); };
+  box.append(h('span', { class: 'lmark c5', 'aria-hidden': 'true' }, '✦'),
+    h('div', { class: 'whatsnew-main' }, h('b', {}, `Updated to ${w.to}`), h('span', { class: 'small muted' }, ` · from ${w.from}`)),
+    h('button', { class: 'btn small primary', onclick: async () => { await (await import('./releases.js')).showReleaseNotes({ from: w.from, to: w.to, title: `What's new in ${w.to}` }); seen(); } }, "See what's new"),
+    h('button', { class: 'btn small icon', 'aria-label': "Hide what's new", title: 'Hide', onclick: seen }, '✕'));
+  return box;
 }
 // ---------- install on your phone (061): the panel is an installable web app ----------
 const INSTALL_KEY = 'duniya.installHint';

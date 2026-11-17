@@ -3,6 +3,8 @@
 // panel user, so role gates, validation and activity logging are exactly the panel's. `calls` names the routes a
 // tool uses: the minimum role to see and run the tool is the highest role those routes require.
 // Risky tools never run directly: they return a plain-language preview and a confirm code for confirm_action.
+/** 065: version a is not newer than b ("2.9.0" vs "v2.10.0"). */
+const notAfter = (a, b) => { const [x, y] = [a, b].map((v) => String(v).replace(/^v/, '').split('.').map(Number)); const i = x.findIndex((n, k) => n !== y[k]); return i < 0 || x[i] < y[i]; };
 const iso = (ts) => (ts ? new Date(ts).toISOString() : null); // no imports: tests and the admin MCP load this catalog statically
 
 const enc = encodeURIComponent;
@@ -448,8 +450,12 @@ export const TOOLS = [
 
   // ---------- updates ----------
   { name: 'get_update_status', readOnly: true, calls: [['GET', '/api/updates']],
-    description: 'Running version, last update check, whether an update is available or running. When a breaking release is waiting: breaking, steps (title, summary, actions the owner must take), safeTarget (newest release that needs no decision) and decision.', input: {},
+    description: 'Running version, last update check, whether an update is available or running. status.notes: every release between the running version and the target, newest first (version, title, summary, breaking, actions, changes: [{ type new | improved | fixed | removed, text }]); tell the owner the key changes before updating. When a breaking release is waiting: breaking, steps (title, summary, actions the owner must take), safeTarget (newest release that needs no decision) and decision.', input: {},
     run: (a, x) => x.call('GET', '/api/updates') },
+  { name: 'get_release_notes', readOnly: true, calls: [['GET', '/api/releases']],
+    description: 'Release notes of the installed version and the ones before it (what is new, improved, fixed or removed per version, newest first). Optional from (exclusive) and to (inclusive), e.g. from v2.24.0 to v2.26.0 for "what changed in the last update".',
+    input: { from: str('Versions after this one (optional, e.g. v2.24.0)'), to: str('Up to this version (optional)') },
+    run: (a, x) => x.call('GET', `/api/releases?${new URLSearchParams({ from: a.from || '', to: a.to || '' })}`) },
   { name: 'check_for_updates', calls: [['POST', '/api/updates/check']], description: 'Check GitHub for a newer version now.', input: {},
     run: (a, x) => x.call('POST', '/api/updates/check') },
   { name: 'apply_update', risky: true, calls: [['POST', '/api/updates/apply']],
@@ -461,7 +467,9 @@ export const TOOLS = [
       const target = st.breaking && !a.breaking ? st.safeTarget : st.target || st.latest;
       if (!target) throw fail(`Version v${st.decisionVersion} is a breaking release: call again with breaking: true after the owner read its steps`, 409);
       const steps = a.breaking && st.breaking ? ` BREAKING: ${st.steps.map((s) => `v${s.version} ${s.title}${s.actions.length ? ` (you must: ${s.actions.join(' ')})` : ''}`).join('; ')}.` : '';
-      return `Update from ${st.current} to ${target}.${steps}${a.backup === false ? ' No backup first.' : ''} The app restarts: agents are offline for 1–2 minutes.`;
+      const notes = (st.notes || []).filter((n) => notAfter(n.version, target));
+      const what = notes.length ? ` What changes: ${notes.slice(0, 5).map((n) => `v${n.version} ${n.title}`).join('; ')}${notes.length > 5 ? `; and ${notes.length - 5} earlier releases` : ''}.` : '';
+      return `Update from ${st.current} to ${target}.${what}${steps}${a.backup === false ? ' No backup first.' : ''} The app restarts: agents are offline for 1–2 minutes.`;
     },
     run: (a, x) => x.call('POST', '/api/updates/apply', { breaking: a.breaking === true, backup: a.backup !== false }) },
   { name: 'snooze_update_decision', calls: [['POST', '/api/updates/decision']],

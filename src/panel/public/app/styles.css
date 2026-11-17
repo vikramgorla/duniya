@@ -259,6 +259,25 @@ dialog.ask .ask-text p { margin: 0 0 var(--s2); color: var(--muted); white-space
 dialog.ask .ask-body { margin: var(--s3) 0; max-height: 45vh; overflow: auto; }
 dialog.ask .ask-actions { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s4); flex-wrap: wrap; }
 dialog.ask.danger h2::before { content: "!"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; margin-right: 8px; background: var(--bad-soft); color: var(--bad); font: 700 13px var(--mono); vertical-align: 2px; }
+dialog.ask.wide { width: min(640px, calc(100vw - 24px)); } dialog.ask.wide .ask-body { max-height: 55vh; }
+/* release notes (065): one row per version (version · title), its changes grouped by kind; breaking ones marked */
+details.rel { border-top: 1px solid var(--line); margin: 0; }
+details.rel:first-child { border-top: 0; }
+details.rel > summary { display: flex; align-items: baseline; gap: var(--s2); min-height: 44px; padding: 11px 0; cursor: pointer; list-style: none; color: var(--ink); font-size: var(--fs); }
+details.rel > summary::-webkit-details-marker { display: none; }
+details.rel > summary::before { content: "›"; flex: none; width: 10px; color: var(--muted); transition: transform var(--fast); }
+details.rel[open] > summary::before { transform: rotate(90deg); }
+.rel-v { flex: none; font: 600 var(--fs-xs) var(--mono); color: var(--muted); }
+.rel-title { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+details.rel .pill { flex: none; align-self: center; }
+details.rel > .note, .rel-sum, .rel-group, .rel-more { margin: 0 0 var(--s3) 18px; }
+.rel-group .eyebrow { margin-bottom: 2px; }
+.rel-group ul { margin: 0; padding-left: 18px; font-size: var(--fs-s); }
+.rel-group li + li { margin-top: 3px; }
+.rel-more { display: inline-block; }
+.rel-backup { border-top: 1px solid var(--line); padding-top: var(--s2); }
+.whatsnew { display: flex; align-items: center; gap: var(--s3); padding: 12px 16px; margin-bottom: 16px; }
+.whatsnew-main { flex: 1; min-width: 0; }
 .btn.danger.solid { background: #c42443; border-color: #c42443; color: #fff; }
 .btn.danger.solid:hover { box-shadow: 0 8px 20px -10px rgba(196,36,67,.8); }
 /* toasts: stack, errors look different and interrupt politely (064) */

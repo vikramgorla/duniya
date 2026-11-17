@@ -1,6 +1,7 @@
 // @ts-check
-// Panel routes for updates (008, 045). Owner only.
-import { getUpdateSettings, setUpdateSettings, updateStatus, checkForUpdate, applyUpdate, installKind, updateRunning, backupConfigured } from '../../core/updates.js';
+// Panel routes for updates (008, 045; owner only) and the installed release notes (065; everyone signed in).
+import { getUpdateSettings, setUpdateSettings, updateStatus, checkForUpdate, applyUpdate, installKind, updateRunning, backupConfigured, installedReleases, runningVersion, markSeen } from '../../core/updates.js';
+import { releaseRange } from '../../core/releases.js';
 import { pendingDecision, snoozeDecision, runConfirmedUpdate, setUpdateRestart } from '../../core/update-decision.js';
 
 const OWNER = { role: 'owner' };
@@ -8,6 +9,9 @@ const OWNER = { role: 'owner' };
 export function updateRoutes(route, { restart = () => setTimeout(() => process.exit(0), 500) } = {}) {
   setUpdateRestart(restart);
   route('GET', '/api/updates', async () => ({ settings: getUpdateSettings(), status: updateStatus(), install: installKind(), running: updateRunning(), decision: pendingDecision(), backup: backupConfigured() }), OWNER);
+  // 065: release notes of the installed version: all of them, or the versions after `from` up to `to` (newest first)
+  route('GET', '/api/releases', async (req, res, body, q) => ({ running: runningVersion(), versions: releaseRange(installedReleases(), q.get('from') || '', q.get('to') || '') }));
+  route('POST', '/api/releases/seen', async (req, res, body, q, p, user) => markSeen(user), { role: 'viewer' });
   route('PUT', '/api/updates/settings', async (req, res, body) => setUpdateSettings(body), OWNER);
   route('POST', '/api/updates/check', async () => checkForUpdate(), OWNER);
   /**

@@ -39,6 +39,7 @@ const ICONS = {
   search: 'M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zM15.5 15.5 20 20',
   pending: 'M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 8v4.5l3 2',
   secrets: 'M14.5 4a5.5 5.5 0 1 1-4.9 8L4 17.6V20h2.5v-2h2v-2h2l.9-.9A5.5 5.5 0 0 1 14.5 4zM15.5 8.5h.01',
+  notes: 'M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10.5a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5zM14 3.5V8h4M9.5 12h5M9.5 15.5h5', // 065: release notes
   settings: 'M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-1.9 1.1L15 20.5h-4l-.3-2a7 7 0 0 1-1.9-1.1l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-3l-1.6-1.2 2-3.4 1.9.7a7 7 0 0 1 1.9-1.1L11 3.5h4l.3 2a7 7 0 0 1 1.9 1.1l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 3z',
 };
 export function icon(name) {
@@ -78,14 +79,16 @@ export function toast(msg, { bad = false, undo = null } = {}) {
  * package lists), `typed` asks to type that word first. Esc, Cancel and a tap outside cancel. Resolves true or false.
  * @param {{ title: string, text?: string, ok?: string, danger?: boolean, body?: any, typed?: string, cancel?: string }} o
  */
-export function ask({ title, text = '', ok = 'Continue', danger = false, body = null, typed = '', cancel = 'Cancel' }) {
+/** ok: null shows no action button (a dialog to read, with only `cancel`, e.g. "Close"); wide: room for a long details
+ *  area such as release notes (065). */
+export function ask({ title, text = '', ok = 'Continue', danger = false, body = null, typed = '', cancel = 'Cancel', wide = false }) {
   return new Promise((resolve) => {
     const back = document.activeElement;
     const id = `ask${Date.now().toString(36)}`;
     const typedIn = typed ? h('input', { autocomplete: 'off', spellcheck: 'false', 'aria-label': `Type ${typed} to confirm`, oninput: () => { yes.disabled = typedIn.value.trim() !== typed; } }) : null;
-    const yes = h('button', { class: `btn ${danger ? 'danger solid' : 'primary'}`, value: 'yes', disabled: !!typed }, ok);
+    const yes = ok == null ? null : h('button', { class: `btn ${danger ? 'danger solid' : 'primary'}`, value: 'yes', disabled: !!typed }, ok);
     const no = h('button', { class: 'btn', type: 'button', onclick: () => dlg.close('no') }, cancel);
-    const dlg = h('dialog', { class: `dlg ask${danger ? ' danger' : ''}`, role: danger ? 'alertdialog' : 'dialog', 'aria-modal': 'true', 'aria-labelledby': `${id}-t`, 'aria-describedby': text ? `${id}-d` : null,
+    const dlg = h('dialog', { class: `dlg ask${danger ? ' danger' : ''}${wide ? ' wide' : ''}`, role: danger ? 'alertdialog' : 'dialog', 'aria-modal': 'true', 'aria-labelledby': `${id}-t`, 'aria-describedby': text ? `${id}-d` : null,
       onclick: (e) => { if (e.target === dlg) dlg.close('no'); } },
     h('form', { method: 'dialog' },
       h('h2', { id: `${id}-t` }, title),
@@ -95,7 +98,7 @@ export function ask({ title, text = '', ok = 'Continue', danger = false, body = 
       h('div', { class: 'ask-actions' }, no, yes)));
     dlg.addEventListener('close', () => { dlg.remove(); if (back instanceof HTMLElement && back.isConnected) back.focus(); resolve(dlg.returnValue === 'yes'); });
     document.body.append(dlg); dlg.showModal();
-    (typedIn || (danger ? no : yes)).focus();
+    (typedIn || (danger || !yes ? no : yes)).focus();
   });
 }
 /** A ⋯ menu (064): secondary actions of a row behind one button instead of a row of buttons. `label` names it for
