@@ -1,6 +1,6 @@
 // Find anything (062): loaded when first opened. Module of the panel (063).
 // ---------- Find anything (062): / or ⌘K (Ctrl+K), or the search button: jump to a screen, agent, chat, setting or action ----------
-import { $, PRIMARY, S, TABS, api, badgeFor, can, go, h, icon, optimistic, recover, serverBadge, show, signOut, tryApi } from './core.js';
+import { $, PRIMARY, S, TABS, api, askSignOut, avatar, badgeFor, can, go, h, icon, optimistic, recover, serverBadge, show, tryApi } from './core.js';
 import { PROVIDER_NAMES } from './names.js';
 import { AGENT_SECTIONS, SETTINGS_SECTIONS } from './shared.js';
 /** Everything the Find box can open. Agents and chats come from the status and the cached chat list. */
@@ -28,7 +28,7 @@ async function paletteItems() {
   }
   if (can('owner')) act('Back up now', 'backup download', () => { location.hash = 'backups'; });
   act('Why agents stayed quiet', 'silent silence not answering', () => { location.hash = 'overview/quiet'; });
-  act('Sign out', 'logout', signOut);
+  act('Sign out', 'logout', askSignOut);
   return items;
 }
 /** Lower score is better; null when a word does not match. Word starts in the name count most, then anywhere else. */
@@ -72,17 +72,20 @@ export async function openPalette() {
   };
   draw();
 }
-/** More (064): the screens that are not in the phone tab bar, Find anything and Sign out, in a bottom sheet. */
+/** More (064, 068): the screens that are not in the phone tab bar as compact rows, Find anything, Refresh as a small
+ *  icon, and the account row (Sign out behind it, with a question: it was easy to tap by mistake). */
 export function openMore() {
   const close = () => dlg.close();
   const dlg = h('dialog', { class: 'dlg more', 'aria-label': 'More screens', tabindex: '-1', onclose: () => dlg.remove(), onclick: (e) => { if (e.target === dlg) close(); } },
-    h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'More'), h('button', { class: 'btn small', onclick: close }, 'Close')),
-    // 066: a compact search row (it rendered a giant icon); the sheet itself takes focus, so touch shows no ring on Close
-    h('button', { class: 'btn more-find', style: 'margin-top:12px', onclick: () => { close(); openPalette(); } }, icon('search'), 'Find anything'),
+    h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0;flex:1' }, 'More'),
+      h('button', { class: 'btn small icon quiet', 'aria-label': 'Refresh', title: 'Refresh', onclick: () => { close(); recover(true); } }, icon('refresh')),
+      h('button', { class: 'btn small', onclick: close }, 'Close')),
+    // 066: a compact search row; the sheet itself takes focus, so touch shows no ring on Close
+    h('button', { class: 'btn more-find', onclick: () => { close(); openPalette(); } }, icon('search'), 'Find anything'),
     h('div', { class: 'more-list' }, TABS().filter(([id]) => !PRIMARY.includes(id)).map(([id, label]) =>
       h('button', { class: id === S.tab ? 'on' : '', 'aria-current': id === S.tab ? 'page' : null, onclick: () => { close(); go(id); } }, icon(id), label, badgeFor(id)))),
-    h('div', { class: 'more-foot' }, h('span', { class: 'small muted' }, `Signed in as ${S.user.username} · ${S.user.role}`),
-      h('div', { class: 'btns' }, h('button', { class: 'btn small', onclick: () => { close(); recover(true); } }, 'Refresh'), h('button', { class: 'btn small', onclick: signOut }, 'Sign out'))));
+    h('button', { class: 'more-account', onclick: () => { close(); askSignOut(); } }, avatar(S.user.username, S.user.username, 's'),
+      h('span', {}, h('b', {}, S.user.username), h('span', { class: 'small muted' }, ` · ${S.user.role}`)), h('span', { class: 'small muted' }, 'Sign out…')));
   document.body.append(dlg); dlg.showModal(); dlg.focus(); // 066: the sheet, not Close, takes focus (no ring on touch)
   serverBadge(S.status?.osUpdates);
 }

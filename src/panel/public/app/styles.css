@@ -586,14 +586,15 @@ dialog.palette input { width: 100%; font-size: 16px; }
 .ptr.armed, .ptr.busy { color: var(--ink); } .ptr.busy .spinner { animation-play-state: running; }
 .load-failed .btn { margin-top: var(--s1); }
 /* More sheet (064): the screens that are not in the bottom tab bar */
-.more-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); margin: var(--s3) 0; }
-.more-list button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 6px; min-height: 76px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--bg) 45%, var(--card)); color: var(--ink); font: inherit; font-size: var(--fs-s); font-weight: 600; cursor: pointer; position: relative; }
-.more-list button svg { width: 22px; height: 22px; }
-.more-list button.on { border-color: var(--ink); }
-.more-list .nbadge { position: absolute; top: 6px; right: 6px; }
-.btn.more-find { width: 100%; justify-content: flex-start; color: var(--muted) !important; }
+.more-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 var(--s2); margin: var(--s2) 0; }
+.more-list button { display: flex; align-items: center; gap: 10px; padding: 0 10px; min-height: 48px; border: 0; border-radius: var(--radius-s); background: none; color: var(--ink); font: inherit; font-size: var(--fs); font-weight: 600; cursor: pointer; position: relative; text-align: left; }
+.more-list button svg { width: 20px; height: 20px; color: var(--muted); }
+.more-list button.on { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.more-list .nbadge { margin-left: auto; }
+.more-account { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 10px; border: 0; border-top: 1px solid var(--line); background: none; color: var(--ink); font: inherit; cursor: pointer; text-align: left; }
+.more-account > span:nth-child(2) { flex: 1; }
+.btn.more-find { margin-top: var(--s3); width: 100%; justify-content: flex-start; color: var(--muted) !important; }
 dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
-.more-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); border-top: 1px solid var(--line); padding-top: var(--s3); }
 /* AI helper review (#32): additions lime with +, removals red struck through with −, never colour alone */
 .dreview ins, .dnew ins { background: var(--add-bg); color: var(--add-ink); text-decoration: none; border-radius: 3px; box-shadow: inset 0 -1.5px color-mix(in srgb, var(--add-ink) 45%, transparent); }
 .dreview del { background: var(--del-bg); color: var(--del-ink); text-decoration: line-through; text-decoration-thickness: 1.5px; border-radius: 3px; }
@@ -709,3 +710,12 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
   table.stack.flat tr:last-child { border-bottom: 0; }
 }
 @keyframes rise { from { transform: translateY(40px); opacity: .4; } }
+
+/* 068: Overview — a calm line when all is fine; compact rows for why-quiet */
+.calm-line { margin: 6px 0 0; grid-column: 1 / -1; }
+.ask-head { margin-bottom: var(--s2); }
+.num-dm > summary { cursor: pointer; margin-top: 4px; }
+.quiet-list { list-style: none; margin: var(--s2) 0 0; padding: 0; }
+.quiet-list li { display: flex; align-items: center; gap: var(--s2); padding: 6px 0; flex-wrap: wrap; }
+.quiet-list li + li { border-top: 1px solid var(--line); }
+.quiet-list .q-main { flex: 1 1 200px; min-width: 0; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }

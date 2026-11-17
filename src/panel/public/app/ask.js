@@ -5,7 +5,7 @@
 // Module of the panel (063).
 import { S, api, apiStream, copyBtn, h, icon, toast, tryApi } from './core.js';
 import { toolPhrase } from './names.js';
-import { plural } from './shared.js';
+import { helpLink, plural } from './shared.js';
 
 /** 066: inline **bold**, __bold__ and `code` as elements with text nodes (model text never becomes HTML). */
 const inline = (text) => text.split(/(\*\*[^*\n]+\*\*|__[^_\n]+__|`[^`\n]+`)/).filter(Boolean)
@@ -131,7 +131,7 @@ export function askCard({ id = 'ov-ask', title = 'Ask', wide = true } = {}) {
   });
   draw();
   return h('div', { class: 'card askcard', id, style: wide ? 'grid-column:1/-1' : null },
-    h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, title), h('span', { class: 'pill' }, S.user.role)),
-    h('p', { class: 'small muted', style: 'margin:4px 0 10px' }, 'Looks across the chats that are on (not those private to members). Changes need your Confirm.'),
+    // 068: no explanation paragraph: what it can see is behind the "?"
+    h('div', { class: 'sec-head ask-head' }, h('h2', {}, title), helpLink('owner-assistant.md', 'What Ask can see and do')),
     thread, h('div', { class: 'ask-form' }, q, btn));
 }

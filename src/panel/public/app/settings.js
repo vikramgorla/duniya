@@ -1,6 +1,6 @@
 // Settings screen: every section (tool services, owner assistant, users, sign-in, web access, logging, …). Module of the panel (063).
 // ---------- secrets ----------
-import { $, S, ago, api, ask, can, copyBtn, copyRow, extLink, field, fieldError, gLogo, h, icon, splitLines, toast, toggle, tryApi } from './core.js';
+import { $, S, ago, api, ask, can, copyBtn, copyRow, extLink, field, fieldError, gLogo, h, icon, refreshStatus, splitLines, toast, toggle, tryApi } from './core.js';
 import { browseButton, registrySettingsBox } from './registry.js';
 import { listDetail } from './listdetail.js';
 import { releaseList } from './releases.js';
@@ -12,7 +12,7 @@ async function secretsCard() {
   const redraw = async () => card.replaceWith(await secretsCard());
   const name = h('input', { placeholder: 'NAME_LIKE_THIS', 'aria-label': 'Secret name' }); const val = h('input', { type: 'password', placeholder: 'value', 'aria-label': 'Secret value' });
   const card = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Secrets'),
-    h('p', { class: 'small muted' }, 'API keys and tokens, stored encrypted on the server and never shown again. Agents reference them as ${NAME}. Save an empty value to remove.'),
+    h('p', { class: 'small muted' }, 'Stored encrypted, never shown again. Agents use them as ${NAME}.'),
     rows.length ? h('table', { class: 'stack' }, h('tbody', {}, rows.map((n) => { const v = h('input', { type: 'password', placeholder: 'new value', 'aria-label': `New value for ${n.name}` });
       return h('tr', {}, h('td', { 'data-label': '' }, h('code', {}, n.name), n.usedByAgents ? h('div', { class: 'small muted' }, 'used by an agent') : null),
         h('td', { 'data-label': 'Status' }, h('span', { class: `pill ${n.set ? 'ok' : 'bad'}` }, n.set ? 'set' : 'missing')),
@@ -37,9 +37,12 @@ export async function renderSettings() {
   const by = {
     'tool-services': await toolServicesCard().catch(loadErr('Tool services for all agents')),
     'owner-assistant': oa ? ownerAssistantCard(oa) : null,
-    'direct-messages': h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default agent for direct messages without a trigger'),
-      h('select', { disabled: !can('admin'), 'aria-label': 'Default agent for direct messages', onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmAgent: e.target.value }), 'Saved') },
-        h('option', { value: '' }, '— first agent that accepts the sender —'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmAgent === b.id }, b.name)))),
+    // 068: chat-wide settings live here, not above the Chats list
+    'direct-messages': h('div', { class: 'card' }, h('h2', {}, 'Chats & direct messages'),
+      field('Default agent for direct messages', h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmAgent: e.target.value }), 'Saved') },
+        h('option', { value: '' }, 'The first agent that accepts the sender'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmAgent === b.id }, b.name))), 'For direct messages without a trigger.'),
+      field('When a chat is switched on, load its last', h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/settings', { historyLoadCount: Number(e.target.value) }); refreshStatus(); }, 'Saved') },
+        [0, 25, 50, 100, 200].map((n) => h('option', { value: n, selected: Number(S.status?.settings?.historyLoadCount ?? 50) === n }, n ? `${n} messages` : 'Nothing'))), 'Asked from your phone, which must be online.')),
     'privacy-notice': notice ? privacyNoticeCard(notice) : null,
     'photos-voice': await photosVoiceCard().catch(loadErr('Photos & voice')),
     secrets: can('admin') ? await secretsCard().catch(loadErr('Secrets')) : null,
@@ -74,7 +77,7 @@ const SETTINGS_GROUPS = [['Agents & chats', ['tool-services', 'owner-assistant',
 const SECTION_ICON = { 'tool-services': ['models', 'c4'], 'owner-assistant': ['agents', 'c5'], 'direct-messages': ['chats', 'c3'], 'privacy-notice': ['shield', 'c3'], 'photos-voice': ['image', 'c2'],
   users: ['contacts', 'c4'], 'sign-in': ['lock', 'c0'], google: ['globe', 'c4'], assistants: ['agents', 'c1'], password: ['secrets', 'c0'], 'my-google': ['contacts', 'c0'],
   'web-access': ['globe', 'c3'], secrets: ['secrets', 'c1'], logging: ['activity', 'c0'], 'small-mode': ['server', 'c0'], 'getting-started': ['overview', 'c5'], 'whatsapp-helpers': ['chats', 'c0'], 'release-notes': ['notes', 'c2'] };
-const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assistant': 'Your own chat, alerts, weekly summary', 'direct-messages': 'Who answers a direct message',
+const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assistant': 'Your own chat, alerts, weekly summary', 'direct-messages': 'Direct messages, earlier messages',
   'privacy-notice': 'What groups are told', 'photos-voice': 'Pictures, voice notes, speech', users: 'Who can use this panel', 'sign-in': 'Passwords or Google only',
   google: 'Google sign-in client', assistants: 'ChatGPT, Claude and other MCP clients', password: 'Change your password', 'my-google': 'Link your Google account',
   'web-access': 'Domain, HTTPS, who may open the panel', secrets: 'Keys and tokens', logging: 'What is recorded, for how long', 'small-mode': 'Heavier features on a small server',
@@ -123,7 +126,7 @@ function ownerAssistantCard(o) {
       h('button', { class: 'btn', onclick: reload }, 'I sent it — check'));
   }
   return h('div', { class: 'card' }, h('h2', {}, 'Owner assistant'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Your own agent in your private WhatsApp chat with an agent number (and the Ask box on Overview): recaps, who said what, usage and changes, plus GIFs, pictures, voice, polls and tools — and it can send into chats that are on after you confirm. It only answers linked panel users, never in groups, and sees only chats that are on and not private to members. Changes always need “confirm CODE”. Start a message with an agent’s trigger (e.g. “!family …”) to talk to that agent instead.'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Your own agent in your WhatsApp chat and in Ask. Changes always need your confirm.'),
     h('p', { class: 'small muted' }, o.role === 'viewer' ? 'Your account is read-only: the assistant can look things up for you but not change anything or read messages.' : o.role === 'admin' ? 'As an admin, the assistant can do what you can do in the panel, except owner-only settings.' : 'As an owner, the assistant can do everything you can do here; tools that need keys or passwords stay in the panel.'),
     state, box,
     h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn', onclick: () => openAgent(o.agent) }, 'Character, tools, voice, schedules & alerts →')),
@@ -136,7 +139,7 @@ function privacyNoticeCard(n) {
   const dmText = h('textarea', { value: n.dmText, maxlength: 500, style: 'min-height:56px', 'aria-label': 'Direct message notice', disabled: !can('admin') });
   const save = (body, msg) => tryApi(async () => { await api('PUT', '/api/privacy-notice', body); renderSettings(); }, msg);
   return h('div', { class: 'card' }, h('h2', {}, 'Privacy notice'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'When you switch a group On, the agents’ number posts this once, so members know messages are stored. It is posted again only if you change the text or after 90 days. Groups can opt out on the Chats page (recorded in Activity). Chats that are off never get anything.'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Posted once when a group is switched on. A group can opt out on its chat page.'),
     h('div', { class: 'row', style: 'gap:10px' }, h('label', { class: 'inline' }, toggle(n.enabled, (v) => save({ enabled: v }, v ? 'Notice on' : 'Notice off')), 'Post in groups when switched on')),
     field('Group notice', text),
     h('div', { class: 'row', style: 'gap:10px;margin-top:10px' }, h('label', { class: 'inline' }, toggle(n.dmFirstReply, (v) => save({ dmFirstReply: v }, 'Saved')), 'Direct messages: add a line to the agent’s first reply, once per person')),
@@ -183,7 +186,7 @@ async function photosVoiceCard() {
         e.installed ? h('button', { class: 'btn small danger mut', onclick: async () => (await ask({ title: `Remove ${e.label}?`, text: 'Agents stop using it; you can download it again later.', ok: 'Remove', danger: true })) && tryApi(async () => { await api('DELETE', `/api/media/local/${kind}`); redraw(); }, 'Removed') }, 'Remove') : null) : null);
   };
   card.append(h('h2', {}, 'Photos & voice'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Server-wide choices for photos, pictures and voice. Each agent switches what it uses on its own page; what each provider can do is on ', h('a', { href: '#models' }, 'Models'), '.'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Server-wide; each agent chooses on its own page. What providers can do: ', h('a', { href: '#models' }, 'Models'), '.'),
     field('When an agent’s model can’t see photos, use', fb, 'A model that sees images (Claude, GPT, many OpenRouter models). Without one, the agent says kindly that it can’t look at photos.'),
     imgChoices.length ? [field('Pictures are made with', img), field(`Price per picture${priceRef ? ` (${priceRef})` : ''}`, price, 'Optional, for Usage and spending caps when the provider does not report a cost (OpenRouter does).')] : h('p', { class: 'small muted' }, 'No connected provider can create pictures (an OpenAI key with image models, or OpenRouter).'),
     h('div', { class: 'row' }, field('Voice for spoken replies (OpenAI)', voice), field('Longest voice note (minutes)', maxMin)),
@@ -193,7 +196,7 @@ async function photosVoiceCard() {
       save(patch);
     } }, 'Save') : null,
     h('h3', { style: 'margin:18px 0 6px' }, 'On-server speech'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Listen to voice notes and answer with voice on this server, without a provider — free, private, slower. Used after the providers, or alone. Open-source engines (Whisper, Piper via sherpa-onnx), downloaded only if you choose to.'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Free, private, slower: listening and speaking on this server, without a provider.'),
     !m.local.supported ? h('div', { class: 'note warn' }, `On-server speech runs on Linux (x64 or arm64); this server is ${m.local.platform}.`) : null,
     m.server?.effectiveMb < 2048 && m.local.supported ? h('div', { class: 'note' },
       h('b', {}, `Small server mode is ${S.status?.server?.smallMode ? 'on' : 'off'}. `), 'On a server with about 1 GB of memory, on-server speech runs only with ', SMALL_MODE_LINK(),
@@ -211,7 +214,7 @@ async function toolServicesCard() {
   const items = list.map((g) => ({ s: serverState(g.name, g.config), g }));
   const box = h('div', {});
   const card = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Tool services for all agents'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Connect a tool service once and every agent can use it. Each agent can switch a service off (Agents → the agent → Tool services), and its role rules decide which tools organizers and participants get. The ticks below are the defaults for agents without their own choice.'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Every agent can use these; each agent can switch one off. Ticks are the defaults per role.'),
     box);
   const defaultsRules = (s) => ({
     has: (role, name) => (s.defaults[role] || []).some((x) => globRe(x).test(name)),
@@ -269,7 +272,7 @@ function assistantsCard(a) {
   const revoke = async (g) => (await ask({ title: `Disconnect ${g.clientName}${g.userId !== a.you ? ` (${g.username})` : ''}?`, text: 'It stops working right away. You can connect it again later.', ok: 'Disconnect', danger: true }))
     && tryApi(async () => { await api('DELETE', `/api/assistants/${g.userId}/${encodeURIComponent(g.clientId)}`); renderSettings(); }, 'Disconnected');
   return h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Connected AI assistants'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Manage this app by chatting with ChatGPT or Claude: “which agents are on?”, “turn off the carpool agent”, “what happened in the Panduga group today?”. The assistant signs in as you and can do what your account can do.'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Manage this app by chatting with ChatGPT or Claude. They sign in as you.'),
     a.https ? null : h('div', { class: 'note warn' }, 'This address only works on this network. ChatGPT and Claude need the public https address of this app: set up internet access first (Caddy or Cloudflare, see the install guide), then open the panel at that address and come back here.'),
     h('label', {}, 'Address to paste in your assistant'), h('div', { class: 'row nowrap' }, url, copyButton(a.mcpUrl)),
     steps('ChatGPT', ['In ChatGPT open Settings → Apps & Connectors → Advanced settings and turn on Developer mode.', 'Go back to Apps & Connectors and click Create. Name it “Duniya”, paste the address above as the MCP server URL, choose OAuth, and click Create.', 'A Duniya page opens: sign in if asked, check what it may do, and click Approve.', 'In a new chat, turn on the Duniya connector (+ → Developer mode) and ask away.']),
@@ -329,7 +332,7 @@ function usersCard(users, inv, signin) {
   const days = (ts) => Math.max(0, Math.ceil((ts - Date.now()) / 86400000));
   const sl = S.signupLink;
   return h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Users'),
-    h('p', { class: 'small muted' }, 'Owners manage everything incl. users, backups and updates. Admins manage agents, chats, models and memory. Viewers can only look.'),
+    h('p', { class: 'small muted' }, 'Owners: everything. Admins: agents, chats, models, memory. Viewers: look only.'),
     sl ? h('div', { class: 'note' }, `Send this to ${sl.username} only: they set their own password (works once, 48 hours). `, h('code', { class: 'small', style: 'word-break:break-all' }, sl.link), ' ', copyBtn(sl.link), ' ', h('button', { class: 'btn small', onclick: () => { S.signupLink = null; renderSettings(); } }, 'Done')) : null,
     h('div', { class: 'tscroll' }, h('table', { class: 'stack' }, h('tbody', {}, users.map((u) => h('tr', {},
       h('td', { 'data-label': '' }, h('b', {}, u.username), ' ', u.google ? h('span', { class: 'pill info', title: 'Signs in with Google' }, gLogo(), 'Google') : null,
@@ -395,7 +398,7 @@ function googleSetupCard(g) {
   return h('div', { class: 'card', style: 'grid-column:1/-1' },
     h('div', { class: 'row spread' }, h('h2', {}, 'Sign in with Google'),
       h('span', { class: `pill ${g.ready ? (g.lastTest?.ok === false ? 'bad' : 'ok') : g.clientId && g.secretSet && !g.enabled ? 'warn' : ''}` }, g.ready ? (g.lastTest?.ok === false ? 'test failed' : 'on') : saved && !g.enabled ? 'off' : 'not set up')),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Let people sign in with their Google account, and invite new people by email. Passwords keep working. Google does not let apps create this for you, so it takes four short steps in Google Cloud (about 5 minutes, free).'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Sign in with Google and invite people by email. Four short steps in Google Cloud, about 5 minutes.'),
     saved ? [
       h('div', { class: 'row', style: 'margin-bottom:6px' },
         h('button', { class: 'btn', onclick: (e) => runTest(e.currentTarget) }, 'Test'),
@@ -611,7 +614,7 @@ function loggingCard({ settings, categories }) {
   const days = h('input', { type: 'number', 'aria-label': 'Keep for (days)', value: cfg.retentionDays, min: 1, max: 365, style: 'max-width:100px' });
   const max = h('input', { type: 'number', 'aria-label': 'At most (entries)', value: cfg.maxEntries, min: 500, step: 500, style: 'max-width:120px' });
   return h('div', { class: 'card' }, h('h2', {}, 'Activity log'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Choose what is recorded, to keep the log useful and small. Errors, confirmations and configuration changes are always kept. Each chat can override this on the Chats page.'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Errors, confirmations and changes are always kept. A chat can override this.'),
     levelSeg, hint, cats,
     h('div', { class: 'row', style: 'margin-top:10px' }, h('div', {}, h('label', {}, 'Keep for (days)'), days), h('div', {}, h('label', {}, 'At most (entries)'), max)),
     can('admin') ? h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: () => tryApi(() => api('PUT', '/api/logging', { ...cfg, retentionDays: Number(days.value), maxEntries: Number(max.value) }), 'Saved') }, 'Save') : null);

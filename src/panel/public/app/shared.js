@@ -42,7 +42,7 @@ export const saveSecretKey = (name) => async (value) => { await api('PUT', '/api
 export const SETTINGS_SECTIONS = [
   ['tool-services', 'Tool services for all agents', 'mcp tools weather calendar registry browse'],
   ['owner-assistant', 'Owner assistant', 'my own chat alerts weekly summary character'],
-  ['direct-messages', 'Direct messages', 'dm default agent private'],
+  ['direct-messages', 'Chats & direct messages', 'dm default agent history load earlier messages phone'],
   ['privacy-notice', 'Privacy notice', 'notice group members opt-out'],
   ['photos-voice', 'Photos & voice', 'images voice notes transcription speech pictures'],
   ['secrets', 'Secrets', 'keys tokens api key password'],

@@ -234,7 +234,7 @@ function whatsappCard(c) {
     body.replaceChildren(
       h('div', { class: 'row', style: 'gap:6px;margin:6px 0 10px' }, h('span', { class: 'pill' }, `${g.size} members`), h('span', { class: 'pill info' }, `${admins} admin${admins === 1 ? '' : 's'}`)),
       meAdmin,
-      h('p', { class: 'small muted', style: 'margin-top:0' }, 'Changes here happen in WhatsApp right away and are recorded in Activity. The agent’s number must be a group admin for most of them.'),
+      h('p', { class: 'small muted', style: 'margin-top:0' }, 'Changes happen in WhatsApp at once. Most need the agents’ number to be a group admin.'),
       field('Group name', h('div', { class: 'row nowrap' }, subject, h('button', { class: 'btn small', onclick: async () => { if (await put({ subject: subject.value }, 'Group renamed')) g.subject = subject.value; } }, 'Save'))),
       field('Description', desc),
       h('div', { class: 'row', style: 'margin:6px 0 12px' }, h('button', { class: 'btn small', onclick: () => put({ description: desc.value }, 'Description saved') }, 'Save description')),
@@ -275,7 +275,7 @@ function messagesCard(c) {
   }
   const card = h('div', { class: 'card', style: 'margin-top:16px' },
     h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, `Messages · ${c.name}`), h('form', { class: 'row nowrap', style: 'flex:0 1 420px', onsubmit: (e) => { e.preventDefault(); load(false); } }, q, h('button', { class: 'btn small' }, 'Search'))),
-    h('p', { class: 'small muted' }, 'Messages the agents have stored for context (groups always; direct chats only when an agent answered). Only admins and owners can read them, and each look is recorded in the activity log.'),
+    h('p', { class: 'small muted' }, 'Stored for context. Each look is recorded in Activity.'),
     h('div', { style: 'text-align:center' }, more), log);
   load(false);
   return card;

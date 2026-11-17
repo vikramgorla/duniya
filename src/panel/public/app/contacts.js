@@ -34,7 +34,7 @@ export async function renderContacts() {
   $('#main').replaceChildren(
     h('div', { class: 'card' },
       h('div', { class: 'row spread' }, h('h2', {}, `Contacts (${list.length})`), search),
-      h('p', { class: 'small muted' }, 'Names from your linked WhatsApp phone appear here automatically, plus the people you add. Agents can look up numbers: organizers see everyone, participants only contacts marked Shared. Nothing is shared until you tick it.'),
+      h('p', { class: 'small muted' }, 'From your phone, plus people you add. Participants only see contacts marked Shared.'),
       sum ? h('p', { class: 'small muted', role: 'status' }, `Names refresh from your phone by themselves (after it connects and once a day)${sum.refreshedAt ? `, last ${ago(sum.refreshedAt)} ago` : ''}: ${sum.book} phone contact${sum.book === 1 ? '' : 's'}, ${sum.profile} profile name${sum.profile === 1 ? '' : 's'}${sum.hiddenNumbers ? `, ${sum.hiddenNumbers} waiting for WhatsApp to share their number` : ''}.`,
         edit ? [' ', h('button', { class: 'btn small mut', title: 'Optional: the server also does this by itself', onclick: () => tryApi(async () => { await api('POST', '/api/contacts/refresh'); setTimeout(renderContacts, 4000); }, 'Asked WhatsApp for names') }, 'Refresh now')] : null) : null,
       sum ? h('label', { class: 'tick small' }, h('input', { type: 'checkbox', checked: sum.namesForAgents !== false, disabled: !can('owner'),

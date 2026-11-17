@@ -23,18 +23,17 @@ export function silenceFix(s, after, { onChats = false } = {}) {
     default: return null;
   }
 }
+/** Why agents stayed quiet (068): one row per chat and reason, the fix on the row; the explanation is its tooltip. */
 export function silencesCard(rows, after) {
   const top = rows.slice(0, 6);
   if (!top.length) return null;
   return h('div', { class: 'card', id: 'ov-silences' },
-    h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Why agents stayed quiet'), h('span', { class: 'pill' }, 'last 7 days')),
-    h('p', { class: 'small muted' }, 'Messages an agent did not answer, and why. Only counts are kept — never the messages.'),
-    h('table', { class: 'stack flat' }, h('tbody', {}, top.map((s) => h('tr', {},
-      h('td', { 'data-label': '' }, h('b', {}, s.chatName || 'Unnamed chat'), s.agentName ? h('span', { class: 'small muted' }, ` · ${s.agentName}`) : null,
-        h('div', { class: `small${s.reason === 'not_addressed' ? ' muted' : ''}`, style: s.reason === 'not_addressed' ? '' : 'color:var(--warn)', title: s.explain }, quietLine(s)),
-        h('div', { class: 'small muted' }, `${s.explain} Last ${ago(s.lastTs)} ago${s.sampleSender ? ` · e.g. ${s.sampleSender}` : ''}`)),
-      h('td', { 'data-label': '' }, h('div', { class: 'btns', style: 'justify-content:flex-end;flex-wrap:nowrap' }, silenceFix(s, after),
-        can('admin') ? h('button', { class: 'btn small ghost mut', title: 'Forget this record', 'aria-label': `Clear: ${s.chatName || 'Unnamed chat'}, ${quietLine(s)}`, onclick: () => tryApi(async () => { await api('DELETE', `/api/silences?chat=${encodeURIComponent(s.chat)}&reason=${s.reason}${s.agent ? `&agent=${encodeURIComponent(s.agent)}` : ''}`); after?.(); }, 'Cleared') }, 'Clear') : null)))))));
+    h('div', { class: 'sec-head' }, h('h2', {}, 'Why agents stayed quiet'), h('span', { class: 'small muted' }, 'last 7 days')),
+    h('ul', { class: 'quiet-list' }, top.map((s) => h('li', {},
+      h('a', { class: 'q-main', href: `#chats/${encodeURIComponent(s.chat)}`, title: `${s.explain} Last ${ago(s.lastTs)} ago.` }, h('b', {}, s.chatName || 'Unnamed chat'),
+        h('span', { class: `small${s.reason === 'not_addressed' ? ' muted' : ''}`, style: s.reason === 'not_addressed' ? '' : 'color:var(--warn)' }, ` ${quietLine(s).replace(/^Quiet: /, '')}`)),
+      h('div', { class: 'btns' }, silenceFix(s, after),
+        can('admin') ? h('button', { class: 'btn small ghost', title: 'Forget this record', 'aria-label': `Clear: ${s.chatName || 'Unnamed chat'}, ${quietLine(s)}`, onclick: () => tryApi(async () => { await api('DELETE', `/api/silences?chat=${encodeURIComponent(s.chat)}&reason=${s.reason}${s.agent ? `&agent=${encodeURIComponent(s.agent)}` : ''}`); after?.(); }, 'Cleared') }, 'Clear') : null)))));
 }
 export async function refreshSilences() {
   const slot = $('#ov-silences-slot'); if (!slot) return;

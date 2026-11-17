@@ -39,6 +39,7 @@ const ICONS = {
   globe: 'M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17zM3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z',
   more: 'M5 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM12 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM19 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z',
   send: 'M12 19V5M5.5 11.5 12 5l6.5 6.5',
+  refresh: 'M19 12a7 7 0 1 1-2.05-4.95M19 4.5V8h-3.5', // 068: More → Refresh
   search: 'M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zM15.5 15.5 20 20',
   pending: 'M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 8v4.5l3 2',
   secrets: 'M14.5 4a5.5 5.5 0 1 1-4.9 8L4 17.6V20h2.5v-2h2v-2h2l.9-.9A5.5 5.5 0 0 1 14.5 4zM15.5 8.5h.01',
@@ -327,6 +328,8 @@ let statusTimer = null; // slow fallback poll, only while the live stream is dow
 /** The four everyday screens in the phone tab bar (064); every other screen is under More. */
 export const PRIMARY = ['overview', 'chats', 'agents', 'activity'];
 export const signOut = async () => { await api('POST', '/api/logout').catch(() => {}); S.user = null; renderLogin(); };
+/** 068: signing out asks first (it sat next to Refresh and was easy to tap by mistake). */
+export const askSignOut = async () => { if (await ask({ title: 'Sign out?', text: `You are signed in as ${S.user?.username} (${S.user?.role}). To come back you sign in again.`, ok: 'Sign out' })) signOut(); };
 /** The signed-in shell. `status`: the status that came with the session (login.js), if any. */
 export async function boot(status = null) {
   const app = $('#app'); app.replaceChildren();
@@ -339,7 +342,7 @@ export async function boot(status = null) {
     h('header', {}, h('h1', { class: 'sr-only', id: 'screen-title' }, 'Duniya'), h('div', { class: 'bar' }, h('div', { class: 'brand' }, logo(), 'Duniya', h('span', { class: 'dot', id: 'wa-dot', role: 'img', 'aria-label': 'WhatsApp' }), h('small', { id: 'brand-sub' }, 'agents')),
       h('div', { class: 'grow' }), h('button', { class: 'btn small search-btn', title: 'Find anything (/ or ⌘K)', 'aria-label': 'Find anything', 'aria-keyshortcuts': '/ Control+K Meta+K', onclick: openFind }, icon('search'), h('span', { class: 'desk-only' }, 'Find'), h('kbd', { class: 'desk-only', 'aria-hidden': 'true' }, '/')),
       h('span', { class: 'who desk-nav', title: `${S.user.username} · ${S.user.role}` }, S.user.username, ` · ${S.user.role}`),
-      h('button', { class: 'btn small desk-nav', onclick: signOut }, 'Sign out')), nav),
+      h('button', { class: 'btn small desk-nav', onclick: askSignOut }, 'Sign out')), nav),
     h('main', { id: 'main', tabindex: '-1', 'aria-labelledby': 'screen-title' }),
     h('nav', { class: 'tabbar', 'aria-label': 'Screens' }));
   S.tab = ''; // the first status draws no screen; show() below draws the one in the address (063)
