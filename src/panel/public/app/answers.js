@@ -5,7 +5,7 @@ import { api, can, dropCache, h, tryApi } from './core.js';
 import { trunc } from './shared.js';
 
 /** The words Teach starts the AI helper with; the cursor waits after "Better answer:". */
-export const teachText = (a) => `Someone asked: “${trunc(a.question?.text || '(no question found)', 300)}”\nIt answered: “${trunc(a.text, 400)}”\nBetter answer: `;
+const teachText = (a) => `Someone asked: “${trunc(a.question?.text || '(no question found)', 300)}”\nIt answered: “${trunc(a.text, 400)}”\nBetter answer: `;
 
 /**
  * The rating row of one answer. `a`: { id, agent, rating, text, question? }. `teach(text)`: what Teach does (the agent
@@ -22,7 +22,7 @@ export function answerActions(a, { teach = null, extra = null } = {}) {
   const paint = (r) => {
     a.rating = r;
     for (const [b, v] of [[up, 1], [down, -1]]) { b.classList.toggle('on', r === v); b.setAttribute('aria-pressed', String(r === v)); }
-    if (teachBtn) teachBtn.hidden = !(r < 0);
+    teachBtn?.classList.toggle('hide', !(r < 0));
   };
   async function rate(v) {
     const r = await tryApi(() => api('PUT', `/api/agents/${encodeURIComponent(a.agent)}/review/${a.id}`, { rating: v }));

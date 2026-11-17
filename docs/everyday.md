@@ -60,9 +60,14 @@ long*. Only counts, the last time and one sample sender are kept, never the mess
 
 | Screen | What for |
 |---|---|
-| **Activity** | every message in and out, tool call, model call, change and error, grouped by day; tap an entry for details; filter per agent. What is recorded: **Settings → Activity log** ([Privacy](privacy.md#what-is-kept-and-who-sees-it)) |
-| **Usage** | tokens and cost by agent, chat, provider and model; monthly caps ([Usage & spending caps](spending.md)) |
-| **Pending** | changes an agent prepared that wait for an organizer's `confirm CODE` (shown only while there are some) |
+| **Activity** | every message in and out, tool call, model call, change and error, grouped by day; filter per agent, or per chat from a chat's **Activity** row. Tap an entry: a reply shows its 👍 / 👎 · **Teach…** row and **See in messages**; every entry links to its chat and agent; *Details* holds the raw entry. What is recorded: **Settings → Activity log** ([Privacy](privacy.md#what-is-kept-and-who-sees-it)) |
+| **Usage** | tokens and cost by agent, chat, provider and model (agent and chat names open their page); monthly caps ([Usage & spending caps](spending.md)) |
+| **Pending** | changes an agent prepared that wait for an organizer's `confirm CODE` (shown only while there are some): what it would do, which agent, the chat (a link to its messages), **Apply** or **Cancel** |
+
+> [!TIP]
+> **Everything links to everything.** A chat's page links to its agent, Messages, Memory and Activity; an agent's
+> Review links each answer to its place in the chat; an Activity entry links to its chat, agent and message. The same
+> answer has the same 👍 / 👎 wherever it is shown.
 
 ## On your phone
 

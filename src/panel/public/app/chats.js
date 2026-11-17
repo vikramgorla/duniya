@@ -319,7 +319,7 @@ function messagesView(c, agents, q0 = '', at = 0) {
     more.classList.toggle('hide', page.length < (at && !older && !term ? 26 : 50));
     latest.classList.toggle('hide', !at || !!term);
     const hit = at && log.querySelector('.hit');
-    if (hit) hit.scrollIntoView({ block: 'center' }); else if (!older) log.scrollTop = log.scrollHeight;
+    if (hit) log.scrollTop = hit.offsetTop - log.clientHeight / 3; else if (!older) log.scrollTop = log.scrollHeight; // only the list scrolls
   }
   // #91: earlier messages from the phone; while it sends them the line follows (only on this page, only while loading)
   const hist = h('div', {}, historyLine(c));
@@ -354,7 +354,7 @@ function memoryView(c, box = h('div', {})) {
     h('div', { class: 'sblock' }, h('h3', {}, 'Running summary'), h('p', { class: 'small muted' }, m.updatedAt ? `Updated ${time(m.updatedAt)} · from ${plural(m.messageCount, 'stored message')}` : plural(m.messageCount, 'stored message')),
       m.summary ? h('pre', {}, m.summary) : h('p', { class: 'small muted' }, 'No summary yet. It starts once older messages pile up.')),
     h('div', { class: 'sblock' }, h('h3', {}, `Notes (${m.notes.length})`),
-      m.notes.length ? h('ul', { class: 'notes' }, m.notes.map((n) => h('li', { class: 'row spread nowrap' }, h('span', {}, n.text, h('span', { class: 'small muted', style: 'display:block' }, `${n.author || '?'} (${n.role || 'note'}) · ${time(n.ts)}`)),
+      m.notes.length ? h('ul', { class: 'notes' }, m.notes.map((n) => h('li', { style: 'flex-wrap:nowrap' }, h('span', { style: 'flex:1;min-width:0' }, n.text, h('span', { class: 'small muted', style: 'display:block' }, `${n.author || '?'} (${n.role || 'note'}) · ${time(n.ts)}`)),
         admin ? h('button', { class: 'btn small ghost', type: 'button', 'aria-label': `Delete note: ${n.text.slice(0, 40)}`, onclick: () => tryApi(async () => { await api('DELETE', `/api/notes/${n.id}`); memoryView(c, box); }, 'Note deleted') }, 'Delete') : null)))
         : h('p', { class: 'small muted' }, 'No notes. People add them in WhatsApp: “remember that …”.')),
     admin ? h('div', { class: 'row', style: 'margin-top:10px' },

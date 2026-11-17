@@ -1,6 +1,18 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.32.0": {
+      "breaking": false,
+      "title": "A chat's Messages and Memory one tap away, and the same 👍 / 👎 everywhere",
+      "changes": [
+        { "type": "new", "text": "A chat's page has rows for Messages, Memory, WhatsApp group and Activity, each opening its own page. No more hunting behind ⋯." },
+        { "type": "new", "text": "In a chat's Messages, each answer shows its agent's avatar and colour, with 👍 / 👎 and Teach… right under it. A rating made there, in the agent's Review or in Activity is the same rating everywhere." },
+        { "type": "new", "text": "Review answers open the conversation at that answer (In chat ›). Activity entries link to their chat, agent and message, and a chat's Activity shows only that chat." },
+        { "type": "improved", "text": "Pending changes show the agent, what it would do in plain words and the chat, with a link to it." },
+        { "type": "improved", "text": "Usage links each agent and chat to its page and shows models by name. Activity shows models by name too (\"Claude Haiku 5.5\")." },
+        { "type": "improved", "text": "An agent's Memory links to the memory of each of its chats. Find anything lists each chat's Messages and Memory." }
+      ]
+    },
     "2.31.1": {
       "breaking": false,
       "title": "Clearer guides and a new website",

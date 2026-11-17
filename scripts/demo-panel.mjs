@@ -353,7 +353,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     [26 * H, 'system', '', '', 'Started'],
     [6 * H, 'schedule.run', 'carpool', G(3), "Posted today's rides (3 rides, 2 free seats)"],
     [5 * H, 'message.in', 'family', G(2), 'Ravi: !family what time is Diwali dinner on Saturday?'],
-    [5 * H - 40000, 'model.usage', 'family', G(2), 'chatgpt:gpt-5.5 · 1,204 in / 88 out tokens'],
+    [5 * H - 40000, 'model.usage', 'family', G(2), 'GPT-5.5: 1204 in / 88 out'],
     [5 * H - 30000, 'message.out', 'family', G(2), 'Saturday 22 Nov, 19:00 at Ravi & Priya’s. Bring dessert!'],
     [3 * H, 'config', '', G(5), 'Chat switched OFF — agents ignore it (admin)'],
     [2 * H, 'mcp.call', '', '', 'Claude (AI assistant): list_agents'],
@@ -363,13 +363,14 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     [40 * MIN, 'whatsapp.vote', 'school', G(1), 'Lea voted “I can drive (3 seats)”'],
     [24 * MIN, 'message.in', 'carpool', G(3), 'Luca: @Car pooling who drives tomorrow?'],
     [23 * MIN, 'tool.call', 'carpool', G(3), 'transport:connections — Morges → Geneva, Thu 07:15'],
-    [23 * MIN - 9000, 'model.usage', 'carpool', G(3), 'anthropic:claude-haiku-5-5 · 2,310 in / 71 out tokens'],
-    [23 * MIN - 8000, 'message.out', 'carpool', G(3), 'Tomorrow (Thu 20 Nov): Luca 07:15 from Morges (full), Mia back from Cornavin at 18:10 (1 seat).'],
+    [23 * MIN - 9000, 'model.usage', 'carpool', G(3), 'Claude Haiku 5.5: 2310 in / 71 out'],
+    // 072: the reply points at the stored answer (its rating shows in Activity, See in messages opens it)
+    [23 * MIN - 8000, 'message.out', 'carpool', G(3), 'Tomorrow (Thu 20 Nov): Luca 07:15 from Morges (full), Mia back from Cornavin at 18:10 (1 seat). Sophie, Mia could take you.', { msg: answers[1] }],
     [22 * MIN, 'whatsapp.reaction', 'carpool', G(3), 'Mia reacted 👍 to the agent'],
     [8 * MIN, 'message.in', 'football', `club#${G(8)}`, 'Arjun: !coach who brings snacks Saturday?'],
     [8 * MIN - 6000, 'message.out', 'football', `club#${G(8)}`, 'Saturday snacks: the Meier family (oranges) and Priya (water). Kick-off 10:30 in Nyon.'],
   ];
-  for (const [ago, type, agent, chat, summary] of acts) db.insertActivity({ ts: now - ago, type, agent, chat, summary });
+  for (const [ago, type, agent, chat, summary, detail] of acts) db.insertActivity({ ts: now - ago, type, agent, chat, summary, ...(detail ? { detail } : {}) });
 
   // why agents stayed quiet (#34): counters per chat + agent + reason
   const { silenceReason } = await imp('src/core/silences.js');

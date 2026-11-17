@@ -82,6 +82,10 @@ asked, the chat and the time.
 3. The helper proposes a FAQ entry (for fixed facts: times, places, links) or one short rule in the instructions,
    shown as the usual visual diff. **Apply & save**; the toast offers **Undo**.
 
+**In chat ›** next to an answer opens the chat's [Messages](chats.md#messages-and-memory) at that answer, so you see
+the conversation around it. The same 👍 / 👎 · **Teach…** row is under every answer in a chat's Messages and in an
+Activity reply: rate wherever you notice it, and it shows the same everywhere.
+
 > [!NOTE]
 > Admins and the owner can review; viewers can't read answers. Answers in chats that are *Private to members* are
 > left out. A rating keeps only who rated and when, and disappears with the answer (retention, *Erase memory*).
@@ -189,7 +193,7 @@ unless allowed.
 
 23 actions, chosen per role: send images, documents, voice notes, locations and contact cards, react, run polls and
 read votes, and (organizers) manage the group: name, description, picture, settings, invite link, members. Every
-action is logged (`whatsapp.action`). Admins get the same group tools on a group's page → **⋯ → Messages & memory** ([Chats](chats.md)).
+action is logged (`whatsapp.action`). Admins get the same group tools on a group's page → **WhatsApp group** ([Chats](chats.md#whatsapp-group-tools)).
 
 ![WhatsApp card of a group](site/img/card-wa-group.webp)
 
@@ -200,7 +204,8 @@ action is logged (`whatsapp.action`). Admins get the same group tools on a group
 | **Chat memory** | recent messages, a running summary and notes per chat; limits on **Server → Health** (default 90 days, 5 000 per chat) | the agent |
 | **Shared memory** | notes across all of an agent's chats (agent page → **Memory**) | organizers only, so one group can't plant facts for another |
 
-Admins can read, search (each look logged), rebuild or erase it. Tools:
+Each chat's memory is on its page: **Chats → a chat → Memory** (the agent's **Memory** section links to each of its
+chats). Admins can read, search (each look logged), rebuild or erase it. Tools:
 `memory__remember`, `list_notes`, `find_notes`, `update_note`, `forget` (last two organizers only), `search_history`.
 
 ![Memory card](site/img/card-memory.webp)

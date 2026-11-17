@@ -18,13 +18,41 @@
   *Off · 12 members*), a short hint when an agent stayed quiet there, and the switch. *All / Groups / People* and a
   search box sit above it; **Add a direct chat** is the last row.
 - **A chat's page** (on a computer beside the list, on a phone over it): its agent (**Open <agent>** jumps to the
-  agent), why it stayed quiet with a one-tap fix, recent messages, model and **Fallback…**
+  agent), why it stayed quiet with a one-tap fix, then rows that open their own page: **Messages**, **Memory**,
+  **WhatsApp group** (groups) and **Activity**. Below them: model and **Fallback…**
   ([Models](models.md#fallback-and-several-accounts)), activity log level, welcome override, **Private to members**,
-  the privacy notice, the [spending cap](spending.md), and under **⋯**: *Messages & memory* (with the group's
-  WhatsApp tools) and, for a person, *Send intro…*.
-- Links: `#chats/<chat id>` opens a chat.
+  the privacy notice and the [spending cap](spending.md). For a person, **⋯ → Send intro…**.
+- Links: `#chats/<chat id>` opens a chat; `#chats/<chat id>/messages`, `/memory` and `/group` open a section;
+  `#chats/<chat id>/messages/<message id>` opens the messages at one answer. Find anything lists *Messages · <chat>*
+  and *Memory · <chat>*.
 
-![A chat's page: its agent, why it stayed quiet, recent messages and settings](site/img/card-chat-page.webp)
+![A chat's page: its agent, why it stayed quiet, the Messages, Memory, WhatsApp group and Activity rows, settings](site/img/card-chat-page.webp)
+
+## Messages and memory
+
+**Chats → a chat → Messages** (admins): who said what, newest at the bottom. People are on the left; each answer is on
+the right in its agent's colour, with the agent's avatar and name (a link to the agent).
+
+- Under every answer: **👍 / 👎**, and on a 👎 **Teach…** (the AI helper, pre-filled with the question, the answer and
+  *Better answer:*). It is the same row as the agent's [Review](agents.md#review-and-teach) and an Activity reply: a
+  rating made in one place shows in all three.
+- Search the chat's stored messages, **Load older**, and **Load earlier from your phone** (see below).
+- **In chat ›** in Review and **See in messages** in Activity open the messages at that answer, marked; **Show the
+  latest** goes back to the newest.
+- Answers in a chat that is **Private to members** are shown here but not rated, as in Review.
+- Each look is recorded in Activity (who looked, never the text).
+
+**Chats → a chat → Memory**: the running summary (when it was updated, from how many messages), the notes people asked
+the agent to keep (**Delete** per note), **Rebuild summary** and **Erase memory** (asks first; it cannot be undone).
+An agent's *Memory* section links to the memory of each of its chats.
+
+**Chats → a chat → Activity** opens Activity for that chat only (**✕ All chats** shows everything again).
+
+## WhatsApp group tools
+
+**Chats → a group → WhatsApp group** (admins): rename the group, change its description, *Only admins send*, *Only
+admins edit info*, *Approve new members*, show or reset the invite link, and the members with their admin badges and
+tags. Changes happen in WhatsApp at once; most need the agents' number to be a group admin.
 
 > [!TIP]
 > **Private to members** hides a chat from the owner assistant, Ask and message search; its agent still answers there.
@@ -33,7 +61,7 @@
 
 1. Press **/** (or ⌘K, or the search button on a phone) and type two or more characters.
 2. Pick the last row, **Search messages for "…"**.
-3. Tap a result to open that chat's *Messages & memory* with the search filled in.
+3. Tap a result to open that chat's **Messages** with the search filled in.
 
 All words must appear, in any order; word beginnings match (*ride* finds *rides*); case and accents don't matter.
 Only chats that are on and not private are searched, newest first (**Show older matches** for more). Each search is
@@ -49,7 +77,8 @@ chat's newest message). When you switch a chat **on**, the server asks your phon
 
 - The phone must be **online**. No answer within a minute → *Will retry automatically…*: after 2 min, 15 min, 1 h,
   6 h, then daily for three days, and right away when your phone shows up online. Nothing to click.
-- **Load recent messages** (optional) asks for messages before the oldest stored one. Admin MCP: `load_chat_history`.
+- **Messages → Load earlier from your phone** (optional) asks for messages before the oldest stored one. Admin MCP:
+  `load_chat_history`.
 - The agent is told what it has ("12 stored messages since 3 Nov") and says so instead of guessing.
 
 ## Set up a direct chat before the person writes
