@@ -530,6 +530,7 @@ export async function ask({ user, text, source, surface, onEvent = null, dm = {}
     const results = [];
     for (const call of calls) {
       if (signal?.aborted) break; // 066: Stop: the remaining tools do not run
+      emit({ type: 'step', step: 'calling', tool: call.name }); // 066: the panel shows "Checking …" while it runs
       const tool = byName.get(call.name);
       let args = call.input || {};
       let content; let isError = false;

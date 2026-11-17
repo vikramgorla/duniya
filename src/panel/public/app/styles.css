@@ -397,16 +397,34 @@ label.welcome-pick { gap: 6px; justify-content: flex-start; } label.welcome-pick
 .chainlist { margin: 6px 0 var(--s2); padding-left: 22px; } .chainlist li { display: flex; align-items: center; gap: 6px; margin: var(--s1) 0; }
 .chainlist .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; } .acct { margin-top: var(--s2); } .acct .row { flex-wrap: wrap; }
 .chainlist .btn { min-width: 40px; }
-.asksteps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 2px; } .asksteps .pill { overflow-wrap: anywhere; }
-.askpartial { border-left-style: dashed; }
 .ask-form { display: flex; gap: var(--s2); align-items: flex-end; }
-.ask-form textarea { min-height: 44px; height: 44px; font-family: inherit; font-size: var(--fs); resize: vertical; field-sizing: content; max-height: 160px; }
+.ask-form textarea { min-height: 44px; height: 44px; font-family: inherit; font-size: var(--fs); resize: none; field-sizing: content; max-height: 160px; }
 .ask-form .btn { flex: none; min-height: 44px; }
+.stopsq { width: 10px; height: 10px; border-radius: 2px; background: currentColor; }
+/* 066: the Ask conversation — question bubble, live tool chips, thinking, the answer streaming with a caret */
+.thread { display: flex; flex-direction: column; gap: var(--s4); max-height: min(560px, 62vh); overflow-y: auto; overscroll-behavior: contain; margin: 0 0 var(--s3); padding: 2px 2px var(--s1); }
+.turn { display: flex; flex-direction: column; gap: var(--s2); }
+.turn > .bubble.me { max-width: 85%; }
+.answer { display: flex; flex-direction: column; gap: var(--s2); min-width: 0; }
+.asksteps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.asksteps .pill { overflow-wrap: anywhere; font-weight: 550; animation: enter var(--slow) var(--ease) both; }
+.asksteps .pill.run { background: var(--info-soft); color: var(--info); }
+.asksteps .pill .spinner { width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; }
+.asksteps-fold > summary { font-size: var(--fs-s); color: var(--muted); padding: 2px 0; cursor: pointer; }
+.asksteps-fold[open] > summary { margin-bottom: 6px; }
+.thinking { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
+.shimmer { color: var(--muted); -webkit-mask-image: linear-gradient(90deg, #000 35%, rgba(0,0,0,.4) 50%, #000 65%); mask-image: linear-gradient(90deg, #000 35%, rgba(0,0,0,.4) 50%, #000 65%); -webkit-mask-size: 300% 100%; mask-size: 300% 100%; animation: sweep 1.8s linear infinite; }
+@keyframes sweep { from { -webkit-mask-position: 150% 0; mask-position: 150% 0; } to { -webkit-mask-position: -150% 0; mask-position: -150% 0; } }
+.dots { display: inline-flex; gap: 3px; } .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); animation: beat 1.2s ease-in-out infinite; }
+.dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
+.caret { display: inline-block; width: 7px; height: 1.1em; margin-left: 2px; vertical-align: -3px; border-radius: 1px; background: var(--ink); animation: caret 1s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+.answer-actions { display: flex; gap: var(--s2); }
 /* 066: the answer: a safe markdown subset drawn as text nodes (paragraphs, lists, bold) */
-.md { color: var(--ink); background: var(--bg-2); border-radius: var(--radius-s); padding: var(--s3) 14px; margin: var(--s2) 0; overflow-wrap: anywhere; font-size: 14px; }
-.md > :first-child { margin-top: 0; } .md > :last-child { margin-bottom: 0; }
+.md { color: var(--ink); overflow-wrap: anywhere; font-size: var(--fs); line-height: 1.55; }
 .md p { margin: 0 0 var(--s2); } .md ul, .md ol { margin: 0 0 var(--s2); padding-left: 20px; } .md li + li { margin-top: 2px; }
-.md.askpartial { opacity: .85; }
+.md > :last-child { margin-bottom: 0; }
+.md code { font: 13px var(--mono); background: var(--bg-2); padding: 1px 5px; border-radius: var(--radius-xs); }
 /* WhatsApp tools and members (agent editor) */
 .wa-settings { display: grid; gap: 10px; }
 .wa-tools { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 18px; }
@@ -480,8 +498,7 @@ dialog.palette input { width: 100%; font-size: 16px; }
 .more-list button svg { width: 22px; height: 22px; }
 .more-list button.on { border-color: var(--ink); }
 .more-list .nbadge { position: absolute; top: 6px; right: 6px; }
-.more-find { width: 100%; justify-content: flex-start; color: var(--muted) !important; }
-.more-find kbd { margin-left: auto; font: 600 11px var(--mono); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; }
+.btn.more-find { width: 100%; justify-content: flex-start; color: var(--muted) !important; }
 dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
 .more-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); border-top: 1px solid var(--line); padding-top: var(--s3); }
 /* AI helper review (#32): additions lime with +, removals red struck through with −, never colour alone */

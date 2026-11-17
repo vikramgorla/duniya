@@ -1,6 +1,11 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.26.0": {
+      "breaking": false,
+      "title": "Ask is a live conversation, and Activity, Overview and the phone tab bar are easier to read",
+      "summary": "Ask, on Overview and on the owner assistant's page, now works like a chat. Your question appears as a bubble, then 'Thinking…'. Each lookup shows as it runs ('Checking server metrics…') and gets a tick when done. The answer appears word by word, with lists and bold drawn properly. Stop ends an answer, Copy copies it, and you can ask a follow-up or Retry after an error. Activity is grouped by day, with one clear row per entry in plain words ('Checked maintenance status · via admin', not tool names). Overview's status reads '2 agents live', '3 chats on'. On a phone, the active tab icon is dark on lime so you can see it, and Find anything in More is a normal row. Add a provider lists providers by name (OpenRouter, Claude, OpenAI, GitHub Copilot, ChatGPT, Custom), with one line each. Nothing to do on your server."
+    },
     "2.25.0": {
       "breaking": false,
       "title": "A calmer, denser panel that feels like an app on your phone, with its own questions and plain names",

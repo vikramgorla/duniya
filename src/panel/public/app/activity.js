@@ -22,7 +22,8 @@ export async function loadChatNames() {
 function subjectOf(summary, label) {
   const s = String(summary || '');
   const m = s.match(/^([^:\n]{1,40}):\s+/);
-  const rest = m && m[1].toLowerCase().startsWith(label.toLowerCase()) ? s.slice(m[0].length) : s;
+  if (!m || !m[1].toLowerCase().startsWith(label.toLowerCase())) return s || label;
+  const rest = s.slice(m[0].length);
   return rest ? rest[0].toUpperCase() + rest.slice(1) : label;
 }
 const dayKey = (ts) => new Date(ts).toDateString();
@@ -37,7 +38,7 @@ const dayHead = (ts) => h('li', { class: 'fday', 'data-day': dayKey(ts) }, h('h3
 /** One entry: marker (agent avatar or type icon) · bold subject · muted type, agent and chat · time on the right. */
 function feedItem(a) {
   const [label, tone = '', ic = 'activity'] = EVENTS[a.type] || [a.type];
-  const agentName = a.agent ? S.status?.agents?.find((b) => b.id === a.agent)?.name || a.agent : '';
+  const agentName = a.agent ? S.status?.agents?.find((b) => b.id === a.agent)?.name || (a.agent === 'owner-assistant' ? 'Owner assistant' : a.agent) : '';
   const chatName = a.chat ? S.chatNames?.get(a.chat) || `chat …${a.chat.split('@')[0].slice(-4)}` : '';
   const detail = h('pre', { class: 'hide' }, JSON.stringify({ type: a.type, ...(a.detail ? { detail: a.detail } : {}) }, null, 2));
   const li = h('li', { class: `fitem ${tone}`, tabindex: '0', 'aria-expanded': 'false', 'data-day': dayKey(a.ts),

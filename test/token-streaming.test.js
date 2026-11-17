@@ -58,7 +58,7 @@ test('047: Anthropic streams the text token by token; the whole text and the rep
     [{ type: 'text', text: 'Anu said the train leaves at 9:10.' }],
   );
   const ev = await stream('who talked about the train?');
-  assert.deepEqual(kinds(ev), ['thinking', 'delta', 'text', 'tool', 'thinking', 'delta', 'text', 'done']);
+  assert.deepEqual(kinds(ev), ['thinking', 'delta', 'text', 'calling', 'tool', 'thinking', 'delta', 'text', 'done']);
   const ds = deltas(ev);
   assert.ok(ds.length >= 10, `many small pieces, got ${ds.length}`);
   assert.equal(ds.join(''), 'Let me look at the chats.Anu said the train leaves at 9:10.');
@@ -131,7 +131,7 @@ test('047: OpenAI-compatible SSE: tool calls joined from chunks, text streamed, 
     { content: 'Two chats are on.' },
   );
   const ev = await stream('which chats are on?');
-  assert.deepEqual(kinds(ev), ['thinking', 'delta', 'text', 'tool', 'thinking', 'delta', 'text', 'done']);
+  assert.deepEqual(kinds(ev), ['thinking', 'delta', 'text', 'calling', 'tool', 'thinking', 'delta', 'text', 'done']);
   assert.equal(ev.find((e) => e.type === 'step' && e.step === 'tool').ok, true);
   assert.equal(deltas(ev).join(''), 'Checking.Two chats are on.');
   assert.equal(ev.at(-1).reply, 'Two chats are on.');

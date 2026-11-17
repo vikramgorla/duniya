@@ -37,6 +37,7 @@
 | **Offline** | the panel needs the server: without a connection it shows the browser's offline page (no data is cached on the phone) |
 | **Alerts** | owner alerts and the weekly summary come in WhatsApp from the [owner assistant](owner-assistant.md) |
 | **Finding your way** | the tab bar at the bottom; **More** (with a badge when a change waits for a confirm) holds the other screens; the search button in the header finds any screen, agent, chat or setting |
+| **Activity** | grouped by day (*Today*, *Yesterday*, …), one row per entry: a coloured type mark, what happened in plain words, the agent and chat underneath, the time on the right; tap a row for its details |
 | **Undo** | switching a chat off or pausing all agents shows **Undo** for a few seconds |
 | **Sign out** | **More** → **Sign out** (on a computer: in the header) |
 
