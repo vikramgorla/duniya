@@ -571,6 +571,11 @@ dialog.palette input { width: 100%; font-size: 16px; }
 .pal-list li svg { width: 16px; height: 16px; flex: none; opacity: .7; }
 .pal-list .pal-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pal-list .pal-label small { font-size: var(--fs-s); }
+.pal-list li.pal-msg { align-items: flex-start; }
+.pal-list li.pal-msg svg { margin-top: 3px; }
+.pal-list li.pal-msg .pal-label { white-space: normal; }
+.pal-snip { display: block; font-size: var(--fs-s); color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+mark { background: var(--signal); color: var(--signal-ink); border-radius: 3px; padding: 0 1px; }
 .pal-help { margin-top: var(--s2); text-align: right; }
 /* Pull to refresh (066) and "Couldn't load" (066) */
 .ptr { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 52px); z-index: 7; width: 36px; height: 36px; margin-top: -36px; border-radius: 50%; display: grid; place-items: center; background: var(--card); color: var(--muted); box-shadow: var(--shadow), 0 4px 14px -6px rgba(16,18,22,.35); transform: translate(-50%, 0); pointer-events: none; }

@@ -3,7 +3,7 @@ import { $, S, ago, api, ask, avatar, can, copyRow, emptyState, field, h, menu, 
 import { chatFallbackEditor, chatFallbackLine } from './fallback.js';
 import { silenceFix } from './quiet.js';
 import { listDetail } from './listdetail.js';
-import { helpLink, loadModels, modelSelect, plural, quietLine, usageLine } from './shared.js';
+import { helpLink, highlight, loadModels, modelSelect, plural, quietLine, searchWords, usageLine } from './shared.js';
 import { capEditor, usageSummary } from './usage.js';
 let chatsFilter = 'all';
 let chatsQuery = ''; // 062: Find a chat
@@ -189,7 +189,13 @@ function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
     tickPref('Private to members (hidden from Ask and the owner assistant)', !!c.private, (v) => ({ private: v })),
     c.isGroup ? tickPref(`Privacy notice${c.noticePostedAt ? ` (posted ${ago(c.noticePostedAt)} ago)` : ''}`, !c.noticeOff, (v) => ({ noticeOff: !v })) : null),
     h('details', { class: 'sblock', ontoggle: async (e) => { const d = e.currentTarget; if (d.open && !d.dataset.loaded) { d.dataset.loaded = '1'; d.append(await capEditor('chat', c.id, models)); } } }, h('summary', {}, 'Spending cap')),
-    extra);
+    extra, openSearchHit(c, open));
+}
+/** 070: arriving from Search messages (Find anything): open this chat's messages filtered by the search. */
+function openSearchHit(c, open) {
+  const hit = S.msgSearch?.chat === c.id ? S.msgSearch : null;
+  if (hit) { S.msgSearch = null; setTimeout(() => open(renderMemory(c, undefined, hit.q)), 0); }
+  return null;
 }
 /** #91: status of loading earlier messages from the phone for one chat row (no message content). */
 function historyLine(c) {
@@ -257,18 +263,20 @@ function whatsappCard(c) {
 }
 
 /** Stored messages of a chat (admins): newest at the bottom, search, load older. Viewing is logged. */
-function messagesCard(c) {
+function messagesCard(c, q0 = '') {
   const enc = encodeURIComponent(c.id);
   const log = h('div', { class: 'chatlog', style: 'max-height:520px' });
-  const q = h('input', { placeholder: 'Search the stored messages', style: 'max-width:320px' });
+  const q = h('input', { type: 'search', value: q0, placeholder: 'Search the stored messages', 'aria-label': 'Search the stored messages of this chat', style: 'max-width:320px' });
   let oldest = 0; let rows = [];
   const more = h('button', { class: 'btn small', onclick: () => load(true) }, 'Load older');
   const bubble = (m) => h('div', { class: `bubble ${m.fromAgent ? 'me' : 'agent'}` },
     h('div', { class: 'small', style: 'opacity:.75;margin-bottom:2px' }, m.fromAgent ? 'Agent' : (m.name || (m.sender ? `+${m.sender}` : 'someone')), m.tag ? ` (${m.tag})` : '', ` · ${time(m.ts)}`, m.addressed ? ' · to the agent' : ''),
-    m.quoted ? h('div', { class: 'small', style: 'opacity:.75;border-left:2px solid currentColor;padding-left:6px;margin:2px 0 4px' }, m.quoted) : null, m.text);
+    m.quoted ? h('div', { class: 'small', style: 'opacity:.75;border-left:2px solid currentColor;padding-left:6px;margin:2px 0 4px' }, m.quoted) : null, h('span', {}, highlight(m.text, searchWords(shown))));
+  let shown = '';
   async function load(older) {
     const page = await tryApi(() => api('GET', `/api/chats/${enc}/messages?limit=50${older && oldest ? `&before=${oldest}` : ''}${q.value.trim() ? `&q=${encodeURIComponent(q.value.trim())}` : ''}`));
     if (!page) return;
+    shown = q.value.trim();
     rows = older ? [...page.reverse(), ...rows] : page.reverse();
     oldest = rows[0]?.id || 0;
     log.replaceChildren(...(rows.length ? rows.map(bubble) : [h('p', { class: 'small muted' }, q.value.trim() ? 'No stored message matches.' : 'No stored messages for this chat.')]));
@@ -283,7 +291,7 @@ function messagesCard(c) {
   return card;
 }
 
-async function renderMemory(c, box = h('div', {})) {
+async function renderMemory(c, box = h('div', {}), q0 = '') {
   const enc = encodeURIComponent(c.id);
   const m = await api('GET', `/api/chats/${enc}/memory`);
   box.replaceChildren(h('div', { class: 'card', style: 'margin-top:14px' },
@@ -297,7 +305,7 @@ async function renderMemory(c, box = h('div', {})) {
       h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('POST', `/api/chats/${enc}/memory/summarize`); renderMemory(c, box); }, 'Summary rebuilt') }, 'Rebuild summary'),
       h('button', { class: 'btn danger', onclick: async () => (await ask({ title: `Erase the memory of “${c.name}”?`, text: 'All stored messages, the running summary and the notes of this chat are deleted. This cannot be undone.', ok: 'Erase memory', danger: true })) && tryApi(async () => { await api('DELETE', `/api/chats/${enc}/memory`); renderMemory(c, box); }, 'Memory erased') }, 'Erase memory'))));
   if (can('admin') && c.isGroup) box.append(whatsappCard(c));
-  if (can('admin')) box.append(messagesCard(c));
+  if (can('admin')) box.append(messagesCard(c, q0));
   return box;
 }
 
