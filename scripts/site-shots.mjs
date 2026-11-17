@@ -62,23 +62,21 @@ const PAGES = [
   ['overview', 'overview', ASK + ' show(S.tab); await T.wait(600);', true],
   ['agents', 'agents', '', true],
   ['chats', 'chats', '', true],
-  ['models', 'models', '', true],
-  ['usage', 'usage', '', true],
+  ['models', 'models', '', false],
+  ['usage', 'usage', '', false],
   ['server', 'server', '', false],
   ['backups', 'backups', '', false],
-  ['settings', 'settings', '', true],
   ['activity', 'activity', '', false],
-  ['agent-editor', 'agents/carpool', '', false],
   ['agent-section', 'agents/carpool/where', '', false], // 068: a section page
 ];
 // [name, hash, js that prepares it, selector or T.box heading, viewport width]
 const CARDS = [
   ['card-ask', 'overview', ASK + ' show(S.tab); await T.wait(600);', '#ov-ask', 1100],
   ['card-quiet', 'overview', '', '#ov-silences', 1100],
+  ['card-wa-numbers', 'overview', '', '#ov-whatsapp', 600], // 071: Connect WhatsApp
   ['card-update-notes', 'overview', UPDATE_NOTES, 'dialog.ask', 900],
   ['card-checklist', 'overview', START, '#ov-checklist', 1100, fakeChecklist('chat')],
   ['card-start-model', 'overview', START, '#ov-checklist', 1100, fakeChecklist('provider')],
-  ['card-start-agent', 'overview', START, '#ov-checklist', 1100, fakeChecklist('agent')],
   ['card-find', 'chats', "await openFind(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'ge'; i.dispatchEvent(new Event('input')); await T.wait(200);", '#palette', 1100],
   ['card-search', 'chats', "await openFind(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'cornavin'; i.dispatchEvent(new Event('input')); await T.wait(200); [...document.querySelectorAll('#palette li')].at(-1).click(); await T.until('.pal-msg'); await T.wait(300);", '#palette', 1100], // 070: Search messages
   ['card-review', 'agents/carpool/review', '', '.ap-sec', 600], // 070: Review & teach
@@ -99,7 +97,6 @@ const CARDS = [
   ['card-logging', 'settings/logging', '', 'box:Activity log', 600],
   ['card-mcp', 'agents/carpool/tools', '', '.ap-sec', 600],
   ['card-registry', 'agents/carpool/tools', "await T.click('Browse tool services', 'button', 1500);", 'dialog.dlg', 900],
-  ['card-wa-actions', 'agents/carpool/tools', 'T.openAll();', '.ap-sec', 600],
   ['card-people', 'agents/carpool/people', '', '.ap-sec', 600],
   ['card-quick', 'agents/carpool/quick', '', '.ap-sec', 600],
   ['card-quick-test', 'agents/carpool/test', "const i = document.querySelector('#test-console input[placeholder^=\"Ask the\"]'); i.value = '!rides'; await T.click('Send', 'button', 900); i.value = 'where is the pick-up point in Geneva?'; await T.click('Send', 'button', 900);", '#test-console', 1100],
@@ -164,23 +161,20 @@ for (const width of [...new Set(CARDS.map((c) => c[4]))]) {
 
 // videos: frames at ~8 fps while a script runs in the page, joined by ffmpeg with their real timing
 const VIDEOS = [
-  ['tour', 'overview', `for (const t of ['overview', 'chats', 'agents', 'agents/carpool/review', 'models', 'models/chatgpt', 'settings', 'activity']) { location.hash = t; await T.wait(2100); }
-    await openFind(); await T.wait(500); const i = document.querySelector('#palette input'); await T.type(i, 'cornavin'); await T.wait(300); [...document.querySelectorAll('#palette li')].at(-1).click(); await T.wait(2200);`, 21000],
+  // 071: the website's hero: Overview with Ask, a chat's page, an agent and its Review, Models, Server Health, then a message search
+  ['tour', 'overview', `${ASK} show('overview'); await T.wait(3200);
+    for (const t of ['chats', 'chats/120363041122330003%40g.us', 'agents/carpool', 'agents/carpool/review', 'models', 'server']) { location.hash = t; await T.wait(2300); }
+    document.querySelector('#health')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); await T.wait(1800);
+    await openFind(); await T.wait(500); const i = document.querySelector('#palette input'); await T.type(i, 'cornavin'); await T.wait(300); [...document.querySelectorAll('#palette li')].at(-1).click(); await T.wait(2600);`, 25000],
   ['chat-on', 'chats/120363041122330006%40g.us', `await T.wait(1200);
     const sel = document.querySelector('.chat-page select'); if (sel) { sel.focus(); await T.wait(600); sel.value = [...sel.options].find((o) => /family/i.test(o.textContent))?.value || sel.value; sel.dispatchEvent(new Event('change', { bubbles: true })); }`, 6500],
-  ['ai-create', 'agents/new', `await T.wait(1500); const ta = document.querySelector('#main textarea'); await T.wait(500);
-    await T.type(ta, 'A helper for our running club that posts Sunday’s run every Saturday evening');
-    await T.click('Draft', 'button', 200); await T.until('.dreview, .note.bad'); await T.wait(900);
-    for (let y = 0; y < 900; y += 30) { scrollBy(0, 30); await T.wait(60); }`, 12000],
-  ['test-console', 'agents/school/test', `await T.wait(1200); const i = document.querySelector('input[placeholder^="Ask the"]'); i.scrollIntoView({ block: 'center' }); await T.wait(600);
-    await T.type(i, 'When are the museum trip forms due?'); await T.click('Send', 'button', 100);`, 7000],
 ];
 if (!opt['no-video']) {
   const page = await newPage(cdp, { width: 1280, height: 800, scale: 1, scheme: opt.scheme });
   await page.goto(base); await page.evaluate(login);
   for (const [name, hash, js, ms] of VIDEOS) {
     if (!want(name)) continue;
-    await open(page, hash, '');
+    await open(page, hash, name === 'tour' ? `${ASK} show(S.tab); await T.wait(600);` : ''); // the hero poster shows Ask too
     await capture(page, join(vid, `${name}-poster.webp`), null, 70);
     const dir = mkdtempSync(join(tmpdir(), 'duniya-frames-'));
     await page.evaluate(`(async () => { ${PRELUDE} ${PANEL} window.__done = false; try { ${js} } finally { window.__done = true; } })(); 0`);

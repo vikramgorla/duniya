@@ -393,7 +393,7 @@
       "title": "Names instead of numbers, group member tags, and automatic retries",
       "summary": "The panel shows people by the name you gave them, then your phone contact name, business name or profile name, instead of numbers; a profile-name change no longer replaces your contact name, and people WhatsApp shows only by a hidden id get their name once the number is known. Contact names refresh by themselves (one full refresh after this update, then daily). Group member tags (\"Driver\") show next to names and agents see them, for chats that are on. Loading recent messages retries by itself when your phone was offline. Existing synced names start as profile names until the first refresh brings back your contact names.",
       "data": "migrated",
-      "docs": "docs/agents.md#which-name-is-shown",
+      "docs": "docs/chats.md#which-name-is-shown",
       "changes": [
         {
           "type": "improved",
@@ -529,7 +529,7 @@
       "summary": "Chats → Add a direct chat (or Contacts → Set up chat) assigns an agent, on/off, private, model and caps to a phone number before any message; their first message goes to that agent, whichever form WhatsApp uses. The owner assistant does it in one go (\"assign Mochi to Vedika\"). The agent can send an intro, only after you confirm.",
       "actions": [],
       "data": "unchanged",
-      "docs": "docs/agents.md#set-up-a-direct-chat-before-the-person-writes",
+      "docs": "docs/chats.md#set-up-a-direct-chat-before-the-person-writes",
       "changes": [
         {
           "type": "new",

@@ -16,7 +16,7 @@
 
 Examples: OCI `VM.Standard.E2.1.Micro`, Google `e2-micro`. Size also in `/api/status` (`server.size`).
 
-![Small server note on the Server page](site/img/card-small-server.webp)
+![Server: CPU, memory, disk and network, the small-server note, Health and OS updates](site/img/server-desktop.webp)
 
 ## What adapts
 
@@ -50,9 +50,6 @@ also `set_small_server_mode` for [AI assistants](admin-mcp.md), with a confirmat
 > [!NOTE]
 > **Not covered:** GitHub Copilot sign-in. Its ~400 MB download and helper process run inside the app's 700 MB memory
 > cap next to the app itself, so on 1 GB they fail or get the app stopped. It stays refused below 2 GB.
-
-Before 2.17 the switch was in **Settings → Photos & voice** and covered only on-server speech; an existing setting is
-carried over.
 
 ## The media queue
 

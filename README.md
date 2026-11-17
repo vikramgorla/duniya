@@ -14,90 +14,52 @@
 
 <p align="center">
   <a href="docs/README.md"><b>Guides</b></a> · <a href="docs/install.md">Install</a> ·
-  <a href="docs/install.md#where-is-my-panel-find-the-ip--url">Where is my panel?</a> ·
-  <a href="CONTRIBUTING.md">Contributing</a> · <a href="SECURITY.md">Security</a>
+  <a href="docs/getting-started.md">Getting started</a> · <a href="CONTRIBUTING.md">Contributing</a> ·
+  <a href="SECURITY.md">Security</a>
 </p>
 
 <p align="center">
-  <img src="docs/site/img/overview-desktop.webp" alt="The Duniya panel: everything running, the Ask box with a recap of this week's chats, two WhatsApp numbers and agents with on/off switches." width="900">
+  <img src="docs/site/img/overview-desktop.webp" alt="The Duniya panel: everything running, the Ask box with a recap of this week's chats, WhatsApp numbers, agents with on/off switches and the server." width="900">
 </p>
 
-> [!TIP]
-> Free to host on Oracle Cloud or Google Cloud, ~180 MB of RAM, no SSH needed after the install. Open the buttons
-> in a new tab (Ctrl/⌘-click or long-press) so this page stays open.
+Duniya links to a spare WhatsApp number and runs helpers in the chats you choose: a car-pool planner, a school-class
+assistant, a family organiser. **You** pick which chats they join, which model they use and what they may do. Every
+chat is silent until you switch it on.
 
-## What it does
-
-<table>
-<tr>
-<td width="33%" valign="top"><a href="docs/agents.md"><img src="docs/img/thumb-agents.webp" alt="AI helper showing a visual diff of an agent change" width="100%"></a><br><b>Agents in plain words</b><br>Templates or describe it; review a visual diff. Calm lists, one row per agent and chat; each agent's settings as short sections. Quick replies, welcomes and FAQ answers without AI. <b>Review</b> its real answers with 👍/👎 and teach it a better one in two taps.</td>
-<td width="33%" valign="top"><a href="docs/privacy.md"><img src="docs/img/thumb-privacy.webp" alt="Privacy notice settings" width="100%"></a><br><b>Silent by default</b><br>Chats are off until you switch them on; then recent messages load from your phone (retried by itself). Set up a person's chat before they write.</td>
-<td width="33%" valign="top"><a href="docs/owner-assistant.md"><img src="docs/img/thumb-ask.webp" alt="Ask box with a weekly recap" width="100%"></a><br><b>Your own super agent</b><br>Recaps, GIFs, voice and pictures in your own WhatsApp chat, or the Ask conversation in the panel (live thinking, tool steps and streaming answers, Stop and follow-ups); posts into your groups after you confirm. Keys and passwords never go through the chat: one-time links instead.</td>
-</tr>
-<tr>
-<td valign="top"><a href="docs/models.md"><img src="docs/img/thumb-fallback.webp" alt="When a model fails: fallback settings" width="100%"></a><br><b>Any model, with a backup</b><br>ChatGPT, Copilot, OpenRouter, keys, Ollama. When a plan hits its limit, the next model answers until it resets.</td>
-<td valign="top"><a href="docs/models.md#photos--voice"><img src="docs/img/thumb-photos-voice.webp" alt="Photos and voice capabilities per provider" width="100%"></a><br><b>Photos &amp; voice</b><br>Sees photos, hears and sends voice notes.</td>
-<td valign="top"><a href="docs/spending.md"><img src="docs/img/thumb-usage.webp" alt="Usage page with costs per agent" width="100%"></a><br><b>Spending caps</b><br>Monthly caps, 80 % alert, weekly summary.</td>
-</tr>
-<tr>
-<td valign="top"><a href="docs/agents.md#tool-services-mcp"><img src="docs/img/thumb-mcp.webp" alt="Adding an MCP tool service" width="100%"></a><br><b>Real tools via MCP</b><br>Browse the MCP Registry and add in one click; per-role allow lists, confirm step for changes.</td>
-<td valign="top"><a href="docs/agents.md#whatsapp-actions"><img src="docs/img/thumb-wa-group.webp" alt="WhatsApp group settings card" width="100%"></a><br><b>WhatsApp powers</b><br>Media, polls, reactions, group admin per role. Names from your phone contacts and group member tags.</td>
-<td valign="top"><a href="docs/getting-started.md#why-didnt-it-answer"><img src="docs/img/thumb-quiet.webp" alt="Why agents stayed quiet, with fixes" width="100%"></a><br><b>"Why didn't it answer?"</b><br>Reasons per chat, one-click fixes. Press <b>/</b> to find anything, or search what was said in every chat.</td>
-</tr>
-<tr>
-<td valign="top"><a href="docs/domains-and-access.md"><img src="docs/img/thumb-web-access.webp" alt="Web address and access settings" width="100%"></a><br><b>Your domain, any proxy</b><br>Automatic HTTPS, a switch that never locks you out.</td>
-<td valign="top"><a href="docs/backups-and-updates.md"><img src="docs/img/thumb-backups.webp" alt="Backups page" width="100%"></a><br><b>Backups &amp; updates</b><br>Encrypted while written (a few MB of memory) to GitHub or S3; every update shows what's new before and after; breaking ones wait for your OK; no SSH needed.</td>
-<td valign="top"><a href="docs/admin-mcp.md"><img src="docs/img/thumb-assistants.webp" alt="Connected AI assistants card" width="100%"></a><br><b>From ChatGPT, Claude or your phone</b><br>The app is an MCP server too, and the panel <a href="docs/phone.md">installs on your home screen</a> (tab bar at your thumb, works with a keyboard and a screen reader) and opens fast on a slow connection.</td>
-</tr>
-</table>
-
-## How it works
-
-<p align="center"><img src="docs/diagrams/overview.svg" alt="How a message flows: WhatsApp, the chat allow-list (chats that are off are dropped and never stored), the router, the agent, its model with fallback and its tools, with changes confirmed by an organizer; the owner manages agents from the panel (also on a phone) or ChatGPT/Claude" width="612"></p>
-
-<details><summary>Diagram as text</summary>
-
-1. A message arrives on the WhatsApp linked device.
-2. Is the chat switched on? If not, it is dropped, never stored, and the agent stays silent (when you switch it on, its recent messages are loaded from your phone).
-3. The router checks the trigger, the role and the rate limits.
-4. The agent (stored in the app) answers with its model, which falls back to another one if needed.
-5. The agent can use tools: MCP services, WhatsApp actions and memory.
-6. Tools that change something wait until an organizer replies `confirm CODE`.
-7. The owner manages agents from the panel (installable on a phone) or ChatGPT/Claude.
-
-</details>
-
-## Get it running
-
-| Host | Cost | Start |
-|---|---|---|
-| **Oracle Cloud** (Always Free) | free | Deploy button above → **Apply** → open `http://<server-ip>/` ([guide](docs/deploy/oci-free-tier.md)) |
-| **Google Cloud** (e2-micro) | free | Cloud Shell button above → follow the tutorial ([guide](docs/deploy/google-cloud.md)) |
-| **Any Ubuntu/Debian server** | your VM | one command, below ([options](docs/install.md)) |
-| **Docker** | your machine | `docker compose up -d` ([guide](docs/deploy/docker.md)) |
+## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash
 ```
 
-Then **Getting started** on Overview walks you through it in place, about five taps: link WhatsApp, paste any model
-key (or start free), tap a template, switch a group on, send a test. Afterwards press **/** to find any agent, chat or
-setting. [Getting started →](docs/getting-started.md)
+Any Ubuntu/Debian server with 1 GB of memory, or one click on Oracle Cloud or Google Cloud (free tiers), or
+[Docker](docs/deploy/docker.md). It ends with the panel address and a setup code; **Getting started** on Overview
+then takes about five taps: link WhatsApp, connect a model, pick a template, switch a group on, send a test.
+[Install guide →](docs/install.md) · [Where is my panel?](docs/install.md#where-is-my-panel-find-the-ip--url)
 
-A free 1 GB VM is enough: heavier extras (on-server speech, local tool services) stay off there unless you switch on
-**Small server mode** in Settings → Server. Old data is pruned by itself and **Server → Health** shows what is kept;
-a full disk, a wrong clock, dropped connections and crashes are handled without you. [Small servers →](docs/small-servers.md)
+## Highlights
 
-> [!IMPORTANT]
-> **Where is my panel?** Open `http://<server-ip>/`: a live progress page that turns into the panel at
-> `https://<ip-with-dashes>.sslip.io`.
-> **Oracle:** job *Succeeded* → **reload the page** → **Application information** → **Open the panel** (sign in as
-> `admin` with the stack's owner password). **Google:** the last lines in Cloud Shell (`Ready: …` and the setup
-> code). **Own server:** the installer's last lines, or `sudo duniya status`.
-> [Every host, step by step →](docs/install.md#where-is-my-panel-find-the-ip--url)
+<table>
+<tr>
+<td width="25%" valign="top"><a href="docs/agents.md"><img src="docs/img/thumb-agents.webp" alt="AI helper showing a visual diff of an agent change" width="100%"></a><br><b>Agents in plain words</b><br>A template or a sentence; every change as a visual diff. Quick replies and FAQ without AI. Test before, <b>Review &amp; teach</b> after.</td>
+<td width="25%" valign="top"><a href="docs/owner-assistant.md"><img src="docs/img/thumb-ask.webp" alt="Ask box with a weekly recap" width="100%"></a><br><b>Your own assistant</b><br>Recaps, GIFs, voice and sends into your groups, in your WhatsApp or the <b>Ask</b> box. Changes wait for your OK.</td>
+<td width="25%" valign="top"><a href="docs/chats.md#search-messages-owner"><img src="docs/img/thumb-chats.webp" alt="A chat's page with its agent and recent messages" width="100%"></a><br><b>Find &amp; search</b><br>Press <b>/</b> for any agent, chat or setting, or search what was said in every chat. <i>Why didn't it answer?</i> with a fix.</td>
+<td width="25%" valign="top"><a href="docs/models.md"><img src="docs/img/thumb-fallback.webp" alt="When a model fails: fallback settings" width="100%"></a><br><b>Any model, with a backup</b><br>OpenRouter (free models), ChatGPT plan, Claude, OpenAI, Copilot, Ollama. Photos &amp; voice. Spending caps.</td>
+</tr>
+<tr>
+<td valign="top"><a href="docs/privacy.md"><img src="docs/img/thumb-privacy.webp" alt="Privacy notice settings" width="100%"></a><br><b>Silent by default</b><br>Off chats are never stored or sent to a model; groups are told once. Tools are allowed per role, in code.</td>
+<td valign="top"><a href="docs/everyday.md#on-your-phone"><img src="docs/img/thumb-phone.webp" alt="The panel on a phone" width="100%"></a><br><b>On your phone</b><br>Installs on your home screen: tab bar at your thumb, live, light and dark. Nothing from a store.</td>
+<td valign="top"><a href="docs/small-servers.md"><img src="docs/img/thumb-small-server.webp" alt="Server card for a small server" width="100%"></a><br><b>Made for a 1 GB VM</b><br>~180 MB of RAM. Old data pruned by itself; reconnects, crashes and a full disk handled without you.</td>
+<td valign="top"><a href="docs/backups-and-updates.md"><img src="docs/img/thumb-backups.webp" alt="Backups page" width="100%"></a><br><b>Backups &amp; updates</b><br>Encrypted to GitHub or S3. One-click updates that show what's new; breaking ones wait for you. No SSH.</td>
+</tr>
+</table>
 
-**Already running?** Update, recreate, remove: [Managing your server](docs/README.md#run-it) ·
-a release needs a step: [Upgrading](docs/upgrading.md).
+More: [MCP tool services](docs/agents.md#tool-services-mcp) · [manage it from ChatGPT or Claude](docs/admin-mcp.md) ·
+[your own domain](docs/domains-and-access.md) · [how it works](docs/architecture.md).
+
+> [!WARNING]
+> Use a **dedicated WhatsApp number**: Duniya links as a normal linked device (via
+> [Baileys](https://github.com/WhiskeySockets/Baileys)), and unofficial clients can be banned.
 
 <p align="center">
   <a href="docs/README.md"><img src="docs/img/btn-guides.svg" alt="Read the guides" height="32"></a>
@@ -105,12 +67,6 @@ a release needs a step: [Upgrading](docs/upgrading.md).
 
 ---
 
-<sub>[Feature specs](specs) · [Design language](DESIGN.md) ·
-[AGENTS.md](AGENTS.md) (working rules, Definition of Done) · [Security policy](SECURITY.md)</sub>
-
-> [!WARNING]
-> Use a **dedicated WhatsApp number**: Duniya links as a normal linked device (via
-> [Baileys](https://github.com/WhiskeySockets/Baileys)), and unofficial clients can be banned.
-
-<sub>Duniya is an independent open-source project, not affiliated with, endorsed by or sponsored by WhatsApp or Meta.
-WhatsApp is a trademark of its owner.</sub>
+<sub>[Feature specs](specs) · [Design language](DESIGN.md) · [AGENTS.md](AGENTS.md) (working rules, Definition of
+Done) · [Security policy](SECURITY.md). Duniya is an independent open-source project, not affiliated with, endorsed by
+or sponsored by WhatsApp or Meta. WhatsApp is a trademark of its owner.</sub>

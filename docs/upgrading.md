@@ -8,7 +8,7 @@
 - Semver: minor = features, patch = fixes, major = may need a reinstall.
 - Since 2.9.0 the app asks you before a breaking release; older servers: update to 2.9.0 first.
 - Releases that need a step from you are listed [below](#how-breaking-releases-reach-you).
-- Since 2.26.0 every update shows what each release in between brings, and Overview says what's new afterwards.
+- Every update shows what each release in between brings, and Overview says what's new afterwards.
 
 ## Within 2.x
 
@@ -74,6 +74,7 @@ release (or a new major) and you are asked on the panel and on WhatsApp.
 
 | Version | Breaking | What to do |
 |---|---|---|
+| 2.31.0 | no | New backup format: backups made by 2.30 or earlier can't be restored any more. After updating, make a new backup (**Backups → Back up now**, or wait for the next scheduled one) ([details](backups-and-updates.md#backups)). |
 | 2.17.0 | no | Servers whose maintenance helper predates 2.17: run `sudo duniya update` once (or reinstall without SSH) so the helper can [update itself](#the-maintenance-helper) from then on. Small server mode moved to **Settings → Server** and now also covers local tool services ([details](small-servers.md#small-server-mode)). |
 | 2.15.1 | no | Full OS updates (new kernels, gradual updates, restart banner): run `sudo duniya update` on the server once (or re-run the installer) so the root maintenance helper is refreshed; the in-panel update cannot replace it. ([details](backups-and-updates.md#os-updates-installer-servers)) |
 | 2.9.6 | no | Sign in with Google on more than one address (or after a domain change): register every origin and redirect URI shown under **Settings → Sign in with Google** ([how](google-sign-in.md#when-the-panels-address-changes)). |

@@ -44,7 +44,7 @@ function addDirectChatCard(agents, { pre = null, onDone } = {}) {
     toast(r.warning ? `Chat ready. ${r.warning}` : `Chat with ${r.name} ready — waiting for the first message`);
     onDone?.(r);
   } },
-  h('div', { class: 'sec-head' }, h('h2', { tabindex: '-1' }, 'Add a direct chat'), helpLink('agents.md#set-up-a-direct-chat-before-the-person-writes')),
+  h('div', { class: 'sec-head' }, h('h2', { tabindex: '-1' }, 'Add a direct chat'), helpLink('chats.md#set-up-a-direct-chat-before-the-person-writes')),
   h('p', { class: 'small muted sec-line' }, 'Their first message goes straight to the agent. Nothing is sent to them.'),
   h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px' },
     h('div', {}, h('label', {}, 'Phone number'), phone, who, status),

@@ -7,8 +7,7 @@
 **In 30 seconds**
 - Five steps, in order: link WhatsApp, connect a model, create an agent, switch a chat on, send a test.
 - Chats are **off** until you switch them on: nothing stored, no model call.
-- Lost? Press **/** (or ⌘K, or the search button on a phone) and type what you want: an agent, a group, a setting.
-- Agent quiet? **Overview → Why agents stayed quiet** says why, with a fix.
+- Each step links to its guide: [WhatsApp](whatsapp.md), [models](models.md), [agents](agents.md), [chats](chats.md).
 
 ## Where is my panel?
 
@@ -32,14 +31,14 @@ through five steps; the one you are on opens in place:
 ![Getting started: switch a chat on](site/img/card-checklist.webp)
 
 1. **Link your WhatsApp number**: scan the QR code with the phone of the agents' number (*WhatsApp → Settings →
-   Linked devices → Link a device*), or get a pairing code. Use a number just for the agents.
+   Linked devices → Link a device*), or get a pairing code. Use a number just for the agents. [Connect WhatsApp](whatsapp.md)
 2. **Connect an AI model**: paste any key into the one box: Duniya recognises OpenRouter (`sk-or-`, free models
    only), Anthropic (`sk-ant-`), OpenAI (`sk-`) and GitHub Copilot (`github_pat_`). No key yet? **Free key from
    OpenRouter ↗**, or **Use my ChatGPT plan**. Everything else: [Models](models.md).
 3. **Create your first agent**: tap a template (Car pooling, Family, Event planning…) or describe it in your own words
    and let the AI helper draft it. You can change everything later. [Agents](agents.md)
 4. **Switch a chat on**: tap **Switch on** next to a group. The agent is chosen for it, the group gets a short privacy
-   notice once, and its recent messages are loaded from your phone (keep the phone online).
+   notice once, and its recent messages are loaded from your phone (keep the phone online). [Chats](chats.md)
 5. **Send a test message**: ask the agent something; the answer shows right there (nothing is posted to WhatsApp).
    Then try it in the group: `!yourtrigger hello` or @mention the agent.
 
@@ -51,7 +50,7 @@ Getting started**). Afterwards: **Backups** (passphrase, GitHub or S3, schedule)
 
 > [!TIP]
 > For one person instead of a group, **Chats → Add a direct chat** works before they have written
-> ([Agents](agents.md#set-up-a-direct-chat-before-the-person-writes)). Tools every agent should have (a calendar, a
+> ([Chats](chats.md#set-up-a-direct-chat-before-the-person-writes)). Tools every agent should have (a calendar, a
 > shared planner) go under **Settings → Tool services** once, instead of per agent.
 
 <p align="center"><img src="diagrams/first-steps.svg" alt="First steps: link WhatsApp, connect a model, create an agent, switch a chat on, send a test message" width="182"></p>
@@ -66,45 +65,5 @@ Getting started**). Afterwards: **Backups** (passphrase, GitHub or S3, schedule)
 
 </details>
 
-## Find anything
-
-Press **/** or **⌘K** (Ctrl+K), or tap the search button in the header, and type: a group, a person, an agent
-(*Test · Car pooling* opens its test), a setting (*secrets*, *privacy*, *backup*) or an action (*pause*, *new
-agent*, *add a direct chat*). ↑ ↓ and Enter, or tap. Links like `#settings/secrets`, `#models/chatgpt` or
-`#chats/<chat id>` open the screen at that spot.
-
-As the owner, the last row is **Search messages for "…"**: what was said in any chat that is on (word beginnings
-match, any order), with the words marked; tap a result to open that chat's messages
-([Agents → Chats](agents.md#the-chats-screen-and-a-chats-page)).
-
-![Find anything](site/img/card-find.webp)
-
-## Trying an agent: test console and *Test as*
-
-Every agent page has a **Test** section: real tools and saved settings, nothing posted to WhatsApp. **Test as** picks
-the role (participant or organizer) and the chat (one of the agent's chats or a new direct chat), and shows the tools
-that role really gets.
-
-![Test as an organizer](site/img/card-test-as.webp)
-
-> [!NOTE]
-> If the chosen chat is off, a note says that in WhatsApp the agent would stay silent there.
-
-## Why didn't it answer?
-
-**Overview → Why agents stayed quiet** (and a line per chat on **Chats**) shows the last 7 days with counts and
-one-click fixes.
-
-![Why agents stayed quiet](site/img/card-quiet.webp)
-
-<details>
-<summary>All reasons</summary>
-
-*chat is off*, *not mentioned*, *no agent chosen*, *agent is off*, *all agents paused*, *direct messages off*,
-*sender not allowed*, *rate limit*, *model error*, *empty answer*, *budget cap reached*, *server busy*, *waited too
-long*. Only counts, the last time and one sample sender are kept, never the messages. Admin MCP: `list_silences`.
-
-</details>
-
 ---
-**Next:** [Agents, tools & memory](agents.md) · [Models](models.md) · [Privacy](privacy.md) · [Docs index](README.md)
+**Next:** [Connect WhatsApp](whatsapp.md) · [Agents](agents.md) · [Everyday use](everyday.md) · [Docs index](README.md)

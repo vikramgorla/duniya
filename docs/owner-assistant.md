@@ -92,7 +92,7 @@ confirmation setup; its *Try it* section is the Ask box). It adds **Alerts**. Th
 | **Audit** | every question and action is in Activity (`owner.*`, `whatsapp.action`, always recorded), in plain words: "Checked maintenance status · via admin" (the tool's name is in the entry's details) |
 | **API** | `POST /api/owner/ask` (whole answer) or `POST /api/owner/ask/stream` (newline-delimited JSON: `step` (`thinking`, `calling` before a tool runs, `tool`, `held`), `delta`, `restarted`, `text`, `done`, `error`; closing the request stops the answer; see below); the record is `GET`/`PUT /api/agents/owner-assistant` |
 | **Admin MCP** | `get_owner_assistant` (link), `get_agent` / `update_agent` / `run_schedule_now` with `owner-assistant`, `preview_weekly_summary`, `set_chat_private` |
-| **People who never wrote** | "assign Mochi to Vedika" works in one go: it looks up the contact and prepares the direct chat (`prepare_direct_chat`, see [Agents](agents.md#set-up-a-direct-chat-before-the-person-writes)); you confirm once |
+| **People who never wrote** | "assign Mochi to Vedika" works in one go: it looks up the contact and prepares the direct chat (`prepare_direct_chat`, see [Agents](chats.md#set-up-a-direct-chat-before-the-person-writes)); you confirm once |
 
 <details>
 <summary>Streamed answers: the events</summary>

@@ -31,7 +31,7 @@ context…" (edit under **Settings → Privacy notice**).
 - Switching on also loads the group's recent messages from your phone, so "stored" covers those earlier messages too.
 - Per-group opt-out on **Chats** (recorded).
 - Direct messages get a line in the agent's first reply, once per person (can be switched off). An intro the agent
-  sends to a [prepared direct chat](agents.md#set-up-a-direct-chat-before-the-person-writes) carries it too.
+  sends to a [prepared direct chat](chats.md#set-up-a-direct-chat-before-the-person-writes) carries it too.
 - A [welcome message](agents.md#quick-replies-welcome--faq) for new members comes after the notice when the notice is
   still due.
 - Admin MCP: `get_privacy_notice`, `set_privacy_notice`, `set_chat_privacy_notice`.
@@ -42,10 +42,10 @@ context…" (edit under **Settings → Privacy notice**).
 
 | | |
 |---|---|
-| **Stored messages** | only chats that are on, for memory, with retention limits (90 days and 5 000 per chat by default, pruned every hour; **Server → Health**). Switching a chat on loads its recent messages from your phone ([Agents → Earlier messages](agents.md#earlier-messages-when-a-chat-is-switched-on)). Admins and owners can read them; every look is in the activity log. Erase a chat's memory with one click |
-| **Search messages** | the owner only, over chats that are on and not *Private to members*; each search is in the activity log with its words and the number found, never message text ([Agents → Chats](agents.md#the-chats-screen-and-a-chats-page)) |
+| **Stored messages** | only chats that are on, for memory, with retention limits (90 days and 5 000 per chat by default, pruned every hour; **Server → Health**). Switching a chat on loads its recent messages from your phone ([Agents → Earlier messages](chats.md#earlier-messages-when-a-chat-is-switched-on)). Admins and owners can read them; every look is in the activity log. Erase a chat's memory with one click |
+| **Search messages** | the owner only, over chats that are on and not *Private to members*; each search is in the activity log with its words and the number found, never message text ([Agents → Chats](chats.md#search-messages-owner)) |
 | **Answer ratings** | 👍 / 👎 on an agent's answers (*Review*): who rated and when, no copy of the text; gone with the answer. Answers in private chats are not shown ([Review and teach](agents.md#review-and-teach)) |
-| **Names and member tags** | phone contact, business and profile names from your linked phone (Contacts; agents use the same name you see, phone contact names included, unless you switch that off on the Contacts page); group member tags only for chats that are on, erased with the chat's memory ([Agents → Contacts](agents.md#which-name-is-shown)) |
+| **Names and member tags** | phone contact, business and profile names from your linked phone (Contacts; agents use the same name you see, phone contact names included, unless you switch that off on the Contacts page); group member tags only for chats that are on, erased with the chat's memory ([Agents → Contacts](chats.md#which-name-is-shown)) |
 | **Chats that are off** | the id, time and sender id of the newest message only (no text, no names), to ask the phone for history later |
 | **Activity log** | minimal, normal or verbose, by category and per chat, with retention. Errors, confirmations, configuration changes and channel status are always recorded |
 | **Summaries** | the weekly summary and *Why agents stayed quiet* keep counts only |

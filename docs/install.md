@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/m
 > are not trustworthy ([research](../specs/030-free-vms/research.md)). From your own fork:
 > [Terraform + GitHub Actions](deploy/terraform-github-actions.md).
 
-<p align="center"><img src="diagrams/install-flow.svg" alt="Install flow: press the button or run one command, the VM boots and the installer runs, follow the live progress page at http://server-ip/, then open the panel at https://ip-with-dashes.sslip.io with the setup code or owner password and follow the first-run checklist" width="320"></p>
+<p align="center"><img src="diagrams/install-flow.svg" alt="Install flow: press the button or run one command, the VM boots and the installer runs, follow the live progress page at http://server-ip/, then open the panel at https://ip-with-dashes.sslip.io with the setup code or owner password and follow Getting started on Overview" width="320"></p>
 
 <details><summary>Diagram as text</summary>
 
