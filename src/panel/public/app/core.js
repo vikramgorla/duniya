@@ -433,7 +433,7 @@ export function show(tab) {
   // 066: a screen that fails or stalls (a module or request hung after the phone suspended the app) shows why and Retry,
   // instead of placeholder cards forever.
   Promise.resolve(r && deadline(r(), S.loadTimeout + 5000, 'screen')).catch((e) => {
-    console.error(`Duniya: ${tab} did not load`, e);
+    console.error('Duniya: a screen did not load:', String(tab), e);
     if (S.renderSeq !== seq || !main || e?.message === 'Please sign in') return;
     // A screen module that is missing (the app was updated while this page was open: new file names) → load the new app
     // once; a second failure within a minute shows Retry instead of looping.
@@ -446,7 +446,7 @@ export function show(tab) {
       main?.classList.remove('loading'); main?.removeAttribute('aria-busy'); S.renderDone = seq;
       if (main) main.dataset.screen = tab;
       if (S.overdrawn === seq) { S.overdrawn = 0; show(S.tab); return; } // an older screen finished meanwhile and may have drawn over this one
-      if (main?.querySelector(':scope > .skel')) { console.error(`Duniya: ${tab} finished without drawing`); main.replaceChildren(loadFailed(new Error('This screen did not finish drawing.'), () => show(S.tab))); }
+      if (main?.querySelector(':scope > .skel')) { console.error('Duniya: a screen finished without drawing:', String(tab)); main.replaceChildren(loadFailed(new Error('This screen did not finish drawing.'), () => show(S.tab))); }
       if (moved && from && main) {
         main.classList.remove('enter'); void main.offsetWidth; main.classList.add('enter');
         // Keyboard and screen-reader users land on the new screen, not on the tab they left (064).
