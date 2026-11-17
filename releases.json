@@ -1,6 +1,20 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.33.0": {
+      "breaking": false,
+      "title": "Chats by their name everywhere, calmer Overview, shorter screens on your phone",
+      "changes": [
+        { "type": "fixed", "text": "Why agents stayed quiet (and Activity, Pending, Usage, caps, the owner assistant and the admin tools) shows a group's name instead of a long number. Group names are remembered, so they show while WhatsApp is offline too." },
+        { "type": "improved", "text": "Why agents stayed quiet is grouped by chat: the chat's name, then each reason with its count and the fix as a small link (Open triggers, Switch on). Clear is behind ⋯." },
+        { "type": "improved", "text": "The update on Overview is one line: Up to date · version · checked 2m ago, with Release notes and ⋯ for Check now. The last update, its backup and the update settings are on the new Settings → Updates page." },
+        { "type": "fixed", "text": "No more thick ring around the tab or button you just tapped on Android. Keyboard users still see where they are." },
+        { "type": "improved", "text": "Usage is a quarter of its length on a phone: one Breakdown with Agents, Chats, Models, Accounts and Kind as short rows. A model's price is set from its ⋯." },
+        { "type": "improved", "text": "Server is shorter: one line about this server, Health as a summary with Details, and Logs open when you need them." },
+        { "type": "new", "text": "Each contact has a page: name, number, note, Shared, their direct chat with its agent and the groups they wrote in. A person's chat links back to it, and Find anything lists contacts." },
+        { "type": "improved", "text": "On Overview, an agent's name opens its page and Review is one tap away. Tool calls in Activity are in plain words." }
+      ]
+    },
     "2.32.0": {
       "breaking": false,
       "title": "A chat's Messages and Memory one tap away, and the same 👍 / 👎 everywhere",

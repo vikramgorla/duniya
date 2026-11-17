@@ -7,6 +7,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setup } from './harness.js';
+import { toolPhrase } from '../src/panel/public/app/names.js';
 
 let t;
 before(async () => { t = await setup({ env: { RATE_LIMIT_PER_MIN: '1000' } }); });
@@ -112,7 +113,7 @@ test('every tool calls the matching channel function on the current chat and is 
       assert.equal(t.sent[sent].text, 'Yes, 9:10', 'reply sends the text');
     }
     const act = lastAction();
-    assert.match(act.summary, new RegExp(`^${tool} by `), `${tool} logged`);
+    assert.ok(act.summary.startsWith(`${toolPhrase(tool)} by `), `${tool} logged in plain words: ${act.summary}`); // 073
     assert.equal(act.detail.tool, tool);
   }
   assert.ok(t.db.history('g1@g.us', 50).some((m) => m.from_agent && m.text.startsWith('[poll: Lunch?')), 'own sends are stored for context');

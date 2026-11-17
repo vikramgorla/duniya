@@ -75,6 +75,16 @@ const REGISTRY_ADDED = `const f1 = window.fetch; window.fetch = async (u, o) => 
       { name: 'alerts', description: 'Official weather warnings for a region.', risky: false, organizer: true, participant: false },
       { name: 'set_alert', description: 'Send a message when a warning starts.', risky: true, organizer: true, participant: false }] } }), { status: 201, headers: { 'content-type': 'application/json' } });
   return f1(u, o); };`;
+// 073: every tappable element on Overview: focused by script after a tap → no ring; after Tab → a ring.
+const FOCUS_RINGS = `const ring = (e) => { const st = getComputedStyle(e); return st.outlineStyle !== 'none' && parseFloat(st.outlineWidth) > 0; };
+  const els = [...document.querySelectorAll('nav button, button, a[href], summary')].filter((e) => e.offsetParent || e.closest('nav')).slice(0, 60);
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+  document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  for (const e of els) { e.focus({ preventScroll: true }); if (document.activeElement === e && ring(e)) throw new Error('focus ring after a tap: ' + (e.textContent || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 40)); }
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+  const b = els[0]; b.blur(); b.focus({ preventScroll: true });
+  if (!ring(b)) throw new Error('no focus ring for keyboard users');
+  b.blur(); document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));`;
 // js runs in the page after the screen loaded; T.* helpers are defined in PRELUDE.
 const STATES = [
   { name: 'login', hash: '', js: "await fetch('/api/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); await (await import('/app/login.js')).renderLogin();", relogin: true },
@@ -99,6 +109,12 @@ const STATES = [
   { name: 'overview-whats-new', hash: 'overview', wait: 1500, js: WHATS_NEW },
   { name: 'whats-new-dialog', hash: 'overview', wait: 1500, js: `${WHATS_NEW} await T.click("See what's new", 'button', 1200);` },
   { name: 'settings-release-notes', hash: 'settings/release-notes', wait: 2000 },
+  // 073: Overview's update is one row; the whole story is Settings → Updates
+  { name: 'overview-update-available', hash: 'overview', before: UPDATE_AVAILABLE, wait: 1500 },
+  { name: 'settings-updates', hash: 'settings/updates', wait: 2000 },
+  { name: 'settings-updates-available', hash: 'settings/updates', before: UPDATE_AVAILABLE, wait: 2000 },
+  // 073: no focus ring after a tap or click, even when focus moves by script (Chrome on Android); a ring for the keyboard
+  { name: 'focus-ring-touch', hash: 'overview', wait: 1500, js: FOCUS_RINGS },
   { name: 'activity', hash: 'activity', js: "document.querySelector('#feed .fitem')?.click(); await T.wait(300);" },
   { name: 'agents', hash: 'agents' },
   // 066: fast tab switching (bottom tab bar, More sheet, top tabs), on a slow network, from deep down a long screen, must
@@ -154,6 +170,9 @@ const STATES = [
   { name: 'more-sheet', hash: 'overview', js: "(await import('/app/find.js')).openMore(); await T.wait(400);" },
   { name: 'more-sheet-account', hash: 'overview', js: "const { askSignOut } = await import('/app/core.js'); askSignOut(); await T.wait(400);" },
   { name: 'contacts', hash: 'contacts' },
+  // 073: a person's page (their direct chat and groups), also for someone who is not a saved contact
+  { name: 'contact-person', hash: 'contacts/41790000004', wait: 1500 },
+  { name: 'contact-person-unsaved', hash: 'contacts/41790000999', wait: 1500 },
   { name: 'models', hash: 'models', js: 'T.openAll();' },
   // 064: list → page: a provider's page, the Add page, Backups → Restore, Settings sections
   { name: 'models-provider', hash: 'models/chatgpt', js: 'T.openAll();' },
@@ -165,6 +184,8 @@ const STATES = [
       if (String(u).startsWith('/api/providers') && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); if (Array.isArray(j)) return new Response(JSON.stringify(j.filter((x) => x.id !== 'openrouter').map((x) => ({ ...x, connected: false, models: 0 })))); }
       return r; }; S.models = null;`, js: "await T.click('Sign in with ChatGPT', 'button', 1200); T.openAll();" },
   { name: 'usage', hash: 'usage' },
+  { name: 'usage-models', hash: 'usage', js: "await T.click('Models', '.seg button', 300);" }, // 073: breakdown rows with prices and ⋯
+  { name: 'usage-set-price', hash: 'usage', js: "await T.click('Models', '.seg button', 300); document.querySelector('.urows details.menu').open = true; await T.click('Set price', 'button', 600);" },
   { name: 'server', hash: 'server', wait: 2000, js: 'T.openAll();' },
   // 069: Health with an almost-full disk (writes paused) and a queue at its limit
   { name: 'server-health-disk-full', hash: 'server', wait: 2000, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);

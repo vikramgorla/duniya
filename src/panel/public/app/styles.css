@@ -53,12 +53,16 @@ a:not(.btn) { color: var(--accent); text-underline-offset: 2px; }
 @media (prefers-color-scheme: light) { a:not(.btn) { color: var(--info); } }
 code { overflow-wrap: anywhere; font-family: var(--mono); }
 .muted { color: var(--muted); } .small { font-size: var(--fs-s); } .num { font-variant-numeric: tabular-nums; }
+[hidden] { display: none !important; }
 .hide { display: none !important; }
 .phone-only { display: none !important; }
-/* keyboard focus: always visible, never on mouse clicks (064) */
-:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-xs); }
-.btn:focus-visible, nav button:focus-visible, .choice:focus-visible, .seg button:focus-visible, summary:focus-visible { outline-offset: 2px; box-shadow: 0 0 0 5px color-mix(in srgb, var(--signal) 55%, transparent); }
-.toggle input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* keyboard focus: always visible, never after a tap or click (064). 073: only while the keyboard is in use (html.kbd,
+   set by Tab / arrows / Esc, cleared by any pointer): Chrome on Android also matched :focus-visible after a tap when
+   focus moved by script (a closed sheet giving focus back, a new screen), leaving a thick ring on the bottom tab. */
+:focus-visible { outline: none; }
+.kbd :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-xs); }
+.kbd .btn:focus-visible, .kbd nav button:focus-visible, .kbd .choice:focus-visible, .kbd .seg button:focus-visible, .kbd summary:focus-visible { outline-offset: 2px; box-shadow: 0 0 0 5px color-mix(in srgb, var(--signal) 55%, transparent); }
+.kbd .toggle input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
 .skip { position: fixed; left: 12px; top: -60px; z-index: 50; background: var(--ink); color: var(--bg) !important; padding: 10px 16px; border-radius: var(--radius-s); text-decoration: none; transition: top var(--fast); }
 .skip:focus { top: calc(8px + env(safe-area-inset-top)); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -374,6 +378,22 @@ a.choice { text-decoration: none; color: var(--ink) !important; }
 .ctl-list { list-style: none; margin: 10px 0 0; padding: 0; }
 .ctl-list li { display: flex; align-items: center; gap: var(--s3); padding: 9px 0; border-top: 1px solid var(--line); }
 .ctl-list li > div { flex: 1; min-width: 0; }
+.ctl-name { font-weight: 650; color: var(--ink) !important; text-decoration: none; }
+.ctl-name:hover { text-decoration: underline; }
+/* 073: Overview's update row — LED · one status line · Release notes · the one action · ⋯ */
+.upd-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.upd-main { flex: 1 1 180px; min-width: 0; }
+.upd-text { font-size: var(--fs-s); } .upd-text > .dot { vertical-align: 1px; margin-right: 2px; } .upd-text > .spinner { vertical-align: -3px; }
+.upd-notes { white-space: nowrap; }
+/* 073: Usage breakdown rows — name · muted calls and tokens · cost · ⋯ */
+.urows { list-style: none; margin: 0; padding: 0; }
+.urows li { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 0; }
+.urows li + li { border-top: 1px solid var(--line); }
+.u-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.u-name { font-weight: 600; overflow-wrap: anywhere; } .u-name a { color: var(--ink) !important; text-decoration: none; } .u-name a:hover { text-decoration: underline; }
+.u-cost { font-weight: 600; white-space: nowrap; }
+/* 073: Server — Logs start as one row; Health details behind a disclosure */
+.card details.logs { margin: 0; } .card details.logs > summary { color: var(--ink); padding: 8px 0; min-height: 44px; }
 .install-hint { margin-bottom: var(--s3); }
 /* Agents */
 /* Chats: one row per chat; its less-used settings open in place (064) */
@@ -461,7 +481,6 @@ a.help:hover { color: var(--ink) !important; border-color: var(--ink); }
 .ld-tools { display: flex; gap: var(--s2); align-items: center; padding: 2px 2px var(--s2); }
 .ld-tools .seg { flex: none; } .ld-tools input { flex: 1; min-width: 0; min-height: 36px; }
 .lrow-sub .q { color: var(--muted); } .lrow-sub .q.warn { color: var(--warn); }
-.chat-page .quiet { padding: 6px 0; gap: var(--s2); }
 .chat-page > .sblock .tick, .sbody .tick { display: flex; justify-content: flex-start; margin-top: 4px; }
 /* Quick replies, welcome & FAQ rows (054) */
 .qa-rows { display: grid; gap: 10px; margin: 6px 0 var(--s2); }
@@ -469,7 +488,6 @@ a.help:hover { color: var(--ink) !important; border-color: var(--ink); }
 .qa-row .row > input, .qa-row .row > select { flex: 1 1 140px; width: auto; }
 .qa-preview { margin-top: 6px; padding: var(--s2) 10px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--bg-2) 70%, transparent); white-space: pre-wrap; overflow-wrap: anywhere; }
 .qa-preview .eyebrow { display: block; margin-bottom: 2px; }
-label.welcome-pick { gap: 6px; justify-content: flex-start; } label.welcome-pick select { width: auto; padding: 4px 8px; min-height: 40px; }
 .chainlist { margin: 6px 0 var(--s2); padding-left: 22px; } .chainlist li { display: flex; align-items: center; gap: 6px; margin: var(--s1) 0; }
 .chainlist .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; } .acct { margin-top: var(--s2); } .acct .row { flex-wrap: wrap; }
 .chainlist .btn { min-width: 40px; }
@@ -555,7 +573,6 @@ details.add-acct > summary::-webkit-details-marker { display: none; }
 .checklist-steps li.done b, .checklist-steps li.skipped b { color: var(--muted); font-weight: 500; }
 .checklist-steps .ck-do { flex: 1 1 100%; margin: var(--s1) 0 var(--s1) 40px; min-width: 0; }
 .checklist-steps .ck-do .qr { max-width: 220px; }
-.quiet { margin-top: 6px; display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
 .toolset { margin: var(--s2) 0 0; padding: 0; list-style: none; font-size: var(--fs-s); }
 .toolset li { padding: 3px 0; overflow-wrap: anywhere; } .toolset code { font-size: var(--fs-xs); }
 .start h2 { margin-top: var(--s1); }
@@ -698,7 +715,6 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
   table.stack td:not([data-label]), table.stack td[data-label=""] { display: block; }
   table.stack td > select, table.stack td > .row, table.stack td > form { flex: 1 1 150px; min-width: 0; }
   table.stack td.c { justify-content: space-between; }
-  table.stack td.tname { font-weight: 600; }
   /* flat: rows separated by a rule instead of a card each (long lists inside a card) */
   table.stack.flat tr { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; margin: 0; padding: var(--s2) 0; }
   table.stack.flat tr:last-child { border-bottom: 0; }
@@ -709,12 +725,27 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
 .calm-line { margin: 6px 0 0; grid-column: 1 / -1; }
 .ask-head { margin-bottom: var(--s2); }
 .num-dm > summary { cursor: pointer; margin-top: 4px; }
+/* 073: why-quiet grouped by chat — avatar · the chat's name (a link) · ⋯; under it one line per reason with a text-link fix */
 .quiet-list { list-style: none; margin: var(--s2) 0 0; padding: 0; }
-.quiet-list li { display: flex; align-items: center; gap: var(--s2); padding: 6px 0; flex-wrap: wrap; }
+.quiet-list li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0 4px; }
 .quiet-list li + li { border-top: 1px solid var(--line); }
-.quiet-list .q-main { flex: 1 1 200px; min-width: 0; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.quiet-list li > .av { margin-top: 2px; }
+.quiet-list .q-main { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.q-chat { font-weight: 650; color: var(--ink) !important; text-decoration: none; display: inline-block; padding: 2px 0; }
+.q-chat:hover { text-decoration: underline; }
+.q-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0 10px; font-size: var(--fs-s); min-height: 32px; }
+.q-warn { color: var(--warn); }
+.quiet-list details.menu > summary, .upd-row details.menu > summary { border-color: transparent; background: none; color: var(--muted); }
+.q-why { flex-basis: 100%; margin: -4px 0 4px; }
+.qfix { display: inline-flex; align-items: center; min-height: 40px; padding: 0 2px; border: 0; background: none; font: inherit; font-size: var(--fs-s); font-weight: 600;
+  color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+@media (prefers-color-scheme: light) { .qfix { color: var(--info); } }
 .contact-list { list-style: none; margin: var(--s2) 0 0; padding: 0; }
-.contact-list li { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 0; }
+.contact-list { margin-left: calc(-1 * var(--s2)); margin-right: calc(-1 * var(--s2)); }
+/* 073: a person's page — header, Shared, their direct chat and groups as rows */
+.person-page .lgroup { margin: var(--s3) calc(-1 * var(--s2)) 0; }
+.person-page .lgroup li + li { border-top: 1px solid var(--line); }
+button.lrow { width: 100%; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
 .contact-list li + li { border-top: 1px solid var(--line); }
 
 /* Review & teach (070) */

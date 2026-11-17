@@ -53,7 +53,7 @@ function calls(tag) {
 
 test('every data table turns into cards on phones (table.stack) or scrolls inside its card', () => {
   const tables = calls('table');
-  assert.ok(tables.length >= 10, `found only ${tables.length} tables`);
+  assert.ok(tables.length >= 8, `found only ${tables.length} tables`); // 073: Usage and This server became rows
   const bad = tables.filter(({ start, attrs }) => {
     if (/class: '[^']*\bstack\b/.test(attrs)) return false;
     const before = js.slice(Math.max(0, start - 120), start);

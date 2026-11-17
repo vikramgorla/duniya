@@ -1,8 +1,26 @@
 // @ts-check
 // Panel routes: contacts and the names agents may see.
-import { contactNamesForAgents, contactSummary, getContact, listContacts, removeContact, saveContact, setContactNamesForAgents } from '../../core/contacts.js';
-import { kvGet } from '../../core/db.js';
+import { digits } from '../../core/config.js';
+import { contactNamesForAgents, contactSummary, getContact, personInfo, listContacts, removeContact, saveContact, setContactNamesForAgents } from '../../core/contacts.js';
+import { agentForChat } from '../../core/agents.js';
+import { chatLabels } from '../../core/chat-names.js';
+import { getChatPrefs } from '../../core/chat-prefs.js';
+import { db, kvGet } from '../../core/db.js';
+import { listDirectChats } from '../../core/direct-chats.js';
 import { activity } from '../../core/events.js';
+
+/**
+ * 073: a person's page — the contact and their chats: the direct chat(s) (prepared, seen or bound, on any number) and the
+ * groups they wrote in (stored messages, so only chats that were on). Each chat with its name, agent and on/off.
+ */
+async function personChats(phone, channel) {
+  const direct = new Set(listDirectChats().filter((d) => d.phone === phone).map((d) => d.chat));
+  for (const r of db.prepare("SELECT chat FROM chats_seen WHERE tenant_id = 'default' AND is_group = 0 AND (phone = ? OR chat = ? OR chat LIKE ?)").all(phone, `${phone}@s.whatsapp.net`, `%#${phone}@s.whatsapp.net`)) direct.add(r.chat);
+  const groups = db.prepare("SELECT chat, MAX(ts) AS last FROM messages WHERE sender = ? AND chat LIKE '%@g.us' GROUP BY chat ORDER BY last DESC LIMIT 50").all(phone);
+  const names = await chatLabels([...direct, ...groups.map((g) => g.chat)], channel);
+  const view = (id, extra) => { const a = agentForChat(id); return { id, name: names.get(id), agent: a?.id || '', agentName: a?.name || '', enabled: getChatPrefs(id).enabled, ...extra }; };
+  return { direct: [...direct].map((id) => view(id, {})), groups: groups.map((g) => view(g.chat, { lastAt: g.last })) };
+}
 
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
 export function contactRoutes(route, { channel } = {}) {
@@ -28,6 +46,13 @@ export function contactRoutes(route, { channel } = {}) {
     activity('config', { summary: `Contact names refreshed from WhatsApp (${user.username})` });
     return { numbers: r, ...contactSummary() };
   });
+  route('GET', '/api/contacts/:phone/person', async (req, res, body, q, p) => {
+    const phone = digits(decodeURIComponent(p.phone));
+    if (phone.length < 6) return [404, { error: 'Not a phone number' }];
+    // someone with a chat who is not a saved contact still has a page (name from WhatsApp, or the number)
+    const c = getContact(phone) || { phone, name: personInfo({ phone }).label, source: 'none', notSaved: true };
+    return { ...c, ...(await personChats(phone, channel)) };
+  }, { role: 'admin' });
   route('PUT', '/api/contacts/:phone', async (req, res, body, q, p, user) => saveContact({ ...body, phone: decodeURIComponent(p.phone) }, user.username));
   route('DELETE', '/api/contacts/:phone', async (req, res, body, q, p, user) => {
     if (!getContact(decodeURIComponent(p.phone))) return [404, { error: 'Not found' }];

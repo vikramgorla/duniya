@@ -68,12 +68,12 @@ test('a profile-name update never replaces the address-book name; precedence own
   assert.ok(c.listContacts({ q: 'sharma' }).some((x) => x.phone === '41790000101'), 'search finds address-book names');
 });
 
-test('LID-only address-book entries wait for the mapping; raw LIDs are never shown as numbers', () => {
+test('LID-only address-book entries wait for the mapping; raw LIDs are never shown as numbers', async () => {
   c.syncWhatsAppContacts([{ id: '777@lid', name: 'Kiran Book', lid: '777@lid' }]);
   let p = c.personInfo({ jid: '777@lid' });
   assert.deepEqual([p.name, p.phone, p.hidden, p.label], ['Kiran Book', '', true, 'Kiran Book']);
   assert.equal(c.personInfo({ jid: '12345@lid' }).label, 'Unknown (hidden number)');
-  assert.equal(c.chatTitle({ id: '12345@lid', isGroup: false }), 'Unknown (hidden number)');
+  assert.equal((await import('../src/core/chat-names.js')).chatLabel('12345@lid'), 'Unknown (hidden number)');
   assert.ok(c.contactSummary().hiddenNumbers >= 1);
   assert.ok(c.mapLid('777@lid', '41790000105@s.whatsapp.net'), 'mapping arrives later');
   p = c.personInfo({ jid: '777@lid' });

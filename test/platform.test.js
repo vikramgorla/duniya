@@ -119,6 +119,6 @@ test('002: panel auth, CSRF guard, agent edit validation, secrets never returned
   assert.equal((await get('/api/chats')).find((c) => c.id === 'g1@g.us').agent, 'panduga');
   const acts = await get('/api/activity?limit=500');
   assert.ok(acts.some((a) => a.type === 'confirm.applied'));
-  assert.ok(acts.some((a) => a.type === 'tool.call' && a.summary.startsWith('panduga:agenda_list')));
+  assert.ok(acts.some((a) => a.type === 'tool.call' && a.summary.startsWith('Agenda list (panduga)') && a.detail?.tool === 'panduga:agenda_list'));
   assert.match(await fetch(`${t.base}/`).then((r) => r.text()), /Duniya/);
 });

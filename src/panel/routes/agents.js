@@ -2,8 +2,9 @@
 // Panel routes: agents (create, edit, import/export, AI draft, people, tool services and their sign-in, test console, schedules) and shared agent memory.
 import { agentView, createAgent, deleteAgent, exportAgent, getAgent, importAgent, isBuiltin, listAgents, listTemplates, loadAgents, templateConfig, updateAgent } from '../../core/agents.js';
 import { draftAgent } from '../../core/ai-builder.js';
-import { isChatEnabled, seenChats } from '../../core/chat-prefs.js';
-import { chatTitle, personInfo } from '../../core/contacts.js';
+import { isChatEnabled } from '../../core/chat-prefs.js';
+import { chatLabels } from '../../core/chat-names.js';
+import { personInfo } from '../../core/contacts.js';
 import { digits, fail } from '../../core/config.js';
 import { deleteNote, getNote, listNotes, namesInChat } from '../../core/db.js';
 import { activity } from '../../core/events.js';
@@ -54,9 +55,7 @@ export function agentRoutes(route, { channel } = {}) {
     const b = getAgent(p.id);
     if (!b || isBuiltin(p.id)) return [404, { error: 'Not found' }];
     const rows = listAnswers(p.id, { before: q.get('before'), only: q.get('only') || '', limit: 21 });
-    const seen = new Map(seenChats().map((c) => [c.id, chatTitle(c)]));
-    const names = new Map();
-    for (const chat of new Set(rows.map((r) => r.chat))) names.set(chat, (await channel.chatName?.(chat).catch(() => '')) || seen.get(chat) || chat);
+    const names = await chatLabels(rows.map((r) => r.chat), channel);
     if (!q.get('before')) activity('config', { agent: p.id, summary: `Answers of ${b.name} reviewed by ${user.username}` });
     return {
       counts: reviewCounts(p.id), more: rows.length > 20,
@@ -118,7 +117,7 @@ export function agentRoutes(route, { channel } = {}) {
       const names = namesInChat(chat);
       const tags = tagsInChat(chat);
       groups.push({
-        chat, name: (await channel.chatName?.(chat).catch(() => '')) || chat, error,
+        chat, name: (await chatLabels([chat], channel)).get(chat), error,
         members: members.map((m) => ({
           // 057: one resolver — own name > address book > business > profile > number; hidden numbers never as digits
           ...personView({ phone: m.phone, jid: m.jid, fallbackName: names[m.phone] }, chat, tags), admin: m.admin,

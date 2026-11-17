@@ -137,13 +137,6 @@ export function agentName({ phone = '', jid = '', fallbackName = '' } = {}) {
   const l = isLid(j) ? getLid.get(TENANT, j) : null;
   return r?.biz_name || l?.biz_name || r?.push_name || l?.push_name || clean(fallbackName);
 }
-/** Label for a chat seen by the app (1:1: the person; groups: their subject). `c`: { id, phone, name, isGroup }. */
-export function chatTitle(c) {
-  if (!c) return '';
-  if (c.isGroup) return c.name || c.id;
-  const jid = String(c.id || '').split('#').pop();
-  return personInfo({ phone: c.phone, jid, fallbackName: c.name }).label;
-}
 
 /** Counts for the Contacts page: how many names of each kind, and people WhatsApp shows only by a hidden number. */
 export function contactSummary() {
