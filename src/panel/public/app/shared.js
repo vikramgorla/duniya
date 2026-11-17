@@ -17,6 +17,15 @@ export function modelSelect(models, value, { withInherit = false, autoLabel = 'A
 }
 export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 export const trunc = (s, n) => { const t = String(s || '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
+/** The guides on GitHub, and a small "?" that opens one (068: details live there, not in long help paragraphs). */
+export const DOCS = 'https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/';
+export const helpLink = (path, label = 'Help: open the guide') => h('a', { class: 'help', href: DOCS + path, target: '_blank', rel: 'noopener', 'aria-label': label, title: label }, '?');
+/** 068: the sections of an agent's page that Find anything lists ([id, title, words, only for normal agents]). */
+export const AGENT_SECTIONS = [['character', 'Character', 'instructions prompt description name'], ['where', 'Where it answers', 'triggers mention direct dm chats', true],
+  ['people', 'People', 'organizers participants roles', true], ['quick', 'Quick replies & FAQ', 'commands help faq', true], ['welcome', 'Welcome', 'new members greet rules', true],
+  ['schedules', 'Schedules', 'scheduled posts weekly summary'], ['model', 'Model', 'fallback provider'], ['tools', 'Tools', 'mcp tool services whatsapp actions confirm'],
+  ['memory', 'Memory', 'notes shared'], ['media', 'Photos & voice', 'images pictures voice notes'], ['cap', 'Spending cap', 'budget limit cost'],
+  ['advanced', 'Advanced', 'timezone history tokens'], ['test', 'Test', 'try console']];
 // ---------- models ----------
 export const LINKS = {
   anthropicKeys: 'https://platform.claude.com/settings/keys',

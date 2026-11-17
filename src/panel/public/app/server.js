@@ -1,6 +1,6 @@
 // Server screen: metrics, OS updates, maintenance helper, logs, hosting. Module of the panel (063).
 import { $, S, ago, api, ask, can, h, serverBadge, time, tryApi } from './core.js';
-import { SIZE_LABEL, bytes, meter, pct, plural } from './shared.js';
+import { DOCS, SIZE_LABEL, bytes, meter, pct, plural } from './shared.js';
 function spark(values, max) {
   const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('viewBox', '0 0 100 30'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('class', 'spark');
@@ -25,7 +25,6 @@ function serverSizeNote(s, q) {
     waiting);
 }
 // Hosting help (#56): open the step-by-step guide for where this server runs (update, recreate, remove, console help).
-const DOCS = 'https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/';
 const HOST_GUIDES = {
   oci: ['Oracle Cloud', 'deploy/oci-free-tier.md', 'Update the stack (new zip → Plan → Apply), recreate, remove (Destroy, then Delete), find the IP and console history, out-of-capacity and LimitExceeded.'],
   gcp: ['Google Cloud', 'deploy/google-cloud.md', 'Recreate or remove the VM, firewall rule and IPs, serial console, SSH, resize, what keeps the IP.'],

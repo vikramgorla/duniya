@@ -2,14 +2,15 @@
 // ---------- Find anything (062): / or ⌘K (Ctrl+K), or the search button: jump to a screen, agent, chat, setting or action ----------
 import { $, PRIMARY, S, TABS, api, badgeFor, can, go, h, icon, optimistic, recover, serverBadge, show, signOut, tryApi } from './core.js';
 import { PROVIDER_NAMES } from './names.js';
-import { SETTINGS_SECTIONS } from './shared.js';
+import { AGENT_SECTIONS, SETTINGS_SECTIONS } from './shared.js';
 /** Everything the Find box can open. Agents and chats come from the status and the cached chat list. */
 async function paletteItems() {
   const items = TABS().map(([id, label]) => ({ kind: 'Screen', label, go: `#${id}`, icon: id }));
   const agents = await api('GET', '/api/agents').catch(() => []);
   for (const a of agents) {
     items.push({ kind: 'Agent', label: a.name, hint: a.builtin ? 'built in' : a.description || '', go: `#agents/${encodeURIComponent(a.id)}`, icon: 'agents' });
-    if (!a.builtin) items.push({ kind: 'Test', label: `Test ${a.name}`, go: `#agents/${encodeURIComponent(a.id)}/test`, icon: 'agents' });
+    // 068: each section of its page ("Tools · Car pooling")
+    for (const [sid, title, words, only] of AGENT_SECTIONS) if (!(only && a.builtin)) items.push({ kind: 'Agent', label: `${title} · ${a.name}`, words, go: `#agents/${encodeURIComponent(a.id)}/${sid}`, icon: 'agents' });
   }
   const names = new Map(agents.map((a) => [a.id, a.name]));
   for (const c of await api('GET', '/api/chats').catch(() => [])) {
@@ -21,7 +22,7 @@ async function paletteItems() {
   const act = (label, words, run) => items.push({ kind: 'Action', label, words, run });
   if (admin) {
     act(S.status?.settings?.paused ? 'Resume all agents' : 'Pause all agents', 'stop silence', () => optimistic(() => { S.status.settings.paused = !S.status.settings.paused; }, () => api('POST', '/api/settings', { paused: S.status.settings.paused }), S.status.settings.paused ? 'Paused' : 'Resumed'));
-    act('New agent', 'create template ai draft', () => { location.hash = 'agents'; });
+    act('New agent', 'create template ai draft import', () => { location.hash = 'agents/new'; });
     act('Add a direct chat', 'person phone dm', () => { S.dmPrefill = {}; location.hash = 'chats'; });
     if (S.checklist?.dismissed && !S.checklist.complete) act('Show Getting started', 'checklist setup first run', () => tryApi(async () => { S.checklist = await api('PUT', '/api/checklist', { dismissed: false }); location.hash = 'overview'; show('overview'); }));
   }
