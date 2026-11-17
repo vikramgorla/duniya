@@ -5,11 +5,11 @@ import { ago, h } from './core.js';
 import { fmtCost, meter, plural } from './shared.js';
 
 /** Plan and credit limits, tightest first (`p.usage` from /api/providers). */
-export const planLimits = (p) => (p?.usage?.limits || []).filter((l) => l.kind !== 'rate');
+const planLimits = (p) => (p?.usage?.limits || []).filter((l) => l.kind !== 'rate');
 const rateLimits = (p) => (p?.usage?.limits || []).filter((l) => l.kind === 'rate');
 const pctText = (l) => `${Math.round(l.used)}%`;
 /** "resets 14:20" today, "resets Thu 14:20" this week, "resets 1 Dec" later. */
-export function resetText(t) {
+function resetText(t) {
   if (!t) return '';
   const d = new Date(t); const days = (t - Date.now()) / 86400000;
   const opts = /** @type {Intl.DateTimeFormatOptions} */ (days < 0.8 ? { hour: '2-digit', minute: '2-digit' } : days < 6 ? { weekday: 'short', hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short' });
@@ -22,7 +22,7 @@ export function rowStatus(p) {
   return [`${l.used >= 100 ? 'Used up' : `${pctText(l)} of`} ${l.label}`, h('span', { class: `lmeter${l.used >= 85 ? ' hot' : ''}`, 'aria-hidden': 'true' }, h('i', { style: `width:${Math.min(100, Math.round(l.used))}%` }))];
 }
 const limitRow = (l) => h('div', { class: 'limit' },
-  h('div', { class: 'row spread small' }, h('span', {}, l.label[0].toUpperCase() + l.label.slice(1)), h('b', { class: 'num' }, l.used >= 100 ? 'Used up' : `${pctText(l)} used`)),
+  h('div', { class: 'row spread small' }, h('span', {}, l.label[0].toUpperCase() + l.label.slice(1)), h('b', { class: 'num' }, l.used >= 100 ? 'Used up' : l.kind === 'rate' ? `${Math.round(100 - l.used)}% left` : `${pctText(l)} used`)),
   meter(l.used), h('div', { class: 'small muted' }, [l.detail, resetText(l.resetAt)].filter(Boolean).join(' · ')));
 const spendLine = (p) => (p?.spend?.calls ? h('div', { class: 'small muted num' }, `This month through Duniya: ${p.spend.unpriced && !p.spend.cost ? 'price not set' : fmtCost(p.spend.cost)} · ${plural(p.spend.calls, 'call')}`) : null);
 
@@ -37,7 +37,7 @@ export function planSection(p) {
     h('h3', {}, plans.length ? 'Plan usage' : 'Usage and limits'),
     plans.map(limitRow),
     rates.length ? h('div', { class: 'limit' }, h('div', { class: 'eyebrow', style: 'margin:0 0 4px' }, 'Rate limit headroom'), rates.map(limitRow)) : null,
-    spend,
+    spend ? h('div', { class: 'limit' }, spend) : null,
     p.usage ? h('div', { class: 'small muted', style: 'margin-top:6px' }, `Updated ${ago(p.usage.at)} ago, from what ${p.name} reports`) : null);
 }
 
@@ -45,7 +45,7 @@ export function planSection(p) {
 export function plansCard(provs) {
   const rows = provs.filter((p) => p.connected && planLimits(p).length);
   if (!rows.length) return null;
-  return h('div', { class: 'card', id: 'plans' }, h('h2', {}, 'Plans and credit'),
+  return h('div', { class: 'card', id: 'plans', style: 'margin-top:16px' }, h('h2', {}, 'Plans and credit'),
     h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px' }, rows.map((p) => {
       const l = planLimits(p)[0]; const more = planLimits(p).length - 1;
       return h('a', { class: 'capbar plan', href: `#models/${p.type === 'compatible' ? `x-${p.id}` : p.type}` },

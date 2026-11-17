@@ -197,7 +197,7 @@ export function forget(id) {
 
 /**
  * What the panel, the admin tools and the alerts show: { at (latest update), limits } or null when the provider
- * reports nothing. A window whose reset time has passed is shown as renewed (rate limits: full headroom, left out).
+ * reports nothing. A window whose reset time has passed is shown as renewed (0 % used).
  */
 export function view(id, now = Date.now()) {
   const s = snaps.get(id);
@@ -205,10 +205,8 @@ export function view(id, now = Date.now()) {
   const limits = [];
   for (const src of Object.values(s.sources || {})) {
     for (const l of src.limits || []) {
-      if (l.resetAt && l.resetAt <= now) {
-        if (l.kind === 'rate') continue;
-        limits.push({ ...l, used: 0, resetAt: null, detail: 'renewed since the last answer' });
-      } else limits.push({ ...l });
+      if (l.resetAt && l.resetAt <= now) limits.push({ ...l, used: 0, resetAt: null, detail: l.kind === 'rate' ? 'full again' : 'renewed since the last answer' });
+      else limits.push({ ...l });
     }
   }
   if (!limits.length) return null;
