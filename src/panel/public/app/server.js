@@ -58,7 +58,7 @@ function healthCard(x, redraw) {
     ['Stored messages', `${n(x.database.rows.messages)}${x.oldest.messages ? ` · since ${day(x.oldest.messages)}` : ''} · kept ${r.messagesDays} days`],
     ['Activity', `${n(x.database.rows.activity)}${x.oldest.activity ? ` · since ${day(x.oldest.activity)}` : ''} · kept ${r.activityDays} days`],
     ['Usage detail', `${n(x.database.rows.usage)}${x.oldest.usage ? ` · since ${day(x.oldest.usage)}` : ''} · kept ${r.usageDays} days`],
-    ['Last clean-up', x.lastPrune ? `${ago(x.lastPrune.at)} ago · ${n(x.lastPrune.removed.messages + x.lastPrune.removed.activity + x.lastPrune.removed.usage)} rows removed${x.vacuumAt ? ` · compacted ${day(x.vacuumAt)}` : ''}` : 'soon after the app starts'],
+    ['Last clean-up', x.lastPrune ? `${ago(x.lastPrune.at)} ago · ${((k) => (k ? `${n(k)} old rows removed` : 'nothing old to remove'))(x.lastPrune.removed.messages + x.lastPrune.removed.activity + x.lastPrune.removed.usage)}${x.vacuumAt ? ` · compacted ${day(x.vacuumAt)}` : ''}` : 'soon after the app starts'],
     ['Photos & voice queue', q.queued || q.running ? `${q.running} working · ${q.queued} waiting (at most ${q.max})` : 'empty'],
   ];
   const owner = can('owner');

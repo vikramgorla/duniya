@@ -130,19 +130,20 @@ Before and after 069 (#143), same machine:
 
 | | v2.29.1 | v2.30.0 |
 |---|---|---|
-| Startup to panel ready (1 CPU) / RSS | 416 ms / 158 MB | AFTER_STARTUP |
-| Router: stored, not addressed | 257 msg/s | AFTER_QUIET msg/s |
-| Router: chat off | 1 923 msg/s | AFTER_OFF msg/s |
-| Router: answered by the fake model | 64 msg/s | AFTER_ASK msg/s |
-| Panel API (status, chats, agents, activity pages, contacts) | 1–7 ms median | AFTER_API |
-| Usage by day, all time | 21 ms | AFTER_USAGE |
+| Startup to panel ready (1 CPU) / RSS | 416 ms / 158 MB | 276 ms / 164 MB |
+| Router: stored, not addressed | 257 msg/s | 970 msg/s (3.8×) |
+| Router: chat off | 1 923 msg/s | 11 250 msg/s (5.9×) |
+| Router: answered by the fake model | 64 msg/s | 240 msg/s (3.8×) |
+| Panel API (status, chats, agents, activity pages, contacts) | 1–7 ms median | 1–7 ms median (Health 1 ms) |
+| Usage by day, all time | 21 ms | 21 ms |
 | Activity for one chat / age prunes | `SCAN activity` / `SCAN messages` | index searches |
-| Retention (messages kept 30 days) | pruned on the write path | AFTER_PRUNE |
-| One backup | – | AFTER_BACKUP |
+| Retention (messages kept 30 days) | pruned on the write path | 125 000 rows in 63 upkeep ticks, ≤ 102 ms each |
+| One backup | – | 1 s, 6.7 MB, +167 MB RSS while it runs |
 
 What made the difference: WAL with `synchronous = NORMAL` (no fsync per write), no pruning on the write path (one
 bounded pass on the upkeep tick, `src/core/retention.js`), indexes for the chat filter and the age prunes, one date
-formatter per time zone, and counting before loading rows to summarize.
+formatter per time zone, and counting before loading rows to summarize. Still open: a backup holds the whole
+database in memory several times (base64 + gzip) — about 170 MB extra for a 36 MB database.
 
 ## Commits and pull requests
 

@@ -26,12 +26,12 @@ const HOUR = 3600000;
 const BATCH = 2000;
 const MB = 1048576;
 const LABELS = { messagesDays: 'Stored messages: days', messagesPerChat: 'Stored messages per chat', usageDays: 'Usage detail: days' };
-export const RETENTION_LIMITS = Object.freeze({ messagesDays: [7, 3650], messagesPerChat: [200, 50000], usageDays: [30, 3650] });
+const RETENTION_LIMITS = Object.freeze({ messagesDays: [7, 3650], messagesPerChat: [200, 50000], usageDays: [30, 3650] });
 // Disk levels: low below 500 MB or 5 % free; full below 100 MB (writes pause).
 const DISK_LOW = 500 * MB; const DISK_FULL = 100 * MB;
 
 /** What is kept: stored messages and usage detail (here) and the activity log (Settings → Activity log). */
-export function retentionSettings() {
+function retentionSettings() {
   const s = getSetting('retention', null) || {};
   return { messagesDays: s.messagesDays ?? env.memory.retentionDays, messagesPerChat: s.messagesPerChat ?? env.memory.maxMessagesPerChat, usageDays: s.usageDays ?? 400 };
 }
