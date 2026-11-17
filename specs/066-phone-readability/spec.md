@@ -38,19 +38,23 @@ Issue #132. The owner tested v2.25.0 on an iPhone (installed app, dark mode).
   - respects reduced motion
   - the same component is *Try it* on the owner assistant's page
 
-- R7 (Addition) The installed iPhone app sometimes stayed on skeleton cards until it was closed. Root causes:
-  - requests had no deadline, and a request or socket left hanging after iOS suspended the app kept the screen waiting
-  - its pending promise sat in the `api()` cache
-  - a failed or stalled render left the skeleton in place (only a toast was shown)
-  - a stalled dynamic import (More, Find anything) can never be retried in the page
-  - `pagehide` set the live stream to null, so a later `visibilitychange` never reconnected it
-  
-  Fix:
-  - deadlines (AbortController) on every request; failed or aborted promises leave the cache
-  - a screen deadline that ends in *Couldn't load* + **Retry** (a stuck module reloads the page)
-  - after more than 30 s away (`visibilitychange` / `pageshow`), drop waiting requests, reconnect and redraw an
-    unfinished screen
-  - pull to refresh on touch screens, and **More → Refresh**
+- R7 (Addition) The installed iPhone app sometimes stayed on skeleton cards while switching screens (Activity, More →
+  a screen) until it was closed. Root causes, reproduced in headless Chrome by switching tabs fast on a slow network:
+  - **Placeholder timer over a drawn screen.** The 120 ms placeholder timer replaced the screen with skeletons even
+    when the screen had already drawn and was still waiting for more data. Activity draws its card, then loads the
+    list, which then filled a card no longer on the page. Placeholders only replace what was there before the
+    navigation.
+  - **Older screen drawn over the newer one.** An older screen that finished while the newer one was still loading
+    drew over it and stayed. The current screen is now drawn again when it finishes.
+  - **Live status redraws Overview after you leave.** A status update could redraw Overview after you had already
+    moved to another tab. It now draws only on a finished Overview.
+  - **Errors left skeletons in place.** A render that failed showed only a toast. Now every failure or stall ends in
+    *Couldn't load* + **Retry** and is logged to the console. A screen module missing after an update reloads the app
+    once.
+  - **Guards.** Deadlines on requests (failed ones leave the cache) and on sheets. After more than 30 s in the
+    background, recover: drop waiting requests and reconnect the stream (it also reconnects when it was closed on
+    `pagehide`). Pull to refresh, and **More → Refresh**.
+  - **Regression check.** `nav-stress`, `load-failed` and `load-retry` in `check:responsive` run in CI.
 
 ## Out of scope
 
