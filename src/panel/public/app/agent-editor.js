@@ -353,16 +353,19 @@ function buildTools(x, { save }) {
     })));
   }
   const waOn = (role, t) => { const mine = splitLines(rulesBox[role].value).filter((r) => r.startsWith('whatsapp:')); return !mine.length ? role === 'organizer' || t.participantDefault : mine.some((r) => globRe(r).test(`whatsapp:${t.name}`)); };
-  const setWa = (role, name, on) => {
+  const setWa = (role, name, on) => { // name '*': all or none (#165)
     const may = waTools.filter((t) => role === 'organizer' || !t.organizerOnly);
-    const next = may.filter((t) => (t.name === name ? on : waOn(role, t))).map((t) => t.name);
+    const next = may.filter((t) => (name === '*' || t.name === name ? on : waOn(role, t))).map((t) => t.name);
     const rest = splitLines(rulesBox[role].value).filter((r) => !r.startsWith('whatsapp:'));
     rulesBox[role].value = [...rest, ...(!next.length ? ['whatsapp:-'] : role === 'organizer' && next.length === may.length ? ['whatsapp:*'] : next.map((n) => `whatsapp:${n}`))].join('\n');
   };
-  const drawWa = () => waBox.replaceChildren(waTools.length ? h('details', {}, h('summary', {}, `Choose per role (${waTools.length})`), h('ul', { class: 'wa-tools' }, waTools.map((t) => h('li', {},
+  const drawWa = () => waBox.replaceChildren(waTools.length ? h('details', {}, h('summary', {}, `Choose per role (${waTools.length})`),
+    can('admin') ? h('div', { class: 'row', style: 'gap:6px' }, ['participant', 'organizer'].map((role) => { const may = waTools.filter((t) => role === 'organizer' || !t.organizerOnly), n = may.filter((t) => waOn(role, t)).length;
+      return h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: n === may.length, indeterminate: n > 0 && n < may.length, onchange: (e) => { setWa(role, '*', e.target.checked); drawWa(); } }), ` All: ${ROLE_LABEL[role]}`); })) : null,
+    h('ul', { class: 'wa-tools' }, waTools.map((t) => h('li', {},
     h('div', {}, h('b', {}, t.name.replace(/_/g, ' ')), t.organizerOnly ? h('span', { class: 'small muted' }, ' · organizers only') : null), h('div', { class: 'small muted' }, t.description),
     h('div', { class: 'row', style: 'gap:4px;margin-top:4px' }, ['participant', 'organizer'].map((role) => h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: (role === 'organizer' || !t.organizerOnly) && waOn(role, t), disabled: !can('admin') || (role === 'participant' && t.organizerOnly),
-      onchange: (e) => setWa(role, t.name, e.target.checked) }), ` ${ROLE_LABEL[role]}`))))))) : h('p', { class: 'small muted' }, 'None.'));
+      onchange: (e) => { setWa(role, t.name, e.target.checked); drawWa(); } }), ` ${ROLE_LABEL[role]}`))))))) : h('p', { class: 'small muted' }, 'None.'));
   const ready = Promise.all([api('GET', `/api/agents/${x.enc}/connections`).catch(() => []), api('GET', `/api/agents/${x.enc}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => []),
     can('admin') ? api('GET', '/api/tool-services/registry/settings').catch(() => null) : null]).then(([cn, lo, wa, reg]) => {
     conns = cn; locals = lo; waTools = bi ? wa.filter((t) => t.owner) : wa; registry = reg;

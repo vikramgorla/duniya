@@ -10,6 +10,7 @@ export function h(tag, attrs, ...kids) {
     else if (k === 'class') el.className = v;
     else if (k === 'value') el.value = v;
     else if (k === 'checked') el.checked = !!v;
+    else if (k === 'indeterminate') el.indeterminate = true;
     else el.setAttribute(k, v === true ? '' : v);
   }
   for (const kid of kids.flat(Infinity)) {

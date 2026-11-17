@@ -25,6 +25,10 @@ const KEEP_MS = 10 * 60000; // late chunks of a finished load still count for th
 let channel = null;
 export const setHistoryChannel = (ch) => { channel = ch; };
 
+// #167: the phone answered another load a moment ago, so it is online: no answer then means it has nothing earlier
+// (a number added to a group only has the messages since it joined). The load ends as "nothing earlier", no retries.
+const ONLINE_PROOF_MS = 10 * 60000;
+let phoneAnsweredAt = 0;
 const loads = new Map(); // chat -> { state, requested, loaded, pages, at, doneAt, error, ids, timer, by }
 const lastStart = new Map();
 
@@ -123,10 +127,11 @@ function anchorOf(chat) {
 
 function finish(chat, l, state, error = '') {
   clearTimeout(l.timer);
+  if (state === 'no_response' && Date.now() - phoneAnsweredAt < ONLINE_PROOF_MS) state = 'loaded';
   l.state = state; l.doneAt = Date.now(); if (error) l.error = error;
   const agent = agentForChat(chat);
   activity('memory.history', { agent: agent?.id || '', chat,
-    summary: state === 'loaded' ? `Loaded ${l.loaded} earlier message${l.loaded === 1 ? '' : 's'} from the phone` : state === 'no_response' ? 'The phone did not send earlier messages (it may be offline); retrying automatically' : `Loading earlier messages failed: ${error}; retrying automatically` });
+    summary: state === 'loaded' && !l.loaded ? 'The phone answered other chats but had no earlier messages for this one' : state === 'loaded' ? `Loaded ${l.loaded} earlier message${l.loaded === 1 ? '' : 's'} from the phone` : state === 'no_response' ? 'The phone did not send earlier messages (it may be offline); retrying automatically' : `Loading earlier messages failed: ${error}; retrying automatically` });
   if (l.ids.length) summarizeAfterLoad(chat, agent, l.ids).catch(() => {});
   if (state === 'loaded') dropRetry(chat);
   else if (state === 'no_response' || state === 'failed') planRetry(chat, l, l.attempt || 0);
@@ -182,6 +187,7 @@ export function storeLoadedBatch(chat, rows) {
   const l = loads.get(chat);
   const ours = l && (l.state === 'loading' || Date.now() - (l.doneAt || 0) < KEEP_MS);
   const stored = rows.length ? insertEarlierMessages(chat, rows) : [];
+  if (rows.length) phoneAnsweredAt = Date.now();
   if (stored.length) dropRetry(chat);
   if (!ours) {
     if (stored.length) {
@@ -206,5 +212,5 @@ export function storeLoadedBatch(chat, rows) {
 /** Tests: forget statuses and cooldowns. */
 export function resetHistoryLoads() {
   for (const l of loads.values()) clearTimeout(l.timer);
-  loads.clear(); lastStart.clear(); retries.clear(); kvSet(RETRY_KEY, '{}');
+  loads.clear(); lastStart.clear(); phoneAnsweredAt = 0; retries.clear(); kvSet(RETRY_KEY, '{}');
 }

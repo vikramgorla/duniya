@@ -16,15 +16,23 @@ export const serverConfig = (s) => (s.type === 'local'
   ? { type: 'local', package: s.pkg, args: splitLines(s.args), env: parseKv(s.env, '='), allowScripts: s.allowScripts }
   : { type: 'remote', url: s.url, auth: s.auth, tokens: s.auth === 'token' ? { organizer: s.org, participant: s.part } : {}, headers: parseKv(s.headers, ':'),
     ...(s.auth === 'oauth' && s.oauthId ? { oauthClient: { id: s.oauthId, secret: s.oauthSecret } } : {}) });
-/** Tools of a service with a tick per role. rules: { has(role, tool), write(role, tools ticked, all tools) }. */
+/** Tools of a service with a tick per role, an all/none tick per role and "Everyone: all tools" (#165).
+ * rules: { has(role, tool), write(role, tools ticked, all tools) }. */
 export function toolGrid(box, tools, rules) {
-  const on = { participant: new Set(tools.filter((t) => rules.has('participant', t.name)).map((t) => t.name)), organizer: new Set(tools.filter((t) => rules.has('organizer', t.name)).map((t) => t.name)) };
-  const set = (role, name, v) => { if (v) on[role].add(name); else on[role].delete(name); rules.write(role, tools.filter((t) => on[role].has(t.name)).map((t) => t.name), tools); };
-  box.replaceChildren(h('div', { class: 'small muted phone-only', style: 'margin-top:8px' }, `${tools.length} tools`),
-    h('table', { class: 'stack flat' }, h('thead', {}, h('tr', {}, h('th', {}, `${tools.length} tools`), h('th', { class: 'c' }, 'Participants'), h('th', { class: 'c' }, 'Organizers'))),
+  const ROLES = ['participant', 'organizer'];
+  const on = Object.fromEntries(ROLES.map((r) => [r, new Set(tools.filter((t) => rules.has(r, t.name)).map((t) => t.name))]));
+  const save = (role) => rules.write(role, tools.filter((t) => on[role].has(t.name)).map((t) => t.name), tools);
+  const all = (role, v) => { on[role] = new Set(v ? tools.map((t) => t.name) : []); save(role); draw(); };
+  const tick = (checked, label, onchange, mixed, text) => h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked, indeterminate: !!mixed, disabled: !can('admin'), 'aria-label': label, onchange }), text);
+  const draw = () => box.replaceChildren(
+    h('div', { class: 'row', style: 'gap:6px;margin-top:8px' }, h('span', { class: 'small muted' }, `${tools.length} tools`),
+      ...ROLES.map((r) => tick(on[r].size === tools.length, `All tools: ${ROLE_LABEL[r]}`, (e) => all(r, e.target.checked), on[r].size && on[r].size < tools.length, ` All: ${ROLE_LABEL[r]}`)),
+      can('admin') ? h('button', { class: 'btn small', type: 'button', disabled: ROLES.every((r) => on[r].size === tools.length), onclick: () => { for (const r of ROLES) { on[r] = new Set(tools.map((t) => t.name)); save(r); } draw(); } }, 'Everyone: all tools') : null),
+    h('table', { class: 'stack flat' }, h('thead', {}, h('tr', {}, h('th', {}, 'Tool'), ...ROLES.map((r) => h('th', { class: 'c' }, ROLE_LABEL[r])))),
       h('tbody', {}, tools.map((t) => h('tr', {}, h('td', { 'data-label': '' }, h('b', {}, t.name), h('div', { class: 'small muted' }, t.description)),
-        ...['participant', 'organizer'].map((role) => h('td', { class: 'c', 'data-label': role === 'participant' ? 'Participants' : 'Organizers' },
-          h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: on[role].has(t.name), disabled: !can('admin'), 'aria-label': `${t.name}: ${role}s`, onchange: (e) => set(role, t.name, e.target.checked) })))))))));
+        ...ROLES.map((r) => h('td', { class: 'c', 'data-label': ROLE_LABEL[r] },
+          tick(on[r].has(t.name), `${t.name}: ${ROLE_LABEL[r]}`, (e) => { if (e.target.checked) on[r].add(t.name); else on[r].delete(t.name); save(r); draw(); }))))))));
+  draw();
 }
 /**
  * One tool service as a fieldset. o: { base (API prefix with /probe, /discover, /connections, /local), conns, locals,
