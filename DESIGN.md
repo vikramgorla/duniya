@@ -97,13 +97,55 @@ Text meets WCAG AA (4.5:1, 3:1 for large text) in both themes; `npm run check:re
 ## Components (in `src/panel/public/app/`: `styles.css`, `core.js` helpers, screen modules)
 
 `card`, `ask()` (the panel's own confirmation: never the browser's `confirm()`, `alert()` or `prompt()`, which
-`check:panel` refuses), `toast(msg, { bad, undo })`, `emptyState(art, title, text, action)`, `skeleton()`,
-`avatar()`, `pulse()`, `tiles` + stat tile, `table.stack` (cards on phones; every `td` has a `data-label`, empty for a full-width
+`check:panel` refuses), `toast(msg, { bad, undo })`, `emptyState(art, title, text, action)`,
+`avatar()`, `pulse()`, `menu()` (⋯), `listDetail()`, `tiles` + stat tile, `table.stack` (cards on phones; every `td` has a `data-label`, empty for a full-width
 cell; `stack flat` for long lists), `.tscroll` (key/value tables that keep their columns), `label.tick` (a checkbox on
 its own with a 40 px tap area), `meter`, `spark(values)`, `pill`, `note`, `seg` (segmented control), `toggle`,
 `btn` (`primary`, `danger`, `small`), `number-card`, `feed`, `bubble` (test console), `spinner`, `modelSelect()`
 (Auto / provider · Auto / specific model), `field(label, input, hint)`, `.qa-row` + `.qa-preview` (an editable row of
 user-written text with a live *Preview* filled with sample values; rows stack on phones).
+
+## Density and layout (064)
+
+Calm and compact: say more with less chrome.
+
+- **Rows before cards.** A simple item is one row: mark or avatar · name · short status in muted small text · chevron
+  (`.lrow`, 44 px tall on desktop, 52 px on phones). A card is for a whole section, never for a single fact.
+- **No boxes in boxes.** Inside a card, separate items with a hairline (`border-top`), not a nested bordered box.
+  Cards use 16–18 px padding and 12 px gaps.
+- **Secondary information** goes in muted small text on the same row. **Secondary actions** go behind a ⋯ menu
+  (`menu(label, …buttons)`), or onto the item's page, never in a row of buttons. A row shows at most one primary
+  action.
+- **Progressive disclosure.** Show what is needed every day. The rest goes under *More settings* in place, an
+  *Advanced* `<details>`, or the item's page.
+- **List → page** (`listDetail()` in `listdetail.js`).
+  - A list of rows, grouped under eyebrow titles, and the page of the chosen row.
+  - On wide screens: two panes, with the list sticky on the left.
+  - On phones: the list, then the page pushed over it with a back arrow.
+  - Deep links are `#<screen>/<id>`; Find anything and the back button work.
+  - Adding something is one row at the end of its list ("Add a provider").
+  - Used by Models, Settings and Backups. Agents → editor and Chats → *More settings* follow the same idea.
+- **Touch:** every target is at least 44 px on phones (40 px is the hard floor that `check:responsive` enforces).
+
+## Names (064)
+
+Names are short and familiar, and the same everywhere: the panel, the admin MCP tools, activity, docs and the website.
+The one source is `src/panel/public/app/names.js` (`PROVIDER_NAMES`, `accountName()`, `modelName()`). The server uses
+it for the names its API returns, and panel modules import it.
+
+- Providers: **ChatGPT**, **Claude**, **OpenAI**, **GitHub Copilot**, **OpenRouter**, and **Custom (OpenAI-compatible)**
+  only where a generic endpoint must be named. No explanations in brackets: how you connect (sign in or key) belongs
+  on the provider's page.
+- Accounts: the provider's name, with the label only when there are several accounts: "ChatGPT · work".
+- Models: as people know them ("GPT-5.5", "Claude Sonnet 4.5"). The provider's own display name wins; a raw id is
+  tidied. The raw id appears only as small print on detail pages.
+
+## Meters (064)
+
+`meter(percent)` is a 6 px track; the fill is ink in light mode and lime in dark mode. From 85 % the fill turns red
+(`hot`). On a list row a 3 px `lmeter` sits under the short status ("62% of 5-hour limit"). A provider's page shows a
+**Plan usage** section: one meter per limit with "N% used" and "resets …". The data is what the provider reports
+(`limits` on the account, or Copilot's premium requests) and is never made up. Without data the section is hidden.
 
 ## Confirmations (064)
 
@@ -133,8 +175,11 @@ action that already asked for it. It is a centred dialog on wide screens and a b
   a bigger screen, not a tab (Secrets lives in Settings).
 - **Find anything** (`openPalette()`): `/` or ⌘K / Ctrl+K, or the search button in the header. Every new screen,
   Settings section (`SETTINGS_SECTIONS`) or frequent action should be findable there.
-- **Deep links**: `#tab/<section>` scrolls to the element with `data-jump="<section>"` and flashes it once. Give new
-  sections a `data-jump`; an old address that moved goes in `MOVED`.
+- **Deep links**:
+  - On list → page screens, `#tab/<id>` opens that page (Models, Settings, Backups). A new Settings section goes in
+    `SETTINGS_SECTIONS` (Find anything) and in `SETTINGS_GROUPS`, with its icon and one-line description.
+  - Elsewhere, `#tab/<section>` scrolls to the element with `data-jump="<section>"` and flashes it once.
+  - An old address that moved goes in `MOVED`.
 - **Getting started** is the one first-run guide: the current step opens in place with its action (no tab-hopping);
   steps can be skipped; it ends with an *All set* card and then disappears. Don't add a second checklist or wizard.
 - **Empty states teach**: say what is missing and link to where it is fixed ("WhatsApp is not linked yet… Link
@@ -159,4 +204,7 @@ action that already asked for it. It is a centred dialog on wide screens and a b
 - [ ] No flicker when live updates arrive (status and activity over `/api/events`); no new polling.
 - [ ] Every control has a name, keyboard focus is visible, text meets AA in both themes (`check:responsive`).
 - [ ] Questions use `ask()` with the action named on the button; reversible switches offer Undo.
-- [ ] Empty states use `emptyState()`; first loads show `skeleton()` (the router does this for screens).
+- [ ] Empty states use `emptyState()`; first loads show skeletons (the router does this for screens).
+- [ ] Simple items are rows, not cards; secondary actions sit behind ⋯ or on the item's page; lists with pages use
+  `listDetail()` and deep links.
+- [ ] Provider, account and model names come from `names.js`.

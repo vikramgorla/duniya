@@ -91,7 +91,7 @@ export const esc = (x) => String(x).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt
  * A small standalone result page. Used where the browser arrives from another site (Google, GitHub): the
  * SameSite=Strict session cookie is not sent on that navigation, but it is on the same-origin one this page makes.
  */
-export function resultPage(res, { ok, title, message, back = '/', backLabel = 'Back to the panel', autoMs = 1200, status }) {
+export function resultPage(res, { ok, title, message, back = '/', backLabel = 'Back to the panel', autoMs = 1200, status = 0 }) {
   const html = `${pageHead(title)}
 ${ok && autoMs != null ? `<meta http-equiv=refresh content="${Math.max(0, Math.round(Number(autoMs) / 1000))};url=${esc(back)}">` : ''}
 <body><main class=result><div class="mark${ok ? '' : ' bad'}" aria-hidden=true>${ok ? '✓' : '!'}</div><h1>${esc(title)}</h1>

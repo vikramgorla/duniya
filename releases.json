@@ -1,6 +1,11 @@
 {
   "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.25.0": {
+      "breaking": false,
+      "title": "A calmer, denser panel that feels like an app on your phone, with its own questions and plain names",
+      "summary": "On a phone the panel has a tab bar at the bottom (Overview, Chats, Agents, Activity, More). Models, Settings and Backups are short lists that open into pages, side by side on a computer. Chats shows one row per chat, with the rest under More settings. Agents get avatars, and Overview shows live 'reading… / answered' per agent. Activity speaks in plain words with names instead of ids. Questions such as 'Unlink this number?' open in the panel's own dialog, with the action on the button. Switching a chat off or pausing agents can be undone. Providers have short names everywhere (ChatGPT, Claude, OpenAI, GitHub Copilot, OpenRouter). The panel works with a keyboard and a screen reader and meets contrast guidelines in light and dark. Nothing to do on your server."
+    },
     "2.24.0": {
       "breaking": false,
       "title": "The panel opens faster: Overview first, other screens when you open them, only changed files after an update",

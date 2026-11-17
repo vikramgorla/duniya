@@ -59,11 +59,28 @@ An audit of every screen showed several problems, at 375 / 393 / 1440 px, light 
 8. **Stricter server pages.** The result page, the Google address help, the GitHub app hand-off and the MCP sign-in
    callback load `/page.css` and `/page.js`. Their CSP has no `'unsafe-inline'`.
 
+9. **Clean and dense.**
+   - Simple items are rows (mark · name · short status · chevron) instead of cards, with fewer boxes inside boxes and
+     tighter spacing.
+   - A row's secondary actions sit behind a ⋯ menu (WhatsApp numbers).
+   - Models, Settings and Backups are lists that open into pages: two panes on a desktop; on a phone the list, then
+     the page with a back arrow. Deep links are `#models/<id>`, `#settings/<section>` and `#backups/<id>`.
+   - Adding a provider is one "Add a provider" row.
+   - Settings sections are grouped (Agents & chats, People & sign-in, Server, Help), each with an icon and one line.
+10. **Plain names.**
+    - Providers are ChatGPT, Claude, OpenAI, GitHub Copilot and OpenRouter, everywhere: panel, admin MCP tools and
+      activity.
+    - Accounts are "ChatGPT · work" only when there are several.
+    - Models are named as people know them ("GPT-5.5", "Claude Sonnet 4.5").
+    - One source: `src/panel/public/app/names.js`, which the server imports and the panel loads.
+11. **Plan usage fits.** A provider row can show "62% of premium requests" with a thin meter, and its page has a *Plan
+    usage* section (meters with reset times). It uses only what the provider reports (today: Copilot's quota), never
+    made-up numbers.
+
 ## Requirements
 
 - R1 No framework, no build step, no new dependency. No polling and no new timers (pulses fade with CSS).
-- R2 The first-screen budget is raised from 47 KB to 51 KB (brotli), with the reason in `check-panel.mjs`; the total
-  stays within 147 KB.
+- R2 Budgets raised with the reason in `check-panel.mjs`: first screen 47 → 53 KB, total 147 → 152 KB (brotli).
 - R3 `check:responsive` passes at 375 / 393 / 1440 px, light and dark, including the new states: More sheet, open chat
   settings, toasts, a normal / a danger / a details confirmation.
 - R4 DESIGN.md describes the tokens, pills, avatars, confirmations and accessibility rules; the website's screenshots and

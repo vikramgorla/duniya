@@ -42,6 +42,14 @@
   - `check-responsive.mjs`: contrast audit (blended backgrounds, opacity), accessible names via
     `Accessibility.getFullAXTree`, and new states. It now passes the audit through `page.call`.
 
+- **List → page** (`listdetail.js`): rows grouped under eyebrows. A row click uses `pushState` and swaps the page in
+  place; back or a hash change redraws through the router. `known(id)` allows pages without a row (a provider that is
+  not connected yet). On phones, CSS hides the list or the page (`.has-page`).
+- **Names** (`app/names.js`): `PROVIDER_NAMES`, `accountName()`, `modelName()`. `src/core/providers/index.js` imports
+  them; `TYPES` keeps only the secret names.
+- **Plan usage** (`models.js`): `limitsOf(p)` reads `p.limits` (future server field) or the Copilot quota;
+  `planUsage()` and the row `lmeter`.
+
 ## Small servers
 
 Static files only; nothing on the server's tick; no new timers or polling.

@@ -10,6 +10,10 @@
 - [x] T008 Accessible names (fields, switches, selects), `fieldError()` inline validation; contrast fixes
 - [x] T009 Automated accessibility in `check:responsive` (names from the accessibility tree, AA contrast)
 - [x] T010 `page.css` / `page.js`, `PAGE_CSP`; result page, Google help, GitHub hand-off, MCP callback without `'unsafe-inline'`; test
+- [x] T012 `listdetail.js` (rows, two panes / pushed page, deep links, back); Models, Settings (grouped, icons), Backups; states in `check:responsive`, shots in `site-shots`
+- [x] T013 Density pass (padding, gaps, flat number rows); ⋯ `menu()` for WhatsApp number actions
+- [x] T014 `names.js` shared by server and panel; provider, account and model names; tests and docs updated
+- [x] T015 Plan usage: row meter and *Plan usage* section from reported limits (Copilot quota); DESIGN.md meters
 - [x] T011 Carry-over: T104/T105 ticked in `specs/063-maintainability/tasks.md`
 
 ## Definition of Done
