@@ -38,9 +38,8 @@ function hostingCard(hosting) {
       h('a', { class: `btn small${primary ? ' primary' : ''}`, href: DOCS + path, target: '_blank', rel: 'noopener' }, 'Open guide')); };
   const known = HOST_GUIDES[p];
   return h('div', { class: 'card', id: 'hosting-help' }, h('h2', {}, 'Hosting help'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, known ? `Runs on ${known[0]}.` : 'Pick where this server runs.'),
-    known ? link(p, true) : [link('oci'), link('gcp'), link('server'), link('docker')],
-    h('p', { class: 'small muted' }, 'Updates are on Overview. Back up before you recreate or remove a server.'),
+    known ? link(p, true) : [h('p', { class: 'small muted', style: 'margin-top:0' }, 'Pick where this server runs.'), link('oci'), link('gcp'), link('server'), link('docker')],
+    h('p', { class: 'small muted' }, 'Back up before you recreate or remove a server. App updates: ', h('a', { href: '#settings/updates' }, 'Settings → Updates'), '.'),
     known ? h('details', {}, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Other hosts'), Object.keys(HOST_GUIDES).filter((k) => k !== p).map((k) => link(k))) : null);
 }
 // 069: Health — how big the data is, what is kept and that the server cleans up by itself. Loaded once per visit.
@@ -64,12 +63,15 @@ function healthCard(x, redraw) {
   const owner = can('owner');
   const num = (k, v) => h('input', { type: 'number', inputmode: 'numeric', name: k, value: v, min: r.limits[k][0], max: r.limits[k][1], style: 'max-width:120px' });
   const F = { messagesDays: num('messagesDays', r.messagesDays), messagesPerChat: num('messagesPerChat', r.messagesPerChat), usageDays: num('usageDays', r.usageDays) };
+  // 073: one summary line; what is kept and how long behind Details
+  const summary = [bytes(x.database.bytes), `${n(x.database.rows.messages)} messages`, x.lastPrune ? `cleaned up ${ago(x.lastPrune.at)} ago` : 'clean-up soon'].join(' · ');
   return h('div', { class: 'card', id: 'health' },
     h('h2', {}, 'Health'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Old data is pruned by itself every hour and the database is kept compact. Summaries, notes, contacts and settings are never pruned.'),
-    state ? h('div', { class: `note ${state[0]}`, role: 'status' }, state[1]) : null,
-    h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {}, rows.map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v)))))),
-    owner ? h('details', { style: 'margin-top:8px' }, h('summary', { class: 'small' }, 'Change how long data is kept'),
+    state ? h('div', { class: `note ${state[0]}`, role: 'status' }, state[1]) : h('p', { class: 'small muted', style: 'margin:0' }, h('span', { class: 'dot ok', 'aria-hidden': 'true' }), ` ${summary}`),
+    h('details', {}, h('summary', { class: 'small' }, 'Details'),
+      h('p', { class: 'small muted' }, 'Old data is pruned by itself every hour. Summaries, notes, contacts and settings are never pruned.'),
+      h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {}, rows.map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v))))))),
+    owner ? h('details', {}, h('summary', { class: 'small' }, 'Change how long data is kept'),
       field('Stored messages: days', F.messagesDays, 'Agents remember older talk through the chat summary.'), field('Stored messages: at most per chat', F.messagesPerChat),
       field('Usage detail: days', F.usageDays, 'Spending caps and the Usage screen need the last month; the weekly summary keeps its own counts.'),
       h('p', { class: 'small muted' }, 'Activity is kept as set in ', h('a', { href: '#settings/logging' }, 'Settings → Activity log'), '.'),
@@ -98,8 +100,9 @@ export async function renderServer() {
       tile('Network', h('div', { class: 'stat' }, bytes(x.network?.rxRate || 0), h('small', {}, '/s in')), `${bytes(x.network?.txRate || 0)}/s out · total ${bytes(x.network?.rx)} in`, spark(hist.map((p) => p.rx + p.tx))),
       tile('Uptime', h('div', { class: 'stat', style: 'font-size:24px' }, ago(Date.now() - x.uptimeSec * 1000)), `since ${time(Date.now() - x.uptimeSec * 1000)}`,
         x.rebootRequired ? h('a', { class: 'note warn', href: '#server', style: 'display:block', onclick: (e) => { e.preventDefault(); document.getElementById('restart-needed')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }, 'Restart needed to finish updates') : null));
+    // 073: one muted line (host · system · kernel · Node), not a table
     infoBox.replaceChildren(h('h2', {}, 'This server'),
-      h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {}, [['Host', x.host], ['System', x.os], ['Kernel', `${x.kernel} (${x.arch})`], ['App', `pid ${x.app.pid} · Node ${x.app.node}`]].map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v)))))),
+      h('p', { class: 'small muted', style: 'margin:0;overflow-wrap:anywhere' }, [x.host, x.os, `kernel ${x.kernel} (${x.arch})`, `Node ${x.app.node} · pid ${x.app.pid}`].join(' · ')),
       serverSizeNote(S.status?.server, S.status?.mediaQueue),
       Object.keys(x.services).length ? h('div', {}, h('h3', {}, 'Services'), h('div', { class: 'row' }, Object.entries(x.services).filter(([, v]) => v !== 'inactive' && v !== 'unknown' || true).map(([k, v]) => h('span', { class: `pill ${v === 'active' ? 'ok' : v === 'inactive' ? '' : 'bad'}` }, `${k}: ${v}`)))) : h('p', { class: 'small muted' }, 'Service status is available on installs that use systemd.'));
   }
@@ -172,12 +175,16 @@ export async function renderServer() {
     const r = await api('GET', `/api/system/logs?unit=${encodeURIComponent(logUnit)}&lines=200`).catch((e) => ({ lines: [], note: e.message }));
     const seg = h('div', { class: 'seg' }, [['whatsapp-agent-duniya', 'App'], ['caddy', 'Web server'], ['cloudflared', 'Tunnel'], ['duniya-ops', 'Maintenance']].map(([u, l]) => h('button', { class: logUnit === u ? 'on' : '', onclick: () => { logUnit = u; logsCard(); } }, l)));
     const pre = h('pre', { style: 'max-height:460px' }, r.lines.length ? r.lines.join('\n') : (r.note || 'No log lines.'));
-    logBox.replaceChildren(h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Logs'), h('button', { class: 'btn small', onclick: logsCard }, 'Refresh')),
-      h('div', { style: 'margin:10px 0;overflow-x:auto' }, seg), pre);
+    logBox.replaceChildren(h('details', { class: 'logs', open: true, ontoggle: (e) => { if (!e.target.open) drawLogsRow(); } }, h('summary', {}, h('h2', { style: 'margin:0;display:inline' }, 'Logs')),
+      h('div', { class: 'row spread', style: 'margin-top:10px' }, h('div', { style: 'overflow-x:auto' }, seg), h('button', { class: 'btn small', onclick: logsCard }, 'Refresh')), pre));
     pre.scrollTop = pre.scrollHeight;
   }
+  /** 073: Logs start as one row; they load when opened. */
+  function drawLogsRow() {
+    logBox.replaceChildren(h('details', { class: 'logs', ontoggle: (e) => { if (e.target.open) logsCard(); } }, h('summary', {}, h('h2', { style: 'margin:0;display:inline' }, 'Logs'), h('span', { class: 'small muted' }, ' · app, web server, tunnel, maintenance'))));
+  }
   const health = (x) => { if (x) healthBox.replaceChildren(healthCard(x, health)); };
-  await tiles(); api('GET', '/api/server/health').then(health).catch(() => {}); opsCard(); logsCard();
+  await tiles(); api('GET', '/api/server/health').then(health).catch(() => {}); opsCard(); if (can('admin')) drawLogsRow();
   serverTimer = setInterval(tiles, 10000);
 }
 

@@ -1,11 +1,12 @@
 // Settings screen: every section (tool services, owner assistant, users, sign-in, web access, logging, …). Module of the panel (063).
 // ---------- secrets ----------
-import { $, S, ago, api, ask, can, copyBtn, copyRow, extLink, field, fieldError, gLogo, h, icon, refreshStatus, splitLines, toast, toggle, tryApi } from './core.js';
+import { $, S, ago, api, ask, can, copyBtn, copyRow, extLink, field, fieldError, gLogo, h, icon, refreshStatus, splitLines, time, toast, toggle, tryApi } from './core.js';
 import { browseButton, registrySettingsBox } from './registry.js';
 import { listDetail } from './listdetail.js';
 import { releaseList } from './releases.js';
-import { SETTINGS_SECTIONS, SIZE_LABEL, SMALL_MODE_LINK, loadModels, modelSelect, openAgent } from './shared.js';
+import { SETTINGS_SECTIONS, SIZE_LABEL, SMALL_MODE_LINK, loadModels, modelSelect, openAgent, plural } from './shared.js';
 import { globRe, markSaved, serverConfig, serverState, toolServiceEditor } from './tool-editor.js';
+import { renderUpdates } from './updates.js';
 /** Settings → Secrets (062: was its own tab). Redraws itself after a change. */
 async function secretsCard() {
   const rows = await api('GET', '/api/secrets');
@@ -57,6 +58,8 @@ export async function renderSettings() {
     'my-google': S.google || me.google ? myGoogleCard(me) : null,
     logging: lg ? loggingCard(lg) : null,
     'small-mode': smallModeCard(S.status?.server),
+    // 073: the whole update story (Overview shows one calm row)
+    updates: can('owner') ? updatesPage() : null,
     'getting-started': can('admin') && checklist ? h('div', { class: 'card' }, h('h2', {}, 'Getting started'),
       h('p', { class: 'small muted', style: 'margin-top:0' }, checklist.complete ? `All ${checklist.total} steps are done.` : checklist.dismissed ? `Hidden from Overview, ${checklist.done} of ${checklist.total} steps done.` : `On Overview, ${checklist.done} of ${checklist.total} steps done.`),
       checklist.dismissed && !checklist.complete ? h('button', { class: 'btn', onclick: () => tryApi(async () => { S.checklist = await api('PUT', '/api/checklist', { dismissed: false }); location.hash = 'overview'; }) }, 'Show on Overview again') : null) : null,
@@ -72,16 +75,40 @@ export async function renderSettings() {
     groups: SETTINGS_GROUPS.map(([g, ids]) => ({ title: g, items: ids.filter((id) => by[id]).map((id) => ({ id, name: title[id], sub: SECTION_SUB[id], mark: h('span', { class: `lmark ${SECTION_ICON[id][1]}`, 'aria-hidden': 'true' }, icon(SECTION_ICON[id][0])) })) })) }));
 }
 const SETTINGS_GROUPS = [['Agents & chats', ['tool-services', 'owner-assistant', 'direct-messages', 'privacy-notice', 'photos-voice']],
-  ['People & sign-in', ['users', 'sign-in', 'google', 'assistants', 'password', 'my-google']], ['Server', ['web-access', 'secrets', 'logging', 'small-mode']],
+  ['People & sign-in', ['users', 'sign-in', 'google', 'assistants', 'password', 'my-google']], ['Server', ['updates', 'web-access', 'secrets', 'logging', 'small-mode']],
   ['Help', ['getting-started', 'whatsapp-helpers', 'release-notes']]];
 const SECTION_ICON = { 'tool-services': ['models', 'c4'], 'owner-assistant': ['agents', 'c5'], 'direct-messages': ['chats', 'c3'], 'privacy-notice': ['shield', 'c3'], 'photos-voice': ['image', 'c2'],
   users: ['contacts', 'c4'], 'sign-in': ['lock', 'c0'], google: ['globe', 'c4'], assistants: ['agents', 'c1'], password: ['secrets', 'c0'], 'my-google': ['contacts', 'c0'],
-  'web-access': ['globe', 'c3'], secrets: ['secrets', 'c1'], logging: ['activity', 'c0'], 'small-mode': ['server', 'c0'], 'getting-started': ['overview', 'c5'], 'whatsapp-helpers': ['chats', 'c0'], 'release-notes': ['notes', 'c2'] };
+  'web-access': ['globe', 'c3'], secrets: ['secrets', 'c1'], logging: ['activity', 'c0'], 'small-mode': ['server', 'c0'], updates: ['refresh', 'c5'], 'getting-started': ['overview', 'c5'], 'whatsapp-helpers': ['chats', 'c0'], 'release-notes': ['notes', 'c2'] };
 const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assistant': 'Your own chat, alerts, weekly summary', 'direct-messages': 'Direct messages, earlier messages',
   'privacy-notice': 'What groups are told', 'photos-voice': 'Pictures, voice notes, speech', users: 'Who can use this panel', 'sign-in': 'Passwords or Google only',
   google: 'Google sign-in client', assistants: 'ChatGPT, Claude and other MCP clients', password: 'Change your password', 'my-google': 'Link your Google account',
-  'web-access': 'Domain, HTTPS, who may open the panel', secrets: 'Keys and tokens', logging: 'What is recorded, for how long', 'small-mode': 'Heavier features on a small server',
+  'web-access': 'Domain, HTTPS, who may open the panel', secrets: 'Keys and tokens', logging: 'What is recorded, for how long', 'small-mode': 'Heavier features on a small server', updates: 'Version, automatic updates, last update',
   'getting-started': 'The first-run guide', 'whatsapp-helpers': 'Commands in WhatsApp', 'release-notes': "What's new in each version" };
+
+/** Settings → Updates (073): the status line and actions come from updates.js (which also draws Overview's one row);
+ *  the last update with its backup, the settings and Restart service are only here. */
+function updatesPage() { const box = h('div', {}); renderUpdates(box, { page: updatesCard }); return box; }
+function updatesCard(u, { line, check, reviewBtn, updateBtn, docker }) {
+  const st = u.status || {}; const d = u.decision; const lr = st.lastResult;
+  const mode = h('select', { 'aria-label': 'Updates' }, ['notify', 'auto', 'off'].map((m) => h('option', { value: m, selected: u.settings.mode === m }, { notify: 'Notify me', auto: 'Install automatically', off: 'Off' }[m])));
+  const channel = h('select', { 'aria-label': 'Release channel' }, ['stable', 'main'].map((m) => h('option', { value: m, selected: u.settings.channel === m }, m === 'stable' ? 'Stable releases' : 'Latest (main)')));
+  const at = h('input', { value: u.settings.at, style: 'max-width:90px', 'aria-label': 'Time of day for automatic installs' });
+  const keep = h('input', { type: 'number', min: 1, max: 20, value: u.settings.keepPreUpdate ?? 3, style: 'max-width:70px', 'aria-label': 'Pre-update backups to keep' });
+  const notes = d ? h('div', { class: 'small', style: 'margin-top:4px' }, d.steps.map((x) => `v${x.version}: ${x.title}`).join(' · '),
+    d.snoozedUntil ? h('div', { class: 'muted' }, `Reminder snoozed until ${time(d.snoozedUntil)}`) : d.dismissed ? h('div', { class: 'muted' }, 'Dismissed: no more reminders for this release') : null)
+    : st.available && st.notes?.length ? h('div', { class: 'small', style: 'margin-top:4px' }, `${plural(st.notes.length, 'release')} · newest: ${st.notes[0].title}`) : null;
+  return h('div', { class: 'card' }, h('h2', {}, 'Updates'),
+    docker ? h('div', { class: 'note' }, 'Docker install: update with  docker compose pull && docker compose up -d') : null,
+    h('div', { class: 'upd-main' }, line, notes),
+    lr ? h('p', { class: 'small muted' }, lr.ok ? `Last update: ${lr.from ? `${lr.from} → ` : ''}${lr.target} on ${time(lr.at)}${lr.backup ? ` · backup ${lr.backup}` : ''}` : `Last update failed on ${time(lr.at)}; the previous version kept running.`) : null,
+    h('div', { class: 'row', style: 'margin-top:8px' }, reviewBtn, updateBtn, h('button', { class: 'btn small', onclick: check }, 'Check now'), h('a', { class: 'btn small ghost', href: '#settings/release-notes' }, 'Release notes')),
+    h('div', { class: 'sblock' }, h('h3', {}, 'Settings'),
+      h('div', { class: 'row', style: 'margin-top:8px' }, mode, channel, at, h('button', { class: 'btn', onclick: () => tryApi(() => api('PUT', '/api/updates/settings', { mode: mode.value, channel: channel.value, at: at.value, keepPreUpdate: Number(keep.value) }), 'Saved') }, 'Save')),
+      h('p', { class: 'small muted' }, 'Automatic installs never cross a breaking release: you are asked first, here and on WhatsApp. ',
+        u.backup ? 'A local backup is made before every update; keep the last ' : 'Set a backup passphrase under Backups to get a local backup before every update; keep the last ', keep, ' pre-update backups.')),
+    h('div', { class: 'sblock' }, h('button', { class: 'btn small', onclick: async () => (await ask({ title: 'Restart the service?', text: 'Agents pause for a few seconds; the page reloads by itself.', ok: 'Restart service', danger: true })) && api('POST', '/api/system/restart').catch(() => {}).then(() => { toast('Restarting…'); setTimeout(() => location.reload(), 6000); }) }, 'Restart service')));
+}
 
 // ---------- Settings → Server: Small server mode (055), one switch for heavier features on a small server ----------
 function smallModeCard(sv) {

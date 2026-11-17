@@ -115,6 +115,13 @@ export function menu(label, ...items) {
   return d;
 }
 document.addEventListener('click', (e) => { for (const m of document.querySelectorAll('details.menu[open]')) if (!m.contains(e.target)) m.open = false; });
+// 073: focus rings only while the keyboard is in use (styles.css `.kbd`): Tab, arrows, Esc — or Enter / Space outside
+// a text field — turn them on; any tap or click turns them off. Typing in a field (phone keyboards too) changes nothing.
+const NAV_KEYS = new Set(['Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Escape', 'Home', 'End', 'PageUp', 'PageDown']);
+addEventListener('keydown', (e) => {
+  if (NAV_KEYS.has(e.key) || ((e.key === 'Enter' || e.key === ' ') && !e.target?.closest?.('input, textarea, select, [contenteditable]'))) document.documentElement.classList.add('kbd');
+}, true);
+addEventListener('pointerdown', () => document.documentElement.classList.remove('kbd'), true);
 /** Agent (or chat) avatar (064): initials on one of the five "people" colours, the same colour for the same id. */
 export function avatar(name, id = name, size = '') {
   const words = String(name || '?').replace(/[^\p{L}\p{N} ]/gu, ' ').trim().split(/\s+/);

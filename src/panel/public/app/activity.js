@@ -14,11 +14,6 @@ const EVENTS = {
   'backup.done': ['Backup', 'ok', 'backups'], 'backup.restore': ['Restore', 'warn', 'backups'], 'backup.settings': ['Backups', '', 'backups'], 'mcp.call': ['Tool service', 'info', 'settings'], 'mcp.register': ['Tool service', '', 'settings'],
   'owner.question': ['Ask', 'info', 'search'], 'owner.action': ['Owner assistant', '', 'agents'], 'owner.tool': ['Owner assistant', '', 'agents'], 'owner.link': ['Owner assistant', '', 'agents'],
 };
-/** Chat names for the feed (064): chat ids are never shown when the chat list knows the name. */
-export async function loadChatNames() {
-  const chats = await api('GET', '/api/chats').catch(() => null);
-  if (chats) S.chatNames = new Map(chats.map((c) => [c.id, c.name || (c.phone ? `+${c.phone}` : '')]));
-}
 // 066: the summary without the words the type marker already says ("Stayed quiet: chat is off" → "Chat is off").
 function subjectOf(summary, label) {
   const s = String(summary || '');
@@ -27,8 +22,9 @@ function subjectOf(summary, label) {
   const rest = plainTool(s.slice(m[0].length));
   return rest ? rest[0].toUpperCase() + rest.slice(1) : label;
 }
-// #136: entries written before 2.27 start with a raw tool name ("chat_recap", "check_for_updates · admin via Claude")
-const plainTool = (s) => s.replace(/^[a-z][a-z0-9]*_[a-z0-9_]+(?=$|\s)/i, (t) => toolPhrase(t.toLowerCase()));
+// #136: entries written before 2.27 start with a raw tool name ("chat_recap", "check_for_updates · admin via Claude");
+// 073: also an MCP tool ("transport:connections — …" → "Connections (transport) — …")
+const plainTool = (s) => s.replace(/^(?:[a-z][\w-]*:[a-z][\w-]*|[a-z][a-z0-9]*_[a-z0-9_]+)(?=$|\s)/i, (t) => toolPhrase(t.toLowerCase()));
 const dayKey = (ts) => new Date(ts).toDateString();
 /** "Today", "Yesterday" or "Mon 16 Nov". */
 function dayLabel(ts) {
@@ -43,7 +39,7 @@ const dayHead = (ts) => h('li', { class: 'fday', 'data-day': dayKey(ts) }, h('h3
 function feedItem(a) {
   const [label, tone = '', ic = 'activity'] = EVENTS[a.type] || [a.type];
   const agentName = a.agent ? S.status?.agents?.find((b) => b.id === a.agent)?.name || (a.agent === 'owner-assistant' ? 'Owner assistant' : a.agent) : '';
-  const chatName = a.chat ? S.chatNames?.get(a.chat) || `chat …${a.chat.split('@')[0].slice(-4)}` : '';
+  const chatName = a.chat ? a.chatName || 'a chat' : ''; // 073: the server names every entry's chat (never its id)
   const open = h('div', { class: 'fopen hide', onclick: (e) => e.stopPropagation() });
   const fill = async () => open.replaceChildren(...(await import('./answers.js')).entryOpen(a, chatName, agentName));
   const li = h('li', { class: `fitem ${tone}`, tabindex: '0', 'aria-expanded': 'false', 'data-day': dayKey(a.ts),
@@ -82,7 +78,7 @@ export function feedPrepend(list, a, max = 0) {
 /** 072: #activity/chat=<id> shows one chat's activity (the chat page's *Activity* row); ✕ shows everything again. */
 const chatFilter = () => decodeURIComponent((/^#activity\/chat=(.+)$/.exec(location.hash) || [])[1] || '');
 export async function renderActivity() {
-  const [agents] = await Promise.all([api('GET', '/api/agents'), loadChatNames()]);
+  const agents = await api('GET', '/api/agents');
   S.feedChat = chatFilter();
   const q = () => `/api/activity?limit=200&agent=${encodeURIComponent(S.feedAgent)}&chat=${encodeURIComponent(S.feedChat)}`;
   const sel = h('select', { class: 'compact', 'aria-label': 'Show activity of', onchange: async (e) => { S.feedAgent = e.target.value; await load(); } },
@@ -90,13 +86,14 @@ export async function renderActivity() {
   const list = h('ul', { class: 'feed', id: 'feed' });
   const more = h('button', { class: 'btn', onclick: async () => { const last = [...list.querySelectorAll('.fitem')].at(-1)?.dataset.id; appendFeed(list, await api('GET', `${q()}&before=${last || 0}`)); } }, 'Load older');
   const empty = h('div', {});
-  const name = S.chatNames?.get(S.feedChat) || 'this chat';
-  const chip = S.feedChat ? h('div', { class: 'row fchat' }, h('a', { class: 'pill raw', href: `#chats/${encodeURIComponent(S.feedChat)}` }, name),
+  const nameEl = h('a', { class: 'pill raw', href: `#chats/${encodeURIComponent(S.feedChat)}` }, 'this chat');
+  const chip = S.feedChat ? h('div', { class: 'row fchat' }, nameEl,
     h('a', { class: 'btn small ghost', href: '#activity', 'aria-label': 'Show all chats' }, '✕ All chats')) : null;
   $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'Activity'), sel), chip,
     h('p', { class: 'small muted', style: 'margin:4px 0 6px' }, 'Live, newest first. Tap an entry for links and details.'), list, empty, h('div', { style: 'margin-top:10px' }, more)));
   async function load() {
     const rows = await api('GET', q());
+    const name = rows.find((r) => r.chatName)?.chatName || 'this chat'; nameEl.textContent = name;
     list.replaceChildren(); appendFeed(list, rows); more.classList.toggle('hide', rows.length < 200);
     empty.replaceChildren(rows.length ? '' : S.feedChat ? emptyState('activity', `Nothing recorded in ${name}`, 'Messages, answers and changes in this chat show up here.')
       : emptyState('activity', 'Nothing happened yet', 'Messages your agents read and send, tool calls and changes show up here as they happen.'));

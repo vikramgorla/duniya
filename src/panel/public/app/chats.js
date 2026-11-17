@@ -2,7 +2,7 @@
 import { $, S, ago, api, ask, avatar, can, copyRow, emptyState, field, h, icon, menu, refreshStatus, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
 import { answerActions } from './answers.js';
 import { chatFallbackEditor, chatFallbackLine } from './fallback.js';
-import { silenceFix } from './quiet.js';
+import { quietReason } from './quiet.js';
 import { listDetail } from './listdetail.js';
 import { highlight, searchWords } from './find.js';
 import { helpLink, loadModels, modelSelect, plural, quietLine, usageLine } from './shared.js';
@@ -154,7 +154,9 @@ function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
   function home() {
     const savePrefs = (patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${enc}/prefs`, patch)); refresh(c); return true; }, 'Saved');
     const agentLink = h('span', {});
-    const drawLink = () => agentLink.replaceChildren(c.agent ? h('a', { href: `#agents/${encodeURIComponent(c.agent)}` }, `Open ${agents.find((x) => x.id === c.agent)?.name || 'agent'} ›`) : null);
+    // 073: chat ↔ person — a direct chat links to the person's contact page
+    const drawLink = () => agentLink.replaceChildren(c.agent ? h('a', { href: `#agents/${encodeURIComponent(c.agent)}` }, `Open ${agents.find((x) => x.id === c.agent)?.name || 'agent'} ›`) : null,
+      !c.isGroup && c.phone && can('admin') ? [c.agent ? ' · ' : '', h('a', { href: `#contacts/${encodeURIComponent(c.phone)}` }, 'Contact page ›')] : null);
     drawLink();
     const agentSel = h('select', { disabled: !admin, onchange: (e) => tryApi(async () => {
       // 062: choosing an agent for a chat that is Off switches it on too (one step instead of two)
@@ -191,8 +193,7 @@ function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
         intro ? menu(`More actions for ${name}`, intro) : null),
       c.waiting ? h('p', { class: 'small', style: 'color:var(--warn)' }, 'Waiting for the first message: it goes to the agent chosen here.') : null,
       !c.enabled ? h('p', { class: 'small muted' }, `Off: ignored, nothing stored${c.ignored ? ` (${plural(c.ignored, 'message')} since restart)` : ''}. Choosing an agent switches it on.`) : null,
-      quiet.length ? h('div', { class: 'sblock' }, h('h3', {}, 'Why it stayed quiet'), quiet.slice(0, 3).map((q) => h('div', { class: 'quiet row spread' },
-        h('span', { class: `small${q.reason === 'not_addressed' ? ' muted' : ''}`, style: q.reason === 'not_addressed' ? '' : 'color:var(--warn)', title: q.explain }, `${quietLine(q)} · ${q.explain}`), silenceFix(q, () => renderChats(), { onChats: true })))) : null,
+      quiet.length ? h('div', { class: 'sblock' }, h('h3', {}, 'Why it stayed quiet'), quiet.slice(0, 3).map((q) => quietReason(q, () => renderChats(), { onChats: true }))) : null,
       h('div', { class: 'sblock' }, field('Agent', agentSel), agentLink),
       h('div', { class: 'lgroup' }, h('ul', {}, rows)),
       h('div', { class: 'sblock' }, h('h3', {}, 'Settings'), h('div', { class: 'grid2' },

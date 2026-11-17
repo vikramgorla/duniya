@@ -4,7 +4,7 @@ import { env } from './config.js';
 import { addPending, takePending, peekPending, dropPending } from './db.js';
 import { chat as modelChat, effectiveFallback } from './providers/index.js';
 import { REASON_TEXT } from './providers/errors.js';
-import { modelName } from '../panel/public/app/names.js';
+import { modelName, toolPhrase } from '../panel/public/app/names.js';
 import { getChatPrefs } from './chat-prefs.js';
 
 /** The model for a chat: the chat's own choice (auto, provider:auto or provider:model) or the agent's. */
@@ -176,8 +176,8 @@ export async function runAgent(ctx) {
       let content = String(out.text ?? '').slice(0, 12000);
       activity(out.isError ? 'tool.error' : 'tool.call', {
         agent: agent.id, chat,
-        summary: `${m?.fq || call.name} (${Date.now() - started} ms)${out.isError ? ' failed' : ''}`,
-        detail: { input: call.input, output: content.slice(0, 2000), role },
+        summary: `${toolPhrase(m?.fq || call.name)} (${Date.now() - started} ms)${out.isError ? ' failed' : ''}`, // 073: plain words, the raw name is in detail.tool
+        detail: { tool: m?.fq || call.name, input: call.input, output: content.slice(0, 2000), role },
       });
 
       if (!out.isError && m?.kind === 'mcp' && agent.confirm && matchesAny(m.fq, [agent.confirm.preview])) {
