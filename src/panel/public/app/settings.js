@@ -2,6 +2,7 @@
 // ---------- secrets ----------
 import { $, S, ago, api, ask, can, copyBtn, copyRow, extLink, field, fieldError, gLogo, h, icon, refreshStatus, splitLines, time, toast, toggle, tryApi } from './core.js';
 import { browseButton, registrySettingsBox } from './registry.js';
+import { channelItems, channelPage } from './channels.js';
 import { listDetail } from './listdetail.js';
 import { releaseList } from './releases.js';
 import { SETTINGS_SECTIONS, SIZE_LABEL, SMALL_MODE_LINK, loadModels, modelSelect, openAgent, plural } from './shared.js';
@@ -71,8 +72,11 @@ export async function renderSettings() {
   };
   // 064: grouped sections (icon · name · one line) → the section's page; two panes on wide screens, list → page on phones
   const title = Object.fromEntries(SETTINGS_SECTIONS.map(([id, t]) => [id, t]));
+  // 075: Channels first — one row per channel this server has, each with its page
+  const channels = channelItems(S.status);
+  for (const c of channels) by[c.id] = channelPage(c.id);
   $('#main').replaceChildren(listDetail({ screen: 'settings', title: 'Settings', page: (id) => by[id],
-    groups: SETTINGS_GROUPS.map(([g, ids]) => ({ title: g, items: ids.filter((id) => by[id]).map((id) => ({ id, name: title[id], sub: SECTION_SUB[id], mark: h('span', { class: `lmark ${SECTION_ICON[id][1]}`, 'aria-hidden': 'true' }, icon(SECTION_ICON[id][0])) })) })) }));
+    groups: [{ title: 'Channels', items: channels }, ...SETTINGS_GROUPS.map(([g, ids]) => ({ title: g, items: ids.filter((id) => by[id]).map((id) => ({ id, name: title[id], sub: SECTION_SUB[id], mark: h('span', { class: `lmark ${SECTION_ICON[id][1]}`, 'aria-hidden': 'true' }, icon(SECTION_ICON[id][0])) })) }))] }));
 }
 const SETTINGS_GROUPS = [['Agents & chats', ['tool-services', 'owner-assistant', 'direct-messages', 'privacy-notice', 'photos-voice']],
   ['People & sign-in', ['users', 'sign-in', 'google', 'assistants', 'password', 'my-google']], ['Server', ['updates', 'web-access', 'secrets', 'logging', 'small-mode']],

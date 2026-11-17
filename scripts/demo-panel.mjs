@@ -217,10 +217,13 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const contacts = await imp('src/core/contacts.js');
   const globalMcp = await imp('src/core/global-mcp.js');
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
-  const { createChannelRegistry } = await imp('src/channels/registry.js');
+  const { createHub } = await imp('src/channels/hub.js');
+  const { createWhatsAppAdapter } = await imp('src/channels/whatsapp/index.js');
+  // 075: the real hub and WhatsApp adapter over fake sessions (one per number)
+  const createChannelHub = (factory) => createHub({ loaders: { whatsapp: async () => createWhatsAppAdapter({ factory }) } });
   const { createRouter, createHistoryHandler } = await imp('src/core/router.js');
 
-  if (empty) return startEmpty({ imp, createChannelRegistry, createRouter, createHistoryHandler });
+  if (empty) return startEmpty({ imp, createChannelHub, createRouter, createHistoryHandler });
 
   const now = Date.now(); const MIN = 60000; const H = 60 * MIN; const D = 24 * H;
   const P = (n) => `417900000${String(n).padStart(2, '0')}`; // +41 79 000 00 NN — obviously fake
@@ -435,7 +438,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const { backupRoutes } = await imp('src/panel/routes/backups.js');
   const { updateRoutes } = await imp('src/panel/routes/updates.js');
   const { startPanel } = await imp('src/panel/server.js');
-  const wa = createChannelRegistry({ factory });
+  const wa = createChannelHub(factory);
   const panel = startPanel({ channel: wa, extend: [providerRoutes, (r) => backupRoutes(r, { restart: () => {} }), (r) => updateRoutes(r, { restart: () => {} })] });
   await new Promise((r) => (panel.listening ? r() : panel.once('listening', r)));
   store.createUser({ username: 'priya', email: 'priya@example.org', role: 'admin', password: 'demo-password-456' });
@@ -443,7 +446,8 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   // owner assistant (044): the owner's own phone (fake) is linked, so Settings shows "Linked +41 79 000 00 01"
   await imp('src/core/owner-assistant.js');
   db.db.prepare("INSERT OR REPLACE INTO owner_links (tenant_id, user_id, phone, status, code_hash, expires_at, linked_at) SELECT 'default', id, ?, 'linked', NULL, 0, ? FROM users WHERE username = 'admin'").run(P(1), now - 2 * D);
-  await wa.start(createRouter(wa), { onHistory: createHistoryHandler() });
+  await wa.start({ onMessage: createRouter(wa), onHistory: createHistoryHandler() });
+  await wa.upkeep(Date.now() + 61000); // 075: the memory WhatsApp uses is measured a minute after start; the demo has no scheduler
   // #91: Chats shows "Loaded 12 earlier messages" (rides) and "Loading recent messages from your phone…" (Family)
   prefs.noteLatestKeys([2, 5, 6, 7].map((n) => ({ chat: G(n), isGroup: true, msgId: `last-${n}`, participant: `${P(n)}@s.whatsapp.net`, ts: now - n * H })));
   const phoneHistory = await imp('src/core/history-load.js');
@@ -454,9 +458,10 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   return { base: `http://127.0.0.1:${panel.address().port}`, dataDir };
 }
 
-/** 062: a fresh install, to see the true first run. One number waiting for its QR scan; a pairing code links it after
+/** 062: a fresh install, to see the true first run. 075: WhatsApp is not set up (nothing loaded) until Link WhatsApp;
+ *  then one number waits for its QR scan; a pairing code links it after
  *  3 s, with three groups and a direct chat. The models answer as in the full demo once a provider is connected. */
-async function startEmpty({ imp, createChannelRegistry, createRouter, createHistoryHandler }) {
+async function startEmpty({ imp, createChannelHub, createRouter, createHistoryHandler }) {
   await (await imp('src/core/agents.js')).loadAgents();
   const QR = (await import('qrcode')).default;
   const { bus } = await imp('src/core/events.js');
@@ -480,10 +485,10 @@ async function startEmpty({ imp, createChannelRegistry, createRouter, createHist
   });
   const { providerRoutes } = await imp('src/panel/routes/providers.js');
   const { startPanel } = await imp('src/panel/server.js');
-  const wa = createChannelRegistry({ factory });
+  const wa = createChannelHub(factory);
   const panel = startPanel({ channel: wa, extend: [providerRoutes] });
   await new Promise((r) => (panel.listening ? r() : panel.once('listening', r)));
-  await wa.start(createRouter(wa), { onHistory: createHistoryHandler() });
+  await wa.start({ onMessage: createRouter(wa), onHistory: createHistoryHandler() }); // nothing set up yet: Link WhatsApp loads it
   return { base: `http://127.0.0.1:${panel.address().port}`, dataDir: process.env.DATA_DIR };
 }
 

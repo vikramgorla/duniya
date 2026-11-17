@@ -128,15 +128,15 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 
 | Path | What lives there |
 |---|---|
-| `src/index.js` | Startup: data dir, WhatsApp channels, router, panel, scheduler |
-| `src/channels/` | `whatsapp.js` (Baileys linked device), `registry.js` (several numbers) |
+| `src/index.js` | Startup: data dir, the channel hub, router, panel, scheduler |
+| `src/channels/` | `index.js` (the catalogue: channel ids, `isGroup`/`phoneOf`/`chatKey` helpers, capabilities; no adapter code), `hub.js` (loads an adapter with `import()` only when its channel is set up and on, routes every chat action by chat id, status, upkeep, memory per channel), `whatsapp/` (adapter #1: `index.js` several numbers, `session.js` one Baileys linked device, `ids.js` JIDs). See `docs/development.md#adding-a-channel` |
 | `src/core/router.js` | Message routing: allow-list, triggers, roles, rate limits, silence reasons, owner assistant hand-off |
-| `src/core/runner.js`, `tools.js`, `mcp*.js` | Agent turns, tool allow lists, confirm gate, MCP clients (remote, OAuth, local) |
+| `src/core/runner.js`, `tools.js`, `chat-tools.js`, `mcp*.js` | Agent turns, tool allow lists, chat actions by channel capability, confirm gate, MCP clients (remote, OAuth, local) |
 | `src/core/agents.js`, `schema.js`, `ai-builder.js` | Agents as data, validation, the AI helper |
 | `src/core/quick.js`, `welcome.js` | Built-in answers without AI: quick replies, `!help`, FAQ matching; welcome for new group members |
 | `src/core/providers/` | Anthropic, ChatGPT sign-in, Copilot, OpenAI-compatible; `breaker.js` + `fallback-config.js` (fallback, accounts) |
 | `src/core/media*.js`, `speech-*.js`, `resources.js` | Photos & voice, media queue, on-server speech, small-server guardrails |
-| `src/core/memory.js`, `contacts.js`, `chat-prefs.js` | Chat and shared memory, contacts, per-chat settings (on/off, private) |
+| `src/core/memory.js`, `contacts.js`, `people.js`, `chat-prefs.js` | Chat and shared memory, contacts, people across channels (identities joined by phone), per-chat settings (on/off, private) |
 | `src/core/owner-assistant.js`, `privacy-notice.js`, `owner-alerts.js`, `weekly.js`, `budget.js`, `silences.js` | Owner assistant, privacy notice, alerts, weekly summary, spending caps, why-quiet |
 | `src/core/backup/`, `updates.js`, `system.js`, `webaccess.js` | Backups (GitHub, S3), updates, server metrics, domains & access |
 | `src/core/store.js`, `db.js` | Settings, users, secrets; SQLite (`node:sqlite`) |

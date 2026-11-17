@@ -16,9 +16,9 @@
 
 | Card | What it shows |
 |---|---|
-| **Header** | *Everything is running* or what needs you: WhatsApp numbers, agents live, chats on, changes waiting for a confirm |
+| **Header** | *Everything is running* or what needs you: WhatsApp numbers (the chip opens **Settings → WhatsApp**), agents live, chats on, changes waiting for a confirm |
 | **Ask** | the [owner assistant](owner-assistant.md) as a conversation: "what did the families decide this week?" |
-| **WhatsApp numbers** | each number's state and its direct-message agent ([Connect WhatsApp](whatsapp.md)) |
+| **WhatsApp** | each number and its state; **Details ›** opens **Settings → Channels → WhatsApp** (link, add, switch off — [Connect WhatsApp](whatsapp.md)) |
 | **Control** | **Pause all agents** and a switch per agent, with a live *reading… / answered* pulse; the name opens the agent, **Review** its answers |
 | **Server** | version, memory and one update row: *Up to date · v2.33.0 · checked 2m ago*, **Release notes**, the one action when there is one, ⋯ for **Check now** and the settings ([Backups & updates](backups-and-updates.md#updates)) |
 | **Why agents stayed quiet** | the last 7 days, [below](#why-didnt-it-answer) |

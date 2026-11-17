@@ -59,6 +59,8 @@ function healthCard(x, redraw) {
     ['Usage detail', `${n(x.database.rows.usage)}${x.oldest.usage ? ` · since ${day(x.oldest.usage)}` : ''} · kept ${r.usageDays} days`],
     ['Last clean-up', x.lastPrune ? `${ago(x.lastPrune.at)} ago · ${((k) => (k ? `${n(k)} old rows removed` : 'nothing old to remove'))(x.lastPrune.removed.messages + x.lastPrune.removed.activity + x.lastPrune.removed.usage)}${x.vacuumAt ? ` · compacted ${day(x.vacuumAt)}` : ''}` : 'soon after the app starts'],
     ['Photos & voice queue', q.queued || q.running ? `${q.running} working · ${q.queued} waiting (at most ${q.max})` : 'empty'],
+    // 075: memory per channel (load cost, measured a minute after it starts); a channel that is off or not set up loads nothing
+    ...(x.channels || []).map((c) => [c.label, c.state !== 'on' ? `${c.state === 'off' ? 'off' : 'not set up'} · nothing loaded` : c.measuring ? 'on · memory measured a minute after start' : `on · ${c.memoryMb ? `about ${c.memoryMb} MB` : 'under 1 MB'}`]),
   ];
   const owner = can('owner');
   const num = (k, v) => h('input', { type: 'number', inputmode: 'numeric', name: k, value: v, min: r.limits[k][0], max: r.limits[k][1], style: 'max-width:120px' });

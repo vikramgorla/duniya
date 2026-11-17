@@ -113,6 +113,16 @@ export const fakeNumbers = (sessions, extra = () => ({})) => ({ number, label })
 };
 
 /**
+ * 075: the real channel hub with the real WhatsApp adapter over fake sessions (`factory`, e.g. fakeNumbers(...)), so
+ * messages go through the multi-number and hub paths. Load it after setup() (it reads the test's data dir).
+ */
+export async function fakeWhatsAppHub(factory) {
+  const { createHub } = await import('../src/channels/hub.js');
+  const { createWhatsAppAdapter } = await import('../src/channels/whatsapp/index.js');
+  return createHub({ loaders: { whatsapp: async () => createWhatsAppAdapter({ factory }) } });
+}
+
+/**
  * Answer one MCP request (streamable HTTP, JSON responses) with a fresh fake server: `tools` are names,
  * `call(name)` returns the text result. For tests that host MCP next to their own OAuth endpoints.
  */
@@ -236,6 +246,9 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
     isMember: async (chat, phone) => chat === 'g1@g.us' && phone === '41790000002',
     groupMembers: async (chat) => (chat === 'g1@g.us' ? [{ phone: '41790000001', jid: 'a', admin: true }, { phone: '41790000002', jid: 'b', admin: false }, { phone: '41790000003', jid: 'c', admin: true }, { phone: '', jid: 'x@lid', admin: false }] : []),
     status: async () => ({ status: 'open', me: '41790000099:1@s.whatsapp.net', since: Date.now() }),
+    // 075: the hub's channel list (one WhatsApp channel, on)
+    channels: async () => [{ id: 'whatsapp', label: 'WhatsApp', setup: 'qr', state: 'on', error: '', accounts: 1, connected: 1, memoryMb: 21, measuring: false }],
+    setEnabled: async (id, on) => ({ id, state: on ? 'on' : 'off' }),
   };
   // WhatsApp actions (026): every call recorded as { fn, chat, args }; results look like the real channel's.
   t.waCalls = [];

@@ -1,6 +1,6 @@
 // Prepared direct chats (049, issue #92). The owner sets up a 1:1 chat — agent, on/off, private, model, logging,
 // fallback, spending cap — for a phone number before that person has written. The chat id is the phone form
-// `<digits>@s.whatsapp.net` (prefixed `<number>#` on other WhatsApp numbers, as in src/channels/registry.js).
+// `<digits>@s.whatsapp.net` (prefixed `<number>#` on other WhatsApp numbers, src/channels/whatsapp/ids.js).
 // WhatsApp may deliver that person's first message from their LID (`…@lid`): resolveDirectChat() maps it to the
 // prepared chat by phone (or by the LID WhatsApp told us when the chat was prepared) and keeps an alias, so replies,
 // memory and later lookups all use one chat id. Only settings are stored here, never message text.
@@ -15,6 +15,7 @@ import { activity } from './events.js';
 import { dmNoticeOnce, dmNoticePending } from './privacy-notice.js';
 import { putTtl, takeTtl } from './ttl-store.js';
 import { newToken, sha256 } from './crypto.js';
+import { MAIN, chatKey, splitChat, isLidJid, pnJid, isDirectChat as isDirect, phoneOfChat } from '../channels/whatsapp/ids.js';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS direct_chats (
@@ -27,13 +28,8 @@ db.exec(`
   );
 `);
 
-/** Chat ids across numbers: chats on the first number ("main") keep their plain WhatsApp id, others are "<number>#<jid>". */
-export const MAIN = 'main';
 const INTRO_KIND = 'dm-intro';
 const INTRO_TTL = 10 * 60000;
-export const chatKey = (number, jid) => (number === MAIN ? jid : `${number}#${jid}`);
-export const splitChat = (chat) => { const i = String(chat).indexOf('#'); return i > 0 ? { number: chat.slice(0, i), jid: chat.slice(i + 1) } : { number: MAIN, jid: String(chat) }; };
-const isDirect = (chat) => /@(s\.whatsapp\.net|lid)$/.test(splitChat(chat).jid);
 
 /** A phone number in E.164 form (+41 79 123 45 67, 0041…, spaces/dashes allowed) → digits; throws a 400 otherwise. */
 export function normalizePhone(input) {
@@ -93,8 +89,8 @@ export function resolveDirectChat(msg) {
     if (!chat) {
       const { number, jid } = splitChat(msg.chat);
       const phone = digits(msg.phone);
-      if (jid.endsWith('@lid') && phone) {
-        const target = chatKey(number, `${phone}@s.whatsapp.net`);
+      if (isLidJid(jid) && phone) {
+        const target = chatKey(number, pnJid(phone));
         if (c.prepared.has(target) && !hasOwnEntry(msg.chat)) { chat = target; addAlias(msg.chat, target, 'first message'); }
       }
     }
@@ -146,10 +142,10 @@ const lookWarning = (look) => (look.onWhatsApp === false ? 'This number does not
 
 /** The chat id to prepare: an existing LID chat of this phone that has its own settings, else the phone form. */
 function targetChat(number, phone) {
-  const pn = chatKey(number, `${phone}@s.whatsapp.net`);
+  const pn = chatKey(number, pnJid(phone));
   const alias = load().aliases.get(pn);
   if (alias) return alias;
-  const seenLid = seenChats({ groups: false }).find((c) => c.number === number && c.phone === phone && c.id !== pn && splitChat(c.id).jid.endsWith('@lid'));
+  const seenLid = seenChats({ groups: false }).find((c) => c.number === number && c.phone === phone && c.id !== pn && isLidJid(splitChat(c.id).jid));
   return seenLid && hasOwnEntry(seenLid.id) && !hasOwnEntry(pn) ? seenLid.id : pn;
 }
 
@@ -195,7 +191,7 @@ export async function prepareDirectChat(input = {}, { channel, by = '' } = {}) {
   }
   // A LID chat seen earlier for this phone without settings of its own: same person, same chat from now on.
   for (const c of seenChats({ groups: false })) {
-    if (c.number === n.id && c.phone === d && c.id !== chat && splitChat(c.id).jid.endsWith('@lid') && !hasOwnEntry(c.id)) addAlias(c.id, chat, 'seen before');
+    if (c.number === n.id && c.phone === d && c.id !== chat && isLidJid(splitChat(c.id).jid) && !hasOwnEntry(c.id)) addAlias(c.id, chat, 'seen before');
   }
   const prefs = getChatPrefs(chat);
   const agent = agentForChat(chat);
@@ -212,7 +208,7 @@ function introTarget(chat) {
   if (!agent) throw bad('Assign an agent to this chat first', 'agent', 409);
   if (!agent.enabled) throw bad(`The agent ${agent.name} is switched off`, 'agent', 409);
   const row = load().prepared.get(chat);
-  const phone = row?.phone || (splitChat(chat).jid.endsWith('@s.whatsapp.net') ? digits(splitChat(chat).jid.split('@')[0]) : '');
+  const phone = row?.phone || phoneOfChat(chat);
   return { agent, phone, row };
 }
 const defaultIntro = (agent, name) => {

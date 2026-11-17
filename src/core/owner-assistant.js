@@ -17,7 +17,8 @@ import { weeklyText } from './weekly.js';
 import { sendOwnerAlert } from './owner-alerts.js';
 import { personInfo } from './contacts.js';
 import { chatLabels } from './chat-names.js';
-import { env, digits, clip, iso, isGroup, fail } from './config.js';
+import { env, digits, clip, iso, fail } from './config.js';
+import { isGroup, phoneOf, phoneChat } from '../channels/index.js';
 import { getUser, onUserDeleted, TENANT } from './store.js';
 import { listAgents, agentForChat, getAgent, OWNER_AGENT_ID } from './agents.js';
 import { getChatPrefs, enabledChats, privateChats } from './chat-prefs.js';
@@ -28,7 +29,7 @@ import { friendlyModelError } from './runner.js';
 import { randomInt } from 'node:crypto';
 import { humanCode, sha256 } from './crypto.js';
 import { putTtl, getTtl, takeTtl } from './ttl-store.js';
-import { whatsappChannel, whatsappTools, OWNER_WA_TOOLS } from './whatsapp-tools.js';
+import { chatChannel, chatTools, OWNER_CHAT_TOOLS } from './chat-tools.js';
 import { toolsFor as agentToolsFor } from './tools.js';
 import { WA_READ_ONLY } from './runner.js';
 import { inboundKind, prepareInbound, planAttachments, visionCallOptions, noVisionNote, wantsVoice, speak } from './media-ai.js';
@@ -159,7 +160,7 @@ export function hideChats(v, hidden) {
 }
 
 /** 073: the one chat-name resolver (group subjects, people's names), never an id. */
-const chatNames = (ids) => chatLabels(ids, whatsappChannel());
+const chatNames = (ids) => chatLabels(ids, chatChannel());
 function parseSince(v, fallbackMs = 7 * 86400000) {
   const s = String(v ?? '').trim();
   if (!s) return Date.now() - fallbackMs;
@@ -182,7 +183,7 @@ const CORE_TOOLS = [
       return visibleChats().map((chat) => {
         const r = db.prepare('SELECT COUNT(*) AS n, MAX(ts) AS last FROM messages WHERE chat = ? AND ts >= ?').get(chat, since);
         const last = r.last || db.prepare('SELECT MAX(ts) AS last FROM messages WHERE chat = ?').get(chat).last;
-        return { chat, name: names.get(chat), group: chat.endsWith('@g.us'), agent: agentForChat(chat)?.id || '', messages: r.n, lastMessage: iso(last),
+        return { chat, name: names.get(chat), group: isGroup(chat), agent: agentForChat(chat)?.id || '', messages: r.n, lastMessage: iso(last),
           quietDays: last ? Math.floor((Date.now() - last) / 86400000) : null };
       }).sort((x, y) => y.messages - x.messages);
     } },
@@ -220,7 +221,7 @@ const CORE_TOOLS = [
     preview: (a) => sendPreview(a.chat, `Send "${clip(a.text, 300)}"`),
     run: async (a) => {
       if (!isVisible(a.chat)) throw fail('That chat is off or private to members now: nothing was sent.', 403);
-      const ch = whatsappChannel();
+      const ch = chatChannel();
       if (!ch) throw fail('WhatsApp is not available', 503);
       const line = dmLine(a.chat);
       const text = `${String(a.text).slice(0, 4000)}${line ? `\n\n_${line}_` : ''}`;
@@ -235,7 +236,7 @@ const CORE_TOOLS = [
 const OWNER_AGENT = OWNER_AGENT_ID;
 // WhatsApp actions it may ever use: messaging, not group administration (the admin tools cover that). Decided here,
 // whatever the record's rules say; the rules can only narrow it.
-const WA_NEVER = whatsappTools.map((t) => t.name).filter((n) => !OWNER_WA_TOOLS.includes(n)).map((n) => `whatsapp:${n}`);
+const WA_NEVER = chatTools.map((t) => t.name).filter((n) => !OWNER_CHAT_TOOLS.includes(n)).map((n) => `whatsapp:${n}`);
 const WA_VERB = { send_media: 'Send', send_location: 'Send a location', send_contact: 'Send a contact card', react: 'React', reply: 'Reply',
   edit_message: 'Edit a message', delete_message: 'Delete a message', create_poll: 'Post a poll' };
 /** Panel role → agent role: owners and admins act like an agent's organizers, viewers like participants. */
@@ -271,12 +272,12 @@ async function resolveChat(want, ownChat, user) {
   if (hits.length > 1) throw fail(`Several chats match "${clip(w, 60)}": ${hits.map((c) => names.get(c)).join(', ')}. Say which one.`);
   throw fail(`No chat that is on matches "${clip(w, 60)}". Chats that are off or private to members can't be used.`, 403);
 }
-const whoInDm = (chat) => { const jid = String(chat).split('#').pop(); return jid.endsWith('@s.whatsapp.net') ? jid.split('@')[0] : chat; };
+const whoInDm = (chat) => phoneOf(chat) || chat;
 /** 044 rules for sends into another person's chat: the DM privacy line once per person (groups got their notice when switched on). */
 const dmLine = (chat) => (isGroup(chat) ? '' : dmNoticeOnce(whoInDm(chat)));
 async function privacyLineAfterSend(chat) {
   const line = dmLine(chat);
-  if (line) await whatsappChannel()?.send(chat, `_${line}_`).catch(() => {});
+  if (line) await chatChannel()?.send(chat, `_${line}_`).catch(() => {});
 }
 async function sendPreview(chat, what) {
   const name = (await chatNames([chat])).get(chat);
@@ -292,7 +293,7 @@ async function agentTools(user, dm = {}) {
   const role = agentRole(user);
   const own = dm.chat || '';
   const agent = ownerAgent(user, own);
-  const { defs, run, meta } = await agentToolsFor(agent, role);
+  const { defs, run, meta } = await agentToolsFor(agent, role, { chat: own });
   for (const err of meta.get('__errors') || []) activity('error', { summary: `Owner assistant: ${err}` });
   const ctx = { agent, role, chat: own, ownerChat: own, senderName: user.username, requester: dm.phone || '', isGroup: false, source: 'whatsapp',
     msgId: dm.msgId || '', senderJid: dm.senderJid || '', text: dm.text || '', attachments: dm.attachments || [] };
@@ -675,10 +676,10 @@ async function ownerTurn(msg, channel, user, { queued = false } = {}) {
   }
 }
 
-const sorry = (text) => async (p) => { const ch = whatsappChannel(); const msg = unpackMsg(ch, p.msg); await ch?.send(msg.chat, text, quoteOf(msg)).catch(() => {}); };
+const sorry = (text) => async (p) => { const ch = chatChannel(); const msg = unpackMsg(ch, p.msg); await ch?.send(msg.chat, text, quoteOf(msg)).catch(() => {}); };
 registerJobHandler('owner', {
   async run(p) {
-    const ch = whatsappChannel();
+    const ch = chatChannel();
     const user = userForPhone(p.msg.phone);
     if (!ch || user?.id !== p.userId) return; // unlinked (or another user) meanwhile: nothing to answer
     await ownerTurn(unpackMsg(ch, p.msg), ch, user, { queued: true });
@@ -689,12 +690,12 @@ registerJobHandler('owner', {
 
 // ---------------------------------------------------------------- schedules (059)
 /** The chat a linked user last wrote from (their own chat on the number they use), else their number on the first one. */
-const ownChatOf = (link) => kvGet(`owner-chat:${link.userId}`) || `${link.phone}@s.whatsapp.net`;
+const ownChatOf = (link) => kvGet(`owner-chat:${link.userId}`) || phoneChat(link.phone);
 
 /** 060: a short note to a linked user in their own chat (e.g. "Saved OPENAI_API_KEY"). False when not linked. */
 export async function tellUser(userId, text) {
   const link = listLinks().find((l) => l.userId === Number(userId));
-  const ch = whatsappChannel();
+  const ch = chatChannel();
   if (!link || !ch) return false;
   await ch.send(ownChatOf(link), text);
   return true;
@@ -717,7 +718,7 @@ export async function runOwnerSchedule(sched, { date, force = false }) {
     const r = await sendOwnerAlert(text, { kind: force ? 'weekly summary (sent now)' : 'weekly summary' });
     return [{ chat: r.to, reply: r.sent ? text : null }];
   }
-  const ch = whatsappChannel();
+  const ch = chatChannel();
   const results = [];
   for (const l of people) {
     if (!once(l.userId)) continue;

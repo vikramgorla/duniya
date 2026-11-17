@@ -7,11 +7,10 @@
 import { db } from './db.js';
 import './chat-prefs.js'; // chats_seen
 import { personInfo } from './contacts.js';
+import { isGroup, personOfChat } from '../channels/index.js';
 
 const TENANT = 'default';
 export const UNNAMED_GROUP = 'Unnamed group';
-const jidOf = (chat) => chat.slice(chat.indexOf('#') + 1); // "<number>#<jid>" on other numbers (012)
-const isGroup = (chat) => jidOf(String(chat)).endsWith('@g.us');
 const getSeen = db.prepare('SELECT name, phone FROM chats_seen WHERE tenant_id = ? AND chat = ?');
 // A group that is new to chats_seen stays out of seenChats() (last_at NULL): it only carries the name.
 const putName = db.prepare(`INSERT INTO chats_seen (tenant_id, chat, is_group, name) VALUES (?, ?, 1, ?)
@@ -29,7 +28,7 @@ export function rememberGroupNames(list) {
   }
 }
 
-/** The name to show for a chat, from what is stored (no network). Never an id for a WhatsApp chat. */
+/** The name to show for a chat, from what is stored (no network). Never an id for a channel's chat. */
 export function chatLabel(id) {
   const chat = String(id || '');
   if (!chat) return '';
@@ -37,8 +36,8 @@ export function chatLabel(id) {
     if (!subjects.has(chat)) { const n = getSeen.get(TENANT, chat)?.name; if (n) subjects.set(chat, n); }
     return subjects.get(chat) || UNNAMED_GROUP;
   }
-  const jid = jidOf(chat);
-  if (!/@(s\.whatsapp\.net|lid)$/.test(jid)) return chat; // not a WhatsApp chat (the test console's own words)
+  const jid = personOfChat(chat);
+  if (!jid) return chat; // not a person on a channel (the test console's own words)
   const seen = getSeen.get(TENANT, chat);
   return personInfo({ phone: seen?.phone || '', jid, fallbackName: seen?.name || '' }).label;
 }

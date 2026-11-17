@@ -181,6 +181,7 @@ const STATES = [
   { name: 'models-codex', hash: 'models/codex' }, // 074: an agent app's device sign-in steps
   { name: 'models-paused', hash: 'models/openrouter' }, // 042: an account paused by its usage limit
   { name: 'backups-restore', hash: 'backups/restore' },
+  { name: 'settings-whatsapp', hash: 'settings/whatsapp', wait: 2000, js: 'T.openAll();' }, // 075: Settings → Channels → WhatsApp
   { name: 'settings-users', hash: 'settings/users', wait: 2000, js: 'T.openAll();' },
   { name: 'models-setup', hash: 'models/chatgpt', before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u).startsWith('/api/providers') && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); if (Array.isArray(j)) return new Response(JSON.stringify(j.filter((x) => x.id !== 'openrouter').map((x) => ({ ...x, connected: false, models: 0 })))); }

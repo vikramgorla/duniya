@@ -7,7 +7,8 @@ import { isConnected, runtimeProvider, GLOBAL_SCOPE } from './mcp-oauth.js';
 import { globalServers } from './global-mcp.js';
 import { memoryTools, memoryEnabled, MEMORY_DEFAULT_ALLOW } from './memory.js';
 import { contactsTools, CONTACTS_DEFAULT_ALLOW } from './contacts.js';
-import { whatsappTools, whatsappRules, whatsappChannel } from './whatsapp-tools.js';
+import { chatToolsFor, chatToolRules, chatChannel } from './chat-tools.js';
+import { capsOf } from '../channels/index.js';
 import { mediaTools, imageToolAllowed } from './media-ai.js';
 
 /** "panduga:*_preview" style globs. */
@@ -90,10 +91,10 @@ function serverAllow(srv, key, allow, role) {
 export const organizerConnection = (agent, serverKey) => connectionFor(agent, serverKey, 'organizer');
 
 /**
- * Build the tool list for an agent + role.
- * Returns { defs: [Anthropic tool defs], run: (name, input, ctx) => {isError, text}, meta: Map }
+ * Build the tool list for an agent + role, in a chat (075: chat tools only as far as the chat's channel can do them;
+ * no chat = the test console). Returns { defs: [Anthropic tool defs], run: (name, input, ctx) => {isError, text}, meta: Map }
  */
-export async function toolsFor(agent, role) {
+export async function toolsFor(agent, role, { chat = '' } = {}) {
   const allow = agent.tools[role] || [];
   const deny = [...(agent.tools.deny || [])];
   if (agent.confirm?.tool) deny.push(agent.confirm.tool); // confirming is never the model's job
@@ -142,13 +143,13 @@ export async function toolsFor(agent, role) {
   const contactRules = allow.filter((r) => r.startsWith('contacts:'));
   addLocal('contacts', contactsTools, contactRules.length ? contactRules : CONTACTS_DEFAULT_ALLOW[role] || []);
 
-  // WhatsApp actions (026): role defaults unless the role has explicit whatsapp: rules; organizer-only tools never
-  // reach participants (t.roles), and the deny list always wins.
-  if (whatsappChannel()) addLocal('whatsapp', whatsappTools, whatsappRules(agent, role));
+  // Chat actions (026, 075 by capability): role defaults unless the role has explicit whatsapp: rules; organizer-only
+  // tools never reach participants (t.roles), and the deny list always wins.
+  if (chatChannel()) addLocal('whatsapp', chatToolsFor(chat), chatToolRules(agent, role));
 
   // Photos & voice (043): create_image only when a connected provider can make pictures and the agent allows it for
   // this role (organizers on, participants off by default); the deny list always wins.
-  if (whatsappChannel() && await imageToolAllowed(agent, role).catch(() => false)) addLocal('media', mediaTools, null);
+  if (chatChannel() && (!capsOf(chat) || capsOf(chat).media) && await imageToolAllowed(agent, role).catch(() => false)) addLocal('media', mediaTools, null);
 
   async function run(name, input, ctx) {
     const m = meta.get(name);

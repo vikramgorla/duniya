@@ -9,6 +9,8 @@
   CPUs, **medium** otherwise.
 - Photos and voice notes queue up (one at a time on small servers); text never waits.
 - Under memory pressure optional work pauses; replies continue.
+- A channel loads only when it is set up and on: a fresh install loads no WhatsApp code and opens no connection;
+  switching a channel off frees its connections and caches. [Channels](#channels-load-only-when-used).
 - On-server speech and local tool services are off on small servers; **Small server mode** (Settings → Server)
   allows them anyway, slower and one at a time.
 - Old data is pruned by itself and the server recovers by itself (reconnects, restarts, a full disk): see
@@ -96,10 +98,27 @@ Max age: `MEDIA_JOB_MAX_AGE_MIN` (15). [Settings](settings.md)
   the agent's Tools section says *Not started on this server* and why, the activity log says it once, and Install is refused.
   Switch on Small server mode, move to a bigger server, or remove them.
 
+## Channels load only when used
+
+Each chat channel (today WhatsApp) is a module the server loads only when the channel is set up and switched on.
+
+| | Memory (measured on the app, 35 s after start) |
+|---|---|
+| Fresh install, no WhatsApp number | ~150 MB: WhatsApp's library is not loaded, no connection is open |
+| One WhatsApp number linked | ~180–200 MB: WhatsApp (Baileys) adds roughly 30–45 MB |
+
+- **Settings → WhatsApp** and **Server → Health** show the memory a channel uses, measured a minute after it starts
+  (the difference in the app's memory, so an estimate).
+- **Switching a channel off** (owner, **Settings → WhatsApp**) closes its connections and drops its caches. Its code
+  stays loaded until the next restart, which happens by itself at the next update.
+- Under memory pressure a live channel is never switched off: replies matter most. Its optional upkeep (contact
+  names, member lists) pauses like other optional work.
+
 ## Health: data that stays small
 
 **Server → Health** shows the database size, how many stored messages, activity entries and model calls are kept and
-since when, how long each kind is kept, the last automatic clean-up and the photos & voice queue. Nothing to click:
+since when, how long each kind is kept, the last automatic clean-up, the photos & voice queue and the memory each
+channel uses. Nothing to click:
 
 - **Every hour** old data goes, in small batches so replies never wait: stored messages older than **90 days** or
   beyond **5 000 per chat**, activity as set in **Settings → Activity log** (30 days / 5 000 entries), usage detail

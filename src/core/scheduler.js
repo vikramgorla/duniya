@@ -1,6 +1,7 @@
 // @ts-check
 import { isChatEnabled } from './chat-prefs.js';
 import { env } from './config.js';
+import { isGroup } from '../channels/index.js';
 import { getSetting } from './store.js';
 import { listAgents, isBuiltin } from './agents.js';
 import { runAgent } from './runner.js';
@@ -35,7 +36,7 @@ export async function runSchedule(agent, sched, channel, { force = false } = {})
       const reply = await runAgent({
         agent, role: 'participant', chat, senderName: 'scheduler', requester: 'scheduler',
         text: `${sched.prompt}\n(If there is nothing worth posting, reply with exactly: SKIP)`,
-        isGroup: chat.endsWith('@g.us'), source: 'schedule',
+        isGroup: isGroup(chat), source: 'schedule',
       });
       const skip = !reply || reply.trim() === 'SKIP';
       if (!skip) {

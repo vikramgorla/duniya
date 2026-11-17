@@ -2,7 +2,7 @@
 // any WhatsApp number) goes to the prepared agent with the prepared settings; optional intro behind a confirm.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setup, fakeNumbers } from './harness.js';
+import { setup, fakeNumbers, fakeWhatsAppHub } from './harness.js';
 
 const t = await setup({ privacyNotice: true, chatsOn: true, env: { RATE_LIMIT_PER_MIN: '100' } });
 const owner = await t.login();
@@ -21,12 +21,11 @@ t.channel.lookupNumber = async (number, phone) => {
   return { jid: `${phone}@s.whatsapp.net`, exists: !phone.startsWith('4179000099'), lid: phone === '41790000704' ? '99704@lid' : '' };
 };
 
-// A registry with two fake numbers, to send messages through the real multi-number path.
+// The channel hub with two fake numbers, to send messages through the real multi-number path.
 const sessions = {};
 const fakeFactory = fakeNumbers(sessions);
-const { createChannelRegistry } = await import('../src/channels/registry.js');
-const reg = createChannelRegistry({ factory: fakeFactory });
-await reg.start(t.router.createRouter(reg), { onHistory: async () => {} });
+const reg = await fakeWhatsAppHub(fakeFactory);
+await reg.start({ onMessage: t.router.createRouter(reg), onHistory: async () => {} });
 await reg.addNumber({ id: 'shop', label: 'Shop' });
 
 const dm = (o) => ({ channel: 'whatsapp', raw: {}, isGroup: false, senderName: 'Vedika', mentioned: false, replyToAgent: false, quoted: '', msgId: `m${Math.random()}`, ts: Date.now(), ...o });

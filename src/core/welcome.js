@@ -13,7 +13,7 @@ import { activity } from './events.js';
 import { countStat } from './stats.js';
 import { recordUsage } from './usage.js';
 import { fillPlaceholders, todayText, DEFAULT_WELCOME } from './quick.js';
-import { isGroup } from './config.js';
+import { isGroup } from '../channels/index.js';
 
 db.exec(`CREATE TABLE IF NOT EXISTS welcome_seen (tenant_id TEXT NOT NULL, key TEXT NOT NULL, ts INTEGER NOT NULL, PRIMARY KEY (tenant_id, key))`);
 

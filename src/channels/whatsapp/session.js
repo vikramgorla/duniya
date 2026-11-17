@@ -7,13 +7,13 @@ import pino from 'pino';
 import QRCode from 'qrcode';
 import { rmSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { DATA_DIR, digits, fail } from '../core/config.js';
-import { activity, bus } from '../core/events.js';
-import { loadMedia, MAX_MEDIA_BYTES } from '../core/media.js';
-import { savePoll, getPoll, kvGet, kvSet } from '../core/db.js';
-import { syncWhatsAppContacts, mapLid, unmappedLids } from '../core/contacts.js';
-import { rememberGroupNames } from '../core/chat-names.js';
-import { chatKey } from '../core/direct-chats.js';
+import { DATA_DIR, digits, fail } from '../../core/config.js';
+import { activity, bus } from '../../core/events.js';
+import { loadMedia, MAX_MEDIA_BYTES } from '../../core/media.js';
+import { savePoll, getPoll, kvGet, kvSet } from '../../core/db.js';
+import { syncWhatsAppContacts, mapLid, unmappedLids } from '../../core/contacts.js';
+import { rememberGroupNames } from '../../core/chat-names.js';
+import { chatKey } from './ids.js';
 
 const logger = pino({ level: process.env.BAILEYS_LOG || 'warn' });
 // 057: address-book names live in the app-state collection "critical_unblock_low" (contactAction / lidContactAction).
@@ -27,18 +27,18 @@ const AUTH_DIR = resolve(DATA_DIR, 'whatsapp-auth');
 const STATUS_WORDS = { open: 'Connected', qr: 'Waiting for the QR scan', reconnecting: 'Reconnecting', starting: 'Starting', logged_out: 'Unlinked from the phone', closed: 'Disconnected' };
 
 /**
- * WhatsApp channel (linked device via Baileys).
- * Channel interface used by the router/panel:
+ * One WhatsApp number: a linked-device session via Baileys (075: the adapter in index.js holds one per number).
+ * What the adapter calls:
  *   start(onMessage), send(chat, text, opts), listChats(), status(), pair(phone), logout(), restart()
  * plus the WhatsApp actions of 026 (media, location, contact, react, edit/delete, polls, groups, profile, block).
  * `deps` lets tests pass a fake socket (makeSocket), auth state and version lookup.
  */
-export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir = AUTH_DIR, deps = {} } = {}) {
+export function createWhatsAppSession({ number = 'main', label = 'Main', authDir = AUTH_DIR, deps = {} } = {}) {
   const makeSocket = deps.makeSocket || makeWASocket;
   const authState = deps.authState || useMultiFileAuthState;
   const fetchVersion = deps.fetchVersion || fetchLatestBaileysVersion;
   const mediaOpts = deps.media || {};
-  const storeKey = (jid) => (number === 'main' ? jid : `${number}#${jid}`); // same ids as the registry
+  const storeKey = (jid) => chatKey(number, jid); // the app's chat ids (ids.js)
   const AUTH = authDir;
   let sock = null;
   let onMessage = () => {};

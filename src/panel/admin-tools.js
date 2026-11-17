@@ -585,13 +585,21 @@ export const TOOLS = [
     },
     run: (a, x) => x.call('DELETE', `/api/users/${enc(a.user_id)}`) },
 
-  // ---------- WhatsApp numbers ----------
+  // ---------- channels (075) and WhatsApp numbers ----------
+  { name: 'list_channels', readOnly: true, calls: [['GET', '/api/channels']],
+    description: 'The chat channels of this server (today: WhatsApp) with their state (on, off, not set up), numbers/accounts connected and memory used.', input: {},
+    run: (a, x) => x.call('GET', '/api/channels') },
+  { name: 'set_channel_enabled', calls: [['PUT', '/api/channels/x']], risky: (a) => a.enabled === false,
+    description: 'Switch a channel on or off. Off closes its connections and frees its memory: agents stop answering there until it is on again (stays linked). Switching off needs confirm_action.',
+    input: { channel: str('Channel id, e.g. "whatsapp" (see list_channels)'), enabled: { type: 'boolean' } }, required: ['channel', 'enabled'],
+    preview: async (a) => `Switch ${a.channel} off: its connections close and agents stop answering on it until it is switched on again. Nothing is unlinked.`,
+    run: (a, x) => x.call('PUT', `/api/channels/${enc(a.channel)}`, { enabled: !!a.enabled }) },
   { name: 'list_whatsapp_numbers', readOnly: true, calls: [['GET', '/api/status']], description: 'WhatsApp numbers and their connection state. Linking a number (QR code / pairing) is done in the panel.', input: {},
     run: async (a, x) => (await numbers(x)).map((n) => ({ id: n.id, label: n.label, status: n.status, me: n.me, dmAgent: n.dmAgent || '' })) },
   { name: 'add_whatsapp_number', calls: [['POST', '/api/whatsapp/numbers']],
-    description: 'Add another WhatsApp number. Afterwards, open the panel (Overview) on a computer to link it with the phone (QR code).',
+    description: 'Add another WhatsApp number. Afterwards, open the panel (Settings → WhatsApp) on a computer to link it with the phone (QR code).',
     input: { label: str('Name shown in the panel, e.g. "Carpool phone"'), id: str('Short id (optional, lowercase letters, digits, -)') }, required: ['label'],
-    run: async (a, x) => ({ ...(await x.call('POST', '/api/whatsapp/numbers', { id: a.id, label: a.label })), next: 'Open the panel → Overview to link this number with its phone.' }) },
+    run: async (a, x) => ({ ...(await x.call('POST', '/api/whatsapp/numbers', { id: a.id, label: a.label })), next: 'Open the panel → Settings → WhatsApp to link this number with its phone.' }) },
   { name: 'remove_whatsapp_number', risky: true, calls: [['DELETE', '/api/whatsapp/numbers/x']], description: 'Remove an extra WhatsApp number. Needs confirm_action.',
     input: { number_id: str('Number id (see list_whatsapp_numbers)') }, required: ['number_id'],
     preview: async (a, x) => {

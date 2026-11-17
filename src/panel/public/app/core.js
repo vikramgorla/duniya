@@ -398,6 +398,7 @@ function applyStatus(next) {
   const sub = $('#brand-sub'); if (sub) sub.textContent = S.status.settings.paused ? 'paused' : `${S.status.agents.filter((b) => b.enabled).length} agents live`;
   serverBadge(S.status.osUpdates);
   if (S.tab === 'overview') import('./overview.js').then((m) => { if (S.tab === 'overview' && S.renderDone === S.renderSeq) m.renderOverview(true); }); // 066: never over another screen, never mid-navigation
+  if (S.tab === 'settings' && document.querySelector('[id^="ch-"]')) import('./channels.js').then((m) => { if (S.tab === 'settings') m.refreshChannelPage(); }); // 075: a new QR, connected, off
 }
 // #96: the Server tab counts only OS updates that will install now (not gradual roll-outs or held packages); "!" when
 // a restart is needed to finish updates.

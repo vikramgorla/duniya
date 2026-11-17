@@ -8,6 +8,7 @@
 // - The owner can snooze the notice (reminded again after 7 days) or dismiss it (until a newer breaking release).
 import { randomInt } from 'node:crypto';
 import { env, fail, restartSoon } from './config.js';
+import { phoneChat } from '../channels/index.js';
 import { kvGet, kvSet } from './db.js';
 import { getUser } from './store.js';
 import { activity } from './events.js';
@@ -15,7 +16,7 @@ import { updateStatus, checkForUpdate, applyUpdate, getUpdateSettings, installKi
 import { releaseRange } from './releases.js';
 import { sendOwnerAlert, ownerNumber } from './owner-alerts.js';
 import { listLinks, registerConfirmHandler } from './owner-assistant.js';
-import { whatsappChannel } from './whatsapp-tools.js';
+import { chatChannel } from './chat-tools.js';
 
 const DAY = 86400000;
 const SNOOZE_DAYS = 7;
@@ -98,14 +99,14 @@ export async function announceBreaking(st = updateStatus(), now = Date.now()) {
   const text = noticeText(st);
   activity('system', { summary: `Update ${v(st.decisionVersion)} needs your decision (breaking release; automatic updates stop before it)`, detail: { steps: st.steps.map((s) => s.version) } });
   const owners = linkedOwners();
-  const ch = whatsappChannel();
+  const ch = chatChannel();
   const backupLine = backupConfigured() ? 'a backup is made first' : 'no backup passphrase is set, so no backup is made';
   for (const o of owners) {
     const code = newCode({ userId: o.userId, version: st.decisionVersion, target: st.target });
     const msg = `${text}\n\nReply *confirm ${code}* to update to ${st.target} — ${backupLine}. Reply *cancel ${code}* to be reminded in ${SNOOZE_DAYS} days.`;
     try {
       if (!ch) throw new Error('WhatsApp is not available');
-      await ch.send(`${o.phone}@s.whatsapp.net`, msg);
+      await ch.send(phoneChat(o.phone), msg);
       activity('system', { summary: `Update decision ${v(st.decisionVersion)} sent to ${o.username} on WhatsApp (owner assistant)` });
     } catch (e) { activity('error', { summary: `Update decision message to ${o.username} failed: ${e.message}` }); }
   }
@@ -130,7 +131,7 @@ export async function runConfirmedUpdate({ by = '', backup = true, reportTo = ''
     if (reportTo) kvSet('updates:report', JSON.stringify({ chat: reportTo, target: st.target, from, backup: r.backup, at: Date.now() }));
     restartFn();
   } else if (reportTo) {
-    await whatsappChannel()?.send(reportTo, `The update to ${st.target} was not installed; still running ${from}. ${r.code === 2 ? r.log : 'Details: Overview → Server → Updates.'}`).catch(() => {});
+    await chatChannel()?.send(reportTo, `The update to ${st.target} was not installed; still running ${from}. ${r.code === 2 ? r.log : 'Details: Overview → Server → Updates.'}`).catch(() => {});
   }
   return { ...r, target: st.target, from };
 }
@@ -151,7 +152,7 @@ async function resolveUpdateConfirm({ user, code, cancel = false, surface = '' }
   if (installKind() === 'docker') return 'This server runs in Docker: update the image on the host (docker compose pull && docker compose up -d).';
   const chat = String(surface).slice('whatsapp:'.length);
   runConfirmedUpdate({ by: `${user.username} (WhatsApp)`, backup: true, reportTo: chat })
-    .catch((e) => whatsappChannel()?.send(chat, `The update did not start: ${e.message}`).catch(() => {}));
+    .catch((e) => chatChannel()?.send(chat, `The update did not start: ${e.message}`).catch(() => {}));
   return `Starting: ${backupConfigured() ? 'backup, then ' : ''}update to ${c.target}. The agents pause for 1–2 minutes; I will message you here when it is back.`;
 }
 registerConfirmHandler(resolveUpdateConfirm);
@@ -161,7 +162,7 @@ export async function deliverUpdateReport(now = Date.now()) {
   const rec = readKv('updates:report', null);
   if (!rec?.chat) return false;
   if (now - rec.at > REPORT_TTL) { kvSet('updates:report', 'null'); return false; }
-  const ch = whatsappChannel();
+  const ch = chatChannel();
   if (!ch) return false;
   const running = runningVersion();
   const ok = running !== rec.from;

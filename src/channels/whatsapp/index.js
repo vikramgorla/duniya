@@ -1,22 +1,22 @@
 // @ts-check
-// Several WhatsApp numbers (012). Each number is its own linked-device session. The registry looks like one channel
-// to the rest of the app: chats on the first number keep their plain WhatsApp id (no migration), chats on other
-// numbers are prefixed "<number>#<jid>", and send/typing/isMember route to the right session from the chat id.
+// WhatsApp, channel adapter #1 (075; several numbers since 012). Each number is its own linked-device session
+// (session.js, Baileys). The adapter looks like one channel to the hub: chats on the first number keep their plain
+// WhatsApp id (no migration), chats on other numbers are prefixed "<number>#<jid>", and every action routes to the
+// right session from the chat id. The hub loads this module with import() only when WhatsApp is set up and on.
 import { resolve } from 'node:path';
-import { DATA_DIR, fail } from '../core/config.js';
-import { getSetting, updateSettings } from '../core/store.js';
-import { activity } from '../core/events.js';
-import { noteChat } from '../core/chat-prefs.js';
-import { rememberGroupNames } from '../core/chat-names.js';
-import { resolveDirectChat, MAIN, chatKey, splitChat } from '../core/direct-chats.js';
-import { createWhatsAppChannel } from './whatsapp.js';
+import { DATA_DIR, fail } from '../../core/config.js';
+import { getSetting, updateSettings } from '../../core/store.js';
+import { activity } from '../../core/events.js';
+import { resolveDirectChat } from '../../core/direct-chats.js';
+import { MAIN, chatKey, splitChat } from './ids.js';
+import { createWhatsAppSession } from './session.js';
 
 const NUMBER_ID_RE = /^[a-z][a-z0-9-]{1,23}$/;
 
-/** WhatsApp actions (026) that act on one chat: registry.<name>(chat, ...args) → session.<name>(jid, ...args). */
-const CHAT_ACTIONS = ['sendMedia', 'sendLocation', 'sendContact', 'react', 'editMessage', 'deleteMessage', 'markRead', 'presence', 'sendPoll',
+/** WhatsApp actions (026) that act on one chat: adapter.<name>(chat, ...args) → session.<name>(jid, ...args). */
+const CHAT_ACTIONS = ['send', 'groupMembers', 'refreshGroup', 'sendMedia', 'sendLocation', 'sendContact', 'react', 'editMessage', 'deleteMessage', 'markRead', 'presence', 'sendPoll',
   'downloadMedia', 'fetchHistory', 'groupInfo', 'groupInviteLink', 'groupRevokeInvite', 'groupParticipants', 'groupSubject', 'groupDescription', 'groupPicture', 'groupSettings', 'groupLeave'];
-/** Actions of the number itself: registry.<name>(chat, ...args) → session.<name>(...args) on the chat's number. */
+/** Actions of the number itself: adapter.<name>(chat, ...args) → session.<name>(...args) on the chat's number. */
 const NUMBER_ACTIONS = ['profile', 'block', 'unblock', 'setProfileName', 'setProfileStatus'];
 
 const numbersSetting = () => {
@@ -24,28 +24,25 @@ const numbersSetting = () => {
   return Array.isArray(list) && list.length ? list : [{ id: MAIN, label: 'Main' }];
 };
 
-/** `factory` makes one channel per number (tests pass fakes). */
-export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) {
-  const sessions = new Map(); // id -> channel
-  let handler = null; let historyHandler = null; let joinHandler = null; let tagHandler = null; let activeHandler = null; let groupHandler = null;
+/** `factory` makes one session per number (tests pass fakes). */
+export function createWhatsAppAdapter({ factory = createWhatsAppSession } = {}) {
+  const sessions = new Map(); // id -> session
+  /** @type {any} */ let on = null; // the hub's handlers
 
   const make = (n) => factory({ number: n.id, label: n.label, authDir: resolve(DATA_DIR, n.id === MAIN ? 'whatsapp-auth' : `whatsapp-auth-${n.id}`) });
   const wrapMsg = (n) => (m) => ({ ...m, chat: chatKey(n.id, m.chat), number: n.id });
   async function startOne(n) {
     const ch = make(n);
     sessions.set(n.id, ch);
-    if (!handler) return ch;
+    if (!on) return ch;
     const wrap = wrapMsg(n);
-    await ch.start(async (m) => {
-      const msg = resolveDirectChat(wrap(m)); // 049: a prepared person's LID chat is noted under the prepared chat
-      try { noteChat({ chat: msg.chat, number: n.id, isGroup: msg.isGroup, name: msg.isGroup ? '' : msg.senderName, phone: msg.isGroup ? '' : msg.phone }); } catch { /* best effort */ }
-      return handler(msg);
-    }, { onHistory: async (msgs, meta = {}) => historyHandler?.(msgs.map(wrap), { ...meta, // #91: keys and chats in app chat ids
+    // 049: a prepared person's LID chat arrives under the prepared chat id
+    await ch.start(async (m) => on.onMessage(resolveDirectChat(wrap(m))), { onHistory: async (msgs, meta = {}) => on.onHistory?.(msgs.map(wrap), { ...meta, // #91: keys and chats in app chat ids
       keys: (meta.keys || []).map((k) => ({ ...k, chat: chatKey(n.id, k.chat), number: n.id })), chats: (meta.chats || []).map((c) => chatKey(n.id, c)) }),
-    onJoin: async (ev) => joinHandler?.({ ...ev, chat: chatKey(n.id, ev.chat) }), // 054: welcome
-    onMemberTag: async (ev) => tagHandler?.({ ...ev, chat: chatKey(n.id, ev.chat) }), // 057: member tags
-    onPhoneActive: (ev) => activeHandler?.({ ...ev, number: n.id }), // 057: retry history loads
-    onGroupChange: (ev) => groupHandler?.({ ...ev, chat: chatKey(n.id, ev.chat) }) }); // 057: refresh member list
+    onJoin: async (ev) => on.onJoin?.({ ...ev, chat: chatKey(n.id, ev.chat) }), // 054: welcome
+    onMemberTag: async (ev) => on.onMemberTag?.({ ...ev, chat: chatKey(n.id, ev.chat) }), // 057: member tags
+    onPhoneActive: (ev) => on.onPhoneActive?.({ ...ev, number: n.id }), // 057: retry history loads
+    onGroupChange: (ev) => on.onGroupChange?.({ ...ev, chat: chatKey(n.id, ev.chat) }) }); // 057: refresh member list
     return ch;
   }
   const route = (chat) => {
@@ -84,26 +81,20 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
       const g = await byNumber(number).groupCreate(subject, people);
       return { ...g, id: chatKey(number || MAIN, g.id) };
     },
-    /** @param {Function} onMessage  @param {{ onHistory?: Function, onJoin?: Function, onMemberTag?: Function, onPhoneActive?: Function, onGroupChange?: Function }} [handlers] */
-    async start(onMessage, { onHistory, onJoin, onMemberTag, onPhoneActive, onGroupChange } = {}) {
-      handler = onMessage; historyHandler = onHistory || null; joinHandler = onJoin || null; tagHandler = onMemberTag || null; activeHandler = onPhoneActive || null;
-      groupHandler = onGroupChange || null;
+    /** Connect every number. `handlers` = { onMessage, onHistory?, onJoin?, onMemberTag?, onPhoneActive?, onGroupChange? }. */
+    async start(handlers) {
+      on = handlers;
       for (const n of numbersSetting()) await startOne(n);
     },
-    async send(chat, text, opts) { const { ch, jid } = route(chat); return ch.send(jid, text, opts); },
-    async typing(chat) { try { const { ch, jid } = route(chat); await ch.typing?.(jid); } catch { /* ignore */ } },
-    async chatName(chat) { // 073: every subject WhatsApp tells us is remembered for the one chat-name resolver
-      try { const { ch, jid } = route(chat); const name = await ch.chatName?.(jid); rememberGroupNames([{ id: chat, name }]); return name; } catch { return ''; }
-    },
-    async groupMembers(chat) { const { ch, jid } = route(chat); return ch.groupMembers ? ch.groupMembers(jid) : []; },
-    async isMember(chat, phone, senderJid) { try { const { ch, jid } = route(chat); return await ch.isMember(jid, phone, senderJid); } catch { return false; } },
+    async typing(chat) { const { ch, jid } = route(chat); await ch.typing?.(jid); },
+    async chatName(chat) { const { ch, jid } = route(chat); return (await ch.chatName?.(jid)) || ''; },
+    async isMember(chat, phone, senderJid) { const { ch, jid } = route(chat); return ch.isMember(jid, phone, senderJid); },
     async listChats() {
       const out = [];
       for (const n of numbersSetting()) {
         const ch = sessions.get(n.id); if (!ch) continue;
         for (const g of await ch.listChats().catch(() => [])) out.push({ ...g, id: chatKey(n.id, g.id), number: n.id, numberLabel: n.label });
       }
-      rememberGroupNames(out);
       return out;
     },
     /** First number's status at the top level (as before) plus every number under `numbers`. */
@@ -122,14 +113,13 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
       for (const ch of sessions.values()) { const r = await ch.upkeep?.().catch(() => null); if (r?.ok || (r && r.reason !== 'not_due')) return r; }
       return { ok: false, reason: 'not_due' };
     },
-    async refreshGroup(chat) { const { ch, jid } = route(chat); return ch.refreshGroup ? ch.refreshGroup(jid) : null; },
     /** 057: refresh address-book names on every number (each number also does this by itself). */
     async refreshNames() {
       const out = [];
       for (const [id, ch] of sessions) out.push({ number: id, ...(ch.refreshNames ? await ch.refreshNames().catch(() => ({ ok: false })) : { ok: false, reason: 'unsupported' }) });
       return out;
     },
-    /** 069: graceful shutdown: every number's socket closes (still linked). */
+    /** 069: graceful shutdown, 075: switched off: every number's socket closes (still linked), no reconnect. */
     async stop() { for (const ch of sessions.values()) await ch.stop?.().catch(() => {}); },
     pair: (phone, number) => byNumber(number).pair(phone),
     logout: (number) => byNumber(number).logout(),

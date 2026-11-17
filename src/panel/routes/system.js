@@ -1,5 +1,6 @@
 // @ts-check
-// Panel routes: pending confirmations, secrets, usage & prices, server metrics & maintenance, WhatsApp numbers, restart.
+// Panel routes: pending confirmations, secrets, usage & prices, server metrics & maintenance, channels and WhatsApp
+// numbers, restart.
 import { getAgent, listAgents } from '../../core/agents.js';
 import { restartSoon } from '../../core/config.js';
 import { healthView, setRetention } from '../../core/retention.js';
@@ -68,7 +69,14 @@ export function systemRoutes(route, { channel } = {}) {
   route('GET', '/api/system/ops', async () => opsStatus(), { role: 'owner' });
   route('POST', '/api/system/ops', async (req, res, body, q, p, user) => requestOp(String(body.action || ''), user.username), { role: 'owner' });
 
-  // ---------- channel control ----------
+  // ---------- channels (075): which channels exist, on/off (off = connections closed, adapter dropped) ----------
+  route('GET', '/api/channels', async () => channel.channels());
+  // admins may switch a channel on (the first-run Link WhatsApp); only the owner switches one off
+  route('PUT', '/api/channels/:id', async (req, res, body, q, p, user) => {
+    if (!body.enabled && user.role !== 'owner') return [403, { error: 'Only the owner can switch a channel off' }];
+    return channel.setEnabled(p.id, !!body.enabled, user.username);
+  }, { role: 'admin' });
+  // ---------- WhatsApp ----------
   route('POST', '/api/whatsapp/pair', async (req, res, body) => ({ code: await channel.pair(body.phone, body.number) }));
   route('POST', '/api/whatsapp/logout', async (req, res, body) => { await channel.logout(body.number); return { ok: true }; });
   route('POST', '/api/whatsapp/restart', async (req, res, body) => { await channel.restart(body.number); return { ok: true }; });
@@ -89,11 +97,11 @@ export function systemRoutes(route, { channel } = {}) {
 
   // ---------- system ----------
   // 069: Server → Health: database size, oldest kept data, retention, last clean-up, disk, queue, clock
-  route('GET', '/api/server/health', async () => healthView());
+  route('GET', '/api/server/health', async () => ({ ...healthView(), channels: await channel.channels() })); // 075: memory per channel
   route('PUT', '/api/server/retention', async (req, res, body, q, p, user) => {
     const next = setRetention(body);
     activity('config', { summary: `Keep stored messages ${next.messagesDays} days (at most ${next.messagesPerChat} per chat), usage detail ${next.usageDays} days (${user.username})` });
-    return healthView();
+    return { ...healthView(), channels: await channel.channels() };
   }, { role: 'owner' });
   route('POST', '/api/system/restart', async () => { restartSoon(300); return { ok: true }; }, { role: 'owner' });
 }

@@ -98,7 +98,7 @@ settings stay together.
 > `prepare_direct_chat`, `send_chat_intro` (confirmed).
 
 People who write to an agent number privately get the agent chosen for that number
-([Connect WhatsApp](whatsapp.md#the-whatsapp-numbers-card)); a person can be given another agent on their chat's page.
+([Connect WhatsApp](whatsapp.md#settings--channels--whatsapp)); a person can be given another agent on their chat's page.
 
 ## Contacts
 

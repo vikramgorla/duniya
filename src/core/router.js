@@ -4,13 +4,14 @@ import { storeLoadedBatch, setHistoryChannel, historyChatActive } from './histor
 import { personInfo, agentName } from './contacts.js';
 import { memberTag } from './member-tags.js';
 import { env, clip } from './config.js';
+import { isGroup } from '../channels/index.js';
 import { getSetting } from './store.js';
 import { listAgents as allAgents, getAgent, agentForChat, roleIn, isBuiltin } from './agents.js';
 import { runAgent, handleConfirmCommand } from './runner.js';
 import { logMessage, messageByMsgId, saveReaction, savePollVote, pollTally, setMessageText } from './db.js';
 import { activity } from './events.js';
 import { maybeSummarize } from './memory.js';
-import { setWhatsAppChannel } from './whatsapp-tools.js';
+import { setChatChannel } from './chat-tools.js';
 import { countStat } from './stats.js';
 import { silenceReason } from './silences.js';
 import { handleOwnerMessage } from './owner-assistant.js';
@@ -22,6 +23,7 @@ import { readFileSync, rmSync } from 'node:fs';
 import { builtinAnswer, todayText, fillPlaceholders } from './quick.js';
 import { recordUsage } from './usage.js';
 import { noteJoin } from './welcome.js';
+import { notePerson } from './people.js';
 
 // 059: the built-in owner assistant is reached through the owner hand-off only, never by routing.
 const listAgents = () => allAgents().filter((b) => !isBuiltin(b));
@@ -77,7 +79,7 @@ export function stripTriggers(agent, text) {
 export async function resolveRole(agent, msg, channel) {
   const saved = roleIn(agent, msg.phone);
   if (saved === 'organizer' || agent.organizers.length || !msg.phone) return saved;
-  const groups = msg.isGroup ? [msg.chat] : agent.chats.filter((c) => !/@(s\.whatsapp\.net|lid)$/.test(c));
+  const groups = msg.isGroup ? [msg.chat] : agent.chats.filter((c) => isGroup(c));
   for (const g of groups) {
     try {
       const members = await channel.groupMembers?.(g);
@@ -200,7 +202,7 @@ function recordEvent(msg) {
 
 /** Build the live message router for a channel. */
 export function createRouter(channel) {
-  setWhatsAppChannel(channel);
+  setChatChannel(channel);
   setHistoryChannel(channel);
   registerMediaHandlers(channel);
   return async function onMessage(incoming) {
@@ -249,6 +251,8 @@ export function createRouter(channel) {
       }
     }
 
+    // 075: who wrote, across channels (ids and phone only; chats that are on or answered only)
+    msg.personId = notePerson(msg);
     // Groups: remember everything said (bound or not, paused or not) so agents have context.
     let rowId = 0;
     if (msg.isGroup) {

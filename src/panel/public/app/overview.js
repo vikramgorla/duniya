@@ -2,10 +2,10 @@
 // ---------- overview ----------
 import { feedList } from './activity.js';
 import { askCard } from './ask.js';
-import { $, S, ago, api, ask, avatar, can, emptyState, field, h, logo, menu, optimistic, pulse, refreshStatus, show, time, toggle, tryApi } from './core.js';
+import { $, S, ago, api, avatar, can, emptyState, h, logo, optimistic, pulse, show, toggle } from './core.js';
 import { plural } from './shared.js';
 import { refreshSilences, silencesCard } from './quiet.js';
-import { checklistActive, checklistBox, checklistNext, goTo, linkNumberBox, refreshChecklist } from './start.js';
+import { checklistActive, checklistBox, refreshChecklist } from './start.js';
 import { renderUpdates } from './updates.js';
 let overviewSig = '';
 export async function renderOverview(soft) {
@@ -21,30 +21,14 @@ export async function renderOverview(soft) {
   }
   if (soft && (S.overviewBusy || S.ask?.busy || $('#main')?.contains(document.activeElement))) return; // #66: never redraw under a streaming answer
   overviewSig = sig;
-  const c = st.channel;
-  const numbers = c.numbers || [{ id: 'main', label: 'Main', ...c }];
-  const pillFor = (x) => h('span', { class: `pill ${x.status === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(x.status) ? 'warn' : 'bad'}` }, x.status === 'open' ? 'connected' : x.status === 'qr' ? 'waiting for scan' : x.status.replace('_', ' '));
-  const numberBlock = (n) => {
-    const body = { number: n.id };
-    const linked = n.status === 'open';
-    const dmSel = h('select', { disabled: !can('admin'), style: 'max-width:260px', 'aria-label': `Direct messages to ${n.label} go to`, onchange: (e) => tryApi(() => api('PUT', `/api/whatsapp/numbers/${n.id}`, { dmAgent: e.target.value }), 'Saved') },
-      h('option', { value: '' }, 'Default agent (see Settings)'), st.agents.map((b) => h('option', { value: b.id, selected: n.dmAgent === b.id }, b.name)));
-    return h('div', { class: 'number-card' },
-      h('div', { class: 'row spread' }, h('div', {}, h('b', {}, n.label), linked ? h('span', { class: 'muted small num' }, `  +${(n.me || '').split(':')[0].split('@')[0]}`) : null), h('div', { class: 'btns' }, pillFor(n), can('admin') ? menu(`Actions for ${n.label}`,
-        h('button', { class: 'btn small', onclick: () => tryApi(() => api('POST', '/api/whatsapp/restart', body), 'Reconnecting…') }, linked ? 'Reconnect' : 'New QR code'),
-        linked ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Unlink ${n.label}?`, text: 'Agents stop answering on this number until you scan a new QR code with its phone.', ok: 'Unlink number', danger: true })) && tryApi(() => api('POST', '/api/whatsapp/logout', body), 'Unlinked') }, 'Unlink') : null,
-        n.id !== 'main' && can('owner') ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Remove the number “${n.label}”?`, text: 'Its chats keep their memory, but agents bound to them stop answering there.', ok: 'Remove number', danger: true })) && tryApi(async () => { await api('DELETE', `/api/whatsapp/numbers/${n.id}`); refreshStatus(); }, 'Removed') }, 'Remove') : null) : null)),
-
-      !linked && can('admin') ? (checklistNext() === 'whatsapp' ? h('p', { class: 'small muted' }, 'Waiting for the scan: the QR code is in ', h('a', { href: '#overview/start', onclick: goTo('#overview/start') }, 'Getting started'), ' above.') : linkNumberBox(n)) : null,
-      n.lastError && !linked ? h('p', { class: 'small', style: 'color:var(--bad)' }, n.lastError) : null,
-      linked ? h('details', { class: 'num-dm' }, h('summary', { class: 'small muted' }, `Direct messages: ${st.agents.find((b) => b.id === n.dmAgent)?.name || 'default agent'} · connected since ${time(n.since)}`), field('Direct messages to this number go to', dmSel)) : null);
-  };
-  const newLabel = h('input', { placeholder: 'Name, e.g. Shop', onfocus: () => (S.overviewBusy = true), onblur: () => (S.overviewBusy = false) });
-  const wa = h('div', { class: 'card', id: 'ov-whatsapp', 'data-jump': 'whatsapp' },
-    h('div', { class: 'row spread' }, h('h2', {}, 'WhatsApp numbers'), h('span', { class: 'pill' }, `${numbers.filter((n) => n.status === 'open').length}/${numbers.length} connected`)),
-    numbers.map(numberBlock),
-    can('owner') ? h('details', { class: 'mut' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, '+ Add another number'),
-      h('div', { class: 'row' }, newLabel, h('button', { class: 'btn primary', onclick: () => tryApi(async () => { await api('POST', '/api/whatsapp/numbers', { label: newLabel.value }); S.overviewBusy = false; await refreshStatus(); renderOverview(); }, 'Added — scan its QR') }, 'Add number'))) : null);
+  // 075: WhatsApp numbers live under Settings → WhatsApp; Overview keeps one status chip that links there
+  const wa = st.channel.channels?.find((x) => x.id === 'whatsapp') || { state: 'on' };
+  const numbers = st.channel.numbers || [];
+  // 075: one calm row per number; linking, adding and switching off are on the channel's page
+  const pill = (n) => h('span', { class: `pill ${n.status === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(n.status) ? 'warn' : 'bad'}` }, n.status === 'open' ? 'connected' : n.status === 'qr' ? 'waiting for scan' : n.status.replace('_', ' '));
+  const channelsCard = h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'WhatsApp'), h('a', { class: 'small', href: '#settings/whatsapp' }, 'Details ›')),
+    numbers.length ? h('ul', { class: 'ctl-list' }, numbers.map((n) => h('li', {}, h('div', {}, h('b', {}, n.label), h('div', { class: 'small muted num' }, n.status === 'open' ? `+${(n.me || '').split(':')[0].split('@')[0]}` : 'Open Details to link it')), pill(n))))
+      : h('p', { class: 'small muted' }, wa.state === 'off' ? 'Switched off: agents do not answer on WhatsApp.' : 'Not linked yet: Getting started shows the QR code.'));
   // 064: avatars, a live pulse per agent (reading… / answered, from the activity stream) and named switches
   const pause = (v) => optimistic(() => { st.settings.paused = v; }, () => api('POST', '/api/settings', { paused: v }), v ? 'All agents paused' : 'Agents resumed', () => pause(!v));
   const control = h('div', { class: 'card' }, h('h2', {}, 'Control'),
@@ -70,11 +54,11 @@ export async function renderOverview(soft) {
   const hr = new Date().getHours();
   const hello = hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
   const live = st.agents.filter((b) => b.enabled).length; const open = numbers.filter((n) => n.status === 'open').length;
-  const allGood = !st.settings.paused && open === numbers.length && live > 0;
-  const led = (ok, text) => h('span', { class: 'led' }, h('span', { class: `dot ${ok === true ? 'ok' : ok === false ? 'bad' : 'warn'}`, 'aria-hidden': 'true' }), text);
+  const allGood = !st.settings.paused && open > 0 && open === numbers.length && live > 0;
+  const led = (ok, text, href) => h(href ? 'a' : 'span', { class: 'led', ...(href ? { href } : {}) }, h('span', { class: `dot ${ok === true ? 'ok' : ok === false ? 'bad' : 'warn'}`, 'aria-hidden': 'true' }), text);
   // 062: the first thing that is missing, in the order Getting started asks for it
   const noModel = S.checklist?.steps?.find((x) => x.id === 'provider')?.done === false;
-  const headline = st.settings.paused ? 'All agents are paused' : !open ? 'Link your WhatsApp number to begin' : noModel ? 'Connect an AI model so agents can answer'
+  const headline = st.settings.paused ? 'All agents are paused' : wa.state === 'off' ? 'WhatsApp is switched off' : !open ? 'Link your WhatsApp number to begin' : noModel ? 'Connect an AI model so agents can answer'
     : !st.agents.length ? 'Create your first agent' : st.enabledChats === 0 ? 'No chat is switched on — agents stay silent' : allGood ? 'Everything is running'
       : open < numbers.length ? 'A WhatsApp number needs attention' : live ? 'Running, with something to check' : 'No agent is switched on yet';
   const hero = h('div', { class: 'card console' },
@@ -82,13 +66,13 @@ export async function renderOverview(soft) {
       h('h2', {}, headline)),
     allGood && !st.pending ? h('p', { class: 'small muted calm-line' }, [numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : 'WhatsApp connected', `${plural(live, 'agent')} live`, `${plural(st.enabledChats, 'chat')} on`].join(' · ')) : h('div', { class: 'leds' },
       // 066: plain sentence-case chips ("2 agents live"), not mono caps
-      led(open === numbers.length ? true : open ? null : false, numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : open ? 'WhatsApp connected' : 'WhatsApp not linked'),
+      led(numbers.length && open === numbers.length ? true : open ? null : false, wa.state === 'off' ? 'WhatsApp off' : numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : open ? 'WhatsApp connected' : 'WhatsApp not linked', '#settings/whatsapp'),
       led(st.settings.paused ? false : live ? true : null, st.settings.paused ? 'Agents paused' : live ? `${plural(live, 'agent')} live` : 'No agent live'),
       led(st.enabledChats ? true : null, st.enabledChats ? `${plural(st.enabledChats, 'chat')} on` : 'No chat on'),
       led(st.pending ? null : true, st.pending ? `${st.pending} waiting for a confirm` : 'Nothing waiting')),
     st.enabledChats === 0 && open && st.agents.length && !checklistActive() ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
   const silencesSlot = h('div', { id: 'ov-silences-slot', 'data-jump': 'quiet', style: `grid-column:1/-1${S.silences?.length ? '' : ';display:none'}` }, S.silences?.length ? silencesCard(S.silences, refreshSilences) : null);
-  $('#main').replaceChildren(hero, whatsNewBox(), updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), wa, control, server, silencesSlot, recent));
+  $('#main').replaceChildren(hero, whatsNewBox(), updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), channelsCard, control, server, silencesSlot, recent));
   refreshSilences();
   // the feed and the chat names it shows (064) load after the first paint
   Promise.resolve(S.feed.length ? S.feed : api('GET', '/api/activity?limit=50'))

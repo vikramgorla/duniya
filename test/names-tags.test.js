@@ -44,8 +44,8 @@ function fakeSocket(log) {
   };
 }
 async function channel(log = []) {
-  const { createWhatsAppChannel } = await import('../src/channels/whatsapp.js');
-  const ch = createWhatsAppChannel({ authDir: mkdtempSync(join(tmpdir(), 'wa-auth-')), deps: { makeSocket: fakeSocket(log), fetchVersion: async () => ({ version: [2, 3000, 1] }) } });
+  const { createWhatsAppSession } = await import('../src/channels/whatsapp/session.js');
+  const ch = createWhatsAppSession({ authDir: mkdtempSync(join(tmpdir(), 'wa-auth-')), deps: { makeSocket: fakeSocket(log), fetchVersion: async () => ({ version: [2, 3000, 1] }) } });
   const got = { msgs: [], active: [], groups: [] };
   await ch.start(async (m) => { got.msgs.push(m); }, { onMemberTag: tags.createMemberTagHandler(), onPhoneActive: (e) => got.active.push(e), onGroupChange: (e) => got.groups.push(e) });
   fakeSocket.last.ev.emit('connection.update', { connection: 'open' });

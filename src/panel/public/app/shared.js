@@ -35,6 +35,7 @@ export const saveSecretKey = (name) => async (value) => { await api('PUT', '/api
 /** 062: Settings sections in page order: [id, title, words people search for]. The index at the top of Settings and the
  *  Find box (/ or ⌘K) both use it; each card carries data-jump="<id>" (#settings/<id> opens it). */
 export const SETTINGS_SECTIONS = [
+  ['whatsapp', 'WhatsApp', 'channels numbers qr code link phone pairing unlink add number memory switch off'],
   ['tool-services', 'Tool services for all agents', 'mcp tools weather calendar registry browse'],
   ['owner-assistant', 'Owner assistant', 'my own chat alerts weekly summary character'],
   ['direct-messages', 'Chats & direct messages', 'dm default agent history load earlier messages phone'],

@@ -14,7 +14,8 @@ import { eraseChatMemory, maybeSummarize, memoryView } from '../../core/memory.j
 import { ratingsOf } from '../../core/review.js';
 import { visibleChats } from '../../core/owner-assistant.js';
 import { maybePostNotice, noticePostedAt, setChatNoticeOff } from '../../core/privacy-notice.js';
-import { isGroupChat, whatsappToolCatalog } from '../../core/whatsapp-tools.js';
+import { chatToolCatalog } from '../../core/chat-tools.js';
+import { isGroup, personOfChat, splitChatId } from '../../channels/index.js';
 
 /** Leave out empty values and settings at their default. */
 const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && v !== '' && v !== false && v !== 0 && v !== 'inherit'));
@@ -31,7 +32,7 @@ export function chatRoutes(route, { channel } = {}) {
     const known = new Set(groups.map((c) => c.id));
     // 1:1 chats the numbers have seen (name and number only) and any bound chat we can't see right now
     /** @type {any[]} */
-    const people = seenChats({ groups: false }).filter((c) => !known.has(c.id)).map((c) => ({ id: c.id, name: chatLabel(c.id), phone: c.phone || personInfo({ jid: String(c.id).split('#').pop() }).phone, number: c.number, isGroup: false, lastAt: c.lastAt }));
+    const people = seenChats({ groups: false }).filter((c) => !known.has(c.id)).map((c) => ({ id: c.id, name: chatLabel(c.id), phone: c.phone || personInfo({ jid: personOfChat(c.id) }).phone, number: c.number, isGroup: false, lastAt: c.lastAt }));
     for (const c of people) known.add(c.id);
     // 049: direct chats prepared before the person wrote ("Waiting for the first message"); LID aliases are not listed.
     const prepared = listDirectChats();
@@ -42,11 +43,11 @@ export function chatRoutes(route, { channel } = {}) {
       known.add(d.chat);
     }
     for (let i = people.length - 1; i >= 0; i--) if (isChatAlias(people[i].id)) people.splice(i, 1);
-    const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: chatLabel(id), offline: true, size: 0, isGroup: !/@(s\.whatsapp\.net|lid)$/.test(id) }));
+    const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: chatLabel(id), offline: true, size: 0, isGroup: isGroup(id) }));
     // 070: settings that are at their default are left out (model, logging, welcome "inherit", fallback inherit, off,
     // not private…): the list stays small with hundreds of chats; the panel and the admin tools fill in the defaults.
     return [...groups, ...people, ...missing].map((c) => {
-      const number = c.number || (c.id.includes('#') ? c.id.split('#')[0] : 'main');
+      const number = c.number || splitChatId(c.id).account;
       const pr = prefs[c.id];
       return compact({ ...c, number, numberLabel: numbers.get(number) || number, agent: owner.get(c.id), model: pr?.model, logging: pr?.logging,
         fallback: pr?.fallback && (pr.fallback.mode !== 'inherit' || pr.fallback.chain?.length) ? pr.fallback : null, enabled: pr?.enabled, ignored: ignoredCounts.get(c.id),
@@ -126,11 +127,11 @@ export function chatRoutes(route, { channel } = {}) {
     };
   }, { role: 'owner' });
   // ---------- WhatsApp group tools for admins (026): same channel functions as the agents' whatsapp tools ----------
-  route('GET', '/api/whatsapp/tools', async () => whatsappToolCatalog());
+  route('GET', '/api/whatsapp/tools', async () => chatToolCatalog());
   const ADMIN_RANK = { superadmin: 2, admin: 1 };
   const waGroup = (p) => {
     const chat = decodeURIComponent(p.chat);
-    if (!isGroupChat(chat)) throw fail('This is not a WhatsApp group');
+    if (!isGroup(chat)) throw fail('This is not a group');
     if (typeof channel.groupInfo !== 'function') throw fail('WhatsApp actions are not available', 501);
     return chat;
   };

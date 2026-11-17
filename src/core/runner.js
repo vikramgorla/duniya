@@ -105,7 +105,7 @@ export async function runAgent(ctx) {
     }
     if (budget.action === 'fallback') model = budget.model;
   }
-  const { defs, run, meta } = await toolsFor(agent, role);
+  const { defs, run, meta } = await toolsFor(agent, role, { chat });
   for (const err of meta.get('__errors') || []) activity('error', { agent: agent.id, chat, summary: err });
 
   const memory = buildContext({ agent, chat: ctx.contextChat || chat, excludeId: ctx.msgRowId || 0 });
