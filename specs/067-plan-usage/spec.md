@@ -34,3 +34,19 @@ Issue #135. Owner: "Wherever we can, show the usage of the plan (e.g. quota of C
   when the error has no Retry-After.
 - R7 Admin MCP `list_model_accounts` returns `usage` (label, kind, percent used, left, reset ISO time, updated) and
   `spend_this_month`; the owner assistant uses it ("how much ChatGPT quota is left?"). Secrets never appear.
+
+## Follow-up: ChatGPT usage endpoint (#140, v2.28.1)
+
+Verified on a real server: the Sign in with ChatGPT route (`POST https://api.openai.com/v1/responses`) sends no
+`x-codex-*` headers and no `codex.rate_limits` event, so ChatGPT plan usage never appeared.
+
+- **FR-140-1** ChatGPT accounts read `GET https://chatgpt.com/backend-api/wham/usage` (as OpenAI's open-source Codex:
+  `codex-rs/backend-client/src/client/rate_limit_resets.rs` `rate_limit_status_url`) with `Authorization: Bearer
+  <access token>`, `chatgpt-account-id` when the ID token carries one, and Duniya's own `originator` / User-Agent.
+  The body (`rate_limit.primary_window|secondary_window` with `used_percent`, `limit_window_seconds`, `reset_at`,
+  `reset_after_seconds`; `additional_rate_limits`) is parsed defensively; nothing is estimated.
+- **FR-140-2** Read when Models opens (at most every 10 minutes) and on the upkeep tick (at most every 30 minutes); no
+  new timers. A 401 / 403 / 404 records "not available for this sign-in": no numbers, no alert, no error; the ChatGPT
+  page shows one muted line, `list_model_accounts` a `usage_note`; asked again after 24 hours or a new sign-in.
+- **FR-140-3** Header parsing stays and accepts every Codex header family (`x-<limit>-primary-used-percent`, named by
+  `x-<limit>-limit-name`); when headers and the endpoint report the same window, the newer reading wins.

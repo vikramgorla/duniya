@@ -20,3 +20,11 @@
   headers); harness fakes can send headers; Copilot setup test reads `usage`.
 - No new dependency, timer or polling. Small servers: one HTTP request per Copilot/OpenRouter account every 30 min at
   most, a few hundred bytes of memory per account, no runtime started.
+
+## Follow-up #140: ChatGPT usage endpoint
+
+`chatgpt.planLimits(secret)` (endpoint `CHATGPT_BACKEND_BASE`, default `https://chatgpt.com/backend-api`) →
+`plan-usage.parseWhamUsage`; `providers/index.js` adds `chatgpt` to the endpoint readers (`ENDPOINT_READERS`), with a
+24-hour retry for refused accounts (`endpointUnavailable`). `view()` keeps the newest source per limit id. Panel:
+`plans.js` muted line from `usageUnavailable`. Tests: fake usage endpoint in `test/plan-usage.test.js`; the harness
+and the demo point the endpoint at local fakes.

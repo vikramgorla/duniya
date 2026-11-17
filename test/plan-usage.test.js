@@ -9,9 +9,15 @@ import { setup, fakeChatProvider } from './harness.js';
 
 const orf = fakeChatProvider({ name: 'openrouter', models: ['free/model:free', 'paid/model'] });
 // Fake ChatGPT backend (Responses API): headers and an optional codex.rate_limits event with every answer.
-const cg = { headers: {}, event: null, fail: [], reqs: 0 };
+// #140: also the plan's usage endpoint (GET /backend-api/wham/usage); it refuses (404) unless a test sets cg.usage.
+const cg = { headers: {}, event: null, fail: [], reqs: 0, usage: null, usageReqs: [] };
 cg.server = http.createServer(async (req, res) => {
   for await (const _ of req) { /* drain the request */ }
+  if (req.url === '/backend-api/wham/usage') {
+    cg.usageReqs.push(req.headers);
+    const u = cg.usage || { status: 404, body: { detail: 'Not Found' } };
+    res.writeHead(u.status, { 'content-type': 'application/json' }); return res.end(typeof u.body === 'string' ? u.body : JSON.stringify(u.body));
+  }
   if (req.url.endsWith('/models')) { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ models: [{ slug: 'gpt-x', display_name: 'GPT X' }] })); }
   cg.reqs++;
   const f = cg.fail.shift();
@@ -42,6 +48,7 @@ const codex = (p, w, min, resetMs) => ({ [`x-codex-${p}-used-percent`]: String(w
 before(async () => {
   t = await setup({ env: { RATE_LIMIT_PER_MIN: '1000' }, beforeImport: () => {
     process.env.OPENAI_API_BASE = `http://127.0.0.1:${cg.server.address().port}/v1`;
+    process.env.CHATGPT_BACKEND_BASE = `http://127.0.0.1:${cg.server.address().port}/backend-api`;
     process.env.OPENROUTER_API_BASE = orf.url();
     process.env.GITHUB_API_BASE = `http://127.0.0.1:${gh.server.address().port}`;
   } });
@@ -55,7 +62,7 @@ before(async () => {
 after(() => { cg.server.close(); gh.server.close(); orf.close(); t.close(); });
 beforeEach(() => {
   plan.forget(); breaker.reset(); breaker.resetSwitches(); breaker.resetAllFailedAlert();
-  cg.headers = {}; cg.event = null; cg.fail.length = 0; t.claudeHeaders = {}; t.claudeFail.length = 0; t.script.length = 0;
+  cg.headers = {}; cg.event = null; cg.fail.length = 0; cg.usage = null; cg.usageReqs.length = 0; t.claudeHeaders = {}; t.claudeFail.length = 0; t.script.length = 0;
 });
 
 test('parsing is defensive: unknown or malformed headers show nothing; windows get plain names', () => {
@@ -131,6 +138,82 @@ test('ChatGPT plan: alert once per window at 90 %, again when used up; the pause
   cg.headers = codex('primary', 95, 300, 7 * H); breaker.reset('chatgpt');
   await t.route(t.msg({ text: '!panduga four' }));
   assert.equal(toOwner().length - before, 3);
+});
+
+test('ChatGPT plan: 5-hour and weekly windows from the usage endpoint Codex reads (wham/usage), on Models and the tick', async () => {
+  const jwt = (claims) => `h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`;
+  const saved = t.store.getSecret('CHATGPT_CREDENTIALS');
+  t.store.setSecret('CHATGPT_CREDENTIALS', JSON.stringify({ ...JSON.parse(saved), id_token: jwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-123' } }) }));
+  const reset5h = Math.round((Date.now() + 2 * H) / 1000);
+  cg.usage = { status: 200, body: { plan_type: 'plus', rate_limit: { allowed: true, limit_reached: false,
+    primary_window: { used_percent: 42, limit_window_seconds: 18000, reset_after_seconds: 7200, reset_at: reset5h },
+    secondary_window: { used_percent: 12, limit_window_seconds: 604800, reset_after_seconds: 400000, reset_at: 0 } },
+    credits: { has_credits: false, unlimited: false, balance: null },
+    additional_rate_limits: [{ limit_name: 'GPT-Spark', metered_feature: 'codex_spark', rate_limit: { allowed: true, limit_reached: false, primary_window: { used_percent: 5, limit_window_seconds: 18000, reset_after_seconds: 60, reset_at: reset5h } } }] } };
+  const p = await prov('chatgpt');
+  assert.deepEqual(p.usage.limits.map((l) => [l.label, l.used]), [['5-hour limit', 42], ['weekly limit', 12], ['GPT-Spark 5-hour limit', 5]]);
+  assert.equal(p.usage.limits[0].resetAt, reset5h * 1000);
+  assert.ok(Math.abs(p.usage.limits[1].resetAt - (Date.now() + 400000000)) < 5000, 'reset_after_seconds when reset_at is missing');
+  assert.equal(p.usageUnavailable, undefined);
+  // the same headers Codex sends: bearer, chatgpt-account-id from the ID token; we identify as ourselves
+  const hd = cg.usageReqs.at(-1);
+  assert.equal(hd.authorization, 'Bearer cg-token'); assert.equal(hd['chatgpt-account-id'], 'acct-123');
+  assert.equal(hd.originator, 'whatsapp-agent-duniya');
+  // Models open again within 10 minutes: no new request; the tick reads it at most every 30 minutes
+  const n = cg.usageReqs.length;
+  await prov('chatgpt');
+  assert.equal(cg.usageReqs.length, n);
+  const { upkeepTick, resetUpkeep } = await import('../src/core/upkeep.js');
+  resetUpkeep();
+  assert.equal((await upkeepTick(null)).plan, null);
+  cg.usage.body.rate_limit.primary_window.used_percent = 55;
+  assert.equal((await upkeepTick(null, Date.now() + 31 * 60000)).plan, 'chatgpt');
+  assert.equal((await prov('chatgpt')).usage.limits[0].used, 55);
+  // an answer that does carry headers: the newer reading wins, never the same window twice
+  await t.agents.updateAgent('panduga', { model: 'chatgpt:gpt-x' });
+  cg.headers = codex('primary', 61, 300, 2 * H);
+  await t.route(t.msg({ text: '!panduga hi' }));
+  assert.deepEqual((await prov('chatgpt')).usage.limits.filter((l) => l.label === '5-hour limit').map((l) => l.used), [61]);
+  // a server error or a body without windows: the last reading stays, nothing made up
+  const five = async () => (await prov('chatgpt', '?refresh=1')).usage.limits.find((l) => l.label === '5-hour limit').used;
+  cg.usage = { status: 502, body: 'bad gateway' };
+  assert.equal(await five(), 61);
+  cg.usage = { status: 200, body: '<html>not json</html>' };
+  assert.equal(await five(), 61);
+  t.store.setSecret('CHATGPT_CREDENTIALS', saved);
+});
+
+test('ChatGPT plan: when the usage endpoint refuses this sign-in, it says so once, quietly, and asks again only a day later', async () => {
+  for (const status of [401, 403, 404]) {
+    plan.forget();
+    cg.usage = { status, body: { error: { code: 'subscription_sharing_route_not_supported' } } };
+    const before = toOwner().length;
+    const p = await prov('chatgpt');
+    assert.equal(p.usage, undefined, `${status}: no numbers`);
+    assert.equal(p.usageUnavailable, true);
+    assert.equal(p.connected, true, 'the account itself is fine');
+    assert.equal(toOwner().length, before, 'no alert');
+  }
+  assert.equal(cg.usageReqs.length, 3);
+  assert.ok(!('chatgpt-account-id' in cg.usageReqs[0]), 'no account id header without one in the sign-in');
+  await prov('chatgpt');
+  const { upkeepTick, resetUpkeep } = await import('../src/core/upkeep.js');
+  resetUpkeep();
+  await upkeepTick(null, Date.now() + 2 * H);
+  assert.equal(cg.usageReqs.length, 3, 'refused: not asked again on Models or the tick within a day');
+  assert.equal((await upkeepTick(null, Date.now() + 25 * H)).plan, 'chatgpt');
+  assert.equal(cg.usageReqs.length, 4);
+  // the admin tool says why there is no usage
+  const { TOOLS } = await import('../src/panel/admin-tools.js');
+  const out = await TOOLS.find((x) => x.name === 'list_model_accounts').run({}, { call: async (m, path, b) => (await t.api(owner, m, path, b)).body });
+  assert.match(out.find((a) => a.id === 'chatgpt').usage_note, /not available for this sign-in/);
+  // headers still count when the answers carry them (any Codex header family)
+  await t.agents.updateAgent('panduga', { model: 'chatgpt:gpt-x' });
+  cg.headers = { ...codex('primary', 20, 300, H), 'x-codex-other-primary-used-percent': '7', 'x-codex-other-primary-window-minutes': '300', 'x-codex-other-limit-name': 'GPT-Spark' };
+  await t.route(t.msg({ text: '!panduga hi' }));
+  const q = await prov('chatgpt');
+  assert.deepEqual(q.usage.limits.map((l) => [l.label, l.used]), [['5-hour limit', 20], ['GPT-Spark 5-hour limit', 7]]);
+  assert.equal(q.usageUnavailable, true);
 });
 
 test('API keys: rate-limit headroom from Anthropic and OpenAI-style headers, and this month’s spend', async () => {
