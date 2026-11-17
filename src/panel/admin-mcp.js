@@ -13,6 +13,7 @@ import { ROOT } from '../core/config.js';
 import { authenticate, createSession, sessionUser } from '../core/store.js';
 import { passwordLoginAllowed } from '../core/google-signin.js';
 import { activity } from '../core/events.js';
+import { toolPhrase } from './public/app/names.js';
 import { sha256 } from '../core/crypto.js';
 import {
   OAuthError, SCOPE, registerClient, getClient, createCode, exchangeCode, refreshTokens, revokeToken, validateAccess, normResource,
@@ -234,7 +235,7 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
     const started = Date.now();
     const { user, client } = ctx;
     const log = (ok, extra = '') => activity('mcp.call', {
-      summary: `${name} · ${user.username} via ${client.name}${ok ? '' : ` — ${extra}`}`.slice(0, 300),
+      summary: `${toolPhrase(name)} · ${user.username} via ${client.name}${ok ? '' : ` — ${extra}`}`.slice(0, 300), // #136: plain words; the tool name is in detail
       detail: { tool: name, args: redact(args), ok, ms: Date.now() - started, client: client.name, user: user.username },
     });
     const fail = (msg) => { log(false, msg); return { isError: true, content: [{ type: 'text', text: msg }] }; };

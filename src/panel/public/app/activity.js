@@ -1,6 +1,7 @@
 // Activity screen and the feed rows every live entry uses (Overview, Activity). Module of the panel (063).
 // ---------- activity ----------
 import { $, S, api, avatar, emptyState, h, icon } from './core.js';
+import { toolPhrase } from './names.js';
 // 064: what each entry is, in plain words (the internal type stays in the details), its tone and (066) its icon.
 const EVENTS = {
   'message.in': ['Message', 'info', 'chats'], 'message.out': ['Reply', 'ok', 'chats'], 'tool.call': ['Tool', '', 'settings'], 'tool.error': ['Tool failed', 'bad', 'settings'], error: ['Error', 'bad', 'shield'],
@@ -11,7 +12,7 @@ const EVENTS = {
   'memory.note.added': ['Note added', 'ok', 'chats'], 'memory.note.removed': ['Note removed', 'warn', 'chats'], 'memory.erased': ['Memory erased', 'bad', 'chats'],
   'model.usage': ['Model', '', 'models'], 'model.provider': ['Model', '', 'models'], 'model.fallback': ['Fallback model', 'warn', 'models'], 'media.voice': ['Voice note', '', 'chats'], 'media.image': ['Photo', '', 'image'],
   'backup.done': ['Backup', 'ok', 'backups'], 'backup.restore': ['Restore', 'warn', 'backups'], 'backup.settings': ['Backups', '', 'backups'], 'mcp.call': ['Tool service', 'info', 'settings'], 'mcp.register': ['Tool service', '', 'settings'],
-  'owner.question': ['Ask', 'info', 'search'], 'owner.action': ['Owner assistant', '', 'overview'], 'owner.tool': ['Owner assistant', '', 'overview'], 'owner.link': ['Owner assistant', '', 'overview'],
+  'owner.question': ['Ask', 'info', 'search'], 'owner.action': ['Owner assistant', '', 'agents'], 'owner.tool': ['Owner assistant', '', 'agents'], 'owner.link': ['Owner assistant', '', 'agents'],
 };
 /** Chat names for the feed (064): chat ids are never shown when the chat list knows the name. */
 export async function loadChatNames() {
@@ -22,10 +23,12 @@ export async function loadChatNames() {
 function subjectOf(summary, label) {
   const s = String(summary || '');
   const m = s.match(/^([^:\n]{1,40}):\s+/);
-  if (!m || !m[1].toLowerCase().startsWith(label.toLowerCase())) return s || label;
-  const rest = s.slice(m[0].length);
+  if (!m || !m[1].toLowerCase().startsWith(label.toLowerCase())) return plainTool(s) || label;
+  const rest = plainTool(s.slice(m[0].length));
   return rest ? rest[0].toUpperCase() + rest.slice(1) : label;
 }
+// #136: entries written before 2.27 start with a raw tool name ("chat_recap", "check_for_updates · admin via Claude")
+const plainTool = (s) => s.replace(/^[a-z][a-z0-9]*_[a-z0-9_]+(?=$|\s)/i, (t) => toolPhrase(t.toLowerCase()));
 const dayKey = (ts) => new Date(ts).toDateString();
 /** "Today", "Yesterday" or "Mon 16 Nov". */
 function dayLabel(ts) {

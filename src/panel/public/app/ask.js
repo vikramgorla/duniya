@@ -63,7 +63,7 @@ function turnView(t, a, last) {
       t.state === 'error' ? h('div', { class: 'note bad', role: 'alert' }, h('div', {}, t.error),
         last ? h('button', { class: 'btn small', style: 'margin-top:8px', onclick: () => a.send(t.q, t) }, 'Retry') : null) : null,
       t.state === 'stopped' ? h('div', { class: 'small muted' }, 'Stopped.') : null,
-      t.state === 'done' && t.reply ? h('div', { class: 'answer-actions' }, copyBtn(() => t.reply)) : null));
+      t.state === 'done' && t.reply ? h('div', { class: 'answer-actions' }, copyBtn(() => t.reply, 'Copy answer', { quiet: true })) : null));
 }
 
 /** The Ask card. `id`: its element id (Overview: ov-ask; the owner assistant's page: oa-ask). */
@@ -77,6 +77,8 @@ export function askCard({ id = 'ov-ask', title = 'Ask', wide = true } = {}) {
   thread.addEventListener('scroll', () => { a.stick = thread.scrollTop + thread.clientHeight >= thread.scrollHeight - 24; }, { passive: true });
   const btn = h('button', { class: 'btn primary', type: 'button', onclick: () => (a.busy ? a.ctrl?.abort() : a.send(a.draft)) });
   const draw = () => {
+    if (q.value !== a.draft) q.value = a.draft; // sent → the box empties; typing keeps them equal
+    q.placeholder = a.turns.length ? 'Ask a follow-up…' : 'Ask about your chats…';
     btn.replaceChildren(...(a.busy ? [h('span', { class: 'stopsq', 'aria-hidden': 'true' }), 'Stop'] : [icon('send'), 'Ask']));
     btn.classList.toggle('primary', !a.busy); btn.setAttribute('aria-label', a.busy ? 'Stop the answer' : 'Ask');
     thread.setAttribute('aria-busy', String(!!a.busy));
