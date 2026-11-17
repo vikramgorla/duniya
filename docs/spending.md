@@ -6,8 +6,6 @@
 
 **In 30 seconds**
 - **Usage**: tokens and cost by agent, chat, provider, account, model, kind, and first choice vs fallback.
-- **Plans and credit** (on Usage): how much of each plan or credit the provider says is used, e.g. Copilot's
-  premium requests or OpenRouter's prepaid credit ([plan usage](models.md#plan-usage)).
 - Prices are yours, published, plans ("included") or free: never guessed.
 - Caps: one alert at 80 %; quiet (or a cheaper model) at 100 %.
 

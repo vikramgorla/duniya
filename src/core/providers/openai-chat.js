@@ -54,7 +54,7 @@ function fromChatResponse(json) {
   return { content, stop_reason: stop, usage: { input_tokens: json.usage?.prompt_tokens || 0, output_tokens: json.usage?.completion_tokens || 0 } };
 }
 
-async function request(url, key, body, { raw = false, timeout = 120000, onHeaders = null } = {}) {
+async function request(url, key, body, { raw = false, timeout = 120000 } = {}) {
   const form = body instanceof FormData;
   const res = await fetch(url, {
     method: body ? 'POST' : 'GET',
@@ -62,7 +62,6 @@ async function request(url, key, body, { raw = false, timeout = 120000, onHeader
     body: body ? (form ? body : JSON.stringify(body)) : undefined,
     signal: AbortSignal.timeout(timeout),
   });
-  onHeaders?.(res.headers);
   if (raw && res.ok) return { buffer: Buffer.from(await res.arrayBuffer()), type: String(res.headers.get('content-type') || '').split(';')[0].trim() };
   const text = await res.text();
   let json; try { json = JSON.parse(text); } catch { json = null; }
@@ -124,13 +123,12 @@ export async function readChatStream(res, onText) {
   return { choices: [{ message, finish_reason: finish || 'stop' }], usage: usage || {} };
 }
 
-async function streamRequest(url, key, body, onText, { timeout = 120000, signal = undefined, onHeaders = null } = {}) {
+async function streamRequest(url, key, body, onText, { timeout = 120000, signal = undefined } = {}) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { ...(key ? { authorization: `Bearer ${key}` } : {}), 'content-type': 'application/json', accept: 'text/event-stream' },
     body: JSON.stringify(body), signal: signal ? AbortSignal.any([AbortSignal.timeout(timeout), signal]) : AbortSignal.timeout(timeout), // 066: Stop
   });
-  onHeaders?.(res.headers);
   if (!res.ok) {
     const text = await res.text();
     let json; try { json = JSON.parse(text); } catch { json = null; }
@@ -206,14 +204,6 @@ function mediaMethods(base, key, flavor) {
   };
 }
 
-/** 067: an OpenRouter key's limits (GET /key) and prepaid credit (GET /credits, when this key may read it). */
-export async function openRouterLimits(baseUrl, key) {
-  const base = String(baseUrl || '').replace(/\/+$/, '');
-  const info = await request(`${base}/key`, key, null, { timeout: 15000 });
-  const credits = await request(`${base}/credits`, key, null, { timeout: 15000 }).catch(() => null);
-  return parseOpenRouter(info, credits);
-}
-
 /** Create an adapter for a base URL ("https://api.openai.com/v1", "https://openrouter.ai/api/v1", …). */
 export function chatCompletionsProvider({ baseUrl, key, official = false }) {
   const base = baseUrl.replace(/\/+$/, '');
@@ -237,21 +227,19 @@ export function chatCompletionsProvider({ baseUrl, key, official = false }) {
         ...(tools?.length ? { tools: toChatTools(tools) } : {}),
         ...(official ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
       };
-      let headers = null; const onHeaders = (x) => { headers = x; }; // 067: x-ratelimit-* headroom (plan-usage.js)
       if (onText) {
         let started = false;
         const forward = (d) => { started = true; onText(d); };
         try {
-          return { ...fromChatResponse(await streamRequest(`${base}/chat/completions`, key(), { ...body, stream: true, stream_options: { include_usage: true } }, forward, { signal, onHeaders })), headers };
+          return fromChatResponse(await streamRequest(`${base}/chat/completions`, key(), { ...body, stream: true, stream_options: { include_usage: true } }, forward, { signal }));
         } catch (e) {
           // Some OpenAI-compatible servers refuse `stream` / `stream_options` (400 / 422): ask the same account once more
           // without streaming. Any other failure goes to the fallback chain.
           if (started || signal?.aborted || !(e.status === 400 || e.status === 422)) throw e;
         }
       }
-      return { ...fromChatResponse(await request(`${base}/chat/completions`, key(), body, { onHeaders })), headers };
+      return fromChatResponse(await request(`${base}/chat/completions`, key(), body));
     },
   };
 }import { fail } from '../config.js';
-import { parseOpenRouter } from './plan-usage.js';
 
