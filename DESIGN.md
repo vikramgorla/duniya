@@ -80,6 +80,8 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
   for notes.
 - **Type:** Segoe UI Variable / SF Pro / Inter for text and headings (tight tracking); SF Mono / Cascadia /
   JetBrains Mono for labels and numbers.
+- **Opaque header (068):** the header is solid `--bg`, above everything (`z-index` and its own layer), so nothing —
+  text or a native control iPhone draws in its own layer — ever shows through it while scrolling.
 - **No blur on the phone app's bars (066):** on phones and the installed app the header and tab bar are near-solid
   (no `backdrop-filter`), the page has no `background-attachment: fixed`, screens fade in without a transform, and a
   new screen starts at the top before its content changes. iPhone (WebKit) otherwise left the top of the screen
@@ -141,8 +143,44 @@ Calm and compact: say more with less chrome.
   - On phones: the list, then the page pushed over it with a back arrow.
   - Deep links are `#<screen>/<id>`; Find anything and the back button work.
   - Adding something is one row at the end of its list ("Add a provider").
-  - Used by Models, Settings and Backups. Agents → editor and Chats → *More settings* follow the same idea.
+  - A row may carry one switch next to its chevron (`end`, outside the link: Agents, Chats); everything else about the
+    item is on its page.
+  - Used by Agents, Chats, Models, Settings and Backups.
 - **Touch:** every target is at least 44 px on phones (40 px is the hard floor that `check:responsive` enforces).
+
+## Screen anatomy (068)
+
+Every screen is built from the same few parts, in this order. If a screen needs something else, it is probably two
+screens (list → page) or a section behind a row.
+
+1. **Status first, in one line.** The first thing says the state ("Everything is running"). When all is fine, the
+   details collapse into one muted line ("WhatsApp connected · 5 agents live · 7 chats on"); chips appear only for what
+   needs attention.
+2. **A list of rows** (`listDetail()`): avatar or mark · name · **one** muted line · optional switch · chevron. Filters
+   and search sit on one line above the list. Adding is the last row ("New agent", "Add a direct chat").
+3. **An item's page**: a compact header (avatar, name, one muted state line, its switch, a ⋯ menu for Test, Duplicate,
+   Export, Delete…), then **grouped section rows** (icon · title · current value · chevron). A section with more than a
+   few fields is its own page (`#screen/<id>/<section>`, with a back link to the item); a few simple settings sit on the
+   item's page under hairline blocks (`.sblock`).
+4. **Help: one short muted line at most.** Details live behind a small **?** (`helpLink()` in `shared.js`, it opens
+   the guide) or in the docs. Step-by-step instructions that are needed to act (a QR scan, a Google Cloud setup) stay.
+
+**Saving (one model everywhere).**
+- Switches and single selects save **at once**, with Undo in the toast for switches.
+- A section page with fields (an agent's *Character*, *Tools*…) saves **as a whole**: it says *All changes saved*
+  until something changes; then a sticky bar *Unsaved changes · Save* stays in reach. Saving shows **Saved** with
+  **Undo** (puts the section's previous values back). Leaving with unsaved changes asks first.
+- Never two Save buttons for the same thing, never a Save at the bottom of a long page.
+
+| Do | Don't |
+|---|---|
+| One row per item with one muted line | Cards with a description paragraph and a cloud of pills |
+| Section rows that show the current value ("2 chats · !ride · direct: members") | Every setting of an item stacked on one long page |
+| A switch on the row, the rest on the item's page | Selects and buttons on every row ("— no agent —", "More settings") |
+| "?" next to a section title | A 4-line paragraph above every form |
+| Hairline blocks inside a card | Boxes in boxes (fieldsets in cards in cards) |
+| Sign out behind the account row, with a question | A Sign out button next to Refresh |
+| A calm status line when all is fine | Four green chips that say nothing is wrong |
 
 ## Names (064)
 
@@ -218,7 +256,8 @@ the reason and **Retry**. Every animation stops with *reduce motion*.
 ## Finding your way (062)
 
 - **Phones and the installed app** (064): a bottom tab bar with Overview, Chats, Agents, Activity and **More** (a sheet
-  with the other screens, Find anything and Sign out; its badge counts changes waiting for a confirm). Wide screens
+  with the other screens as compact rows, Find anything, Refresh as a small icon and the account row, which asks before
+  it signs you out (068); its badge counts changes waiting for a confirm). Wide screens
   keep the tabs at the top.
 - **Tabs** in everyday order (Overview, Chats, Agents, Activity, Usage, Models, Contacts, Server, Backups, Settings).
   A tab that is usually empty appears only when it has something (Pending, with a count). Small lists are a section of
@@ -226,7 +265,8 @@ the reason and **Retry**. Every animation stops with *reduce motion*.
 - **Find anything** (`openPalette()`): `/` or ⌘K / Ctrl+K, or the search button in the header. Every new screen,
   Settings section (`SETTINGS_SECTIONS`) or frequent action should be findable there.
 - **Deep links**:
-  - On list → page screens, `#tab/<id>` opens that page (Models, Settings, Backups). A new Settings section goes in
+  - On list → page screens, `#tab/<id>` opens that page (Agents, Chats, Models, Settings, Backups); an item's sections
+    are `#tab/<id>/<section>` (`#agents/carpool/tools`), and Find anything lists them ("Tools · Car pooling"). A new Settings section goes in
     `SETTINGS_SECTIONS` (Find anything) and in `SETTINGS_GROUPS`, with its icon and one-line description.
   - Elsewhere, `#tab/<section>` scrolls to the element with `data-jump="<section>"` and flashes it once.
   - An old address that moved goes in `MOVED`.
@@ -255,6 +295,8 @@ the reason and **Retry**. Every animation stops with *reduce motion*.
 - [ ] Every control has a name, keyboard focus is visible, text meets AA in both themes (`check:responsive`).
 - [ ] Questions use `ask()` with the action named on the button; reversible switches offer Undo.
 - [ ] Empty states use `emptyState()`; first loads show skeletons (the router does this for screens).
+- [ ] The screen follows *Screen anatomy*: status in one line, rows with one muted line, an item's page with section
+  rows; at most one short line of help (details behind **?**); one save model.
 - [ ] Simple items are rows, not cards; secondary actions sit behind ⋯ or on the item's page; lists with pages use
   `listDetail()` and deep links.
 - [ ] Provider, account and model names come from `names.js`; tool names are shown with `toolPhrase()`.
