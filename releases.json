@@ -7,7 +7,8 @@
       "changes": [
         { "type": "new", "text": "Each role in a tool list has an all / none tick, so you no longer tick tools one by one." },
         { "type": "new", "text": "Everyone: all tools lets participants and organizers use every tool of a service in one tap. Confirming changes still needs an organizer." },
-        { "type": "improved", "text": "WhatsApp tools have the same All tick per role." }
+        { "type": "improved", "text": "WhatsApp tools have the same All tick per role." },
+        { "type": "fixed", "text": "Loading earlier messages from your phone no longer spins and retries for days when the phone simply has nothing older (for example, a group the number joined recently)." }
       ]
     },
     "2.35.1": {
