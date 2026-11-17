@@ -82,6 +82,7 @@ const CARDS = [
   ['card-test-as', 'agents/carpool/test', TEST_AS, '#test-console', 1100],
   ['card-caps', 'usage', '', 'box:Monthly spending caps', 1100],
   ['card-photos-voice', 'models/abilities', '', 'box:Photos & voice', 1100],
+  ['card-plan-usage', 'models/chatgpt', '', '.plan-usage', 900], // 067
   ['card-fallback', 'models/fallback', 'T.openAll(document.querySelector("#fallback"));', '#fallback', 1100],
   ['card-chat-fallback', 'chats', "[...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);", '#chat-fallback', 600],
   ['card-owner-assistant', 'settings/owner-assistant', 'T.openAll(T.box("Owner assistant"));', 'box:Owner assistant', 900],

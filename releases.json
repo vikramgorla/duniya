@@ -1,6 +1,19 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.28.0": {
+      "breaking": false,
+      "title": "See how much of each AI plan is left: ChatGPT's 5-hour and weekly limits, Copilot's premium requests, OpenRouter credit",
+      "summary": "Models now shows what each provider reports about your plan, never a guess. A provider's row says '62% of 5-hour limit' with a thin bar, and its page has Plan usage: a bar per limit with what is left and when it resets, and when the provider last said so. ChatGPT shows its 5-hour and weekly limits, GitHub Copilot its premium requests, OpenRouter the free requests today, the key's limit and your prepaid credit, and API keys (Claude, OpenAI, custom) their rate-limit headroom and what Duniya spent through them this month. Usage has a Plans and credit card, and Overview shows a note when a plan is 80% used. You get one WhatsApp alert when a plan reaches 90% and one when it runs out, per window. When a limit runs out, the agent answers with the next model and the pause says which limit and when it resets. Nothing to do on your server.",
+      "changes": [
+        { "type": "new", "text": "Models shows how much of each plan is used: ChatGPT's 5-hour and weekly limits, Copilot's premium requests, OpenRouter's free requests and credit, with reset times." },
+        { "type": "new", "text": "API keys (Claude, OpenAI, custom) show their rate-limit headroom and what Duniya spent through them this month." },
+        { "type": "new", "text": "Usage has a Plans and credit card, and Overview shows a note when a plan is 80% used." },
+        { "type": "new", "text": "A WhatsApp alert when a plan reaches 90% and when it runs out, once per window." },
+        { "type": "improved", "text": "When a limit runs out, the pause and the fallback say which one and when it resets, and the account waits for that reset." },
+        { "type": "improved", "text": "Ask “how much ChatGPT quota is left?”: the owner assistant and connected AI assistants see each account's plan usage." }
+      ]
+    },
     "2.27.0": {
       "breaking": false,
       "title": "Ask is a live conversation; Activity, Overview and the phone app are easier to read and never get stuck",
