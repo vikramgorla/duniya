@@ -116,8 +116,8 @@ confirmation setup; its *Try it* section is the Ask box). It adds **Alerts**. Th
 **Agents → Owner assistant → Alerts**: enter your number.
 
 - **Cap alerts** and model-provider alerts go there as they happen ([spending caps](spending.md)).
-- **Plan usage**: once per window when a plan or credit reaches 90 % and when it is used up ("ChatGPT has used 91% of
-  its 5-hour limit (resets 14:20)") ([plan usage](models.md#plan-usage)).
+- **Plan usage**: once per window when a plan or credit reaches 90 % and when it is used up ("GitHub Copilot has used
+  91% of its premium requests (resets 1 Dec 01:00)") ([plan usage](models.md#plan-usage)).
 - **Weekly summary**: the owner assistant's `weekly-summary` schedule (on, Monday 09:00; change day, time or switch it
   off in **Scheduled messages to you**). Messages handled, replies and cost per agent this week vs last, ignored
   chats, pending confirmations, update available, backup failures, a server restart waiting more than 7 days to

@@ -7,10 +7,7 @@ Issue #135. Owner: "Wherever we can, show the usage of the plan (e.g. quota of C
 
 - R1 Only what the provider reports, never an estimate; anything unknown or malformed shows nothing.
 - R2 Sources:
-  - ChatGPT plan: the headers of every answer and failure, `x-codex-{primary,secondary}-{used-percent,window-minutes,
-    reset-at}` (Unix seconds; `reset-after-seconds` from older backends), and the `codex.rate_limits` stream event —
-    names as in `openai/codex` `codex-rs/codex-api/src/rate_limits.rs`. Windows are named from their length
-    ("5-hour limit", "weekly limit").
+  - ChatGPT plan: none (#144: the Sign in with ChatGPT token gets no plan usage from any source).
   - GitHub Copilot: `GET {GITHUB_API_BASE}/copilot_internal/user` → `quota_snapshots` (`premium_interactions`, `chat`:
     entitlement, remaining, percent_remaining, unlimited) and `quota_reset_date(_utc)`; when GitHub does not answer it
     for the token, the Copilot runtime's quota — never starting the runtime just for this on the tick.
@@ -29,24 +26,20 @@ Issue #135. Owner: "Wherever we can, show the usage of the plan (e.g. quota of C
 - R5 Owner alert (owner assistant → Alerts) when a plan or credit limit reaches 90 % and when it is used up, once per
   limit, level and window (a window is known by its reset time, ±30 min; limits without one at most weekly). Rate
   limits never alert.
-- R6 A quota or rate-limit failure names the plan window that is used up in the pause ("Paused until 14:20 — 5-hour
-  limit used up, resets 14:20"), in the fallback activity and in "after …" texts, and the pause lasts until that reset
+- R6 A quota or rate-limit failure names the plan window that is used up in the pause ("Paused until 01:00 — free
+  requests today used up, resets 01:00"), in the fallback activity and in "after …" texts, and the pause lasts until that reset
   when the error has no Retry-After.
 - R7 Admin MCP `list_model_accounts` returns `usage` (label, kind, percent used, left, reset ISO time, updated) and
-  `spend_this_month`; the owner assistant uses it ("how much ChatGPT quota is left?"). Secrets never appear.
+  `spend_this_month`; the owner assistant uses it ("how much Copilot quota is left?"). Secrets never appear.
 
-## Follow-up: ChatGPT usage endpoint (#140, v2.28.1)
+## Follow-up: ChatGPT plan usage removed (#144, v2.29.2)
 
-Verified on a real server: the Sign in with ChatGPT route (`POST https://api.openai.com/v1/responses`) sends no
-`x-codex-*` headers and no `codex.rate_limits` event, so ChatGPT plan usage never appeared.
+#140 (v2.28.1–v2.29.1) tried `x-codex-*` headers, the `codex.rate_limits` stream event and
+`chatgpt.com/backend-api/wham/usage`. Verified on a real server: the official Sign in with ChatGPT for third-party apps
+gets none of them. Owner decision: remove the feature and its code.
 
-- **FR-140-1** ChatGPT accounts read `GET https://chatgpt.com/backend-api/wham/usage` (as OpenAI's open-source Codex:
-  `codex-rs/backend-client/src/client/rate_limit_resets.rs` `rate_limit_status_url`) with `Authorization: Bearer
-  <access token>`, `chatgpt-account-id` when the ID token carries one, and Duniya's own `originator` / User-Agent.
-  The body (`rate_limit.primary_window|secondary_window` with `used_percent`, `limit_window_seconds`, `reset_at`,
-  `reset_after_seconds`; `additional_rate_limits`) is parsed defensively; nothing is estimated.
-- **FR-140-2** Read when Models opens (at most every 10 minutes) and on the upkeep tick (at most every 30 minutes); no
-  new timers. A 401 / 403 / 404 records "not available for this sign-in": no numbers, no alert, no error; the ChatGPT
-  page shows one muted line, `list_model_accounts` a `usage_note`; asked again after 24 hours or a new sign-in.
-- **FR-140-3** Header parsing stays and accepts every Codex header family (`x-<limit>-primary-used-percent`, named by
-  `x-<limit>-limit-name`); when headers and the endpoint report the same window, the newer reading wins.
+- **FR-144-1** ChatGPT accounts show no plan limits and no "not available" note; their page keeps Duniya's own 30-day
+  usage line. No request is made for ChatGPT plan usage.
+- **FR-144-2** A ChatGPT usage-limit error still pauses the account until the reset the error reports and the fallback
+  answers (errors.js `retryAfterMs`, breaker).
+- **FR-144-3** Copilot, OpenRouter and API-key rate-limit headroom are unchanged.

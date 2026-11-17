@@ -27,3 +27,10 @@
 - [x] T140-3 Panel muted line; admin MCP `usage_note`
 - [x] T140-4 Tests with a fake usage endpoint (ok, 401/403/404, 5xx, garbage); harness and demo never reach chatgpt.com
 - [x] T140-5 Docs `models.md#plan-usage`, `admin-mcp.md`; version 2.28.1 + `releases.json`
+
+## Follow-up #144 (v2.29.2): ChatGPT plan usage removed
+
+- [x] T144-1 Delete the ChatGPT usage reader, Codex headers/event parsing, `unavailable` mechanism, `usage_note`, muted line
+- [x] T144-2 Tests: ChatGPT shows no usage and pauses until the reported reset; alert/pause/Overview/admin via OpenRouter
+- [x] T144-3 Demo without ChatGPT meters; `card-plan-usage` shot from OpenRouter; Models shots retaken
+- [x] T144-4 Docs (`models.md`, `admin-mcp.md`, `owner-assistant.md`, `spending.md`), README, website; version 2.29.2 + `releases.json`
