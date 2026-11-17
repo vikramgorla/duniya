@@ -18,6 +18,13 @@
         { "type": "fixed", "text": "A server clock that jumps can no longer make Duniya delete history." }
       ]
     },
+    "2.29.2": {
+      "breaking": false,
+      "title": "ChatGPT plan limits removed from Models",
+      "changes": [
+        { "type": "removed", "text": "ChatGPT's 5-hour and weekly limits on Models: ChatGPT doesn't share them with this sign-in. When a ChatGPT limit is reached, Duniya still pauses it until the reset and another model answers." }
+      ]
+    },
     "2.29.1": {
       "breaking": false,
       "title": "ChatGPT plan limits now show up: the 5-hour and weekly limits are read from your plan",

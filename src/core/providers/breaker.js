@@ -41,7 +41,7 @@ const hhmm = (ts) => new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit',
 
 /** Why it failed: the plan window that is used up when the provider reported it (067), else the reason. */
 const why = (s) => s.limit || REASON_TEXT[s.reason] || s.reason;
-/** Plain-language status line, e.g. "Paused until 14:20 — usage limit reached" or "… — 5-hour limit used up, resets 14:20". */
+/** Plain-language status line, e.g. "Paused until 14:20 — usage limit reached" or "… — free requests today used up, resets 01:00". */
 function describe(s) {
   if (s.needsReconnect) return 'Sign-in expired or key rejected — reconnect this account';
   if (s.probing) return `Checking again — last error: ${why(s)}`;
@@ -86,7 +86,7 @@ export function release(id) { const s = states.get(id); if (s) s.probing = false
 /** Earliest time any of these accounts can be tried again (for "paused until"). */
 export const nextTry = (ids) => Math.min(...ids.map((id) => states.get(id)?.until || 0));
 
-/** `limit` (067): the plan window that is used up, e.g. "weekly limit used up, resets Thu 14:20". */
+/** `limit` (067): the plan window that is used up, e.g. "premium requests used up, resets 1 Dec". */
 export function recordFailure(id, cls, { name = id, message = '', limit = '' } = {}) {
   const t = now();
   const s = states.get(id) || { failures: 0, since: t, alerted: false, name };

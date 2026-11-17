@@ -1,5 +1,5 @@
-// Plan usage (067): what a model account's provider reports about its plan, credit and rate limits — the ChatGPT plan's
-// 5-hour and weekly windows, Copilot's premium requests, OpenRouter's credit, an API key's rate-limit headroom — and
+// Plan usage (067): what a model account's provider reports about its plan, credit and rate limits — Copilot's premium
+// requests, OpenRouter's credit and free requests, an API key's rate-limit headroom — and
 // what Duniya spent through it this month. Never estimated: without data nothing is shown. Used by Models and Usage.
 import { ago, h } from './core.js';
 import { fmtCost, meter, plural } from './shared.js';
@@ -15,7 +15,7 @@ function resetText(t) {
   const opts = /** @type {Intl.DateTimeFormatOptions} */ (days < 0.8 ? { hour: '2-digit', minute: '2-digit' } : days < 6 ? { weekday: 'short', hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short' });
   return `resets ${d.toLocaleString([], opts)}`;
 }
-/** Short status for a list row: "62% of 5-hour limit" with a 3 px meter, or null. */
+/** Short status for a list row: "62% of premium requests" with a 3 px meter, or null. */
 export function rowStatus(p) {
   const l = planLimits(p)[0];
   if (!l) return null;
@@ -28,14 +28,11 @@ const spendLine = (p) => (p?.spend?.calls ? h('div', { class: 'small muted num' 
 
 /**
  * A provider page's "Plan usage" section: a meter per plan or credit limit with what is left and its reset time, then
- * the rate-limit headroom of API keys, this month's spend and when the provider last reported. Without data: null, or
- * one muted line when the provider's usage endpoint refused this sign-in.
+ * the rate-limit headroom of API keys, this month's spend and when the provider last reported. Null without data.
  */
 export function planSection(p) {
   const plans = planLimits(p); const rates = rateLimits(p); const spend = spendLine(p);
-  if (!plans.length && !rates.length && !spend) {
-    return p?.usageUnavailable ? h('p', { class: 'small muted' }, `Plan usage is not available for this sign-in: ${p.name} does not report it.`) : null; // #140
-  }
+  if (!plans.length && !rates.length && !spend) return null;
   return h('div', { class: 'plan-usage' },
     h('h3', {}, plans.length ? 'Plan usage' : 'Usage and limits'),
     plans.map(limitRow),
