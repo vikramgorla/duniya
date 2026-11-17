@@ -1,6 +1,6 @@
 // First-load measurement of the panel (063): the seeded demo panel in headless Chrome on throttled networks.
 // Reports what a signed-in owner downloads before Overview is drawn and how long that takes, cold (empty cache) and
-// warm (a second visit). Needs Chrome (CHROME_PATH); no network beyond 127.0.0.1.
+// warm (a second visit), also with a phone-speed CPU. Needs Chrome (CHROME_PATH); no network beyond 127.0.0.1.
 //
 //   npm run measure:load            → a table: profile, cold/warm, bytes, requests, first render (median of 3 runs)
 import { startDemo, DEMO_PASSWORD } from './demo-panel.mjs';
@@ -9,6 +9,7 @@ import { launch, newPage } from './cdp.mjs';
 const PROFILES = [
   { name: '1.6 Mbps / 150 ms', down: 1.6e6 / 8, up: 750e3 / 8, latency: 150 },
   { name: '10 Mbps / 40 ms', down: 10e6 / 8, up: 5e6 / 8, latency: 40 },
+  { name: '10 Mbps / 40 ms, phone CPU (4× slower)', down: 10e6 / 8, up: 5e6 / 8, latency: 40, cpu: 4 },
 ];
 const RUNS = 3;
 // Marks the moment the Overview hero card exists (constant source, installed before every navigation).
@@ -47,6 +48,7 @@ async function visit() {
 const rows = [];
 for (const p of PROFILES) {
   await page.send('Network.emulateNetworkConditions', { offline: false, latency: p.latency, downloadThroughput: p.down, uploadThroughput: p.up });
+  await page.send('Emulation.setCPUThrottlingRate', { rate: p.cpu || 1 });
   for (const mode of ['cold', 'warm']) {
     const runs = [];
     for (let i = 0; i < RUNS; i++) {

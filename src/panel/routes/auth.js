@@ -5,6 +5,7 @@ import { passwordLoginAllowed } from '../../core/google-signin.js';
 import { authenticate, countUsers, createUser, deleteSession, deleteUser, listUsers, updateUser } from '../../core/store.js';
 import { checkSetupCode, clientIp, cookie, limiter, requestUser, setSessionCookie, setSetupCode } from '../http.js';
 import { googleReady } from './google.js';
+import { statusFor } from './status.js';
 import { rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { env, DATA_DIR } from '../../core/config.js';
@@ -33,12 +34,14 @@ export function bootstrapAuth() {
   console.log(`\n  First-run setup code: ${setupCode}\n  Open the admin panel and enter it to create the owner account.\n`);
 }
 
-/** @param {import('../http.js').Route} route */
-export function authRoutes(route) {
+/** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
+export function authRoutes(route, { channel } = {}) {
   // ---------- session / setup ----------
-  route('GET', '/api/session', async (req) => {
+  // 063: ?status=1 adds the status for a signed-in user, so the panel's first screen needs one round trip, not two
+  route('GET', '/api/session', async (req, res, body, q) => {
     const user = requestUser(req);
-    return { authed: !!user, user, needsSetup: countUsers() === 0, google: googleReady(), passwordLogin: passwordLoginAllowed() };
+    return { authed: !!user, user, needsSetup: countUsers() === 0, google: googleReady(), passwordLogin: passwordLoginAllowed(),
+      ...(user && q.get('status') === '1' ? { status: await statusFor(user, channel) } : {}) };
   }, { public: true });
   route('POST', '/api/setup', async (req, res, body) => {
     if (countUsers() > 0) return [409, { error: 'Already set up' }];

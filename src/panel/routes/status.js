@@ -25,25 +25,26 @@ const smallModeView = () => ({ enabled: smallServerMode(), server: serverSize(),
     'Local tool services (at most 2 at once, started when first used, stopped when memory is tight)'],
   notCovered: ['GitHub Copilot sign-in (its ~400 MB download and helper do not fit next to the app; needs 2 GB)'] });
 
+/** What Overview and the shell show (GET /api/status, the live stream, and the panel's first load with the session). */
+export const statusFor = async (user, channel) => ({
+  user, enabledChats: enabledChats().length,
+  channel: await channel.status(),
+  settings: getSettings(),
+  version: await gitVersion(),
+  uptimeSec: Math.round((Date.now() - startedAt) / 1000),
+  memoryMb: Math.round(process.memoryUsage().rss / 1048576),
+  server: { ...serverSize(), smallMode: smallServerMode() }, // small-server guardrails (043, 055): size, RAM, CPUs, switch
+  mediaQueue: queueStats(),
+  node: process.version,
+  agents: listAgents().filter((b) => !isBuiltin(b)).map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })), // 059: chat agents
+  pending: listPending().length,
+  // #96: Server tab badge — only updates that will install now (from the last check; never runs apt here)
+  osUpdates: ['admin', 'owner'].includes(user?.role) ? { ...(osUpdatesCached() || { count: 0, security: 0, at: null }), restart: rebootStatus().required } : null,
+});
+
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
 export function statusRoutes(route, { channel } = {}) {
-  // ---------- overview ----------
-  const statusFor = async (user) => ({
-    user, enabledChats: enabledChats().length,
-    channel: await channel.status(),
-    settings: getSettings(),
-    version: await gitVersion(),
-    uptimeSec: Math.round((Date.now() - startedAt) / 1000),
-    memoryMb: Math.round(process.memoryUsage().rss / 1048576),
-    server: { ...serverSize(), smallMode: smallServerMode() }, // small-server guardrails (043, 055): size, RAM, CPUs, switch
-    mediaQueue: queueStats(),
-    node: process.version,
-    agents: listAgents().filter((b) => !isBuiltin(b)).map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })), // 059: chat agents
-    pending: listPending().length,
-    // #96: Server tab badge — only updates that will install now (from the last check; never runs apt here)
-    osUpdates: ['admin', 'owner'].includes(user?.role) ? { ...(osUpdatesCached() || { count: 0, security: 0, at: null }), restart: rebootStatus().required } : null,
-  });
-  route('GET', '/api/status', async (req, res, body, q, p, user) => statusFor(user));
+  route('GET', '/api/status', async (req, res, body, q, p, user) => statusFor(user, channel));
   // 055: Small server mode — one server-wide switch for heavier features on a small server (owner only).
   route('GET', '/api/server/small-mode', async () => smallModeView());
   route('PUT', '/api/server/small-mode', async (req, res, body, q, p, user) => {
@@ -73,7 +74,7 @@ export function statusRoutes(route, { channel } = {}) {
     let last = ''; let soon = null; let closed = false;
     const pushStatus = async (always) => {
       soon = null;
-      const st = await statusFor(user).catch(() => null);
+      const st = await statusFor(user, channel).catch(() => null);
       if (!st || closed) return;
       const { uptimeSec, memoryMb, ...rest } = st;
       const sig = JSON.stringify(rest);

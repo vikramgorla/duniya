@@ -4,16 +4,15 @@ import { $, S, api, boot, field, gLogo, h, logo, meterEl, show, uploadFile, wait
 export async function renderLogin() {
   S.es?.close(); S.es = null;
   const app = $('#app'); app.replaceChildren();
-  // 063: ask for the status together with the session, so a signed-in owner's first screen waits one round trip less
-  const early = fetch('/api/status').then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  let info = {}; try { info = await (await fetch('/api/session')).json(); } catch {}
+  // 063: the session answer carries the status when signed in, so the first screen waits for one round trip, not two
+  let info = {}; try { info = await (await fetch('/api/session?status=1')).json(); } catch {}
   S.google = !!info.google;
   const brand = () => [h('div', { style: 'display:flex;justify-content:center;margin:4px 0 6px' }, Object.assign(logo(), { style: 'width:76px;height:76px' })),
     h('h2', { style: 'text-align:center;font-size:24px;margin-bottom:2px' }, 'Duniya')];
   const signup = /^#signup=([a-f0-9]{64})$/.exec(location.hash);
   if (signup) return renderSignup(app, brand, signup[1]);
   if (/^#secret=/.test(location.hash)) sessionStorage.setItem('duniya.link', location.hash); // survives Sign in with Google
-  if (info.authed) { S.user = info.user; return boot(await early); }
+  if (info.authed) { S.user = info.user; return boot(info.status); }
   const err = h('div', { class: 'small', style: 'color:var(--bad);min-height:20px;margin-top:6px' });
   if (info.needsSetup) return renderSetup(app, brand);
   if (info.google && info.passwordLogin === false) { // 028: the owner allows only Sign in with Google

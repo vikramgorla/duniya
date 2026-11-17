@@ -98,6 +98,19 @@ test('063: modules behind an import map: every module pinned by its content hash
   assert.equal((await get('/app/missing.js')).status, 404);
 });
 
+test('063: the session answer carries the status for the first screen, only when signed in and asked', async () => {
+  const anon = await (await fetch(`${t.base}/api/session?status=1`)).json();
+  assert.equal(anon.authed, false);
+  assert.equal(anon.status, undefined, 'nothing about the server before sign-in');
+  const plain = (await t.api(cookie, 'GET', '/api/session')).body;
+  assert.equal(plain.status, undefined, 'only when asked');
+  const st = (await t.api(cookie, 'GET', '/api/session?status=1')).body.status;
+  const direct = (await t.api(cookie, 'GET', '/api/status')).body;
+  assert.deepEqual(Object.keys(st).sort(), Object.keys(direct).sort());
+  assert.equal(st.version, direct.version);
+  assert.equal(st.user.username, 'admin');
+});
+
 test('061: the panel is an installable web app: manifest, icons that exist, iOS tags, no service worker', async () => {
   const html = (await get('/')).body.toString('utf8');
   const m = JSON.parse((await get('/manifest.webmanifest')).body.toString('utf8'));

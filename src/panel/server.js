@@ -49,7 +49,7 @@ export function startPanel({ channel, extend = [] }) {
   });
 
 
-  authRoutes(route); // session, setup, sign-in, own password, users
+  authRoutes(route, { channel }); // session, setup, sign-in, own password, users
   googleRoutes(route); // Sign in with Google, invites (019)
   webRoutes(route); // web address & access (031)
   linkRoutes(route, { invoke }); // POST /api/users (with a password or a sign-up link), one-time links (060)

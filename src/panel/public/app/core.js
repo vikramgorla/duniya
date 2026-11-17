@@ -197,7 +197,7 @@ const MOVED = { secrets: 'settings/secrets' };
 
 // ---------- shell ----------
 let statusTimer = null; // slow fallback poll, only while the live stream is down
-/** The signed-in shell. `status`: an /api/status answer fetched alongside the session (login.js), if any. */
+/** The signed-in shell. `status`: the status that came with the session (login.js), if any. */
 export async function boot(status = null) {
   const app = $('#app'); app.replaceChildren();
   document.body.classList.toggle('readonly', !can('admin'));
