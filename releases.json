@@ -1,6 +1,13 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.34.1": {
+      "breaking": false,
+      "title": "A renamed WhatsApp group shows its new name right away",
+      "changes": [
+        { "type": "improved", "text": "When a group is renamed on WhatsApp, Duniya saves the new name as soon as WhatsApp tells it, so Chats, Activity, Why quiet and the owner assistant show it at once." }
+      ]
+    },
     "2.34.0": {
       "breaking": false,
       "title": "Use your Claude, ChatGPT and Copilot plans through their official apps, also on a 1 GB server",

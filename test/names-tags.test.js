@@ -217,3 +217,17 @@ test('admin MCP covers the names status and the optional refresh', async () => {
   assert.equal(r.status, 200);
   assert.equal(r.body.numbers[0].ok, true);
 });
+
+test('#159: a group renamed on WhatsApp shows its new name at once (groups.update), also a newly joined group', async () => {
+  const { sock } = await channel();
+  const names = await import('../src/core/chat-names.js');
+  sock.ev.emit('groups.upsert', [{ id: '999000111@g.us', subject: 'Carpool' }]);
+  await wait();
+  assert.equal(names.chatLabel('999000111@g.us'), 'Carpool');
+  sock.ev.emit('groups.update', [{ id: '999000111@g.us', subject: 'Carpool Vevey' }]);
+  await wait();
+  assert.equal(names.chatLabel('999000111@g.us'), 'Carpool Vevey');
+  sock.ev.emit('groups.update', [{ id: '999000111@g.us', announce: true }]); // other group changes keep the name
+  await wait();
+  assert.equal(names.chatLabel('999000111@g.us'), 'Carpool Vevey');
+});

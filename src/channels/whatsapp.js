@@ -12,6 +12,8 @@ import { activity, bus } from '../core/events.js';
 import { loadMedia, MAX_MEDIA_BYTES } from '../core/media.js';
 import { savePoll, getPoll, kvGet, kvSet } from '../core/db.js';
 import { syncWhatsAppContacts, mapLid, unmappedLids } from '../core/contacts.js';
+import { rememberGroupNames } from '../core/chat-names.js';
+import { chatKey } from '../core/direct-chats.js';
 
 const logger = pino({ level: process.env.BAILEYS_LOG || 'warn' });
 // 057: address-book names live in the app-state collection "critical_unblock_low" (contactAction / lidContactAction).
@@ -136,6 +138,12 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     // reports all of them as action "add" (stub types GROUP_PARTICIPANT_ADD / _INVITE / _ADD_REQUEST_JOIN); "invite"
     // and "join" are accepted too. Participants are contacts ({ id, phoneNumber }) or plain jids. The number itself is
     // skipped (its own join is not a new member).
+    // A group renamed (or newly joined): save its subject at once, so the new name shows everywhere (#159)
+    const renamed = (list) => { const named = (list || []).filter((g) => g?.id && typeof g.subject === 'string' && g.subject.trim());
+      for (const g of named) invalidate(g.id);
+      safe(() => rememberGroupNames(named.map((g) => ({ id: chatKey(number, g.id), name: g.subject })))); };
+    sock.ev.on('groups.update', renamed);
+    sock.ev.on('groups.upsert', renamed);
     sock.ev.on('group-participants.update', async ({ id, participants, action }) => {
       if (mySock !== sock || !isJidGroup(id)) return;
       groupCache.delete(id);
