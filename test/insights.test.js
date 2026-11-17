@@ -274,3 +274,14 @@ test('#163: the test console sends its conversation so far, so a follow-up is un
   assert.ok(!last.includes('turn 9 ') && last.includes('turn 10 ') && last.includes('turn 29 '));
   assert.ok(!last.includes('x'.repeat(2001)));
 });
+
+test('#165: "Everyone: all tools" (service:* for both roles) gives participants every tool, never the confirm tool', async () => {
+  const before = (await t.api(owner, 'GET', '/api/agents/panduga')).body.config.tools;
+  const r = await t.api(owner, 'PUT', '/api/agents/panduga', { tools: { ...before, participant: [...before.participant.filter((x) => !x.startsWith('panduga:')), 'panduga:*'], organizer: [...before.organizer.filter((x) => !x.startsWith('panduga:')), 'panduga:*'] } });
+  assert.equal(r.status, 200);
+  const names = (role) => t.api(owner, 'GET', `/api/agents/panduga/test-tools?role=${role}`).then((x) => x.body.services.find((s) => s.service === 'panduga').tools.map((y) => y.name));
+  const [p, o] = [await names('participant'), await names('organizer')];
+  assert.ok(p.includes('room_assign_preview') && !p.includes('confirm'));
+  assert.deepEqual(p.sort(), o.sort());
+  await t.api(owner, 'PUT', '/api/agents/panduga', { tools: before });
+});

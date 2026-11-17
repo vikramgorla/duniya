@@ -144,7 +144,9 @@ Admin MCP and owner assistant: `set_agent_quick_answers` (only the parts given c
 
 1. Agent page → **Tools** → **+ Add by address** → enter the URL → **Check**.
 2. **Connect** to sign in (OAuth, your own OAuth app), or use a token or custom headers.
-3. **Discover tools** → tick what participants and organizers may use → save.
+3. **Discover tools** → tick what participants and organizers may use → save. **All: Participants** / **All: Organizers**
+   tick all or none; **Everyone: all tools** gives both roles every tool (the confirm tool still never reaches the
+   model). WhatsApp tools have the same *All* ticks.
 
 Or skip the URL hunting: **Browse tool services** (below).
 
