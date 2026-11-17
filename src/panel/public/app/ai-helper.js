@@ -3,12 +3,12 @@ import * as D from './diff.js';
 import { api, ask as askDialog, h, toast, tryApi } from './core.js';
 import { loadModels, modelLabel, modelSelect, plural, trunc } from './shared.js';
 // ---------- AI helper (016) ----------
-const FIELD_LABEL = { name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', dm: 'Who may message it directly',
+const FIELD_LABEL = { name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', groupReplies: 'In groups', dm: 'Who may message it directly',
   organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', globalMcp: 'Global tool services', tools: 'Tool rules', confirm: 'Confirmation', schedules: 'Schedules', memory: 'Memory',
   model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', enabled: 'Enabled', media: 'Photos & voice',
   quickReplies: 'Quick replies', help: '!help list', welcome: 'Welcome message', faq: 'FAQ auto-answers' };
 // The agent page's sections (068), in its order: the review groups changes the same way.
-const AI_SECTIONS = [['Character', ['name', 'description', 'prompt']], ['Where it answers', ['enabled', 'triggers', 'respondToMentions', 'dm']], ['People', ['organizers', 'participants']],
+const AI_SECTIONS = [['Character', ['name', 'description', 'prompt']], ['Where it answers', ['enabled', 'triggers', 'respondToMentions', 'groupReplies', 'dm']], ['People', ['organizers', 'participants']],
   ['Quick replies & FAQ', ['quickReplies', 'help', 'faq']], ['Welcome', ['welcome']], ['Schedules', ['schedules']], ['Model', ['model']],
   ['Tools', ['mcpServers', 'globalMcp', 'tools', 'confirm']], ['Memory', ['memory']], ['Photos & voice', ['media']], ['Advanced', ['timezone', 'historySize', 'maxTokens']]];
 const AI_ORDER = AI_SECTIONS.flatMap(([, f]) => f);

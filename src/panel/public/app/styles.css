@@ -761,3 +761,9 @@ button.lrow { width: 100%; border: 0; background: none; font: inherit; text-alig
 .rv-a.open { display: block; }
 .rv-t:not(.on) { filter: grayscale(1); opacity: .7; }
 .devcode { font-size: 22px; font-weight: 700; letter-spacing: .08em; padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--card); }
+/* 076: tags (wake words) — chips inside one box; the box looks like an input */
+.tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border: 1px solid var(--line-2); border-radius: var(--radius-s); background: var(--card); padding: 6px 8px; cursor: text; }
+.tags input { border: 0; padding: 4px 2px; flex: 1; min-width: 120px; width: auto; background: none; box-shadow: none; }
+.tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 10px; border-radius: 999px; background: var(--bg-2); font-size: var(--fs-s); overflow-wrap: anywhere; }
+.tag-x { font: inherit; border: 0; background: none; color: var(--muted); cursor: pointer; min-width: 40px; min-height: 40px; margin: -9px -4px -9px -6px; border-radius: 999px; }
+.tag-x:hover { color: var(--ink); background: var(--line); }

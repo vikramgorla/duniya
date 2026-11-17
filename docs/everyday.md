@@ -50,7 +50,7 @@ their name (the group's WhatsApp name, or the person's), never by an id.
 <details>
 <summary>All reasons</summary>
 
-*chat is off*, *not mentioned*, *no agent chosen*, *agent is off*, *all agents paused*, *direct messages off*,
+*chat is off*, *not mentioned*, *not for it* (it read the message and left it), *no agent chosen*, *agent is off*, *all agents paused*, *direct messages off*,
 *sender not allowed*, *rate limit*, *model error*, *empty answer*, *budget cap reached*, *server busy*, *waited too
 long*. Only counts, the last time and one sample sender are kept, never the messages. Admin MCP: `list_silences`.
 

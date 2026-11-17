@@ -17,6 +17,7 @@ db.exec(`
 /** Reasons, in plain words. `label` fits "Quiet: …"; `fix` names the one-click fix the panel offers. */
 export const SILENCE_REASONS = Object.freeze({
   chat_off: { label: 'chat is off', explain: 'This chat is switched off, so agents ignore it.', fix: 'chat_on' },
+  not_for_me: { label: 'not for it', explain: 'The agent read the message (a follow-up or a group it answers when needed) and decided it was not for it.', fix: 'triggers' },
   not_addressed: { label: 'not mentioned', explain: 'Nobody @mentioned the agent, replied to it or started with one of its triggers.', fix: 'triggers' },
   no_agent: { label: 'no agent chosen', explain: 'Someone addressed an agent, but no agent is chosen for this group.', fix: 'assign' },
   agent_disabled: { label: 'agent is off', explain: 'The agent for this chat is switched off.', fix: 'agent_on' },

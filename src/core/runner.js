@@ -1,4 +1,5 @@
 // @ts-check
+import { JUDGE_NOTE } from './group-replies.js';
 import { randomInt } from 'node:crypto';
 import { env } from './config.js';
 import { addPending, takePending, peekPending, dropPending } from './db.js';
@@ -119,7 +120,7 @@ export async function runAgent(ctx) {
   const notes = [ctx.mediaNote, plan.note].filter(Boolean).join('\n');
   // #163: the panel test console sends its conversation so far (it is not stored as chat history)
   const thread = Array.isArray(ctx.thread) && ctx.thread.length ? `Earlier in this test conversation:\n${ctx.thread.map((t) => `${t.from === 'agent' ? 'You' : senderName}: ${t.text}`).join('\n')}\n\n` : '';
-  const turnText = `${memory ? `${memory}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}`;
+  const turnText = `${memory ? `${memory}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}${ctx.unaddressed ? `\n\n${JUDGE_NOTE}` : ''}`;
   const messages = [{
     role: 'user',
     content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText,

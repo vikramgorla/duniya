@@ -327,11 +327,12 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
       ...JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures/panduga-agent.json'), 'utf8')), name: 'Panduga', model: 'anthropic:claude-sonnet-5-5',
       // token-based service (OAuth sign-in has its own test, mcp-oauth.test.js)
       mcpServers: { panduga: { url: '${PANDUGA_MCP_URL}', tokens: { organizer: '${PANDUGA_TOKEN_ORGANIZER}', participant: '${PANDUGA_TOKEN_MEMBER}' } } },
-      chats: ['g1@g.us'], organizers: ['+41 79 000 00 01'], ...(bindings.panduga || {}),
+      // 076: the older tests expect wake-word-only groups; group-replies.test.js covers follow-ups and auto
+      groupReplies: 'wake', chats: ['g1@g.us'], organizers: ['+41 79 000 00 01'], ...(bindings.panduga || {}),
     } });
     await t.agents.createAgent({ id: 'helper', config: {
       name: 'Helper', prompt: 'You help.', model: 'anthropic:claude-sonnet-5-5', triggers: ['!help'], dm: 'organizers',
-      chats: ['g2@g.us'], organizers: ['41790000001'], ...(bindings.helper || {}),
+      groupReplies: 'wake', chats: ['g2@g.us'], organizers: ['41790000001'], ...(bindings.helper || {}),
     } });
   }
   // #10: chats are off by default. Tests written before that switch on the chats they use; tests about the
