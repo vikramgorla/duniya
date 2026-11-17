@@ -1,9 +1,9 @@
 // Agents → one agent: the editor (instructions, chats, people, tools, schedules, quick answers, test console). Module of the panel (063).
 import { aiHelper } from './ai-helper.js';
-import { $, S, api, can, field, fieldError, h, lines, plural, splitLines, tagPill, time, toast, tryApi, whoLabel } from './core.js';
+import { $, S, api, ask, can, field, fieldError, h, lines, splitLines, tagPill, time, toast, tryApi, whoLabel } from './core.js';
 import { fallbackLine, fallbackPicker } from './fallback.js';
 import { browseButton } from './registry.js';
-import { loadModels, modelLabel, modelSelect, openAgent } from './shared.js';
+import { loadModels, modelLabel, modelSelect, openAgent, plural } from './shared.js';
 import { ROLE_LABEL, globRe, markSaved, serverConfig, serverState, toolGrid, toolServiceEditor } from './tool-editor.js';
 import { capEditor } from './usage.js';
 export async function renderAgentEditor(id) {
@@ -21,7 +21,7 @@ export async function renderAgentEditor(id) {
   F.dm = h('select', {}, [['members', 'Members of its groups + listed participants'], ['organizers', 'Organizers only'], ['anyone', 'Anyone — even people whose chat is off'], ['none', 'Nobody']].map(([v, l]) => h('option', { value: v, selected: c.dm === v }, l)));
   F.enabled = h('input', { type: 'checkbox', checked: c.enabled }); F.respondToMentions = h('input', { type: 'checkbox', checked: c.respondToMentions });
   F.memory = h('input', { type: 'checkbox', checked: c.memory?.enabled !== false });
-  F.prompt = h('textarea', { class: 'prose', value: c.prompt });
+  F.prompt = h('textarea', { class: 'prose', 'aria-label': 'Instructions', value: c.prompt });
   F.triggers = h('input', { value: (c.triggers || []).join(', ') });
   F.organizers = h('textarea', { value: lines(c.organizers), style: 'min-height:60px' });
   F.participants = h('textarea', { value: lines(c.participants), style: 'min-height:50px' });
@@ -269,7 +269,7 @@ export async function renderAgentEditor(id) {
         h('a', { class: 'btn phone-only', href: '#test-console', onclick: (e) => { e.preventDefault(); $('#test-console')?.scrollIntoView({ behavior: 'smooth' }); } }, 'Test ↓'),
         h('a', { class: 'btn', href: `/api/agents/${encodeURIComponent(id)}/export`, download: `${id}.agent.json` }, 'Export'),
         bi ? null : h('button', { class: 'btn mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/agents/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openAgent(r.id); } }, 'Duplicate'),
-        bi ? null : h('button', { class: 'btn danger mut', onclick: async () => { if (confirm(`Delete “${c.name}”? Its group bindings are removed; chat memory stays until erased.`) && await tryApi(() => api('DELETE', `/api/agents/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'agents'; } } }, 'Delete'),
+        bi ? null : h('button', { class: 'btn danger mut', onclick: async () => { if (await ask({ title: `Delete “${c.name}”?`, text: 'Its chats no longer have this agent. Chat memory stays until you erase it.', ok: 'Delete agent', danger: true }) && await tryApi(() => api('DELETE', `/api/agents/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'agents'; } } }, 'Delete'),
         h('button', { class: 'btn primary mut', onclick: save }, 'Save'))),
     can('admin') ? await aiHelper({ agentId: id, title: [h('span', { class: 'ai-chip' }, 'AI'), 'Change this agent with AI'], applyLabel: 'Apply & save',
       placeholder: 'What should change? e.g. “Make the replies shorter and friendlier”, “Let participants also see the shopping list”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',

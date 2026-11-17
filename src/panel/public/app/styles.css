@@ -85,6 +85,7 @@ nav.tabs button.on::after { content: ""; width: 6px; height: 6px; border-radius:
 @media (prefers-color-scheme: dark) { nav.tabs button.on::after { background: var(--accent-ink); box-shadow: none; } }
 .nbadge { font: 700 var(--fs-s)/18px var(--mono); min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--warn-soft); color: var(--warn); text-align: center; }
 .nbadge:empty { display: none; }
+nav.tabs button.on .nbadge { background: var(--accent-ink); color: var(--accent); }
 /* Bottom tab bar (064): phones and the installed app on a touch screen. Four everyday screens + More. */
 nav.tabbar { display: none; }
 @media (max-width: 640px), (display-mode: standalone) and (pointer: coarse) {
@@ -99,7 +100,7 @@ nav.tabbar { display: none; }
   nav.tabbar button.on { background: none; color: var(--ink); }
   nav.tabbar button.on svg { opacity: 1; }
   nav.tabbar button.on::before { content: ""; position: absolute; top: 2px; width: 44px; height: 30px; border-radius: 15px; background: var(--signal); z-index: -1; }
-  nav.tabbar button .nbadge { position: absolute; top: 0; right: calc(50% - 24px); font-size: var(--fs-s); line-height: 18px; min-width: 18px; padding: 0 4px; background: var(--bad); color: #fff; }
+  nav.tabbar button .nbadge { position: absolute; top: 0; right: calc(50% - 24px); font-size: var(--fs-s); line-height: 18px; min-width: 18px; padding: 0 4px; background: #c42443; color: #fff; }
   main { padding-bottom: calc(var(--tabbar-h) + 32px + env(safe-area-inset-bottom)) !important; }
 }
 main { max-width: 1160px; margin: 0 auto; padding: 18px var(--s5) 48px; }
@@ -244,13 +245,22 @@ dialog.dlg::backdrop { background: var(--scrim); }
 dialog.dlg h2 { margin-top: 0; }
 dialog.dlg ul { margin: 6px 0 0; padding-left: 18px; }
 dialog.dlg.sheet { width: min(720px, calc(100vw - 24px)); }
+/* the panel's own confirmation (064): question, what happens, optional details, the action named on its button */
+dialog.ask { width: min(480px, calc(100vw - 24px)); padding: var(--s5); }
+dialog.ask h2 { font-size: var(--fs-l); margin: 0 0 var(--s2); }
+dialog.ask .ask-text p { margin: 0 0 var(--s2); color: var(--muted); white-space: pre-line; overflow-wrap: anywhere; }
+dialog.ask .ask-body { margin: var(--s3) 0; max-height: 45vh; overflow: auto; }
+dialog.ask .ask-actions { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s4); flex-wrap: wrap; }
+dialog.ask.danger h2::before { content: "!"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; margin-right: 8px; background: var(--bad-soft); color: var(--bad); font: 700 13px var(--mono); vertical-align: 2px; }
+.btn.danger.solid { background: #c42443; border-color: #c42443; color: #fff; }
+.btn.danger.solid:hover { box-shadow: 0 8px 20px -10px rgba(196,36,67,.8); }
 /* toasts: stack, errors look different and interrupt politely (064) */
 .toasts { position: fixed; bottom: calc(20px + var(--tabbar-h) + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 40; display: flex; flex-direction: column; align-items: center; gap: var(--s2); width: max-content; max-width: 92vw; pointer-events: none; }
 .toast { display: flex; align-items: center; gap: var(--s3); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; max-width: 100%; box-shadow: var(--shadow); pointer-events: auto; animation: toastin var(--slow) var(--ease); }
-.toast.bad { background: var(--bad); color: #fff; }
+.toast.bad { background: #c42443; color: #fff; }
 .toast.bad::before { content: "!"; font: 700 12px/18px var(--mono); width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,.25); text-align: center; flex: none; }
-.toast button { font: inherit; font-weight: 700; color: var(--signal); background: none; border: 0; padding: 6px 4px; min-height: 32px; cursor: pointer; }
-@media (prefers-color-scheme: light) { .toast button { color: var(--signal); } }
+.toast button { font: inherit; font-weight: 700; color: var(--signal); background: none; border: 0; padding: 6px 6px; min-height: 40px; cursor: pointer; }
+@media (prefers-color-scheme: dark) { .toast button { color: var(--signal-deep); } }
 @keyframes toastin { from { opacity: 0; transform: translateY(10px); } }
 /* activity feed */
 .feed { list-style: none; margin: 0; padding: 0; }
@@ -464,12 +474,13 @@ dialog.palette input { width: 100%; font-size: 16px; }
 @media (min-width: 1200px) { nav.tabs { max-width: none; margin: 0; padding-left: max(16px, calc((100% - 1160px) / 2 + 16px)); } }
 @media (max-width: 720px) { .console { grid-template-columns: 1fr; } .leds { justify-content: flex-start; } }
 
-/* ---------- phones (iPhone 15 = 393 px, SE = 375 px): 40 px taps, nothing under 13 px, nothing wider than the screen ---------- */
+/* Phones (iPhone 15 = 393 px, SE = 375 px): 40 px taps, nothing under 13 px, nothing wider than the screen. */
 @media (max-width: 640px) {
   main { padding: 14px var(--s3) 40px; } .card { padding: var(--s4); } .bar { padding: 10px 14px 10px; gap: var(--s2); }
   .phone-only { display: inline-flex !important; } .desk-only { display: none !important; }
-  dialog.dlg.sheet, dialog.dlg.more { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 20px 20px 0 0; max-height: 92vh; padding: var(--s4) 14px calc(var(--s4) + env(safe-area-inset-bottom)); }
-  dialog.dlg.sheet[open], dialog.dlg.more[open] { animation: rise var(--slow) var(--ease); }
+  dialog.dlg.sheet, dialog.dlg.more, dialog.dlg.ask { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 20px 20px 0 0; max-height: 92vh; padding: var(--s4) 14px calc(var(--s4) + env(safe-area-inset-bottom)); }
+  dialog.ask .ask-actions > .btn { flex: 1; min-height: 48px; }
+  dialog.dlg.sheet[open], dialog.dlg.more[open], dialog.dlg.ask[open] { animation: rise var(--slow) var(--ease); }
   label.tick { min-width: 40px; min-height: 40px; }
   .btn, button.btn, .btn.small, .btn.icon { min-height: 40px; } .btn.icon { width: 40px; }
   .btn.small { padding: 6px 12px; white-space: nowrap; }
@@ -484,7 +495,7 @@ dialog.palette input { width: 100%; font-size: 16px; }
   /* 16 px form fields: iOS zooms into anything smaller when it gets focus (061) */
   input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 16px; }
   .pill, .eyebrow, legend, th, .led, .feed .meta, .pulse, pre, .steps code, .ptags code, .copyrow code, .toast, .brand small, .toolset code, .dgl,
-  table.stack td[data-label]:not([data-label=""])::before { font-size: var(--fs-s); }
+  table.stack td[data-label]:not([data-label=""])::before { font-size: 13px; }
   .pill { white-space: normal; overflow-wrap: anywhere; }
   legend, .eyebrow, th, .led { letter-spacing: .08em; }
   td { overflow-wrap: anywhere; }

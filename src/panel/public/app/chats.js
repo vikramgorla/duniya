@@ -1,8 +1,8 @@
 // Chats screen: on/off per chat, direct chats, history, WhatsApp settings and memory. Module of the panel (063).
-import { $, S, ago, api, avatar, can, copyRow, emptyState, field, h, plural, refreshStatus, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
+import { $, S, ago, api, ask, avatar, can, copyRow, emptyState, field, h, refreshStatus, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
 import { chatFallbackEditor, chatFallbackLine } from './fallback.js';
 import { silenceFix } from './quiet.js';
-import { loadModels, modelSelect, quietLine, usageLine } from './shared.js';
+import { loadModels, modelSelect, plural, quietLine, usageLine } from './shared.js';
 import { capAmount, capEditor, usageSummary } from './usage.js';
 let chatsFilter = 'all';
 let chatsQuery = ''; // 062: Find a chat
@@ -223,7 +223,7 @@ function whatsappCard(c) {
       if (!r) return;
       linkBox.replaceChildren(r.link ? copyRow(r.link) : h('p', { class: 'small muted' }, 'WhatsApp did not return a link.'),
         h('button', { class: 'btn small danger', onclick: async () => {
-          if (!confirm('Reset the invite link? Anyone with the old link can no longer join with it.')) return;
+          if (!await ask({ title: 'Reset the invite link?', text: 'Anyone with the old link can no longer join with it. A new link is created.', ok: 'Reset link', danger: true })) return;
           const n = await tryApi(() => api('POST', `/api/chats/${enc}/whatsapp/invite/revoke`), 'New invite link created');
           if (n) { linkBox.firstChild.replaceWith(copyRow(n.link)); }
         } }, 'Reset link'));
@@ -294,7 +294,7 @@ async function renderMemory(c, box) {
       h('button', { class: 'btn small mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/notes/${n.id}`); renderMemory(c, box); }, 'Note deleted') }, 'Delete')))) : h('p', { class: 'small muted' }, 'No notes.'),
     h('div', { class: 'row mut', style: 'margin-top:10px' },
       h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('POST', `/api/chats/${enc}/memory/summarize`); renderMemory(c, box); }, 'Summary rebuilt') }, 'Rebuild summary'),
-      h('button', { class: 'btn danger', onclick: () => confirm(`Erase all stored messages, the summary and notes for “${c.name}”?`) && tryApi(async () => { await api('DELETE', `/api/chats/${enc}/memory`); renderMemory(c, box); }, 'Memory erased') }, 'Erase memory'))));
+      h('button', { class: 'btn danger', onclick: async () => (await ask({ title: `Erase the memory of “${c.name}”?`, text: 'All stored messages, the running summary and the notes of this chat are deleted. This cannot be undone.', ok: 'Erase memory', danger: true })) && tryApi(async () => { await api('DELETE', `/api/chats/${enc}/memory`); renderMemory(c, box); }, 'Memory erased') }, 'Erase memory'))));
   if (can('admin') && c.isGroup) box.append(whatsappCard(c));
   if (can('admin')) box.append(messagesCard(c));
   box.scrollIntoView({ behavior: 'smooth' });

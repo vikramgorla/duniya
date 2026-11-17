@@ -1,5 +1,5 @@
 // Models screen: providers, accounts, defaults, fallback, photos & voice capabilities. Module of the panel (063).
-import { $, S, api, can, field, h, toast, toggle, tryApi } from './core.js';
+import { $, S, api, ask, can, field, h, toast, toggle, tryApi } from './core.js';
 import { chainEditor } from './fallback.js';
 import { LINKS, loadModels, meter, modelSelect, saveSecretKey, usageLine } from './shared.js';
 import { usageSummary } from './usage.js';
@@ -119,7 +119,7 @@ function accountsBox({ first, provs, addForm, ownerOnly }) {
       p.health?.state === 'reconnect' && p.type === 'chatgpt' && can('owner') ? (() => { const f = chatgptFlow({ account: p.id }); return h('div', {}, f.start, f.form); })() : null,
       h('div', { class: 'row', style: 'margin-top:8px' }, t?.btn,
         can('admin') ? h('details', { class: 'small mut' }, h('summary', {}, 'Rename'), h('form', { class: 'row nowrap', style: 'margin-top:6px', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', `/api/accounts/${encodeURIComponent(p.id)}`, { label: name.value.trim() }), 'Renamed')) { S.models = null; renderModels(); } } }, name, h('button', { class: 'btn small' }, 'Save'))) : null,
-        can('owner') ? h('button', { class: 'btn small danger mut', onclick: () => confirm(`Remove ${p.name}? Its key or sign-in is deleted. Agents set to its models switch to the next model in the fallback chain.`) && tryApi(async () => { await api('DELETE', `/api/accounts/${encodeURIComponent(p.id)}`); S.models = null; renderModels(); }, 'Removed') }, 'Remove') : null),
+        can('owner') ? h('button', { class: 'btn small danger mut', onclick: async () => (await ask({ title: `Remove ${p.name}?`, text: 'Its key or sign-in is deleted. Agents set to its models switch to the next model in the fallback chain.', ok: 'Remove account', danger: true })) && tryApi(async () => { await api('DELETE', `/api/accounts/${encodeURIComponent(p.id)}`); S.models = null; renderModels(); }, 'Removed') }, 'Remove') : null),
       t?.out);
   });
   const strat = first.strategy || 'order';
@@ -153,7 +153,7 @@ export async function renderModels() {
   const by = Object.fromEntries(provs.map((p) => [p.id, p]));
   const anyOn = provs.some((p) => p.connected);
   const go = (id) => () => document.getElementById(`prov-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  const disconnect = (what, path, consequence) => h('button', { class: 'btn small danger mut', onclick: () => confirm(`Disconnect ${what}? ${consequence}`) && tryApi(async () => { await api('DELETE', path); S.models = null; renderModels(); }, 'Disconnected') }, 'Disconnect');
+  const disconnect = (what, path, consequence) => h('button', { class: 'btn small danger mut', onclick: async () => (await ask({ title: `Disconnect ${what}?`, text: consequence, ok: 'Disconnect', danger: true })) && tryApi(async () => { await api('DELETE', path); S.models = null; renderModels(); }, 'Disconnected') }, 'Disconnect');
 
   // Start here
   const start = anyOn
@@ -184,7 +184,7 @@ export async function renderModels() {
       h('p', { class: 'small muted', style: 'margin:4px 0 0' }, or?.freeOnly ? 'Only models ending in “:free” are listed and used, so nothing is charged. Auto picks one of them.' : 'All OpenRouter models are listed. Paid models use your OpenRouter credit.')),
     accounts: accountsBox({ first: or, provs, addForm: () => accountKeyForm({ placeholder: 'sk-or-v1-…', submit: (label, key) => api('POST', '/api/providers/openrouter', { label, key, freeOnly: true }) }) }),
     extra: [replaceKey(keyForm({ placeholder: 'sk-or-v1-…', button: 'Save', submit: (key) => api('POST', '/api/providers/openrouter', { key }) })),
-      h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove OpenRouter? Agents using OpenRouter models switch to Auto.') && tryApi(async () => { await api('DELETE', '/api/providers/compatible/openrouter'); S.models = null; renderModels(); }, 'Removed') }, 'Remove')],
+      h('button', { class: 'btn small danger mut', onclick: async () => (await ask({ title: 'Remove OpenRouter?', text: 'Agents using OpenRouter models switch to Auto.', ok: 'Remove OpenRouter', danger: true })) && tryApi(async () => { await api('DELETE', '/api/providers/compatible/openrouter'); S.models = null; renderModels(); }, 'Removed') }, 'Remove')],
   });
 
   // Anthropic
@@ -200,7 +200,7 @@ export async function renderModels() {
     connected: h('p', { class: 'small muted', style: 'margin:0' }, 'Claude Pro/Max subscriptions can’t be used here; this uses your API key.'),
     accounts: accountsBox({ first: by.anthropic, provs, addForm: () => accountKeyForm({ placeholder: 'sk-ant-…', submit: (label, key) => api('POST', '/api/accounts', { type: 'anthropic', label, key }) }) }),
     extra: [replaceKey(keyForm({ placeholder: 'sk-ant-…', button: 'Save', submit: saveSecretKey('ANTHROPIC_API_KEY') })),
-      h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove the Anthropic key? Agents using Claude stop answering until another model is chosen.') && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'ANTHROPIC_API_KEY', value: '' }); S.models = null; renderModels(); }, 'Removed') }, 'Remove')],
+      h('button', { class: 'btn small danger mut', onclick: async () => (await ask({ title: 'Remove the Anthropic key?', text: 'Agents using Claude stop answering until another model is chosen.', ok: 'Remove key', danger: true })) && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'ANTHROPIC_API_KEY', value: '' }); S.models = null; renderModels(); }, 'Removed') }, 'Remove')],
   });
 
   // OpenAI
@@ -215,7 +215,7 @@ export async function renderModels() {
     form: keyForm({ placeholder: 'sk-…', submit: saveSecretKey('OPENAI_API_KEY') }),
     accounts: accountsBox({ first: by.openai, provs, addForm: () => accountKeyForm({ placeholder: 'sk-…', submit: (label, key) => api('POST', '/api/accounts', { type: 'openai', label, key }) }) }),
     extra: [replaceKey(keyForm({ placeholder: 'sk-…', button: 'Save', submit: saveSecretKey('OPENAI_API_KEY') })),
-      h('button', { class: 'btn small danger mut', onclick: () => confirm('Remove the OpenAI key? Agents using OpenAI models stop answering until another model is chosen.') && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'OPENAI_API_KEY', value: '' }); S.models = null; renderModels(); }, 'Removed') }, 'Remove')],
+      h('button', { class: 'btn small danger mut', onclick: async () => (await ask({ title: 'Remove the OpenAI key?', text: 'Agents using OpenAI models stop answering until another model is chosen.', ok: 'Remove key', danger: true })) && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'OPENAI_API_KEY', value: '' }); S.models = null; renderModels(); }, 'Removed') }, 'Remove')],
   });
 
   // ChatGPT plan (sign-in logic unchanged; clearer steps)
@@ -271,7 +271,7 @@ export async function renderModels() {
     compat.map((p) => { const t = p.connected ? testBox(p.id) : null; return h('div', { class: 'number-card' },
       h('div', { class: 'row spread' }, h('div', {}, h('b', {}, p.name), h('div', { class: 'small muted' }, p.baseUrl)), healthPill(p)),
       p.error ? h('div', { class: 'note bad' }, p.error) : null, healthNote(p),
-      h('div', { class: 'row', style: 'margin-top:8px' }, t?.btn, h('button', { class: 'btn small danger mut', onclick: () => confirm(`Remove ${p.name}? Agents using its models switch to Auto.`) && tryApi(async () => { await api('DELETE', `/api/providers/compatible/${p.id}`); S.models = null; renderModels(); }, 'Removed') }, 'Remove')), t?.out); }),
+      h('div', { class: 'row', style: 'margin-top:8px' }, t?.btn, h('button', { class: 'btn small danger mut', onclick: async () => (await ask({ title: `Remove ${p.name}?`, text: 'Agents using its models switch to Auto.', ok: `Remove ${p.name}`, danger: true })) && tryApi(async () => { await api('DELETE', `/api/providers/compatible/${p.id}`); S.models = null; renderModels(); }, 'Removed') }, 'Remove')), t?.out); }),
     h('details', { class: 'mut' }, h('summary', {}, 'Add an endpoint'),
       h('form', { onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('POST', '/api/providers/compatible', { id: cid.value.trim(), name: cname.value.trim(), baseUrl: curl.value.trim(), key: ckey.value }), 'Saved')) { S.models = null; renderModels(); } } },
         h('div', { class: 'row', style: 'margin-top:8px' }, cid, cname), h('div', { class: 'row', style: 'margin-top:6px' }, curl, ckey), h('button', { class: 'btn', style: 'margin-top:8px' }, 'Add endpoint'))));

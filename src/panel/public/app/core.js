@@ -65,6 +65,34 @@ export function toast(msg, { bad = false, undo = null } = {}) {
     undo ? h('button', { type: 'button', onclick: () => { t.remove(); undo(); } }, 'Undo') : null);
   box.append(t); setTimeout(() => t.remove(), undo ? 6000 : bad ? 5000 : 3500);
 }
+/**
+ * The panel's own confirmation (064), instead of the browser's confirm(): a centred dialog on wide screens, a bottom
+ * sheet on phones. `title` asks the question, `text` says what will happen (a string, "\n\n" separates paragraphs),
+ * `ok` names the action ("Delete agent", never "OK"), `danger` marks something destructive or disruptive (red button,
+ * Cancel has the focus so Enter does not confirm it by accident), `body` is extra content (fields, release notes,
+ * package lists), `typed` asks to type that word first. Esc, Cancel and a tap outside cancel. Resolves true or false.
+ * @param {{ title: string, text?: string, ok?: string, danger?: boolean, body?: any, typed?: string, cancel?: string }} o
+ */
+export function ask({ title, text = '', ok = 'Continue', danger = false, body = null, typed = '', cancel = 'Cancel' }) {
+  return new Promise((resolve) => {
+    const back = document.activeElement;
+    const id = `ask${Date.now().toString(36)}`;
+    const typedIn = typed ? h('input', { autocomplete: 'off', spellcheck: 'false', 'aria-label': `Type ${typed} to confirm`, oninput: () => { yes.disabled = typedIn.value.trim() !== typed; } }) : null;
+    const yes = h('button', { class: `btn ${danger ? 'danger solid' : 'primary'}`, value: 'yes', disabled: !!typed }, ok);
+    const no = h('button', { class: 'btn', type: 'button', onclick: () => dlg.close('no') }, cancel);
+    const dlg = h('dialog', { class: `dlg ask${danger ? ' danger' : ''}`, role: danger ? 'alertdialog' : 'dialog', 'aria-modal': 'true', 'aria-labelledby': `${id}-t`, 'aria-describedby': text ? `${id}-d` : null,
+      onclick: (e) => { if (e.target === dlg) dlg.close('no'); } },
+    h('form', { method: 'dialog' },
+      h('h2', { id: `${id}-t` }, title),
+      text ? h('div', { id: `${id}-d`, class: 'ask-text' }, String(text).split(/\n\n+/).map((p) => h('p', {}, p))) : null,
+      body ? h('div', { class: 'ask-body' }, body) : null,
+      typed ? h('div', {}, h('label', {}, 'Type ', h('b', {}, typed), ' to confirm'), typedIn) : null,
+      h('div', { class: 'ask-actions' }, no, yes)));
+    dlg.addEventListener('close', () => { dlg.remove(); if (back instanceof HTMLElement && back.isConnected) back.focus(); resolve(dlg.returnValue === 'yes'); });
+    document.body.append(dlg); dlg.showModal();
+    (typedIn || (danger ? no : yes)).focus();
+  });
+}
 /** Agent (or chat) avatar (064): initials on one of the five "people" colours, the same colour for the same id. */
 export function avatar(name, id = name, size = '') {
   const words = String(name || '?').replace(/[^\p{L}\p{N} ]/gu, ' ').trim().split(/\s+/);
@@ -72,8 +100,6 @@ export function avatar(name, id = name, size = '') {
   let n = 0; for (const ch of String(id)) n = (n * 31 + ch.codePointAt(0)) >>> 0;
   return h('span', { class: `av c${(n % 5) + 1}${size ? ` ${size}` : ''}`, 'aria-hidden': 'true' }, initials);
 }
-/** Plural that reads well: plural(1, 'chat') → "1 chat", plural(2, 'chat') → "2 chats". */
-export const plural = (n, word, many = `${word}s`) => `${n ?? 0} ${n === 1 ? word : many}`;
 // Tiny inline illustrations for empty states (64 × 48 grid, stroke = currentColor).
 const ART = {
   chats: 'M8 12h30a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H20l-8 6v-6H8a6 6 0 0 1-6-6V18a6 6 0 0 1 6-6zM30 26h26a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6h-2v5l-7-5H30a6 6 0 0 1-6-6',

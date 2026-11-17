@@ -9,7 +9,7 @@ import {
 import { getSecret, setSecret, countUsers } from '../../core/store.js';
 import { activity } from '../../core/events.js';
 import {
-  publicBase, resultPage, esc, send, CSP, receiveUpload, uploadPath, dropUpload, limiter, clientIp, checkSetupCode, UPLOAD_MAX,
+  publicBase, resultPage, esc, send, PAGE_CSP, pageHead, receiveUpload, uploadPath, dropUpload, limiter, clientIp, checkSetupCode, UPLOAD_MAX,
 } from '../http.js';
 import { baseUrl } from '../http-util.js';
 
@@ -176,15 +176,12 @@ export function backupRoutes(route, { restart = () => setTimeout(() => process.e
     const manifest = github.appManifest({ name: `Duniya backups ${randomBytes(3).toString('hex')}`, baseUrl: base });
     const action = github.manifestFormUrl(state, org);
     const web = new URL(github.webBase()).origin;
-    const html = `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=color-scheme content="light dark"><title>Opening GitHub…</title>
-<style>body{font:16px -apple-system,system-ui,sans-serif;display:grid;place-items:center;min-height:90vh;margin:0;background:#f7f3ec;color:#1c2030}.c{background:#fffdf9;border:1px solid #e6dfd3;border-radius:18px;padding:28px;max-width:440px;margin:16px;text-align:center}
-button{font:inherit;font-weight:600;padding:10px 18px;border-radius:999px;border:0;background:#0b7a75;color:#fff;cursor:pointer}p{color:#6d6a73}
-@media (prefers-color-scheme:dark){body{background:#11131c;color:#ece9e2}.c{background:#1a1d2a;border-color:#2a2e3e}button{background:#3cc4b7;color:#0b1a19}p{color:#9a98a3}}</style>
-<body><form class=c method=post action="${esc(action)}"><h2>Opening GitHub…</h2>
+    const html = `${pageHead('Opening GitHub…')}
+<body><main class=result><form method=post action="${esc(action)}" data-autosubmit><h1>Opening GitHub…</h1>
 <p>GitHub will show a page to create your private backup app. Click <b>Create GitHub App</b> there; you come back here automatically.</p>
-<input type=hidden name=manifest value="${esc(JSON.stringify(manifest))}"><button>Continue to GitHub</button></form>
-<script>document.forms[0].submit()</script>`;
-    send(res, 200, html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP.replace("form-action 'self'", `form-action ${web}`), 'x-frame-options': 'DENY' });
+<input type=hidden name=manifest value="${esc(JSON.stringify(manifest))}"><div class=actions><button>Continue to GitHub</button></div></form></main>
+<script src="/page.js"></script>`;
+    send(res, 200, html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PAGE_CSP.replace("form-action 'self'", `form-action ${web}`), 'x-frame-options': 'DENY' });
     return null;
   }, OWNER);
   // GitHub sends the browser back with ?code&state (cross-site: no session cookie; the single-use state proves

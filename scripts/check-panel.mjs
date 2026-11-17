@@ -5,6 +5,8 @@
 //     exports y.js has.
 //  3. Budgets (brotli, what a browser downloads): the first screen (the shell, styles.css and every module the entry
 //     and Overview import) and all of the panel's code. Raising one is a decision: say why in the PR.
+//  4. No browser dialogs (064): confirm(), alert() and prompt() are never called; the panel asks with its own dialog
+//     (core.js#ask), which works the same on phones and desktops, can be styled and is accessible.
 // Also run by scripts/ci-checks.mjs. Exit code 1 on any problem.
 import vm from 'node:vm';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -12,8 +14,10 @@ import { resolve } from 'node:path';
 import { brotliCompressSync, constants as zc } from 'node:zlib';
 import { FIRST_SCREEN, staticClosure } from '../src/panel/module-graph.js';
 
-// Budgets in brotli bytes: the sizes when 063 set them plus ~10 %.
-const FIRST_BUDGET = 47_000;
+// Budgets in brotli bytes: the sizes when 063 set them plus ~10 %. 064 raised the first screen to 51 KB for what every
+// screen needs from the start: one design-token set, the phone tab bar, skeletons, empty states, avatars, the panel's
+// own confirmation dialog, and accessibility (switch roles, labelled fields, focus handling).
+const FIRST_BUDGET = 51_000;
 const TOTAL_BUDGET = 147_000;
 
 const PUBLIC = resolve(import.meta.dirname, '../src/panel/public');
@@ -47,6 +51,12 @@ export async function checkPanel() {
       if (!text.has(t)) problems.push(`app/${f}: loads ./${t}, which does not exist`);
       else if (ex) for (const n of wanted) if (!ex.has(n)) problems.push(`app/${f}: loads ./${t} for ${n}, which it does not export`);
     }
+  }
+  // 4. browser dialogs: calls only (comments and method calls such as installPrompt.prompt() are fine)
+  const scripts = [...text].concat([['../page.js', readFileSync(resolve(PUBLIC, 'page.js'), 'utf8')]]);
+  for (const [f, src] of scripts) {
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
+    for (const m of code.matchAll(/(?<![.\w$])(confirm|alert|prompt)\s*\(/g)) problems.push(`app/${f}: calls ${m[1]}(): ask with the panel's own dialog instead (core.js ask())`);
   }
   const br = (s) => brotliCompressSync(Buffer.from(s), { params: { [zc.BROTLI_PARAM_QUALITY]: 9 } }).length;
   const first = staticClosure(FIRST_SCREEN, (f) => text.get(f) || '');

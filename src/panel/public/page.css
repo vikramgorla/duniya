@@ -1,0 +1,29 @@
+/* Standalone server pages (064): sign-in results, the Google address help, the GitHub app hand-off. Served as a file so
+   these pages need no 'unsafe-inline' in their Content-Security-Policy (http.js PAGE_CSP). Same tokens as the panel. */
+:root { --bg: #f2f1ec; --card: #fff; --ink: #101216; --muted: #5a5e67; --line: #e2e0d8; --code: #f2f1ec; --warn: #8f4500; --warn-soft: #ffeedd;
+  --info: #2c4fd6; --info-soft: #e8edff; --ok: #3f6b00; --ok-soft: #e9f7c4; --bad: #c42443; --bad-soft: #ffe6ea; --btn: #101216; --btn-ink: #fff; --focus: #101216;
+  --mono: "SF Mono", ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace; color-scheme: light dark; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0b0c0f; --card: #121419; --ink: #eceef2; --muted: #9ba0ab; --line: #23262e; --code: #1b1e25; --warn: #ffb36b; --warn-soft: #3a2c14;
+    --info: #a5b6ff; --info-soft: #18264a; --ok: #c6f432; --ok-soft: rgba(198,244,50,.12); --bad: #ff8599; --bad-soft: rgba(255,80,110,.14); --btn: #c6f432; --btn-ink: #101216; --focus: #c6f432; }
+}
+* { box-sizing: border-box; }
+body { font: 15px/1.5 "Segoe UI Variable Text", -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+main { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; max-width: 640px; margin: 24px auto; box-shadow: 0 6px 24px -10px rgba(16,18,22,.18); }
+main.result { max-width: 440px; margin: 12vh auto 24px; text-align: center; padding: 28px; }
+@media (max-width: 680px) { main { margin: 12px; padding: 18px; } main.result { margin-top: 8vh; } }
+h1 { font-size: 21px; letter-spacing: -.01em; margin: 0 0 8px; } h2 { font-size: 15px; margin: 18px 0 6px; } p { margin: 8px 0; }
+p, .small { color: var(--muted); } .small { font-size: 13px; }
+.mark { width: 52px; height: 52px; border-radius: 16px; margin: 0 auto 12px; display: grid; place-items: center; font: 700 26px/1 var(--mono); background: var(--ok-soft); color: var(--ok); }
+.mark.bad { background: var(--bad-soft); color: var(--bad); }
+.note { background: var(--info-soft); color: var(--info); border-left: 3px solid currentColor; border-radius: 6px; padding: 10px 12px; font-size: 14px; margin: 12px 0; }
+.note.warn { background: var(--warn-soft); color: var(--warn); }
+ol { padding-left: 20px; margin: 8px 0; } li { margin: 6px 0; }
+.row { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+.row code { flex: 1; min-width: 0; overflow-wrap: anywhere; background: var(--code); border-radius: 10px; padding: 8px 10px; font: 13px var(--mono); }
+code { font-family: var(--mono); }
+button, .btn { font: inherit; font-size: 14px; font-weight: 600; min-height: 40px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.btn.primary, form button { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; } main.result .actions { justify-content: center; }
+a { color: inherit; }

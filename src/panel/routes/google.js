@@ -6,7 +6,7 @@ import {
   googleOnlyState, setGoogleOnly, passwordLoginAllowed,
 } from '../../core/google-signin.js';
 import { current as webCurrent, webSettings } from '../../core/webaccess.js';
-import { cookie, clientIp, isHttps, publicBase, setSessionCookie, limiter, resultPage, send, esc, CSP } from '../http.js';
+import { cookie, clientIp, isHttps, publicBase, setSessionCookie, limiter, resultPage, send, esc, PAGE_CSP, pageHead } from '../http.js';
 
 export { googleReady };
 const OWNER = { role: 'owner' };
@@ -234,22 +234,7 @@ function addressHelpPage(req, res, { kind, startHost, thisHost, mode, message })
     ? `<div class="note warn"><b>Only Sign in with Google is allowed on this panel.</b> ${thisHost ? `Sign in at this address (https://${esc(thisHost)}) for now: it is registered, so it works.` : 'Use the panel’s previous address for now.'} Or, on the server, run <code>sudo duniya enable-password-login</code> to turn passwords back on.</div>`
     : '';
   const hereNote = thisHost && !link ? `<p class=small>Until then, sign in from <b>https://${esc(thisHost)}</b>: it works now.</p>` : '';
-  const html = `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=color-scheme content="light dark"><title>${esc(title)}</title>
-<style>
-:root{--bg:#f2f1ec;--card:#fff;--ink:#101216;--muted:#5d6068;--line:#e3e1da;--code:#f2f1ec;--warn:#8a5300;--warn-soft:#fbefd9;--info:#2f5fb3;--info-soft:#e7eefb;--btn:#101216;--btn-ink:#fff;--mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,monospace}
-@media (prefers-color-scheme:dark){:root{--bg:#0b0c0f;--card:#121419;--ink:#ece9e2;--muted:#9a98a3;--line:#262a33;--code:#1b1e25;--warn:#f2b553;--warn-soft:#3a2c14;--info:#8db3f5;--info-soft:#18264a;--btn:#c6f432;--btn-ink:#0b1a19}}
-*{box-sizing:border-box}body{font:15px/1.5 "Segoe UI Variable","SF Pro Text",Inter,-apple-system,system-ui,sans-serif;margin:0;background:var(--bg);color:var(--ink)}
-main{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;max-width:640px;margin:24px auto;box-shadow:0 6px 24px -10px rgba(16,18,22,.18)}
-@media (max-width:680px){main{margin:12px;padding:18px}}
-h1{font-size:21px;letter-spacing:-.01em;margin:0 0 8px}h2{font-size:15px;margin:18px 0 6px}p{margin:8px 0}.small{font-size:13px;color:var(--muted)}
-.note{background:var(--info-soft);color:var(--info);border-radius:10px;padding:10px 12px;font-size:14px;margin:12px 0}.note.warn{background:var(--warn-soft);color:var(--warn)}
-ol{padding-left:20px;margin:8px 0}li{margin:6px 0}
-.row{display:flex;gap:6px;align-items:center;margin:6px 0}.row code{flex:1;min-width:0;overflow-wrap:anywhere;background:var(--code);border-radius:10px;padding:8px 10px;font:13px var(--mono)}
-code{font-family:var(--mono)}
-button,.btn{font:inherit;font-size:14px;min-height:40px;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
-.btn.primary{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
-a{color:inherit}
-</style>
+  const html = `${pageHead(title)}
 <body><main>
 <h1>${esc(title)}</h1>
 <p>${esc(what)}</p>
@@ -263,7 +248,7 @@ a{color:inherit}
 ${hereNote}${onlyGoogle}
 <div class=actions>${actions.join('')}</div>
 </main>
-<script>document.querySelectorAll('button[data-copy]').forEach(function(b){b.onclick=function(){var v=b.getAttribute('data-copy');var done=function(){b.textContent='Copied ✓';setTimeout(function(){b.textContent='Copy'},1600)};if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(v).then(done,function(){})}else{var t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();try{document.execCommand('copy');done()}catch(e){}t.remove()}}})</script>`;
-  send(res, 400, html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
+<script src="/page.js"></script>`;
+  send(res, 400, html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PAGE_CSP, 'x-frame-options': 'DENY' });
   return null;
 }

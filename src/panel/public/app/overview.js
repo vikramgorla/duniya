@@ -2,7 +2,8 @@
 // ---------- overview ----------
 import { feedItem, loadChatNames } from './activity.js';
 import { askCard } from './ask.js';
-import { $, S, ago, api, avatar, can, emptyState, h, logo, optimistic, plural, pulse, refreshStatus, show, time, toggle, tryApi } from './core.js';
+import { $, S, ago, api, ask, avatar, can, emptyState, h, logo, optimistic, pulse, refreshStatus, show, time, toggle, tryApi } from './core.js';
+import { plural } from './shared.js';
 import { refreshSilences, silencesCard } from './quiet.js';
 import { checklistActive, checklistBox, checklistNext, goTo, linkNumberBox, refreshChecklist } from './start.js';
 import { renderUpdates } from './updates.js';
@@ -36,8 +37,8 @@ export async function renderOverview(soft) {
       linked ? [h('label', {}, 'Direct messages to this number go to'), dmSel] : null,
       h('div', { class: 'row mut', style: 'margin-top:10px' },
         h('button', { class: 'btn small', onclick: () => tryApi(() => api('POST', '/api/whatsapp/restart', body), 'Reconnecting…') }, linked ? 'Reconnect' : 'New QR code'),
-        linked ? h('button', { class: 'btn small danger', onclick: () => confirm(`Unlink ${n.label}? Agents stop answering on it until you scan a new QR code.`) && tryApi(() => api('POST', '/api/whatsapp/logout', body), 'Unlinked') }, 'Unlink') : null,
-        n.id !== 'main' && can('owner') ? h('button', { class: 'btn small danger', onclick: () => confirm(`Remove the number “${n.label}”? Its chats keep their memory; agents bound to them stop answering there.`) && tryApi(async () => { await api('DELETE', `/api/whatsapp/numbers/${n.id}`); refreshStatus(); }, 'Removed') }, 'Remove') : null));
+        linked ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Unlink ${n.label}?`, text: 'Agents stop answering on this number until you scan a new QR code with its phone.', ok: 'Unlink number', danger: true })) && tryApi(() => api('POST', '/api/whatsapp/logout', body), 'Unlinked') }, 'Unlink') : null,
+        n.id !== 'main' && can('owner') ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Remove the number “${n.label}”?`, text: 'Its chats keep their memory, but agents bound to them stop answering there.', ok: 'Remove number', danger: true })) && tryApi(async () => { await api('DELETE', `/api/whatsapp/numbers/${n.id}`); refreshStatus(); }, 'Removed') }, 'Remove') : null));
   };
   const newLabel = h('input', { placeholder: 'Name, e.g. Shop', onfocus: () => (S.overviewBusy = true), onblur: () => (S.overviewBusy = false) });
   const wa = h('div', { class: 'card', id: 'ov-whatsapp', 'data-jump': 'whatsapp' },

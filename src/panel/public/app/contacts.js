@@ -1,7 +1,7 @@
 // Contacts screen. Module of the panel (063).
 // ---------- contacts (#11) ----------
 import { renderChats } from './chats.js';
-import { $, S, ago, api, can, h, tryApi } from './core.js';
+import { $, S, ago, api, ask, can, field, h, tryApi } from './core.js';
 let contactsQuery = '';
 export async function renderContacts() {
   const [list, sum] = await Promise.all([api('GET', `/api/contacts?q=${encodeURIComponent(contactsQuery)}`), api('GET', '/api/contacts/summary').catch(() => null)]);
@@ -19,9 +19,9 @@ export async function renderContacts() {
   const row = (c) => {
     const shared = h('input', { type: 'checkbox', checked: c.shared, disabled: !edit, 'aria-label': `Share ${c.name}`, onchange: () => tryApi(() => api('PUT', `/api/contacts/${c.phone}`, { shared: shared.checked }), shared.checked ? 'Shared' : 'Not shared') });
     const editBtn = h('button', { class: 'btn small', onclick: async () => {
-      const name = prompt('Name', c.ownName || c.whatsappName); if (name === null) return;
-      const note = prompt('Note (optional)', c.note || ''); if (note === null) return;
-      if (await tryApi(() => api('PUT', `/api/contacts/${c.phone}`, { name, note }), 'Contact saved')) renderContacts();
+      const name = h('input', { value: c.ownName || c.whatsappName || '', autocomplete: 'off' }); const note = h('input', { value: c.note || '', autocomplete: 'off' });
+      if (!await ask({ title: `Edit ${c.name}`, ok: 'Save contact', body: [field('Name', name), field('Note (optional)', note)] })) return;
+      if (await tryApi(() => api('PUT', `/api/contacts/${c.phone}`, { name: name.value, note: note.value }), 'Contact saved')) renderContacts();
     } }, 'Edit');
     return h('tr', {},
       h('td', { 'data-label': '' }, h('strong', {}, c.name), KIND(c) ? h('span', { class: 'small muted' }, ` · ${KIND(c)}`) : null, c.note ? h('div', { class: 'small muted' }, c.note) : null),
@@ -30,7 +30,7 @@ export async function renderContacts() {
       h('td', { 'data-label': 'Shared' }, h('label', { class: 'tick' }, shared)),
       h('td', { 'data-label': '' }, edit ? h('div', { class: 'row nowrap', style: 'gap:6px' }, editBtn,
         h('button', { class: 'btn small', title: 'Choose an agent for this person before they write', onclick: () => { S.dmPrefill = { phone: c.phone, name: c.name }; if (location.hash === '#chats') renderChats(); else location.hash = '#chats'; } }, 'Set up chat'),
-        c.source !== 'whatsapp' ? h('button', { class: 'btn small mut', onclick: () => confirm(`Remove ${c.name}?`) && tryApi(async () => { await api('DELETE', `/api/contacts/${c.phone}`); renderContacts(); }, 'Removed') }, 'Remove') : null) : null));
+        c.source !== 'whatsapp' ? h('button', { class: 'btn small mut', onclick: async () => (await ask({ title: `Remove ${c.name}?`, text: 'The contact is removed from Duniya; WhatsApp and your phone are not changed.', ok: 'Remove contact', danger: true })) && tryApi(async () => { await api('DELETE', `/api/contacts/${c.phone}`); renderContacts(); }, 'Removed') }, 'Remove') : null) : null));
   };
   $('#main').replaceChildren(
     h('div', { class: 'card' },

@@ -79,7 +79,7 @@ test('phone rules: 40 px touch targets, 13 px text, stacked tables, no page wide
     assert.match(phone, re);
   }
   assert.match(css, /table\.stack td:not\(\[data-label\]\), table\.stack td\[data-label=""\] \{ display: block/);
-  assert.match(css, /\.grid \{ grid-template-columns: repeat\(auto-fit, minmax\(min\(310px, 100%\), 1fr\)\)/);
+  assert.match(css, /\.grid \{[^}]*grid-template-columns: repeat\(auto-fit, minmax\(min\(310px, 100%\), 1fr\)\)/);
 });
 
 test('checkboxes in tables have a 40 px label around them', () => {

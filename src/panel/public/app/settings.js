@@ -1,6 +1,6 @@
 // Settings screen: every section (tool services, owner assistant, users, sign-in, web access, logging, …). Module of the panel (063).
 // ---------- secrets ----------
-import { $, S, ago, api, can, copyBtn, copyRow, extLink, field, fieldError, gLogo, h, jumpToSub, splitLines, toast, toggle, tryApi } from './core.js';
+import { $, S, ago, api, ask, can, copyBtn, copyRow, extLink, field, fieldError, gLogo, h, jumpToSub, splitLines, toast, toggle, tryApi } from './core.js';
 import { browseButton, registrySettingsBox } from './registry.js';
 import { SETTINGS_SECTIONS, SIZE_LABEL, SMALL_MODE_LINK, loadModels, modelSelect, openAgent } from './shared.js';
 import { globRe, markSaved, serverConfig, serverState, toolServiceEditor } from './tool-editor.js';
@@ -89,7 +89,7 @@ function ownerAssistantCard(o) {
   let state;
   if (l.status === 'linked') {
     state = [h('div', { class: 'note ok' }, `✓ Linked +${l.phone}. Message ${sendTo} from this phone to ask about your chats.`),
-      h('button', { class: 'btn small danger', onclick: () => confirm(`Unlink +${l.phone}? The owner assistant stops answering this number.`) && tryApi(async () => { await api('DELETE', '/api/owner-assistant/link'); reload(); }, 'Unlinked') }, 'Unlink')];
+      h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Unlink +${l.phone}?`, text: 'The owner assistant stops answering this number.', ok: 'Unlink', danger: true })) && tryApi(async () => { await api('DELETE', '/api/owner-assistant/link'); reload(); }, 'Unlinked') }, 'Unlink')];
   } else if (l.status === 'pending') {
     state = [h('div', { class: 'note warn' }, `Linked +${l.phone}? Confirm only if this is your phone.`),
       h('div', { class: 'row', style: 'gap:8px' },
@@ -113,7 +113,7 @@ function ownerAssistantCard(o) {
     state, box,
     h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn', onclick: () => openAgent(o.agent) }, 'Character, tools, voice, schedules & alerts →')),
     o.links?.length ? h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small', style: 'cursor:pointer' }, `Linked people (${o.links.length})`),
-      h('ul', { class: 'small' }, o.links.map((x) => h('li', {}, `${x.username} · +${x.phone} `, h('button', { class: 'btn small danger', onclick: () => confirm(`Unlink ${x.username} (+${x.phone})?`) && tryApi(async () => { await api('DELETE', `/api/owner-assistant/links/${x.userId}`); reload(); }, 'Unlinked') }, 'Unlink'))))) : null);
+      h('ul', { class: 'small' }, o.links.map((x) => h('li', {}, `${x.username} · +${x.phone} `, h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Unlink ${x.username} (+${x.phone})?`, text: 'The owner assistant stops answering this number.', ok: 'Unlink', danger: true })) && tryApi(async () => { await api('DELETE', `/api/owner-assistant/links/${x.userId}`); reload(); }, 'Unlinked') }, 'Unlink'))))) : null);
 }
 // ---------- Settings → Privacy notice (044) ----------
 function privacyNoticeCard(n) {
@@ -165,7 +165,7 @@ async function photosVoiceCard() {
       can('owner') ? h('div', { class: 'row', style: 'margin-top:8px' },
         !e.installed && !e.installing ? h('button', { class: 'btn small', disabled: !allowed || !m.local.supported, onclick: () => tryApi(async () => { await api('POST', `/api/media/local/${kind}/install`); redraw(); }, 'Download started') }, e.error ? 'Try again' : 'Download') : null,
         e.installed ? h('label', { class: 'inline' }, toggle(on, (v) => save({ local: { [useKey[kind]]: v } }, v ? 'On' : 'Off'), !allowed), 'Use it') : null,
-        e.installed ? h('button', { class: 'btn small danger mut', onclick: () => confirm(`Remove ${e.label}? Agents stop using it; you can download it again later.`) && tryApi(async () => { await api('DELETE', `/api/media/local/${kind}`); redraw(); }, 'Removed') }, 'Remove') : null) : null);
+        e.installed ? h('button', { class: 'btn small danger mut', onclick: async () => (await ask({ title: `Remove ${e.label}?`, text: 'Agents stop using it; you can download it again later.', ok: 'Remove', danger: true })) && tryApi(async () => { await api('DELETE', `/api/media/local/${kind}`); redraw(); }, 'Removed') }, 'Remove') : null) : null);
   };
   card.append(h('h2', {}, 'Photos & voice'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, 'Server-wide choices for photos, pictures and voice. Each agent switches what it uses on its own page; what each provider can do is on ', h('a', { href: '#models' }, 'Models'), '.'),
@@ -213,7 +213,7 @@ async function toolServicesCard() {
   async function removeOne(it) {
     if (it.s.isNew) { items.splice(items.indexOf(it), 1); return draw(); }
     const n = it.g?.agents?.using?.length || 0;
-    if (!confirm(`Remove ${it.s.key} from all agents? ${n} agent${n === 1 ? '' : 's'} lose its tools right away and its sign-ins are deleted.`)) return;
+    if (!await ask({ title: `Remove ${it.s.key} from all agents?`, text: `${n} agent${n === 1 ? '' : 's'} lose its tools right away and its sign-ins are deleted.`, ok: 'Remove tool service', danger: true })) return;
     if (await tryApi(() => api('DELETE', `/api/tool-services/${encodeURIComponent(it.s.key)}`), 'Removed')) { items.splice(items.indexOf(it), 1); draw(); }
   }
   function draw() {
@@ -251,7 +251,7 @@ function assistantsCard(a) {
   const url = h('input', { value: a.mcpUrl, readonly: true, 'aria-label': 'Address for AI assistants', onfocus: (e) => e.target.select() });
   const steps = (title, items) => h('details', {}, h('summary', { style: 'cursor:pointer;font-weight:600;margin:10px 0 4px' }, title), h('ol', { class: 'small', style: 'margin:6px 0 0;padding-left:20px' }, items.map((x) => h('li', { style: 'margin:3px 0' }, x))));
   const others = a.grants.some((g) => g.userId !== a.you);
-  const revoke = (g) => confirm(`Disconnect ${g.clientName}${g.userId !== a.you ? ` (${g.username})` : ''}? It stops working right away. You can connect it again later.`)
+  const revoke = async (g) => (await ask({ title: `Disconnect ${g.clientName}${g.userId !== a.you ? ` (${g.username})` : ''}?`, text: 'It stops working right away. You can connect it again later.', ok: 'Disconnect', danger: true }))
     && tryApi(async () => { await api('DELETE', `/api/assistants/${g.userId}/${encodeURIComponent(g.clientId)}`); renderSettings(); }, 'Disconnected');
   return h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Connected AI assistants'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, 'Manage this app by chatting with ChatGPT or Claude: “which agents are on?”, “turn off the carpool agent”, “what happened in the Panduga group today?”. The assistant signs in as you and can do what your account can do.'),
@@ -274,7 +274,7 @@ function myGoogleCard(me) {
   return h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'Your Google account'), h('span', { class: `pill ${me.google ? 'ok' : ''}` }, me.google ? 'linked' : 'not linked')),
     me.google
       ? [h('p', { class: 'small muted', style: 'margin-top:0' }, 'You can use “Sign in with Google” on the sign-in page.'),
-        me.hasPassword ? h('button', { class: 'btn small danger', onclick: () => confirm('Unlink your Google account? You then sign in with your password only.') && tryApi(async () => { await api('DELETE', '/api/me/google'); renderSettings(); }, 'Unlinked') }, 'Unlink')
+        me.hasPassword ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: 'Unlink your Google account?', text: 'You then sign in with your password only.', ok: 'Unlink Google', danger: true })) && tryApi(async () => { await api('DELETE', '/api/me/google'); renderSettings(); }, 'Unlinked') }, 'Unlink')
           : h('p', { class: 'small muted' }, 'To unlink Google, add a password first.')]
       : [h('p', { class: 'small muted', style: 'margin-top:0' }, 'Link your Google account to sign in with one click instead of your password.'),
         h('a', { class: 'btn google', href: '/auth/google/start?mode=link' }, gLogo(), 'Link my Google account')]);
@@ -289,7 +289,7 @@ function inviteMessage(i, panelUrl) {
 function signinCard(st) {
   const busy = h('span', { class: 'small muted' });
   const set = async (v) => {
-    if (v && !confirm(`Switch off password sign-in? Everyone must use Sign in with Google from now on.${st.withoutGoogle.length ? `\n\nThese accounts have no Google link and can no longer sign in: ${st.withoutGoogle.join(', ')}.` : ''}\n\nIf Google ever stops working, run “sudo duniya enable-password-login” on the server.`)) return renderSettings();
+    if (v && !await ask({ title: 'Switch off password sign-in?', text: `Everyone must use Sign in with Google from now on.${st.withoutGoogle.length ? `\n\nThese accounts have no Google link and can no longer sign in: ${st.withoutGoogle.join(', ')}.` : ''}\n\nIf Google ever stops working, run “sudo duniya enable-password-login” on the server.`, ok: 'Switch off passwords', danger: true })) return renderSettings();
     await tryApi(() => api('PUT', '/api/auth/signin', { googleOnly: v }), v ? 'Only Google sign-in from now on' : 'Password sign-in is back on');
     renderSettings();
   };
@@ -322,9 +322,9 @@ function usersCard(users, inv, signin) {
       h('td', { 'data-label': 'Role' }, h('select', { style: 'min-width:110px', 'aria-label': `Role of ${u.username}`, onchange: (e) => tryApi(() => api('PUT', `/api/users/${u.id}`, { role: e.target.value }), 'Role changed').then((r) => r || renderSettings()) },
         ['owner', 'admin', 'viewer'].map((r) => h('option', { value: r, selected: u.role === r }, r)))),
       h('td', { style: 'white-space:nowrap;text-align:right', 'data-label': '' }, u.id === S.user.id ? h('span', { class: 'small muted' }, 'you') : [
-        u.google && u.hasPassword ? h('button', { class: 'btn small', onclick: () => confirm(`Unlink Google from ${u.username}? They then sign in with their password.`) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}/google`); renderSettings(); }, 'Unlinked') }, 'Unlink Google') : null, ' ',
-        signin?.active ? null : h('button', { class: 'btn small', title: 'A one-time link (48 h) where they set their own password', onclick: () => (u.hasPassword ? confirm(`Make a link where ${u.username} sets a new password? Send it to them only.`) : true) && tryApi(() => api('POST', `/api/users/${u.id}/signup-link`)).then((r) => r && signup(r)) }, u.hasPassword ? 'Password link' : 'Sign-up link'), ' ',
-        h('button', { class: 'btn small danger', onclick: () => confirm(`Remove ${u.username}? They can no longer sign in.`) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}`); renderSettings(); }, 'Removed') }, 'Remove')])))))),
+        u.google && u.hasPassword ? h('button', { class: 'btn small', onclick: async () => (await ask({ title: `Unlink Google from ${u.username}?`, text: 'They then sign in with their password.', ok: 'Unlink Google', danger: true })) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}/google`); renderSettings(); }, 'Unlinked') }, 'Unlink Google') : null, ' ',
+        signin?.active ? null : h('button', { class: 'btn small', title: 'A one-time link (48 h) where they set their own password', onclick: async () => (u.hasPassword ? await ask({ title: `Make a password link for ${u.username}?`, text: 'A one-time link (48 h) where they set a new password. Send it to them only.', ok: 'Make link' }) : true) && tryApi(() => api('POST', `/api/users/${u.id}/signup-link`)).then((r) => r && signup(r)) }, u.hasPassword ? 'Password link' : 'Sign-up link'), ' ',
+        h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Remove ${u.username}?`, text: 'They can no longer sign in.', ok: 'Remove user', danger: true })) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}`); renderSettings(); }, 'Removed') }, 'Remove')])))))),
     h('h3', {}, 'Invite someone with Google'),
     inv.googleReady
       ? h('p', { class: 'small muted', style: 'margin-top:0' }, 'They sign in with their Google account the first time — no password to share. Send them the invite by email or copy it into WhatsApp.')
@@ -338,7 +338,7 @@ function usersCard(users, inv, signin) {
         h('a', { class: 'btn small', href: mail(i), onclick: () => api('POST', `/api/invites/${i.id}/renew`).then(() => setTimeout(renderSettings, 500)).catch(() => {}) }, i.expired ? 'Renew & email' : 'Email'),
         copyBtn(() => inviteMessage(i, inv.panelUrl), 'Copy message'),
         h('button', { class: 'btn small', title: 'Give them 14 more days', onclick: () => tryApi(async () => { await api('POST', `/api/invites/${i.id}/renew`); renderSettings(); }, 'Invite renewed for 14 days') }, 'Resend'),
-        h('button', { class: 'btn small danger', onclick: () => confirm(`Revoke the invite for ${i.email}? They can no longer sign in with it.`) && tryApi(async () => { await api('DELETE', `/api/invites/${i.id}`); renderSettings(); }, 'Invite revoked') }, 'Revoke'))))) : null,
+        h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Revoke the invite for ${i.email}?`, text: 'They can no longer sign in with it.', ok: 'Revoke invite', danger: true })) && tryApi(async () => { await api('DELETE', `/api/invites/${i.id}`); renderSettings(); }, 'Invite revoked') }, 'Revoke'))))) : null,
     signin?.active ? null : h('details', { style: 'margin-top:12px' }, h('summary', { class: 'small muted' }, 'Add a user with a password or a sign-up link instead'),
       h('form', { class: 'row', style: 'margin-top:10px', onsubmit: async (e) => { e.preventDefault(); const r = await tryApi(() => api('POST', '/api/users', { username: un.value, email: ue.value, role: ur.value, password: up.value }), 'User added'); if (r) signup(r.signup || null); } },
         un, ue, ur, up, h('button', { class: 'btn primary' }, 'Add user'))));
@@ -387,7 +387,7 @@ function googleSetupCard(g) {
         h('label', { class: 'inline', style: 'margin-left:auto' }, toggle(g.enabled, (v) => tryApi(async () => { await api('PUT', '/api/auth/google', { enabled: v }); renderSettings(); }, v ? 'Google sign-in on' : 'Google sign-in off')), 'Show on the sign-in page')),
       result,
       h('details', {}, h('summary', { class: 'small muted' }, 'Setup steps and addresses'), steps,
-        h('button', { class: 'btn small danger', onclick: () => confirm('Remove Google sign-in? People who only use Google cannot sign in until you set it up again (accounts and links are kept).') && tryApi(async () => { await api('DELETE', '/api/auth/google'); renderSettings(); }, 'Removed') }, 'Remove Google sign-in'))]
+        h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: 'Remove Google sign-in?', text: 'People who only use Google cannot sign in until you set it up again. Accounts and links are kept.', ok: 'Remove Google sign-in', danger: true })) && tryApi(async () => { await api('DELETE', '/api/auth/google'); renderSettings(); }, 'Removed') }, 'Remove Google sign-in'))]
       : [steps, result]);
 }
 
@@ -457,14 +457,14 @@ function webAccessCard(initial) {
       const here = w.you.host === sw.newHost;
       switchBox = h('div', { class: 'note info' }, h('b', {}, `Step 2 of 3 · ${sw.newHost} added. `), `Both addresses work now. ${here ? 'You are using the new address, so it works:' : 'Open the panel at the new address and confirm there (that proves it works):'}`,
         h('div', { class: 'row', style: 'margin-top:8px;flex-wrap:wrap' },
-          here ? h('button', { class: 'btn primary', onclick: () => (!gs || confirm(`Make ${sw.newHost} the main address?\n\nGoogle sign-in: added https://${sw.newHost} in Google Cloud (origin and redirect URI shown below)? If not, Google sign-in from it fails until you do; turning off ${sw.oldHost} later leaves no working address for Google sign-in${gs.only ? ', and only Google is allowed on this panel' : ''}.`)) && post('/api/web/domain/confirm', 'Confirmed') }, 'Confirm — new address works')
+          here ? h('button', { class: 'btn primary', onclick: async () => (!gs || await ask({ title: `Make ${sw.newHost} the main address?`, text: `Google sign-in: did you add https://${sw.newHost} in Google Cloud (origin and redirect URI shown below)? If not, Google sign-in from it fails until you do; turning off ${sw.oldHost} later leaves no working address for Google sign-in${gs.only ? ', and only Google is allowed on this panel' : ''}.`, ok: 'Make it the main address' })) && post('/api/web/domain/confirm', 'Confirmed') }, 'Confirm — new address works')
             : h('a', { class: 'btn primary', href: `https://${sw.newHost}`, target: '_blank', rel: 'noopener' }, `Open https://${sw.newHost} ↗`),
-          h('button', { class: 'btn', onclick: () => confirm(`Remove ${sw.newHost} again? ${sw.oldHost} stays the address.`) && post('/api/web/domain/cancel', 'Cancelled') }, 'Cancel')));
+          h('button', { class: 'btn', onclick: async () => (await ask({ title: `Remove ${sw.newHost} again?`, text: `${sw.oldHost} stays the address.`, ok: 'Remove address', danger: true })) && post('/api/web/domain/cancel', 'Cancelled') }, 'Cancel')));
     } else if (sw?.phase === 'confirmed') {
       switchBox = h('div', { class: 'note ok' }, h('b', {}, `Step 3 of 3 · ${sw.newHost} is the main address. `), `${sw.oldHost} still works too. When nobody needs it any more (bookmarks, Google sign-in, AI assistants updated), turn it off: it then only forwards to the new address.`,
         h('div', { class: 'row', style: 'margin-top:8px;flex-wrap:wrap' },
-          h('button', { class: 'btn danger', onclick: () => confirm(`Turn off ${sw.oldHost}?\n\nThe panel stops answering there; visits are forwarded to https://${sw.newHost}.`) && post('/api/web/domain/finish', 'Old address turned off') }, `Turn off ${sw.oldHost}`),
-          h('button', { class: 'btn', onclick: () => confirm(`Go back to ${sw.oldHost} as the main address and remove ${sw.newHost}?`) && post('/api/web/domain/cancel', 'Back to the previous address') }, 'Go back')));
+          h('button', { class: 'btn danger', onclick: async () => (await ask({ title: `Turn off ${sw.oldHost}?`, text: `The panel stops answering there; visits are forwarded to https://${sw.newHost}.`, ok: `Turn off ${sw.oldHost}`, danger: true })) && post('/api/web/domain/finish', 'Old address turned off') }, `Turn off ${sw.oldHost}`),
+          h('button', { class: 'btn', onclick: async () => (await ask({ title: `Go back to ${sw.oldHost}?`, text: `${sw.oldHost} is the main address again and ${sw.newHost} is removed.`, ok: 'Go back', danger: true })) && post('/api/web/domain/cancel', 'Back to the previous address') }, 'Go back')));
     }
 
     // #77: next to the switch (adding, added, confirming, confirmed): what to register for Google sign-in
@@ -507,7 +507,7 @@ function webAccessCard(initial) {
     };
     addBtn.onclick = async () => {
       const d = dom.value.trim().toLowerCase();
-      if (!confirm(`Add https://${d}?\n\nIt is added next to the current address: both work, nothing is switched off. Then you open the panel at the new address and confirm it there.${gs ? `\n\nGoogle sign-in is set up: add https://${d} (origin) and https://${d}${gs.callbackPath} (redirect URI) to your OAuth client in Google Cloud Console → APIs & Services → Credentials. The panel shows both with copy buttons next.` : ''}`)) return;
+      if (!await ask({ title: `Add https://${d}?`, text: `It is added next to the current address: both work, nothing is switched off. Then you open the panel at the new address and confirm it there.${gs ? `\n\nGoogle sign-in is set up: add https://${d} (origin) and https://${d}${gs.callbackPath} (redirect URI) to your OAuth client in Google Cloud Console → APIs & Services → Credentials. The panel shows both with copy buttons next.` : ''}`, ok: 'Add address' })) return;
       if (await tryApi(() => api('POST', '/api/web/domain', { domain: d }), 'Adding…')) reload();
     };
 
@@ -552,7 +552,7 @@ function webAccessCard(initial) {
         const r = await api('PUT', '/api/web/access', { ...accessBody(), confirmLockout });
         toast(r.trial ? 'Trying the new rules: confirm them within 10 minutes' : 'Applying…'); reload();
       } catch (e) {
-        if (e.data?.needsConfirm && confirm(`${e.message}\n\nThe change is a trial: if you do not confirm it within 10 minutes it is undone automatically. Locked out for longer? On the server run: sudo duniya open-access\n\nApply anyway?`)) return applyAccess(true);
+        if (e.data?.needsConfirm && await ask({ title: 'Apply this access change anyway?', text: `${e.message}\n\nThe change is a trial: if you do not confirm it within 10 minutes it is undone automatically. Locked out for longer? On the server run: sudo duniya open-access`, ok: 'Apply anyway', danger: true })) return applyAccess(true);
         if (!e.data?.needsConfirm) toast(e.message, { bad: true });
       }
     };

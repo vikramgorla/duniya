@@ -1,8 +1,8 @@
 // Agents screen: the list, templates and the AI draft of a new agent. Module of the panel (063).
 import { renderAgentEditor } from './agent-editor.js';
 import { aiHelper } from './ai-helper.js';
-import { $, api, avatar, can, emptyState, h, plural, toggle, tryApi } from './core.js';
-import { openAgent, usageLine } from './shared.js';
+import { $, api, avatar, can, emptyState, h, toggle, tryApi } from './core.js';
+import { openAgent, plural, usageLine } from './shared.js';
 import { usageSummary } from './usage.js';
 export async function renderAgents() {
   const route = location.hash.split('/');

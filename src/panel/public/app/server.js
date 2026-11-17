@@ -1,5 +1,5 @@
 // Server screen: metrics, OS updates, maintenance helper, logs, hosting. Module of the panel (063).
-import { $, S, ago, api, can, h, serverBadge, time, tryApi } from './core.js';
+import { $, S, ago, api, ask, can, h, serverBadge, time, tryApi } from './core.js';
 import { SIZE_LABEL, bytes, meter, pct, plural } from './shared.js';
 function spark(values, max) {
   const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg');
@@ -77,7 +77,9 @@ export async function renderServer() {
     const [upd, ops] = await Promise.all([api('GET', '/api/system/os-updates').catch(() => null), can('owner') ? api('GET', '/api/system/ops').catch(() => null) : null]);
     if (S.tab !== 'server') return;
     const run = ops?.status?.state === 'running' ? ops.status : null;
-    const act = (action, label, cls = '', ask = '') => h('button', { class: `btn ${cls}`, disabled: !!run || !ops?.available, onclick: () => (!ask || confirm(ask)) && tryApi(async () => { await api('POST', '/api/system/ops', { action }); setTimeout(opsCard, 1500); }, 'Started') }, label);
+    // 064: each action asks in the panel's own dialog (q: title, text, optional body with the details), named on its button
+    const act = (action, label, cls = '', q = null) => h('button', { class: `btn ${cls}`, disabled: !!run || !ops?.available, onclick: async () => (!q || await ask({ ok: label, danger: cls.includes('danger'), ...q })) && tryApi(async () => { await api('POST', '/api/system/ops', { action }); setTimeout(opsCard, 1500); }, 'Started') }, label);
+    const pkgList = (items) => (items?.length ? h('ul', { class: 'small' }, items.slice(0, 30).map((p) => h('li', {}, p.name, ver(p))), items.length > 30 ? h('li', {}, `and ${items.length - 30} more`) : null) : null);
     const reboot = ops?.reboot || lastSys?.reboot || { required: !!lastSys?.rebootRequired, packages: lastSys?.rebootPackages || [] };
     if (S.status?.osUpdates && upd?.supported) serverBadge({ ...S.status.osUpdates, count: upd.count, restart: reboot.required });
     const ver = (p) => (p.from || p.to ? ` ${p.from || 'new'} → ${p.to || '?'}` : '');
@@ -90,7 +92,7 @@ export async function renderServer() {
       reboot.since ? ` · waiting since ${time(reboot.since)}` : '',
       reboot.packages?.length ? h('div', { class: 'small', style: 'margin-top:4px;overflow-wrap:anywhere' }, `For: ${reboot.packages.slice(0, 12).join(', ')}${reboot.packages.length > 12 ? ` and ${reboot.packages.length - 12} more` : ''}`) : null,
       h('div', { class: 'small muted', style: 'margin-top:4px' }, 'Agents are offline for 1–2 minutes while the server restarts.'),
-      can('owner') && ops?.available ? h('div', { class: 'row', style: 'margin-top:8px' }, act('reboot', 'Restart server', 'danger', 'Restart the whole server now to finish the updates? Agents are offline for 1–2 minutes.')) : null) : null;
+      can('owner') && ops?.available ? h('div', { class: 'row', style: 'margin-top:8px' }, act('reboot', 'Restart server', 'danger', { title: 'Restart the whole server now?', text: 'This finishes the updates. Agents are offline for 1–2 minutes and catch up on messages afterwards.', body: reboot.packages?.length ? h('div', {}, h('b', { class: 'small' }, 'Waiting for the restart'), h('ul', { class: 'small' }, reboot.packages.slice(0, 30).map((p) => h('li', {}, p)))) : null })) : null) : null;
     const phasedHint = 'Ubuntu rolls these out gradually: it installs them automatically within days. They are not needed now.';
     const updates = !upd ? null : !upd.supported ? h('p', { class: 'small muted' }, 'OS update checks are available on Debian/Ubuntu servers.')
       : h('div', { style: 'margin:10px 0' },
@@ -111,7 +113,7 @@ export async function renderServer() {
     const oldHelper = !ops?.available || !(ops.helperOutdated || !ops.helperCurrent) ? null
       : ops.helperSelfUpdate ? h('div', { class: 'note info', id: 'helper-update', style: 'margin-top:10px' },
         h('b', {}, 'A newer maintenance helper comes with this release'), ` (version ${ops.helperVersion} → ${ops.helperBundled}). It normally updates itself after an app update; if that did not happen, update it here. It is downloaded from the official repository by the server itself.`,
-        h('div', { class: 'row', style: 'margin-top:8px' }, act('update-helper', 'Update maintenance helper', 'primary', 'Update the root maintenance helper to the one of this release? The server downloads it from the official repository; agents keep running.')))
+        h('div', { class: 'row', style: 'margin-top:8px' }, act('update-helper', 'Update maintenance helper', 'primary', { title: 'Update the maintenance helper?', text: 'The server downloads the root maintenance helper of this release from the official repository. Agents keep running.' })))
         : h('div', { class: 'note info', id: 'helper-update', style: 'margin-top:10px' },
           h('b', {}, 'This server has an older maintenance helper'), ' that cannot update itself yet. Run ', h('code', {}, 'sudo duniya update'),
           ' on the server once; after that it updates itself from here. No SSH access (for example an Oracle server created without an SSH key)? Reinstall instead: ', helperDoc, ' (your data comes back from a backup).');
@@ -122,9 +124,9 @@ export async function renderServer() {
         run ? h('div', { class: 'note' }, h('span', { class: 'spinner' }), h('b', {}, ` ${ops.actions[run.action] || run.action}…`), ` started ${ago(run.startedAt)} ago`) : null,
         lastLine,
         h('div', { class: 'row', style: 'margin-top:8px' },
-          act('os-update', 'Install OS updates', 'primary', 'Install the OS updates now? Updates Ubuntu is still rolling out gradually wait. The server stays online; a restart may be needed afterwards.'),
-          upd?.phased?.length && ops.helperCurrent ? act('os-update-all', 'Include gradual updates now', '', `Also install ${plural(upd.phased.length, 'update')} Ubuntu is still rolling out gradually (${upd.phased.map((p) => p.name).slice(0, 5).join(', ')})? Normally they arrive within days.`) : null,
-          reboot.required ? null : act('reboot', 'Restart server', 'danger', 'Restart the whole server now? Agents are offline for 1–2 minutes.')),
+          act('os-update', 'Install OS updates', 'primary', { title: 'Install the OS updates now?', text: 'The server stays online. Updates Ubuntu is still rolling out gradually wait. A restart may be needed afterwards.', body: pkgList(upd?.install) }),
+          upd?.phased?.length && ops.helperCurrent ? act('os-update-all', 'Include gradual updates now', '', { title: `Also install ${plural(upd.phased.length, 'gradual update')}?`, text: 'Ubuntu is still rolling these out gradually; normally they arrive within days.', body: pkgList(upd.phased) }) : null,
+          reboot.required ? null : act('reboot', 'Restart server', 'danger', { title: 'Restart the whole server now?', text: 'Agents are offline for 1–2 minutes and catch up on messages afterwards.' })),
         oldHelper,
         h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'More'),
           h('div', { class: 'row', style: 'margin-top:8px' }, act('os-cleanup', 'Remove unused packages'), act('restart-web', 'Restart web server'), act('restart-tunnel', 'Restart tunnel'))),

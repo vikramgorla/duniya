@@ -17,7 +17,7 @@ import { runSchedule } from '../../core/scheduler.js';
 import { interpolate } from '../../core/store.js';
 import { oauthClientOf, organizerConnection } from '../../core/tools.js';
 import { isGroupChat } from '../../core/whatsapp-tools.js';
-import { CSP, isHttps, send } from '../http.js';
+import { isHttps, resultPage, send } from '../http.js';
 
 // Local tool services run third-party code on this server: only owners may add or change them.
 const localSig = (cfg) => JSON.stringify(Object.entries(cfg?.mcpServers || {}).filter(([, v]) => v?.type === 'local')
@@ -153,16 +153,8 @@ export function agentRoutes(route, { channel } = {}) {
       const r = await finishSignIn({ state: q.get('state'), code: q.get('code'), error: q.get('error'), errorDescription: q.get('error_description') });
       agentId = r.agentId; msg = `Connected ${r.server} for ${r.role}s.`;
     } catch (e) { ok = false; msg = e.message; agentId = e.agentId || ''; }
-    const esc = (x) => String(x).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
     const back = agentId === GLOBAL_SCOPE ? '/#settings' : agentId ? `/#agents/${encodeURIComponent(agentId)}` : '/';
-    const html = `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>${ok ? 'Connected' : 'Sign-in failed'}</title>
-<body style="font:16px -apple-system,system-ui,sans-serif;display:grid;place-items:center;min-height:90vh;margin:0;background:#f4f6f5;color:#14201b">
-<div style="background:#fff;border:1px solid #e3e8e5;border-radius:16px;padding:28px;max-width:440px;text-align:center">
-<div style="font-size:40px">${ok ? '✅' : '⚠️'}</div><h2 style="margin:8px 0">${ok ? 'Connected' : 'Sign-in did not complete'}</h2>
-<p style="color:#5b6a63">${esc(msg)}</p><p><a href="${esc(back)}" id=b style="color:#128c7e;font-weight:600">Back to the panel</a></p></div>
-${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
-    send(res, ok ? 200 : 400, html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP });
-    return null;
+    return resultPage(res, { ok, title: ok ? 'Connected' : 'Sign-in did not complete', message: msg, back, autoMs: 1000 });
   }, { public: true });
 
   route('POST', '/api/agents/:id/discover', async (req, res, body, q, p) => {

@@ -1,5 +1,5 @@
 // App updates: the Overview box, banner and the breaking-release dialog (045). Module of the panel (063).
-import { $, S, ago, api, h, time, toast, tryApi } from './core.js';
+import { $, S, ago, api, ask, h, time, toast, tryApi } from './core.js';
 function watchUpdate(from, onTick) {
   if (S.updateWatch) return;
   const started = Date.now(); let wentDown = false; let bootUptime = null;
@@ -90,7 +90,8 @@ export async function renderUpdates(box, note = '') {
   const last = lr ? h('p', { class: 'small muted' }, lr.ok ? `Last update: ${lr.from ? `${lr.from} → ` : ''}${lr.target} on ${time(lr.at)}${lr.backup ? ` · backup ${lr.backup}` : ''}` : `Last update failed on ${time(lr.at)}; the previous version kept running.`) : null;
   const plain = st.breaking ? st.safeTarget : st.available ? st.latest : null;
   const updateBtn = plain && !u.running && u.install !== 'docker' ? h('button', { class: `btn${d ? '' : ' primary'}`, onclick: async (e) => {
-    if (!confirm(`Install ${plain} and restart?${u.backup ? ' A backup is made first.' : ''} The agents pause for about a minute.`)) return;
+    if (!await ask({ title: `Update to ${plain}?`, text: `The service installs ${plain} and restarts. The agents pause for about a minute.`, ok: `Update to ${plain}`,
+      body: h('ul', { class: 'small' }, h('li', {}, `Running ${st.current} now`), h('li', {}, u.backup ? 'A backup is made first' : 'No backup first: set a backup passphrase under Backups to get one'), h('li', {}, 'This page reloads by itself when it is done')) })) return;
     e.target.disabled = true;
     const r = await tryApi(() => api('POST', '/api/updates/apply'));
     if (r) { S.updateFrom = st.current; renderUpdates(box); }
@@ -110,7 +111,7 @@ export async function renderUpdates(box, note = '') {
       h('div', { class: 'row', style: 'margin-top:8px' }, mode, channel, at, h('button', { class: 'btn', onclick: () => tryApi(() => api('PUT', '/api/updates/settings', { mode: mode.value, channel: channel.value, at: at.value, keepPreUpdate: Number(keep.value) }), 'Saved') }, 'Save')),
       h('p', { class: 'small muted' }, 'Automatic installs never cross a breaking release: you are asked first, here and on WhatsApp. ',
         u.backup ? 'A local backup is made before every update; keep the last ' : 'Set a backup passphrase under Backups to get a local backup before every update; keep the last ', keep, ' pre-update backups.'),
-      h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: () => confirm('Restart the service?') && api('POST', '/api/system/restart').catch(() => {}).then(() => { toast('Restarting…'); setTimeout(() => location.reload(), 6000); }) }, 'Restart service'))),
+      h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: async () => (await ask({ title: 'Restart the service?', text: 'Agents pause for a few seconds; the page reloads by itself.', ok: 'Restart service', danger: true })) && api('POST', '/api/system/restart').catch(() => {}).then(() => { toast('Restarting…'); setTimeout(() => location.reload(), 6000); }) }, 'Restart service'))),
     log);
 }
 
