@@ -22,7 +22,7 @@ import { activity } from './events.js';
 import { MAX_MEDIA_BYTES, sniffType } from './media.js';
 import { runJob, optionalPaused } from './resources.js';
 import { transcribeLocal, speakLocal, engineReady, hasFfmpeg, convertAudio, localStatus } from './speech-local.js';
-import { whatsappChannel } from './whatsapp-tools.js';
+import { chatChannel } from './chat-tools.js';
 
 const TMP = join(DATA_DIR, 'media-tmp');
 const LAST_PHOTO_MS = 15 * 60000;
@@ -412,7 +412,7 @@ export async function createImage(input, { agent, chat, image = null }) {
       const tokenPrice = priceFor(p.type, model);
       usageRow({ agent, chat, p, model, kind: 'image', usage: r.usage, cost: r.cost, perImage: r.cost === undefined && perImage === undefined && tokenPrice ? undefined : perImage });
       const caption = clip(input.caption || '', 300);
-      const ch = whatsappChannel();
+      const ch = chatChannel();
       if (!ch) throw new Error('WhatsApp is not available here');
       const sent = await ch.sendMedia(chat, { kind: 'image', base64: r.buffer.toString('base64'), mimetype: r.mimetype, caption });
       activity('media.image', { agent: agent.id, chat, summary: `Created a picture with ${p.name} · ${model}${image ? ' (edit)' : ''}: ${clip(prompt, 160)}`, detail: { size: size || 'default', bytes: r.buffer.length } });

@@ -13,6 +13,7 @@
 // arrives; then their names move to the phone's row. A raw LID is never shown as if it were a number.
 import { db } from './db.js';
 import { digits, fail } from './config.js';
+import { bareJid, isLidJid, pnDigits } from '../channels/whatsapp/ids.js';
 import { activity } from './events.js';
 import { getSetting, updateSettings } from './store.js';
 
@@ -43,11 +44,6 @@ const normPhone = (p) => {
   return d;
 };
 const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, 100);
-/** user part of a jid without device: "123:4@lid" → "123@lid". */
-export const bareJid = (j) => { const s = String(j || ''); const at = s.indexOf('@'); return at < 0 ? '' : `${s.slice(0, at).split(':')[0]}${s.slice(at)}`; };
-const isLid = (j) => /@(lid|hosted\.lid)$/.test(String(j || ''));
-const isPn = (j) => /@(s\.whatsapp\.net|c\.us|hosted)$/.test(String(j || ''));
-const pnDigits = (j) => (isPn(j) ? digits(String(j).split('@')[0].split(':')[0]) : '');
 
 const getRow = db.prepare('SELECT * FROM contacts WHERE tenant_id = ? AND phone = ?');
 const getLid = db.prepare('SELECT * FROM contact_lids WHERE tenant_id = ? AND lid = ?');
@@ -66,7 +62,7 @@ const setLidPhone = db.prepare(`INSERT INTO contact_lids (tenant_id, lid, phone,
  */
 export function mapLid(lid, phone) {
   const l = bareJid(lid); const p = digits(String(phone || '').split('@')[0].split(':')[0]);
-  if (!isLid(l) || p.length < 6 || p.length > 15) return false;
+  if (!isLidJid(l) || p.length < 6 || p.length > 15) return false;
   const changed = setLidPhone.run(TENANT, l, p, Date.now()).changes > 0;
   const r = getLid.get(TENANT, l);
   let moved = 0;
@@ -74,7 +70,7 @@ export function mapLid(lid, phone) {
   return changed || moved > 0;
 }
 /** Phone digits of a LID when the mapping is known, else ''. */
-export const lidPhone = (lid) => (isLid(lid) ? getLid.get(TENANT, bareJid(lid))?.phone || '' : '');
+export const lidPhone = (lid) => (isLidJid(lid) ? getLid.get(TENANT, bareJid(lid))?.phone || '' : '');
 
 /**
  * Contacts from Baileys (contacts.upsert / contacts.update / history): { id, lid?, phoneNumber?, name?, notify?,
@@ -87,7 +83,7 @@ export function syncWhatsAppContacts(list = []) {
   try {
     for (const c of list) {
       const id = bareJid(c?.id);
-      const lid = [id, bareJid(c?.lid)].find(isLid) || '';
+      const lid = [id, bareJid(c?.lid)].find(isLidJid) || '';
       const phone = pnDigits(id) || pnDigits(bareJid(c?.phoneNumber)) || (lid ? lidPhone(lid) : '');
       if (lid && phone) mapLid(lid, phone);
       const names = { book: clean(c?.name), biz: clean(c?.verifiedName), push: clean(c?.notify) };
@@ -114,7 +110,7 @@ export function personInfo({ phone = '', jid = '', fallbackName = '' } = {}) {
   const j = bareJid(jid);
   const p = digits(phone) || pnDigits(j) || lidPhone(j);
   const r = p ? getRow.get(TENANT, p) : null;
-  const l = isLid(j) ? getLid.get(TENANT, j) : null;
+  const l = isLidJid(j) ? getLid.get(TENANT, j) : null;
   const fb = clean(fallbackName);
   const seen = fb && digits(fb) !== fb.replace(/[\s+]/g, '') ? fb : ''; // a fallback that is only the number is no name
   const pick = [['own', r?.name], ['book', r?.book_name || l?.book_name], ['business', r?.biz_name || l?.biz_name], ['profile', r?.push_name || l?.push_name], ['seen', seen]]
@@ -134,7 +130,7 @@ export function agentName({ phone = '', jid = '', fallbackName = '' } = {}) {
   if (info.source !== 'book' || contactNamesForAgents()) return info.name || clean(fallbackName);
   const j = bareJid(jid);
   const r = info.phone ? getRow.get(TENANT, info.phone) : null;
-  const l = isLid(j) ? getLid.get(TENANT, j) : null;
+  const l = isLidJid(j) ? getLid.get(TENANT, j) : null;
   return r?.biz_name || l?.biz_name || r?.push_name || l?.push_name || clean(fallbackName);
 }
 

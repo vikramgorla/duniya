@@ -14,7 +14,7 @@ import { optionalPaused } from './resources.js';
 import { enabledChats } from './chat-prefs.js';
 import { historyRetryTick } from './history-load.js';
 import { activity } from './events.js';
-import { isGroup } from './config.js';
+import { isGroup } from '../channels/index.js';
 import { retentionTick } from './retention.js';
 import { sendOwnerAlert } from './owner-alerts.js';
 import { appsTick } from './providers/apps.js';

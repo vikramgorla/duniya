@@ -19,7 +19,7 @@ import { listAnswers, rateAnswer, reviewCounts } from '../../core/review.js';
 import { runSchedule } from '../../core/scheduler.js';
 import { interpolate } from '../../core/store.js';
 import { oauthClientOf, organizerConnection } from '../../core/tools.js';
-import { isGroupChat } from '../../core/whatsapp-tools.js';
+import { isGroup as isGroupChat } from '../../channels/index.js';
 import { isHttps, resultPage, send } from '../http.js';
 
 // Local tool services run third-party code on this server: only owners may add or change them.
@@ -111,7 +111,7 @@ export function agentRoutes(route, { channel } = {}) {
   async function peopleOf(agent) {
     const suggest = agent.organizers.length === 0;
     const groups = [];
-    for (const chat of agent.chats.filter((c) => !/@(s\.whatsapp\.net|lid)$/.test(c))) {
+    for (const chat of agent.chats.filter(isGroupChat)) {
       let members = []; let error = '';
       try { members = await channel.groupMembers?.(chat) || []; } catch (e) { error = e.message; }
       const names = namesInChat(chat);

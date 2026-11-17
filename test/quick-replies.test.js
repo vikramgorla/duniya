@@ -189,9 +189,9 @@ test('welcome is counted as 0-cost usage and logged without names', async () => 
 });
 
 test('WhatsApp channel: group-participants.update (add) reaches the join handler; the number itself is skipped', async () => {
-  const { createWhatsAppChannel } = await import('../src/channels/whatsapp.js');
+  const { createWhatsAppSession } = await import('../src/channels/whatsapp/session.js');
   let sock;
-  const ch = createWhatsAppChannel({ authDir: mkdtempSync(join(tmpdir(), 'wa-auth-')), deps: {
+  const ch = createWhatsAppSession({ authDir: mkdtempSync(join(tmpdir(), 'wa-auth-')), deps: {
     makeSocket: () => (sock = { ev: new EventEmitter(), user: { id: '41790000099:3@s.whatsapp.net', lid: '99999@lid' }, sendMessage: async () => ({ key: { id: 'S1' } }), end: () => {}, logout: async () => {} }),
     fetchVersion: async () => ({ version: [2, 3000, 1] }) } });
   const joins = [];

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { setup, fakeNumbers } from './harness.js';
+import { setup, fakeNumbers, fakeWhatsAppHub } from './harness.js';
 
 const ops = mkdtempSync(join(tmpdir(), 'duniya-ops-'));
 mkdirSync(join(ops, 'req')); mkdirSync(join(ops, 'state'));
@@ -15,7 +15,7 @@ t.store.createUser({ username: 'ada', role: 'admin', password: 'admin password 1
 const admin = await t.login('ada', 'admin password 123');
 after(() => t.close());
 
-// Fake sessions for the registry: one per number.
+// Fake sessions behind the channel hub: one per number.
 const sessions = {};
 const fakeFactory = fakeNumbers(sessions, (s) => ({
   async chatName() { return `${s.label} group`; },
@@ -23,9 +23,8 @@ const fakeFactory = fakeNumbers(sessions, (s) => ({
   async status() { return { status: 'open', me: `4179000${s.number.length}:1@s.whatsapp.net`, since: 1 }; },
   async pair() { return 'ABCD-1234'; }, async logout() {}, async restart() {}, async remove() { s.removed = true; },
 }));
-const { createChannelRegistry } = await import('../src/channels/registry.js');
-const { splitChat, chatKey } = await import('../src/core/direct-chats.js');
-const reg = createChannelRegistry({ factory: fakeFactory });
+const { splitChat, chatKey } = await import('../src/channels/whatsapp/ids.js');
+const reg = await fakeWhatsAppHub(fakeFactory);
 const msg = (o) => ({ channel: 'whatsapp', raw: {}, isGroup: false, chat: '41790000555@s.whatsapp.net', phone: '41790000555', senderJid: 'x', senderName: 'Stranger', mentioned: false, replyToAgent: false, quoted: '', msgId: `m${Math.random()}`, ts: Date.now(), ...o });
 
 test('012: chat ids — first number unchanged, others prefixed', () => {
@@ -36,7 +35,7 @@ test('012: chat ids — first number unchanged, others prefixed', () => {
 });
 
 test('012: add a second number; messages route to the right session; status lists both', async () => {
-  await reg.start(t.router.createRouter(reg), { onHistory: async () => {} });
+  await reg.start({ onMessage: t.router.createRouter(reg), onHistory: async () => {} });
   const n = await reg.addNumber({ id: 'shop', label: 'Shop' });
   assert.equal(n.id, 'shop');
   await assert.rejects(reg.addNumber({ id: 'shop' }), /already used/);

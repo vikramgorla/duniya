@@ -8,7 +8,8 @@ import { getChatPrefs, setChatPrefs } from './chat-prefs.js';
 import { agentForChat } from './agents.js';
 import { activity } from './events.js';
 import { sha256 } from './crypto.js';
-import { bad, isGroup } from './config.js';
+import { bad } from './config.js';
+import { isGroup } from '../channels/index.js';
 
 export const DEFAULT_GROUP_TEXT = 'Messages in this group are stored so the assistant has context. The group\'s organiser can review them. Ask an organiser if you have questions.';
 export const DEFAULT_DM_TEXT = 'Messages in this chat are stored so the assistant has context. The organiser can review them.';

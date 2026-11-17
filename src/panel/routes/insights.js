@@ -29,7 +29,7 @@ async function checklist(channel) {
   const first = pick?.id || '';
   const skipped = new Set(getSetting('checklistSkipped', null) || []);
   const steps = [
-    { id: 'whatsapp', title: 'Link your WhatsApp number', done: numbers.some((n) => n.status === 'open'), href: '#overview/whatsapp',
+    { id: 'whatsapp', title: 'Link your WhatsApp number', done: numbers.some((n) => n.status === 'open'), href: '#settings/whatsapp',
       hint: 'Use the phone of the number your agents answer from (best a number just for them). Duniya links like WhatsApp on a computer.' },
     { id: 'provider', title: 'Connect an AI model', done: providers.some((p) => p.connected), href: '#models',
       hint: 'Agents need a model to think with. Paste a key, or start free with OpenRouter.' },

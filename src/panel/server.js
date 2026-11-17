@@ -3,7 +3,7 @@
 // calls, and the static panel files. Routes live in routes/<area>.js, registered here in one place.
 import http from 'node:http';
 import { env, fail } from '../core/config.js';
-import { setWhatsAppChannel } from '../core/whatsapp-tools.js';
+import { setChatChannel } from '../core/chat-tools.js';
 import { domainCheckResponse } from '../core/webaccess.js';
 import { setOwnerToolRunner } from '../core/owner-assistant.js';
 import { send, uploadAllowed, requestUser } from './http.js';
@@ -38,7 +38,7 @@ async function readBody(req) {
 
 export function startPanel({ channel, extend = [] }) {
   bootstrapAuth();
-  setWhatsAppChannel(channel);
+  setChatChannel(channel);
   const routes = [];
   /** opts.role: minimum role (default: viewer for GET, admin otherwise). opts.public: no auth. */
   /** opts.raw: the handler reads the (binary) request body itself; see uploadAllowed() for the CSRF guard. */

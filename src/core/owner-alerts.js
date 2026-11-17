@@ -3,14 +3,15 @@
 // enters one in the owner assistant's editor (Agents → Owner assistant → Alerts, 059: alerts are messages of the
 // built-in owner assistant). Without one, alerts are only recorded in Activity. Alerts stay event-driven.
 import { digits } from './config.js';
+import { phoneChat } from '../channels/index.js';
 import { getAgent, OWNER_AGENT_ID } from './agents.js';
 import { activity } from './events.js';
-import { whatsappChannel } from './whatsapp-tools.js';
+import { chatChannel } from './chat-tools.js';
 
 /** The owner's alert number (digits with country code) or ''. */
 export const ownerNumber = () => digits(getAgent(OWNER_AGENT_ID)?.alerts?.to || '');
 /** The chat id alerts go to (always the first WhatsApp number's session). */
-const ownerChat = () => (ownerNumber() ? `${ownerNumber()}@s.whatsapp.net` : '');
+const ownerChat = () => (ownerNumber() ? phoneChat(ownerNumber()) : '');
 
 /** Send one alert to the owner. Never throws. Returns { sent, to, reason? }. */
 export async function sendOwnerAlert(text, { kind = 'alert' } = {}) {
@@ -19,7 +20,7 @@ export async function sendOwnerAlert(text, { kind = 'alert' } = {}) {
     activity('system', { summary: `Owner alert not sent (no number under Agents → Owner assistant → Alerts): ${text}`, detail: { kind } });
     return { sent: false, to: '', reason: 'No alert number set' };
   }
-  const ch = whatsappChannel();
+  const ch = chatChannel();
   if (!ch) return { sent: false, to, reason: 'WhatsApp is not available' };
   try {
     await ch.send(to, text);

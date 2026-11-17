@@ -6,7 +6,8 @@
 import { db } from './db.js';
 import { digits } from './config.js';
 import { isChatEnabled } from './chat-prefs.js';
-import { mapLid, bareJid as bare, personInfo } from './contacts.js';
+import { mapLid, personInfo } from './contacts.js';
+import { bareJid as bare, isLidJid, pnJid } from '../channels/whatsapp/ids.js';
 
 const up = db.prepare(`INSERT INTO member_tags (chat, member, phone, label, ts) VALUES (?, ?, ?, ?, ?)
   ON CONFLICT (chat, member) DO UPDATE SET label = excluded.label, ts = excluded.ts, phone = COALESCE(NULLIF(excluded.phone, ''), member_tags.phone)
@@ -17,10 +18,10 @@ const up = db.prepare(`INSERT INTO member_tags (chat, member, phone, label, ts) 
  * ts (ms) }. Ignored for chats that are off. Older events never replace newer ones. Returns true when stored.
  */
 export function saveMemberTag({ chat, participant, phone = '', label = '', ts = Date.now() } = {}) {
-  const member = bare(participant) || (digits(phone) ? `${digits(phone)}@s.whatsapp.net` : '');
+  const member = bare(participant) || (digits(phone) ? pnJid(phone) : '');
   if (!chat || !member || !isChatEnabled(chat)) return false;
   const p = digits(phone);
-  if (p && member.endsWith('@lid')) mapLid(member, p);
+  if (p && isLidJid(member)) mapLid(member, p);
   const text = String(label || '').replace(/\s+/g, ' ').trim().slice(0, 30);
   return up.run(chat, member, p, text, Math.floor(Number(ts) || Date.now())).changes > 0;
 }
@@ -38,7 +39,7 @@ export function tagsInChat(chat) {
 /** One member's tag in a chat (by phone digits and/or jid), '' when none. */
 export function memberTag(chat, { phone = '', jid = '' } = {}, tags = null) {
   const m = tags || tagsInChat(chat);
-  return m.get(digits(phone)) || m.get(bare(jid)) || (digits(phone) ? m.get(`${digits(phone)}@s.whatsapp.net`) : '') || '';
+  return m.get(digits(phone)) || m.get(bare(jid)) || (digits(phone) ? m.get(pnJid(phone)) : '') || '';
 }
 
 /** Handler the channels call (registered from index.js). */

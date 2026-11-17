@@ -147,7 +147,7 @@ test('acting on another chat needs that chat to be bound to the same agent (id o
   assert.equal(call.fn, 'groupSettings');
   assert.equal(call.chat, 'g1@g.us');
   const notGroup = await callTool('set_group_subject', { subject: 'Y' }, { phone: ORG, isGroup: false, chat: `${ORG}@s.whatsapp.net` });
-  assert.match(notGroup.content, /only works in a WhatsApp group/);
+  assert.match(notGroup.content, /only works in a group/);
 });
 
 // ---------- incoming reactions and poll votes reach the context ----------
@@ -318,9 +318,9 @@ function fakeSocket(calls) {
 }
 
 test('channel (fake Baileys socket): sends, reactions, edits, groups, profile and block use the Baileys 7 calls', async () => {
-  const { createWhatsAppChannel } = await import('../src/channels/whatsapp.js');
+  const { createWhatsAppSession } = await import('../src/channels/whatsapp/session.js');
   const calls = [];
-  const ch = createWhatsAppChannel({ authDir: mkdtempSync(join(tmpdir(), 'wa-auth-')), deps: { makeSocket: fakeSocket(calls), fetchVersion: async () => ({ version: [2, 3000, 1] }), media: { allow: () => true } } });
+  const ch = createWhatsAppSession({ authDir: mkdtempSync(join(tmpdir(), 'wa-auth-')), deps: { makeSocket: fakeSocket(calls), fetchVersion: async () => ({ version: [2, 3000, 1] }), media: { allow: () => true } } });
   const got = [];
   await ch.start(async (m) => { got.push(m); });
   await assert.rejects(ch.sendLocation('g@g.us', { latitude: 1, longitude: 2 }), /not connected/);
@@ -380,9 +380,9 @@ test('channel (fake Baileys socket): sends, reactions, edits, groups, profile an
 
 test('channel (fake socket): incoming media placeholders, reactions and encrypted poll votes', async () => {
   const baileys = await import('baileys');
-  const { createWhatsAppChannel } = await import('../src/channels/whatsapp.js');
+  const { createWhatsAppSession } = await import('../src/channels/whatsapp/session.js');
   const calls = [];
-  const ch = createWhatsAppChannel({ authDir: mkdtempSync(join(tmpdir(), 'wa-auth-')), deps: { makeSocket: fakeSocket(calls), fetchVersion: async () => ({ version: [2, 3000, 1] }) } });
+  const ch = createWhatsAppSession({ authDir: mkdtempSync(join(tmpdir(), 'wa-auth-')), deps: { makeSocket: fakeSocket(calls), fetchVersion: async () => ({ version: [2, 3000, 1] }) } });
   const got = [];
   await ch.start(async (m) => { got.push(m); await t.route(m); });
   const sock = fakeSocket.last;
@@ -424,8 +424,8 @@ test('channel (fake socket): incoming media placeholders, reactions and encrypte
   assert.ok(again.pollCreationMessageV3 && again.messageContextInfo.messageSecret);
 });
 
-test('registry routes WhatsApp actions to the right number', async () => {
-  const { createChannelRegistry } = await import('../src/channels/registry.js');
+test('the hub routes WhatsApp actions to the right number', async () => {
+  const { fakeWhatsAppHub } = await import('./harness.js');
   const seen = [];
   const factory = ({ number }) => ({
     id: 'whatsapp', number, start: async () => {}, status: async () => ({ status: 'open' }), listChats: async () => [],
@@ -435,8 +435,8 @@ test('registry routes WhatsApp actions to the right number', async () => {
   });
   t.store.updateSettings({ whatsappNumbers: [{ id: 'main', label: 'Main' }, { id: 'carpool', label: 'Carpool' }] });
   try {
-    const reg = createChannelRegistry({ factory });
-    await reg.start(async () => {});
+    const reg = await fakeWhatsAppHub(factory);
+    await reg.start({ onMessage: async () => {} });
     await reg.react('carpool#g@g.us', { msgId: 'X' }, '👍');
     await reg.react('g0@g.us', { msgId: 'Y' }, '✅');
     await reg.block('carpool#41790000001@s.whatsapp.net', '+41 79 1');

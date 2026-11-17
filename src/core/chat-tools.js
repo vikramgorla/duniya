@@ -1,5 +1,8 @@
 // @ts-check
-// Built-in WhatsApp tools (026), exposed to the model as whatsapp__<name>. Same shape as the memory tools.
+// Built-in chat tools (026; 075: by channel capability), exposed to the model as whatsapp__<name> (the name and the
+// `whatsapp:` rule prefix stay, so saved agent rules keep working). Same shape as the memory tools. Every tool names
+// the capability it needs (channels/index.js): an agent only gets the tools its chat's channel has, and a tool that
+// acts on another chat checks that chat's channel too.
 // Role rules are code (constitution III): participants get the send/react/poll-type tools by default, organizers all;
 // powerful actions (people, group settings, block, delete) are organizer-only whatever the rules say, and are applied
 // immediately (owner decision on issue #2: no confirm code). Every action is logged as `whatsapp.action`.
@@ -9,19 +12,16 @@ import {
   logMessage, messageByMsgId, lastAgentMessage, setMessageText, searchMessages, namesInChat, getPoll, latestPoll, recentPolls, pollTally,
 } from './db.js';
 import { activity } from './events.js';
+import { capsOf, channelOf, isGroup, CHANNELS } from '../channels/index.js';
 import { toolPhrase } from '../panel/public/app/names.js';
 
 let channel = null;
-/** The channel the tools act through (set by the router and the panel at startup). */
-export const setWhatsAppChannel = (ch) => { channel = ch; };
-export const whatsappChannel = () => channel;
-
-const jidOf = (chat) => { const i = String(chat).indexOf('#'); return i > 0 ? chat.slice(i + 1) : String(chat); };
-export const isGroupChat = (chat) => jidOf(chat).endsWith('@g.us');
-const isWhatsAppChat = (chat) => /@(g\.us|s\.whatsapp\.net|lid)$/.test(jidOf(chat || ''));
+/** The channel hub the tools act through (set by the router and the panel at startup). */
+export const setChatChannel = (ch) => { channel = ch; };
+export const chatChannel = () => channel;
 
 // 059: the actions the built-in owner assistant may ever use (messaging, no group administration).
-export const OWNER_WA_TOOLS = ['send_media', 'send_location', 'send_contact', 'react', 'reply', 'edit_message', 'delete_message', 'create_poll', 'poll_results', 'group_info', 'profile_info'];
+export const OWNER_CHAT_TOOLS = ['send_media', 'send_location', 'send_contact', 'react', 'reply', 'edit_message', 'delete_message', 'create_poll', 'poll_results', 'group_info', 'profile_info'];
 const WHATSAPP_PARTICIPANT_DEFAULT = ['send_media', 'send_location', 'react', 'reply', 'create_poll', 'poll_results', 'group_info', 'profile_info'];
 const WHATSAPP_DEFAULT_ALLOW = {
   organizer: ['whatsapp:*'],
@@ -32,19 +32,31 @@ const WHATSAPP_DEFAULT_ALLOW = {
  * Rules for whatsapp tools of a role: the role's explicit `whatsapp:` rules when it has any (the editor writes them,
  * `whatsapp:-` = none), otherwise the defaults above.
  */
-export function whatsappRules(agent, role) {
+export function chatToolRules(agent, role) {
   const explicit = (agent.tools?.[role] || []).filter((r) => r.startsWith('whatsapp:'));
   return explicit.length ? explicit : WHATSAPP_DEFAULT_ALLOW[role] || [];
 }
 
 // ---------- shared helpers ----------
-function need() { if (!channel) throw fail('WhatsApp is not available here', 503); return channel; }
+function need() { if (!channel) throw fail('No chat channel is available here', 503); return channel; }
+/** Does the chat's channel have this capability? A chat of no channel (test console, Ask box) has none. */
+const can = (chat, cap) => !!capsOf(chat)?.[cap];
+const needCap = (chat, cap) => { if (!can(chat, cap)) throw fail(`${channelLabel(chat)} cannot do this`); };
+const channelLabel = (chat) => CHANNELS.find((c) => c.id === channelOf(chat))?.label || 'This chat';
 
-/** The chat to act on: the current one, or another chat (id or group name) bound to the same agent. */
-async function targetChat(input, ctx) {
+/**
+ * The chat to act on: the current one, or another chat (id or group name) bound to the same agent; its channel must
+ * have the capability the tool needs.
+ */
+async function targetChat(input, ctx, cap) {
+  const chat = await pickChat(input, ctx);
+  needCap(chat, cap);
+  return chat;
+}
+async function pickChat(input, ctx) {
   const want = String(input.chat || '').trim();
   if (!want || want === ctx.chat) {
-    if (!isWhatsAppChat(ctx.chat)) throw fail('There is no WhatsApp chat here; name the group (chat) to act on');
+    if (!channelOf(ctx.chat)) throw fail('There is no chat here; name the group (chat) to act on');
     return ctx.chat;
   }
   const bound = ctx.agent.chats || [];
@@ -55,7 +67,7 @@ async function targetChat(input, ctx) {
   }
   throw fail('I can only act in this chat or in other chats this agent is in');
 }
-const needGroup = (chat) => { if (!isGroupChat(chat)) throw fail('This only works in a WhatsApp group'); };
+const needGroup = (chat) => { if (!isGroup(chat)) throw fail('This only works in a group'); };
 
 /** A stored message → { msgId, fromMe, participant, text }. `message` = id or a few words of it (latest match). */
 function findMessage(chat, message, fallback) {
@@ -94,7 +106,7 @@ function people(input) {
 }
 const ACTION_WORD = { add: 'Added', remove: 'Removed', promote: 'Made admin', demote: 'No longer admin' };
 async function participantsAction(input, ctx, action) {
-  const chat = await targetChat(input, ctx); needGroup(chat);
+  const chat = await targetChat(input, ctx, 'groupMembers'); needGroup(chat);
   const res = await need().groupParticipants(chat, people(input), action);
   const failed = res.filter((r) => !r.ok);
   return { chat, result: { done: res.filter((r) => r.ok).length, failed: failed.map((r) => ({ who: r.who, status: r.status })) },
@@ -106,12 +118,19 @@ const CHAT = str('Optional: another chat this agent is in (group name or chat id
 const MESSAGE = (dflt) => str(`Optional: the message, as its id or a few words of it. Default: ${dflt}.`);
 const PEOPLE = { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 20, description: 'Phone numbers with country code, e.g. "+41 79 123 45 67"' };
 
+/** Block / unblock act on the account of the current chat, else of the agent's first chat that can block. */
+function blockChat(ctx) {
+  const chat = can(ctx.chat, 'block') ? ctx.chat : (ctx.agent.chats || []).find((c) => can(c, 'block'));
+  if (!chat) throw fail('No chat here can block people');
+  return chat;
+}
+
 /**
- * Tool definitions. roles = who may ever get the tool (organizer-only tools stay off participants even if ticked).
+ * Tool definitions. cap = the channel capability it needs (channels/index.js). roles = who may ever get the tool (organizer-only tools stay off participants even if ticked).
  * run returns { chat, result, summary } — summary is for the activity log, result goes to the model.
  */
 const DEFS = [
-  { name: 'send_media', roles: ['organizer', 'participant'],
+  { name: 'send_media', cap: 'media', roles: ['organizer', 'participant'],
     description: 'Send an image, GIF, video, sticker, audio (voice note) or document to the chat from a public https URL (or base64). Max 16 MB. Use for pictures, flyers, PDFs, maps.',
     input_schema: { type: 'object', properties: {
       kind: { type: 'string', enum: ['image', 'gif', 'video', 'sticker', 'audio', 'document'], description: 'What to send. GIFs are sent as looping MP4; stickers must be WebP; voice notes OGG/Opus.' },
@@ -119,89 +138,89 @@ const DEFS = [
       caption: str('Optional caption (image, GIF, video, document)', { maxLength: 1000 }), file_name: str('File name shown for documents'), chat: CHAT,
     }, required: ['kind'] },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx);
+      const chat = await targetChat(input, ctx, 'media');
       const r = await need().sendMedia(chat, { kind: input.kind, url: input.url, base64: input.base64, mimetype: input.mimetype, caption: input.caption || '', fileName: input.file_name || '' });
       const label = `[${input.kind === 'audio' ? 'voice note' : input.kind}${input.caption ? `: ${clip(input.caption, 300)}` : ''}]`;
       remember(ctx, chat, r.msgId, label);
       return { chat, result: { sent: true, msgId: r.msgId, type: r.mimetype, ...(r.asStill ? { note: 'Sent as a still image (use an MP4 for a moving GIF)' } : {}) }, summary: `${label} ${r.bytes} bytes` };
     } },
-  { name: 'send_location', roles: ['organizer', 'participant'],
+  { name: 'send_location', cap: 'location', roles: ['organizer', 'participant'],
     description: 'Send a location pin (latitude/longitude, optional place name and address) to the chat.',
     input_schema: { type: 'object', properties: { latitude: { type: 'number', minimum: -90, maximum: 90 }, longitude: { type: 'number', minimum: -180, maximum: 180 },
       name: str('Place name'), address: str('Address'), chat: CHAT }, required: ['latitude', 'longitude'] },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx);
+      const chat = await targetChat(input, ctx, 'location');
       const r = await need().sendLocation(chat, { latitude: input.latitude, longitude: input.longitude, name: input.name || '', address: input.address || '' });
       const label = `[location${input.name ? `: ${clip(input.name, 100)}` : ''} (${input.latitude}, ${input.longitude})]`;
       remember(ctx, chat, r.msgId, label);
       return { chat, result: { sent: true, msgId: r.msgId }, summary: label };
     } },
-  { name: 'send_contact', roles: ['organizer', 'participant'],
+  { name: 'send_contact', cap: 'contactCards', roles: ['organizer', 'participant'],
     description: 'Send a contact card (name and phone number) to the chat.',
     input_schema: { type: 'object', properties: { name: str('Contact name'), phone: str('Phone number with country code'), org: str('Optional organisation'), chat: CHAT }, required: ['name', 'phone'] },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx);
+      const chat = await targetChat(input, ctx, 'contactCards');
       const r = await need().sendContact(chat, { name: input.name, phone: input.phone, org: input.org || '' });
       remember(ctx, chat, r.msgId, `[contact: ${clip(input.name, 80)}]`);
       return { chat, result: { sent: true, msgId: r.msgId }, summary: `[contact: ${clip(input.name, 80)}]` };
     } },
-  { name: 'react', roles: ['organizer', 'participant'],
+  { name: 'react', cap: 'reactions', roles: ['organizer', 'participant'],
     description: 'React to a message with an emoji (e.g. 👍 ✅ ❤️), or remove your reaction with an empty emoji. Default: the message you are answering.',
     input_schema: { type: 'object', properties: { emoji: str('One emoji; empty removes the reaction', { maxLength: 16 }), message: MESSAGE('the message you are answering'), chat: CHAT }, required: ['emoji'] },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx);
+      const chat = await targetChat(input, ctx, 'reactions');
       const ref = findMessage(chat, input.message, current(chat, ctx));
       await need().react(chat, ref, input.emoji || '');
       return { chat, result: { ok: true }, summary: `${input.emoji ? `Reacted ${input.emoji}` : 'Removed reaction'} to "${clip(ref.text, 80)}"` };
     } },
-  { name: 'reply', roles: ['organizer', 'participant'],
+  { name: 'reply', cap: 'quotes', roles: ['organizer', 'participant'],
     description: 'Send a text that quotes (replies to) a specific earlier message, e.g. to answer an older question. Your normal answer already quotes the current message; use this only for another message.',
     input_schema: { type: 'object', properties: { text: str('Your reply', { maxLength: 4000 }), message: MESSAGE('the message you are answering'), chat: CHAT }, required: ['text'] },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx);
+      const chat = await targetChat(input, ctx, 'quotes');
       const ref = findMessage(chat, input.message, current(chat, ctx));
       const r = await need().send(chat, String(input.text), { quote: ref });
       remember(ctx, chat, r?.msgId, String(input.text), ref.text);
       return { chat, result: { sent: true, msgId: r?.msgId || null }, summary: `Replied to "${clip(ref.text, 60)}": ${clip(input.text, 120)}` };
     } },
-  { name: 'edit_message', roles: ['organizer', 'participant'],
+  { name: 'edit_message', cap: 'edit', roles: ['organizer', 'participant'],
     description: 'Change the text of a message you (the assistant) sent earlier. Default: your last message in this chat.',
     input_schema: { type: 'object', properties: { text: str('New text', { maxLength: 4000 }), message: MESSAGE('your last message'), chat: CHAT }, required: ['text'] },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx);
+      const chat = await targetChat(input, ctx, 'edit');
       const ref = findMessage(chat, input.message, () => lastAgentMessage(chat));
       if (!ref.fromMe) throw fail('Only messages the assistant sent can be edited');
       await need().editMessage(chat, ref.msgId, String(input.text));
       setMessageText(chat, ref.msgId, String(input.text));
       return { chat, result: { ok: true }, summary: `Edited "${clip(ref.text, 60)}" → "${clip(input.text, 80)}"` };
     } },
-  { name: 'delete_message', roles: ['organizer'],
+  { name: 'delete_message', cap: 'delete', roles: ['organizer'],
     description: 'Delete a message for everyone: one the assistant sent (default: its last message), or someone else\'s in a group where the assistant is admin.',
     input_schema: { type: 'object', properties: { message: MESSAGE('your last message'), chat: CHAT } },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx);
+      const chat = await targetChat(input, ctx, 'delete');
       const ref = findMessage(chat, input.message, () => lastAgentMessage(chat));
       if (!ref.fromMe) needGroup(chat);
       await need().deleteMessage(chat, ref);
       setMessageText(chat, ref.msgId, '[deleted]');
       return { chat, result: { ok: true }, summary: `Deleted "${clip(ref.text, 80)}"` };
     } },
-  { name: 'create_poll', roles: ['organizer', 'participant'],
+  { name: 'create_poll', cap: 'polls', roles: ['organizer', 'participant'],
     description: 'Post a WhatsApp poll with 2–12 options; single choice by default or several answers with multiple=true. Votes arrive automatically; read them with poll_results.',
     input_schema: { type: 'object', properties: { question: str('The poll question', { maxLength: 255 }), options: { type: 'array', items: { type: 'string', maxLength: 100 }, minItems: 2, maxItems: 12 },
       multiple: { type: 'boolean', description: 'Allow several answers (default false)' }, chat: CHAT }, required: ['question', 'options'] },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx);
+      const chat = await targetChat(input, ctx, 'polls');
       const r = await need().sendPoll(chat, { name: input.question, options: input.options, multi: !!input.multiple });
       const label = `[poll: ${clip(input.question, 200)} — ${(input.options || []).join(' / ')}]`;
       remember(ctx, chat, r.msgId, label);
       return { chat, result: { posted: true, msgId: r.msgId }, summary: label };
     } },
-  { name: 'poll_results', roles: ['organizer', 'participant'],
+  { name: 'poll_results', cap: 'polls', roles: ['organizer', 'participant'],
     description: 'Current votes of a poll in this chat (default: the latest poll): count and who voted per option.',
     input_schema: { type: 'object', properties: { poll: str('Optional: poll id or words of its question. Default: the latest poll.'), chat: CHAT } },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx);
+      const chat = await targetChat(input, ctx, 'polls');
       let p;
       if (input.poll) p = getPoll(chat, input.poll) || findPollByQuestion(chat, input.poll);
       else p = latestPoll(chat);
@@ -209,11 +228,11 @@ const DEFS = [
       const options = pollTally(p);
       return { chat, result: { question: p.name, multiple: p.selectable !== 1, voters: Object.keys(p.votes).length, options }, summary: `Poll "${clip(p.name, 60)}": ${options.map((o) => `${o.name} ${o.votes}`).join(', ')}` };
     } },
-  { name: 'group_info', roles: ['organizer', 'participant'],
+  { name: 'group_info', cap: 'groups', roles: ['organizer', 'participant'],
     description: 'Facts about the group: name, description, settings, member count, admins and members (names; phone numbers only for organizers).',
     input_schema: { type: 'object', properties: { chat: CHAT } },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx); needGroup(chat);
+      const chat = await targetChat(input, ctx, 'groups'); needGroup(chat);
       const g = await need().groupInfo(chat);
       const names = namesInChat(chat);
       const tags = tagsInChat(chat); // 057: member tags (chats that are on only); names stay the ones seen in the chat
@@ -223,68 +242,68 @@ const DEFS = [
       return { chat, result: { name: g.subject, description: g.description, members: g.size, onlyAdminsSend: g.announcement, onlyAdminsEditInfo: g.locked, joinApproval: g.joinApproval,
         admins: members.filter((m) => m.admin).map((m) => m.name), people: members }, summary: `Group info (${g.size} members)` };
     } },
-  { name: 'group_invite_link', roles: ['organizer', 'participant'],
+  { name: 'group_invite_link', cap: 'groupInvite', roles: ['organizer', 'participant'],
     description: 'Get the invite link of the group (the assistant must be a group admin).',
     input_schema: { type: 'object', properties: { chat: CHAT } },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx); needGroup(chat);
+      const chat = await targetChat(input, ctx, 'groupInvite'); needGroup(chat);
       const r = await need().groupInviteLink(chat);
       return { chat, result: r, summary: 'Invite link read' };
     } },
-  { name: 'revoke_invite_link', roles: ['organizer'],
+  { name: 'revoke_invite_link', cap: 'groupInvite', roles: ['organizer'],
     description: 'Reset the group invite link: the old link stops working and a new one is returned.',
     input_schema: { type: 'object', properties: { chat: CHAT } },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx); needGroup(chat);
+      const chat = await targetChat(input, ctx, 'groupInvite'); needGroup(chat);
       const r = await need().groupRevokeInvite(chat);
       return { chat, result: r, summary: 'Invite link reset' };
     } },
-  { name: 'add_participants', roles: ['organizer'], description: 'Add people to the group by phone number (the assistant must be a group admin). Applied immediately.',
+  { name: 'add_participants', cap: 'groupMembers', roles: ['organizer'], description: 'Add people to the group by phone number (the assistant must be a group admin). Applied immediately.',
     input_schema: { type: 'object', properties: { people: PEOPLE, chat: CHAT }, required: ['people'] }, run: (i, c) => participantsAction(i, c, 'add') },
-  { name: 'remove_participants', roles: ['organizer'], description: 'Remove people from the group by phone number (the assistant must be a group admin). Applied immediately.',
+  { name: 'remove_participants', cap: 'groupMembers', roles: ['organizer'], description: 'Remove people from the group by phone number (the assistant must be a group admin). Applied immediately.',
     input_schema: { type: 'object', properties: { people: PEOPLE, chat: CHAT }, required: ['people'] }, run: (i, c) => participantsAction(i, c, 'remove') },
-  { name: 'promote', roles: ['organizer'], description: 'Make group members admins (by phone number). Applied immediately.',
+  { name: 'promote', cap: 'groupMembers', roles: ['organizer'], description: 'Make group members admins (by phone number). Applied immediately.',
     input_schema: { type: 'object', properties: { people: PEOPLE, chat: CHAT }, required: ['people'] }, run: (i, c) => participantsAction(i, c, 'promote') },
-  { name: 'demote', roles: ['organizer'], description: 'Remove admin rights from group admins (by phone number). Applied immediately.',
+  { name: 'demote', cap: 'groupMembers', roles: ['organizer'], description: 'Remove admin rights from group admins (by phone number). Applied immediately.',
     input_schema: { type: 'object', properties: { people: PEOPLE, chat: CHAT }, required: ['people'] }, run: (i, c) => participantsAction(i, c, 'demote') },
-  { name: 'set_group_subject', roles: ['organizer'], description: 'Rename the group.',
+  { name: 'set_group_subject', cap: 'groupAdmin', roles: ['organizer'], description: 'Rename the group.',
     input_schema: { type: 'object', properties: { subject: str('New group name', { minLength: 1, maxLength: 100 }), chat: CHAT }, required: ['subject'] },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx); needGroup(chat);
+      const chat = await targetChat(input, ctx, 'groupAdmin'); needGroup(chat);
       if (!String(input.subject || '').trim()) throw fail('The group name cannot be empty');
       await need().groupSubject(chat, String(input.subject).trim());
       return { chat, result: { ok: true }, summary: `Group renamed to "${clip(input.subject, 100)}"` };
     } },
-  { name: 'set_group_description', roles: ['organizer'], description: 'Change the group description (empty clears it).',
+  { name: 'set_group_description', cap: 'groupAdmin', roles: ['organizer'], description: 'Change the group description (empty clears it).',
     input_schema: { type: 'object', properties: { description: str('New description', { maxLength: 2048 }), chat: CHAT }, required: ['description'] },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx); needGroup(chat);
+      const chat = await targetChat(input, ctx, 'groupAdmin'); needGroup(chat);
       await need().groupDescription(chat, String(input.description || ''));
       return { chat, result: { ok: true }, summary: `Description set: ${clip(input.description, 120) || '(cleared)'}` };
     } },
-  { name: 'set_group_picture', roles: ['organizer'], description: 'Set the group picture from a public image URL (JPEG/PNG).',
+  { name: 'set_group_picture', cap: 'groupAdmin', roles: ['organizer'], description: 'Set the group picture from a public image URL (JPEG/PNG).',
     input_schema: { type: 'object', properties: { url: str('Public http(s) image URL'), chat: CHAT }, required: ['url'] },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx); needGroup(chat);
+      const chat = await targetChat(input, ctx, 'groupAdmin'); needGroup(chat);
       await need().groupPicture(chat, { url: input.url });
       return { chat, result: { ok: true }, summary: 'Group picture changed' };
     } },
-  { name: 'set_group_settings', roles: ['organizer'],
+  { name: 'set_group_settings', cap: 'groupAdmin', roles: ['organizer'],
     description: 'Group settings: only_admins_send (announcement group), only_admins_edit_info (lock name/picture/description), join_approval (admins approve new members). Give only what changes.',
     input_schema: { type: 'object', properties: { only_admins_send: { type: 'boolean' }, only_admins_edit_info: { type: 'boolean' }, join_approval: { type: 'boolean' }, chat: CHAT } },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx); needGroup(chat);
+      const chat = await targetChat(input, ctx, 'groupAdmin'); needGroup(chat);
       const s = { announcement: input.only_admins_send, locked: input.only_admins_edit_info, joinApproval: input.join_approval };
       const changed = Object.entries(s).filter(([, v]) => typeof v === 'boolean');
       if (!changed.length) throw fail('Nothing to change: give only_admins_send, only_admins_edit_info or join_approval');
       await need().groupSettings(chat, Object.fromEntries(changed));
       return { chat, result: { ok: true }, summary: `Settings: ${changed.map(([k, v]) => `${k} ${v ? 'on' : 'off'}`).join(', ')}` };
     } },
-  { name: 'profile_info', roles: ['organizer', 'participant'],
+  { name: 'profile_info', cap: 'profile', roles: ['organizer', 'participant'],
     description: 'WhatsApp profile of a person: name seen in this chat, "about" text and profile picture link. Default: the person you are talking to.',
     input_schema: { type: 'object', properties: { person: str('Phone number with country code (default: the sender)'), chat: CHAT } },
     async run(input, ctx) {
-      const chat = await targetChat(input, ctx);
+      const chat = await targetChat(input, ctx, 'profile');
       const who = String(input.person || ctx.requester || '').trim();
       if (!who) throw fail('Whose profile? Give a phone number');
       if (ctx.role !== 'organizer' && digits(who) !== digits(ctx.requester || '')) {
@@ -295,21 +314,19 @@ const DEFS = [
       const name = namesInChat(chat)[digits(p.phone || who)] || '';
       return { chat, result: { name, about: p.about, pictureUrl: p.pictureUrl, ...(ctx.role === 'organizer' ? { phone: p.phone ? `+${p.phone}` : '' } : {}) }, summary: `Profile of ${name || 'a person'}` };
     } },
-  { name: 'block', roles: ['organizer'], description: 'Block a phone number on this WhatsApp number (they can no longer message it). Applied immediately.',
+  { name: 'block', cap: 'block', roles: ['organizer'], description: 'Block a phone number on this WhatsApp number (they can no longer message it). Applied immediately.',
     input_schema: { type: 'object', properties: { person: str('Phone number with country code') }, required: ['person'] },
     async run(input, ctx) {
       const d = digits(input.person);
       if ((ctx.agent.organizers || []).includes(d)) throw fail('Organizers of this agent cannot be blocked');
-      const chat = isWhatsAppChat(ctx.chat) ? ctx.chat : (ctx.agent.chats || [])[0];
-      if (!chat) throw fail('No WhatsApp number to act on');
+      const chat = blockChat(ctx);
       await need().block(chat, input.person);
       return { chat, result: { blocked: true }, summary: `Blocked +${d}` };
     } },
-  { name: 'unblock', roles: ['organizer'], description: 'Unblock a phone number on this WhatsApp number.',
+  { name: 'unblock', cap: 'block', roles: ['organizer'], description: 'Unblock a phone number on this WhatsApp number.',
     input_schema: { type: 'object', properties: { person: str('Phone number with country code') }, required: ['person'] },
     async run(input, ctx) {
-      const chat = isWhatsAppChat(ctx.chat) ? ctx.chat : (ctx.agent.chats || [])[0];
-      if (!chat) throw fail('No WhatsApp number to act on');
+      const chat = blockChat(ctx);
       await need().unblock(chat, input.person);
       return { chat, result: { unblocked: true }, summary: `Unblocked +${digits(input.person)}` };
     } },
@@ -323,8 +340,8 @@ function findPollByQuestion(chat, words) {
 const scrubInput = (input) => Object.fromEntries(Object.entries(input || {}).map(([k, v]) => [k, k === 'base64' ? `(${String(v).length} chars)` : v]));
 
 /** Tools in the memory-tool shape: run(input, ctx) logs `whatsapp.action` and returns the result for the model. */
-export const whatsappTools = DEFS.map((d) => ({
-  name: d.name, description: d.description, input_schema: d.input_schema, roles: d.roles,
+export const chatTools = DEFS.map((d) => ({
+  name: d.name, description: d.description, input_schema: d.input_schema, roles: d.roles, cap: d.cap,
   async run(input, ctx) {
     if (!d.roles.includes(ctx.role)) throw fail('Only organizers can do this');
     try {
@@ -339,6 +356,11 @@ export const whatsappTools = DEFS.map((d) => ({
     }
   },
 }));
+/**
+ * The chat tools usable from a chat: the ones its channel can do. From a chat of no channel (test console, Ask box)
+ * the ones any channel can do; they then act on a named chat, which is checked again (targetChat).
+ */
+export const chatToolsFor = (chat) => { const caps = capsOf(chat); return chatTools.filter((t) => (caps ? !!caps[t.cap] : CHANNELS.some((c) => c.caps[t.cap]))); };
 /** For the agent editor: name, description, which roles may have it and the participant default. */
-export const whatsappToolCatalog = () => whatsappTools.map((t) => ({ name: t.name, description: t.description, organizerOnly: !t.roles.includes('participant'),
-  participantDefault: WHATSAPP_PARTICIPANT_DEFAULT.includes(t.name), owner: OWNER_WA_TOOLS.includes(t.name) }));
+export const chatToolCatalog = () => chatTools.map((t) => ({ name: t.name, description: t.description, organizerOnly: !t.roles.includes('participant'),
+  participantDefault: WHATSAPP_PARTICIPANT_DEFAULT.includes(t.name), owner: OWNER_CHAT_TOOLS.includes(t.name) }));
