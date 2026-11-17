@@ -158,6 +158,8 @@ const STATES = [
   // 064: list → page: a provider's page, the Add page, Backups → Restore, Settings sections
   { name: 'models-provider', hash: 'models/chatgpt', js: 'T.openAll();' },
   { name: 'models-add', hash: 'models/add' },
+  { name: 'models-claudecode', hash: 'models/claudecode', js: 'T.openAll();' }, // 074: an agent app, connected
+  { name: 'models-codex', hash: 'models/codex' }, // 074: an agent app's device sign-in steps
   { name: 'models-paused', hash: 'models/openrouter' }, // 042: an account paused by its usage limit
   { name: 'backups-restore', hash: 'backups/restore' },
   { name: 'settings-users', hash: 'settings/users', wait: 2000, js: 'T.openAll();' },

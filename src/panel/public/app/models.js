@@ -359,7 +359,7 @@ export async function renderModels() {
     can('admin') ? h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn primary mut', onclick: () => tryApi(async () => { await api('PUT', '/api/fallback', { enabled: fbOn.checked, chain: fbChain.value() }); S.models = null; renderModels(); }, 'Saved') }, 'Save')) : null);
 
   // 064: a list of providers (mark, name, health, short status) → the chosen provider's page; #models/<id>
-  const MARKS = { openrouter: ['O', 'c4'], anthropic: ['A', 'c1'], openai: ['O', 'c3'], chatgpt: ['C', 'c5'], copilot: ['G', 'c0'], claudecode: ['C', 'c1'], codex: ['X', 'c5'] };
+  const MARKS = { openrouter: ['O', 'c4'], anthropic: ['A', 'c1'], openai: ['O', 'c3'], chatgpt: ['C', 'c5'], copilot: ['G', 'c0'], claudecode: ['C', 'c1'], codex: ['C', 'c5'] };
   const pages = { openrouter: orCard, anthropic: anCard, openai: oaCard, chatgpt: cgCard, copilot: coCard, claudecode: ccCard, codex: cxCard };
   const names = Object.fromEntries(Object.entries(pages).map(([id, card]) => [id, card.querySelector('h2')?.textContent || id]));
   const state = (p) => (!p?.connected ? (p?.error ? ['bad', 'needs attention'] : ['', 'not connected']) : p.health?.state && p.health.state !== 'ok' ? [p.health.state === 'reconnect' ? 'bad' : 'warn', p.health.text] : ['ok', `Connected · ${plural(p.models, 'model')}`]);
@@ -376,7 +376,7 @@ export async function renderModels() {
     h('ul', { class: 'add-list' }, ADD_PROVIDERS.map(([id, line]) => {
       const isOn = by[id]?.connected; const [letter, c] = MARKS[id] || ['E', 'c0'];
       return h('li', {}, h('a', { class: 'lrow', href: `#models/${id === 'compatible' ? 'endpoints' : id}` }, mark(letter, c),
-        h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, PROVIDER_NAMES[id]), h('span', { class: 'lrow-sub' }, isOn ? 'Connected · add another account' : line)),
+        h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, PROVIDER_NAMES[id]), h('span', { class: 'lrow-sub' }, isOn ? (id === 'claudecode' || id === 'codex' ? 'Connected' : 'Connected · add another account') : line)),
         isOn ? h('span', { class: 'dot ok', 'aria-hidden': 'true' }) : null, h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
     })));
   pages.endpoints = otherCard; pages.fallback = fallbackCard; pages.defaults = defaults;

@@ -6,7 +6,8 @@
 **Getting started** on Overview: Duniya recognises it.
 
 **In 30 seconds**
-- No key yet? **OpenRouter** with free models only, or **Sign in with ChatGPT** with your Plus/Pro plan.
+- No key yet? **OpenRouter** with free models only, **Sign in with ChatGPT** with your Plus/Pro plan, or your Claude,
+  ChatGPT or Copilot plan through its official app ([agent apps](#agent-apps)).
 - Pick a model per agent and per chat, or *Auto*.
 - A failing model hands over to the next one; tools that already ran never run twice.
 - Photos & voice depend on the provider: [see the table](#photos--voice).
@@ -19,10 +20,12 @@
 | Claude, OpenAI | API key |
 | Custom (OpenAI-compatible: Ollama, LM Studio, …) | endpoint URL |
 | ChatGPT | your Plus/Pro plan: *Sign in with ChatGPT* (OpenAI's official flow, preview) |
-| GitHub Copilot | your allowance via the official Copilot SDK (downloaded only if you connect it; needs 2 GB) |
+| Claude Code | your Claude Pro/Max plan through Anthropic's Claude Code app on the server ([agent apps](#agent-apps)) |
+| Codex | your ChatGPT plan through OpenAI's Codex app on the server ([agent apps](#agent-apps)) |
+| GitHub Copilot | your allowance via the official Copilot SDK ([agent apps](#agent-apps): downloaded only if you connect it) |
 
 Names are the same everywhere (panel, admin MCP tools, activity): *ChatGPT*, *Claude*, *OpenAI*, *GitHub Copilot*,
-*OpenRouter*; with several accounts of one provider, its label is added: *ChatGPT · work*.
+*Claude Code*, *Codex*, *OpenRouter*; with several accounts of one provider, its label is added: *ChatGPT · work*.
 
 > [!TIP]
 > **Sign in with ChatGPT** ends on a page that says *This site can't be reached*: that's expected. Copy the whole
@@ -30,8 +33,63 @@ Names are the same everywhere (panel, admin MCP tools, activity): *ChatGPT*, *Cl
 > `localhost` or `127.0.0.1`, or only the part from `code=`.
 
 > [!NOTE]
-> Claude **subscriptions** (Pro/Max) can't be used by third-party apps under Anthropic's terms, so Claude needs an
-> API key.
+> *Claude* uses an API key. For a Claude **Pro or Max plan**, connect **Claude Code** instead: Duniya then runs
+> Anthropic's own, unmodified Claude Code app, signed in with your own account ([agent apps](#agent-apps)).
+
+## Agent apps
+
+**Use your own Claude, ChatGPT or GitHub Copilot plan through each vendor's official app, also on a 1 GB server.**
+
+**Do it:** **Models** → **Add a provider** → **Claude Code**, **Codex** or **GitHub Copilot** (owner only).
+
+**In 30 seconds**
+- Duniya runs the official app on the server for each answer: Claude Code (Claude plan), Codex (ChatGPT plan), the
+  Copilot SDK (Copilot plan). The app is downloaded only when you connect it, into the data folder.
+- Your agents' tools (WhatsApp actions, tool services) still work, and roles and confirmations are still decided by
+  Duniya: the app sees only those tools, never a shell, files or the web.
+- A usage limit pauses the account until the reset the app reports; the next model answers meanwhile.
+- On a small server: switch on [Small server mode](small-servers.md#small-server-mode); one app answers at a time.
+
+**Connect**
+
+| App | Sign-in | Download |
+|---|---|---|
+| **Claude Code** | On your computer run `claude setup-token` (Claude Code installed, [how](https://code.claude.com/docs/en/setup)), sign in in the browser, paste the `sk-ant-oat01-…` token it prints. Valid for a year. Duniya checks it with one tiny answer before keeping it. | about 360 MB |
+| **Codex** | **Sign in with ChatGPT**: the page shows a link and a one-time code; open the link on any device, sign in, enter the code. The page updates by itself. | about 400 MB |
+| **GitHub Copilot** | a fine-grained GitHub token with *Copilot requests* (steps on its page) | about 220 MB |
+
+**What runs, measured** (Linux x64, Claude Code 2.1.326, Codex 0.169.0, Copilot SDK 1.0.34; a local stand-in for the
+model, so the model's own thinking time comes on top):
+
+| App | Memory while answering | Between answers | Start until its first request | Download (npm, peak memory) |
+|---|---|---|---|---|
+| Claude Code | about 200 MB | nothing runs | about 0.5 s | 355 MB, 280 MB |
+| Codex | about 140 MB | nothing runs | about 0.2–0.3 s | 405 MB, 355 MB |
+| GitHub Copilot | runtime about 60 MB idle | stopped after 2 min idle on small servers (10 min otherwise) | under 0.1 s | 220 MB, 295 MB |
+
+Each app's page shows what it measured on *your* server (*about 200 MB while answering · starts in 0.6 s*).
+
+**How it stays small**
+- Started for one answer and ended with it; Copilot's runtime is stopped by the upkeep tick when idle.
+- One app at a time on small servers (two or three on bigger ones); the next waits up to 2 minutes with ⏳ on the
+  message, then the next model in the fallback chain answers.
+- Before every start: enough free memory (the app's need + 80 MB), else the next model answers at once and the account
+  is not paused. Memory tight: idle runtimes stop at once.
+- A download needs about 380 MB free memory and 1.2 GB free disk; on 1 GB the installer's 2 GB swap is the safety net.
+
+> [!WARNING]
+> **Terms, in plain words (not legal advice; check the sources yourself).**
+> - **Claude:** Anthropic allows *an end user signing in to the unmodified Claude Code binary with their own Claude
+>   subscription*, also where a platform hosts Claude Code, and says Pro and Max limits *assume ordinary, individual
+>   usage* ([Claude Code legal and compliance](https://code.claude.com/docs/en/legal-and-compliance)). `claude -p`
+>   signed in with your plan draws from your subscription limits ([Use the Claude Agent SDK with your Claude
+>   plan](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan), updated
+>   7 Oct 2026). Use your own account for your own agents; a busy group answered all day is not "individual usage".
+> - **ChatGPT / Codex:** Codex signed in with ChatGPT uses your plan's Codex limits; OpenAI recommends API keys for
+>   programmatic CI work and says not to share `auth.json` ([Codex authentication](https://learn.chatgpt.com/docs/auth)).
+>   Duniya keeps it in the data folder (only the app's user can read it) and never shows it.
+> - **GitHub Copilot:** requests count against your Copilot plan's allowance (premium requests).
+> - Never share one plan between several people's servers or use several accounts to get around limits.
 
 ## Fallback and several accounts
 
@@ -107,7 +165,7 @@ voice notes. Photos and voice notes are sent to that provider.
 
 ![Photos & voice per provider](site/img/card-photos-voice.webp)
 
-| | Claude | OpenAI | ChatGPT | GitHub Copilot | OpenRouter | Custom | This server |
+| | Claude | OpenAI | ChatGPT | GitHub Copilot, Claude Code, Codex | OpenRouter | Custom | This server |
 |---|---|---|---|---|---|---|---|
 | Sees photos / PDFs | ✓ | ✓ | ✓ | — (vision fallback) | models with image input | by model | — |
 | Hears voice notes | — | ✓ `gpt-4o-mini-transcribe` | — ¹ | — | ✓ (paid) | — | Whisper tiny (optional) |
