@@ -67,8 +67,8 @@ const PAGES = [
   ['backups', 'backups', '', false],
   ['settings', 'settings', '', true],
   ['activity', 'activity', '', false],
-  ['agent-editor', 'agents/carpool', '', true],
-  ['agent-section', 'agents/carpool/where', '', true], // 068: a section page
+  ['agent-editor', 'agents/carpool', '', false],
+  ['agent-section', 'agents/carpool/where', '', false], // 068: a section page
 ];
 // [name, hash, js that prepares it, selector or T.box heading, viewport width]
 const CARDS = [

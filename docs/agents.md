@@ -27,6 +27,8 @@
   anything (`/`) lists every section ("Tools · Car pooling").
 - **Change with AI** opens the AI helper in a sheet: describe the change, review the visual diff, apply.
 
+![A section of an agent's page: Where it answers, with its chats, wake words and direct messages](site/img/agent-section-desktop.webp)
+
 ## The Chats screen and a chat's page
 
 - **The list:** one row per chat, under *On* and *Off*: avatar, name, one line (*Car pooling · 14 members* when on,
@@ -36,6 +38,8 @@
   lists its chats and links back), why it stayed quiet with a one-tap fix, recent messages from your phone, model and
   fallback, activity log, welcome override, *Private to members*, the privacy notice, the spending cap, and behind
   **⋯**: *Messages & memory* and, for a person, *Send intro…*.
+
+![A chat's page: its agent, why it stayed quiet, recent messages and settings](site/img/card-chat-page.webp)
 
 
 > [!TIP]
