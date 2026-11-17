@@ -1,8 +1,8 @@
 // Chats screen: on/off per chat, direct chats, history, WhatsApp settings and memory. Module of the panel (063).
-import { $, S, ago, api, can, copyRow, field, h, refreshStatus, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
+import { $, S, ago, api, ask, avatar, can, copyRow, emptyState, field, h, refreshStatus, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
 import { chatFallbackEditor, chatFallbackLine } from './fallback.js';
 import { silenceFix } from './quiet.js';
-import { loadModels, modelSelect, quietLine, usageLine } from './shared.js';
+import { loadModels, modelSelect, plural, quietLine, usageLine } from './shared.js';
 import { capAmount, capEditor, usageSummary } from './usage.js';
 let chatsFilter = 'all';
 let chatsQuery = ''; // 062: Find a chat
@@ -77,7 +77,6 @@ async function introCard(c, { onClose, onSent } = {}) {
     h('div', { class: 'row', style: 'justify-content:flex-end;margin-top:10px' }, send));
 }
 export async function renderChats() {
-  $('#main').replaceChildren(h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Loading chats…')));
   const [chats, agents, models, us, bud, quiet] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/agents'), loadModels().catch(() => ({ models: [] })), usageSummary(), api('GET', '/api/budget').catch(() => null), api('GET', '/api/silences?days=7').catch(() => ({ silences: [] }))]);
   const capOf = new Map((bud?.caps || []).filter((x) => x.scope === 'chat').map((x) => [x.id, x]));
   const openCap = async (c) => { memBox.replaceChildren(h('div', { class: 'card', style: 'margin-top:14px' }, h('h2', {}, `Spending cap · ${c.name || c.id}`), await capEditor('chat', c.id, models))); memBox.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
@@ -99,49 +98,55 @@ export async function renderChats() {
   const draw = () => {
     const q = chatsQuery.trim().toLowerCase();
     const shown = chats.filter((c) => (chatsFilter === 'all' || (chatsFilter === 'groups' ? c.isGroup : !c.isGroup)) && (!q || `${c.name} ${c.phone || ''} ${agents.find((b) => b.id === c.agent)?.name || ''}`.toLowerCase().includes(q)));
-    list.replaceChildren(shown.length ? h('table', { class: 'stack' }, h('thead', {}, h('tr', {}, h('th', {}, 'On'), h('th', {}, 'Chat'), h('th', {}, 'Agent'), h('th', {}, 'Model'), h('th', {}, 'Activity log'))),
-      h('tbody', {}, shown.map((c) => h('tr', { style: c.enabled ? '' : 'opacity:.78', 'data-jump': c.id },
-        h('td', { style: 'width:52px', 'data-label': 'On' }, toggle(c.enabled, (v) => tryApi(async () => { const r = await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, { enabled: v }); c.enabled = v; c.ignored = 0; if (r.history) c.history = r.history; draw(); watchHistory(c); }, v ? 'On — agents may answer here' : 'Off — agents ignore this chat'), !can('admin'))),
-        h('td', { 'data-label': '' }, h('div', { class: 'row', style: 'gap:6px' }, h('b', {}, c.name || c.id), h('span', { class: `pill ${c.isGroup ? 'info' : ''}` }, c.isGroup ? 'group' : 'person'), multi ? h('span', { class: 'pill' }, c.numberLabel) : null,
+    // 064: one row per chat — on/off, who, its agent and Messages & memory; everything else under "More settings", in place
+    const agentName = (c) => agents.find((x) => x.id === c.agent)?.name;
+    const setOn = (c, v) => tryApi(async () => {
+      const r = await api('PUT', `/api/chats/${encodeURIComponent(c.id)}/prefs`, { enabled: v }); c.enabled = v; c.ignored = 0; if (r.history) c.history = r.history; draw(); watchHistory(c);
+      toast(v ? `${c.name || 'Chat'} on — agents may answer here` : `${c.name || 'Chat'} off — agents ignore it`, { undo: () => setOn(c, !v) });
+    });
+    list.replaceChildren(shown.length ? h('div', { class: 'chat-list', role: 'list' }, shown.map((c) => h('div', { class: `chat-row${c.enabled ? '' : ' off'}`, role: 'listitem', 'data-jump': c.id },
+      h('div', { class: 'chat-main' },
+        toggle(c.enabled, (v) => setOn(c, v), !can('admin'), `${c.name || c.id} on`),
+        h('div', { class: 'who-line' }, avatar(c.name || c.phone || c.id, c.id, c.enabled ? '' : 'off'), h('div', {},
+          h('div', { class: 'chat-name' }, h('span', {}, c.name || c.id), h('span', { class: `pill ${c.isGroup ? 'info' : ''}` }, c.isGroup ? 'Group' : 'Person'), multi ? h('span', { class: 'pill raw' }, c.numberLabel) : null,
             c.waiting ? h('span', { class: 'pill warn', title: 'Set up before this person wrote; their first message goes to the agent chosen here' }, 'Waiting for the first message') : null),
-          h('div', { class: 'small muted' }, c.isGroup ? `${c.size || 0} members` : c.phone ? `+${c.phone}` : '', c.lastAt ? ` · last message ${ago(c.lastAt)} ago` : ''),
-          us?.chat?.[c.id] ? h('div', { class: 'small muted num' }, `30 days: ${usageLine(us.chat[c.id])}`) : null,
-          !c.enabled ? h('div', { class: 'small', style: 'color:var(--warn)' }, `Off — ignored${c.ignored ? ` (${c.ignored} message${c.ignored > 1 ? 's' : ''} since restart)` : ''}`) : null,
+          h('div', { class: 'small muted num' }, c.isGroup ? plural(c.size || 0, 'member') : c.phone ? `+${c.phone}` : '', c.lastAt ? ` · last message ${ago(c.lastAt)} ago` : '', us?.chat?.[c.id] ? ` · 30 days: ${usageLine(us.chat[c.id])}` : ''),
+          !c.enabled ? h('div', { class: 'small', style: 'color:var(--warn)' }, `Off — ignored${c.ignored ? ` (${plural(c.ignored, 'message')} since restart)` : ''}`) : null,
           capOf.get(c.id) ? h('div', { class: 'small num', style: `color:var(--${capOf.get(c.id).state === 'ok' ? 'muted' : 'warn'})` }, `Cap: ${Math.round(capOf.get(c.id).used * 100)}% used · ${capAmount(capOf.get(c.id))}`) : null,
           (quietBy.get(c.id) || []).slice(0, 2).map((q) => h('div', { class: 'quiet' }, h('span', { class: `small${q.reason === 'not_addressed' ? ' muted' : ''}`, style: q.reason === 'not_addressed' ? '' : 'color:var(--warn)', title: `${q.explain} Last ${ago(q.lastTs)} ago.` }, quietLine(q)),
             silenceFix(q, () => renderChats(), { onChats: true }))),
-          c.enabled ? histBox(c) : null,
-          h('div', { class: 'row', style: 'gap:6px;margin-top:6px' },
-            h('button', { class: 'btn small', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory'),
-            h('button', { class: 'btn small', onclick: () => openCap(c) }, 'Spending cap'),
-            c.enabled && can('admin') ? histBtn(c) : null,
-            !c.isGroup && can('admin') && c.enabled && c.agent ? h('button', { class: 'btn small', onclick: () => openIntro(c) }, c.introAt ? 'Send another intro…' : 'Send intro…') : null),
-          // 044: hidden from the owner assistant / Ask box; per-group opt-out of the privacy notice (recorded)
-          h('div', { class: 'row', style: 'gap:4px 14px;margin-top:4px' },
-            h('label', { class: 'tick small', title: 'The agent keeps working here, but the owner assistant and the Ask box never see this chat.' },
-              h('input', { type: 'checkbox', checked: !!c.private, disabled: !can('admin'), onchange: (e) => savePrefs(c, { private: e.target.checked }) }), ' Private to members'),
-            c.isGroup ? h('label', { class: 'tick small', title: c.noticePostedAt ? `Privacy notice posted ${ago(c.noticePostedAt)} ago` : 'Posted once when this group is switched on' },
-              h('input', { type: 'checkbox', checked: !c.noticeOff, disabled: !can('admin'), onchange: (e) => savePrefs(c, { noticeOff: !e.target.checked }) }), ' Privacy notice') : null,
-            // 054: "Welcome new members" for this group: the agent setting, or always on / off here
-            c.isGroup ? h('label', { class: 'tick small welcome-pick', title: 'Greet people who join this group (once per person), with the agent’s welcome text' }, 'Welcome new members',
-              h('select', { class: 'small', disabled: !can('admin'), 'aria-label': `Welcome new members in ${c.name || c.id}`, onchange: (e) => savePrefs(c, { welcome: e.target.value }) },
-                [['inherit', `As the agent (${agents.find((x) => x.id === c.agent)?.config?.welcome?.enabled ? 'on' : 'off'})`], ['on', 'On'], ['off', 'Off']].map(([v, l]) => h('option', { value: v, selected: (c.welcome || 'inherit') === v }, l)))) : null)),
-        h('td', { style: 'min-width:170px', 'data-label': 'Agent' }, h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => {
+          c.enabled ? histBox(c) : null)),
+        h('div', { class: 'chat-agent btns' }, h('select', { style: 'flex:1;min-width:0', 'aria-label': `Agent for ${c.name || c.id}`, disabled: !can('admin'), onchange: (e) => tryApi(async () => {
           // 062: choosing an agent for a chat that is Off switches it on too (one step instead of two)
           const agent = e.target.value; const r = await api('POST', '/api/chats/bind', { chat: c.id, agent: agent || null, enable: true }); c.agent = agent;
-          const name = agents.find((b) => b.id === agent)?.name;
-          if (agent && !c.enabled && r.enabled) { c.enabled = true; c.ignored = 0; if (r.history) c.history = r.history; refreshStatus(); draw(); watchHistory(c); return toast(`${c.name || 'Chat'} is on: ${name} answers there`); }
-          toast(agent ? `${name} answers in ${c.name || 'this chat'}` : 'No agent here now');
+          if (agent && !c.enabled && r.enabled) { c.enabled = true; c.ignored = 0; if (r.history) c.history = r.history; refreshStatus(); draw(); watchHistory(c); return toast(`${c.name || 'Chat'} is on: ${agentName(c)} answers there`); }
+          toast(agent ? `${agentName(c)} answers in ${c.name || 'this chat'}` : 'No agent here now');
         }) },
-          h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)))),
-        h('td', { style: 'min-width:200px', 'data-label': 'Model' }, modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) }),
-          // 042 / #65: per-chat fallback, edited in a card below (same picker and chain editor as agents)
-          h('div', { class: 'small muted', style: 'margin-top:6px;overflow-wrap:anywhere' }, chatFallbackLine(c.fallback, models)),
-          h('button', { class: 'btn small', style: 'margin-top:4px', 'aria-label': `Model fallback for ${c.name || c.id}`, onclick: () => openFallback(c) }, can('admin') ? 'Fallback…' : 'Fallback')),
-        h('td', { style: 'min-width:130px', 'data-label': 'Logging' }, h('select', { disabled: !can('admin'), onchange: (e) => savePrefs(c, { logging: e.target.value }) },
-          [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))))))) : q ? h('p', { class: 'muted' }, `No chat matches “${chatsQuery}”.`)
-      : !(S.status?.channel?.numbers || []).some((n) => n.status === 'open') ? h('div', { class: 'note warn' }, 'WhatsApp is not linked yet, so there are no chats to show. ', h('a', { href: '#overview/whatsapp' }, 'Link WhatsApp on Overview'), '.')
-        : h('p', { class: 'muted' }, chatsFilter === 'people' ? 'No direct chats yet. People appear here after they message an agent number, or add one with “Add a direct chat”.' : 'No chats yet. Groups appear here once the linked number is in them.'));
+          h('option', { value: '' }, c.isGroup ? '— no agent —' : '— default for direct messages —'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name))),
+        h('button', { class: 'btn small', onclick: () => renderMemory(c, memBox) }, can('admin') ? 'Messages & memory' : 'Memory'))),
+      h('details', { class: 'chat-more' }, h('summary', {}, 'More settings', h('span', { class: 'muted' }, [c.model && c.model !== 'inherit' ? 'own model' : '', c.fallback && (c.fallback.mode !== 'inherit' || c.fallback.chain?.length) ? 'own fallback' : '', c.logging && c.logging !== 'inherit' ? `log: ${c.logging}` : '',
+        c.private ? 'private' : '', c.isGroup && c.noticeOff ? 'no privacy notice' : ''].filter(Boolean).map((x) => ` · ${x}`).join(''))),
+        h('div', { class: 'chat-set' },
+          field('Model', modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !can('admin'), onchange: (e) => savePrefs(c, { model: e.target.value }) }),
+            // 042 / #65: per-chat fallback, edited in a card below (same picker and chain editor as agents)
+            h('div', { class: 'btns', style: 'margin-top:6px' }, h('span', { class: 'small muted', style: 'flex:1;overflow-wrap:anywhere' }, chatFallbackLine(c.fallback, models)),
+              h('button', { class: 'btn small', 'aria-label': `Model fallback for ${c.name || c.id}`, onclick: () => openFallback(c) }, can('admin') ? 'Fallback…' : 'Fallback'))),
+          field('Activity log', h('select', { disabled: !can('admin'), onchange: (e) => savePrefs(c, { logging: e.target.value }) },
+            [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']].map(([v, l]) => h('option', { value: v, selected: c.logging === v }, l)))),
+          // 054: "Welcome new members" for this group: the agent setting, or always on / off here
+          c.isGroup ? field('Welcome new members', h('select', { disabled: !can('admin'), title: 'Greet people who join this group (once per person), with the agent’s welcome text', onchange: (e) => savePrefs(c, { welcome: e.target.value }) },
+            [['inherit', `As the agent (${agents.find((x) => x.id === c.agent)?.config?.welcome?.enabled ? 'on' : 'off'})`], ['on', 'On'], ['off', 'Off']].map(([v, l]) => h('option', { value: v, selected: (c.welcome || 'inherit') === v }, l)))) : null,
+          // 044: hidden from the owner assistant / Ask box; per-group opt-out of the privacy notice (recorded)
+          h('div', {}, h('label', { class: 'check', title: 'The agent keeps working here, but the owner assistant and the Ask box never see this chat.' },
+            h('input', { type: 'checkbox', checked: !!c.private, disabled: !can('admin'), onchange: (e) => savePrefs(c, { private: e.target.checked }) }), 'Private to members'),
+          c.isGroup ? h('label', { class: 'check', title: c.noticePostedAt ? `Privacy notice posted ${ago(c.noticePostedAt)} ago` : 'Posted once when this group is switched on' },
+            h('input', { type: 'checkbox', checked: !c.noticeOff, disabled: !can('admin'), onchange: (e) => savePrefs(c, { noticeOff: !e.target.checked }) }), 'Privacy notice') : null),
+          h('div', { class: 'btns', style: 'grid-column:1/-1' },
+            h('button', { class: 'btn small', onclick: () => openCap(c) }, 'Spending cap'),
+            c.enabled && can('admin') ? histBtn(c) : null,
+            !c.isGroup && can('admin') && c.enabled && c.agent ? h('button', { class: 'btn small', onclick: () => openIntro(c) }, c.introAt ? 'Send another intro…' : 'Send intro…') : null)))))) : q ? emptyState('chats', `No chat matches “${chatsQuery}”`, 'Try part of the name, a phone number or an agent.')
+      : !(S.status?.channel?.numbers || []).some((n) => n.status === 'open') ? emptyState('chats', 'WhatsApp is not linked yet', 'Your groups and people show up here once your number is linked.', h('a', { class: 'btn small primary', href: '#overview/whatsapp' }, 'Link WhatsApp on Overview'))
+        : emptyState('chats', chatsFilter === 'people' ? 'No direct chats yet' : 'No chats yet', chatsFilter === 'people' ? 'People appear here after they message an agent number, or add one with “Add a direct chat”.' : 'Groups appear here once the linked number is in them.'));
   };
   // #91: what the phone sent when a chat was switched on / "Load recent messages" (polled while loading; only the
   // status line and the button are redrawn, so a select someone is using is left alone)
@@ -169,17 +174,19 @@ export async function renderChats() {
     } finally { watching.delete(c.id); }
   };
   for (const c of chats) watchHistory(c);
-  const seg = h('div', { class: 'seg' }, [['all', 'All'], ['groups', 'Groups'], ['people', 'People']].map(([v, l]) => h('button', { class: chatsFilter === v ? 'on' : '', onclick: (e) => { chatsFilter = v; seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === e.target)); draw(); } }, l)));
+  const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Show' }, [['all', 'All'], ['groups', 'Groups'], ['people', 'People']].map(([v, l]) => h('button', { class: chatsFilter === v ? 'on' : '', 'aria-pressed': String(chatsFilter === v), onclick: (e) => {
+    chatsFilter = v; seg.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b === e.target); b.setAttribute('aria-pressed', String(b === e.target)); }); draw();
+  } }, l)));
   draw();
   const addBtn = can('admin') ? h('button', { class: 'btn small primary', onclick: () => openAdd() }, '+ Add a direct chat') : null;
   const find = chats.length > 6 ? h('input', { type: 'search', class: 'chat-find', value: chatsQuery, placeholder: 'Find a chat, person or agent', 'aria-label': 'Find a chat', oninput: (e) => { chatsQuery = e.target.value; draw(); } }) : null;
-  $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Chats'), h('div', { class: 'row', style: 'gap:8px' }, addBtn, seg)),
-    h('p', { class: 'small muted' }, 'Agents only answer in chats that are On. A chat that is Off is ignored completely: nothing is stored (only the time of its newest message) and no model is called. Choosing an agent for a chat switches it on. (An agent set to answer “Anyone” also answers people whose chat is off.)'),
+  $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'chat-head' }, h('h2', {}, 'Chats'), seg, addBtn),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Agents only answer in chats that are On. A chat that is Off is ignored completely: nothing is stored (only the time of its newest message) and no model is called. Choosing an agent for a chat switches it on. (An agent set to answer “Anyone” also answers people whose chat is off.)'),
     find,
-    h('label', { class: 'small muted row', style: 'gap:6px;margin:-4px 0 10px;flex-wrap:wrap' }, 'When a chat is switched on, load its last',
+    chats.length ? h('label', { class: 'small muted row', style: 'gap:6px;margin:-4px 0 10px;flex-wrap:wrap' }, 'When a chat is switched on, load its last',
       h('select', { style: 'width:auto;flex:0 0 auto;min-width:96px', disabled: !can('admin'), 'aria-label': 'Messages to load when a chat is switched on', onchange: (e) => tryApi(async () => { await api('POST', '/api/settings', { historyLoadCount: Number(e.target.value) }); refreshStatus(); }, 'Saved') },
         [0, 25, 50, 100, 200].map((n) => h('option', { value: n, selected: Number(S.status?.settings?.historyLoadCount ?? 50) === n }, n ? String(n) : 'no'))),
-      'messages from your phone'),
+      'messages from your phone') : null,
     list), memBox);
   if (S.dmPrefill && can('admin')) { const pre = S.dmPrefill; S.dmPrefill = null; openAdd(pre); }
 }
@@ -216,13 +223,13 @@ function whatsappCard(c) {
       if (!r) return;
       linkBox.replaceChildren(r.link ? copyRow(r.link) : h('p', { class: 'small muted' }, 'WhatsApp did not return a link.'),
         h('button', { class: 'btn small danger', onclick: async () => {
-          if (!confirm('Reset the invite link? Anyone with the old link can no longer join with it.')) return;
+          if (!await ask({ title: 'Reset the invite link?', text: 'Anyone with the old link can no longer join with it. A new link is created.', ok: 'Reset link', danger: true })) return;
           const n = await tryApi(() => api('POST', `/api/chats/${enc}/whatsapp/invite/revoke`), 'New invite link created');
           if (n) { linkBox.firstChild.replaceWith(copyRow(n.link)); }
         } }, 'Reset link'));
     };
     const setting = (key, label, hint) => h('div', { class: 'wa-setting' },
-      toggle(!!g[key], async (on) => { if (await put({ [key]: on }, `${label}: ${on ? 'on' : 'off'}`)) g[key] = on; else load(); }),
+      toggle(!!g[key], async (on) => { if (await put({ [key]: on }, `${label}: ${on ? 'on' : 'off'}`)) g[key] = on; else load(); }, false, label),
       h('span', {}, h('b', {}, label), h('span', { class: 'small muted', style: 'display:block' }, hint)));
     const admins = g.participants.filter((p) => p.admin).length;
     body.replaceChildren(
@@ -287,7 +294,7 @@ async function renderMemory(c, box) {
       h('button', { class: 'btn small mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/notes/${n.id}`); renderMemory(c, box); }, 'Note deleted') }, 'Delete')))) : h('p', { class: 'small muted' }, 'No notes.'),
     h('div', { class: 'row mut', style: 'margin-top:10px' },
       h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('POST', `/api/chats/${enc}/memory/summarize`); renderMemory(c, box); }, 'Summary rebuilt') }, 'Rebuild summary'),
-      h('button', { class: 'btn danger', onclick: () => confirm(`Erase all stored messages, the summary and notes for “${c.name}”?`) && tryApi(async () => { await api('DELETE', `/api/chats/${enc}/memory`); renderMemory(c, box); }, 'Memory erased') }, 'Erase memory'))));
+      h('button', { class: 'btn danger', onclick: async () => (await ask({ title: `Erase the memory of “${c.name}”?`, text: 'All stored messages, the running summary and the notes of this chat are deleted. This cannot be undone.', ok: 'Erase memory', danger: true })) && tryApi(async () => { await api('DELETE', `/api/chats/${enc}/memory`); renderMemory(c, box); }, 'Memory erased') }, 'Erase memory'))));
   if (can('admin') && c.isGroup) box.append(whatsappCard(c));
   if (can('admin')) box.append(messagesCard(c));
   box.scrollIntoView({ behavior: 'smooth' });

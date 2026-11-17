@@ -58,7 +58,7 @@ test('060: secret link — admin+ only, single use, 15 min expiry, value saved a
 test('060: secret link for a model account key goes through the account key route', async () => {
   assert.equal((await t.api(admin, 'POST', '/api/secret-links', { account: 'nope' })).status, 404);
   const r = (await t.api(admin, 'POST', '/api/secret-links', { account: 'anthropic' })).body;
-  assert.match(r.for, /API key of Anthropic/);
+  assert.match(r.for, /API key of Claude/);
   await t.api(admin, 'POST', '/api/secret-links/use', { token: tokenOf(r.link, 'secret'), value: 'sk-ant-new-key-0001' });
   assert.equal(t.store.getSecret('ANTHROPIC_API_KEY'), 'sk-ant-new-key-0001');
   t.store.setSecret('ANTHROPIC_API_KEY', 'test');

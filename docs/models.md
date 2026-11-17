@@ -2,20 +2,27 @@
 
 **Use any model you already pay for (or a free one), with an automatic backup when it fails.**
 
-**Do it:** panel → **Models** → connect a provider (OpenRouter is one tap).
+**Do it:** panel → **Models** → **Add a provider** → pick one (OpenRouter is one tap).
 
 **In 30 seconds**
 - Pick a model per agent and per chat, or *Auto*.
 - A failing model hands over to the next in the chain; tools that already ran never run twice.
 - Photos & voice depend on the provider: [see the table](#photos--voice).
+- **Models** is a list: each provider with a health dot and a short status ("ok · 8 models", "Paused until 14:20"),
+  then *Default models*, *When a model fails*, *Photos & voice* and *Other endpoints*. Tap a row for its page: keys or
+  sign-in, accounts, test, and **Plan usage** when the provider reports limits (Copilot's premium requests today).
+  Each page has its own address (`#models/chatgpt`).
 
 | Provider | How |
 |---|---|
 | OpenRouter | one tap; optionally free models only |
-| Anthropic / OpenAI | API key |
-| OpenAI-compatible (Ollama, …) | endpoint URL |
-| ChatGPT Plus/Pro | *Sign in with ChatGPT* (OpenAI's official flow, preview) |
+| Claude, OpenAI | API key |
+| Custom (OpenAI-compatible: Ollama, LM Studio, …) | endpoint URL |
+| ChatGPT | your Plus/Pro plan: *Sign in with ChatGPT* (OpenAI's official flow, preview) |
 | GitHub Copilot | your allowance via the official Copilot SDK (downloaded only if you connect it; needs 2 GB) |
+
+Names are the same everywhere (panel, admin MCP tools, activity): *ChatGPT*, *Claude*, *OpenAI*, *GitHub Copilot*,
+*OpenRouter*; with several accounts of one provider, its label is added: *ChatGPT · work*.
 
 > [!TIP]
 > **Sign in with ChatGPT** ends on a page that says *This site can't be reached*: that's expected. Copy the whole
@@ -80,7 +87,7 @@ voice notes. Photos and voice notes are sent to that provider.
 
 ![Photos & voice per provider](site/img/card-photos-voice.webp)
 
-| | Anthropic | OpenAI (API key) | ChatGPT sign-in | Copilot | OpenRouter | Other endpoints | This server |
+| | Claude | OpenAI | ChatGPT | GitHub Copilot | OpenRouter | Custom | This server |
 |---|---|---|---|---|---|---|---|
 | Sees photos / PDFs | ✓ | ✓ | ✓ | — (vision fallback) | models with image input | by model | — |
 | Hears voice notes | — | ✓ `gpt-4o-mini-transcribe` | — ¹ | — | ✓ (paid) | — | Whisper tiny (optional) |

@@ -47,7 +47,7 @@
 <tr>
 <td valign="top"><a href="docs/domains-and-access.md"><img src="docs/img/thumb-web-access.webp" alt="Web address and access settings" width="100%"></a><br><b>Your domain, any proxy</b><br>Automatic HTTPS, a switch that never locks you out.</td>
 <td valign="top"><a href="docs/backups-and-updates.md"><img src="docs/img/thumb-backups.webp" alt="Backups page" width="100%"></a><br><b>Backups &amp; updates</b><br>Encrypted to GitHub or S3; updates wait for your OK when breaking; no SSH needed, even for the root helper.</td>
-<td valign="top"><a href="docs/admin-mcp.md"><img src="docs/img/thumb-assistants.webp" alt="Connected AI assistants card" width="100%"></a><br><b>From ChatGPT, Claude or your phone</b><br>The app is an MCP server too, and the panel <a href="docs/phone.md">installs on your home screen</a> and opens fast on a slow connection.</td>
+<td valign="top"><a href="docs/admin-mcp.md"><img src="docs/img/thumb-assistants.webp" alt="Connected AI assistants card" width="100%"></a><br><b>From ChatGPT, Claude or your phone</b><br>The app is an MCP server too, and the panel <a href="docs/phone.md">installs on your home screen</a> (tab bar at your thumb, works with a keyboard and a screen reader) and opens fast on a slow connection.</td>
 </tr>
 </table>
 

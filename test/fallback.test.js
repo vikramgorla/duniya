@@ -75,8 +75,8 @@ test('chain order: a rate-limited model is paused and the next connected provide
   assert.ok(Math.abs(st.until - (now + 120000)) < 2000, 'Retry-After respected');
   const sw = acts('model.fallback');
   assert.equal(sw.length, 1);
-  assert.match(sw[0].summary, /Answered by alpha after Anthropic \(Claude\) failed \(rate limit\)/);
-  assert.ok(acts('model.usage').some((x) => /alpha:fake-large: .* \(after Anthropic \(Claude\): rate limit\)/.test(x.summary)));
+  assert.match(sw[0].summary, /Answered by alpha after Claude failed \(rate limit\)/);
+  assert.ok(acts('model.usage').some((x) => /alpha:fake-large: .* \(after Claude: rate limit\)/.test(x.summary)));
   const fbRows = usage.usageReport({ groupBy: 'fallback' }).rows;
   assert.ok(fbRows.some((r) => r.key === 'fallback' && r.calls >= 1));
   assert.ok(usage.usageReport({ groupBy: 'account' }).rows.some((r) => r.key === 'alpha'));
@@ -90,7 +90,7 @@ test('chain order: a rate-limited model is paused and the next connected provide
   // the test console shows who answered and why
   const r = await t.api(owner, 'POST', '/api/agents/panduga/test', { text: 'hi', role: 'participant' });
   assert.equal(r.body.answeredBy, 'alpha');
-  assert.equal(r.body.fallback.failed[0].name, 'Anthropic (Claude)');
+  assert.equal(r.body.fallback.failed[0].name, 'Claude');
   assert.equal(r.body.fallback.failed[0].reason, 'rate_limit');
 
   // Models page data: the paused account and its status line
@@ -139,7 +139,7 @@ test('breaker: cooldown 1 min then doubling; skipped while cooling; one probe; r
   await t.route(t.msg({ text: '!panduga four' }));
   assert.equal(last(), 'Claude is back');
   assert.equal((await health('anthropic')).state, 'ok', 'success closes the breaker');
-  assert.ok(acts('model.provider').some((x) => /Anthropic \(Claude\) is answering again/.test(x.summary)));
+  assert.ok(acts('model.provider').some((x) => /Claude is answering again/.test(x.summary)));
 
   // cap at 30 minutes
   const cls = { reason: 'server' };
@@ -190,13 +190,13 @@ test('several accounts per provider: labels, failover in order, spread, usage by
   const add = await t.api(owner, 'POST', '/api/accounts', { type: 'openai', label: 'work', key: 'k2' });
   assert.equal(add.status, 200, JSON.stringify(add.body));
   assert.equal(add.body.id, 'openai-work');
-  assert.equal(add.body.name, 'OpenAI — work');
+  assert.equal(add.body.name, 'OpenAI · work');
   assert.equal(add.body.connected, true);
   assert.equal((await t.api(owner, 'POST', '/api/accounts', { type: 'openai', label: 'Work', key: 'k3' })).status, 400, 'labels are unique per provider');
   const models = (await t.api(owner, 'GET', '/api/models')).body.models;
-  assert.ok(models.some((m) => m.ref === 'openai-work:fake-large' && m.label === 'OpenAI — work · fake-large'));
+  assert.ok(models.some((m) => m.ref === 'openai-work:fake-large' && m.label === 'OpenAI · work · Fake Large'));
   const ren = await t.api(owner, 'PUT', '/api/accounts/openai', { label: 'Vik' });
-  assert.equal(ren.body.name, 'OpenAI — Vik');
+  assert.equal(ren.body.name, 'OpenAI · Vik');
 
   await t.agents.updateAgent('helper', { model: 'openai:fake-large' });
   // in order (default): the first account answers; on a quota error the second answers the same model
@@ -297,7 +297,7 @@ test('owner alerts: an account failing for more than 15 minutes, and all provide
   tick(16 * 60000);
   await t.route(t.msg({ text: '!panduga hi again' }));
   await t.waitFor(() => toOwner().length === n + 1);
-  assert.match(toOwner().at(-1).text, /Anthropic \(Claude\) needs to be reconnected/);
+  assert.match(toOwner().at(-1).text, /Claude needs to be reconnected/);
   await t.route(t.msg({ text: '!panduga and again' }));
   await new Promise((r) => setTimeout(r, 50));
   assert.equal(toOwner().length, n + 1, 'once per episode');

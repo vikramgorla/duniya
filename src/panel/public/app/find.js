@@ -1,7 +1,7 @@
 // Find anything (062): loaded when first opened. Module of the panel (063).
 // ---------- Find anything (062): / or ⌘K (Ctrl+K), or the search button: jump to a screen, agent, chat, setting or action ----------
-import { $, S, TABS, api, can, h, icon, optimistic, show, tryApi } from './core.js';
-import { renderLogin } from './login.js';
+import { $, PRIMARY, S, TABS, api, badgeFor, can, go, h, icon, optimistic, serverBadge, show, signOut, tryApi } from './core.js';
+import { PROVIDER_NAMES } from './names.js';
 import { SETTINGS_SECTIONS } from './shared.js';
 /** Everything the Find box can open. Agents and chats come from the status and the cached chat list. */
 async function paletteItems() {
@@ -16,7 +16,7 @@ async function paletteItems() {
     items.push({ kind: c.isGroup ? 'Group' : 'Person', label: c.name || (c.phone ? `+${c.phone}` : c.id), hint: c.enabled ? `on · ${names.get(c.agent) || 'no agent'}` : 'off', go: `#chats/${encodeURIComponent(c.id)}`, icon: 'chats' });
   }
   for (const [id, title, words] of SETTINGS_SECTIONS) items.push({ kind: 'Setting', label: title, words, go: `#settings/${id}`, icon: 'settings' });
-  for (const p of [['openrouter', 'OpenRouter'], ['anthropic', 'Anthropic (Claude)'], ['openai', 'OpenAI'], ['chatgpt', 'ChatGPT plan'], ['copilot', 'GitHub Copilot']]) items.push({ kind: 'Model', label: p[1], words: 'provider key connect', go: `#models/${p[0]}`, icon: 'models' });
+  for (const p of ['openrouter', 'anthropic', 'openai', 'chatgpt', 'copilot'].map((id) => [id, PROVIDER_NAMES[id]])) items.push({ kind: 'Model', label: p[1], words: 'provider key connect', go: `#models/${p[0]}`, icon: 'models' });
   const admin = can('admin');
   const act = (label, words, run) => items.push({ kind: 'Action', label, words, run });
   if (admin) {
@@ -27,7 +27,7 @@ async function paletteItems() {
   }
   if (can('owner')) act('Back up now', 'backup download', () => { location.hash = 'backups'; });
   act('Why agents stayed quiet', 'silent silence not answering', () => { location.hash = 'overview/quiet'; });
-  act('Sign out', 'logout', async () => { await api('POST', '/api/logout').catch(() => {}); S.user = null; renderLogin(); });
+  act('Sign out', 'logout', signOut);
   return items;
 }
 /** Lower score is better; null when a word does not match. Word starts in the name count most, then anywhere else. */
@@ -46,7 +46,7 @@ function paletteScore(it, words) {
 export async function openPalette() {
   if ($('#palette')) return;
   const input = h('input', { type: 'search', placeholder: 'Find an agent, chat, setting or action', 'aria-label': 'Find anything', autocomplete: 'off', spellcheck: 'false' });
-  const list = h('ul', { class: 'pal-list', role: 'listbox' });
+  const list = h('ul', { class: 'pal-list', role: 'listbox', 'aria-label': 'Results' });
   const dlg = h('dialog', { class: 'dlg palette', id: 'palette', 'aria-label': 'Find anything' }, input, list,
     h('div', { class: 'small muted pal-help desk-only' }, '↑ ↓ to move · Enter to open · Esc to close'));
   document.body.append(dlg);
@@ -70,4 +70,16 @@ export async function openPalette() {
     if (e.key === 'Enter' && hits[sel]) { e.preventDefault(); open(hits[sel]); }
   };
   draw();
+}
+/** More (064): the screens that are not in the phone tab bar, Find anything and Sign out, in a bottom sheet. */
+export function openMore() {
+  const close = () => dlg.close();
+  const dlg = h('dialog', { class: 'dlg more', 'aria-label': 'More screens', onclose: () => dlg.remove(), onclick: (e) => { if (e.target === dlg) close(); } },
+    h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'More'), h('button', { class: 'btn small', onclick: close }, 'Close')),
+    h('div', { class: 'more-list' }, TABS().filter(([id]) => !PRIMARY.includes(id)).map(([id, label]) =>
+      h('button', { class: id === S.tab ? 'on' : '', 'aria-current': id === S.tab ? 'page' : null, onclick: () => { close(); go(id); } }, icon(id), label, badgeFor(id)))),
+    h('button', { class: 'btn', style: 'width:100%', onclick: () => { close(); openPalette(); } }, icon('search'), 'Find anything'),
+    h('div', { class: 'more-foot', style: 'margin-top:12px' }, h('span', { class: 'small muted' }, `Signed in as ${S.user.username} · ${S.user.role}`), h('button', { class: 'btn small', onclick: signOut }, 'Sign out')));
+  document.body.append(dlg); dlg.showModal();
+  serverBadge(S.status?.osUpdates);
 }

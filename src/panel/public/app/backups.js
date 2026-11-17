@@ -1,6 +1,7 @@
 // Backups screen (owner): schedule, GitHub, S3, download and restore. Module of the panel (063).
 // ---------- backups (owner) ----------
-import { $, S, api, extLink, field, h, kb, meterEl, time, toast, tryApi, uploadFile, waitForRestart } from './core.js';
+import { $, S, api, ask, extLink, field, h, icon, kb, meterEl, time, toast, tryApi, uploadFile, waitForRestart } from './core.js';
+import { listDetail } from './listdetail.js';
 const backupTime = (f) => { const m = f.match(/(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)/); return m ? time(Date.UTC(m[1], m[2] - 1, m[3], m[4], m[5], m[6])) : f; };
 function downloadFile(href, name) { const a = h('a', { href, download: name, class: 'hide' }); document.body.append(a); a.click(); a.remove(); }
 let ghPollTimer = null; let ghAutoChecked = 0;
@@ -9,9 +10,9 @@ export async function renderBackups() {
   clearTimeout(ghPollTimer); ghPollTimer = null;
   const b = await api('GET', '/api/backups'); const s = b.settings;
   const pass = h('input', { type: 'password', placeholder: b.passphraseSet ? '•••• set — enter a new one to change' : 'At least 12 characters — keep it safe!' });
-  const sched = h('select', {}, [['hourly', 'Every hour'], ['6h', 'Every 6 hours'], ['daily', 'Daily'], ['weekly', 'Weekly']].map(([v, l]) => h('option', { value: v, selected: s.schedule === v }, l)));
-  const at = h('input', { value: s.at, style: 'max-width:90px' }); const wd = h('select', { style: 'max-width:90px' }, ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => h('option', { value: d, selected: s.weekday === d }, d)));
-  const keep = h('input', { type: 'number', value: s.keep, style: 'max-width:90px' });
+  const sched = h('select', { 'aria-label': 'How often' }, [['hourly', 'Every hour'], ['6h', 'Every 6 hours'], ['daily', 'Daily'], ['weekly', 'Weekly']].map(([v, l]) => h('option', { value: v, selected: s.schedule === v }, l)));
+  const at = h('input', { value: s.at, 'aria-label': 'At (time)', style: 'max-width:90px' }); const wd = h('select', { 'aria-label': 'Weekday', style: 'max-width:90px' }, ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => h('option', { value: d, selected: s.weekday === d }, d)));
+  const keep = h('input', { type: 'number', 'aria-label': 'Backups to keep', value: s.keep, style: 'max-width:90px' });
   const en = h('input', { type: 'checkbox', checked: s.enabled }); const wa = h('input', { type: 'checkbox', checked: s.includeWhatsApp });
   const saveSettings = (patch) => tryApi(async () => { await api('PUT', '/api/backups/settings', patch); renderBackups(); }, 'Saved');
   const last = b.last;
@@ -59,13 +60,22 @@ export async function renderBackups() {
       h('button', { class: 'btn primary', onclick: () => saveSettings({ s3: { enabled: $('#s3on').checked, endpoint: se.value.trim(), region: sr.value.trim() || 'auto', bucket: sb.value.trim(), prefix: sp.value.trim() } }) }, 'Save'),
       h('button', { class: 'btn', onclick: async () => { const r = await api('POST', '/api/backups/test/s3'); toast(r.ok ? 'S3 OK' : r.error); } }, 'Test')));
 
-  $('#main').replaceChildren(h('div', { class: 'grid' }, scheduleCard, localCard, githubCard(b, s, saveSettings), s3Card, restoreCard(b, s)));
+  // 064: list → page, like Models and Settings: each place a backup goes, with its state on the row
+  const pages = { schedule: scheduleCard, local: localCard, github: githubCard(b, s, saveSettings), s3: s3Card, restore: restoreCard(b, s) };
+  const SCHED = { hourly: 'every hour', '6h': 'every 6 hours', daily: 'daily', weekly: 'weekly' };
+  const row = (id, name, sub, ic, cls, st = '') => ({ id, name, sub, mark: h('span', { class: `lmark ${cls}`, 'aria-hidden': 'true' }, icon(ic)), status: st ? h('span', { class: `dot ${st}`, 'aria-hidden': 'true' }) : null });
+  $('#main').replaceChildren(listDetail({ screen: 'backups', title: 'Backups', page: (id) => pages[id], groups: [
+    { title: 'Backups', items: [row('schedule', 'Schedule', !b.passphraseSet ? 'Set a passphrase first' : s.enabled ? `On · ${SCHED[s.schedule] || s.schedule}${s.schedule === 'daily' || s.schedule === 'weekly' ? ` at ${s.at}` : ''}` : 'Off', 'pending', 'c4', b.passphraseSet && s.enabled ? 'ok' : 'warn'),
+      row('local', 'This server', b.local.length ? `${b.local.length} ${b.local.length === 1 ? 'backup' : 'backups'}${last?.at ? ` · last ${time(last.at)}` : ''}` : 'No backups yet', 'server', 'c0'),
+      row('github', 'GitHub', s.github.enabled ? 'On' : 'Off', 'backups', 'c0', s.github.enabled ? 'ok' : ''),
+      row('s3', 'S3 storage', s.s3.enabled ? 'On' : 'Off', 'backups', 'c3', s.s3.enabled ? 'ok' : '')] },
+    { title: 'Restore', items: [row('restore', 'Restore a backup', 'From this server, GitHub, S3 or a file', 'back', 'c1')] }] }));
   if (b.github.app.app && !b.github.app.installed && Date.now() - ghAutoChecked > 15000) { ghAutoChecked = Date.now(); checkGithubApp(true); }
 }
 
 /** Ask the server whether the GitHub app is installed yet; redraw when something changed. */
 async function checkGithubApp(quiet) {
-  const r = await api('POST', '/api/backups/github-app/check').catch((e) => { if (!quiet) toast(e.message); return null; });
+  const r = await api('POST', '/api/backups/github-app/check').catch((e) => { if (!quiet) toast(e.message, { bad: true }); return null; });
   if (r?.installed) { if (S.tab === 'backups') renderBackups(); if (!quiet) toast(r.repo ? `Installed — backing up to ${r.repo}` : 'Installed'); }
   else if (r && !quiet) toast('Not installed yet');
   return r;
@@ -89,7 +99,7 @@ function githubCard(b, s, saveSettings) {
     body = [h('div', { class: 'note ok' }, '✓ Backups go to ', h('b', {}, s.github.repo), ' through your GitHub app “', A.app.name, '”.'),
       repoSel ? field('Repository', repoSel) : null,
       h('div', { class: 'row', style: 'margin-top:8px' }, onOff, testBtn, extLink(`${A.app.htmlUrl || A.app.settingsUrl}`, 'App on GitHub'),
-        h('button', { class: 'btn small danger', onclick: () => confirm('Disconnect the GitHub app? Backups stop going to GitHub; the backups already there stay. You can delete the app on GitHub afterwards.') && tryApi(async () => { const r = await api('DELETE', '/api/backups/github-app'); if (r.deleteUrl) window.open(r.deleteUrl, '_blank', 'noopener'); renderBackups(); }, 'Disconnected') }, 'Disconnect'))];
+        h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: 'Disconnect the GitHub app?', text: 'Backups stop going to GitHub; the backups already there stay. You can delete the app on GitHub afterwards.', ok: 'Disconnect app', danger: true })) && tryApi(async () => { const r = await api('DELETE', '/api/backups/github-app'); if (r.deleteUrl) window.open(r.deleteUrl, '_blank', 'noopener'); renderBackups(); }, 'Disconnected') }, 'Disconnect'))];
   } else if (A.app) {
     const statusEl = h('div', {});
     const chooseSel = h('select', {}, A.repos.map((r) => h('option', { value: r }, r)));
@@ -106,13 +116,13 @@ function githubCard(b, s, saveSettings) {
         !A.installed ? h('span', { class: 'small muted' }, 'Done automatically when the app can see one repository.')
           : !A.repos.length ? h('div', { class: 'note warn' }, 'The app is installed but cannot see any repository. On GitHub, open the app’s installation and add the backup repository, then click Check now.')
             : h('div', { class: 'row' }, chooseSel, h('button', { class: 'btn primary', onclick: () => tryApi(async () => { await api('PUT', '/api/backups/github-app/repo', { repo: chooseSel.value }); renderBackups(); }, 'Backing up to GitHub') }, 'Use')))),
-    h('button', { class: 'btn small danger', onclick: () => confirm('Start over? This forgets the GitHub app here; you can delete it on GitHub afterwards.') && tryApi(async () => { const r = await api('DELETE', '/api/backups/github-app'); if (r.deleteUrl) window.open(r.deleteUrl, '_blank', 'noopener'); renderBackups(); }) }, 'Start over')];
+    h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: 'Start over?', text: 'This forgets the GitHub app here; you can delete it on GitHub afterwards.', ok: 'Start over', danger: true })) && tryApi(async () => { const r = await api('DELETE', '/api/backups/github-app'); if (r.deleteUrl) window.open(r.deleteUrl, '_blank', 'noopener'); renderBackups(); }) }, 'Start over')];
   } else if (G.via === 'token') {
     const ghRepo = h('input', { value: s.github.repo, placeholder: 'owner/duniya-backups' });
     body = [field('Repository', h('div', { class: 'row' }, ghRepo, h('button', { class: 'btn', onclick: () => saveSettings({ github: { enabled: true, repo: ghRepo.value.trim() } }) }, 'Use'))),
       !s.github.repo ? h('button', { class: 'btn primary', style: 'margin-top:8px', onclick: () => tryApi(async () => { await api('POST', '/api/backups/github/create-repo', {}); renderBackups(); }, 'Private repo created') }, 'Create private repo “duniya-backups”') : null,
       h('div', { class: 'row', style: 'margin-top:8px' }, onOff, testBtn,
-        h('button', { class: 'btn small danger', onclick: () => confirm('Disconnect GitHub? Backups stop going there; the backups already there stay.') && tryApi(async () => { await api('DELETE', '/api/backups/github'); renderBackups(); }) }, 'Disconnect'))];
+        h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: 'Disconnect GitHub?', text: 'Backups stop going there; the backups already there stay.', ok: 'Disconnect GitHub', danger: true })) && tryApi(async () => { await api('DELETE', '/api/backups/github'); renderBackups(); }) }, 'Disconnect'))];
   } else {
     const org = h('input', { placeholder: 'organization name' });
     body = [h('p', { class: 'small muted', style: 'margin-top:0' }, 'Keep encrypted copies in a private GitHub repository. One click creates a small GitHub app owned by you that can only write to the repository you choose — no keys to copy.'),
@@ -156,7 +166,7 @@ function restoreCard(b, s) {
   if (!modes.some(([v]) => v === restoreMode)) restoreMode = 'local';
   const seg = h('div', { class: 'seg', style: 'margin-bottom:8px;flex-wrap:wrap' }, modes.map(([v, l]) => h('button', { class: v === restoreMode ? 'on' : '', onclick: (e) => { restoreMode = v; seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); err.textContent = ''; draw(); } }, l)));
   const rpass = h('input', { type: 'password', placeholder: b.passphraseSet ? 'Backup passphrase (empty: this server’s)' : 'Backup passphrase', autocomplete: 'off' });
-  const confirmText = (what) => `Restore ${what}? Agents, users, settings, secrets, memory and the WhatsApp link are replaced by the backup and the server restarts (1–2 minutes). The current data is kept aside on the server.`;
+  const restoreAsk = (what) => ({ title: `Restore ${what}?`, text: 'Agents, users, settings, secrets, memory and the WhatsApp link are replaced by the backup, and the server restarts (1–2 minutes).\n\nThe current data is kept aside on the server.', ok: 'Restore backup', danger: true });
   function draw() {
     if (restoreMode === 'upload') {
       const file = h('input', { type: 'file', accept: '.dbk,application/octet-stream' });
@@ -166,7 +176,7 @@ function restoreCard(b, s) {
         err.textContent = ''; const f = file.files[0];
         if (!f) return (err.textContent = 'Choose a backup file (.dbk) first');
         if (!rpass.value && !b.passphraseSet) return (err.textContent = 'Enter the passphrase the backup was made with');
-        if (!confirm(confirmText(f.name))) return;
+        if (!await ask(restoreAsk(f.name))) return;
         go.disabled = true; prog.classList.remove('hide');
         try {
           const up = await uploadFile('/api/backups/upload', f, {}, (x) => { meter.set(x); status.textContent = ` Uploading… ${Math.round(x * 100)} %`; });
@@ -178,11 +188,11 @@ function restoreCard(b, s) {
       box.replaceChildren(h('p', { class: 'small muted', style: 'margin-top:0' }, `A .dbk file you downloaded earlier, from this or another server (up to ${b.uploadMaxMb} MB). You need the passphrase that server used.`),
         h('div', { class: 'filepick' }, file), h('div', { style: 'margin-top:8px' }, rpass), go, prog);
     } else {
-      const files = h('select', {}, h('option', {}, 'Loading…'));
+      const files = h('select', { 'aria-label': 'Backup to restore' }, h('option', {}, 'Loading…'));
       const go = h('button', { class: 'btn danger', style: 'margin-top:8px', onclick: async () => {
         err.textContent = '';
         if (!files.value) return (err.textContent = 'Pick a backup');
-        if (!confirm(confirmText(files.value))) return;
+        if (!await ask(restoreAsk(files.options[files.selectedIndex]?.textContent || files.value))) return;
         const status = h('span', { class: 'small' }); go.disabled = true;
         try { await api('POST', '/api/backups/restore', { source: restoreMode, file: files.value, passphrase: rpass.value }); go.after(h('div', { class: 'note' }, h('span', { class: 'spinner' }), status)); waitForRestart(status); } catch (x) { err.textContent = x.message; go.disabled = false; }
       } }, 'Restore');

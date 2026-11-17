@@ -186,3 +186,20 @@ test('058: the panel uses the live stream instead of polling the status', () => 
   assert.match(script, /addEventListener\('status'/);
   assert.match(script, /setInterval\(refreshStatus, 30000\)/, 'slow fallback while the stream is down');
 });
+
+test('064: standalone server pages (sign-in results, GitHub app hand-off) need no unsafe-inline: styles and script are files', async () => {
+  for (const path of ['/oauth/mcp/callback?state=nope', '/backups/github-app/installed']) {
+    const r = await get(path);
+    const html = r.body.toString('utf8');
+    const csp = r.headers['content-security-policy'];
+    assert.doesNotMatch(csp, /unsafe-inline/, path);
+    assert.match(csp, /style-src 'self'/, path);
+    assert.match(html, /<link rel=stylesheet href="\/page\.css">/, path);
+    assert.doesNotMatch(html, /<style|style=|<script>|<script(?![^>]*\bsrc=)[^>]*>/, `${path}: nothing inline`);
+    assert.match(html, /<html lang=en>/, path);
+  }
+  assert.match((await get('/oauth/mcp/callback?state=nope')).body.toString('utf8'), /Sign-in did not complete/);
+  const css = await get('/page.css'); const js = await get('/page.js');
+  assert.equal(css.status, 200); assert.equal(css.headers['content-type'], 'text/css; charset=utf-8');
+  assert.equal(js.status, 200); assert.equal(js.headers['content-type'], 'text/javascript; charset=utf-8');
+});

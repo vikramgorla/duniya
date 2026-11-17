@@ -91,7 +91,7 @@ test('047: a stream that fails before its first token falls back as usual; only 
   assert.deepEqual(alpha.reqs.at(-1).body.stream_options, { include_usage: true });
   const row = usageRows().at(-1);
   assert.deepEqual([row.account, row.input, row.output], ['alpha', 4, 3]);
-  assert.match(row.fallback, /after Anthropic/);
+  assert.match(row.fallback, /after Claude/);
 });
 
 test('047: a stream that breaks mid-way: "restarted", the same account once more without streaming, full text', async () => {

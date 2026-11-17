@@ -1,9 +1,9 @@
 // Agents → one agent: the editor (instructions, chats, people, tools, schedules, quick answers, test console). Module of the panel (063).
 import { aiHelper } from './ai-helper.js';
-import { $, S, api, can, field, h, lines, splitLines, tagPill, time, toast, tryApi, whoLabel } from './core.js';
+import { $, S, api, ask, can, field, fieldError, h, lines, menu, splitLines, tagPill, time, toast, tryApi, whoLabel } from './core.js';
 import { fallbackLine, fallbackPicker } from './fallback.js';
 import { browseButton } from './registry.js';
-import { loadModels, modelLabel, modelSelect, openAgent } from './shared.js';
+import { loadModels, modelLabel, modelSelect, openAgent, plural } from './shared.js';
 import { ROLE_LABEL, globRe, markSaved, serverConfig, serverState, toolGrid, toolServiceEditor } from './tool-editor.js';
 import { capEditor } from './usage.js';
 export async function renderAgentEditor(id) {
@@ -21,7 +21,7 @@ export async function renderAgentEditor(id) {
   F.dm = h('select', {}, [['members', 'Members of its groups + listed participants'], ['organizers', 'Organizers only'], ['anyone', 'Anyone — even people whose chat is off'], ['none', 'Nobody']].map(([v, l]) => h('option', { value: v, selected: c.dm === v }, l)));
   F.enabled = h('input', { type: 'checkbox', checked: c.enabled }); F.respondToMentions = h('input', { type: 'checkbox', checked: c.respondToMentions });
   F.memory = h('input', { type: 'checkbox', checked: c.memory?.enabled !== false });
-  F.prompt = h('textarea', { class: 'prose', value: c.prompt });
+  F.prompt = h('textarea', { class: 'prose', 'aria-label': 'Instructions', value: c.prompt });
   F.triggers = h('input', { value: (c.triggers || []).join(', ') });
   F.organizers = h('textarea', { value: lines(c.organizers), style: 'min-height:60px' });
   F.participants = h('textarea', { value: lines(c.participants), style: 'min-height:50px' });
@@ -152,9 +152,9 @@ export async function renderAgentEditor(id) {
         h('input', { value: s.days || 'daily', placeholder: 'daily or mon,wed', style: 'max-width:160px', oninput: (e) => (s.days = e.target.value) }),
         h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.enabled !== false, onchange: (e) => (s.enabled = e.target.checked) }), 'on')),
       s.kind === 'weekly-summary' ? h('div', { class: 'small muted', style: 'margin-top:6px' }, 'The weekly summary: messages, replies and costs per agent, ignored chats, caps and what needs you. Counts only, never message contents.')
-        : h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', value: s.prompt || '', placeholder: bi ? 'What to send you, e.g. a morning brief: what happened overnight in my groups' : 'What to post, e.g. a short summary of today’s agenda', oninput: (e) => (s.prompt = e.target.value) }),
+        : h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', 'aria-label': bi ? 'What to send you' : 'What to post', value: s.prompt || '', placeholder: bi ? 'What to send you, e.g. a morning brief: what happened overnight in my groups' : 'What to post, e.g. a short summary of today’s agenda', oninput: (e) => (s.prompt = e.target.value) }),
       h('div', { class: 'row', style: 'margin-top:6px' },
-        h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${r.length} chat(s)` : bi ? 'Nobody to send it to: link your WhatsApp under Settings → Owner assistant' : 'No chats bound'); }) }, 'Run now'),
+        h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${plural(r.length, 'chat')}` : bi ? 'Nobody to send it to: link your WhatsApp under Settings → Owner assistant' : 'No chats bound'); }) }, 'Run now'),
         s.kind === 'weekly-summary' ? h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('GET', '/api/owner-assistant/weekly-preview'); schedOut.replaceChildren(h('pre', { class: 'small' }, r.text)); }) }, 'Preview') : null,
         h('button', { class: 'btn small danger mut', onclick: () => { scheds.splice(i, 1); drawScheds(); } }, 'Remove')))));
   }
@@ -198,7 +198,7 @@ export async function renderAgentEditor(id) {
       toast(r.warnings?.length ? `Saved — ${r.warnings.join('; ')}` : 'Saved');
       for (const sv of servers) markSaved(sv);
       return true;
-    } catch (e) { toast(e.field ? `${e.field}: ${e.message.replace(/^[^:]+: /, '')}` : e.message); return false; }
+    } catch (e) { return fieldError(e, F); }
   }
 
   // Test console — "Test as…" (#37): a role and a chat; shows the tools that role gets. Never sends to WhatsApp.
@@ -267,9 +267,11 @@ export async function renderAgentEditor(id) {
     h('div', { class: 'row spread editor-bar', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: () => { location.hash = 'agents'; } }, '← All agents'),
       h('div', { class: 'row actions' },
         h('a', { class: 'btn phone-only', href: '#test-console', onclick: (e) => { e.preventDefault(); $('#test-console')?.scrollIntoView({ behavior: 'smooth' }); } }, 'Test ↓'),
-        h('a', { class: 'btn', href: `/api/agents/${encodeURIComponent(id)}/export`, download: `${id}.agent.json` }, 'Export'),
-        bi ? null : h('button', { class: 'btn mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/agents/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openAgent(r.id); } }, 'Duplicate'),
-        bi ? null : h('button', { class: 'btn danger mut', onclick: async () => { if (confirm(`Delete “${c.name}”? Its group bindings are removed; chat memory stays until erased.`) && await tryApi(() => api('DELETE', `/api/agents/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'agents'; } } }, 'Delete'),
+        // 064: secondary actions behind ⋯; Save stays in reach
+        menu(`More actions for ${c.name}`,
+        h('a', { class: 'btn small', href: `/api/agents/${encodeURIComponent(id)}/export`, download: `${id}.agent.json` }, 'Export'),
+        bi ? null : h('button', { class: 'btn small mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/agents/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openAgent(r.id); } }, 'Duplicate'),
+        bi ? null : h('button', { class: 'btn small danger mut', onclick: async () => { if (await ask({ title: `Delete “${c.name}”?`, text: 'Its chats no longer have this agent. Chat memory stays until you erase it.', ok: 'Delete agent', danger: true }) && await tryApi(() => api('DELETE', `/api/agents/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'agents'; } } }, 'Delete')),
         h('button', { class: 'btn primary mut', onclick: save }, 'Save'))),
     can('admin') ? await aiHelper({ agentId: id, title: [h('span', { class: 'ai-chip' }, 'AI'), 'Change this agent with AI'], applyLabel: 'Apply & save',
       placeholder: 'What should change? e.g. “Make the replies shorter and friendlier”, “Let participants also see the shopping list”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',
@@ -359,8 +361,8 @@ function quickAnswersEditor(c, b) {
   const welOn = h('input', { type: 'checkbox', checked: !!wel.enabled, disabled: ro, onchange: (e) => { wel.enabled = e.target.checked; } });
   const welPrev = h('div', {});
   const drawWelPrev = () => { const t = wel.text || 'Welcome {name} to {group}! 👋'; welPrev.replaceChildren(preview(fill(wel.rules && !t.includes('{rules}') ? `${t}\n\n{rules}` : t, { ...sample, name: '@Mia', rules: wel.rules }))); };
-  const welText = h('textarea', { class: 'prose', style: 'min-height:56px', value: wel.text, disabled: ro, placeholder: 'Welcome {name} to {group}! 👋', oninput: (e) => { wel.text = e.target.value; drawWelPrev(); } });
-  const welRules = h('textarea', { class: 'prose', style: 'min-height:56px', value: wel.rules, disabled: ro, placeholder: 'Optional, e.g. Be kind. Rides are posted on Sundays.', oninput: (e) => { wel.rules = e.target.value; drawWelPrev(); } });
+  const welText = h('textarea', { class: 'prose', style: 'min-height:56px', 'aria-label': 'Welcome text', value: wel.text, disabled: ro, placeholder: 'Welcome {name} to {group}! 👋', oninput: (e) => { wel.text = e.target.value; drawWelPrev(); } });
+  const welRules = h('textarea', { class: 'prose', style: 'min-height:56px', 'aria-label': 'House rules', value: wel.rules, disabled: ro, placeholder: 'Optional, e.g. Be kind. Rides are posted on Sundays.', oninput: (e) => { wel.rules = e.target.value; drawWelPrev(); } });
   drawWelPrev();
   // FAQ
   const faqBox = h('div', { class: 'qa-rows' });

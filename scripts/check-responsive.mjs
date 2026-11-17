@@ -9,6 +9,8 @@
 // network), drives headless Chrome over the DevTools protocol (no extra dependencies) and checks every screen:
 //   - no horizontal page scrolling (only tab bars, tables in a scroll box and code may scroll sideways)
 //   - phones (< 600 px): tap targets at least 40 × 40 px, text at least 13 px
+//   - accessibility (064): every control has a name (the browser's accessibility tree, as a screen reader reads it) and
+//     text meets WCAG AA contrast against what is behind it (4.5:1, 3:1 for large text), in light and dark
 // Exit code 1 lists what failed.
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -75,15 +77,29 @@ const STATES = [
   // 052: Browse tool services — the search sheet, the Add form with a key, and the result with its tools
   { name: 'registry-browse', hash: 'agents/carpool', wait: 2500, js: "await T.click('Browse tool services', 'button', 1500);" },
   { name: 'registry-add', hash: 'agents/carpool', wait: 2500, js: "await T.click('Browse tool services', 'button', 1500); [...document.querySelectorAll('.reg-card')].find((c) => c.textContent.includes('Recipe box')).querySelector('button').click(); await T.until('dialog form input[type=password]'); await T.wait(300);" },
-  { name: 'registry-added', hash: 'settings', wait: 2000, before: REGISTRY_ADDED, js: "await T.click('Browse tool services', 'button', 1500); [...document.querySelectorAll('.reg-card')].find((c) => c.textContent.includes('Weather forecasts')).querySelector('button').click(); await T.until('dialog form'); await T.click('Add to all agents', 'button', 1200);" },
+  { name: 'registry-added', hash: 'settings/tool-services', wait: 2000, before: REGISTRY_ADDED, js: "await T.click('Browse tool services', 'button', 1500); [...document.querySelectorAll('.reg-card')].find((c) => c.textContent.includes('Weather forecasts')).querySelector('button').click(); await T.until('dialog form'); await T.click('Add to all agents', 'button', 1200);" },
   { name: 'chats', hash: 'chats' },
-  { name: 'chats-fallback', hash: 'chats', js: "[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);" },
+  // 064: a chat's less-used settings open in place; the phone tab bar's More sheet; toasts (undo, error)
+  { name: 'chats-more-settings', hash: 'chats', js: "document.querySelectorAll('.chat-more').forEach((d, i) => { d.open = i < 2; }); await T.wait(200);" },
+  { name: 'more-sheet', hash: 'overview', js: "document.querySelector('nav.tabbar button[data-tab=more]').click(); await T.until('dialog.more'); await T.wait(500);" },
+  // 064: the panel's own confirmation: a normal one, a destructive one (red, Cancel focused), one with details
+  { name: 'ask-dialog', hash: 'settings', wait: 2000, js: "const { ask } = await import('/app/core.js'); ask({ title: 'Add https://agents.example.org?', text: 'It is added next to the current address: both work, nothing is switched off.\\n\\nThen you open the panel at the new address and confirm it there.', ok: 'Add address' }); await T.wait(500);" },
+  { name: 'ask-danger', hash: 'overview', js: "document.querySelector('details.menu').open = true; await T.click('Unlink', 'button', 600);" },
+  { name: 'row-menu', hash: 'overview', js: "const m = document.querySelector('#ov-whatsapp details.menu'); m.open = true; m.scrollIntoView({ block: 'center' }); await T.wait(300);" },
+  { name: 'ask-details', hash: 'server', wait: 2500, js: "await T.click('Install OS updates', 'button', 600);" },
+  { name: 'toasts', hash: 'chats', js: "const { toast } = await import('/app/core.js'); toast('Book club off — agents ignore it', { undo: () => {} }); toast('The server did not answer. Try again.', { bad: true }); await T.wait(400);" },
+  { name: 'chats-fallback', hash: 'chats', js: "[...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);" },
   { name: 'chats-add-dm', hash: 'chats', js: "[...document.querySelectorAll('button')].find((b) => b.textContent.includes('Add a direct chat'))?.click(); await T.wait(300); const i = document.querySelector('input[inputmode=tel]'); if (i) { i.value = '+41 79 000 00 30'; i.dispatchEvent(new Event('change')); } await T.wait(600);" },
-  { name: 'chats-intro', hash: 'chats', js: "[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Waiting for the first message'))?.querySelector('button')?.parentElement?.querySelectorAll('button')?.forEach((b) => { if (b.textContent.startsWith('Send intro')) b.click(); }); await T.until('textarea[aria-label=\"Intro text\"]'); await T.wait(400);" },
-  { name: 'chats-memory', hash: 'chats', js: "[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button')?.click(); await T.wait(1800); T.openAll();" },
+  { name: 'chats-intro', hash: 'chats', js: "[...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Waiting for the first message'))?.querySelectorAll('button')?.forEach((b) => { if (b.textContent.startsWith('Send intro')) b.click(); }); await T.until('textarea[aria-label=\"Intro text\"]'); await T.wait(400);" },
+  { name: 'chats-memory', hash: 'chats', js: "[...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button')?.click(); await T.wait(1800); T.openAll();" },
   { name: 'contacts', hash: 'contacts' },
   { name: 'models', hash: 'models', js: 'T.openAll();' },
-  { name: 'models-setup', hash: 'models', before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
+  // 064: list → page: a provider's page, the Add page, Backups → Restore, Settings sections
+  { name: 'models-provider', hash: 'models/chatgpt', js: 'T.openAll();' },
+  { name: 'models-add', hash: 'models/add' },
+  { name: 'backups-restore', hash: 'backups/restore' },
+  { name: 'settings-users', hash: 'settings/users', wait: 2000, js: 'T.openAll();' },
+  { name: 'models-setup', hash: 'models/chatgpt', before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u).startsWith('/api/providers') && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); if (Array.isArray(j)) return new Response(JSON.stringify(j.filter((x) => x.id !== 'openrouter').map((x) => ({ ...x, connected: false, models: 0 })))); }
       return r; }; S.models = null;`, js: "await T.click('Sign in with ChatGPT', 'button', 1200); T.openAll();" },
   { name: 'usage', hash: 'usage' },
@@ -108,16 +124,16 @@ const STATES = [
   // 060: one-time links — enter a secret (signed in), a new user's sign-up page (before sign-in), the link in Users.
   { name: 'secret-link', hash: 'secrets', js: "const r = await (await fetch('/api/secret-links', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'OPENAI_API_KEY' }) })).json(); await (await import('/app/login.js')).renderSecretLink(r.link.split('=')[1]);" },
   { name: 'signup-link', hash: '', js: "const r = await (await fetch('/api/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: `lea${Date.now() % 1e6}`, role: 'admin' }) })).json(); S.tab = ''; S.es?.close(); history.replaceState(null, '', `#signup=${r.signup.link.split('=')[1]}`); await (await import('/app/login.js')).renderLogin();" },
-  { name: 'settings-signup-link', hash: 'settings', wait: 2000, js: "S.signupLink = { username: 'lea', link: `${location.origin}/#signup=${'a1'.repeat(32)}` }; await (await import('/app/settings.js')).renderSettings(); document.querySelector('.note code')?.scrollIntoView(); await T.wait(300);" },
+  { name: 'settings-signup-link', hash: 'settings/users', wait: 2000, js: "S.signupLink = { username: 'lea', link: `${location.origin}/#signup=${'a1'.repeat(32)}` }; await (await import('/app/settings.js')).renderSettings(); document.querySelector('.note code')?.scrollIntoView(); await T.wait(300);" },
   { name: 'settings', hash: 'settings', wait: 2000, js: 'T.openAll();' },
   // 055: Settings → Server, Small server mode (one switch for heavier features on a small server)
-  { name: 'settings-small-mode', hash: 'settings', wait: 2000, js: "document.getElementById('small-mode')?.scrollIntoView(); await T.wait(300);" },
+  { name: 'settings-small-mode', hash: 'settings/small-mode', wait: 2000, js: "document.getElementById('small-mode')?.scrollIntoView(); await T.wait(300);" },
   // 055: Small server mode off on a small server: a saved local tool service is shown as not started, with why
   { name: 'agent-local-blocked', hash: 'agents/carpool', wait: 2000, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u) === '/api/status') { const j = await r.clone().json(); return new Response(JSON.stringify({ ...j, server: { ...j.server, size: 'small', smallMode: false } })); }
       return r; };`, js: "T.openAll(); document.getElementById('local-blocked')?.scrollIntoView(); await T.wait(300);" },
   // #77: a new domain was added while Google sign-in is on (callout with the values for Google Cloud)
-  { name: 'settings-web-google', hash: 'settings', wait: 2500, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
+  { name: 'settings-web-google', hash: 'settings/web-access', wait: 2500, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u) === '/api/web' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); const old = j.current?.host || 'agents.example.org';
         return new Response(JSON.stringify({ ...j, switch: { phase: 'added', newHost: 'duniya-panel.example.org', oldHost: old },
           google: { on: true, enabled: true, only: false, callbackPath: '/auth/google/callback', consoleUrl: 'https://console.cloud.google.com/apis/credentials', addresses: [] } })); }
@@ -163,16 +179,65 @@ function audit(W, phone) {
     const seen = new Set(); const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     for (let n = walk.nextNode(); n; n = walk.nextNode()) {
       const e = n.parentElement;
-      if (!n.textContent.trim() || !e || seen.has(e) || !visible(e) || e.closest('.cue, svg, .ai-chip, .toast')) continue;
+      if (!n.textContent.trim() || !e || seen.has(e) || !visible(e) || e.closest('.cue, svg, .ai-chip, .toast, [aria-hidden=true]')) continue;
       seen.add(e);
       const fs = parseFloat(getComputedStyle(e).fontSize);
       if (fs < 12.95) out.text.push(`${desc(e)} ${fs}px`);
     }
   }
+  // 064: WCAG AA contrast of visible text against the colour behind it (backgrounds blended up the tree, opacity included)
+  out.contrast = [];
+  const rgba = (c) => {
+    const m = /^rgba?\(([\d.]+),?\s*([\d.]+),?\s*([\d.]+)(?:,?\s*\/?\s*([\d.]+))?\)$/.exec(c) || /^color\(srgb ([\d.e-]+) ([\d.e-]+) ([\d.e-]+)(?: \/ ([\d.]+))?\)$/.exec(c);
+    if (!m) return null;
+    const k = c.startsWith('color(') ? 255 : 1;
+    return [Number(m[1]) * k, Number(m[2]) * k, Number(m[3]) * k, m[4] == null ? 1 : Number(m[4])];
+  };
+  const over = (top, under) => top.slice(0, 3).map((v, i) => v * top[3] + under[i] * (1 - top[3])).concat(1);
+  const behind = (e) => {
+    const stack = [];
+    for (let p = e; p; p = p.parentElement) { const b = rgba(getComputedStyle(p).backgroundColor); if (b && b[3] > 0) { stack.push(b); if (b[3] >= 1) break; } }
+    return stack.reverse().reduce((acc, b) => over(b, acc), [255, 255, 255, 1]);
+  };
+  const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const seenC = new Set(); const walkC = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walkC.nextNode(); n; n = walkC.nextNode()) {
+    const e = n.parentElement;
+    if (!n.textContent.trim() || !e || seenC.has(e) || !visible(e)) continue;
+    seenC.add(e);
+    if (e.closest('.cue, svg, [aria-hidden=true], :disabled, [disabled], .skel, option, pre, input, textarea, select')) continue;
+    const cs = getComputedStyle(e); const fg = rgba(cs.color); if (!fg) continue;
+    let op = 1; for (let p = e; p; p = p.parentElement) op *= Number(getComputedStyle(p).opacity);
+    const bg = behind(e); const text = over([...fg.slice(0, 3), fg[3] * op], bg);
+    const size = parseFloat(cs.fontSize); const large = size >= 24 || (size >= 18.66 && Number(cs.fontWeight) >= 700);
+    const r = ratio(text, bg);
+    if (r < (large ? 3 : 4.5)) out.contrast.push(`${desc(e)} ${r.toFixed(2)}:1`);
+  }
   const uniq = (a) => [...new Set(a)].slice(0, 12);
-  return { overflow: out.overflow, wide: uniq(out.wide), taps: uniq(out.taps), text: uniq(out.text) };
+  return { overflow: out.overflow, wide: uniq(out.wide), taps: uniq(out.taps), text: uniq(out.text), contrast: uniq(out.contrast) };
 }
 
+
+/** 064: controls without a name, from Chrome's accessibility tree (what a screen reader announces). */
+const NAMED = new Set(['button', 'link', 'checkbox', 'switch', 'textbox', 'searchbox', 'combobox', 'listbox', 'radio', 'slider', 'spinbutton', 'tab', 'menuitem', 'dialog']);
+async function unnamed(page) {
+  await page.send('DOM.enable'); await page.send('Accessibility.enable');
+  const { nodes } = await page.send('Accessibility.getFullAXTree');
+  const out = [];
+  for (const n of nodes) {
+    if (n.ignored || !NAMED.has(n.role?.value) || String(n.name?.value || '').trim()) continue;
+    if (n.properties?.some((p) => p.name === 'hidden' && p.value?.value)) continue;
+    const d = n.backendDOMNodeId ? await page.send('DOM.describeNode', { backendNodeId: n.backendDOMNodeId }).catch(() => null) : null;
+    const attrs = d?.node?.attributes || []; const at = (k) => attrs[attrs.indexOf(k) + 1];
+    // where it is: the heading of its card (helps to find it)
+    const obj = n.backendDOMNodeId ? await page.send('DOM.resolveNode', { backendNodeId: n.backendDOMNodeId }).catch(() => null) : null;
+    const where = obj?.object?.objectId ? (await page.send('Runtime.callFunctionOn', { objectId: obj.object.objectId, returnByValue: true,
+      functionDeclaration: 'function () { const c = this.closest(".card, dialog, section, li, tr"); return (c?.querySelector("h2, h3, b")?.textContent || "").trim().slice(0, 40); }' }).catch(() => null))?.result?.value : '';
+    out.push(`${n.role.value} <${(d?.node?.nodeName || '?').toLowerCase()}${at('class') && attrs.includes('class') ? `.${at('class').split(' ').join('.')}` : ''}${attrs.includes('type') ? ` type=${at('type')}` : ''}>${where ? ` in “${where}”` : ''}`);
+  }
+  return [...new Set(out)].slice(0, 12);
+}
 
 // ---------- run ----------
 const { base } = await startDemo();
@@ -195,8 +260,9 @@ for (const scheme of opt.schemes.split(',')) {
         await sleep(st.wait || 1500);
         if (st.js) await page.evaluate(`(async () => { ${PRELUDE} ${PANEL} ${st.js} })()`);
         await sleep(300);
-        const r = await page.evaluate(`(${audit})(${width}, ${width < 600})`);
-        const bad = r.overflow > 0 || r.wide.length || r.taps.length || r.text.length;
+        const r = await page.call(String(audit), width, width < 600);
+        r.names = await unnamed(page);
+        const bad = r.overflow > 0 || r.wide.length || r.taps.length || r.text.length || r.contrast.length || r.names.length;
         console.log(`${bad ? '✗' : '✓'} ${key}`);
         if (bad) failures.push([key, r]);
         if (opt.shots) await page.shot(join(opt.shots, `${st.name}@${width}-${scheme}.png`));
@@ -213,7 +279,7 @@ if (failures.length) {
     console.log(`\n${key}`);
     if (r.error) console.log(`  error: ${r.error}`);
     if (r.overflow > 0) console.log(`  page scrolls sideways by ${r.overflow} px`);
-    for (const [k, label] of [['wide', 'wider than the screen'], ['taps', 'tap target under 40 px'], ['text', 'text under 13 px']]) for (const x of r[k] || []) console.log(`  ${label}: ${x}`);
+    for (const [k, label] of [['wide', 'wider than the screen'], ['taps', 'tap target under 40 px'], ['text', 'text under 13 px'], ['contrast', 'contrast under AA'], ['names', 'control without a name']]) for (const x of r[k] || []) console.log(`  ${label}: ${x}`);
   }
   process.exit(1);
 }

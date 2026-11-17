@@ -30,6 +30,12 @@ const ICONS = {
   contacts: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3.5 19a5.5 5.5 0 0 1 11 0M16 7.5h5M16 11h5M17.5 14.5H21',
   server: 'M5 5h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM5 13h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zM8 8h.01M8 16h.01',
   backups: 'M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9a4.5 4.5 0 0 1 .5 9zM12 11v5M9.5 13.5 12 11l2.5 2.5',
+  back: 'M15 5l-7 7 7 7',
+  shield: 'M12 3.5l7 2.5v5.5c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6zM9 12l2 2 4-4',
+  image: 'M5 5h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM4 16l5-5 4 4 2-2 5 5M15.5 9h.01',
+  lock: 'M7 11V8a5 5 0 0 1 10 0v3M6 11h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM12 15v2',
+  globe: 'M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17zM3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z',
+  more: 'M5 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM12 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM19 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z',
   search: 'M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zM15.5 15.5 20 20',
   pending: 'M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 8v4.5l3 2',
   secrets: 'M14.5 4a5.5 5.5 0 1 1-4.9 8L4 17.6V20h2.5v-2h2v-2h2l.9-.9A5.5 5.5 0 0 1 14.5 4zM15.5 8.5h.01',
@@ -57,10 +63,77 @@ export function logo() {
     el('path', { d: 'M23.6 37.2a2.9 2.9 0 0 1 5.8 0M34.6 37.2a2.9 2.9 0 0 1 5.8 0', fill: 'none', stroke: '#c6f432', 'stroke-width': 2, 'stroke-linecap': 'round' }));
   return svg;
 }
-export function toast(msg) {
+/** A toast (064). opts.bad: an error (looks different, announced at once); opts.undo: a function, shows an Undo button. */
+export function toast(msg, { bad = false, undo = null } = {}) {
   let box = $('#toasts'); if (!box) { box = h('div', { id: 'toasts', class: 'toasts', role: 'status', 'aria-live': 'polite' }); document.body.append(box); }
-  const t = h('div', { class: 'toast' }, msg); box.append(t); setTimeout(() => t.remove(), 3500);
+  const t = h('div', { class: `toast${bad ? ' bad' : ''}`, role: bad ? 'alert' : null }, h('span', {}, msg),
+    undo ? h('button', { type: 'button', onclick: () => { t.remove(); undo(); } }, 'Undo') : null);
+  box.append(t); setTimeout(() => t.remove(), undo ? 6000 : bad ? 5000 : 3500);
 }
+/**
+ * The panel's own confirmation (064), instead of the browser's confirm(): a centred dialog on wide screens, a bottom
+ * sheet on phones. `title` asks the question, `text` says what will happen (a string, "\n\n" separates paragraphs),
+ * `ok` names the action ("Delete agent", never "OK"), `danger` marks something destructive or disruptive (red button,
+ * Cancel has the focus so Enter does not confirm it by accident), `body` is extra content (fields, release notes,
+ * package lists), `typed` asks to type that word first. Esc, Cancel and a tap outside cancel. Resolves true or false.
+ * @param {{ title: string, text?: string, ok?: string, danger?: boolean, body?: any, typed?: string, cancel?: string }} o
+ */
+export function ask({ title, text = '', ok = 'Continue', danger = false, body = null, typed = '', cancel = 'Cancel' }) {
+  return new Promise((resolve) => {
+    const back = document.activeElement;
+    const id = `ask${Date.now().toString(36)}`;
+    const typedIn = typed ? h('input', { autocomplete: 'off', spellcheck: 'false', 'aria-label': `Type ${typed} to confirm`, oninput: () => { yes.disabled = typedIn.value.trim() !== typed; } }) : null;
+    const yes = h('button', { class: `btn ${danger ? 'danger solid' : 'primary'}`, value: 'yes', disabled: !!typed }, ok);
+    const no = h('button', { class: 'btn', type: 'button', onclick: () => dlg.close('no') }, cancel);
+    const dlg = h('dialog', { class: `dlg ask${danger ? ' danger' : ''}`, role: danger ? 'alertdialog' : 'dialog', 'aria-modal': 'true', 'aria-labelledby': `${id}-t`, 'aria-describedby': text ? `${id}-d` : null,
+      onclick: (e) => { if (e.target === dlg) dlg.close('no'); } },
+    h('form', { method: 'dialog' },
+      h('h2', { id: `${id}-t` }, title),
+      text ? h('div', { id: `${id}-d`, class: 'ask-text' }, String(text).split(/\n\n+/).map((p) => h('p', {}, p))) : null,
+      body ? h('div', { class: 'ask-body' }, body) : null,
+      typed ? h('div', {}, h('label', {}, 'Type ', h('b', {}, typed), ' to confirm'), typedIn) : null,
+      h('div', { class: 'ask-actions' }, no, yes)));
+    dlg.addEventListener('close', () => { dlg.remove(); if (back instanceof HTMLElement && back.isConnected) back.focus(); resolve(dlg.returnValue === 'yes'); });
+    document.body.append(dlg); dlg.showModal();
+    (typedIn || (danger ? no : yes)).focus();
+  });
+}
+/** A ⋯ menu (064): secondary actions of a row behind one button instead of a row of buttons. `label` names it for
+ * screen readers ("Actions for Home"); `items` are buttons. A click anywhere or Esc closes it. */
+export function menu(label, ...items) {
+  const d = h('details', { class: 'menu' }, h('summary', { class: 'btn small icon', 'aria-label': label, title: label }, icon('more')),
+    h('div', { class: 'menu-pop', onclick: () => { d.open = false; } }, items));
+  d.addEventListener('keydown', (e) => { if (e.key === 'Escape' && d.open) { d.open = false; d.querySelector('summary').focus(); } });
+  return d;
+}
+document.addEventListener('click', (e) => { for (const m of document.querySelectorAll('details.menu[open]')) if (!m.contains(e.target)) m.open = false; });
+/** Agent (or chat) avatar (064): initials on one of the five "people" colours, the same colour for the same id. */
+export function avatar(name, id = name, size = '') {
+  const words = String(name || '?').replace(/[^\p{L}\p{N} ]/gu, ' ').trim().split(/\s+/);
+  const initials = (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || '?').slice(0, 2)).toUpperCase();
+  let n = 0; for (const ch of String(id)) n = (n * 31 + ch.codePointAt(0)) >>> 0;
+  return h('span', { class: `av c${(n % 5) + 1}${size ? ` ${size}` : ''}`, 'aria-hidden': 'true' }, initials);
+}
+// Tiny inline illustrations for empty states (64 × 48 grid, stroke = currentColor).
+const ART = {
+  chats: 'M8 12h30a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H20l-8 6v-6H8a6 6 0 0 1-6-6V18a6 6 0 0 1 6-6zM30 26h26a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6h-2v5l-7-5H30a6 6 0 0 1-6-6',
+  agents: 'M20 14V9a12 12 0 0 1 24 0v5M12 20a6 6 0 0 1 6-6h28a6 6 0 0 1 6 6v16a8 8 0 0 1-8 8H20a8 8 0 0 1-8-8zM25 28h.1M39 28h.1M27 36c3 2 7 2 10 0',
+  activity: 'M2 30h12l6-16 10 28 8-20 5 8h19',
+  list: 'M10 8h44a4 4 0 0 1 4 4v30a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4zM16 18h32M16 26h24M16 34h14',
+};
+/** An empty state that teaches (DESIGN.md): a tiny illustration, what is missing, what to do (optional action). */
+export function emptyState(art, title, text, action) {
+  const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 64 52'); svg.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS(ns, 'path'); p.setAttribute('d', ART[art] || ART.list);
+  for (const [k, v] of Object.entries({ fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })) p.setAttribute(k, v);
+  const dot = document.createElementNS(ns, 'circle'); dot.setAttribute('cx', '54'); dot.setAttribute('cy', '8'); dot.setAttribute('r', '4'); dot.setAttribute('fill', 'var(--signal)');
+  svg.append(p, dot);
+  return h('div', { class: 'empty' }, svg, h('b', {}, title), text ? h('p', {}, text) : null, action || null);
+}
+/** Placeholder cards while a screen loads for the first time (064). */
+const skeleton = (cards = 2) => h('div', { class: 'skel', 'aria-hidden': 'true' },
+  Array.from({ length: cards }, () => h('div', { class: 'card' }, h('i', { class: 'h' }), h('i', {}), h('i', { class: 's' }), h('i', { class: 'xs' }))));
 // Screen data cache (058): switching screens reuses what was just loaded. Any change made here and anything the live
 // stream reports (activity, a changed status) drops it; entries also expire after 60 s. Only lists that screens load
 // on open are cached, never live views (status, system, activity, updates).
@@ -110,28 +183,53 @@ export async function apiStream(path, body, onEvent) {
   if (!done) throw new Error('The answer was cut off. Please ask again.');
   return done;
 }
-export const tryApi = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message); return undefined; } };
+/** A save the server refused (064): the error toast, and when the server names the field (`e.field`) and `fields[field]`
+ * is on screen, that field is marked invalid with the reason under it, scrolled to and focused. */
+export function fieldError(e, fields = {}) {
+  toast(e.field ? `${e.field}: ${e.message.replace(/^[^:]+: /, '')}` : e.message, { bad: true });
+  const el = e.field && fields[e.field];
+  if (!(el instanceof HTMLElement)) return false;
+  const msg = h('div', { class: 'field-error', id: `err-${e.field}` }, e.message.replace(/^[^:]+: /, ''));
+  el.nextElementSibling?.classList.contains('field-error') && el.nextElementSibling.remove();
+  el.setAttribute('aria-invalid', 'true'); el.setAttribute('aria-describedby', msg.id); el.after(msg);
+  el.addEventListener('input', () => { el.removeAttribute('aria-invalid'); el.removeAttribute('aria-describedby'); msg.remove(); }, { once: true });
+  el.scrollIntoView({ block: 'center' }); el.focus({ preventScroll: true });
+  return false;
+}
+export const tryApi = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message, { bad: true }); return undefined; } };
 /** A simple switch (058): the screen shows the new state at once; the server's answer (and the live status) confirms it,
  * a refusal puts the real state back. */
-export const optimistic = async (apply, call, okMsg) => {
+export const optimistic = async (apply, call, okMsg, undo) => {
   apply(); applyStatus(S.status);
-  if (await tryApi(call, okMsg) === undefined) refreshStatus();
+  try { await call(); if (okMsg) toast(okMsg, { undo }); } catch (e) { toast(e.message, { bad: true }); refreshStatus(); }
 };
 /** 057: a member tag (WhatsApp's per-group label) as a small pill; text only. */
-export const tagPill = (t) => (t ? h('span', { class: 'pill', style: 'margin-left:6px', title: 'Member tag in this WhatsApp group' }, t) : null);
+export const tagPill = (t) => (t ? h('span', { class: 'pill raw', style: 'margin-left:6px', title: 'Member tag in this WhatsApp group' }, t) : null);
 /** 057: a person's name line — the server's resolver decides the name; a hidden number is never shown as digits. */
 export const whoLabel = (m) => m.label || m.name || (m.phone ? `+${m.phone}` : 'Unknown (hidden number)');
 export const ago = (ts) => { const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s / 60)}m` : s < 86400 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`; };
 export const time = (ts) => (ts ? new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 export const kb = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
-export const TYPE_CLASS = { 'message.in': 'info', 'message.out': 'ok', 'tool.call': '', 'tool.error': 'bad', error: 'bad', 'confirm.created': 'warn', 'confirm.applied': 'ok', 'confirm.cancelled': 'warn', 'channel.status': 'info', 'schedule.run': 'info', 'agent.updated': '', 'agent.created': 'ok', 'agent.deleted': 'warn', system: '', 'memory.summary': 'info', 'memory.history': '', 'memory.note.added': 'ok', 'memory.note.removed': 'warn', 'memory.erased': 'bad', 'model.usage': '', 'backup.done': 'ok', 'backup.restore': 'warn', 'backup.settings': '', 'mcp.call': 'info', 'mcp.register': '' };
-export function toggle(checked, onchange, disabled) { return h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked, disabled: disabled || !can('admin'), onchange: (e) => onchange(e.target.checked) }), h('span')); }
+/** A switch (role=switch). `label`: its name for screen readers when no visible label wraps it (064). */
+export function toggle(checked, onchange, disabled, label) {
+  return h('label', { class: 'toggle' }, h('input', { type: 'checkbox', role: 'switch', checked, 'aria-label': label || null, disabled: disabled || !can('admin'), onchange: (e) => onchange(e.target.checked) }), h('span', { 'aria-hidden': 'true' }));
+}
 // replaceChildren/append would print null/false as text; drop them everywhere.
 for (const fn of ['replaceChildren', 'append']) {
   const orig = Element.prototype[fn];
   Element.prototype[fn] = function (...kids) { return orig.apply(this, kids.flat(Infinity).filter((k) => k != null && k !== false)); };
 }
-export const field = (label, el, hint) => h('div', {}, h('label', {}, label), el, hint ? h('div', { class: 'small muted', style: 'margin-top:3px' }, hint) : null);
+let fieldSeq = 0;
+/** A labelled form field: the label names its input, select or textarea (064), and the hint describes it. */
+export function field(label, el, hint) {
+  const id = `fld${++fieldSeq}`;
+  const target = el instanceof HTMLElement ? (el.matches('input, select, textarea') ? el : el.querySelector('input, select, textarea')) : null;
+  const lab = h('label', {}, label);
+  if (target && !target.getAttribute('aria-label')) { target.id ||= id; lab.htmlFor = target.id; }
+  const tip = hint ? h('div', { class: 'small muted', id: `${id}-hint`, style: 'margin-top:3px' }, hint) : null;
+  if (tip && target) target.setAttribute('aria-describedby', tip.id);
+  return h('div', {}, lab, el, tip);
+}
 export const lines = (arr) => (arr || []).join('\n');
 export const splitLines = (s) => String(s || '').split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
 async function copyText(text) {
@@ -197,19 +295,24 @@ const MOVED = { secrets: 'settings/secrets' };
 
 // ---------- shell ----------
 let statusTimer = null; // slow fallback poll, only while the live stream is down
+/** The four everyday screens in the phone tab bar (064); every other screen is under More. */
+export const PRIMARY = ['overview', 'chats', 'agents', 'activity'];
+export const signOut = async () => { await api('POST', '/api/logout').catch(() => {}); S.user = null; renderLogin(); };
 /** The signed-in shell. `status`: the status that came with the session (login.js), if any. */
 export async function boot(status = null) {
   const app = $('#app'); app.replaceChildren();
   document.body.classList.toggle('readonly', !can('admin'));
-  const nav = h('nav', { onwheel: (e) => { // a mouse wheel scrolls the tab bar sideways when it does not fit
+  const nav = h('nav', { class: 'tabs', 'aria-label': 'Screens', onwheel: (e) => { // a mouse wheel scrolls the tab bar sideways when it does not fit
     if (nav.scrollWidth > nav.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { nav.scrollLeft += e.deltaY; e.preventDefault(); }
   } });
   app.append(
-    h('header', {}, h('div', { class: 'bar' }, h('div', { class: 'brand' }, logo(), 'Duniya', h('span', { class: 'dot', id: 'wa-dot', title: 'WhatsApp' }), h('small', { id: 'brand-sub' }, 'agents')),
-      h('div', { style: 'flex:1' }), h('button', { class: 'btn small search-btn', title: 'Find anything (/ or ⌘K)', 'aria-label': 'Find anything', onclick: openFind }, icon('search'), h('span', { class: 'desk-only' }, 'Find'), h('kbd', { class: 'desk-only' }, '/')),
-      h('span', { class: 'small muted', title: `${S.user.username} · ${S.user.role}` }, S.user.username, h('span', { class: 'who-role' }, ` · ${S.user.role}`)),
-      h('button', { class: 'btn small', onclick: async () => { await api('POST', '/api/logout').catch(() => {}); S.user = null; renderLogin(); } }, 'Sign out')), nav),
-    h('main', { id: 'main' }));
+    h('a', { class: 'skip', href: '#main', onclick: (e) => { e.preventDefault(); $('#main')?.focus(); } }, 'Skip to content'),
+    h('header', {}, h('h1', { class: 'sr-only', id: 'screen-title' }, 'Duniya'), h('div', { class: 'bar' }, h('div', { class: 'brand' }, logo(), 'Duniya', h('span', { class: 'dot', id: 'wa-dot', role: 'img', 'aria-label': 'WhatsApp' }), h('small', { id: 'brand-sub' }, 'agents')),
+      h('div', { class: 'grow' }), h('button', { class: 'btn small search-btn', title: 'Find anything (/ or ⌘K)', 'aria-label': 'Find anything', 'aria-keyshortcuts': '/ Control+K Meta+K', onclick: openFind }, icon('search'), h('span', { class: 'desk-only' }, 'Find'), h('kbd', { class: 'desk-only', 'aria-hidden': 'true' }, '/')),
+      h('span', { class: 'who desk-nav', title: `${S.user.username} · ${S.user.role}` }, S.user.username, ` · ${S.user.role}`),
+      h('button', { class: 'btn small desk-nav', onclick: signOut }, 'Sign out')), nav),
+    h('main', { id: 'main', tabindex: '-1', 'aria-labelledby': 'screen-title' }),
+    h('nav', { class: 'tabbar', 'aria-label': 'Screens' }));
   S.tab = ''; // the first status draws no screen; show() below draws the one in the address (063)
   connectEvents();
   if (status) applyStatus(status); else await refreshStatus();
@@ -223,23 +326,36 @@ export async function boot(status = null) {
 export async function refreshStatus() {
   try { applyStatus(await api('GET', '/api/status')); } catch { /* signed out or offline: the stream retries */ }
 }
-/** The tab bar; drawn again only when the set of tabs changes (Pending comes and goes). */
+export const go = (id) => (location.hash === `#${id}` ? show(id) : (location.hash = id));
+const LABEL = Object.fromEntries([['more', 'More']]);
+export const badgeFor = (id) => (id === 'server' ? h('span', { class: 'nbadge server-badge' }) : id === 'pending' ? h('span', { class: 'nbadge' }, String(S.status?.pending || '')) : null);
+/** The tab bars (top on wide screens, bottom on phones); drawn again only when the set of tabs changes (Pending comes and goes). */
 function drawNav() {
   const nav = $('header nav'); if (!nav) return;
   const tabs = TABS(); const sig = tabs.map(([id]) => id).join();
   if (nav.dataset.sig === sig) return;
   nav.dataset.sig = sig;
-  nav.replaceChildren(...tabs.map(([id, label]) => h('button', { 'data-tab': id, onclick: () => (location.hash === `#${id}` ? show(id) : (location.hash = id)) }, icon(id), label,
-    id === 'server' ? h('span', { class: 'nbadge', id: 'server-badge' }) : id === 'pending' ? h('span', { class: 'nbadge' }, String(S.status?.pending || '')) : null)));
-  nav.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.tab === S.tab));
+  for (const [id, label] of tabs) LABEL[id] = label;
+  nav.replaceChildren(...tabs.map(([id, label]) => h('button', { 'data-tab': id, onclick: () => go(id) }, icon(id), label, badgeFor(id))));
+  $('nav.tabbar')?.replaceChildren(...PRIMARY.map((id) => h('button', { 'data-tab': id, onclick: () => go(id) }, icon(id), LABEL[id])),
+    h('button', { 'data-tab': 'more', 'aria-haspopup': 'dialog', onclick: () => import('./find.js').then((m) => m.openMore()) }, icon('more'), 'More', h('span', { class: 'nbadge' }, S.status?.pending ? String(S.status.pending) : '')));
+  markTabs();
   serverBadge(S.status?.osUpdates);
+}
+/** Current screen in both tab bars: `on` + aria-current; More is current for a screen that lives under it. */
+function markTabs() {
+  for (const b of document.querySelectorAll('nav button[data-tab]')) {
+    const on = b.dataset.tab === S.tab || (b.dataset.tab === 'more' && !!S.tab && !PRIMARY.includes(S.tab));
+    b.classList.toggle('on', on);
+    if (b.dataset.tab === S.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  }
 }
 function applyStatus(next) {
   const pendingWas = S.status?.pending;
   S.status = next;
   if (pendingWas !== next.pending && $('header nav')) { $('header nav').dataset.sig = ''; drawNav(); }
   const st = S.status.channel.status;
-  const dot = $('#wa-dot'); if (dot) dot.className = `dot ${st === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(st) ? 'warn' : 'bad'}`;
+  const dot = $('#wa-dot'); if (dot) { dot.className = `dot ${st === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(st) ? 'warn' : 'bad'}`; dot.setAttribute('aria-label', `WhatsApp: ${st === 'open' ? 'connected' : st.replace('_', ' ')}`); }
   const sub = $('#brand-sub'); if (sub) sub.textContent = S.status.settings.paused ? 'paused' : `${S.status.agents.filter((b) => b.enabled).length} agents live`;
   serverBadge(S.status.osUpdates);
   if (S.tab === 'overview') import('./overview.js').then((m) => m.renderOverview(true));
@@ -247,9 +363,10 @@ function applyStatus(next) {
 // #96: the Server tab counts only OS updates that will install now (not gradual roll-outs or held packages); "!" when
 // a restart is needed to finish updates.
 export function serverBadge(o) {
-  const b = $('#server-badge'); if (!b) return;
-  b.textContent = !o ? '' : o.count ? String(o.count) : o.restart ? '!' : '';
-  b.title = !o ? '' : [o.count ? `${o.count} OS update${o.count > 1 ? 's' : ''} to install` : '', o.restart ? 'Restart needed to finish updates' : ''].filter(Boolean).join(' · ');
+  for (const b of document.querySelectorAll('.server-badge')) {
+    b.textContent = !o ? '' : o.count ? String(o.count) : o.restart ? '!' : '';
+    b.title = !o ? '' : [o.count ? `${o.count} OS update${o.count > 1 ? 's' : ''} to install` : '', o.restart ? 'Restart needed to finish updates' : ''].filter(Boolean).join(' · ');
+  }
 }
 /** Each screen is its own module, loaded on its first visit (063); the browser keeps it for the next one. */
 const SCREENS = {
@@ -266,26 +383,38 @@ const SCREENS = {
   settings: () => import('./settings.js').then((m) => m.renderSettings()),
 };
 /** Find anything (062), loaded when first opened. */
-export const openFind = () => import('./find.js').then((m) => m.openPalette()).catch((e) => toast(e.message));
+export const openFind = () => import('./find.js').then((m) => m.openPalette()).catch((e) => toast(e.message, { bad: true }));
 export function show(tab) {
   if (Object.hasOwn(MOVED, tab)) { history.replaceState(null, '', `#${MOVED[tab]}`); tab = MOVED[tab].split('/')[0]; }
   if (!TABS().some(([id]) => id === tab) && !(tab === 'pending' && can('viewer'))) tab = 'overview';
-  S.tab = tab;
+  const from = S.tab; S.tab = tab;
+  document.title = `${LABEL[tab] || 'Duniya'}${LABEL[tab] ? ' · Duniya' : ''}`;
+  const title = $('#screen-title'); if (title) title.textContent = LABEL[tab] || 'Duniya';
   if (location.hash.slice(1).split('/')[0] !== tab) history.replaceState(null, '', `#${tab}`);
-  document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-  // Phones: the tab bar scrolls sideways; keep the current tab in view.
-  const onBtn = document.querySelector('nav button.on'); const navEl = onBtn?.parentElement;
-  if (navEl) {
+  markTabs();
+  // Wide screens: the top tab bar may scroll sideways; keep the current tab in view.
+  const onBtn = document.querySelector('nav.tabs button.on'); const navEl = onBtn?.parentElement;
+  if (navEl && navEl.clientWidth) {
     const b = onBtn.getBoundingClientRect(); const n = navEl.getBoundingClientRect();
     if (b.left < n.left || b.right > n.right) navEl.scrollTo({ left: navEl.scrollLeft + (b.left - n.left) - (n.width - b.width) / 2, behavior: 'smooth' });
   }
   const seq = (S.renderSeq = (S.renderSeq || 0) + 1);
   const main = $('#main');
-  const slow = setTimeout(() => { if (S.renderSeq === seq) main?.classList.add('loading'); }, 120);
+  const moved = from !== tab; // another screen: placeholder cards while it loads; the same one: dim it
+  const slow = setTimeout(() => { if (S.renderSeq !== seq || !main) return; if (moved) main.replaceChildren(skeleton()); else main.classList.add('loading'); main.setAttribute('aria-busy', 'true'); }, 120);
   const r = Object.hasOwn(SCREENS, tab) ? SCREENS[tab] : null;
-  Promise.resolve(r?.()).catch((e) => toast(e.message)).finally(() => {
+  Promise.resolve(r?.()).catch((e) => toast(e.message, { bad: true })).finally(() => {
     clearTimeout(slow);
-    if (S.renderSeq === seq) { main?.classList.remove('loading'); S.renderDone = seq; jumpToSub(); return; }
+    if (S.renderSeq === seq) {
+      main?.classList.remove('loading'); main?.removeAttribute('aria-busy'); S.renderDone = seq;
+      if (moved && from && main) {
+        main.classList.remove('enter'); void main.offsetWidth; main.classList.add('enter');
+        // Keyboard and screen-reader users land on the new screen, not on the tab they left (064).
+        if ((document.activeElement?.closest?.('nav, dialog') || document.activeElement === document.body) && !location.hash.includes('/')) main.focus({ preventScroll: true });
+        if (!location.hash.includes('/')) window.scrollTo({ top: 0 });
+      }
+      jumpToSub(); return;
+    }
     // A slower, older tab finished after a newer one and drew over it: draw the current tab again.
     if ((S.renderDone || 0) > seq && S.tab) show(S.tab);
   });
@@ -297,6 +426,16 @@ export function jumpToSub() {
   if (!el) return;
   el.scrollIntoView({ block: 'start' });
   el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1800);
+}
+// 064: an agent's live state on Overview from the activity stream (no polling): reading… when a message for it arrives,
+// using tools… while it works, answered when the reply went out. The pulse fades by itself (CSS), nothing to clean up.
+const PULSE = { 'message.in': ['reading', 'reading…'], 'tool.call': ['reading', 'using tools…'], 'mcp.call': ['reading', 'using tools…'], 'message.out': ['answered', 'answered'] };
+export const pulse = (agentId) => h('span', { class: 'pulse', 'data-pulse': agentId, 'aria-live': 'off' });
+function livePulse(a) {
+  const old = a.agent && PULSE[a.type] && document.querySelector(`[data-pulse="${CSS.escape(a.agent)}"]`);
+  if (!old) return;
+  const p = pulse(a.agent); p.classList.add(PULSE[a.type][0]); p.textContent = PULSE[a.type][1];
+  old.replaceWith(p);
 }
 // Live stream (058): activity entries and the status (no polling). While it is down, a slow poll keeps the status
 // fresh; EventSource reconnects by itself.
@@ -318,7 +457,7 @@ export function connectEvents() {
     dropCache();
     S.feed.unshift(a); S.feed.length = Math.min(S.feed.length, 500);
     if (S.tab === 'activity' && (!S.feedAgent || a.agent === S.feedAgent)) $('#feed')?.prepend(feedItem(a));
-    if (S.tab === 'overview') { const r = $('#recent'); if (r) { r.prepend(feedItem(a)); while (r.children.length > 8) r.lastChild.remove(); } }
+    if (S.tab === 'overview') { const r = $('#recent'); if (r) { r.prepend(feedItem(a)); $('#recent + .empty')?.remove(); while (r.children.length > 8) r.lastChild.remove(); } livePulse(a); }
   };
 }
 

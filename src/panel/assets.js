@@ -20,7 +20,7 @@ const TYPES = { js: 'text/javascript; charset=utf-8', css: 'text/css; charset=ut
 export function panelAssets() {
   const files = [
     ...readdirSync(resolve(PUBLIC, 'app')).map((f) => `app/${f}`),
-    'manifest.webmanifest', ...readdirSync(resolve(PUBLIC, 'icons')).map((f) => `icons/${f}`),
+    'manifest.webmanifest', 'page.css', 'page.js', ...readdirSync(resolve(PUBLIC, 'icons')).map((f) => `icons/${f}`),
   ];
   const sources = new Map(files.map((f) => [f, readFileSync(resolve(PUBLIC, f))]));
   const assets = Object.fromEntries(files.map((f) => [`/${f}`, staticFile(sources.get(f), { 'content-type': TYPES[f.split('.').pop()] })]));

@@ -18,6 +18,10 @@ import { newToken } from '../core/crypto.js';
  * @typedef {{ channel?: any, invoke?: Function }} RouteContext  what a route module may use: the WhatsApp channel(s), in-process calls
  */
 export const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+/** Standalone server pages (064): their styles and script are files (/page.css, /page.js), so no 'unsafe-inline'. */
+export const PAGE_CSP = "default-src 'none'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+/** The head every standalone page starts with: title, phone viewport, both colour schemes, the shared page styles. */
+export const pageHead = (title) => `<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=color-scheme content="light dark"><title>${esc(title)}</title><link rel=stylesheet href="/page.css">`;
 
 // Forwarded headers are only trusted when a local proxy (Caddy, cloudflared) is configured (TRUST_PROXY=1). Caddy
 // (036) always sets X-Duniya-Client-IP to the visitor address it resolved (trusted proxies only), so it wins.
@@ -87,16 +91,12 @@ export const esc = (x) => String(x).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt
  * A small standalone result page. Used where the browser arrives from another site (Google, GitHub): the
  * SameSite=Strict session cookie is not sent on that navigation, but it is on the same-origin one this page makes.
  */
-export function resultPage(res, { ok, title, message, back = '/', backLabel = 'Back to the panel', autoMs = 1200, csp = CSP, extraHead = '', status }) {
-  const html = `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=color-scheme content="light dark"><title>${esc(title)}</title>${extraHead}
-<style>body{font:16px -apple-system,system-ui,sans-serif;display:grid;place-items:center;min-height:90vh;margin:0;background:#f7f3ec;color:#1c2030}
-.c{background:#fffdf9;border:1px solid #e6dfd3;border-radius:18px;padding:28px;max-width:440px;margin:16px;text-align:center;box-shadow:0 6px 24px -8px rgba(28,32,48,.1)}
-p{color:#6d6a73}a{color:#0b7a75;font-weight:600}
-@media (prefers-color-scheme:dark){body{background:#11131c;color:#ece9e2}.c{background:#1a1d2a;border-color:#2a2e3e}p{color:#9a98a3}a{color:#3cc4b7}}</style>
-<body><div class=c><div style="font-size:40px">${ok ? '✅' : '⚠️'}</div><h2 style="margin:8px 0">${esc(title)}</h2>
-<p>${esc(message)}</p><p><a href="${esc(back)}">${esc(backLabel)}</a></p></div>
-${ok && autoMs != null ? `<meta http-equiv=refresh content="${Math.max(0, Math.round(Number(autoMs) / 1000))};url=${esc(back)}">` : ''}`;
-  send(res, status || (ok ? 200 : 400), html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': csp, 'x-frame-options': 'DENY' });
+export function resultPage(res, { ok, title, message, back = '/', backLabel = 'Back to the panel', autoMs = 1200, status = 0 }) {
+  const html = `${pageHead(title)}
+${ok && autoMs != null ? `<meta http-equiv=refresh content="${Math.max(0, Math.round(Number(autoMs) / 1000))};url=${esc(back)}">` : ''}
+<body><main class=result><div class="mark${ok ? '' : ' bad'}" aria-hidden=true>${ok ? '✓' : '!'}</div><h1>${esc(title)}</h1>
+<p>${esc(message)}</p><div class=actions><a class="btn primary" href="${esc(back)}">${esc(backLabel)}</a></div></main>`;
+  send(res, status || (ok ? 200 : 400), html, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PAGE_CSP, 'x-frame-options': 'DENY' });
   return null;
 }
 

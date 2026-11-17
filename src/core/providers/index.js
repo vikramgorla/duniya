@@ -15,6 +15,7 @@ import { classify, REASON_TEXT } from './errors.js';
 import * as breaker from './breaker.js';
 import { REF_RE, cleanChain } from './fallback-config.js';
 import { bad, fail } from '../config.js';
+import { accountName, modelName } from '../../panel/public/app/names.js';
 
 export { REF_RE, FALLBACK_MODES, cleanChain, cleanOverride } from './fallback-config.js';
 
@@ -27,11 +28,11 @@ export const compatibleList = () => getSetting('providers', []) || [];
 
 // ---------- built-in provider types ----------
 export const TYPES = Object.freeze({
-  anthropic: { name: 'Anthropic (Claude)', short: 'Anthropic', secret: anthropic.SECRET },
-  openai: { name: 'OpenAI (API key)', short: 'OpenAI', secret: 'OPENAI_API_KEY' },
-  chatgpt: { name: 'ChatGPT plan (Sign in with ChatGPT)', short: 'ChatGPT', secret: chatgpt.SECRET },
-  copilot: { name: 'GitHub Copilot', short: 'Copilot', secret: copilot.SECRET },
-  openrouter: { name: 'OpenRouter', short: 'OpenRouter' },
+  anthropic: { secret: anthropic.SECRET },
+  openai: { secret: 'OPENAI_API_KEY' },
+  chatgpt: { secret: chatgpt.SECRET },
+  copilot: { secret: copilot.SECRET },
+  openrouter: {},
 });
 const BUILTIN = ['anthropic', 'openai', 'chatgpt', 'copilot'];
 export const STRATEGIES = ['order', 'spread'];
@@ -44,7 +45,6 @@ export function secretFor(type, id) {
   const base = `PROVIDER_${id.toUpperCase().replace(/-/g, '_')}`;
   return type === 'chatgpt' ? `${base}_CREDENTIALS` : `${base}_KEY`;
 }
-const displayName = (type, label, fallback) => (label ? `${TYPES[type]?.short || fallback || type} — ${label}` : (TYPES[type]?.name || fallback || type));
 
 // ---------- OpenRouter preset (018) ----------
 export const OPENROUTER_ID = 'openrouter';
@@ -104,7 +104,7 @@ export function providers() {
     const accts = [{ id: type, label: firstLabel }, ...entries.filter((a) => a.type === type && a.id !== type)];
     for (const a of accts) {
       const secret = secretFor(type, a.id);
-      const row = { id: a.id, type, group: type, primary: a.id === type, label: a.label || '', name: displayName(type, a.label), secret,
+      const row = { id: a.id, type, group: type, primary: a.id === type, label: a.label || '', name: accountName(type, a.label), secret,
         configured: configuredFor(type, secret), adapter: builtinAdapter(type, secret) };
       if (type === 'chatgpt') row.account = chatgpt.credentials(secret)?.email || '';
       if (a.id !== type && !row.configured) continue; // an extra account without credentials is not listed
@@ -113,7 +113,7 @@ export function providers() {
   }
   for (const p of compatibleList()) {
     const type = p.preset === 'openrouter' || p.id === OPENROUTER_ID ? 'openrouter' : 'compatible';
-    const name = type === 'openrouter' ? displayName('openrouter', p.label) : (p.name || p.id);
+    const name = type === 'openrouter' ? accountName('openrouter', p.label) : (p.name || p.id);
     const secret = keySecretFor(p.id);
     const base = chatCompletionsProvider({ baseUrl: p.baseUrl, key: () => getSecret(secret) });
     list.push({
@@ -148,12 +148,12 @@ export function addAccount({ type, label, key, id: givenId }) {
   if (!BUILTIN.includes(type)) throw bad('Type must be anthropic, openai, chatgpt or copilot', 'type');
   const lab = cleanLabel(label);
   if (!lab) throw bad('Give the account a label, e.g. “work” or your name', 'label');
-  if (accountEntries().some((a) => a.type === type && a.id !== type && a.label.toLowerCase() === lab.toLowerCase())) throw bad(`There is already a ${TYPES[type].short} account called “${lab}”`, 'label');
+  if (accountEntries().some((a) => a.type === type && a.id !== type && a.label.toLowerCase() === lab.toLowerCase())) throw bad(`There is already a ${accountName(type)} account called “${lab}”`, 'label');
   const id = givenId || newAccountId(type, lab);
   updateSettings({ accounts: [...accountEntries().filter((a) => a.id !== id), { id, type, label: lab }] });
   if (key !== undefined) setSecret(secretFor(type, id), String(key || ''));
   modelCache.delete(id);
-  return providerById(id) || { id, type, label: lab, name: displayName(type, lab), configured: false };
+  return providerById(id) || { id, type, label: lab, name: accountName(type, lab), configured: false };
 }
 
 /** Rename any account (the id stays). */
@@ -268,7 +268,7 @@ export async function allModels({ refresh = false } = {}) {
   for (const p of providers()) {
     if (!p.configured) continue;
     const m = await providerModels(p, { refresh });
-    for (const x of m.models) out.push({ ref: `${p.id}:${x.id}`, provider: p.id, type: p.type, label: `${p.name} · ${x.label}` });
+    for (const x of m.models) out.push({ ref: `${p.id}:${x.id}`, provider: p.id, type: p.type, label: `${p.name} · ${modelName(x.id, x.label)}` });
   }
   return out;
 }
