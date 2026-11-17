@@ -4,10 +4,19 @@ import { createWriteStream, mkdirSync, rmSync, renameSync, readdirSync, statSync
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { gzipSync, brotliCompressSync, constants as zc } from 'node:zlib';
-import { env, DATA_DIR } from '../core/config.js';
-import { createSession } from '../core/store.js';
+import { env, DATA_DIR, fail } from '../core/config.js';
+import { createSession, sessionUser } from '../core/store.js';
 import { newToken } from '../core/crypto.js';
 
+/**
+ * How route modules register panel routes (server.js). A handler gets (req, res, body, query, params, user) and returns
+ * the JSON answer, [status, answer], or null when it wrote the response itself. opts.role: the minimum role (default:
+ * viewer for GET, admin otherwise); opts.public: no sign-in; opts.raw: the handler reads a binary body (uploads).
+ * @typedef {(method: string, pattern: string,
+ *   handler: (req: any, res: any, body: any, q: URLSearchParams, p: Record<string, string>, user: any) => any,
+ *   opts?: { role?: 'viewer' | 'admin' | 'owner', public?: boolean, raw?: boolean }) => void} Route
+ * @typedef {{ channel?: any, invoke?: Function }} RouteContext  what a route module may use: the WhatsApp channel(s), in-process calls
+ */
 export const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
 // Forwarded headers are only trusted when a local proxy (Caddy, cloudflared) is configured (TRUST_PROXY=1). Caddy
@@ -54,6 +63,8 @@ export function staticFile(body, headers) {
   };
   return Object.assign(serve, { version });
 }
+/** The signed-in panel user (session cookie), or null. */
+export const requestUser = (req) => sessionUser(cookie(req, 'duniya_session'));
 export function setSessionCookie(req, res, userId) {
   const { token, maxAge } = createSession(userId, clientIp(req));
   res.setHeader('set-cookie', `duniya_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${isHttps(req) ? '; Secure' : ''}`);
@@ -108,7 +119,7 @@ const UPLOAD_DIR = resolve(DATA_DIR, 'uploads');
 export const UPLOAD_MAX = Number(process.env.BACKUP_UPLOAD_MAX_MB || 200) * 1024 * 1024;
 const UPLOAD_ID_RE = /^[a-f0-9]{32}$/;
 export const uploadPath = (id) => {
-  if (!UPLOAD_ID_RE.test(String(id || ''))) throw Object.assign(new Error('Upload not found — choose the file again'), { status: 400 });
+  if (!UPLOAD_ID_RE.test(String(id || ''))) throw fail('Upload not found — choose the file again');
   return resolve(UPLOAD_DIR, `${id}.dbk`);
 };
 
@@ -123,7 +134,7 @@ export async function receiveUpload(req, { magic = '', max = UPLOAD_MAX } = {}) 
     try { if (Date.now() - statSync(p).mtimeMs > 3600000) rmSync(p, { force: true }); } catch { /* gone */ }
   }
   const declared = Number(req.headers['content-length'] || 0);
-  if (declared > max) throw Object.assign(new Error(`The file is larger than ${Math.round(max / 1048576)} MB`), { status: 413 });
+  if (declared > max) throw fail(`The file is larger than ${Math.round(max / 1048576)} MB`, 413);
   const id = newToken(16);
   const part = resolve(UPLOAD_DIR, `${id}.part`);
   const out = createWriteStream(part, { mode: 0o600 });
@@ -131,14 +142,14 @@ export async function receiveUpload(req, { magic = '', max = UPLOAD_MAX } = {}) 
   try {
     for await (const chunk of req) {
       size += chunk.length;
-      if (size > max) throw Object.assign(new Error(`The file is larger than ${Math.round(max / 1048576)} MB`), { status: 413 });
+      if (size > max) throw fail(`The file is larger than ${Math.round(max / 1048576)} MB`, 413);
       if (head.length < magic.length) {
         head = Buffer.concat([head, chunk]).subarray(0, magic.length);
-        if (head.length === magic.length && head.toString() !== magic) throw Object.assign(new Error('This is not a Duniya backup file (.dbk)'), { status: 400 });
+        if (head.length === magic.length && head.toString() !== magic) throw fail('This is not a Duniya backup file (.dbk)');
       }
       if (!out.write(chunk)) await new Promise((r) => out.once('drain', () => r(null)));
     }
-    if (size < magic.length || (magic && head.toString() !== magic)) throw Object.assign(new Error('This is not a Duniya backup file (.dbk)'), { status: 400 });
+    if (size < magic.length || (magic && head.toString() !== magic)) throw fail('This is not a Duniya backup file (.dbk)');
     await new Promise((r, j) => out.end((e) => (e ? j(e) : r())));
     renameSync(part, resolve(UPLOAD_DIR, `${id}.dbk`));
     return { upload: id, size };

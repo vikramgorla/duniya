@@ -1,5 +1,6 @@
 // Sign in with Google for the admin panel (019): OpenID Connect authorization code flow with PKCE (S256), state,
 // nonce and a browser-binding cookie; the ID token is verified (RS256, Google's JWKS from discovery).
+import { fail } from './config.js';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { getSecret, setSecret, getSetting, updateSettings, findUserByGoogleSub, findUsersByEmail, linkGoogle, acceptInvite, getUser, listUsers } from './store.js';
 import { activity } from './events.js';
@@ -12,7 +13,6 @@ const CLIENT_ID_RE = /^[\w.-]{6,120}\.apps\.googleusercontent\.com$/;
 const PENDING_TTL = 10 * 60 * 1000;
 const pending = new Map(); // state -> { mode, userId, verifier, nonce, binding, redirectUri, expires }
 const b64url = (b) => Buffer.from(b).toString('base64url');
-const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 
 export function googleConfig() {
   const s = getSetting('googleSignin', {}) || {};

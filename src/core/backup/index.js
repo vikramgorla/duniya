@@ -2,7 +2,7 @@
 // Backups (007): settings, run, retention per destination, schedule, list, restore staging.
 import { readFileSync, writeFileSync, readdirSync, rmSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { DATA_DIR, env } from '../config.js';
+import { DATA_DIR, env, fail } from '../config.js';
 import { getSecret, setSecret, getSetting, updateSettings } from '../store.js';
 import { kvGet, kvSet } from '../db.js';
 import { activity } from '../events.js';
@@ -26,7 +26,7 @@ export function getBackupSettings() {
   return { ...DEFAULTS, ...s, github: { ...DEFAULTS.github, ...(s.github || {}) }, s3: { ...DEFAULTS.s3, ...(s.s3 || {}) } };
 }
 
-const bad = (field, msg) => Object.assign(new Error(`${field}: ${msg}`), { status: 400, field });
+const bad = (field, msg) => fail(`${field}: ${msg}`, 400, { field });
 export function updateBackupSettings(patch) {
   const cur = getBackupSettings();
   const next = { ...cur, ...patch, github: { ...cur.github, ...(patch.github || {}) }, s3: { ...cur.s3, ...(patch.s3 || {}) } };
@@ -62,7 +62,7 @@ let instToken = null; // { installationId, token, expiresAt }
 async function appInstallationToken() {
   const app = getBackupSettings().githubApp;
   const pem = getSecret(APP_KEY_SECRET);
-  if (!app?.installationId || !pem) throw Object.assign(new Error('The GitHub app is not installed yet'), { status: 400 });
+  if (!app?.installationId || !pem) throw fail('The GitHub app is not installed yet');
   if (instToken && instToken.installationId === app.installationId && instToken.expiresAt - Date.now() > 300000) return instToken.token;
   const t = await gh.installationToken(gh.appJwt(app.id, pem), app.installationId);
   instToken = { installationId: app.installationId, ...t };
@@ -170,7 +170,7 @@ export async function fetchBackup(source, file) {
   const s = getBackupSettings();
   if (source === 'local') {
     const p = resolve(LOCAL_DIR, file);
-    if (!existsSync(p)) throw Object.assign(new Error('Backup not found'), { status: 404 });
+    if (!existsSync(p)) throw fail('Backup not found', 404);
     return readFileSync(p);
   }
   if (source === 'github') return gh.download(ghToken(), s.github, file);

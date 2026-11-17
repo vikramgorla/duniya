@@ -348,7 +348,7 @@ export const TOOLS = [
     input: { name: str('Service name') }, required: ['name'],
     preview: async (a, x) => {
       const cur = (await x.call('GET', '/api/tool-services')).find((g) => g.name === a.name);
-      if (!cur) throw Object.assign(new Error(`No global tool service named ${a.name}`), { status: 404 });
+      if (!cur) throw fail(`No global tool service named ${a.name}`, 404);
       return `Remove the global tool service ${a.name}. ${cur.agents.using.length} agent${cur.agents.using.length === 1 ? '' : 's'} (${cur.agents.using.join(', ') || 'none'}) lose its tools right away; its sign-ins are deleted.`;
     },
     run: (a, x) => x.call('DELETE', `/api/tool-services/${enc(a.name)}`) },
@@ -379,12 +379,12 @@ export const TOOLS = [
       const d = await x.call('GET', `/api/tool-services/registry/server?${q}`);
       const kind = a.kind || (d.remote ? 'remote' : 'local');
       const way = kind === 'local' ? d.local : d.remote;
-      if (!way) throw Object.assign(new Error(kind === 'local' ? `No package of ${a.server} can run here${d.entry.can.reason ? `: ${d.entry.can.reason}` : ''}` : `${a.server} has no hosted address this app can use`), { status: 400 });
-      if (kind === 'local' && !d.local.allowed) throw Object.assign(new Error(d.local.reason), { status: 403 });
+      if (!way) throw fail(kind === 'local' ? `No package of ${a.server} can run here${d.entry.can.reason ? `: ${d.entry.can.reason}` : ''}` : `${a.server} has no hosted address this app can use`);
+      if (kind === 'local' && !d.local.allowed) throw fail(d.local.reason, 403);
       const secretGiven = way.fields.filter((f) => f.secret && a.values?.[f.id]);
-      if (secretGiven.length) throw Object.assign(new Error(`Do not pass keys here: store ${secretGiven.map((f) => f.secretName).join(', ')} with set_secret (or in the panel) first`), { status: 400 });
+      if (secretGiven.length) throw fail(`Do not pass keys here: store ${secretGiven.map((f) => f.secretName).join(', ')} with set_secret (or in the panel) first`);
       const missing = way.fields.filter((f) => f.required && !f.stored && !(a.values?.[f.id]) && !f.default);
-      if (missing.length) throw Object.assign(new Error(`Needs first: ${missing.map((f) => (f.secret ? `secret ${f.secretName} (set_secret)` : `value ${f.id}`)).join(', ')}`), { status: 400 });
+      if (missing.length) throw fail(`Needs first: ${missing.map((f) => (f.secret ? `secret ${f.secretName} (set_secret)` : `value ${f.id}`)).join(', ')}`);
       const where = a.target === 'all' ? 'all agents' : await agentName(x, a.target);
       const e = d.entry;
       const what = kind === 'local' ? `the local npm package ${e.packages[e.can.local].spec} (runs on this server)` : `the hosted service ${e.remotes[e.can.remote].url}`;
@@ -404,7 +404,7 @@ export const TOOLS = [
     description: 'Set or replace a secret (API key, token) or the API key of a model account WITHOUT seeing its value: returns a one-time link (15 minutes, single use) to a panel page where a signed-in owner or admin pastes the value. Give the link to the user exactly as returned; never ask them to type a key in the chat. Afterwards list_secrets (or list_model_accounts) shows it as set. Give name (UPPER_SNAKE_CASE) or account (an API-key account id from list_model_accounts).',
     input: { name: str('Secret name, UPPER_SNAKE_CASE (or give account)'), account: str('Model account id whose API key to set (optional, instead of name)') },
     run: async (a, x) => {
-      if (a.value !== undefined) throw Object.assign(new Error('Secret values are never taken here: give only the name and send the user the link'), { status: 400 });
+      if (a.value !== undefined) throw fail('Secret values are never taken here: give only the name and send the user the link');
       const r = await x.call('POST', '/api/secret-links', { name: a.name, account: a.account, notify: String(x.surface || '').startsWith('whatsapp:') });
       return { for: r.for, link: r.link, expires: iso(r.expiresAt), note: 'One use, 15 minutes, panel sign-in (owner or admin) required. The value goes straight to the server.' };
     } },
@@ -412,7 +412,7 @@ export const TOOLS = [
     input: { name: str('Secret name') }, required: ['name'],
     preview: async (a, x) => {
       const cur = (await x.call('GET', '/api/secrets')).find((s) => s.name === a.name);
-      if (!cur) throw Object.assign(new Error(`No secret named ${a.name}`), { status: 404 });
+      if (!cur) throw fail(`No secret named ${a.name}`, 404);
       return `Remove the secret ${a.name}.${cur.usedByAgents ? ' An agent uses it: that agent\'s tool service or model stops working until it is set again.' : ''}`;
     },
     run: (a, x) => x.call('PUT', '/api/secrets', { name: a.name, value: '' }) },
@@ -457,9 +457,9 @@ export const TOOLS = [
     input: { breaking: bool('Also install a breaking release (owner decision)'), backup: bool('Make a backup first (default true)') },
     preview: async (a, x) => {
       const st = await x.call('POST', '/api/updates/check');
-      if (!st.available) throw Object.assign(new Error(`Already up to date (${st.current || 'current version'})`), { status: 400 });
+      if (!st.available) throw fail(`Already up to date (${st.current || 'current version'})`);
       const target = st.breaking && !a.breaking ? st.safeTarget : st.target || st.latest;
-      if (!target) throw Object.assign(new Error(`Version v${st.decisionVersion} is a breaking release: call again with breaking: true after the owner read its steps`), { status: 409 });
+      if (!target) throw fail(`Version v${st.decisionVersion} is a breaking release: call again with breaking: true after the owner read its steps`, 409);
       const steps = a.breaking && st.breaking ? ` BREAKING: ${st.steps.map((s) => `v${s.version} ${s.title}${s.actions.length ? ` (you must: ${s.actions.join(' ')})` : ''}`).join('; ')}.` : '';
       return `Update from ${st.current} to ${target}.${steps}${a.backup === false ? ' No backup first.' : ''} The app restarts: agents are offline for 1–2 minutes.`;
     },
@@ -483,7 +483,7 @@ export const TOOLS = [
     preview: async (a, x) => {
       const ops = await x.call('GET', '/api/system/ops');
       const label = ops.actions?.[a.action];
-      if (!label) throw Object.assign(new Error('Unknown action'), { status: 400 });
+      if (!label) throw fail('Unknown action');
       const effect = { reboot: 'The whole server restarts: agents and the panel are offline for a few minutes.', 'os-update': 'Takes a few minutes; services may restart.',
         'os-update-all': 'Takes a few minutes; services may restart. Also installs updates Ubuntu is still rolling out gradually (normally they come within days).',
         'update-helper': `The root helper downloads its own files of this app's release (helper ${ops.helperVersion} → ${ops.helperBundled}) from the official repository and installs them; agents keep running.`,
@@ -529,7 +529,7 @@ export const TOOLS = [
     input: { user_id: int('User id (see list_users)') }, required: ['user_id'],
     preview: async (a, x) => {
       const u = (await x.call('GET', '/api/users')).find((r) => r.id === Number(a.user_id));
-      if (!u) throw Object.assign(new Error('User not found'), { status: 404 });
+      if (!u) throw fail('User not found', 404);
       return `Make a one-time link where the ${u.role} "${u.username}" sets ${u.hasPassword ? 'a new' : 'their'} password (48 hours).${u.hasPassword ? ' Their current password keeps working until the link is used.' : ''} Whoever opens it can choose the password: send it to them only.`;
     },
     run: async (a, x) => {
@@ -544,7 +544,7 @@ export const TOOLS = [
     input: { user_id: int('User id') }, required: ['user_id'],
     preview: async (a, x) => {
       const u = (await x.call('GET', '/api/users')).find((r) => r.id === Number(a.user_id));
-      if (!u) throw Object.assign(new Error('User not found'), { status: 404 });
+      if (!u) throw fail('User not found', 404);
       return `Remove the ${u.role} "${u.username}". They are signed out everywhere and their AI-assistant connections stop working.`;
     },
     run: (a, x) => x.call('DELETE', `/api/users/${enc(a.user_id)}`) },
@@ -560,7 +560,7 @@ export const TOOLS = [
     input: { number_id: str('Number id (see list_whatsapp_numbers)') }, required: ['number_id'],
     preview: async (a, x) => {
       const n = (await numbers(x)).find((r) => r.id === a.number_id);
-      if (!n) throw Object.assign(new Error('Unknown number'), { status: 404 });
+      if (!n) throw fail('Unknown number', 404);
       return `Remove the WhatsApp number "${n.label}" (${n.id}). It is unlinked from this app and its chats stop getting replies.`;
     },
     run: (a, x) => x.call('DELETE', `/api/whatsapp/numbers/${enc(a.number_id)}`) },
@@ -583,7 +583,7 @@ export const TOOLS = [
       if (a.image_price !== undefined) {
         const cur = await x.call('GET', '/api/media');
         const ref = a.image_model || cur.settings.imageModel;
-        if (!ref) throw Object.assign(new Error('Give image_model with image_price'), { status: 400 });
+        if (!ref) throw fail('Give image_model with image_price');
         body.imagePrices = { ...cur.settings.imagePrices, [ref]: a.image_price };
       }
       if (a.local_listen !== undefined || a.local_speak !== undefined) body.local = { ...(a.local_listen !== undefined ? { listen: a.local_listen } : {}), ...(a.local_speak !== undefined ? { speak: a.local_speak } : {}) };
@@ -607,4 +607,5 @@ export const TOOLS = [
       const r = await x.call('PUT', `/api/agents/${enc(a.agent_id)}`, { media });
       return { agent: r.id, media: r.config?.media };
     } },
-];
+];import { fail } from '../core/config.js';
+

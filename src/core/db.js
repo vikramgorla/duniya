@@ -166,6 +166,7 @@ export function pruneActivity({ days = 30, max = 5000 } = {}) {
   db.prepare('DELETE FROM activity WHERE id <= (SELECT id FROM activity ORDER BY id DESC LIMIT 1 OFFSET ?)').run(Math.max(100, max));
   db.prepare('DELETE FROM activity WHERE ts < ?').run(Date.now() - Math.max(1, days) * 86400000);
 }
+/** @param {{ limit?: number|string, agent?: string, chat?: string, before?: number }} [o]  limit: as sent (a query string is fine) */
 export function listActivity({ limit = 200, agent = '', chat = '', before = 0 } = {}) {
   const lim = Math.min(Number(limit) || 200, 1000);
   const where = ['(? = 0 OR id < ?)'];
@@ -216,9 +217,12 @@ export function namesInChat(chat) {
 }
 
 /** Stored messages of a chat, newest first (for admins in the panel). */
+/** @param {string} chat  @param {{ before?: number|string, limit?: number|string, q?: string }} [o]  numbers as sent */
 export function listMessages(chat, { before = 0, limit = 50, q = '' } = {}) {
   const lim = Math.min(Math.max(Number(limit) || 50, 1), 200);
-  const args = [chat]; let where = 'chat = ?';
+  /** @type {(string|number)[]} */
+  const args = [chat];
+  let where = 'chat = ?';
   if (Number(before)) { where += ' AND id < ?'; args.push(Number(before)); }
   if (q) { where += ' AND text LIKE ?'; args.push(`%${String(q).slice(0, 100)}%`); }
   return db.prepare(`SELECT id, sender, sender_jid AS senderJid, name, text, quoted, from_agent AS fromAgent, addressed, ts FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim)

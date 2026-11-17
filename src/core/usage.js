@@ -3,6 +3,7 @@
 // (reply | summary | ai-helper | test). Costs come only from prices the owner set or the provider publishes
 // (e.g. OpenRouter); plan-based providers (ChatGPT plan, GitHub Copilot) are "included", free models cost 0, and
 // anything else is reported as "price not set" — never guessed.
+import { fail } from './config.js';
 import { db } from './db.js';
 import { getSetting, updateSettings } from './store.js';
 
@@ -19,12 +20,12 @@ const priceSetting = () => getSetting('modelPrices', {}) || {};
 
 /** Owner-set prices in USD per 1M tokens: { "provider:model": { in, out } }. Empty values remove the price. */
 export function setPrice(ref, { input, output }) {
-  if (!/^[a-z][a-z0-9-]*:.+$/.test(ref)) throw Object.assign(new Error('Model must look like provider:model'), { status: 400 });
+  if (!/^[a-z][a-z0-9-]*:.+$/.test(ref)) throw fail('Model must look like provider:model');
   const all = { ...priceSetting() };
   const i = input === '' || input == null ? null : Number(input); const o = output === '' || output == null ? null : Number(output);
   if (i == null && o == null) delete all[ref];
   else {
-    if (!(i >= 0) || !(o >= 0) || i > 10000 || o > 10000) throw Object.assign(new Error('Prices are USD per million tokens (0–10000)'), { status: 400 });
+    if (!(i >= 0) || !(o >= 0) || i > 10000 || o > 10000) throw fail('Prices are USD per million tokens (0–10000)');
     all[ref] = { in: i, out: o };
   }
   updateSettings({ modelPrices: all });
@@ -65,7 +66,7 @@ const GROUPS = { agent: 'agent', chat: 'chat', provider: 'provider', account: "C
 /** Totals and breakdowns for a period. */
 export function usageReport({ from = 0, to = Date.now(), groupBy = 'agent', agent = '', chat = '' } = {}) {
   const key = GROUPS[groupBy];
-  if (!key) throw Object.assign(new Error('groupBy must be one of agent, chat, provider, account, model, kind, fallback, day'), { status: 400 });
+  if (!key) throw fail('groupBy must be one of agent, chat, provider, account, model, kind, fallback, day');
   const where = ['ts >= ?', 'ts <= ?'];
   /** @type {(string|number)[]} */
   const args = [Number(from) || 0, Number(to) || Date.now()];

@@ -132,7 +132,7 @@ async function streamRequest(url, key, body, onText, { timeout = 120000 } = {}) 
   if (!res.ok) {
     const text = await res.text();
     let json; try { json = JSON.parse(text); } catch { json = null; }
-    throw Object.assign(new Error(json?.error?.message || `${res.status} ${text.slice(0, 200)}`), { status: res.status, code: json?.error?.code || json?.error?.type, headers: res.headers, error: json });
+    throw fail(json?.error?.message || `${res.status} ${text.slice(0, 200)}`, res.status, { code: json?.error?.code || json?.error?.type, headers: res.headers, error: json });
   }
   return readChatStream(res, onText);
 }
@@ -241,4 +241,5 @@ export function chatCompletionsProvider({ baseUrl, key, official = false }) {
       return fromChatResponse(await request(`${base}/chat/completions`, key(), body));
     },
   };
-}
+}import { fail } from '../config.js';
+

@@ -14,7 +14,7 @@ import { chatCompletionsProvider } from './openai-chat.js';
 import { classify, REASON_TEXT } from './errors.js';
 import * as breaker from './breaker.js';
 import { REF_RE, cleanChain } from './fallback-config.js';
-import { bad } from '../config.js';
+import { bad, fail } from '../config.js';
 
 export { REF_RE, FALLBACK_MODES, cleanChain, cleanOverride } from './fallback-config.js';
 
@@ -199,9 +199,9 @@ export function setStrategy(group, strategy) {
 }
 
 export function addCompatible({ id, name, baseUrl, key, preset, label }) {
-  if (!COMPAT_ID_RE.test(id || '') || RESERVED.has(id)) throw Object.assign(new Error('id: 2–31 lowercase letters/digits/-, not a reserved name'), { status: 400, field: 'id' });
+  if (!COMPAT_ID_RE.test(id || '') || RESERVED.has(id)) throw fail('id: 2–31 lowercase letters/digits/-, not a reserved name', 400, { field: 'id' });
   if (accountEntries().some((a) => a.id === id)) throw bad('That id is used by another account', 'id');
-  try { const u = new URL(baseUrl); if (!/^https?:$/.test(u.protocol)) throw new Error(); } catch { throw Object.assign(new Error('baseUrl must be an http(s) URL'), { status: 400, field: 'baseUrl' }); }
+  try { const u = new URL(baseUrl); if (!/^https?:$/.test(u.protocol)) throw new Error(); } catch { throw fail('baseUrl must be an http(s) URL', 400, { field: 'baseUrl' }); }
   const before = compatibleList().find((p) => p.id === id);
   const list = compatibleList().filter((p) => p.id !== id);
   const lab = cleanLabel(label ?? before?.label);
@@ -525,8 +525,8 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
 /** Connection test (018): send "Say hi" to one account (its Auto model unless one is given); reply + latency. */
 export async function testProvider(id, model) {
   const p = providerById(id);
-  if (!p) throw Object.assign(new Error(`Unknown model provider "${id}"`), { status: 404 });
-  if (!p.configured) throw Object.assign(new Error(`${p.name} is not connected yet`), { status: 400 });
+  if (!p) throw fail(`Unknown model provider "${id}"`, 404);
+  if (!p.configured) throw fail(`${p.name} is not connected yet`);
   const started = Date.now();
   try {
     if (!model) await providerModels(p);

@@ -3,7 +3,7 @@
 // to the rest of the app: chats on the first number keep their plain WhatsApp id (no migration), chats on other
 // numbers are prefixed "<number>#<jid>", and send/typing/isMember route to the right session from the chat id.
 import { resolve } from 'node:path';
-import { DATA_DIR } from '../core/config.js';
+import { DATA_DIR, fail } from '../core/config.js';
 import { getSetting, updateSettings } from '../core/store.js';
 import { activity } from '../core/events.js';
 import { noteChat } from '../core/chat-prefs.js';
@@ -55,7 +55,7 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
   };
   const byNumber = (id = MAIN) => {
     const ch = sessions.get(id || MAIN);
-    if (!ch) throw Object.assign(new Error(`Unknown number "${id}"`), { status: 404 });
+    if (!ch) throw fail(`Unknown number "${id}"`, 404);
     return ch;
   };
 
@@ -63,14 +63,14 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
   for (const name of CHAT_ACTIONS) {
     actions[name] = async (chat, ...args) => {
       const { ch, jid } = route(chat);
-      if (typeof ch[name] !== 'function') throw Object.assign(new Error(`This WhatsApp number cannot ${name}`), { status: 501 });
+      if (typeof ch[name] !== 'function') throw fail(`This WhatsApp number cannot ${name}`, 501);
       return ch[name](jid, ...args);
     };
   }
   for (const name of NUMBER_ACTIONS) {
     actions[name] = async (chat, ...args) => {
       const { ch } = route(chat);
-      if (typeof ch[name] !== 'function') throw Object.assign(new Error(`This WhatsApp number cannot ${name}`), { status: 501 });
+      if (typeof ch[name] !== 'function') throw fail(`This WhatsApp number cannot ${name}`, 501);
       return ch[name](...args);
     };
   }
@@ -131,8 +131,8 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
     async addNumber({ id, label }) {
       const list = numbersSetting();
       const nid = String(id || '').trim().toLowerCase() || `n${list.length + 1}`;
-      if (!NUMBER_ID_RE.test(nid) || nid === MAIN) throw Object.assign(new Error('Id: 2–24 lowercase letters, digits or -'), { status: 400, field: 'id' });
-      if (list.some((n) => n.id === nid)) throw Object.assign(new Error('That id is already used'), { status: 400, field: 'id' });
+      if (!NUMBER_ID_RE.test(nid) || nid === MAIN) throw fail('Id: 2–24 lowercase letters, digits or -', 400, { field: 'id' });
+      if (list.some((n) => n.id === nid)) throw fail('That id is already used', 400, { field: 'id' });
       const n = { id: nid, label: String(label || nid).trim().slice(0, 40) };
       updateSettings({ whatsappNumbers: [...list, n] });
       await startOne(n);
@@ -145,9 +145,9 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
       return list.find((n) => n.id === id);
     },
     async removeNumber(id) {
-      if (id === MAIN) throw Object.assign(new Error('The first number can be unlinked, not removed'), { status: 400 });
+      if (id === MAIN) throw fail('The first number can be unlinked, not removed');
       const ch = sessions.get(id);
-      if (!ch) throw Object.assign(new Error('Unknown number'), { status: 404 });
+      if (!ch) throw fail('Unknown number', 404);
       await ch.remove?.();
       sessions.delete(id);
       updateSettings({ whatsappNumbers: numbersSetting().filter((n) => n.id !== id) });

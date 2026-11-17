@@ -152,7 +152,7 @@ test('060: restore_backup uses the stored passphrase; a backup that does not ope
   await t.api(owner, 'PUT', '/api/backups/passphrase', { passphrase: 'first passphrase 123' });
   const old = (await t.api(owner, 'POST', '/api/backups/run')).body.file;
   await t.api(owner, 'PUT', '/api/backups/passphrase', { passphrase: 'second passphrase 123' });
-  await new Promise((r) => setTimeout(r, 1100)); // backup file names have one-second resolution
+  await new Promise((r) => setTimeout(r, 1005 - (Date.now() % 1000))); // backup file names have one-second resolution: the next second
   const cur = (await t.api(owner, 'POST', '/api/backups/run')).body.file;
 
   // a backup made with another passphrase: the preview fails with the panel link, nothing is held

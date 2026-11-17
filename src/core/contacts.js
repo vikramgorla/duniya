@@ -12,7 +12,7 @@
 // People WhatsApp only identifies by a LID (hidden number) are kept in contact_lids until the LID↔phone mapping
 // arrives; then their names move to the phone's row. A raw LID is never shown as if it were a number.
 import { db } from './db.js';
-import { digits } from './config.js';
+import { digits, fail } from './config.js';
 import { activity } from './events.js';
 import { getSettings, updateSettings } from './store.js';
 
@@ -30,7 +30,6 @@ db.exec(`
     PRIMARY KEY (tenant_id, lid)
   );
 `);
-const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const HIDDEN_NUMBER = 'Unknown (hidden number)';
 const synced = (r) => r.book_name || r.biz_name || r.push_name || '';
 const view = (r) => ({
@@ -40,7 +39,7 @@ const view = (r) => ({
 });
 const normPhone = (p) => {
   const d = digits(p);
-  if (d.length < 6 || d.length > 15) fail(`"${p}" is not a phone number with country code`);
+  if (d.length < 6 || d.length > 15) throw fail(`"${p}" is not a phone number with country code`);
   return d;
 };
 const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, 100);
@@ -177,7 +176,7 @@ export function saveContact({ phone, name, note, shared }, by = 'panel') {
     note: note !== undefined ? String(note).trim().slice(0, 300) : cur?.note || '',
     shared: shared !== undefined ? (shared ? 1 : 0) : cur?.shared || 0,
   };
-  if (!next.name && !(cur && synced(cur))) fail('A name is required');
+  if (!next.name && !(cur && synced(cur))) throw fail('A name is required');
   db.prepare(`INSERT INTO contacts (tenant_id, phone, name, note, shared, own, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)
     ON CONFLICT (tenant_id, phone) DO UPDATE SET name = excluded.name, note = excluded.note, shared = excluded.shared, own = 1, updated_at = excluded.updated_at`)
     .run(TENANT, p, next.name, next.note, next.shared, Date.now());

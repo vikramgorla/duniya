@@ -2,6 +2,7 @@
 // Global tool services (035): Settings → Tool services. Defined once, available to every agent (agents opt out per
 // service). Same shape as an agent's tool-service routes (/api/agents/:id/…) so the panel reuses one editor.
 // Local services run third-party code on this server: only the owner may add, change, remove or install them.
+import { fail } from '../../core/config.js';
 import { interpolate } from '../../core/store.js';
 import { listAgents, updateAgent } from '../../core/agents.js';
 import { listGlobalRows, getGlobalServer, saveGlobalServer, removeGlobalServer } from '../../core/global-mcp.js';
@@ -16,7 +17,7 @@ import { registryRoutes } from './mcp-registry.js';
 
 const ownerOnly = (user, ...configs) => {
   if (user?.role !== 'owner' && configs.some((c) => c?.type === 'local')) {
-    throw Object.assign(new Error('Only the owner can add, change or remove local tool services (they run code on this server)'), { status: 403 });
+    throw fail('Only the owner can add, change or remove local tool services (they run code on this server)', 403);
   }
 };
 const toolList = (tools) => tools.map((t) => ({ name: t.name, description: (t.description || '').slice(0, 300) }));

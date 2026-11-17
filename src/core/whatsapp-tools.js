@@ -3,7 +3,7 @@
 // Role rules are code (constitution III): participants get the send/react/poll-type tools by default, organizers all;
 // powerful actions (people, group settings, block, delete) are organizer-only whatever the rules say, and are applied
 // immediately (owner decision on issue #2: no confirm code). Every action is logged as `whatsapp.action`.
-import { digits, clip } from './config.js';
+import { digits, clip, fail } from './config.js';
 import { tagsInChat, memberTag } from './member-tags.js';
 import {
   logMessage, messageByMsgId, lastAgentMessage, setMessageText, searchMessages, namesInChat, getPoll, latestPoll, recentPolls, pollTally,
@@ -15,7 +15,6 @@ let channel = null;
 export const setWhatsAppChannel = (ch) => { channel = ch; };
 export const whatsappChannel = () => channel;
 
-const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const jidOf = (chat) => { const i = String(chat).indexOf('#'); return i > 0 ? chat.slice(i + 1) : String(chat); };
 export const isGroupChat = (chat) => jidOf(chat).endsWith('@g.us');
 const isWhatsAppChat = (chat) => /@(g\.us|s\.whatsapp\.net|lid)$/.test(jidOf(chat || ''));
@@ -38,13 +37,13 @@ export function whatsappRules(agent, role) {
 }
 
 // ---------- shared helpers ----------
-function need() { if (!channel) fail('WhatsApp is not available here', 503); return channel; }
+function need() { if (!channel) throw fail('WhatsApp is not available here', 503); return channel; }
 
 /** The chat to act on: the current one, or another chat (id or group name) bound to the same agent. */
 async function targetChat(input, ctx) {
   const want = String(input.chat || '').trim();
   if (!want || want === ctx.chat) {
-    if (!isWhatsAppChat(ctx.chat)) fail('There is no WhatsApp chat here; name the group (chat) to act on');
+    if (!isWhatsAppChat(ctx.chat)) throw fail('There is no WhatsApp chat here; name the group (chat) to act on');
     return ctx.chat;
   }
   const bound = ctx.agent.chats || [];
@@ -53,9 +52,9 @@ async function targetChat(input, ctx) {
     const name = await channel?.chatName?.(c).catch(() => '');
     if (name && name.toLowerCase() === want.toLowerCase()) return c;
   }
-  return fail('I can only act in this chat or in other chats this agent is in');
+  throw fail('I can only act in this chat or in other chats this agent is in');
 }
-const needGroup = (chat) => { if (!isGroupChat(chat)) fail('This only works in a WhatsApp group'); };
+const needGroup = (chat) => { if (!isGroupChat(chat)) throw fail('This only works in a WhatsApp group'); };
 
 /** A stored message → { msgId, fromMe, participant, text }. `message` = id or a few words of it (latest match). */
 function findMessage(chat, message, fallback) {
@@ -67,10 +66,10 @@ function findMessage(chat, message, fallback) {
       const hits = searchMessages(chat, want, 30).filter((m) => m.msg_id);
       row = hits.filter((m) => String(m.text).toLowerCase().includes(want.toLowerCase())).at(-1) || hits.at(-1) || null; // own text before quotes
     }
-    if (!row) fail(`No stored message in this chat matches "${clip(want, 60)}"`);
+    if (!row) throw fail(`No stored message in this chat matches "${clip(want, 60)}"`);
   } else {
     row = fallback();
-    if (!row) fail('Which message? Give its id or a few words of it');
+    if (!row) throw fail('Which message? Give its id or a few words of it');
   }
   return { msgId: row.msg_id, fromMe: !!row.from_agent, participant: row.sender_jid || '', text: row.text || '', row };
 }
@@ -88,8 +87,8 @@ function remember(ctx, chat, msgId, text, quoted = '') {
 function people(input) {
   const list = Array.isArray(input.people) ? input.people : String(input.people || '').split(/[,\n]/);
   const out = list.map((p) => String(p).trim()).filter(Boolean);
-  if (!out.length) fail('Name at least one person (phone number with country code)');
-  if (out.length > 20) fail('At most 20 people at once');
+  if (!out.length) throw fail('Name at least one person (phone number with country code)');
+  if (out.length > 20) throw fail('At most 20 people at once');
   return out;
 }
 const ACTION_WORD = { add: 'Added', remove: 'Removed', promote: 'Made admin', demote: 'No longer admin' };
@@ -170,7 +169,7 @@ const DEFS = [
     async run(input, ctx) {
       const chat = await targetChat(input, ctx);
       const ref = findMessage(chat, input.message, () => lastAgentMessage(chat));
-      if (!ref.fromMe) fail('Only messages the assistant sent can be edited');
+      if (!ref.fromMe) throw fail('Only messages the assistant sent can be edited');
       await need().editMessage(chat, ref.msgId, String(input.text));
       setMessageText(chat, ref.msgId, String(input.text));
       return { chat, result: { ok: true }, summary: `Edited "${clip(ref.text, 60)}" → "${clip(input.text, 80)}"` };
@@ -205,7 +204,7 @@ const DEFS = [
       let p;
       if (input.poll) p = getPoll(chat, input.poll) || findPollByQuestion(chat, input.poll);
       else p = latestPoll(chat);
-      if (!p) fail('No poll found in this chat (only polls created while this app was running are tracked)');
+      if (!p) throw fail('No poll found in this chat (only polls created while this app was running are tracked)');
       const options = pollTally(p);
       return { chat, result: { question: p.name, multiple: p.selectable !== 1, voters: Object.keys(p.votes).length, options }, summary: `Poll "${clip(p.name, 60)}": ${options.map((o) => `${o.name} ${o.votes}`).join(', ')}` };
     } },
@@ -251,7 +250,7 @@ const DEFS = [
     input_schema: { type: 'object', properties: { subject: str('New group name', { minLength: 1, maxLength: 100 }), chat: CHAT }, required: ['subject'] },
     async run(input, ctx) {
       const chat = await targetChat(input, ctx); needGroup(chat);
-      if (!String(input.subject || '').trim()) fail('The group name cannot be empty');
+      if (!String(input.subject || '').trim()) throw fail('The group name cannot be empty');
       await need().groupSubject(chat, String(input.subject).trim());
       return { chat, result: { ok: true }, summary: `Group renamed to "${clip(input.subject, 100)}"` };
     } },
@@ -276,7 +275,7 @@ const DEFS = [
       const chat = await targetChat(input, ctx); needGroup(chat);
       const s = { announcement: input.only_admins_send, locked: input.only_admins_edit_info, joinApproval: input.join_approval };
       const changed = Object.entries(s).filter(([, v]) => typeof v === 'boolean');
-      if (!changed.length) fail('Nothing to change: give only_admins_send, only_admins_edit_info or join_approval');
+      if (!changed.length) throw fail('Nothing to change: give only_admins_send, only_admins_edit_info or join_approval');
       await need().groupSettings(chat, Object.fromEntries(changed));
       return { chat, result: { ok: true }, summary: `Settings: ${changed.map(([k, v]) => `${k} ${v ? 'on' : 'off'}`).join(', ')}` };
     } },
@@ -286,10 +285,10 @@ const DEFS = [
     async run(input, ctx) {
       const chat = await targetChat(input, ctx);
       const who = String(input.person || ctx.requester || '').trim();
-      if (!who) fail('Whose profile? Give a phone number');
+      if (!who) throw fail('Whose profile? Give a phone number');
       if (ctx.role !== 'organizer' && digits(who) !== digits(ctx.requester || '')) {
         const names = namesInChat(chat);
-        if (!names[digits(who)]) fail('Participants can look up people of this chat only');
+        if (!names[digits(who)]) throw fail('Participants can look up people of this chat only');
       }
       const p = await need().profile(chat, who);
       const name = namesInChat(chat)[digits(p.phone || who)] || '';
@@ -299,9 +298,9 @@ const DEFS = [
     input_schema: { type: 'object', properties: { person: str('Phone number with country code') }, required: ['person'] },
     async run(input, ctx) {
       const d = digits(input.person);
-      if ((ctx.agent.organizers || []).includes(d)) fail('Organizers of this agent cannot be blocked');
+      if ((ctx.agent.organizers || []).includes(d)) throw fail('Organizers of this agent cannot be blocked');
       const chat = isWhatsAppChat(ctx.chat) ? ctx.chat : (ctx.agent.chats || [])[0];
-      if (!chat) fail('No WhatsApp number to act on');
+      if (!chat) throw fail('No WhatsApp number to act on');
       await need().block(chat, input.person);
       return { chat, result: { blocked: true }, summary: `Blocked +${d}` };
     } },
@@ -309,7 +308,7 @@ const DEFS = [
     input_schema: { type: 'object', properties: { person: str('Phone number with country code') }, required: ['person'] },
     async run(input, ctx) {
       const chat = isWhatsAppChat(ctx.chat) ? ctx.chat : (ctx.agent.chats || [])[0];
-      if (!chat) fail('No WhatsApp number to act on');
+      if (!chat) throw fail('No WhatsApp number to act on');
       await need().unblock(chat, input.person);
       return { chat, result: { unblocked: true }, summary: `Unblocked +${digits(input.person)}` };
     } },
@@ -326,7 +325,7 @@ const scrubInput = (input) => Object.fromEntries(Object.entries(input || {}).map
 export const whatsappTools = DEFS.map((d) => ({
   name: d.name, description: d.description, input_schema: d.input_schema, roles: d.roles,
   async run(input, ctx) {
-    if (!d.roles.includes(ctx.role)) fail('Only organizers can do this');
+    if (!d.roles.includes(ctx.role)) throw fail('Only organizers can do this');
     try {
       const out = await d.run(input || {}, ctx);
       activity('whatsapp.action', { agent: ctx.agent.id, chat: out.chat, summary: `${d.name} by ${ctx.senderName || 'someone'} (${ctx.role}): ${out.summary}`,

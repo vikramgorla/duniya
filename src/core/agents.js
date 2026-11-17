@@ -2,7 +2,7 @@
 // Agent registry (005): agents are database records; templates are JSON files.
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { TEMPLATES_DIR, digits } from './config.js';
+import { TEMPLATES_DIR, digits, fail } from './config.js';
 import { validateAgentConfig, referencedSecrets, slugify, AGENT_ID_RE, ValidationError } from './schema.js';
 import {
   listAgentRows, getAgentRow, saveAgentRow, deleteAgentRow, getSecret,
@@ -32,7 +32,7 @@ function ensureOwnerAgent() {
     // 041 → 059: the weekly summary is a schedule of the owner assistant (counts and costs only, weekly.js)
     schedules: [{ id: 'weekly-summary', kind: 'weekly-summary', at: '09:00', days: 'mon', enabled: true }] }).config, 'system');
 }
-const builtinError = (what) => Object.assign(new Error(`The owner assistant is built in: it ${what}`), { status: 400 });
+const builtinError = (what) => fail(`The owner assistant is built in: it ${what}`);
 
 let agents = new Map();
 function toRuntime(row) {
@@ -77,7 +77,7 @@ export async function createAgent({ id, config, by = '' }) {
   let agentId = id ? String(id).toLowerCase() : slugify(clean.name);
   if (!AGENT_ID_RE.test(agentId)) throw new ValidationError('id', 'must be 2–41 lowercase letters, digits or -');
   if (getAgentRow(agentId)) {
-    if (id) throw Object.assign(new Error(`An agent with id "${agentId}" already exists`), { status: 409 });
+    if (id) throw fail(`An agent with id "${agentId}" already exists`, 409);
     let n = 2; while (getAgentRow(`${agentId}-${n}`)) n++;
     agentId = `${agentId}-${n}`;
   }
@@ -106,7 +106,7 @@ export function changeSummary(before = {}, after = {}) {
 
 export async function updateAgent(id, patch, by = '') {
   const row = getAgentRow(id);
-  if (!row) throw Object.assign(new Error(`Unknown agent ${id}`), { status: 404 });
+  if (!row) throw fail(`Unknown agent ${id}`, 404);
   const { config: clean, warnings } = (isBuiltin(id) ? ownerConfig : agentConfig)({ ...row.config, ...patch });
   guardLocalSmall(row.config.mcpServers, clean.mcpServers);
   if (patch.chats) releaseChats(clean.chats, id, by);
@@ -117,7 +117,7 @@ export async function updateAgent(id, patch, by = '') {
 
 export function deleteAgent(id, by = '') {
   if (isBuiltin(id)) throw builtinError('cannot be deleted');
-  if (!deleteAgentRow(id)) throw Object.assign(new Error(`Unknown agent ${id}`), { status: 404 });
+  if (!deleteAgentRow(id)) throw fail(`Unknown agent ${id}`, 404);
   agents.delete(id);
   deleteAgentConnections(id);
   activity('agent.deleted', { agent: id, summary: `Deleted${by ? ` by ${by}` : ''}` });
@@ -130,7 +130,7 @@ export async function bindChat(chat, agentId, by = '') {
   if (agentId) {
     if (isBuiltin(agentId)) throw builtinError('answers its linked users in their own chats, not in assigned chats');
     const b = getAgent(agentId);
-    if (!b) throw Object.assign(new Error(`Unknown agent ${agentId}`), { status: 404 });
+    if (!b) throw fail(`Unknown agent ${agentId}`, 404);
     if (!b.chats.includes(chat)) await updateAgent(agentId, { chats: [...b.chats, chat] }, by);
   }
 }
@@ -149,13 +149,13 @@ export function listTemplates() {
 export function templateConfig(id) {
   if (!/^[a-z0-9-]+$/.test(id)) throw new ValidationError('template', 'invalid');
   const file = resolve(TEMPLATES_DIR, `${id}.json`);
-  if (!existsSync(file)) throw Object.assign(new Error(`Unknown template ${id}`), { status: 404 });
+  if (!existsSync(file)) throw fail(`Unknown template ${id}`, 404);
   return readJsonFile(file, {});
 }
 
 export function exportAgent(id) {
   const row = getAgentRow(id);
-  if (!row) throw Object.assign(new Error(`Unknown agent ${id}`), { status: 404 });
+  if (!row) throw fail(`Unknown agent ${id}`, 404);
   const { chats, organizers, participants, ...config } = row.config;
   return { format: 'duniya-agent', version: 1, id, exportedAt: new Date().toISOString(), config, secrets: referencedSecrets(row.config) };
 }

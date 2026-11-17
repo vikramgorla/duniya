@@ -1,6 +1,7 @@
 // AI helper for agents (016): draft a new agent, or changes to an existing one, from a plain-language request.
 // The model only PROPOSES; the result is validated with the same schema as the editor and shown as a diff — an
 // admin applies it (constitution IV/VIII). Group bindings and local tool services are never changed by the helper.
+import { fail } from './config.js';
 import { chat as modelChat } from './providers/index.js';
 import { validateAgentConfig, AGENT_DEFAULTS } from './schema.js';
 import { listTemplates } from './agents.js';
@@ -70,7 +71,7 @@ const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
  */
 export async function draftAgent({ agent = null, request, model = 'auto', people = [], by = '' }) {
   const text = String(request || '').trim();
-  if (text.length < 3) throw Object.assign(new Error('Describe what you want first'), { status: 400 });
+  if (text.length < 3) throw fail('Describe what you want first');
   const current = agent ? pick(agent) : pick({ ...AGENT_DEFAULTS });
   const context = {
     mode: agent ? 'edit' : 'create',
@@ -109,5 +110,5 @@ export async function draftAgent({ agent = null, request, model = 'auto', people
         : [{ role: 'user', content: `Invalid: ${lastError}. Fix it and answer again.` }]));
     }
   }
-  throw Object.assign(new Error(`The AI could not produce a valid draft (${lastError}). Try rephrasing or another model.`), { status: 400 });
+  throw fail(`The AI could not produce a valid draft (${lastError}). Try rephrasing or another model.`);
 }

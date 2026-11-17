@@ -1,5 +1,6 @@
 // GitHub destination: device-flow login, private repo creation, Git Data API upload with pruning.
 // 019: every call takes `token` as a string or as an async token provider (a GitHub App installation token).
+import { fail } from '../config.js';
 import { createSign } from 'node:crypto';
 const API = () => (process.env.GITHUB_API_BASE || 'https://api.github.com').replace(/\/+$/, '');
 const WEB = () => (process.env.GITHUB_WEB_BASE || 'https://github.com').replace(/\/+$/, '');
@@ -10,13 +11,13 @@ async function form(url, params) {
     body: new URLSearchParams(params), signal: AbortSignal.timeout(20000),
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(json.error_description || json.message || `GitHub ${res.status}`), { status: 400 });
+  if (!res.ok) throw fail(json.error_description || json.message || `GitHub ${res.status}`);
   return json;
 }
 
 export async function deviceStart(clientId) {
   const r = await form(`${WEB()}/login/device/code`, { client_id: clientId, scope: 'repo' });
-  if (r.error) throw Object.assign(new Error(r.error_description || r.error), { status: 400 });
+  if (r.error) throw fail(r.error_description || r.error);
   return { deviceCode: r.device_code, userCode: r.user_code, verificationUri: r.verification_uri, expiresIn: r.expires_in, interval: r.interval || 5 };
 }
 
@@ -42,7 +43,7 @@ async function api(token, method, path, body) {
   });
   if (res.status === 404 && method === 'GET') return null;
   const json = res.status === 204 ? {} : await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(`GitHub: ${json.message || res.status}`), { status: res.status >= 500 ? 502 : 400, httpStatus: res.status });
+  if (!res.ok) throw fail(`GitHub: ${json.message || res.status}`, res.status >= 500 ? 502 : 400, { httpStatus: res.status });
   return json;
 }
 
@@ -69,7 +70,7 @@ export async function list(token, { repo, branch, path = 'backups' }) {
 
 /** One commit: add the new backup and delete those beyond `keep`. */
 export async function upload(token, { repo, branch, path = 'backups' }, file, buf, keep) {
-  if (buf.length > 90 * 1024 * 1024) throw Object.assign(new Error('Backup is larger than 90 MB; use S3 for large backups'), { status: 400 });
+  if (buf.length > 90 * 1024 * 1024) throw fail('Backup is larger than 90 MB; use S3 for large backups');
   const b = await branchOf(token, repo, branch);
   // an empty repository answers 409 "Git Repository is empty."
   const getRef = () => api(token, 'GET', `/repos/${repo}/git/ref/heads/${encodeURIComponent(b)}`).catch((e) => { if (e.httpStatus === 409) return null; throw e; });
@@ -82,7 +83,7 @@ export async function upload(token, { repo, branch, path = 'backups' }, file, bu
     });
     ref = await getRef();
   }
-  if (!ref) throw Object.assign(new Error(`Branch ${b} not found in ${repo}`), { status: 400 });
+  if (!ref) throw fail(`Branch ${b} not found in ${repo}`);
   const parent = ref.object.sha;
   const commit = await api(token, 'GET', `/repos/${repo}/git/commits/${parent}`);
   const existing = await list(token, { repo, branch: b, path });
@@ -104,7 +105,7 @@ export async function upload(token, { repo, branch, path = 'backups' }, file, bu
 
 export async function download(token, target, file) {
   const entry = (await list(token, target)).find((e) => e.file === file);
-  if (!entry) throw Object.assign(new Error('Backup not found on GitHub'), { status: 404 });
+  if (!entry) throw fail('Backup not found on GitHub', 404);
   const blob = await api(token, 'GET', `/repos/${target.repo}/git/blobs/${entry.sha}`);
   return Buffer.from(blob.content, 'base64');
 }
@@ -126,9 +127,9 @@ export const newRepoUrl = (name = 'duniya-backup') => `${WEB()}/new?name=${encod
 
 /** Exchange the one-hour manifest code for the app's id, slug and private key. */
 export async function convertManifest(code) {
-  if (!/^[\w-]{4,100}$/.test(String(code || ''))) throw Object.assign(new Error('GitHub sent no valid code'), { status: 400 });
+  if (!/^[\w-]{4,100}$/.test(String(code || ''))) throw fail('GitHub sent no valid code');
   const r = await api(null, 'POST', `/app-manifests/${encodeURIComponent(code)}/conversions`);
-  if (!r?.id || !r?.pem) throw Object.assign(new Error('GitHub did not return the app credentials (the code is valid for one hour; start again)'), { status: 400 });
+  if (!r?.id || !r?.pem) throw fail('GitHub did not return the app credentials (the code is valid for one hour; start again)');
   const name = r.name || '';
   const slug = r.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   return { id: r.id, slug, name, owner: r.owner?.login || '', htmlUrl: r.html_url || (slug ? `${WEB()}/apps/${slug}` : ''), clientId: r.client_id || '', pem: r.pem };

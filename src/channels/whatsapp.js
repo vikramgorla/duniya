@@ -7,7 +7,7 @@ import pino from 'pino';
 import QRCode from 'qrcode';
 import { rmSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { DATA_DIR, digits } from '../core/config.js';
+import { DATA_DIR, digits, fail } from '../core/config.js';
 import { activity, bus } from '../core/events.js';
 import { loadMedia, MAX_MEDIA_BYTES } from '../core/media.js';
 import { savePoll, getPoll, kvGet, kvSet } from '../core/db.js';
@@ -329,10 +329,10 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
   /** Only what a later download needs (key + media message), serialisable, so a queued job survives a restart. */
   const mediaRefOf = (msg) => JSON.stringify({ key: msg.key, message: msg.message }, BufferJSON.replacer);
   async function downloadRef(ref, declared = 0) {
-    if (declared > MAX_MEDIA_BYTES) throw Object.assign(new Error('Media is too large'), { status: 413 });
+    if (declared > MAX_MEDIA_BYTES) throw fail('Media is too large', 413);
     const m = typeof ref === 'string' ? JSON.parse(ref, BufferJSON.reviver) : ref;
     const buf = await downloadMediaMessage(m, 'buffer', {}, { logger, reuploadRequest: sock.updateMediaMessage });
-    if (buf.length > MAX_MEDIA_BYTES) throw Object.assign(new Error('Media is too large'), { status: 413 });
+    if (buf.length > MAX_MEDIA_BYTES) throw fail('Media is too large', 413);
     return buf;
   }
 
@@ -455,19 +455,19 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     return meta;
   }
   // ---------- helpers for the WhatsApp actions (026) ----------
-  const ready = () => { if (state.status !== 'open' || !sock) throw Object.assign(new Error('WhatsApp is not connected'), { status: 409 }); return sock; };
-  const needGroup = (jid) => { if (!isJidGroup(jid)) throw Object.assign(new Error('This only works in a group'), { status: 400 }); };
+  const ready = () => { if (state.status !== 'open' || !sock) throw fail('WhatsApp is not connected', 409); return sock; };
+  const needGroup = (jid) => { if (!isJidGroup(jid)) throw fail('This only works in a group'); };
   /** A phone number (any format) or a jid → jid. */
   const toJid = (who) => {
     const v = String(who || '').trim();
     if (v.includes('@')) return jidNormalizedUser(v);
     const d = digits(v);
-    if (d.length < 6) throw Object.assign(new Error(`"${v}" is not a phone number with country code`), { status: 400 });
+    if (d.length < 6) throw fail(`"${v}" is not a phone number with country code`);
     return `${d}@s.whatsapp.net`;
   };
   /** Message key from a stored-message reference { msgId, fromMe, participant }. */
   const keyOf = (jid, ref) => {
-    if (!ref?.msgId) throw Object.assign(new Error('Which message? (msg id missing)'), { status: 400 });
+    if (!ref?.msgId) throw fail('Which message? (msg id missing)');
     return { remoteJid: jid, id: String(ref.msgId), fromMe: !!ref.fromMe, ...(isJidGroup(jid) && !ref.fromMe && ref.participant ? { participant: ref.participant } : {}) };
   };
   const quotedOf = (jid, ref) => (ref?.msgId ? { key: keyOf(jid, ref), message: { conversation: String(ref.text || '') } } : undefined);
@@ -502,12 +502,12 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     },
     async sendLocation(jid, { latitude, longitude, name = '', address = '' }) {
       const lat = Number(latitude); const lng = Number(longitude);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw Object.assign(new Error('latitude/longitude out of range'), { status: 400 });
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw fail('latitude/longitude out of range');
       return sentId(await ready().sendMessage(jid, { location: { degreesLatitude: lat, degreesLongitude: lng, name, address } }));
     },
     async sendContact(jid, { name, phone, org = '' }) {
       const d = digits(phone);
-      if (!name || d.length < 6) throw Object.assign(new Error('A contact needs a name and a phone number with country code'), { status: 400 });
+      if (!name || d.length < 6) throw fail('A contact needs a name and a phone number with country code');
       const esc = (v) => String(v).replace(/[\\;,\n]/g, ' ');
       const vcard = ['BEGIN:VCARD', 'VERSION:3.0', `FN:${esc(name)}`, org ? `ORG:${esc(org)};` : '', `TEL;type=CELL;type=VOICE;waid=${d}:+${d}`, 'END:VCARD'].filter(Boolean).join('\n');
       return sentId(await ready().sendMessage(jid, { contacts: { displayName: String(name), contacts: [{ vcard }] } }));
@@ -518,13 +518,13 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     async deleteMessage(jid, ref) { await ready().sendMessage(jid, { delete: keyOf(jid, ref) }); return { ok: true }; },
     async markRead(jid, refs = []) { await ready().readMessages(refs.map((r) => keyOf(jid, r))); return { ok: true }; },
     async presence(jid, kind = 'composing') {
-      if (!['composing', 'recording', 'paused', 'available', 'unavailable'].includes(kind)) throw Object.assign(new Error('Unknown presence'), { status: 400 });
+      if (!['composing', 'recording', 'paused', 'available', 'unavailable'].includes(kind)) throw fail('Unknown presence');
       await ready().sendPresenceUpdate(kind, jid); return { ok: true };
     },
     /** Create a poll; the creation message is kept so votes can be decrypted. */
     async sendPoll(jid, { name, options, multi = false }) {
       const values = [...new Set((options || []).map((o) => String(o).trim()).filter(Boolean))];
-      if (!String(name || '').trim() || values.length < 2 || values.length > 12) throw Object.assign(new Error('A poll needs a question and 2–12 different options'), { status: 400 });
+      if (!String(name || '').trim() || values.length < 2 || values.length > 12) throw fail('A poll needs a question and 2–12 different options');
       const s = ready();
       const sent = await s.sendMessage(jid, { poll: { name: String(name).trim(), values, selectableCount: multi ? 0 : 1 } });
       if (sent?.message) keepPoll(jid, sent.key.id, sent.message, jidNormalizedUser(s.user?.id || ''), Date.now());
@@ -548,9 +548,9 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     /** action: add | remove | promote | demote. Returns [{ who, status }] (status 200 = done). */
     async groupParticipants(jid, people, action) {
       needGroup(jid);
-      if (!['add', 'remove', 'promote', 'demote'].includes(action)) throw Object.assign(new Error('Unknown action'), { status: 400 });
+      if (!['add', 'remove', 'promote', 'demote'].includes(action)) throw fail('Unknown action');
       const list = (people || []).map(toJid);
-      if (!list.length) throw Object.assign(new Error('Name at least one person (phone number)'), { status: 400 });
+      if (!list.length) throw fail('Name at least one person (phone number)');
       const res = await ready().groupParticipantsUpdate(jid, list, action);
       invalidate(jid);
       return (res || []).map((r) => ({ who: r.jid, status: String(r.status), ok: String(r.status) === '200' }));
@@ -599,7 +599,7 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
      */
     async fetchHistory(jid, count, anchor) {
       const s = ready();
-      if (!anchor?.msgId) throw Object.assign(new Error('No message of this chat is known yet'), { status: 409 });
+      if (!anchor?.msgId) throw fail('No message of this chat is known yet', 409);
       const key = { remoteJid: jid, id: String(anchor.msgId), fromMe: !!anchor.fromMe, ...(isJidGroup(jid) && !anchor.fromMe && anchor.participant ? { participant: anchor.participant } : {}) };
       return s.fetchMessageHistory(Math.max(1, Math.min(50, Number(count) || 50)), key, Number(anchor.ts) || Date.now());
     },
