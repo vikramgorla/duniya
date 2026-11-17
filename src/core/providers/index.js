@@ -250,7 +250,6 @@ export async function status({ refresh = false } = {}) {
       }
       const usage = planUsage.view(p.id); // 067: { at, limits } — only what the provider reports
       if (usage) row.usage = usage;
-      if (planUsage.endpointUnavailable(p.id)) row.usageUnavailable = true; // #140: the usage endpoint refused this sign-in
       if (PRICED.has(p.type) && !p.freeOnly) row.spend = spendOf('account', p.id); // this month, by Duniya
       row.health = breaker.accountState(p.id); // 042: { state: ok | paused | probing | reconnect, text }
       row.accounts = groups.get(p.group) || 1;
@@ -274,31 +273,23 @@ async function copilotExtras(p, { refresh }) {
 
 // ---------- plan usage (067) ----------
 const PRICED = new Set(['anthropic', 'openai', 'openrouter', 'compatible']); // accounts that cost per use
-const ENDPOINT_TYPES = new Set(['copilot', 'openrouter', 'chatgpt']); // usage needs a request (#140: ChatGPT's answers carry none)
+const ENDPOINT_TYPES = new Set(['copilot', 'openrouter']); // usage needs a request (other accounts report it with every answer)
 const USAGE_TTL_MS = 10 * 60000; // when Models opens
 const USAGE_TICK_MS = 30 * 60000; // on the scheduler tick
-const REFUSED_TTL_MS = 24 * 3600000; // an endpoint that refused this account is asked again a day later (or on a new sign-in)
-const usageTtl = (p, ttl) => (planUsage.endpointUnavailable(p.id) ? REFUSED_TTL_MS : ttl);
-const ENDPOINT_READERS = {
-  copilot: (p, o) => copilot.planLimits(p.secret, o),
-  openrouter: (p) => openRouterLimits(p.baseUrl, getSecret(p.secret)),
-  chatgpt: (p) => chatgpt.planLimits(p.secret),
-};
 /** Read an account's usage endpoint when it is older than the TTL (or `force`). Never throws. */
 async function refreshPlanUsage(p, { force = false, ttl = USAGE_TTL_MS, allowStart = true } = {}) {
-  if (!ENDPOINT_TYPES.has(p.type) || (!force && Date.now() - planUsage.endpointAt(p.id) < usageTtl(p, ttl))) return;
+  if (!ENDPOINT_TYPES.has(p.type) || (!force && Date.now() - planUsage.endpointAt(p.id) < ttl)) return;
   try {
-    const limits = await ENDPOINT_READERS[p.type](p, { allowStart });
+    const limits = p.type === 'copilot' ? await copilot.planLimits(p.secret, { allowStart }) : await openRouterLimits(p.baseUrl, getSecret(p.secret));
     if (limits) planUsage.noteEndpoint(p.id, limits, { name: p.name });
   } catch { /* the provider did not say: nothing is shown */ }
 }
 /**
  * Scheduler tick (upkeep.js, skipped while memory is tight): refresh the usage endpoint of at most one account, each at
- * most every 30 minutes (a refused one once a day), never while the account is paused, and never starting the Copilot
- * runtime just for this.
+ * most every 30 minutes, never while the account is paused, and never starting the Copilot runtime just for this.
  */
 export async function planUsageTick(now = Date.now()) {
-  const due = providers().filter((p) => p.configured && ENDPOINT_TYPES.has(p.type) && !breaker.isPaused(p.id) && now - planUsage.endpointAt(p.id) >= usageTtl(p, USAGE_TICK_MS))
+  const due = providers().filter((p) => p.configured && ENDPOINT_TYPES.has(p.type) && !breaker.isPaused(p.id) && now - planUsage.endpointAt(p.id) >= USAGE_TICK_MS)
     .sort((a, b) => planUsage.endpointAt(a.id) - planUsage.endpointAt(b.id))[0];
   if (!due) return null;
   await refreshPlanUsage(due, { force: true, allowStart: false });
@@ -533,7 +524,7 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
         if (signal?.aborted) { breaker.release(p.id); throw Object.assign(new Error('Stopped'), { code: 'aborted' }); } // 066: the asker pressed Stop; not the provider's fault
         if (e?.headers) planUsage.noteHeaders(p.id, e.headers, { name: p.name }); // 067: a 429 says which window is full
         let cls = classify(e);
-        // 067: a limit error names the plan window that is used up ("5-hour limit used up, resets 14:20") and waits for its reset
+        // 067: a limit error names the plan window that is used up ("free requests today used up, resets 01:00") and waits for its reset
         const lim = ['quota', 'rate_limit'].includes(cls.reason) ? planUsage.exhausted(p.id) : null;
         if (lim && !cls.retryAfterMs && lim.resetAt > Date.now()) cls = { ...cls, retryAfterMs: lim.resetAt - Date.now() };
         if (cls.breaker) breaker.recordFailure(p.id, cls, { name: p.name, message: e.message, limit: lim?.text });
@@ -544,8 +535,8 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
         continue;
       }
       breaker.recordSuccess(p.id, { name: p.name });
-      const { headers: rh, planEvent, ...answer } = res; res = answer; // 067: plan usage from the answer's headers / stream event
-      try { if (rh) planUsage.noteHeaders(p.id, rh, { name: p.name }); if (planEvent) planUsage.noteEvent(p.id, planEvent, { name: p.name }); } catch { /* bookkeeping */ }
+      const { headers: rh, ...answer } = res; res = answer; // 067: rate-limit headroom from the answer's headers
+      try { if (rh) planUsage.noteHeaders(p.id, rh, { name: p.name }); } catch { /* bookkeeping */ }
       const failed = failures.filter((f) => f.reason !== 'unavailable' && !(f.paused && f.account === p.id));
       const fbText = failed.length ? `after ${describeFailures(failed)}` : '';
       try { // usage & cost (023): the account and model that actually answered, and why it switched (042)

@@ -16,8 +16,8 @@ list ("Connected · add another account").
   then *Default models*, *When a model fails*, *Photos & voice* and *Other endpoints*. Tap a row for its page: keys or
   sign-in, accounts, test, and **Plan usage** when the provider reports limits ([see below](#plan-usage)).
   Each page has its own address (`#models/chatgpt`).
-- See how much of each plan is left: the ChatGPT plan's 5-hour and weekly limits, Copilot's premium requests,
-  OpenRouter's credit, an API key's rate-limit headroom. A list row says "62% of 5-hour limit".
+- See how much of each plan is left: Copilot's premium requests, OpenRouter's free requests and credit, an API key's
+  rate-limit headroom. A list row says "62% of premium requests".
 
 | Provider | How |
 |---|---|
@@ -62,8 +62,8 @@ Names are the same everywhere (panel, admin MCP tools, activity): *ChatGPT*, *Cl
   (↑ to reorder, ✕ to remove, at most 10). The line under the model shows what is set, e.g.
   "If unavailable: switch model: OpenAI · Auto → Anthropic · Auto".
 - A failing account is paused (1 min, doubling to 30 min; usage limits until the provider's reset time), shown as
-  "Paused until 14:20 — usage limit reached", or with the window when the provider reported it: "Paused until 14:20 —
-  5-hour limit used up, resets 14:20". The fallback entry in Activity says the same. Pauses and "reconnect" marks survive a restart or update.
+  "Paused until 14:20 — usage limit reached", or with the limit when the provider reported it: "Paused until 01:00 —
+  free requests today used up, resets 01:00". The fallback entry in Activity says the same. Pauses and "reconnect" marks survive a restart or update.
 - Photo turns only fall back to models that can see images (then the vision fallback model).
 - The Ask box streams the answer word by word: a stream that fails before its first word falls back as usual; one
   that breaks half-way is dropped and asked again once without streaming ([details](owner-assistant.md#owner-assistant-and-the-ask-box)).
@@ -97,33 +97,32 @@ when a plan is 80 % used or more.
 
 | Provider | What you see | Where it comes from |
 |---|---|---|
-| ChatGPT | 5-hour and weekly limit (and any extra per-model limit): % used, when it resets | the plan's usage endpoint `GET https://chatgpt.com/backend-api/wham/usage`, read the way OpenAI's open-source Codex reads it; also the headers (`x-codex-*`) and rate-limit event of an answer when they come |
 | GitHub Copilot | premium requests (and chat messages on the free plan): left of the allowance, reset date | GitHub's `copilot_internal/user` (what the editors show); else the Copilot runtime's quota |
 | OpenRouter | free requests today, the key's credit limit, prepaid credit | `GET /api/v1/key` and `/credits` (when the key may read it) |
+| ChatGPT | your own usage through Duniya over the last 30 days (on its page and on **Usage**); no plan limits | ChatGPT doesn't share its plan limits with *Sign in with ChatGPT* |
 | Claude, OpenAI, Custom | rate-limit headroom per minute (requests, tokens), and what Duniya spent through the key this month | headers of every answer (`anthropic-ratelimit-*`, `x-ratelimit-*`); the [usage table](spending.md) |
 
-1. Open **Models** and tap a provider. The row already shows its tightest limit ("62% of 5-hour limit").
+1. Open **Models** and tap a provider. The row already shows its tightest limit ("62% of premium requests").
 2. **Plan usage** has a meter per limit with what is left and when it resets, and "Updated 3m ago".
 3. Several accounts of one provider each show their own.
 
 > [!NOTE]
-> ChatGPT, Copilot and OpenRouter need a request to tell: it is made when you open Models (at most every 10 minutes) and on
+> Copilot and OpenRouter need a request to tell: it is made when you open Models (at most every 10 minutes) and on
 > the server's regular upkeep (one account at a time, each every 30 minutes, skipped while memory is tight). Copilot's
 > runtime is never started just for this.
 >
-> ChatGPT's answers through *Sign in with ChatGPT* carry no usage, so Duniya asks the plan's usage endpoint with the
-> same sign-in. If that endpoint does not answer for this kind of sign-in, the ChatGPT page says *Plan usage is not
-> available for this sign-in* and Duniya asks again a day later (or after you sign in again); nothing is guessed. The
-> 5-hour and weekly limits are always on [chatgpt.com → Settings → Usage](https://chatgpt.com/settings/usage).
+> ChatGPT doesn't share its plan limits with this sign-in, so Duniya shows its own 30-day usage instead and nothing is
+> guessed. When ChatGPT says a limit was reached, the account is paused until the reset ChatGPT names and the next
+> model in the chain answers. Your plan's limits are on [chatgpt.com → Settings → Usage](https://chatgpt.com/settings/usage).
 
 > [!TIP]
 > When a limit runs out, Duniya switches to the next model in the chain and waits for the window's reset before it
 > tries that account again. Rate-limit headroom never alerts: it refills within a minute.
 
-![Models → ChatGPT: Plan usage with the 5-hour and weekly limits](site/img/card-plan-usage.webp)
+![Models → OpenRouter: Plan usage with today's free requests used up and when they reset](site/img/card-plan-usage.webp)
 
 Admin MCP: `list_model_accounts` returns each account's `usage` (label, % used, what is left, reset time, when it was
-updated) and `spend_this_month`; the owner assistant uses it for "how much ChatGPT quota is left?".
+updated) and `spend_this_month`; the owner assistant uses it for "how much Copilot quota is left?".
 
 ## Photos & voice
 

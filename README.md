@@ -35,7 +35,7 @@
 <td width="33%" valign="top"><a href="docs/owner-assistant.md"><img src="docs/img/thumb-ask.webp" alt="Ask box with a weekly recap" width="100%"></a><br><b>Your own super agent</b><br>Recaps, GIFs, voice and pictures in your own WhatsApp chat, or the Ask conversation in the panel (live thinking, tool steps and streaming answers, Stop and follow-ups); posts into your groups after you confirm. Keys and passwords never go through the chat: one-time links instead.</td>
 </tr>
 <tr>
-<td valign="top"><a href="docs/models.md"><img src="docs/img/thumb-fallback.webp" alt="When a model fails: fallback settings" width="100%"></a><br><b>Any model, with a backup</b><br>ChatGPT, Copilot, OpenRouter, keys, Ollama. See how much of each plan is left (ChatGPT's 5-hour and weekly limits, Copilot's premium requests, OpenRouter credit), with an alert before it runs out.</td>
+<td valign="top"><a href="docs/models.md"><img src="docs/img/thumb-fallback.webp" alt="When a model fails: fallback settings" width="100%"></a><br><b>Any model, with a backup</b><br>ChatGPT, Copilot, OpenRouter, keys, Ollama. See how much of each plan is left (Copilot's premium requests, OpenRouter credit), with an alert before it runs out.</td>
 <td valign="top"><a href="docs/models.md#photos--voice"><img src="docs/img/thumb-photos-voice.webp" alt="Photos and voice capabilities per provider" width="100%"></a><br><b>Photos &amp; voice</b><br>Sees photos, hears and sends voice notes.</td>
 <td valign="top"><a href="docs/spending.md"><img src="docs/img/thumb-usage.webp" alt="Usage page with costs per agent" width="100%"></a><br><b>Spending caps</b><br>Monthly caps, 80 % alert, weekly summary.</td>
 </tr>
