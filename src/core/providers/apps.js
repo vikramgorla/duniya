@@ -23,7 +23,7 @@ import { activity } from '../events.js';
 import { openBridge } from './app-bridge.js';
 
 const MB = 1024 * 1024;
-export const APPS_DIR = join(DATA_DIR, 'apps');
+const APPS_DIR = join(DATA_DIR, 'apps');
 const INSTALL_FREE_MB = 380; // measured: npm install of an app peaks at 280–355 MB
 const INSTALL_DISK_MB = 1200; // the apps are 220–410 MB on disk, plus npm's cache while installing
 const HEADROOM_MB = 80; // kept free beyond what the app itself needs

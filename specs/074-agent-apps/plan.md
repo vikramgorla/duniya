@@ -11,7 +11,7 @@
   from `codex login --device-auth`), account from its ID token; models: Claude Code aliases, Codex `debug models`.
 - `copilot.js`: SDK downloaded with the shared installer into `DATA_DIR/apps/copilot`; its idle timer replaced by the
   resident rule; each conversation takes a slot; `heavyCheck` removed.
-- Routes `/api/providers/claudecode`, `/api/providers/codex/start|signin`, owner only; Getting started recognises
+- Routes `/api/providers/claudecode`, `/api/providers/codex/start`, owner only; Getting started recognises
   `sk-ant-oat01-` tokens.
 
 ## Checked against the real apps (no account, a local stand-in model)

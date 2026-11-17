@@ -106,7 +106,6 @@ export function providerRoutes(route) {
       else activity('error', { summary: `Codex sign-in did not finish${why ? `: ${why}` : ''}`, detail: { signin: 'codex', ok: false } });
     });
   }, { role: 'owner' });
-  route('GET', '/api/providers/codex/signin', async () => codex.loginState() || {}, { role: 'owner' });
   route('DELETE', '/api/providers/codex', async (req, res, body, q, p, user) => {
     await codex.disconnect();
     clearModelCache('codex');

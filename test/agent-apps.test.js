@@ -68,7 +68,7 @@ test('Claude Code: token checks, download on connect, a turn with a tool through
   for (const flag of ['--strict-mcp-config', '--setting-sources', '--tools', '--no-session-persistence', '--permission-mode', '--system-prompt-file']) assert.ok(c.args.includes(flag), flag);
   assert.deepEqual(c.env, ['CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC', 'CLAUDE_CODE_OAUTH_TOKEN'], 'only its own token: no app secrets in its environment');
   const acts = (await t.api(owner, 'GET', '/api/activity?limit=50')).body;
-  assert.ok(acts.some((a) => a.type === 'tool.call' && /agenda_list/.test(a.summary)), 'tool call recorded by Duniya');
+  assert.ok(acts.some((a) => a.type === 'tool.call' && /agenda_list/.test(a.detail?.tool)), 'tool call recorded by Duniya');
   assert.equal(existsSync(join(DATA_DIR, 'apps', 'claudecode', 'home')) && calls('claudecode').every((x) => x.sysFile), true);
   await t.agents.updateAgent('panduga', { model: 'anthropic:claude-sonnet-5-5' });
 });
@@ -172,4 +172,19 @@ test('Codex: a sign-in that does not finish is reported, nothing connected', asy
   assert.match(fail.summary, /did not finish: Error: device code expired/);
   assert.equal((await provider('codex')).connected, false);
   await t.api(owner, 'DELETE', '/api/providers/codex');
+});
+
+test('tool bridge: only the turn’s own token, only on 127.0.0.1, closed with the turn', async () => {
+  const { openBridge } = await import('../src/core/providers/app-bridge.js');
+  const b = await openBridge({ tools: [{ name: 'panduga:agenda_list', description: 'd' }], onCall: async (name) => ({ text: `ran ${name}` }) });
+  assert.match(b.url, /^http:\/\/127\.0\.0\.1:\d+\/mcp$/);
+  const post = (token, body) => fetch(b.url, { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
+  assert.equal((await post('', { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status, 401);
+  assert.equal((await post('wrong', { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status, 401);
+  const list = await (await post(b.token, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).json();
+  assert.deepEqual(list.result.tools.map((x) => x.name), ['panduga_agenda_list'], 'MCP-safe name');
+  const call = await (await post(b.token, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'panduga_agenda_list', arguments: {} } })).json();
+  assert.equal(call.result.content[0].text, 'ran panduga:agenda_list', 'mapped back to Duniya’s name');
+  b.close();
+  await assert.rejects(post(b.token, { jsonrpc: '2.0', id: 3, method: 'tools/list' }), 'nothing listens after the turn');
 });

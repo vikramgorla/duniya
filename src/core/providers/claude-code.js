@@ -8,15 +8,15 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { getSecret, setSecret } from '../store.js';
 import { fail } from '../config.js';
-import { appDir, appHome, installApp, removeApp, appChat, appExec } from './apps.js';
+import { appDir, installApp, removeApp, appChat } from './apps.js';
 import { toPrompt } from './copilot.js';
 
 export const SECRET = 'CLAUDE_CODE_OAUTH_TOKEN';
-export const SPEC = '@anthropic-ai/claude-code@2.1.326';
+const SPEC = '@anthropic-ai/claude-code@2.1.326';
 const NAME = 'Claude Code';
-export const bin = () => join(appDir('claudecode'), 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+const bin = () => join(appDir('claudecode'), 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
 export const installed = () => existsSync(bin());
-export const configured = (secret = SECRET) => !!getSecret(secret);
+const configured = (secret = SECRET) => !!getSecret(secret);
 /** Claude Code takes model aliases; it maps them to the newest model of each family for the subscription. */
 const MODELS = [{ id: 'sonnet', label: 'Claude Sonnet' }, { id: 'opus', label: 'Claude Opus' }, { id: 'haiku', label: 'Claude Haiku' }];
 
@@ -68,21 +68,10 @@ function resultError(text) {
   return e;
 }
 
-/** What `claude auth status --json` says about the token ({ loggedIn, authMethod }); personal data stays out of logs. */
-export async function account(secret = SECRET) {
-  if (!installed() || !configured(secret)) return '';
-  try {
-    const { stdout } = await appExec({ id: 'claudecode', bin }, ['auth', 'status', '--json'], { env: { CLAUDE_CODE_OAUTH_TOKEN: getSecret(secret) }, timeoutMs: 20000 });
-    const j = JSON.parse(stdout);
-    return j.loggedIn ? (j.email || 'Claude subscription') : '';
-  } catch { return ''; }
-}
-
 export function disconnect(secret = SECRET, { last = true } = {}) {
   setSecret(secret, '');
   if (last) removeApp('claudecode');
 }
-export const homeDir = () => appHome('claudecode');
 
 /** Adapter for one Claude Code account. */
 export const claudeCodeAdapter = (secret = SECRET) => ({

@@ -13,13 +13,13 @@ import { netEnv } from '../mcp-local.js';
 import { appDir, appHome, installApp, removeApp, appChat, appExec, startCheck } from './apps.js';
 import { toPrompt } from './copilot.js';
 
-export const SPEC = '@openai/codex@0.169.0';
+const SPEC = '@openai/codex@0.169.0';
 const NAME = 'Codex';
 const ID = 'codex';
 const codexHome = () => join(appHome(ID), 'codex');
 const catalogFile = () => join(codexHome(), 'duniya-models.json');
 /** The native binary inside the platform package (the npm `codex` command is a Node wrapper we skip: one process less). */
-export function bin() {
+function bin() {
   const base = join(appDir(ID), 'node_modules', '@openai');
   try {
     for (const pkg of readdirSync(base).filter((d) => d.startsWith('codex-'))) {
@@ -87,9 +87,7 @@ export function startLogin(onDone) {
     });
   });
 }
-/** Is a device sign-in waiting for the owner? { url, code } or null. */
-export const loginState = () => (login && !login.done && login.url ? { url: login.url, code: login.code } : null);
-export function cancelLogin() { try { login?.child?.kill('SIGTERM'); } catch { /* gone */ } login = null; }
+function cancelLogin() { try { login?.child?.kill('SIGTERM'); } catch { /* gone */ } login = null; }
 
 export async function disconnect() {
   cancelLogin();
