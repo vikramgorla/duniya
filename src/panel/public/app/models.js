@@ -1,9 +1,9 @@
 // Models screen: providers, accounts, defaults, fallback, photos & voice capabilities. Module of the panel (063).
-import { $, S, api, ask, can, field, h, toast, toggle, tryApi } from './core.js';
+import { $, S, api, ask, can, field, h, icon, menu, toast, toggle, tryApi } from './core.js';
 import { chainEditor } from './fallback.js';
 import { listDetail, mark } from './listdetail.js';
 import { PROVIDER_NAMES } from './names.js';
-import { LINKS, loadModels, modelLabel, modelSelect, plural, saveSecretKey, usageLine } from './shared.js';
+import { LINKS, helpLink, loadModels, modelLabel, modelSelect, plural, saveSecretKey, usageLine } from './shared.js';
 import { usageSummary } from './usage.js';
 import { planSection, rowStatus } from './plans.js';
 /** 066: the Add a provider list, in this order: [provider type (names.js) = page id, one short line]. */
@@ -35,22 +35,37 @@ function testBox(id) {
 }
 
 /** One provider card: what it is + cost, then either the steps to connect or the connected state. */
-function providerCard({ id, mark, title, cost, tag, p, steps, form, connected, extra, ownerOnly, accounts }) {
+/** "vikram.gorla@gmail.com" → "v•••a@gmail.com" (068: the account is shown, not spelled out on every screen). */
+const maskAccount = (a) => String(a || '').replace(/^([^@\s])[^@\s]*([^@\s])@/, '$1•••$2@');
+/** One provider page (068): mark, name and its state; one muted line (sign-in, last 30 days); the plan; Test and a ⋯
+ *  with Rename and Disconnect / Remove; other accounts and "Add another account" as one row. Not connected: the
+ *  steps to connect. */
+function providerCard({ id, mark, title, cost, tag, p, steps, form, connected, extra, ownerOnly, accounts, account }) {
   const isOn = p?.connected;
   const u = providerCard.usage?.account?.[id] || providerCard.usage?.provider?.[id];
   const pill = isOn && p.health?.state && p.health.state !== 'ok' ? healthPill(p) // 042: one clear state while paused
-    : isOn ? h('span', { class: 'pill ok' }, `✓ Connected · ${p.models} model${p.models === 1 ? '' : 's'}`)
+    : isOn ? h('span', { class: 'pill ok' }, `Connected · ${plural(p.models, 'model')}`)
     : p?.error ? h('span', { class: 'pill bad' }, 'Needs attention') : h('span', { class: 'pill' }, 'Not connected');
   const t = isOn ? testBox(id) : null;
+  const more = [extra].flat(Infinity).filter(Boolean);
+  const danger = more.filter((x) => x.classList?.contains('danger')); const rest = more.filter((x) => !danger.includes(x));
+  for (const d of danger) d.classList.remove('mut');
+  const rename = isOn && can('admin') ? h('button', { class: 'btn small', type: 'button', onclick: async () => {
+    const name = h('input', { value: p.label || '', maxlength: 40, placeholder: title, autocomplete: 'off' });
+    if (await ask({ title: `Rename ${p.name}`, text: 'A label for this account, e.g. “work”. Empty: just the provider’s name.', ok: 'Rename', body: field('Label', name) })
+      && await tryApi(() => api('PUT', `/api/accounts/${encodeURIComponent(p.id)}`, { label: name.value.trim() }), 'Renamed')) { S.models = null; renderModels(); }
+  } }, 'Rename') : null;
+  const line = [account ? `Signed in as ${maskAccount(account)}` : null].filter(Boolean);
   return h('div', { class: `card pcard${isOn ? ' on' : ''}`, id: `prov-${id}`, 'data-jump': id },
-    h('div', { class: 'phead' }, h('span', { class: `pmark ${mark}` }, title[0]), h('h2', {}, title), pill),
-    h('div', { class: 'small muted pcost' }, cost),
-    u ? h('div', { class: 'small num', style: 'margin-top:6px' }, h('a', { href: '#usage' }, 'Last 30 days: '), usageLine(u)) : null,
-    tag ? h('div', { class: 'ptags' }, tag) : null,
+    h('div', { class: 'phead' }, h('span', { class: `pmark ${mark}` }, title[0]), h('h2', {}, p?.name || title),
+      isOn && (rename || danger.length) ? menu(`More actions for ${p?.name || title}`, rename, danger) : null),
+    h('div', { class: 'pstate' }, pill, tag || null),
+    h('div', { class: 'small muted pcost' }, cost, ' ', helpLink('models.md')),
+    isOn && (line.length || u) ? h('div', { class: 'small muted num' }, line.join(' · '), line.length && u ? ' · ' : '', u ? [h('a', { href: '#usage' }, 'last 30 days'), `: ${usageLine(u)}`] : null) : null,
     p?.error ? h('div', { class: 'note bad' }, p.error) : null,
     healthNote(p),
     isOn ? planSection(p) : null, // 067
-    isOn ? h('div', {}, connected, h('div', { class: 'row', style: 'margin-top:10px' }, t.btn, extra), t.out, accounts || null)
+    isOn ? h('div', {}, connected, h('div', { class: 'row', style: 'margin-top:10px' }, t.btn, rest), t.out, accounts || null)
       : ownerOnly && !can('owner') ? h('p', { class: 'small muted' }, 'Ask an owner to connect this account.')
         : h('div', {}, h('div', { class: 'eyebrow', style: 'margin-top:14px' }, 'How to connect'), stepList(steps), form));
 }
@@ -117,7 +132,7 @@ function accountsBox({ first, provs, addForm, ownerOnly }) {
   const rows = others.map((p) => {
     const t = p.connected ? testBox(p.id) : null;
     const u = providerCard.usage?.account?.[p.id];
-    const name = h('input', { value: p.label || '', maxlength: 40, placeholder: 'Label' });
+    const name = h('input', { value: p.label || '', maxlength: 40, placeholder: 'Label', autocomplete: 'off' });
     return h('div', { class: 'number-card acct' },
       h('div', { class: 'row spread' }, h('div', {}, h('b', {}, p.name), p.account ? h('div', { class: 'small muted' }, p.account) : null), healthPill(p)),
       u ? h('div', { class: 'small num' }, 'Last 30 days: ', usageLine(u)) : null,
@@ -126,19 +141,19 @@ function accountsBox({ first, provs, addForm, ownerOnly }) {
       p.connected ? planSection(p) : null,
       p.health?.state === 'reconnect' && p.type === 'chatgpt' && can('owner') ? (() => { const f = chatgptFlow({ account: p.id }); return h('div', {}, f.start, f.form); })() : null,
       h('div', { class: 'row', style: 'margin-top:8px' }, t?.btn,
-        can('admin') ? h('details', { class: 'small mut' }, h('summary', {}, 'Rename'), h('form', { class: 'row nowrap', style: 'margin-top:6px', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', `/api/accounts/${encodeURIComponent(p.id)}`, { label: name.value.trim() }), 'Renamed')) { S.models = null; renderModels(); } } }, name, h('button', { class: 'btn small' }, 'Save'))) : null,
-        can('owner') ? h('button', { class: 'btn small danger mut', onclick: async () => (await ask({ title: `Remove ${p.name}?`, text: 'Its key or sign-in is deleted. Agents set to its models switch to the next model in the fallback chain.', ok: 'Remove account', danger: true })) && tryApi(async () => { await api('DELETE', `/api/accounts/${encodeURIComponent(p.id)}`); S.models = null; renderModels(); }, 'Removed') }, 'Remove') : null),
+        can('admin') ? menu(`More actions for ${p.name}`,
+          h('button', { class: 'btn small', type: 'button', onclick: async () => { if (await ask({ title: `Rename ${p.name}`, ok: 'Rename', body: field('Label', name) }) && await tryApi(() => api('PUT', `/api/accounts/${encodeURIComponent(p.id)}`, { label: name.value.trim() }), 'Renamed')) { S.models = null; renderModels(); } } }, 'Rename'),
+          can('owner') ? h('button', { class: 'btn small danger', type: 'button', onclick: async () => (await ask({ title: `Remove ${p.name}?`, text: 'Its key or sign-in is deleted. Agents set to its models switch to the next model in the fallback chain.', ok: 'Remove account', danger: true })) && tryApi(async () => { await api('DELETE', `/api/accounts/${encodeURIComponent(p.id)}`); S.models = null; renderModels(); }, 'Removed') }, 'Remove') : null) : null),
       t?.out);
   });
   const strat = first.strategy || 'order';
   const seg = n > 1 ? h('div', { class: 'seg', role: 'group', 'aria-label': 'How the accounts are used' }, [['order', 'In order'], ['spread', 'Spread']].map(([v, l]) => h('button', { type: 'button', class: strat === v ? 'on' : '', disabled: !can('admin'),
     onclick: () => tryApi(async () => { await api('PUT', '/api/fallback/strategy', { group: first.group, strategy: v }); renderModels(); }, v === 'spread' ? 'Spread across accounts' : 'In order') }, l))) : null;
   return h('div', { style: 'margin-top:14px' },
-    h('div', { class: 'eyebrow' }, n > 1 ? `${n} accounts` : 'More accounts'),
+    n > 1 ? h('div', { class: 'eyebrow' }, `${n} accounts`) : null,
     rows,
     seg ? h('div', { style: 'margin-top:10px' }, seg, h('div', { class: 'small muted', style: 'margin-top:4px' }, strat === 'spread' ? 'Each message goes to the account used least recently. A failing account is skipped.' : 'The first account answers; the others only when it hits a limit or fails.')) : null,
-    mayAdd ? h('details', { class: 'mut', style: 'margin-top:10px' }, h('summary', {}, 'Add another account'),
-      h('p', { class: 'small muted' }, 'Connect another account of this provider, with its own key or sign-in. When one hits a limit, the next one answers.'),
+    mayAdd ? h('details', { class: 'mut add-acct' }, h('summary', {}, h('span', { class: 'lmark add', 'aria-hidden': 'true' }, '+'), h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, 'Add another account'), h('span', { class: 'lrow-sub' }, 'When one hits a limit, the next one answers'))),
       h('div', { class: 'note info small' }, TERMS_NOTE), addForm()) : null);
 }
 
@@ -218,7 +233,7 @@ export async function renderModels() {
   const cgFlow = chatgptFlow({});
   const cgCard = providerCard({
     id: 'chatgpt', mark: 'm-cg', title: cg?.name || 'ChatGPT', p: cg, ownerOnly: true,
-    cost: 'Uses the usage included in your ChatGPT Plus or Pro plan. No extra cost; plan limits apply.',
+    cost: 'Included in your ChatGPT plan; its limits apply.', account: cg?.account,
     steps: [
       [h('span', {}, 'Click the button and open the sign-in.'), cgFlow.start],
       [h('span', {}, 'Sign in with your ChatGPT account and allow access.'), cue.win('auth.openai.com', h('span', { class: 'muted' }, 'Allow duniya to use your plan?'), cue.hl(cue.btn('Allow', true)))],
@@ -227,8 +242,7 @@ export async function renderModels() {
       [h('span', {}, 'Click the address bar, copy the ', h('b', {}, 'whole address'), ' and paste it below. It may start with ', h('code', {}, 'localhost'), ' or ', h('code', {}, '127.0.0.1'), ' without ', h('code', {}, 'http://'), ': that’s fine.')],
     ],
     form: cgFlow.form,
-    connected: h('div', {}, h('p', { style: 'margin:0' }, `Signed in as ${cg.account || 'your ChatGPT account'}.`),
-      cg?.health?.state === 'reconnect' && can('owner') ? h('div', {}, cgFlow.start, cgFlow.form) : null),
+    connected: cg?.health?.state === 'reconnect' && can('owner') ? h('div', {}, cgFlow.start, cgFlow.form) : null,
     accounts: accountsBox({ first: cg, provs, ownerOnly: true, addForm: () => { const f = chatgptFlow({ label: '' }); return h('div', {}, f.start, f.form); } }),
     extra: can('owner') ? disconnect('ChatGPT', '/api/providers/chatgpt', 'Agents using ChatGPT models stop answering until another model is chosen.') : null,
   });
@@ -237,7 +251,7 @@ export async function renderModels() {
   const co = by.copilot;
   const coCard = providerCard({
     id: 'copilot', mark: 'm-gh', title: co?.name || 'GitHub Copilot', p: co, ownerOnly: true,
-    cost: 'Uses your Copilot allowance (Free, Pro or Business). Copilot Free is meant for personal use.',
+    cost: 'Uses your Copilot allowance (Free, Pro or Business).',
     tag: h('span', { class: 'pill' }, 'Uses your Copilot allowance'),
     steps: [
       [h('span', {}, 'You need a GitHub account with Copilot turned on. No account yet? ', ext(LINKS.githubSignup, 'Sign up'), '.')],
@@ -246,8 +260,8 @@ export async function renderModels() {
       [h('span', {}, 'Copy the token (starts with ', h('code', {}, 'github_pat_'), '). It is shown only once. Classic tokens (', h('code', {}, 'ghp_'), ') don’t work.'), cue.win('github.com', cue.hl(cue.field('github_pat_11AB…')))],
     ],
     form: h('div', {}, keyForm({ placeholder: 'github_pat_…', busy: 'Connecting… the first time this downloads Copilot support (about 400 MB, a few minutes)', submit: (token) => api('POST', '/api/providers/copilot', { token }) }),
-      h('p', { class: 'small muted' }, 'If GitHub refuses the token, open it on GitHub and switch “Copilot requests” to the other access level (Read-only ↔ Read and write), then try again. The first connection downloads GitHub’s official Copilot helper to this server (about 400 MB of disk, about 60 MB of memory while in use); nothing is downloaded if you never connect Copilot.')),
-    connected: h('p', { style: 'margin:0 0 6px' }, `Signed in as ${co?.account || 'your GitHub account'}.`),
+      h('p', { class: 'small muted' }, 'Refused? Switch “Copilot requests” to the other access level on GitHub and try again. The first connection downloads GitHub’s Copilot helper (about 400 MB).')),
+    account: co?.account,
     accounts: accountsBox({ first: co, provs, ownerOnly: true, addForm: () => accountKeyForm({ placeholder: 'github_pat_…', keyLabel: 'Paste its GitHub token (fine-grained, with Copilot requests)', submit: (label, token) => api('POST', '/api/providers/copilot', { label, token }) }) }),
     extra: can('owner') ? [replaceKey(keyForm({ placeholder: 'github_pat_…', button: 'Save', submit: (token) => api('POST', '/api/providers/copilot', { token }) })),
       disconnect('GitHub Copilot', '/api/providers/copilot', 'Agents using Copilot models stop answering until another model is chosen.')] : null,
@@ -295,7 +309,7 @@ export async function renderModels() {
   const MARKS = { openrouter: ['O', 'c4'], anthropic: ['A', 'c1'], openai: ['O', 'c3'], chatgpt: ['C', 'c5'], copilot: ['G', 'c0'] };
   const pages = { openrouter: orCard, anthropic: anCard, openai: oaCard, chatgpt: cgCard, copilot: coCard };
   const names = Object.fromEntries(Object.entries(pages).map(([id, card]) => [id, card.querySelector('h2')?.textContent || id]));
-  const state = (p) => (!p?.connected ? (p?.error ? ['bad', 'needs attention'] : ['', 'not connected']) : p.health?.state && p.health.state !== 'ok' ? [p.health.state === 'reconnect' ? 'bad' : 'warn', p.health.text] : ['ok', `ok · ${plural(p.models, 'model')}`]);
+  const state = (p) => (!p?.connected ? (p?.error ? ['bad', 'needs attention'] : ['', 'not connected']) : p.health?.state && p.health.state !== 'ok' ? [p.health.state === 'reconnect' ? 'bad' : 'warn', p.health.text] : ['ok', `Connected · ${plural(p.models, 'model')}`]);
   const row = (id, p, name) => {
     const [st, text] = state(p); const plan = st === 'ok' ? rowStatus(p) : null; // 067: the tightest plan limit, when the provider reports one
     return { id, name, mark: mark(...(MARKS[id] || [name[0], 'c0'])), status: h('span', { class: `dot ${st}`, 'aria-hidden': 'true' }), sub: plan || text };
@@ -318,10 +332,10 @@ export async function renderModels() {
     { title: 'Providers', items: [...on.map((id) => row(id, by[id], names[id])), ...compat.map((p) => row(`x-${p.id}`, p, p.name)),
       { id: 'add', name: anyOn ? 'Add a provider' : 'Connect a model', sub: anyOn ? `${off.length} more available` : 'Start here: free or your own plan', mark: h('span', { class: 'lmark add', 'aria-hidden': 'true' }, '+') }] },
     { title: 'How models are used', items: [
-      { id: 'defaults', name: 'Default models', sub: models.resolvedDefault ? `Auto uses ${modelLabel(models.resolvedDefault, models)}` : 'Auto', mark: mark('D', 'c0') },
-      anyOn ? { id: 'fallback', name: 'When a model fails', sub: troubled.length ? `${troubled.length} paused` : fb.enabled ? 'Switches automatically' : 'Off', mark: mark('F', 'c0'), status: troubled.length ? h('span', { class: 'dot warn', 'aria-hidden': 'true' }) : null } : null,
-      pages.abilities ? { id: 'abilities', name: 'Photos & voice', sub: 'What each provider can do', mark: mark('P', 'c0') } : null,
-      { id: 'endpoints', name: 'Other endpoints', sub: compat.length ? plural(compat.length, 'endpoint') : 'Ollama, LM Studio…', mark: mark('E', 'c0') }].filter(Boolean) }] }));
+      { id: 'defaults', name: 'Default models', sub: models.resolvedDefault ? `Auto uses ${modelLabel(models.resolvedDefault, models)}` : 'Auto', mark: mark(icon('models'), 'c4') },
+      anyOn ? { id: 'fallback', name: 'When a model fails', sub: troubled.length ? `${troubled.length} paused` : fb.enabled ? 'Switches automatically' : 'Off', mark: mark(icon('refresh'), 'c1'), status: troubled.length ? h('span', { class: 'dot warn', 'aria-hidden': 'true' }) : null } : null,
+      pages.abilities ? { id: 'abilities', name: 'Photos & voice', sub: 'What each provider can do', mark: mark(icon('image'), 'c2') } : null,
+      { id: 'endpoints', name: 'Other endpoints', sub: compat.length ? plural(compat.length, 'endpoint') : 'Ollama, LM Studio…', mark: mark(icon('globe'), 'c0') }].filter(Boolean) }] }));
 }
 
 // ---------- Models → Photos & voice (043): what each connected provider can do beyond text ----------
