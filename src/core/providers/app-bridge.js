@@ -53,7 +53,7 @@ function handle(req, res) {
     try {
       const out = await Promise.all(calls.map((m) => answer(t, m)));
       reply(res, 200, Array.isArray(msg) ? out : out[0]);
-    } catch (e) { reply(res, 200, rpcError(calls[0].id, -32603, String(/** @type {Error} */ (e)?.message || e).slice(0, 300))); }
+    } catch { reply(res, 200, rpcError(calls[0].id, -32603, 'Internal error')); } // details stay on the server
   });
 }
 
