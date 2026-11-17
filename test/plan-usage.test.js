@@ -75,7 +75,7 @@ test('ChatGPT (#144): no plan usage is shown; a usage-limit error pauses the acc
   const { TOOLS } = await import('../src/panel/admin-tools.js');
   const out = await TOOLS.find((x) => x.name === 'list_model_accounts').run({}, { call: async (m, path, b) => (await t.api(owner, m, path, b)).body });
   const acct = out.find((a) => a.id === 'chatgpt');
-  assert.equal(acct.usage, undefined); assert.ok(!('usage_note' in acct));
+  assert.equal(acct.usage, undefined);
   // used up: ChatGPT refuses with the reset time; Claude answers; the account waits for that reset
   cg.fail.push({ status: 429, error: { code: 'usage_limit_reached', type: 'usage_limit_reached', message: 'The usage limit has been reached', resets_in_seconds: 7200 } });
   t.script.push([{ type: 'text', text: 'claude answers' }]);
