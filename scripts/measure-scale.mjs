@@ -88,6 +88,8 @@ const paths = [
   ['contacts (first page)', '/api/contacts'], ['contacts (search)', '/api/contacts?q=contact%2012'], ['contacts summary', '/api/contacts/summary'],
   ['chat messages', `/api/chats/${encodeURIComponent(someChat)}/messages?limit=50`], ['silences (7 days)', '/api/silences?days=7'],
   ['server health', '/api/server/health'],
+  ['search messages (one hit)', '/api/search/messages?q=123456'], ['search messages (every message matches)', '/api/search/messages?q=station'],
+  ['agent review', '/api/agents/agent-1/review'],
 ];
 const api = [];
 for (const [name, path] of paths) {

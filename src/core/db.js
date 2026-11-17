@@ -104,14 +104,15 @@ export function searchStored({ chats, query = '', person = '', since = 0, before
   const where = [`m.chat IN (${chats.map(() => '?').join(',')})`, 'm.ts >= ?'];
   /** @type {(string|number)[]} */
   const args = [...chats, Math.trunc(Number(since) || 0)];
-  if (Number(before)) { where.push('m.id < ?'); args.push(Math.trunc(Number(before))); }
+  const order = match ? 'f.rowid' : 'm.id'; // FTS5 walks its rowids backwards itself: a common word stays fast
+  if (Number(before)) { where.push(`${order} < ?`); args.push(Math.trunc(Number(before))); }
   if (person) {
     where.push("(m.name LIKE ? ESCAPE '\\' OR m.sender LIKE ? ESCAPE '\\')");
     args.push(likeArg(person), likeArg(String(person).replace(/\D/g, '') || person));
   }
   const from = match ? 'messages_fts f JOIN messages m ON m.id = f.rowid' : 'messages m';
   if (match) { where.unshift('messages_fts MATCH ?'); args.unshift(match); }
-  return db.prepare(`SELECT m.* FROM ${from} WHERE ${where.join(' AND ')} ORDER BY m.id DESC LIMIT ?`)
+  return db.prepare(`SELECT m.* FROM ${from} WHERE ${where.join(' AND ')} ORDER BY ${order} DESC LIMIT ?`)
     .all(...args, Math.min(Math.max(Math.trunc(Number(limit)) || 25, 1), 100));
 }
 
