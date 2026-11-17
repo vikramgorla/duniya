@@ -38,7 +38,7 @@ test('065: GET /api/releases — all notes, or a range; any signed-in user', asy
   u._setAppRoot(null, { running: 'v2.26.0' });
   const all = (await t.api(owner, 'GET', '/api/releases')).body;
   assert.equal(all.running, 'v2.26.0');
-  assert.equal(all.versions[0].version, '2.26.0');
+  assert.equal(all.versions[0].version, Object.keys(u.installedReleases())[0], 'newest first'); // 066: not tied to the release this test was written for
   assert.ok(all.versions.some((v) => v.version === '2.0.0' && v.breaking));
   const range = (await t.api(owner, 'GET', '/api/releases?from=v2.24.0&to=v2.26.0')).body;
   assert.deepEqual(range.versions.map((v) => v.version), ['2.26.0', '2.25.0']);
@@ -62,7 +62,7 @@ test("065: What's new shows once per person after an update, from the version th
   assert.equal((await t.api(ada, 'POST', '/api/releases/seen', {})).body.seen, 'v2.26.0');
   assert.equal((await t.api(ada, 'GET', '/api/status')).body.whatsNew, null);
   // a version without notes in between (e.g. a dev build) shows nothing
-  u._setAppRoot(null, { running: 'v9.0.0' });
+  u._setAppRoot(null, { running: 'v2.26.1' });
   assert.equal((await t.api(ada, 'GET', '/api/status')).body.whatsNew, null);
   u._setAppRoot(null, { running: 'v2.26.0' });
 });
@@ -75,6 +75,6 @@ test('065: admin MCP reads release notes and the update status describes the not
   let called = '';
   const r = await notes.run({ from: 'v2.24.0' }, { call: async (m, p) => { called = `${m} ${p}`; return (await t.api(owner, m, p)).body; } });
   assert.equal(called, 'GET /api/releases?from=v2.24.0&to=');
-  assert.deepEqual(r.versions.map((v) => v.version), ['2.26.0', '2.25.0']);
+  assert.deepEqual(r.versions.map((v) => v.version).slice(-2), ['2.26.0', '2.25.0']);
   assert.match(TOOLS.find((x) => x.name === 'get_update_status').description, /status\.notes/);
 });
