@@ -45,9 +45,18 @@ elsewhere is restored here in the panel).
 
 ## Updates
 
-**Overview → Server → Updates** → **Update to vX.Y.Z** installs in place, keeps all data, survives a reload.
+**Overview → Server → Updates** → **Update to vX.Y.Z** opens what you get first: every release between your version
+and the new one, newest first, with what is **new**, **improved**, **fixed** or **removed** (long lists fold; releases
+that need your OK are marked, with what to do), and *Make a backup first*. Confirm with **Update to vX.Y.Z**: it
+installs in place, keeps all data, survives a reload.
 **Update settings**: *Notify me*, *Install automatically* (time of day) or *Off*; stable or latest `main`
 (`--update-mode off|notify|auto`). Also `sudo duniya update [--check]` or re-running the installer.
+
+### What's new after an update
+
+After an update, Overview shows **Updated to vX — see what's new** once per person: it opens the changes of the
+versions you just got (hide it with ✕). All release notes are in **Settings → Help → Release notes** (or press `/` and
+type *release*). An update confirmed on WhatsApp is reported there with what is new.
 
 <p align="center"><img src="diagrams/update-decision.svg" alt="How updates are decided: ordinary releases follow the update mode (install automatically after a backup, or notify); a breaking release or new major stops automatic updates, tells the owner once, and the owner updates, postpones or dismisses it" width="720"></p>
 
@@ -69,7 +78,8 @@ A jump is *breaking* when the major version grows or a release in between is mar
 1. You are told **once**: **Overview** banner ("Version 3.0.0 needs your decision"), Updates card, Activity, the
    owner alert number (**Agents → Owner assistant → Alerts**), and a code to every owner linked to the
    [owner assistant](owner-assistant.md).
-2. **Review update**: what changes, what to do, a docs link, *Make a backup first* (on by default).
+2. **Review update**: the same dialog as every update: all releases in between with their changes, the breaking ones
+   marked with what to do and a docs link, *Make a backup first* (on by default).
 3. **Update to vX**, or on WhatsApp reply `confirm ABCD` (backup, update, result reported after the restart).
 4. Not now: *Remind me in 7 days* / `cancel ABCD`, or *Dismiss* until a newer breaking release.
 
@@ -82,7 +92,8 @@ A jump is *breaking* when the major version grows or a release in between is mar
 
 - `sudo duniya update` installs the newest release that needs no decision and prints the notes;
   `sudo duniya update --breaking` also crosses a breaking one.
-- Admin MCP: `get_update_status` (steps, safe target), `apply_update` (`breaking: true` to cross one; confirmation
+- Admin MCP: `get_update_status` (steps, safe target, `notes`: the releases in between with their changes),
+  `get_release_notes` (any range of installed versions), `apply_update` (`breaking: true` to cross one; confirmation
   required), `snooze_update_decision`.
 
 </details>

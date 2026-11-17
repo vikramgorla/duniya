@@ -267,7 +267,7 @@ details.rel > summary { display: flex; align-items: baseline; gap: var(--s2); mi
 details.rel > summary::-webkit-details-marker { display: none; }
 details.rel > summary::before { content: "›"; flex: none; width: 10px; color: var(--muted); transition: transform var(--fast); }
 details.rel[open] > summary::before { transform: rotate(90deg); }
-.rel-v { flex: none; font: 600 var(--fs-xs) var(--mono); color: var(--muted); }
+.rel-v { flex: none; font: 600 var(--fs-s) var(--mono); color: var(--muted); }
 .rel-title { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
 details.rel .pill { flex: none; align-self: center; }
 details.rel > .note, .rel-sum, .rel-group, .rel-more { margin: 0 0 var(--s3) 18px; }
