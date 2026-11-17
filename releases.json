@@ -1,7 +1,7 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
-    "2.28.0": {
+    "2.29.0": {
       "breaking": false,
       "title": "Calm Agents and Chats: one row each, an agent's settings as short sections, less text everywhere",
       "summary": "Agents and Chats are now simple lists: one row per agent or chat with its switch, and the page of the one you tap beside the list (or over it on a phone). An agent's page has a short header and sections that show their current value (Character, Where it answers, People, Model, Tools…); each section saves on its own with Undo. A chat's page holds all its settings and links to its agent. Overview, More, Contacts and Settings say less and show more. Nothing to do on your server.",
