@@ -19,3 +19,11 @@
 - [x] T104 `npm test`, lint, typecheck, `check:panel`, `check:responsive`, `ci-checks.mjs`
 - [x] T105 PR via REST, required checks green, squash merge
 - [x] T106 Issue done comment and close with the release
+
+## Follow-up #140 (v2.28.1)
+
+- [x] T140-1 `chatgpt.planLimits()` + `parseWhamUsage()` (Codex payload), all Codex header families, newest source wins
+- [x] T140-2 ChatGPT in the endpoint refresh (Models 10 min, tick 30 min, refused: 24 h); `usageUnavailable` row flag
+- [x] T140-3 Panel muted line; admin MCP `usage_note`
+- [x] T140-4 Tests with a fake usage endpoint (ok, 401/403/404, 5xx, garbage); harness and demo never reach chatgpt.com
+- [x] T140-5 Docs `models.md#plan-usage`, `admin-mcp.md`; version 2.28.1 + `releases.json`

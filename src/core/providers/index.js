@@ -250,6 +250,7 @@ export async function status({ refresh = false } = {}) {
       }
       const usage = planUsage.view(p.id); // 067: { at, limits } — only what the provider reports
       if (usage) row.usage = usage;
+      if (planUsage.endpointUnavailable(p.id)) row.usageUnavailable = true; // #140: the usage endpoint refused this sign-in
       if (PRICED.has(p.type) && !p.freeOnly) row.spend = spendOf('account', p.id); // this month, by Duniya
       row.health = breaker.accountState(p.id); // 042: { state: ok | paused | probing | reconnect, text }
       row.accounts = groups.get(p.group) || 1;
@@ -273,23 +274,31 @@ async function copilotExtras(p, { refresh }) {
 
 // ---------- plan usage (067) ----------
 const PRICED = new Set(['anthropic', 'openai', 'openrouter', 'compatible']); // accounts that cost per use
-const ENDPOINT_TYPES = new Set(['copilot', 'openrouter']); // usage needs a request (other accounts report it with every answer)
+const ENDPOINT_TYPES = new Set(['copilot', 'openrouter', 'chatgpt']); // usage needs a request (#140: ChatGPT's answers carry none)
 const USAGE_TTL_MS = 10 * 60000; // when Models opens
 const USAGE_TICK_MS = 30 * 60000; // on the scheduler tick
+const REFUSED_TTL_MS = 24 * 3600000; // an endpoint that refused this account is asked again a day later (or on a new sign-in)
+const usageTtl = (p, ttl) => (planUsage.endpointUnavailable(p.id) ? REFUSED_TTL_MS : ttl);
+const ENDPOINT_READERS = {
+  copilot: (p, o) => copilot.planLimits(p.secret, o),
+  openrouter: (p) => openRouterLimits(p.baseUrl, getSecret(p.secret)),
+  chatgpt: (p) => chatgpt.planLimits(p.secret),
+};
 /** Read an account's usage endpoint when it is older than the TTL (or `force`). Never throws. */
 async function refreshPlanUsage(p, { force = false, ttl = USAGE_TTL_MS, allowStart = true } = {}) {
-  if (!ENDPOINT_TYPES.has(p.type) || (!force && Date.now() - planUsage.endpointAt(p.id) < ttl)) return;
+  if (!ENDPOINT_TYPES.has(p.type) || (!force && Date.now() - planUsage.endpointAt(p.id) < usageTtl(p, ttl))) return;
   try {
-    const limits = p.type === 'copilot' ? await copilot.planLimits(p.secret, { allowStart }) : await openRouterLimits(p.baseUrl, getSecret(p.secret));
+    const limits = await ENDPOINT_READERS[p.type](p, { allowStart });
     if (limits) planUsage.noteEndpoint(p.id, limits, { name: p.name });
   } catch { /* the provider did not say: nothing is shown */ }
 }
 /**
  * Scheduler tick (upkeep.js, skipped while memory is tight): refresh the usage endpoint of at most one account, each at
- * most every 30 minutes, never while the account is paused, and never starting the Copilot runtime just for this.
+ * most every 30 minutes (a refused one once a day), never while the account is paused, and never starting the Copilot
+ * runtime just for this.
  */
 export async function planUsageTick(now = Date.now()) {
-  const due = providers().filter((p) => p.configured && ENDPOINT_TYPES.has(p.type) && !breaker.isPaused(p.id) && now - planUsage.endpointAt(p.id) >= USAGE_TICK_MS)
+  const due = providers().filter((p) => p.configured && ENDPOINT_TYPES.has(p.type) && !breaker.isPaused(p.id) && now - planUsage.endpointAt(p.id) >= usageTtl(p, USAGE_TICK_MS))
     .sort((a, b) => planUsage.endpointAt(a.id) - planUsage.endpointAt(b.id))[0];
   if (!due) return null;
   await refreshPlanUsage(due, { force: true, allowStart: false });

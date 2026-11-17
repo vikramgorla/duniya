@@ -5,6 +5,7 @@ import { fail } from '../config.js';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { getSecret, setSecret, getSetting, updateSettings } from '../store.js';
 import { verifyIdToken } from './jwt.js';
+import { parseWhamUsage } from './plan-usage.js';
 
 const AUTH_BASE = () => (process.env.OPENAI_AUTH_BASE || 'https://auth.openai.com').replace(/\/+$/, '');
 const ISSUER = () => process.env.OPENAI_AUTH_ISSUER || 'https://auth.openai.com';
@@ -179,6 +180,39 @@ export async function disconnect(secret = CRED) {
     } catch { /* best effort */ }
   }
   setSecret(secret, '');
+}
+
+// ---------- plan usage (#140) ----------
+// The Responses route of this sign-in sends no x-codex-* headers, so the plan's windows are read where OpenAI's
+// open-source Codex reads them for ChatGPT-plan users: GET {chatgpt_base_url}/wham/usage with the bearer token and the
+// chatgpt-account-id header (codex-rs/backend-client: rate_limit_status_url, headers_with). We identify as ourselves
+// (originator = the agent name registered at sign-in), never as Codex.
+const BACKEND_BASE = () => (process.env.CHATGPT_BACKEND_BASE || 'https://chatgpt.com/backend-api').replace(/\/+$/, '');
+/** The ChatGPT account id from a token's `https://api.openai.com/auth` claim (Codex sends it when it has one). */
+function accountIdOf(c) {
+  for (const tok of [c?.id_token, c?.access_token]) {
+    try {
+      const claims = JSON.parse(Buffer.from(String(tok || '').split('.')[1] || '', 'base64url').toString('utf8'));
+      const id = claims?.['https://api.openai.com/auth']?.chatgpt_account_id;
+      if (typeof id === 'string' && /^[\w-]{1,200}$/.test(id)) return id;
+    } catch { /* not a JWT, or no claim */ }
+  }
+  return '';
+}
+/**
+ * The plan's usage windows as limits (plan-usage.js), `{ unavailable: true }` when the endpoint refuses this sign-in
+ * (401 / 403 / 404), or null when it could not say this time (network, 5xx, unknown body).
+ */
+export async function planLimits(secret = CRED) {
+  const token = await accessToken(secret);
+  const acct = accountIdOf(credentials(secret));
+  const res = await fetch(`${BACKEND_BASE()}/wham/usage`, {
+    headers: { authorization: `Bearer ${token}`, accept: 'application/json', originator: APP_NAME, 'user-agent': APP_NAME, ...(acct ? { 'chatgpt-account-id': acct } : {}) },
+    redirect: 'error', signal: AbortSignal.timeout(15000),
+  });
+  if ([401, 403, 404].includes(res.status)) { await res.body?.cancel(); return { unavailable: true }; }
+  if (!res.ok) { await res.body?.cancel(); return null; }
+  return parseWhamUsage(await res.json().catch(() => null));
 }
 
 const httpError = (res, json, fallback) => Object.assign(new Error(json.error?.message || fallback), { code: json.error?.code || json.error?.type, status: res.status, headers: res.headers, error: json });

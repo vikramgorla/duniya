@@ -297,6 +297,7 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
   t.tmp = tmp;
   Object.assign(process.env, {
     DATA_DIR: join(tmp, 'data'), ANTHROPIC_BASE_URL: `http://127.0.0.1:${t.claudeHttp.address().port}`,
+    CHATGPT_BACKEND_BASE: 'http://127.0.0.1:9/backend-api', // never the real ChatGPT usage endpoint (a test points it at a fake)
     ADMIN_PASSWORD: 'correct horse battery', PANEL_PORT: '0', WELCOME_DELAY_MS: '20', WELCOME_GAP_MS: '0', ...env,
   });
   if (beforeImport) await beforeImport(t);

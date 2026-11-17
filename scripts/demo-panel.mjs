@@ -62,6 +62,7 @@ async function fakeModels() {
     // 067: OpenRouter key info — a free key that used today's free requests (matches its pause)
     if (u.startsWith('/openrouter/key')) return json({ data: { label: 'duniya', limit: null, limit_remaining: null, usage: 0, is_free_tier: true, free_model_daily_requests: { used: 50, limit: 50, remaining: 0 } } });
     if (u.startsWith('/openrouter/credits')) return json({ data: { total_credits: 0, total_usage: 0 } });
+    if (u.startsWith('/chatgpt-backend/')) { res.writeHead(404, { 'content-type': 'application/json' }); return res.end('{}'); } // usage endpoint: the demo plans come from headers
     if (u.startsWith('/chatgpt/models')) return json({ models: [{ slug: 'gpt-5.5', display_name: 'GPT-5.5' }, { slug: 'gpt-5.5-mini', display_name: 'GPT-5.5 mini' }] });
     if (u.startsWith('/openrouter/models')) {
       return json({ data: [
@@ -198,7 +199,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   utimesSync(join(ops, 'reboot-required'), ranAt / 1000, ranAt / 1000);
   Object.assign(process.env, {
     DATA_DIR: data, PANEL_PORT: String(port), ADMIN_PASSWORD: DEMO_PASSWORD,
-    ANTHROPIC_BASE_URL: `${F}/anthropic`, OPENAI_API_BASE: `${F}/chatgpt`, OPENROUTER_API_BASE: `${F}/openrouter`,
+    ANTHROPIC_BASE_URL: `${F}/anthropic`, OPENAI_API_BASE: `${F}/chatgpt`, CHATGPT_BACKEND_BASE: `${F}/chatgpt-backend`, OPENROUTER_API_BASE: `${F}/openrouter`,
     DUNIYA_INSTALL: 'systemd', DUNIYA_HOST: process.env.DUNIYA_HOST || 'oci', DUNIYA_OPS_HELPER: join(ops, 'helper'), DUNIYA_OPS_REQUEST_DIR: join(ops, 'req'), DUNIYA_OPS_STATE_DIR: join(ops, 'state'),
     DUNIYA_FAKE_APT: apt, DUNIYA_REBOOT_REQUIRED_FILE: join(ops, 'reboot-required'),
     UPDATE_MODE: 'notify', TZ_DEFAULT: 'Europe/Zurich', PUBLIC_URL: 'https://duniya.example.org',

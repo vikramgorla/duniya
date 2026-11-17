@@ -28,11 +28,14 @@ const spendLine = (p) => (p?.spend?.calls ? h('div', { class: 'small muted num' 
 
 /**
  * A provider page's "Plan usage" section: a meter per plan or credit limit with what is left and its reset time, then
- * the rate-limit headroom of API keys, this month's spend and when the provider last reported. Null without data.
+ * the rate-limit headroom of API keys, this month's spend and when the provider last reported. Without data: null, or
+ * one muted line when the provider's usage endpoint refused this sign-in.
  */
 export function planSection(p) {
   const plans = planLimits(p); const rates = rateLimits(p); const spend = spendLine(p);
-  if (!plans.length && !rates.length && !spend) return null;
+  if (!plans.length && !rates.length && !spend) {
+    return p?.usageUnavailable ? h('p', { class: 'small muted' }, `Plan usage is not available for this sign-in: ${p.name} does not report it.`) : null; // #140
+  }
   return h('div', { class: 'plan-usage' },
     h('h3', {}, plans.length ? 'Plan usage' : 'Usage and limits'),
     plans.map(limitRow),

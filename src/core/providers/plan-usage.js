@@ -7,7 +7,8 @@
 //  - credit: OpenRouter's key limit and prepaid credit
 //  - rate:   API rate-limit headroom (Anthropic, OpenAI, compatible endpoints): per-minute, never alerted
 // Sources: response headers of every answer and failure (noteHeaders), ChatGPT's `codex.rate_limits` stream event
-// (noteEvent) and the endpoints that need a request (noteEndpoint: Copilot, OpenRouter; see providers/index.js).
+// (noteEvent) and the endpoints that need a request (noteEndpoint: Copilot, OpenRouter, ChatGPT's usage endpoint;
+// see providers/index.js).
 // Owner alert: once per limit and window at ≥ 90 % and once more when it is used up (plan and credit limits only).
 import { putTtl, listTtl, clearTtl, deleteTtl } from '../ttl-store.js';
 import { sendOwnerAlert } from '../owner-alerts.js';
@@ -20,7 +21,7 @@ export const ALERT_AT = 90;
 export const HINT_AT = 80;
 
 /** @typedef {{ id: string, kind: 'plan'|'credit'|'rate', label: string, used: number, resetAt?: number|null, detail?: string }} Limit */
-/** @typedef {{ at: number, sources: Record<string, { at: number, limits: Limit[] }>, alerted: Record<string, number>, name?: string, savedAt?: number }} Snapshot */
+/** @typedef {{ at: number, sources: Record<string, { at: number, limits: Limit[], unavailable?: boolean }>, alerted: Record<string, number>, name?: string, savedAt?: number }} Snapshot */
 /** @type {Map<string, Snapshot>} */
 const snaps = new Map();
 try { for (const r of listTtl(KIND, Date.now())) snaps.set(r.key, { ...r.data, savedAt: Date.now() }); } catch { /* no table yet */ }
@@ -41,18 +42,29 @@ export function windowLabel(min, fallback) {
   return `${min}-minute limit`;
 }
 
-/** ChatGPT plan (Codex backend): x-codex-{primary,secondary}-{used-percent,window-minutes,reset-at|reset-after-seconds}. */
-function codexHeaders(get, now) {
+/**
+ * ChatGPT plan (Codex backend): every header family Codex reads (codex-rs/codex-api/src/rate_limits.rs
+ * parse_all_rate_limits): x-<limit>-{primary,secondary}-{used-percent,window-minutes,reset-at|reset-after-seconds}, the
+ * default limit "codex" plus any other (x-codex-other-…, named by x-<limit>-limit-name).
+ */
+function codexHeaders(get, keys, now) {
+  const fams = new Set(['codex']);
+  for (const k of keys) { const m = /^x-([a-z0-9-]+)-primary-used-percent$/.exec(k); if (m && !m[1].startsWith('ratelimit')) fams.add(m[1]); }
   const out = [];
-  for (const [w, fallback] of [['primary', 'short limit'], ['secondary', 'weekly limit']]) {
-    const used = num(get(`x-codex-${w}-used-percent`));
-    if (used === null) continue;
-    const min = num(get(`x-codex-${w}-window-minutes`));
-    const at = num(get(`x-codex-${w}-reset-at`)); const after = num(get(`x-codex-${w}-reset-after-seconds`));
-    out.push({ id: `codex-${w}`, kind: 'plan', label: windowLabel(min, fallback), used: pct(used), resetAt: at !== null ? secsAt(at, now) : after !== null ? now + after * 1000 : null, window: min || null });
+  for (const fam of fams) {
+    const name = fam === 'codex' ? '' : String(get(`x-${fam}-limit-name`) || '').trim().slice(0, 60);
+    for (const [w, fallback] of [['primary', 'short limit'], ['secondary', 'weekly limit']]) {
+      const used = num(get(`x-${fam}-${w}-used-percent`));
+      if (used === null) continue;
+      const min = num(get(`x-${fam}-${w}-window-minutes`));
+      const at = num(get(`x-${fam}-${w}-reset-at`)); const after = num(get(`x-${fam}-${w}-reset-after-seconds`));
+      out.push(windowLimit(fam === 'codex' ? `codex-${w}` : `${fam}-${w}`, name || (fam === 'codex' ? '' : fam), min, fallback, used, at !== null ? secsAt(at, now) : after !== null ? now + after * 1000 : null));
+    }
   }
   return out;
 }
+const windowLimit = (id, name, min, fallback, used, resetAt) =>
+  ({ id, kind: /** @type {'plan'} */ ('plan'), label: `${name ? `${name} ` : ''}${windowLabel(min, fallback)}`, used: pct(used), resetAt, window: min || null });
 /** Anthropic: anthropic-ratelimit-{requests,tokens,input-tokens,output-tokens}-{limit,remaining,reset (RFC 3339)}. */
 function anthropicHeaders(get) {
   const out = [];
@@ -88,7 +100,8 @@ function openaiHeaders(get, now) {
 export function parseHeaders(headers, now = Date.now()) {
   if (!headers) return [];
   const get = getter(headers);
-  return [...codexHeaders(get, now), ...anthropicHeaders(get), ...openaiHeaders(get, now)];
+  const keys = typeof headers.keys === 'function' ? [...headers.keys()] : Object.keys(headers);
+  return [...codexHeaders(get, keys.map((k) => String(k).toLowerCase()), now), ...anthropicHeaders(get), ...openaiHeaders(get, now)];
 }
 /** ChatGPT's `codex.rate_limits` stream event: { rate_limits: { primary, secondary: { used_percent, window_minutes, reset_at } } }. */
 export function parseCodexEvent(ev, now = Date.now()) {
@@ -99,12 +112,37 @@ export function parseCodexEvent(ev, now = Date.now()) {
     const x = rl[w]; const used = num(x?.used_percent);
     if (used === null) continue;
     const min = num(x.window_minutes); const at = num(x.reset_at ?? x.resets_at); const after = num(x.reset_after_seconds ?? x.resets_in_seconds);
-    out.push({ id: `codex-${w}`, kind: 'plan', label: windowLabel(min, fallback), used: pct(used), resetAt: at !== null ? secsAt(at, now) : after !== null ? now + after * 1000 : null, window: min || null });
+    out.push(windowLimit(`codex-${w}`, '', min, fallback, used, at !== null ? secsAt(at, now) : after !== null ? now + after * 1000 : null));
   }
   return out;
 }
 
 // ---------- endpoints ----------
+/**
+ * ChatGPT's usage endpoint (GET {chatgpt_base_url}/wham/usage, as Codex reads it: codex-rs/backend-client
+ * rate_limit_resets.rs + codex-backend-openapi-models RateLimitStatusPayload): { plan_type, rate_limit: { primary_window,
+ * secondary_window: { used_percent, limit_window_seconds, reset_after_seconds, reset_at } }, additional_rate_limits:
+ * [{ limit_name, metered_feature, rate_limit }] }. Null when the body has none of it.
+ */
+export function parseWhamUsage(json, now = Date.now()) {
+  if (!json || typeof json !== 'object') return null;
+  const out = [];
+  const windows = (rl, prefix, name) => {
+    if (!rl || typeof rl !== 'object') return;
+    for (const [w, key, fallback] of [['primary', 'primary_window', 'short limit'], ['secondary', 'secondary_window', 'weekly limit']]) {
+      const x = rl[key]; const used = num(x?.used_percent);
+      if (used === null) continue;
+      const secs = num(x.limit_window_seconds); const at = num(x.reset_at); const after = num(x.reset_after_seconds);
+      out.push(windowLimit(`${prefix}-${w}`, name, secs ? Math.round(secs / 60) : null, fallback, used, at ? secsAt(at, now) : after !== null ? now + after * 1000 : null));
+    }
+  };
+  windows(json.rate_limit, 'codex', '');
+  for (const a of Array.isArray(json.additional_rate_limits) ? json.additional_rate_limits.slice(0, 10) : []) {
+    const id = String(a?.metered_feature || a?.limit_name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
+    if (id) windows(a.rate_limit, id, String(a.limit_name || '').trim().slice(0, 60));
+  }
+  return out.length || json.rate_limit === null ? out : null;
+}
 const COPILOT_LABELS = { premium_interactions: 'premium requests', chat: 'chat messages' };
 /** GitHub's copilot_internal/user (what the editors show): quota_snapshots with entitlement / remaining / unlimited. */
 export function parseCopilotUser(json) {
@@ -178,18 +216,25 @@ function note(id, source, limits, { name = '', now = Date.now() } = {}) {
 export const noteHeaders = (id, headers, o = {}) => note(id, 'headers', parseHeaders(headers, o.now), o);
 /** ChatGPT's rate-limit stream event. */
 export const noteEvent = (id, ev, o = {}) => note(id, 'headers', parseCodexEvent(ev, o.now), o);
-/** Limits read from a provider endpoint (Copilot, OpenRouter). An empty list means "nothing to show": it clears them. */
+/**
+ * Limits read from a provider endpoint (Copilot, OpenRouter, ChatGPT). An empty list means "nothing to show": it clears
+ * them; `{ unavailable: true }` means the endpoint refuses this account (kept, so it is asked again only rarely).
+ */
 export function noteEndpoint(id, limits, o = {}) {
   const now = o.now || Date.now();
-  if (Array.isArray(limits) && !limits.length) {
+  const unavailable = !Array.isArray(limits) && !!limits?.unavailable;
+  if (unavailable || (Array.isArray(limits) && !limits.length)) {
     const s = snaps.get(id) || { at: 0, sources: {}, alerted: {} };
-    s.sources.endpoint = { at: now, limits: [] }; snaps.set(id, s); save(id, s, true);
+    if (o.name) s.name = o.name;
+    s.sources.endpoint = { at: now, limits: [], ...(unavailable ? { unavailable: true } : {}) }; snaps.set(id, s); save(id, s, true);
     return view(id, now);
   }
   return note(id, 'endpoint', limits, { ...o, now });
 }
 /** When the endpoint of this account was last read (0 = never). */
 export const endpointAt = (id) => snaps.get(id)?.sources?.endpoint?.at || 0;
+/** True when the account's usage endpoint refused it the last time (#140: "not available for this sign-in"). */
+export const endpointUnavailable = (id) => !!snaps.get(id)?.sources?.endpoint?.unavailable;
 /** Forget an account (removed, credentials changed). Without id: everything (tests). */
 export function forget(id) {
   if (id) { snaps.delete(id); try { deleteTtl(KIND, id); } catch { /* ignore */ } } else { snaps.clear(); try { clearTtl(KIND); } catch { /* ignore */ } }
@@ -202,9 +247,12 @@ export function forget(id) {
 export function view(id, now = Date.now()) {
   const s = snaps.get(id);
   if (!s) return null;
-  const limits = [];
-  for (const src of Object.values(s.sources || {})) {
+  const limits = []; const seen = new Set();
+  // the newest source wins for a limit both report (ChatGPT: answer headers and the usage endpoint, #140)
+  for (const src of Object.values(s.sources || {}).sort((a, b) => b.at - a.at)) {
     for (const l of src.limits || []) {
+      if (seen.has(l.id)) continue;
+      seen.add(l.id);
       if (l.resetAt && l.resetAt <= now) limits.push({ ...l, used: 0, resetAt: null, detail: l.kind === 'rate' ? 'full again' : 'renewed since the last answer' });
       else limits.push({ ...l });
     }

@@ -97,7 +97,7 @@ when a plan is 80 % used or more.
 
 | Provider | What you see | Where it comes from |
 |---|---|---|
-| ChatGPT | 5-hour and weekly limit: % used, when it resets | headers of every answer (`x-codex-primary-*`, `x-codex-secondary-*`) and the plan's rate-limit event, as in OpenAI's open-source Codex CLI |
+| ChatGPT | 5-hour and weekly limit (and any extra per-model limit): % used, when it resets | the plan's usage endpoint `GET https://chatgpt.com/backend-api/wham/usage`, read the way OpenAI's open-source Codex reads it; also the headers (`x-codex-*`) and rate-limit event of an answer when they come |
 | GitHub Copilot | premium requests (and chat messages on the free plan): left of the allowance, reset date | GitHub's `copilot_internal/user` (what the editors show); else the Copilot runtime's quota |
 | OpenRouter | free requests today, the key's credit limit, prepaid credit | `GET /api/v1/key` and `/credits` (when the key may read it) |
 | Claude, OpenAI, Custom | rate-limit headroom per minute (requests, tokens), and what Duniya spent through the key this month | headers of every answer (`anthropic-ratelimit-*`, `x-ratelimit-*`); the [usage table](spending.md) |
@@ -107,9 +107,14 @@ when a plan is 80 % used or more.
 3. Several accounts of one provider each show their own.
 
 > [!NOTE]
-> Copilot and OpenRouter need a request to tell: it is made when you open Models (at most every 10 minutes) and on
+> ChatGPT, Copilot and OpenRouter need a request to tell: it is made when you open Models (at most every 10 minutes) and on
 > the server's regular upkeep (one account at a time, each every 30 minutes, skipped while memory is tight). Copilot's
 > runtime is never started just for this.
+>
+> ChatGPT's answers through *Sign in with ChatGPT* carry no usage, so Duniya asks the plan's usage endpoint with the
+> same sign-in. If that endpoint does not answer for this kind of sign-in, the ChatGPT page says *Plan usage is not
+> available for this sign-in* and Duniya asks again a day later (or after you sign in again); nothing is guessed. The
+> 5-hour and weekly limits are always on [chatgpt.com → Settings → Usage](https://chatgpt.com/settings/usage).
 
 > [!TIP]
 > When a limit runs out, Duniya switches to the next model in the chain and waits for the window's reset before it
