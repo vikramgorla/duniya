@@ -85,6 +85,7 @@ const CARDS = [
   ['card-caps', 'usage', '', 'box:Monthly spending caps', 1100],
   ['card-photos-voice', 'models/abilities', '', 'box:Photos & voice', 1100],
   ['card-fallback', 'models/fallback', 'T.openAll(document.querySelector("#fallback"));', '#fallback', 1100],
+  ['card-agent-app', 'models/codex', '', '#prov-codex', 1100], // 074: an agent app's sign-in steps
   ['card-chat-fallback', 'chats/120363041122330003%40g.us', "document.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);", '#chat-fallback', 600],
   ['card-owner-assistant', 'settings/owner-assistant', 'T.openAll(T.box("Owner assistant"));', 'box:Owner assistant', 900],
   ['card-owner-agent', 'agents/owner-assistant', '', '.ap-card', 900], // 059: the owner assistant's own editor

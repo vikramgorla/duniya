@@ -50,6 +50,8 @@ Names are the same everywhere (panel, admin MCP tools, activity): *ChatGPT*, *Cl
 - A usage limit pauses the account until the reset the app reports; the next model answers meanwhile.
 - On a small server: switch on [Small server mode](small-servers.md#small-server-mode); one app answers at a time.
 
+![Codex on Models: sign in with ChatGPT, a link and a one-time code, the note on personal use](site/img/card-agent-app.webp)
+
 **Connect**
 
 | App | Sign-in | Download |
