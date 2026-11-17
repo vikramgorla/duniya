@@ -152,7 +152,7 @@ export async function renderAgentEditor(id) {
         h('input', { value: s.days || 'daily', placeholder: 'daily or mon,wed', style: 'max-width:160px', oninput: (e) => (s.days = e.target.value) }),
         h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.enabled !== false, onchange: (e) => (s.enabled = e.target.checked) }), 'on')),
       s.kind === 'weekly-summary' ? h('div', { class: 'small muted', style: 'margin-top:6px' }, 'The weekly summary: messages, replies and costs per agent, ignored chats, caps and what needs you. Counts only, never message contents.')
-        : h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', value: s.prompt || '', placeholder: bi ? 'What to send you, e.g. a morning brief: what happened overnight in my groups' : 'What to post, e.g. a short summary of today’s agenda', oninput: (e) => (s.prompt = e.target.value) }),
+        : h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', 'aria-label': bi ? 'What to send you' : 'What to post', value: s.prompt || '', placeholder: bi ? 'What to send you, e.g. a morning brief: what happened overnight in my groups' : 'What to post, e.g. a short summary of today’s agenda', oninput: (e) => (s.prompt = e.target.value) }),
       h('div', { class: 'row', style: 'margin-top:6px' },
         h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${plural(r.length, 'chat')}` : bi ? 'Nobody to send it to: link your WhatsApp under Settings → Owner assistant' : 'No chats bound'); }) }, 'Run now'),
         s.kind === 'weekly-summary' ? h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('GET', '/api/owner-assistant/weekly-preview'); schedOut.replaceChildren(h('pre', { class: 'small' }, r.text)); }) }, 'Preview') : null,
@@ -359,8 +359,8 @@ function quickAnswersEditor(c, b) {
   const welOn = h('input', { type: 'checkbox', checked: !!wel.enabled, disabled: ro, onchange: (e) => { wel.enabled = e.target.checked; } });
   const welPrev = h('div', {});
   const drawWelPrev = () => { const t = wel.text || 'Welcome {name} to {group}! 👋'; welPrev.replaceChildren(preview(fill(wel.rules && !t.includes('{rules}') ? `${t}\n\n{rules}` : t, { ...sample, name: '@Mia', rules: wel.rules }))); };
-  const welText = h('textarea', { class: 'prose', style: 'min-height:56px', value: wel.text, disabled: ro, placeholder: 'Welcome {name} to {group}! 👋', oninput: (e) => { wel.text = e.target.value; drawWelPrev(); } });
-  const welRules = h('textarea', { class: 'prose', style: 'min-height:56px', value: wel.rules, disabled: ro, placeholder: 'Optional, e.g. Be kind. Rides are posted on Sundays.', oninput: (e) => { wel.rules = e.target.value; drawWelPrev(); } });
+  const welText = h('textarea', { class: 'prose', style: 'min-height:56px', 'aria-label': 'Welcome text', value: wel.text, disabled: ro, placeholder: 'Welcome {name} to {group}! 👋', oninput: (e) => { wel.text = e.target.value; drawWelPrev(); } });
+  const welRules = h('textarea', { class: 'prose', style: 'min-height:56px', 'aria-label': 'House rules', value: wel.rules, disabled: ro, placeholder: 'Optional, e.g. Be kind. Rides are posted on Sundays.', oninput: (e) => { wel.rules = e.target.value; drawWelPrev(); } });
   drawWelPrev();
   // FAQ
   const faqBox = h('div', { class: 'qa-rows' });

@@ -179,7 +179,17 @@ for (const fn of ['replaceChildren', 'append']) {
   const orig = Element.prototype[fn];
   Element.prototype[fn] = function (...kids) { return orig.apply(this, kids.flat(Infinity).filter((k) => k != null && k !== false)); };
 }
-export const field = (label, el, hint) => h('div', {}, h('label', {}, label), el, hint ? h('div', { class: 'small muted', style: 'margin-top:3px' }, hint) : null);
+let fieldSeq = 0;
+/** A labelled form field: the label names its input, select or textarea (064), and the hint describes it. */
+export function field(label, el, hint) {
+  const id = `fld${++fieldSeq}`;
+  const target = el instanceof HTMLElement ? (el.matches('input, select, textarea') ? el : el.querySelector('input, select, textarea')) : null;
+  const lab = h('label', {}, label);
+  if (target && !target.getAttribute('aria-label')) { target.id ||= id; lab.htmlFor = target.id; }
+  const tip = hint ? h('div', { class: 'small muted', id: `${id}-hint`, style: 'margin-top:3px' }, hint) : null;
+  if (tip && target) target.setAttribute('aria-describedby', tip.id);
+  return h('div', {}, lab, el, tip);
+}
 export const lines = (arr) => (arr || []).join('\n');
 export const splitLines = (s) => String(s || '').split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
 async function copyText(text) {

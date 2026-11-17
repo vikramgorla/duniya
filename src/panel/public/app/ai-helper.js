@@ -160,8 +160,8 @@ function newAgentReview(r, ctx) {
 /** "Describe it → AI drafts → review the changes → apply". onApply(result) does the saving. */
 export async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply, bare = false }) {
   const models = await loadModels().catch(() => ({ models: [] }));
-  const ask = h('textarea', { class: 'prose', style: 'min-height:90px', placeholder });
-  const model = modelSelect(models, 'auto', { autoLabel: `Default model${models.resolvedDefault ? ` (${models.resolvedDefault})` : ''}` });
+  const ask = h('textarea', { class: 'prose', style: 'min-height:90px', placeholder, 'aria-label': 'What you want, in your own words' });
+  const model = modelSelect(models, 'auto', { 'aria-label': 'Model for the AI helper', autoLabel: `Default model${models.resolvedDefault ? ` (${models.resolvedDefault})` : ''}` });
   const out = h('div', {});
   const go = h('button', { class: 'btn primary', onclick: async () => {
     go.disabled = true; out.replaceChildren(h('p', { class: 'muted small' }, h('span', { class: 'spinner' }), ' Thinking… this can take up to a minute.'));

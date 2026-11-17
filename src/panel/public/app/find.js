@@ -45,7 +45,7 @@ function paletteScore(it, words) {
 export async function openPalette() {
   if ($('#palette')) return;
   const input = h('input', { type: 'search', placeholder: 'Find an agent, chat, setting or action', 'aria-label': 'Find anything', autocomplete: 'off', spellcheck: 'false' });
-  const list = h('ul', { class: 'pal-list', role: 'listbox' });
+  const list = h('ul', { class: 'pal-list', role: 'listbox', 'aria-label': 'Results' });
   const dlg = h('dialog', { class: 'dlg palette', id: 'palette', 'aria-label': 'Find anything' }, input, list,
     h('div', { class: 'small muted pal-help desk-only' }, '↑ ↓ to move · Enter to open · Esc to close'));
   document.body.append(dlg);

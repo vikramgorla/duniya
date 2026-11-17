@@ -229,7 +229,7 @@ function whatsappCard(c) {
         } }, 'Reset link'));
     };
     const setting = (key, label, hint) => h('div', { class: 'wa-setting' },
-      toggle(!!g[key], async (on) => { if (await put({ [key]: on }, `${label}: ${on ? 'on' : 'off'}`)) g[key] = on; else load(); }),
+      toggle(!!g[key], async (on) => { if (await put({ [key]: on }, `${label}: ${on ? 'on' : 'off'}`)) g[key] = on; else load(); }, false, label),
       h('span', {}, h('b', {}, label), h('span', { class: 'small muted', style: 'display:block' }, hint)));
     const admins = g.participants.filter((p) => p.admin).length;
     body.replaceChildren(

@@ -9,6 +9,8 @@
 // network), drives headless Chrome over the DevTools protocol (no extra dependencies) and checks every screen:
 //   - no horizontal page scrolling (only tab bars, tables in a scroll box and code may scroll sideways)
 //   - phones (< 600 px): tap targets at least 40 × 40 px, text at least 13 px
+//   - accessibility (064): every control has a name (the browser's accessibility tree, as a screen reader reads it) and
+//     text meets WCAG AA contrast against what is behind it (4.5:1, 3:1 for large text), in light and dark
 // Exit code 1 lists what failed.
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -163,16 +165,65 @@ function audit(W, phone) {
     const seen = new Set(); const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     for (let n = walk.nextNode(); n; n = walk.nextNode()) {
       const e = n.parentElement;
-      if (!n.textContent.trim() || !e || seen.has(e) || !visible(e) || e.closest('.cue, svg, .ai-chip, .toast')) continue;
+      if (!n.textContent.trim() || !e || seen.has(e) || !visible(e) || e.closest('.cue, svg, .ai-chip, .toast, [aria-hidden=true]')) continue;
       seen.add(e);
       const fs = parseFloat(getComputedStyle(e).fontSize);
       if (fs < 12.95) out.text.push(`${desc(e)} ${fs}px`);
     }
   }
+  // 064: WCAG AA contrast of visible text against the colour behind it (backgrounds blended up the tree, opacity included)
+  out.contrast = [];
+  const rgba = (c) => {
+    const m = /^rgba?\(([\d.]+),?\s*([\d.]+),?\s*([\d.]+)(?:,?\s*\/?\s*([\d.]+))?\)$/.exec(c) || /^color\(srgb ([\d.e-]+) ([\d.e-]+) ([\d.e-]+)(?: \/ ([\d.]+))?\)$/.exec(c);
+    if (!m) return null;
+    const k = c.startsWith('color(') ? 255 : 1;
+    return [Number(m[1]) * k, Number(m[2]) * k, Number(m[3]) * k, m[4] == null ? 1 : Number(m[4])];
+  };
+  const over = (top, under) => top.slice(0, 3).map((v, i) => v * top[3] + under[i] * (1 - top[3])).concat(1);
+  const behind = (e) => {
+    const stack = [];
+    for (let p = e; p; p = p.parentElement) { const b = rgba(getComputedStyle(p).backgroundColor); if (b && b[3] > 0) { stack.push(b); if (b[3] >= 1) break; } }
+    return stack.reverse().reduce((acc, b) => over(b, acc), [255, 255, 255, 1]);
+  };
+  const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const seenC = new Set(); const walkC = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walkC.nextNode(); n; n = walkC.nextNode()) {
+    const e = n.parentElement;
+    if (!n.textContent.trim() || !e || seenC.has(e) || !visible(e)) continue;
+    seenC.add(e);
+    if (e.closest('.cue, svg, [aria-hidden=true], :disabled, [disabled], .skel, option, pre, input, textarea, select')) continue;
+    const cs = getComputedStyle(e); const fg = rgba(cs.color); if (!fg) continue;
+    let op = 1; for (let p = e; p; p = p.parentElement) op *= Number(getComputedStyle(p).opacity);
+    const bg = behind(e); const text = over([...fg.slice(0, 3), fg[3] * op], bg);
+    const size = parseFloat(cs.fontSize); const large = size >= 24 || (size >= 18.66 && Number(cs.fontWeight) >= 700);
+    const r = ratio(text, bg);
+    if (r < (large ? 3 : 4.5)) out.contrast.push(`${desc(e)} ${r.toFixed(2)}:1`);
+  }
   const uniq = (a) => [...new Set(a)].slice(0, 12);
-  return { overflow: out.overflow, wide: uniq(out.wide), taps: uniq(out.taps), text: uniq(out.text) };
+  return { overflow: out.overflow, wide: uniq(out.wide), taps: uniq(out.taps), text: uniq(out.text), contrast: uniq(out.contrast) };
 }
 
+
+/** 064: controls without a name, from Chrome's accessibility tree (what a screen reader announces). */
+const NAMED = new Set(['button', 'link', 'checkbox', 'switch', 'textbox', 'searchbox', 'combobox', 'listbox', 'radio', 'slider', 'spinbutton', 'tab', 'menuitem', 'dialog']);
+async function unnamed(page) {
+  await page.send('DOM.enable'); await page.send('Accessibility.enable');
+  const { nodes } = await page.send('Accessibility.getFullAXTree');
+  const out = [];
+  for (const n of nodes) {
+    if (n.ignored || !NAMED.has(n.role?.value) || String(n.name?.value || '').trim()) continue;
+    if (n.properties?.some((p) => p.name === 'hidden' && p.value?.value)) continue;
+    const d = n.backendDOMNodeId ? await page.send('DOM.describeNode', { backendNodeId: n.backendDOMNodeId }).catch(() => null) : null;
+    const attrs = d?.node?.attributes || []; const at = (k) => attrs[attrs.indexOf(k) + 1];
+    // where it is: the heading of its card (helps to find it)
+    const obj = n.backendDOMNodeId ? await page.send('DOM.resolveNode', { backendNodeId: n.backendDOMNodeId }).catch(() => null) : null;
+    const where = obj?.object?.objectId ? (await page.send('Runtime.callFunctionOn', { objectId: obj.object.objectId, returnByValue: true,
+      functionDeclaration: 'function () { const c = this.closest(".card, dialog, section, li, tr"); return (c?.querySelector("h2, h3, b")?.textContent || "").trim().slice(0, 40); }' }).catch(() => null))?.result?.value : '';
+    out.push(`${n.role.value} <${(d?.node?.nodeName || '?').toLowerCase()}${at('class') && attrs.includes('class') ? `.${at('class').split(' ').join('.')}` : ''}${attrs.includes('type') ? ` type=${at('type')}` : ''}>${where ? ` in “${where}”` : ''}`);
+  }
+  return [...new Set(out)].slice(0, 12);
+}
 
 // ---------- run ----------
 const { base } = await startDemo();
@@ -195,8 +246,9 @@ for (const scheme of opt.schemes.split(',')) {
         await sleep(st.wait || 1500);
         if (st.js) await page.evaluate(`(async () => { ${PRELUDE} ${PANEL} ${st.js} })()`);
         await sleep(300);
-        const r = await page.evaluate(`(${audit})(${width}, ${width < 600})`);
-        const bad = r.overflow > 0 || r.wide.length || r.taps.length || r.text.length;
+        const r = await page.call(String(audit), width, width < 600);
+        r.names = await unnamed(page);
+        const bad = r.overflow > 0 || r.wide.length || r.taps.length || r.text.length || r.contrast.length || r.names.length;
         console.log(`${bad ? '✗' : '✓'} ${key}`);
         if (bad) failures.push([key, r]);
         if (opt.shots) await page.shot(join(opt.shots, `${st.name}@${width}-${scheme}.png`));
@@ -213,7 +265,7 @@ if (failures.length) {
     console.log(`\n${key}`);
     if (r.error) console.log(`  error: ${r.error}`);
     if (r.overflow > 0) console.log(`  page scrolls sideways by ${r.overflow} px`);
-    for (const [k, label] of [['wide', 'wider than the screen'], ['taps', 'tap target under 40 px'], ['text', 'text under 13 px']]) for (const x of r[k] || []) console.log(`  ${label}: ${x}`);
+    for (const [k, label] of [['wide', 'wider than the screen'], ['taps', 'tap target under 40 px'], ['text', 'text under 13 px'], ['contrast', 'contrast under AA'], ['names', 'control without a name']]) for (const x of r[k] || []) console.log(`  ${label}: ${x}`);
   }
   process.exit(1);
 }

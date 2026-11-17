@@ -35,7 +35,7 @@ export async function renderSettings() {
     'tool-services': await toolServicesCard().catch(loadErr('Tool services for all agents')),
     'owner-assistant': oa ? ownerAssistantCard(oa) : null,
     'direct-messages': h('div', { class: 'card' }, h('h2', {}, 'Direct messages'), h('label', {}, 'Default agent for direct messages without a trigger'),
-      h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmAgent: e.target.value }), 'Saved') },
+      h('select', { disabled: !can('admin'), 'aria-label': 'Default agent for direct messages', onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmAgent: e.target.value }), 'Saved') },
         h('option', { value: '' }, '— first agent that accepts the sender —'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmAgent === b.id }, b.name)))),
     'privacy-notice': notice ? privacyNoticeCard(notice) : null,
     'photos-voice': await photosVoiceCard().catch(loadErr('Photos & voice')),
@@ -140,12 +140,12 @@ async function photosVoiceCard() {
   const fb = modelSelect(models, st.visionFallback || '', { autoLabel: 'None — say “I can’t see photos”', disabled: !can('admin') });
   fb.querySelector('option[value="auto"]').value = '';
   const imgChoices = m.providers.filter((r) => r.creates && r.imageModel).map((r) => [`${r.id}:${r.imageModel}`, `${r.name} · ${r.imageModel}`]);
-  const img = h('select', { disabled: !can('admin') }, h('option', { value: '' }, 'Automatic'), imgChoices.map(([v, l]) => h('option', { value: v, selected: st.imageModel === v }, l)),
+  const img = h('select', { disabled: !can('admin'), 'aria-label': 'Image model' }, h('option', { value: '' }, 'Automatic'), imgChoices.map(([v, l]) => h('option', { value: v, selected: st.imageModel === v }, l)),
     st.imageModel && !imgChoices.some(([v]) => v === st.imageModel) ? h('option', { value: st.imageModel, selected: true }, `${st.imageModel} (not available)`) : null);
   const priceRef = st.imageModel || imgChoices[0]?.[0] || '';
-  const price = h('input', { type: 'number', min: '0', step: '0.001', placeholder: 'USD per picture', value: priceRef && st.imagePrices[priceRef] != null ? st.imagePrices[priceRef] : '', style: 'max-width:160px', disabled: !can('admin') || !priceRef });
-  const voice = h('select', { disabled: !can('admin') }, m.voices.map((v) => h('option', { value: v, selected: st.voice === v }, v)));
-  const maxMin = h('input', { type: 'number', min: '1', max: '30', value: Math.round(st.maxVoiceSeconds / 60), style: 'max-width:90px', disabled: !can('admin') });
+  const price = h('input', { type: 'number', 'aria-label': 'Price per picture (USD)', min: '0', step: '0.001', placeholder: 'USD per picture', value: priceRef && st.imagePrices[priceRef] != null ? st.imagePrices[priceRef] : '', style: 'max-width:160px', disabled: !can('admin') || !priceRef });
+  const voice = h('select', { 'aria-label': 'Voice', disabled: !can('admin') }, m.voices.map((v) => h('option', { value: v, selected: st.voice === v }, v)));
+  const maxMin = h('input', { type: 'number', 'aria-label': 'Longest voice note (minutes)', min: '1', max: '30', value: Math.round(st.maxVoiceSeconds / 60), style: 'max-width:90px', disabled: !can('admin') });
   // On-server engines
   const allowed = m.localAllowed?.ok;
   const engines = Object.entries(m.local.engines);
@@ -306,7 +306,7 @@ function signinCard(st) {
 
 function usersCard(users, inv, signin) {
   const un = h('input', { placeholder: 'username' }); const ue = h('input', { placeholder: 'email (optional, lets them use Google)' });
-  const roleSel = (val) => h('select', {}, h('option', { value: 'admin', selected: val === 'admin' }, 'Admin'), h('option', { value: 'viewer', selected: val === 'viewer' }, 'Viewer (read-only)'), h('option', { value: 'owner', selected: val === 'owner' }, 'Owner'));
+  const roleSel = (val) => h('select', { 'aria-label': 'Role' }, h('option', { value: 'admin', selected: val === 'admin' }, 'Admin'), h('option', { value: 'viewer', selected: val === 'viewer' }, 'Viewer (read-only)'), h('option', { value: 'owner', selected: val === 'owner' }, 'Owner'));
   const ur = roleSel('admin'); const up = h('input', { type: 'password', placeholder: 'password (12+), or empty for a sign-up link', autocomplete: 'new-password' });
   const signup = (r) => { S.signupLink = r; renderSettings(); };
   const ie = h('input', { type: 'email', placeholder: 'their.name@gmail.com', autocomplete: 'off' }); const ir = roleSel('admin');
@@ -513,7 +513,7 @@ function webAccessCard(initial) {
 
     // ----- who can open the panel -----
     const st = { mode: w.settings.proxy ? 'proxy' : w.settings.allow.length ? 'list' : 'open' };
-    const provSel = h('select', { style: 'max-width:320px' }, w.providers.slice().sort((a, b) => (a.id === 'custom') - (b.id === 'custom') || a.name.localeCompare(b.name))
+    const provSel = h('select', { style: 'max-width:320px', 'aria-label': 'Provider' }, w.providers.slice().sort((a, b) => (a.id === 'custom') - (b.id === 'custom') || a.name.localeCompare(b.name))
       .map((p) => h('option', { value: p.id, selected: (w.settings.proxy || '') === p.id }, p.id === 'custom' ? 'Other proxy (my own ranges)' : p.name)));
     const custom = h('textarea', { rows: 3, placeholder: '198.51.100.0/24\n2001:db8::/32', spellcheck: 'false' }); custom.value = (w.settings.customRanges || []).join('\n');
     const provInfo = h('div', { class: 'small muted', style: 'margin-top:6px' });
@@ -593,8 +593,8 @@ function loggingCard({ settings, categories }) {
   const hint = h('div', { class: 'small muted', style: 'margin-top:6px' }, HINTS[cfg.level]);
   const cats = h('div', { class: cfg.level === 'minimal' ? 'hide' : '', style: 'margin-top:8px' }, Object.entries(categories).map(([k, label]) => h('label', { class: 'inline' },
     h('input', { type: 'checkbox', checked: cfg.categories[k] !== false, disabled: !can('admin'), onchange: (e) => (cfg.categories[k] = e.target.checked) }), label)));
-  const days = h('input', { type: 'number', value: cfg.retentionDays, min: 1, max: 365, style: 'max-width:100px' });
-  const max = h('input', { type: 'number', value: cfg.maxEntries, min: 500, step: 500, style: 'max-width:120px' });
+  const days = h('input', { type: 'number', 'aria-label': 'Keep for (days)', value: cfg.retentionDays, min: 1, max: 365, style: 'max-width:100px' });
+  const max = h('input', { type: 'number', 'aria-label': 'At most (entries)', value: cfg.maxEntries, min: 500, step: 500, style: 'max-width:120px' });
   return h('div', { class: 'card' }, h('h2', {}, 'Activity log'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, 'Choose what is recorded, to keep the log useful and small. Errors, confirmations and configuration changes are always kept. Each chat can override this on the Chats page.'),
     levelSeg, hint, cats,

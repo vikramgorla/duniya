@@ -8,8 +8,8 @@ export async function renderAgents() {
   const route = location.hash.split('/');
   if (route[1]) return renderAgentEditor(decodeURIComponent(route[1]));
   const [agents, templates, us] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/templates'), usageSummary()]);
-  const tpl = h('select', {}, templates.map((t) => h('option', { value: t.id }, t.name)));
-  const name = h('input', { placeholder: 'Agent name' });
+  const tpl = h('select', { 'aria-label': 'Start from' }, templates.map((t) => h('option', { value: t.id }, t.name)));
+  const name = h('input', { placeholder: 'Agent name', 'aria-label': 'Agent name' });
   const fileIn = h('input', { type: 'file', accept: '.json,application/json', class: 'hide', onchange: async () => {
     const f = fileIn.files[0]; if (!f) return;
     const r = await tryApi(async () => api('POST', '/api/agents/import', JSON.parse(await f.text())), 'Imported');

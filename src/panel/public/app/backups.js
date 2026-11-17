@@ -9,9 +9,9 @@ export async function renderBackups() {
   clearTimeout(ghPollTimer); ghPollTimer = null;
   const b = await api('GET', '/api/backups'); const s = b.settings;
   const pass = h('input', { type: 'password', placeholder: b.passphraseSet ? '•••• set — enter a new one to change' : 'At least 12 characters — keep it safe!' });
-  const sched = h('select', {}, [['hourly', 'Every hour'], ['6h', 'Every 6 hours'], ['daily', 'Daily'], ['weekly', 'Weekly']].map(([v, l]) => h('option', { value: v, selected: s.schedule === v }, l)));
-  const at = h('input', { value: s.at, style: 'max-width:90px' }); const wd = h('select', { style: 'max-width:90px' }, ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => h('option', { value: d, selected: s.weekday === d }, d)));
-  const keep = h('input', { type: 'number', value: s.keep, style: 'max-width:90px' });
+  const sched = h('select', { 'aria-label': 'How often' }, [['hourly', 'Every hour'], ['6h', 'Every 6 hours'], ['daily', 'Daily'], ['weekly', 'Weekly']].map(([v, l]) => h('option', { value: v, selected: s.schedule === v }, l)));
+  const at = h('input', { value: s.at, 'aria-label': 'At (time)', style: 'max-width:90px' }); const wd = h('select', { 'aria-label': 'Weekday', style: 'max-width:90px' }, ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => h('option', { value: d, selected: s.weekday === d }, d)));
+  const keep = h('input', { type: 'number', 'aria-label': 'Backups to keep', value: s.keep, style: 'max-width:90px' });
   const en = h('input', { type: 'checkbox', checked: s.enabled }); const wa = h('input', { type: 'checkbox', checked: s.includeWhatsApp });
   const saveSettings = (patch) => tryApi(async () => { await api('PUT', '/api/backups/settings', patch); renderBackups(); }, 'Saved');
   const last = b.last;
@@ -178,7 +178,7 @@ function restoreCard(b, s) {
       box.replaceChildren(h('p', { class: 'small muted', style: 'margin-top:0' }, `A .dbk file you downloaded earlier, from this or another server (up to ${b.uploadMaxMb} MB). You need the passphrase that server used.`),
         h('div', { class: 'filepick' }, file), h('div', { style: 'margin-top:8px' }, rpass), go, prog);
     } else {
-      const files = h('select', {}, h('option', {}, 'Loading…'));
+      const files = h('select', { 'aria-label': 'Backup to restore' }, h('option', {}, 'Loading…'));
       const go = h('button', { class: 'btn danger', style: 'margin-top:8px', onclick: async () => {
         err.textContent = '';
         if (!files.value) return (err.textContent = 'Pick a backup');

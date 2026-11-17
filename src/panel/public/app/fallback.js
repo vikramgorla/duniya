@@ -10,7 +10,7 @@ export function chainEditor(models, initial, { emptyText = 'Any other connected 
   const chain = [...(initial || [])];
   const box = h('div', { class: 'chain' });
   const draw = () => {
-    const add = modelSelect(models, 'auto', { autoLabel: chain.length ? '+ Add another model…' : '+ Add a model…', disabled: !can('admin'), onchange: (e) => { const v = e.target.value; if (v !== 'auto' && !chain.includes(v) && chain.length < 10) chain.push(v); draw(); } });
+    const add = modelSelect(models, 'auto', { 'aria-label': 'Add a fallback model', autoLabel: chain.length ? '+ Add another model…' : '+ Add a model…', disabled: !can('admin'), onchange: (e) => { const v = e.target.value; if (v !== 'auto' && !chain.includes(v) && chain.length < 10) chain.push(v); draw(); } });
     box.replaceChildren(
       chain.length ? h('ol', { class: 'chainlist' }, chain.map((ref, i) => h('li', {},
         h('span', { class: 'grow' }, modelLabel(ref, models)),
