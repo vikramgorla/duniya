@@ -2,6 +2,7 @@
 // Public clients only (dynamic registration, PKCE S256), opaque tokens stored as sha256 hashes, access 1 h,
 // refresh 30 d with rotation and reuse detection (the whole family is revoked). Tokens act as the panel user who
 // approved them; disabled or deleted users and revoked grants stop working on the next call.
+import { fail } from './config.js';
 import { createHash } from 'node:crypto';
 import { db } from './db.js';
 import { TENANT, onUserDeleted } from './store.js';
@@ -216,9 +217,9 @@ export function createConfirm({ userId, clientId, tool, args, preview }) {
 export function takeConfirm(code, { userId, clientId }) {
   const key = String(code || '').trim().toUpperCase();
   const c = getTtl(CONFIRM_KIND, key);
-  if (!c) { throw Object.assign(new Error('This confirm code is unknown, expired (10 minutes) or was already used. Start the action again.'), { status: 404 }); }
-  if (c.userId !== userId || c.clientId !== clientId) throw Object.assign(new Error('This confirm code belongs to another user or assistant.'), { status: 403 });
-  if (!takeTtl(CONFIRM_KIND, key)) throw Object.assign(new Error('This confirm code was already used. Start the action again.'), { status: 404 });
-  if (argsHash(c.args) !== c.hash) throw Object.assign(new Error('The action changed after it was previewed.'), { status: 409 });
+  if (!c) { throw fail('This confirm code is unknown, expired (10 minutes) or was already used. Start the action again.', 404); }
+  if (c.userId !== userId || c.clientId !== clientId) throw fail('This confirm code belongs to another user or assistant.', 403);
+  if (!takeTtl(CONFIRM_KIND, key)) throw fail('This confirm code was already used. Start the action again.', 404);
+  if (argsHash(c.args) !== c.hash) throw fail('The action changed after it was previewed.', 409);
   return c;
 }

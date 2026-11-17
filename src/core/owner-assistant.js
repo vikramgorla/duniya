@@ -16,7 +16,7 @@ import { buildContext } from './memory.js';
 import { weeklyText } from './weekly.js';
 import { sendOwnerAlert } from './owner-alerts.js';
 import { chatTitle, personInfo } from './contacts.js';
-import { env, digits, clip, iso, isGroup } from './config.js';
+import { env, digits, clip, iso, isGroup, fail } from './config.js';
 import { getUser, onUserDeleted, TENANT } from './store.js';
 import { listAgents, agentForChat, getAgent, OWNER_AGENT_ID } from './agents.js';
 import { getChatPrefs, enabledChats, privateChats, seenChats } from './chat-prefs.js';
@@ -71,7 +71,6 @@ onUserDeleted((id) => {
 /** The assistant's notes for one user (memory tools, 059): never in a chat's memory. */
 const notesKey = (userId) => `owner:${userId}`;
 
-const bad = (message, status = 400) => Object.assign(new Error(message), { status });
 
 // ---------------------------------------------------------------- the agent record
 /** The built-in agent record (059): character, model, tools, photos & voice, schedules — edited in the agent editor. */
@@ -101,7 +100,7 @@ export function startLink(user) {
 }
 export function confirmLink(user) {
   const s = linkStatus(user.id);
-  if (s.status !== 'pending') throw bad(s.status === 'linked' ? 'Already linked' : 'Nothing to confirm: send the code from WhatsApp first (or the code expired)', 409);
+  if (s.status !== 'pending') throw fail(s.status === 'linked' ? 'Already linked' : 'Nothing to confirm: send the code from WhatsApp first (or the code expired)', 409);
   db.prepare("UPDATE owner_links SET status = 'linked', code_hash = NULL, linked_at = ? WHERE tenant_id = ? AND user_id = ?").run(Date.now(), TENANT, user.id);
   activity('owner.link', { summary: `Owner assistant: +${s.phone} linked to ${user.username} (${user.role})` });
   return linkStatus(user.id);
@@ -168,7 +167,7 @@ function parseSince(v, fallbackMs = 7 * 86400000) {
   const rel = /^(\d{1,4})\s*([hdw])$/i.exec(s);
   if (rel) return Date.now() - Number(rel[1]) * { h: 3600000, d: 86400000, w: 604800000 }[rel[2].toLowerCase()];
   const t = Date.parse(s);
-  if (Number.isNaN(t)) throw bad('since: use a date (2026-11-01) or a period like 24h, 3d, 2w');
+  if (Number.isNaN(t)) throw fail('since: use a date (2026-11-01) or a period like 24h, 3d, 2w');
   return t;
 }
 const like = (q) => `%${String(q).replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
@@ -194,8 +193,8 @@ const CORE_TOOLS = [
     input: { query: { type: 'string', description: 'Words to look for (optional when person is given)' }, person: { type: 'string', description: 'Sender name or number (optional)' },
       chat: { type: 'string', description: 'Only this chat id (optional)' }, since: { type: 'string', description: 'Date or period (optional)' }, limit: { type: 'integer', minimum: 1, maximum: 50 } },
     run: async (a) => {
-      if (!a.query && !a.person) throw bad('Give a query or a person');
-      if (a.chat && !isVisible(a.chat)) throw bad('That chat is not visible to the assistant (off or private to members)', 403);
+      if (!a.query && !a.person) throw fail('Give a query or a person');
+      if (a.chat && !isVisible(a.chat)) throw fail('That chat is not visible to the assistant (off or private to members)', 403);
       const chats = a.chat ? [a.chat] : visibleChats();
       if (!chats.length) return [];
       const where = [`chat IN (${chats.map(() => '?').join(',')})`, 'ts >= ?']; const args = [...chats, parseSince(a.since, 30 * 86400000)];
@@ -210,7 +209,7 @@ const CORE_TOOLS = [
     input: { chat: { type: 'string', description: 'Chat id (see list_visible_chats)' }, since: { type: 'string', description: 'Date or period like 24h, 3d (optional)' } },
     required: ['chat'],
     run: async (a) => {
-      if (!isVisible(a.chat)) throw bad('That chat is not visible to the assistant (off or private to members)', 403);
+      if (!isVisible(a.chat)) throw fail('That chat is not visible to the assistant (off or private to members)', 403);
       const since = parseSince(a.since, 86400000);
       const rows = db.prepare('SELECT * FROM (SELECT * FROM messages WHERE chat = ? AND ts >= ? ORDER BY id DESC LIMIT 300) ORDER BY id').all(a.chat, since);
       const names = await chatNames();
@@ -224,9 +223,9 @@ const CORE_TOOLS = [
     prepare: async (a, dm, user) => ({ ...a, chat: await resolveChat(a.chat, dm.chat || '', user) }),
     preview: (a) => sendPreview(a.chat, `Send "${clip(a.text, 300)}"`),
     run: async (a) => {
-      if (!isVisible(a.chat)) throw bad('That chat is off or private to members now: nothing was sent.', 403);
+      if (!isVisible(a.chat)) throw fail('That chat is off or private to members now: nothing was sent.', 403);
       const ch = whatsappChannel();
-      if (!ch) throw bad('WhatsApp is not available', 503);
+      if (!ch) throw fail('WhatsApp is not available', 503);
       const line = dmLine(a.chat);
       const text = `${String(a.text).slice(0, 4000)}${line ? `\n\n_${line}_` : ''}`;
       const sent = await ch.send(a.chat, text);
@@ -262,10 +261,10 @@ function ownerAgent(user, ownChat = '') {
 async function resolveChat(want, ownChat, user) {
   const w = String(want ?? '').trim();
   if (!w || w === ownChat || /^(me|here|this chat|my chat)$/i.test(w)) {
-    if (!ownChat) throw bad('Name the chat to act in (group name or contact name)');
+    if (!ownChat) throw fail('Name the chat to act in (group name or contact name)');
     return ownChat;
   }
-  if (agentRole(user) !== 'organizer') throw bad('Your account is read-only: I can act only in our own chat.', 403);
+  if (agentRole(user) !== 'organizer') throw fail('Your account is read-only: I can act only in our own chat.', 403);
   const chats = visibleChats();
   if (chats.includes(w)) return w;
   const names = await chatNames();
@@ -273,8 +272,8 @@ async function resolveChat(want, ownChat, user) {
   const exact = chats.filter((c) => (names.get(c) || '').toLowerCase() === lw);
   const hits = exact.length ? exact : chats.filter((c) => (names.get(c) || '').toLowerCase().includes(lw));
   if (hits.length === 1) return hits[0];
-  if (hits.length > 1) throw bad(`Several chats match "${clip(w, 60)}": ${hits.map((c) => names.get(c) || c).join(', ')}. Say which one.`);
-  throw bad(`No chat that is on matches "${clip(w, 60)}". Chats that are off or private to members can't be used.`, 403);
+  if (hits.length > 1) throw fail(`Several chats match "${clip(w, 60)}": ${hits.map((c) => names.get(c) || c).join(', ')}. Say which one.`);
+  throw fail(`No chat that is on matches "${clip(w, 60)}". Chats that are off or private to members can't be used.`, 403);
 }
 const whoInDm = (chat) => { const jid = String(chat).split('#').pop(); return jid.endsWith('@s.whatsapp.net') ? jid.split('@')[0] : chat; };
 /** 044 rules for sends into another person's chat: the DM privacy line once per person (groups got their notice when switched on). */
@@ -313,9 +312,9 @@ async function agentTools(user, dm = {}) {
         : m.kind === 'mcp' && (m.annotations?.destructiveHint === true || /(^|_)confirm($|_)/i.test(m.tool))),
       preview: async (a) => (wa ? sendPreview(a.chat, `${WA_VERB[m.tool.name] || m.tool.name}${previewArgs(a)}`) : `${m.fq}${previewArgs(a)}`),
       async run(a) {
-        if (elsewhere(a) && !isVisible(a.chat)) throw bad('That chat is off or private to members now: nothing was sent.', 403);
+        if (elsewhere(a) && !isVisible(a.chat)) throw fail('That chat is off or private to members now: nothing was sent.', 403);
         const r = await run(d.name, a, { ...ctx, ...(m.fq.startsWith('memory:') ? { chat: notesKey(user.id) } : {}), toolName: d.name });
-        if (r.isError) throw bad(r.text);
+        if (r.isError) throw fail(r.text);
         if (elsewhere(a) && !WA_READ_ONLY.has(m.fq)) await privacyLineAfterSend(a.chat);
         return r.text;
       } });
@@ -361,7 +360,7 @@ async function previewOf(tool, args, user) {
 
 async function runReadTool(tool, args, user, surface) {
   // Agent tools check their own chat (the user's own chat may be off; other chats must be visible).
-  if (tool.kind !== 'agent' && args.chat && !isVisible(String(args.chat))) throw bad('That chat is not visible to the assistant (off or private to members)', 403);
+  if (tool.kind !== 'agent' && args.chat && !isVisible(String(args.chat))) throw fail('That chat is not visible to the assistant (off or private to members)', 403);
   return hideChats(await runTool(tool, args, user, surface), new Set(privateChats()));
 }
 
@@ -456,9 +455,9 @@ function systemPrompt(user, source) {
  */
 export async function ask({ user, text, source, surface, onEvent = null, dm = {} }) {
   const emit = (e) => { try { onEvent?.(e); } catch { /* a closed stream must not break the turn */ } };
-  if (!wiring) throw bad('The owner assistant is not ready yet', 503);
+  if (!wiring) throw fail('The owner assistant is not ready yet', 503);
   const question = String(text || '').trim().slice(0, 4000);
-  if (!question) throw bad('Ask a question');
+  if (!question) throw fail('Ask a question');
   if (looksSecret(question)) {
     activity('owner.question', { summary: `${user.username} (${source === 'panel' ? 'panel' : 'WhatsApp'}) sent what looks like a key or password: not read, not stored, not sent to a model` });
     return { reply: SECRET_REPLY, confirms: [] };
@@ -529,9 +528,9 @@ export async function ask({ user, text, source, surface, onEvent = null, dm = {}
       let content; let isError = false;
       let hold = false;
       try {
-        if (!tool) throw bad(`Unknown or not allowed tool: ${call.name}`, 403);
+        if (!tool) throw fail(`Unknown or not allowed tool: ${call.name}`, 403);
         const missing = (tool.required || []).filter((k) => args[k] === undefined || args[k] === null || args[k] === '');
-        if (missing.length) throw bad(`Missing: ${missing.join(', ')}`);
+        if (missing.length) throw fail(`Missing: ${missing.join(', ')}`);
         if (tool.prepare) args = await tool.prepare(args); // 059: chat names → chat ids (on, not private), before any preview
         hold = needsConfirm(tool, args);
         if (hold) { // noConfirm (#91): harmless actions, logged as owner.tool below

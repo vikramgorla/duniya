@@ -6,7 +6,7 @@
 import { db } from './db.js';
 import { digits } from './config.js';
 import { isChatEnabled } from './chat-prefs.js';
-import { mapLid, bareJid as bare } from './contacts.js';
+import { mapLid, bareJid as bare, personInfo } from './contacts.js';
 
 const up = db.prepare(`INSERT INTO member_tags (chat, member, phone, label, ts) VALUES (?, ?, ?, ?, ?)
   ON CONFLICT (chat, member) DO UPDATE SET label = excluded.label, ts = excluded.ts, phone = COALESCE(NULLIF(excluded.phone, ''), member_tags.phone)
@@ -43,3 +43,9 @@ export function memberTag(chat, { phone = '', jid = '' } = {}, tags = null) {
 
 /** Handler the channels call (registered from index.js). */
 export const createMemberTagHandler = () => async (ev) => { try { saveMemberTag(ev); } catch { /* best effort */ } };
+
+/** 057: what the panel shows for a person: { phone, name, label, nameSource, hidden, tag }. */
+export function personView(who, chat = '', tags = null) {
+  const p = personInfo(who);
+  return { phone: p.phone, name: p.name, label: p.label, nameSource: p.source, hidden: p.hidden, tag: chat ? memberTag(chat, { phone: p.phone, jid: who.jid }, tags) : '' };
+}

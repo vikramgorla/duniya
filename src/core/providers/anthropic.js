@@ -1,3 +1,4 @@
+// @ts-check
 import Anthropic from '@anthropic-ai/sdk';
 import { getSecret, onSecretChange } from '../store.js';
 

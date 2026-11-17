@@ -1,5 +1,7 @@
+// @ts-check
 // Per-chat preferences (013/011): model choice and activity logging level for a single chat (group or person).
 // The agent a chat talks to stays in the agent's `chats` list (one source of truth for bindings).
+import { fail } from './config.js';
 import { db } from './db.js';
 import { cleanOverride, REF_RE } from './providers/fallback-config.js';
 
@@ -38,15 +40,20 @@ export function getChatPrefs(chat) {
   cache.set(chat, v);
   return v;
 }
+/**
+ * Change some of a chat's settings; what is left out stays as it is.
+ * @param {string} chat
+ * @param {{ model?: string, logging?: string, enabled?: boolean, fallback?: any, private?: boolean, noticeOff?: boolean, welcome?: string }} change
+ */
 export function setChatPrefs(chat, { model, logging, enabled, fallback, private: priv, noticeOff, welcome }) {
   const cur = getChatPrefs(chat);
   const next = { model: model ?? cur.model, logging: logging ?? cur.logging, enabled: enabled === undefined ? cur.enabled : !!enabled,
     fallback: fallback === undefined ? cur.fallback : cleanOverride(fallback, 'fallback'),
     private: priv === undefined ? cur.private : !!priv, noticeOff: noticeOff === undefined ? cur.noticeOff : !!noticeOff,
     welcome: welcome ?? cur.welcome };
-  if (!validModel(next.model)) throw Object.assign(new Error('model must be inherit, auto, provider:auto or provider:model'), { status: 400, field: 'model' });
-  if (!WELCOME_MODES.includes(next.welcome)) throw Object.assign(new Error('welcome must be inherit, on or off'), { status: 400, field: 'welcome' });
-  if (!LOGGING_LEVELS.includes(next.logging)) throw Object.assign(new Error(`logging must be one of ${LOGGING_LEVELS.join(', ')}`), { status: 400, field: 'logging' });
+  if (!validModel(next.model)) throw fail('model must be inherit, auto, provider:auto or provider:model', 400, { field: 'model' });
+  if (!WELCOME_MODES.includes(next.welcome)) throw fail('welcome must be inherit, on or off', 400, { field: 'welcome' });
+  if (!LOGGING_LEVELS.includes(next.logging)) throw fail(`logging must be one of ${LOGGING_LEVELS.join(', ')}`, 400, { field: 'logging' });
   const fb = next.fallback.mode === 'inherit' && !next.fallback.chain.length ? '' : JSON.stringify(next.fallback);
   db.prepare('INSERT OR REPLACE INTO chat_prefs (tenant_id, chat, model, logging, enabled, fallback, private, notice_off, welcome, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .run(TENANT, chat, next.model, next.logging, next.enabled ? 1 : 0, fb, next.private ? 1 : 0, next.noticeOff ? 1 : 0, next.welcome, Date.now());

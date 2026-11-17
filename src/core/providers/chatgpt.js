@@ -1,6 +1,7 @@
 // ChatGPT plan usage via "Sign in with ChatGPT" (OpenAI open-source flow), adapted for headless servers:
 // the owner completes sign-in in their browser and pastes the final loopback address back into the panel.
 // Contract: developers.openai.com/siwc/token-sharing-open-source/*
+import { fail } from '../config.js';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { getSecret, setSecret, getSetting, updateSettings } from '../store.js';
 import { verifyIdToken } from './jwt.js';
@@ -110,17 +111,17 @@ export function parseCallback(input, depth = 0) {
 /** Step 2: the owner pastes the address their browser ended on. */
 export async function completeSignIn(callbackUrl) {
   const q = parseCallback(callbackUrl);
-  if (!q) throw Object.assign(new Error(PASTE_HELP), { status: 400 });
+  if (!q) throw fail(PASTE_HELP);
   if (q.get('error')) {
-    throw Object.assign(new Error(q.get('error') === 'access_denied' ? 'Sign-in was cancelled or plan usage was declined' : `OpenAI returned ${q.get('error')}`), { status: 400 });
+    throw fail(q.get('error') === 'access_denied' ? 'Sign-in was cancelled or plan usage was declined' : `OpenAI returned ${q.get('error')}`);
   }
-  if (!q.get('code')) throw Object.assign(new Error(`The address has no authorization code. ${PASTE_HELP}.`), { status: 400 });
+  if (!q.get('code')) throw fail(`The address has no authorization code. ${PASTE_HELP}.`);
   const p = pending.get(q.get('state') || '');
-  if (!p) throw Object.assign(new Error('This sign-in link is unknown or expired. Start again.'), { status: 400 });
+  if (!p) throw fail('This sign-in link is unknown or expired. Start again.');
   pending.delete(q.get('state'));
   const issued = q.get('client_id');
-  if (p.registering && !issued) throw Object.assign(new Error('Registration incomplete: no client id returned. Start again.'), { status: 400 });
-  if (!p.registering && issued && issued !== p.clientId) throw Object.assign(new Error('Unexpected client id in the response'), { status: 400 });
+  if (p.registering && !issued) throw fail('Registration incomplete: no client id returned. Start again.');
+  if (!p.registering && issued && issued !== p.clientId) throw fail('Unexpected client id in the response');
   const clientId = p.registering ? issued : p.clientId;
   const code = q.get('code');
 
@@ -131,7 +132,7 @@ export async function completeSignIn(callbackUrl) {
   const claims = await verifyIdToken(tok.id_token, { issuer: ISSUER(), audience: clientId, nonce: p.nonce, discoveryBase: AUTH_BASE() });
   const scopes = scopesOf(tok);
   if (!scopes.includes(PLAN_SCOPE)) {
-    throw Object.assign(new Error('Signed in, but ChatGPT plan usage was not granted (Plus or Pro required, and allow plan usage on the consent screen)'), { status: 400 });
+    throw fail('Signed in, but ChatGPT plan usage was not granted (Plus or Pro required, and allow plan usage on the consent screen)');
   }
   const creds = {
     client_id: clientId, ext_agent_host_id: hostId(), email: claims.email || '', issuer: claims.iss, subject: claims.sub,

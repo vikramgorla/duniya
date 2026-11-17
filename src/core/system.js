@@ -1,3 +1,4 @@
+// @ts-check
 // Server metrics and maintenance (011). Read-only metrics come from /proc and standard tools (no root needed).
 // Maintenance (OS updates, reboot, restarting services) is done by a root-owned helper installed by install.sh:
 // the app writes one action word to a request file; a systemd path unit runs the helper, which accepts only a
@@ -5,7 +6,7 @@
 import os from 'node:os';
 import { readFileSync, existsSync, writeFileSync, statfsSync, statSync, mkdirSync } from 'node:fs';
 import { execFile } from 'node:child_process';
-import { DATA_DIR, ROOT, plural } from './config.js';
+import { DATA_DIR, ROOT, plural, fail } from './config.js';
 import { getSetting, updateSettings } from './store.js';
 import { activity } from './events.js';
 
@@ -142,6 +143,7 @@ export const metricsHistory = () => history;
 // A simulation as the app user may ignore phasing (apt treats it like a chroot), so phasing also comes from
 // `apt-cache policy` ("(phased 20%)" next to the candidate). Security updates are never phased.
 // The parsers are pure and tested on captured outputs (test/fixtures/apt/), including apt 3's new layout.
+/** @type {[RegExp, string][]} */
 const LIST_HEADERS = [
   [/^The following upgrades have been deferred due to phasing:$/, 'phased'], [/^Not upgrading yet due to phasing:$/, 'phased'],
   [/^The following packages have been kept back:$/, 'keptBack'], [/^Not upgrading:$/, 'keptBack'],
@@ -286,8 +288,9 @@ export function rebootStatus() {
 }
 
 // ---------- logs ----------
+/** @param {string} unit  @param {number|string} [lines] */
 export async function logs(unit, lines = 200) {
-  if (!LOG_UNITS.includes(unit)) throw Object.assign(new Error('Unknown service'), { status: 400 });
+  if (!LOG_UNITS.includes(unit)) throw fail('Unknown service');
   const n = Math.max(10, Math.min(1000, Number(lines) || 200));
   const r = await run('journalctl', ['-u', unit, '-n', String(n), '--no-pager', '-o', 'short-iso'], 15000);
   if (!r.ok || /No journal files|insufficient permissions|not seeing messages/i.test(r.err + r.out)) {
@@ -331,21 +334,21 @@ export function opsStatus() {
     log: full.split('\n').slice(-120).join('\n') };
 }
 export function requestOp(action, by = '', { files = {} } = {}) {
-  if (!OPS_ACTIONS[action]) throw Object.assign(new Error('Unknown action'), { status: 400 });
-  if (!opsAvailable()) throw Object.assign(new Error('Server maintenance is not set up on this install. Re-run the installer once (or redeploy) to enable it.'), { status: 400 });
+  if (!OPS_ACTIONS[action]) throw fail('Unknown action');
+  if (!opsAvailable()) throw fail('Server maintenance is not set up on this install. Re-run the installer once (or redeploy) to enable it.');
   if (action === 'os-update-all' && opsHelperVersion() < OPS_HELPER_NEEDED) {
-    throw Object.assign(new Error('Including gradual updates needs the newer maintenance helper: run sudo duniya update on the server (or re-run the installer) once.'), { status: 400 });
+    throw fail('Including gradual updates needs the newer maintenance helper: run sudo duniya update on the server (or re-run the installer) once.');
   }
   if (action === 'update-helper') {
     if (opsHelperVersion() < OPS_HELPER_SELF_UPDATE) {
-      throw Object.assign(new Error('This server\'s maintenance helper is too old to update itself: run sudo duniya update on the server once, or reinstall if you have no SSH access. After that it updates itself.'), { status: 400, code: 'helper_too_old' });
+      throw fail('This server\'s maintenance helper is too old to update itself: run sudo duniya update on the server once, or reinstall if you have no SSH access. After that it updates itself.', 400, { code: 'helper_too_old' });
     }
     const v = appVersion();
-    if (!RELEASE_RE.test(v)) throw Object.assign(new Error('The app version is not a release number'), { status: 400 });
+    if (!RELEASE_RE.test(v)) throw fail('The app version is not a release number');
     files = { ...files, 'helper-version': `${v}\n` }; // the helper accepts only vX.Y.Z and fetches that release itself
   }
   const cur = opsStatus().status;
-  if (cur?.state === 'running' && Date.now() - (cur.startedAt || 0) < 60 * 60000) throw Object.assign(new Error(`Already running: ${cur.action}`), { status: 409 });
+  if (cur?.state === 'running' && Date.now() - (cur.startedAt || 0) < 60 * 60000) throw fail(`Already running: ${cur.action}`, 409);
   mkdirSync(OPS_REQUEST_DIR, { recursive: true });
   for (const [name, content] of Object.entries(files)) writeFileSync(`${OPS_REQUEST_DIR}/${name}`, content, { mode: 0o640 }); // read by the helper
   writeFileSync(`${OPS_REQUEST_DIR}/request`, `${action}\n`);

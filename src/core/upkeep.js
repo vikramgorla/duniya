@@ -1,3 +1,4 @@
+// @ts-check
 // Shared upkeep (057, #110): small background chores the owner should never have to click, run from the scheduler's
 // existing 30-second tick (no timers of their own). Each tick does a bounded amount of work:
 //   - history loads the phone did not answer: up to 2 due retries (history-load.js)

@@ -18,7 +18,7 @@ import https from 'node:https';
 import { randomBytes } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
-import { env } from './config.js';
+import { env, fail } from './config.js';
 import { getSetting, updateSettings } from './store.js';
 import { activity } from './events.js';
 import { OPS_STATE_DIR, OPS_WEBCONFIG, opsAvailable, opsStatus, requestOp } from './system.js';
@@ -27,7 +27,6 @@ import {
 } from '../../deploy/ops/webconfig.mjs';
 
 export { PROVIDERS };
-const fail = (message, status = 400, extra = {}) => Object.assign(new Error(message), { status, ...extra });
 const readJson = (f) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return null; } };
 const TRIAL_MS = Number(process.env.DUNIYA_ACCESS_TRIAL_MS || 10 * 60000);
 
@@ -454,6 +453,7 @@ export function cancelSwitch({ user } = {}) {
  * Change who may open the panel. Anything stricter than now is a trial: it reverts by itself unless confirmed through
  * the new rule within TRIAL_MS. Rules that would shut out the current request need `confirmLockout`.
  */
+/** @param {object} body  @param {{ user?: object, ip?: string, req?: object }} [o] */
 export async function setAccess(body, { user, ip = '', req } = {}) {
   ensureFree();
   const s = webSettings();

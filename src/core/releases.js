@@ -1,3 +1,4 @@
+// @ts-check
 // Release notes for updates (045, issue #57). `releases.json` at the repository root says which versions are breaking
 // and what the owner must do. The app reads it from the TARGET release with `git show <tag>:releases.json` (no GitHub
 // API), so the newest release describes every version before it.

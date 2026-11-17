@@ -1,3 +1,4 @@
+// @ts-check
 // Contacts (issue #11, #110): names synced from the linked WhatsApp phone(s) plus the owner's own entries.
 // Agents look contacts up with contacts__find_contact. Participants only ever see contacts marked shared;
 // organizers see all and manage them (owner decision on #11). Synced contacts are never shared by default.
@@ -11,7 +12,7 @@
 // People WhatsApp only identifies by a LID (hidden number) are kept in contact_lids until the LID↔phone mapping
 // arrives; then their names move to the phone's row. A raw LID is never shown as if it were a number.
 import { db } from './db.js';
-import { digits } from './config.js';
+import { digits, fail } from './config.js';
 import { activity } from './events.js';
 import { getSettings, updateSettings } from './store.js';
 
@@ -29,7 +30,6 @@ db.exec(`
     PRIMARY KEY (tenant_id, lid)
   );
 `);
-const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const HIDDEN_NUMBER = 'Unknown (hidden number)';
 const synced = (r) => r.book_name || r.biz_name || r.push_name || '';
 const view = (r) => ({
@@ -39,7 +39,7 @@ const view = (r) => ({
 });
 const normPhone = (p) => {
   const d = digits(p);
-  if (d.length < 6 || d.length > 15) fail(`"${p}" is not a phone number with country code`);
+  if (d.length < 6 || d.length > 15) throw fail(`"${p}" is not a phone number with country code`);
   return d;
 };
 const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, 100);
@@ -70,7 +70,7 @@ export function mapLid(lid, phone) {
   const changed = setLidPhone.run(TENANT, l, p, Date.now()).changes > 0;
   const r = getLid.get(TENANT, l);
   let moved = 0;
-  for (const [k, col] of Object.entries(NAME_COLS)) if (r?.[col]) moved += upPhone[k].run(TENANT, p, r[col], Date.now()).changes;
+  for (const [k, col] of Object.entries(NAME_COLS)) if (r?.[col]) moved += Number(upPhone[k].run(TENANT, p, r[col], Date.now()).changes);
   return changed || moved > 0;
 }
 /** Phone digits of a LID when the mapping is known, else ''. */
@@ -93,8 +93,8 @@ export function syncWhatsAppContacts(list = []) {
       const names = { book: clean(c?.name), biz: clean(c?.verifiedName), push: clean(c?.notify) };
       for (const [k, v] of Object.entries(names)) {
         if (!v || /^\+?\d[\d\s]{5,}$/.test(v)) continue; // a "name" that is only a number adds nothing
-        if (phone.length >= 6) n += upPhone[k].run(TENANT, phone, v, Date.now()).changes;
-        else if (lid) n += upLid[k].run(TENANT, lid, v, Date.now()).changes;
+        if (phone.length >= 6) n += Number(upPhone[k].run(TENANT, phone, v, Date.now()).changes);
+        else if (lid) n += Number(upLid[k].run(TENANT, lid, v, Date.now()).changes);
       }
     }
     db.exec('COMMIT');
@@ -176,7 +176,7 @@ export function saveContact({ phone, name, note, shared }, by = 'panel') {
     note: note !== undefined ? String(note).trim().slice(0, 300) : cur?.note || '',
     shared: shared !== undefined ? (shared ? 1 : 0) : cur?.shared || 0,
   };
-  if (!next.name && !(cur && synced(cur))) fail('A name is required');
+  if (!next.name && !(cur && synced(cur))) throw fail('A name is required');
   db.prepare(`INSERT INTO contacts (tenant_id, phone, name, note, shared, own, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)
     ON CONFLICT (tenant_id, phone) DO UPDATE SET name = excluded.name, note = excluded.note, shared = excluded.shared, own = 1, updated_at = excluded.updated_at`)
     .run(TENANT, p, next.name, next.note, next.shared, Date.now());

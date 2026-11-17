@@ -1,3 +1,4 @@
+// @ts-check
 // Panel routes for updates (008, 045). Owner only.
 import { getUpdateSettings, setUpdateSettings, updateStatus, checkForUpdate, applyUpdate, installKind, updateRunning, backupConfigured } from '../../core/updates.js';
 import { pendingDecision, snoozeDecision, runConfirmedUpdate, setUpdateRestart } from '../../core/update-decision.js';

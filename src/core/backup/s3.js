@@ -1,4 +1,6 @@
+// @ts-check
 // Minimal S3-compatible client with AWS Signature Version 4 (path-style). Works with R2, OCI, AWS, MinIO.
+import { fail } from '../config.js';
 import { createHash, createHmac } from 'node:crypto';
 
 const sha256hex = (d) => createHash('sha256').update(d).digest('hex');
@@ -42,7 +44,7 @@ export function s3Client({ endpoint, region = 'auto', bucket, accessKeyId, secre
     if (!res.ok && !(method === 'DELETE' && res.status === 404)) {
       const text = await res.text();
       const code = text.match(/<Code>([^<]+)<\/Code>/)?.[1];
-      throw Object.assign(new Error(`S3 ${method} ${res.status}${code ? ` ${code}` : ''}`), { status: 400 });
+      throw fail(`S3 ${method} ${res.status}${code ? ` ${code}` : ''}`);
     }
     return res;
   }

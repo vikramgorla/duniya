@@ -13,7 +13,7 @@ import { execFile } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { getSecret, setSecret, onSecretChange } from '../store.js';
-import { DATA_DIR } from '../config.js';
+import { DATA_DIR, fail } from '../config.js';
 import { netEnv } from '../mcp-local.js';
 
 export const id = 'copilot';
@@ -28,9 +28,9 @@ export const configured = (secret = SECRET) => !!getSecret(secret);
 /** Fine-grained PATs (github_pat_…) and OAuth user tokens (gho_/ghu_) work; classic PATs (ghp_) do not. */
 export function checkToken(token) {
   const t = String(token || '').trim();
-  if (!t) throw Object.assign(new Error('Paste a GitHub token'), { status: 400, field: 'token' });
-  if (/^ghp_/.test(t)) throw Object.assign(new Error('Classic tokens (ghp_…) don’t work with Copilot. Create a fine-grained token (github_pat_…) with the link in step 2.'), { status: 400, field: 'token' });
-  if (!/^(github_pat_|gho_|ghu_)[A-Za-z0-9_]{10,}$/.test(t)) throw Object.assign(new Error('That doesn’t look like a GitHub token. It should start with github_pat_'), { status: 400, field: 'token' });
+  if (!t) throw fail('Paste a GitHub token', 400, { field: 'token' });
+  if (/^ghp_/.test(t)) throw fail('Classic tokens (ghp_…) don’t work with Copilot. Create a fine-grained token (github_pat_…) with the link in step 2.', 400, { field: 'token' });
+  if (!/^(github_pat_|gho_|ghu_)[A-Za-z0-9_]{10,}$/.test(t)) throw fail('That doesn’t look like a GitHub token. It should start with github_pat_', 400, { field: 'token' });
   return t;
 }
 
@@ -60,7 +60,7 @@ export function installSdk() {
     execFile(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['install', '--no-audit', '--no-fund', '--omit=dev', '--no-package-lock', SDK_SPEC], {
       cwd: SDK_DIR, timeout: 15 * 60 * 1000, maxBuffer: 8 * 1024 * 1024,
       env: { ...netEnv(), PATH: process.env.PATH, HOME: SDK_DIR, npm_config_cache: join(SDK_DIR, '.npm-cache'), npm_config_update_notifier: 'false' },
-    }, (err, stdout, stderr) => (err ? rej(Object.assign(new Error(`Could not download Copilot support: ${(stderr || err.message).trim().split('\n').slice(-2).join(' ')}`), { status: 400 })) : res()));
+    }, (err, stdout, stderr) => (err ? rej(fail(`Could not download Copilot support: ${(stderr || err.message).trim().split('\n').slice(-2).join(' ')}`)) : res()));
   }).finally(() => { installing = null; });
   return installing;
 }

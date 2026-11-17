@@ -1,3 +1,4 @@
+// @ts-check
 // Owner assistant (044): Settings → Owner assistant (link per signed-in user; 059: everything else is the built-in
 // agent record, edited in the agent editor), the Ask box on Overview, and the
 // privacy notice settings.

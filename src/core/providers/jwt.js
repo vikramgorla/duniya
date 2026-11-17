@@ -1,3 +1,4 @@
+// @ts-check
 // Minimal RS256 JWT verification with OIDC discovery + JWKS (no dependencies).
 import { createPublicKey, verify } from 'node:crypto';
 
@@ -5,6 +6,7 @@ const b64url = (s) => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base
 const jwksCache = new Map(); // issuer -> { at, keys }
 const discoCache = new Map(); // base -> { at, doc }
 
+/** @returns {Promise<any>} */
 async function getJson(url) {
   const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`${url}: ${res.status}`);

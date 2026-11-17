@@ -1,3 +1,4 @@
+// @ts-check
 // Agent configuration: defaults, validation and normalisation (005). Single source of truth for agent shape.
 import { validPackageSpec } from './mcp-local.js';
 import { digits } from './config.js';
@@ -292,7 +293,7 @@ export function validateGlobalServer(name, input) {
 /** Secret names referenced by a config (${NAME}). */
 export function referencedSecrets(config) {
   const names = new Set();
-  JSON.stringify(config.mcpServers || {}).replace(/\$\{([A-Z][A-Z0-9_]*)\}/g, (_, k) => names.add(k));
+  for (const [, k] of JSON.stringify(config.mcpServers || {}).matchAll(/\$\{([A-Z][A-Z0-9_]*)\}/g)) names.add(k);
   return [...names];
 }
 

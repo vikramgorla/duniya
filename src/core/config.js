@@ -1,3 +1,4 @@
+// @ts-check
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { applyPendingRestore } from './restore-apply.js';
@@ -46,8 +47,10 @@ export const env = {
 export const digits = (s) => String(s ?? '').replace(/\D/g, '');
 /** One line of at most `n` characters (whitespace collapsed, "…" when cut). */
 export const clip = (s, n = 120) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
+/** An error the panel answers with `status` (default 400); `extra` (field, code, …) goes along to the client. */
+export const fail = (message, status = 400, extra = {}) => Object.assign(new Error(message), { status, ...extra });
 /** A 400-style error the panel shows next to `field`. */
-export const bad = (message, field, status = 400) => Object.assign(new Error(message), { status, ...(field ? { field } : {}) });
+export const bad = (message, field, status = 400) => fail(message, status, field ? { field } : {});
 export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 export const iso = (ts) => (ts ? new Date(ts).toISOString() : null);
 export const isGroup = (chat) => String(chat).endsWith('@g.us');

@@ -1,13 +1,20 @@
-// #1: the panel works on phones (iPhone 15 = 393 px, SE = 375 px). Static checks of src/panel/public/index.html;
+// #1: the panel works on phones (iPhone 15 = 393 px, SE = 375 px). Static checks of the panel (src/panel/public/);
 // the full browser check is `npm run check:responsive` (needs a local Chrome, not run in CI).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const html = readFileSync(join(import.meta.dirname, '../src/panel/public/index.html'), 'utf8');
-const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
-const js = html.slice(html.lastIndexOf('<script>'), html.lastIndexOf('</script>'));
+const PUBLIC = join(import.meta.dirname, '../src/panel/public');
+const html = readFileSync(join(PUBLIC, 'index.html'), 'utf8');
+const css = readFileSync(join(PUBLIC, 'app/styles.css'), 'utf8');
+// every panel module, one after the other; `where(i)` turns an index back into file:line
+const parts = readdirSync(join(PUBLIC, 'app')).filter((f) => f.endsWith('.js')).map((f) => [f, readFileSync(join(PUBLIC, 'app', f), 'utf8')]);
+const js = parts.map(([, src]) => src).join('\n');
+function where(i) {
+  for (const [f, src] of parts) { if (i <= src.length) return `${f}:${src.slice(0, i).split('\n').length}`; i -= src.length + 1; }
+  return '?';
+}
 
 /** Index just past a string or template literal starting at i (template ${…} parts included). */
 function skipString(src, i) {
@@ -52,8 +59,7 @@ test('every data table turns into cards on phones (table.stack) or scrolls insid
     const before = js.slice(Math.max(0, start - 120), start);
     return !/h\('div', \{ (class: 'tscroll'[^}]*|style: '[^']*overflow-x:\s*auto[^']*') \}, $/.test(before);
   });
-  assert.deepEqual(bad.map((t) => js.slice(0, t.start).split('\n').length + html.slice(0, html.lastIndexOf('<script>')).split('\n').length - 1), [],
-    'tables (by line in index.html) without class stack or a tscroll / overflow-x:auto wrapper');
+  assert.deepEqual(bad.map((t) => where(t.start)), [], 'tables without class stack or a tscroll / overflow-x:auto wrapper');
 });
 
 test('cells of stacked tables say which column they are (data-label, empty for a full-width cell)', () => {

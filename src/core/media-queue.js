@@ -1,3 +1,4 @@
+// @ts-check
 // Media job queue (043, issue #48). Heavy work — a photo or voice-note turn (download, transcription, the model call,
 // a voice reply), image creation, a voice reply to a text message — runs here instead of inside the message
 // handler, so a small server never does several at once and nobody has to resend:

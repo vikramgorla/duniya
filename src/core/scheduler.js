@@ -1,3 +1,4 @@
+// @ts-check
 import { isChatEnabled } from './chat-prefs.js';
 import { env } from './config.js';
 import { getSettings } from './store.js';

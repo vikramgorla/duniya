@@ -1,3 +1,4 @@
+// @ts-check
 // Why didn't the agent answer? (#34) Every time an agent stays silent the router records the reason here, compactly:
 // one row per (chat, agent, reason) with a count, the last time and one sample sender — never a row per message and
 // never message text. The activity log gets at most one `silence` entry per chat + reason per hour.
@@ -73,7 +74,9 @@ const view = (r) => ({
 
 /** Silences seen in the last `days` days, most frequent first. Filters: chat, agent, reason. */
 export function listSilences({ chat = '', agent = '', reason = '', days = 7, limit = 200 } = {}) {
-  const where = ['last_ts >= ?']; const args = [Date.now() - Math.max(1, Math.min(Number(days) || 7, 400)) * 86400000];
+  const where = ['last_ts >= ?'];
+  /** @type {(string|number)[]} */
+  const args = [Date.now() - Math.max(1, Math.min(Number(days) || 7, 400)) * 86400000];
   if (chat) { where.push('chat = ?'); args.push(chat); }
   if (agent) { where.push('agent = ?'); args.push(agent); }
   if (reason) { where.push('reason = ?'); args.push(reason); }

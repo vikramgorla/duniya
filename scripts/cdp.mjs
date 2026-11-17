@@ -24,10 +24,15 @@ export async function launch() {
   if (!/^\d{2,5}$/.test(port) || !/^\/devtools\/browser\/[A-Za-z0-9-]+$/.test(path)) throw new Error('Unexpected DevToolsActivePort content');
   const ws = new WebSocket(`ws://127.0.0.1:${Number(port)}/devtools/browser/${path.split('/').pop()}`);
   await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
-  let id = 0; const waiting = new Map();
-  ws.onmessage = (m) => { const msg = JSON.parse(m.data); const w = waiting.get(msg.id); if (w) { waiting.delete(msg.id); msg.error ? w.reject(new Error(msg.error.message)) : w.resolve(msg.result); } };
+  let id = 0; const waiting = new Map(); const listeners = new Set();
+  ws.onmessage = (m) => {
+    const msg = JSON.parse(m.data); const w = waiting.get(msg.id);
+    if (w) { waiting.delete(msg.id); msg.error ? w.reject(new Error(msg.error.message)) : w.resolve(msg.result); } else if (msg.method) for (const l of listeners) l(msg);
+  };
   const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => { const i = ++id; waiting.set(i, { resolve, reject }); ws.send(JSON.stringify({ id: i, method, params, sessionId })); });
-  return { send, close: () => { ws.close(); proc.kill(); setTimeout(() => rmSync(profile, { recursive: true, force: true }), 500); } };
+  /** Protocol events (e.g. Network.loadingFinished) of every page: on((msg) => …). */
+  const on = (fn) => listeners.add(fn);
+  return { send, on, close: () => { ws.close(); proc.kill(); setTimeout(() => rmSync(profile, { recursive: true, force: true }), 500); } };
 }
 /** A page at `width` (phones < 600 px get touch + mobile emulation). Optional `height` and `scale` (device pixel ratio). */
 export async function newPage(cdp, { width, scheme, height, scale = 1 }) {

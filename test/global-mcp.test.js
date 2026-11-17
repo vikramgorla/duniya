@@ -6,7 +6,6 @@ import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { setup, serveFakeMcp } from './harness.js';
-import { TOOLS } from '../src/panel/admin-tools.js';
 
 // ---------- fake OAuth-protected tool service (dynamic registration, PKCE) ----------
 const as = { valid: new Set(), codes: new Map(), registered: 0, bearers: [] };
@@ -41,6 +40,7 @@ await new Promise((r) => fake.once('listening', r));
 BASE = `http://127.0.0.1:${fake.address().port}`;
 
 const t = await setup({ env: { RATE_LIMIT_PER_MIN: '100', DUNIYA_TEST_ALLOW_FILE_SPECS: '1' } });
+const { TOOLS } = await import('../src/panel/admin-tools.js'); // after setup: the app's modules read DATA_DIR once
 const owner = await t.login();
 t.store.createUser({ username: 'ada', role: 'admin', password: 'admin password 123' });
 const admin = await t.login('ada', 'admin password 123');

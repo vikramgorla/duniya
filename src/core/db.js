@@ -1,7 +1,14 @@
+// @ts-check
 import { DatabaseSync } from 'node:sqlite';
 import { resolve } from 'node:path';
 import { DATA_DIR, env } from './config.js';
 
+/**
+ * Rows are plain objects whose columns the SQL decides, so statements hand them out untyped (063, type checking).
+ * @typedef {{ run: (...params: any[]) => import('node:sqlite').StatementResultingChanges, get: (...params: any[]) => any,
+ *   all: (...params: any[]) => any[], iterate: (...params: any[]) => IterableIterator<any> }} Statement
+ * @type {Omit<DatabaseSync, 'prepare'> & { prepare: (sql: string) => Statement }}
+ */
 export const db = new DatabaseSync(resolve(DATA_DIR, 'duniya.sqlite'));
 db.exec(`
   PRAGMA journal_mode = WAL;
@@ -159,9 +166,12 @@ export function pruneActivity({ days = 30, max = 5000 } = {}) {
   db.prepare('DELETE FROM activity WHERE id <= (SELECT id FROM activity ORDER BY id DESC LIMIT 1 OFFSET ?)').run(Math.max(100, max));
   db.prepare('DELETE FROM activity WHERE ts < ?').run(Date.now() - Math.max(1, days) * 86400000);
 }
+/** @param {{ limit?: number|string, agent?: string, chat?: string, before?: number }} [o]  limit: as sent (a query string is fine) */
 export function listActivity({ limit = 200, agent = '', chat = '', before = 0 } = {}) {
   const lim = Math.min(Number(limit) || 200, 1000);
-  const where = ['(? = 0 OR id < ?)']; const args = [before, before];
+  const where = ['(? = 0 OR id < ?)'];
+  /** @type {(string|number)[]} */
+  const args = [before, before];
   if (agent) { where.push('agent = ?'); args.push(agent); }
   if (chat) { where.push('chat = ?'); args.push(chat); }
   const rows = db.prepare(`SELECT * FROM activity WHERE ${where.join(' AND ')} ORDER BY id DESC LIMIT ?`).all(...args, lim);
@@ -207,9 +217,12 @@ export function namesInChat(chat) {
 }
 
 /** Stored messages of a chat, newest first (for admins in the panel). */
+/** @param {string} chat  @param {{ before?: number|string, limit?: number|string, q?: string }} [o]  numbers as sent */
 export function listMessages(chat, { before = 0, limit = 50, q = '' } = {}) {
   const lim = Math.min(Math.max(Number(limit) || 50, 1), 200);
-  const args = [chat]; let where = 'chat = ?';
+  /** @type {(string|number)[]} */
+  const args = [chat];
+  let where = 'chat = ?';
   if (Number(before)) { where += ' AND id < ?'; args.push(Number(before)); }
   if (q) { where += ' AND text LIKE ?'; args.push(`%${String(q).slice(0, 100)}%`); }
   return db.prepare(`SELECT id, sender, sender_jid AS senderJid, name, text, quoted, from_agent AS fromAgent, addressed, ts FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim)

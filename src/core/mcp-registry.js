@@ -6,6 +6,7 @@
 // Safety: requests go only to the configured registry host (https, or http on this machine for a private registry),
 // never follow redirects, carry no cookies or credentials, time out after 8 s and stop reading after 1 MB. Answers are
 // cached briefly in memory (small, bounded). Registry text is data: the panel renders it as text, links only http(s).
+import { fail } from './config.js';
 import { getSetting, updateSettings, getSecret } from './store.js';
 import { SERVER_KEY_RE, RESERVED_SERVER_KEYS } from './schema.js';
 import { validPackageSpec, localServiceCheck } from './mcp-local.js';
@@ -17,7 +18,6 @@ const CACHE_MS = 5 * 60 * 1000;
 const CACHE_MAX = 50;
 const NPM_HOSTS = ['registry.npmjs.org', 'registry.npmjs.com'];
 
-const bad = (message, status = 400, extra = {}) => Object.assign(new Error(message), { status, ...extra });
 const clip = (v, n = 300) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
 const isLoopback = (host) => ['localhost', '127.0.0.1', '[::1]', '::1'].includes(host);
 
@@ -34,11 +34,11 @@ export function cleanBaseUrl(raw) {
   const s = String(raw ?? '').trim();
   if (!s) return '';
   let u;
-  try { u = new URL(s); } catch { throw bad('Registry address must be a full URL like https://registry.example.com', 400, { field: 'baseUrl' }); }
-  if (u.username || u.password) throw bad('Registry address must not contain a user name or password', 400, { field: 'baseUrl' });
-  if (u.search || u.hash) throw bad('Registry address must not contain ? or #', 400, { field: 'baseUrl' });
+  try { u = new URL(s); } catch { throw fail('Registry address must be a full URL like https://registry.example.com', 400, { field: 'baseUrl' }); }
+  if (u.username || u.password) throw fail('Registry address must not contain a user name or password', 400, { field: 'baseUrl' });
+  if (u.search || u.hash) throw fail('Registry address must not contain ? or #', 400, { field: 'baseUrl' });
   if (u.protocol !== 'https:' && !(u.protocol === 'http:' && isLoopback(u.hostname))) {
-    throw bad('Registry address must use https (http only for a registry on this server)', 400, { field: 'baseUrl' });
+    throw fail('Registry address must use https (http only for a registry on this server)', 400, { field: 'baseUrl' });
   }
   return `${u.origin}${u.pathname.replace(/\/+$/, '')}`;
 }
@@ -56,7 +56,7 @@ const cache = new Map(); // url → { at, data }
 
 async function readCapped(res) {
   const len = Number(res.headers.get('content-length') || 0);
-  if (len > MAX_BYTES) throw bad('The registry answer is too large');
+  if (len > MAX_BYTES) throw fail('The registry answer is too large');
   if (!res.body) return '';
   const reader = res.body.getReader();
   const chunks = []; let total = 0;
@@ -64,7 +64,7 @@ async function readCapped(res) {
     const { done, value } = await reader.read();
     if (done) break;
     total += value.length;
-    if (total > MAX_BYTES) { try { await reader.cancel(); } catch { /* ignore */ } throw bad('The registry answer is too large'); }
+    if (total > MAX_BYTES) { try { await reader.cancel(); } catch { /* ignore */ } throw fail('The registry answer is too large'); }
     chunks.push(value);
   }
   return Buffer.concat(chunks).toString('utf8');
@@ -72,10 +72,10 @@ async function readCapped(res) {
 
 async function registryGet(path, params = {}) {
   const set = registrySettings();
-  if (!set.enabled) throw bad('Browsing the MCP Registry is switched off (Settings → Tool services)', 403, { code: 'registry_off' });
+  if (!set.enabled) throw fail('Browsing the MCP Registry is switched off (Settings → Tool services)', 403, { code: 'registry_off' });
   const base = new URL(`${set.effective}/`);
   const url = new URL(path.replace(/^\//, ''), base);
-  if (url.origin !== base.origin) throw bad('Refused: not the registry host'); // never leave the registry host
+  if (url.origin !== base.origin) throw fail('Refused: not the registry host'); // never leave the registry host
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v));
   const key = url.toString();
   const hit = cache.get(key);
@@ -84,12 +84,12 @@ async function registryGet(path, params = {}) {
   try {
     res = await fetch(url, { redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { accept: 'application/json', 'user-agent': 'whatsapp-agent-duniya' } });
   } catch (e) {
-    throw bad(e?.name === 'TimeoutError' ? 'The MCP Registry did not answer in time; try again' : `Could not reach the MCP Registry (${url.host})`, 502);
+    throw fail(e?.name === 'TimeoutError' ? 'The MCP Registry did not answer in time; try again' : `Could not reach the MCP Registry (${url.host})`, 502);
   }
-  if (res.status === 404) { await readCapped(res).catch(() => ''); throw bad('Not found in the MCP Registry', 404); }
-  if (!res.ok) { await readCapped(res).catch(() => ''); throw bad(`The MCP Registry answered ${res.status}`, 502); }
+  if (res.status === 404) { await readCapped(res).catch(() => ''); throw fail('Not found in the MCP Registry', 404); }
+  if (!res.ok) { await readCapped(res).catch(() => ''); throw fail(`The MCP Registry answered ${res.status}`, 502); }
   let data;
-  try { data = JSON.parse(await readCapped(res)); } catch (e) { throw e.status ? e : bad('The MCP Registry sent something that is not JSON', 502); }
+  try { data = JSON.parse(await readCapped(res)); } catch (e) { throw e.status ? e : fail('The MCP Registry sent something that is not JSON', 502); }
   cache.set(key, { at: Date.now(), data });
   while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
   return data;
@@ -234,9 +234,9 @@ export async function searchRegistry({ q = '', limit = 20, cursor = '' } = {}) {
 /** One entry by its registry name (latest version, or `version`). */
 export async function getRegistryServer(name, version = 'latest') {
   const n = String(name || '').trim();
-  if (!/^[A-Za-z0-9.-]{1,120}\/[A-Za-z0-9._-]{1,120}$/.test(n)) throw bad('Registry name must look like io.github.owner/server');
+  if (!/^[A-Za-z0-9.-]{1,120}\/[A-Za-z0-9._-]{1,120}$/.test(n)) throw fail('Registry name must look like io.github.owner/server');
   const v = String(version || 'latest').trim();
-  if (!/^[A-Za-z0-9.+_-]{1,60}$/.test(v)) throw bad('Version is not valid');
+  if (!/^[A-Za-z0-9.+_-]{1,60}$/.test(v)) throw fail('Version is not valid');
   return normalise(await registryGet(`/v0.1/servers/${encodeURIComponent(n)}/versions/${encodeURIComponent(v)}`));
 }
 
@@ -287,18 +287,18 @@ export const localRegistryCheck = localServiceCheck;
  * Secret values are only ever returned in `secrets` (to store); the config holds ${NAME} references.
  */
 export function buildConfig(entry, kind, key, values = {}) {
-  if (kind !== 'remote' && kind !== 'local') throw bad('Choose hosted (remote) or local');
+  if (kind !== 'remote' && kind !== 'local') throw fail('Choose hosted (remote) or local');
   const idx = kind === 'remote' ? entry.can.remote : entry.can.local;
   if (idx === null || idx === undefined) {
-    throw bad(kind === 'remote' ? 'This entry has no hosted address this app can use' : `This entry has no package this app can run here${entry.can.reason ? `: ${entry.can.reason}` : ''}`);
+    throw fail(kind === 'remote' ? 'This entry has no hosted address this app can use' : `This entry has no package this app can run here${entry.can.reason ? `: ${entry.can.reason}` : ''}`);
   }
   const fields = addFields(entry, kind, key);
   const secrets = []; const missing = []; const warnings = [];
   const val = (f) => {
     const v = values?.[f.id];
     const s = v === undefined || v === null ? '' : String(v).trim();
-    if (s.length > 4000) throw bad(`${f.label}: too long`);
-    if (/[\r\n]/.test(s) && f.kind === 'header') throw bad(`${f.label}: must be one line`);
+    if (s.length > 4000) throw fail(`${f.label}: too long`);
+    if (/[\r\n]/.test(s) && f.kind === 'header') throw fail(`${f.label}: must be one line`);
     return s;
   };
   /** The text to use for a field: a ${SECRET} reference for secrets, else the plain value (or its default). */

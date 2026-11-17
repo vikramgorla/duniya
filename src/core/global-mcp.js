@@ -2,6 +2,7 @@
 // service (config.globalMcp.disabled); an agent's own tool service with the same name replaces the global one for
 // that agent. Tool permissions still come from the agent's per-role rules; the service's `defaults` (tool-name globs
 // per role) apply where a role has no explicit "<name>:" rule.
+import { fail } from './config.js';
 import { db } from './db.js';
 import { TENANT } from './store.js';
 import { validateGlobalServer } from './schema.js';
@@ -57,7 +58,7 @@ export function saveGlobalServer(name, input, by = '') {
 
 export function removeGlobalServer(name, by = '') {
   const n = db.prepare('DELETE FROM global_mcp WHERE tenant_id = ? AND name = ?').run(TENANT, name).changes;
-  if (!n) throw Object.assign(new Error(`No global tool service named ${name}`), { status: 404 });
+  if (!n) throw fail(`No global tool service named ${name}`, 404);
   activity('config', { summary: `Global tool service ${name} removed${by ? ` by ${by}` : ''}` });
   changed();
 }

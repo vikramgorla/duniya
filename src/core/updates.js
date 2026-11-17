@@ -1,3 +1,4 @@
+// @ts-check
 // Updates (008, 045): check the git remote for new releases (tags) or main, apply via deploy/update.sh, optional auto
 // mode. 045: releases.json (read from the target with git) marks breaking releases; the status says what lies between
 // the installed and the available version and which release can be reached safely. Before every update a local backup
@@ -5,7 +6,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ROOT } from './config.js';
+import { ROOT, fail } from './config.js';
 import { getSetting, updateSettings, getSecret } from './store.js';
 import { kvGet, kvSet } from './db.js';
 import { activity } from './events.js';
@@ -36,11 +37,11 @@ export function getUpdateSettings() {
 }
 export function setUpdateSettings(patch) {
   const next = { ...getUpdateSettings(), ...patch };
-  if (!['off', 'notify', 'auto'].includes(next.mode)) throw Object.assign(new Error('mode: off, notify or auto'), { status: 400, field: 'mode' });
-  if (!['stable', 'main'].includes(next.channel)) throw Object.assign(new Error('channel: stable or main'), { status: 400, field: 'channel' });
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(next.at)) throw Object.assign(new Error('at: HH:MM'), { status: 400, field: 'at' });
+  if (!['off', 'notify', 'auto'].includes(next.mode)) throw fail('mode: off, notify or auto', 400, { field: 'mode' });
+  if (!['stable', 'main'].includes(next.channel)) throw fail('channel: stable or main', 400, { field: 'channel' });
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(next.at)) throw fail('at: HH:MM', 400, { field: 'at' });
   next.keepPreUpdate = Number(next.keepPreUpdate);
-  if (!Number.isInteger(next.keepPreUpdate) || next.keepPreUpdate < 1 || next.keepPreUpdate > 20) throw Object.assign(new Error('keepPreUpdate: 1–20'), { status: 400, field: 'keepPreUpdate' });
+  if (!Number.isInteger(next.keepPreUpdate) || next.keepPreUpdate < 1 || next.keepPreUpdate > 20) throw fail('keepPreUpdate: 1–20', 400, { field: 'keepPreUpdate' });
   updateSettings({ updates: next });
   return next;
 }
@@ -120,6 +121,7 @@ export const updateRunning = () => (inflight ? { target: inflight.target, starte
  * Backup (when configured and `backup` is not false) → deploy/update.sh <target>. Returns { code, log, backup }.
  * A second call while one runs gets the same result. A failed backup stops the update (code 2).
  */
+/** @param {{ root?: string, target?: string, backup?: boolean, by?: string }} [o] */
 export function applyUpdate({ root = appRoot, target, backup = true, by = '' } = {}) {
   const own = root === appRoot;
   if (inflight && own) return inflight.promise;

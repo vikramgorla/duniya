@@ -1,3 +1,4 @@
+// @ts-check
 // Admin MCP server (017): manage this app from AI assistants (ChatGPT, Claude, …) over MCP, signed in with OAuth.
 // This app is both the authorization server and the resource server (MCP authorization spec 2025-06-18):
 //   /.well-known/oauth-protected-resource[/mcp]  RFC 9728   /.well-known/oauth-authorization-server  RFC 8414

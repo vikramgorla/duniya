@@ -1,3 +1,4 @@
+// @ts-check
 // Fallback chain values (042), validated without touching providers (used by agent config and chat prefs too).
 import { bad } from '../config.js';
 export const REF_RE = /^[a-z][a-z0-9-]{1,30}:[A-Za-z0-9._:/@+-]{1,120}$/;

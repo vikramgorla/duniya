@@ -2,7 +2,7 @@
   "minLines": 8,
   "format": ["javascript"],
   "path": ["src", "bin", "scripts", "deploy", "test"],
-  "ignore": ["**/node_modules/**", "src/panel/public/**"],
+  "ignore": ["**/node_modules/**"],
   "threshold": 0.5,
   "reporters": ["console"],
   "absolute": false,

@@ -1,3 +1,4 @@
+// @ts-check
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -66,7 +67,7 @@ class McpConnection {
       try {
         if (!this.client) await this.connect();
         const res = await this.client.callTool({ name, arguments: args || {} });
-        const text = (res.content || []).map((c) => (c.type === 'text' ? c.text : JSON.stringify(c))).join('\n');
+        const text = /** @type {any[]} */ (res.content || []).map((c) => (c.type === 'text' ? c.text : JSON.stringify(c))).join('\n');
         return { isError: !!res.isError, text };
       } catch (e) {
         await this.close();
@@ -100,6 +101,11 @@ async function makeRoomForLocal(starting) {
 /**
  * mcpConnection(url, token) or mcpConnection(url, { authProvider, identity }) for OAuth sign-ins
  * (identity = a stable key such as "oauth:<agent>:<server>:<role>").
+ */
+/**
+ * One pooled connection per URL and credential.
+ * @param {string} url
+ * @param {string | { token?: string, identity?: string, headers?: object, local?: object, authProvider?: object }} [cred]
  */
 export function mcpConnection(url, cred = '') {
   const o = cred && typeof cred === 'object' ? cred : { token: String(cred || '') };

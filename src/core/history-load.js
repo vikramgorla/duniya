@@ -7,6 +7,7 @@
 // 1 h, 6 h, then daily for 3 days), sooner when the phone is seen online (connection opens, the owner writes from the
 // phone) — only while the chat is on, and stops once messages arrive. Pending retries survive a restart (kv); they
 // are due times the shared upkeep tick checks, not timers.
+import { fail } from './config.js';
 import { getSettings } from './store.js';
 import { isChatEnabled, latestKey } from './chat-prefs.js';
 import { oldestStoredMessage, insertEarlierMessages, kvGet, kvSet } from './db.js';
@@ -112,7 +113,6 @@ export function historyStatus(chat) {
     ...(r && l.state !== 'loading' && l.state !== 'loaded' ? { retryAt: r.nextAt, automatic: true } : {}) };
 }
 
-const fail = (message, status) => Object.assign(new Error(message), { status });
 
 /** The key WhatsApp needs: the oldest stored message of the chat, else the newest key seen while it was off. */
 function anchorOf(chat) {
@@ -149,6 +149,7 @@ async function requestPage(chat, l, anchor) {
  * Ask the phone for up to `count` messages before the oldest one known. reason: 'switch_on' | 'button'.
  * Returns the status. Throws 409 when the chat is off, 429 when asked again within 30 s, 501 without a channel.
  */
+/** @param {string} chat  @param {{ count?: number, by?: string, reason?: string, attempt?: number }} [o] */
 export async function loadChatHistory(chat, { count, by = 'panel', reason = 'button', attempt = 0 } = {}) {
   if (!isChatEnabled(chat)) throw fail('Switch the chat on first: chats that are off store nothing', 409);
   if (typeof channel?.fetchHistory !== 'function') throw fail('Loading messages from the phone is not available', 501);

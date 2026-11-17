@@ -1,3 +1,4 @@
+// @ts-check
 // Welcome message (054, issue #102). When people join a group (added, invite link, join request accepted), the
 // group's agent greets them once: only in chats that are on, when the agent is enabled and its welcome is on (or the
 // chat's override says so). Joins that arrive together (bulk adds) get one combined message. "Once" is remembered as

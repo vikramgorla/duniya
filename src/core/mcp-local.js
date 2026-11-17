@@ -1,3 +1,4 @@
+// @ts-check
 // Local tool services (010): MCP servers installed from npm or GitHub and run on this server over stdio.
 // They are third-party code running with the app's own permissions, so: only owners add or change them (panel),
 // the installed version is recorded, npm install scripts are off unless allowed, and the process gets a scrubbed
@@ -5,7 +6,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, openSync, readSync, closeSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
-import { DATA_DIR } from './config.js';
+import { DATA_DIR, fail } from './config.js';
 import { sha256 } from './crypto.js';
 import { activity } from './events.js';
 import { smallServerCheck } from './resources.js';
@@ -51,7 +52,7 @@ export function guardLocalSmall(before, after) {
   const added = addedLocalServices(before, after);
   if (!added.length) return;
   const c = localServiceCheck();
-  if (!c.ok) throw Object.assign(new Error(c.reason), { status: 400, code: c.code, field: `mcpServers.${added[0]}` });
+  if (!c.ok) throw fail(c.reason, 400, { code: c.code, field: `mcpServers.${added[0]}` });
 }
 
 const dirFor = (spec, allowScripts) => join(LOCAL_ROOT, sha256(`${spec}\n${allowScripts ? 1 : 0}`).slice(0, 16));
@@ -65,7 +66,7 @@ export function installedInfo(spec, allowScripts = false) {
 function run(cmd, args, opts) {
   return new Promise((res, rej) => {
     execFile(cmd, args, { maxBuffer: 8 * 1024 * 1024, ...opts }, (err, stdout, stderr) => {
-      if (err) rej(Object.assign(new Error((stderr || err.message).trim().split('\n').slice(-6).join('\n')), { status: 400 }));
+      if (err) rej(fail(String(stderr || err.message).trim().split('\n').slice(-6).join('\n')));
       else res(stdout);
     });
   });
@@ -76,8 +77,8 @@ const inflight = new Map();
 /** Install (or reinstall with fresh=true) a package; returns { name, version, bin }. */
 export function installPackage(spec, { allowScripts = false, fresh = false, by = '' } = {}) {
   const small = localServiceCheck();
-  if (!small.ok) throw Object.assign(new Error(small.reason), { status: 400, code: small.code });
-  if (!validPackageSpec(spec)) throw Object.assign(new Error('Package must look like name, name@version, @scope/name or github:owner/repo#ref'), { status: 400 });
+  if (!small.ok) throw fail(small.reason, 400, { code: small.code });
+  if (!validPackageSpec(spec)) throw fail('Package must look like name, name@version, @scope/name or github:owner/repo#ref');
   const dir = dirFor(spec, allowScripts);
   if (inflight.has(dir)) return inflight.get(dir);
   const p = (async () => {
@@ -94,12 +95,12 @@ export function installPackage(spec, { allowScripts = false, fresh = false, by =
     });
     const deps = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).dependencies || {};
     const name = Object.keys(deps)[0];
-    if (!name) throw Object.assign(new Error('npm installed nothing'), { status: 400 });
+    if (!name) throw fail('npm installed nothing');
     const pkgDir = join(dir, 'node_modules', name);
     const pkg = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'));
     const bins = typeof pkg.bin === 'string' ? { [name.split('/').pop()]: pkg.bin } : (pkg.bin || {});
     const binName = bins[name.split('/').pop()] ? name.split('/').pop() : Object.keys(bins)[0];
-    if (!binName) throw Object.assign(new Error(`${name} has no command to run (no "bin" in its package.json)`), { status: 400 });
+    if (!binName) throw fail(`${name} has no command to run (no "bin" in its package.json)`);
     const info = { spec, allowScripts, name, version: pkg.version, bin: resolve(pkgDir, bins[binName]), dir, at: Date.now() };
     writeFileSync(infoFile(dir), JSON.stringify(info, null, 2));
     activity('config', { summary: `Installed local tool service ${name}@${pkg.version}${by ? ` (by ${by})` : ''}` });

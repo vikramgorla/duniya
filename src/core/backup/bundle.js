@@ -1,10 +1,11 @@
+// @ts-check
 // Backup bundle: consistent snapshot → gzip JSON → passphrase encryption (scrypt + AES-256-GCM).
 import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, relative } from 'node:path';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { DATA_DIR } from '../config.js';
+import { DATA_DIR, fail } from '../config.js';
 import { db } from '../db.js';
 import { keyFromPassphrase } from '../crypto.js';
 
@@ -50,7 +51,7 @@ export function encryptBundle(bundle, passphrase) {
 }
 
 export function decryptBundle(buf, passphrase) {
-  if (buf.subarray(0, MAGIC.length).toString() !== MAGIC) throw Object.assign(new Error('Not a duniya backup file'), { status: 400 });
+  if (buf.subarray(0, MAGIC.length).toString() !== MAGIC) throw fail('Not a duniya backup file');
   const nl = buf.indexOf(0x0a, MAGIC.length);
   const h = JSON.parse(buf.subarray(MAGIC.length, nl).toString());
   const key = keyFromPassphrase(passphrase, Buffer.from(h.salt, 'base64'));
@@ -58,12 +59,12 @@ export function decryptBundle(buf, passphrase) {
   d.setAuthTag(Buffer.from(h.tag, 'base64'));
   let plain;
   try { plain = Buffer.concat([d.update(buf.subarray(nl + 1)), d.final()]); } catch {
-    throw Object.assign(new Error('Wrong passphrase (or the file is damaged)'), { status: 400 });
+    throw fail('Wrong passphrase (or the file is damaged)');
   }
   const bundle = JSON.parse(gunzipSync(plain).toString());
-  if (bundle.format !== 'duniya-backup') throw Object.assign(new Error('Unsupported backup format'), { status: 400 });
+  if (bundle.format !== 'duniya-backup') throw fail('Unsupported backup format');
   if (!(bundle.version >= BUNDLE_VERSION)) {
-    throw Object.assign(new Error(`This backup was made by an old Duniya${bundle.app?.version ? ` (${bundle.app.version})` : ''} and cannot be restored into Duniya 2.`), { status: 400 });
+    throw fail(`This backup was made by an old Duniya${bundle.app?.version ? ` (${bundle.app.version})` : ''} and cannot be restored into Duniya 2.`);
   }
   return bundle;
 }
@@ -81,7 +82,7 @@ export function stageRestore(bundle, source = '', dataDir = DATA_DIR) {
     writeFileSync(dst, Buffer.from(b64, 'base64'), { mode: 0o600 });
     names.push(rel);
   }
-  if (!names.includes('duniya.sqlite')) throw Object.assign(new Error('Backup has no database'), { status: 400 });
+  if (!names.includes('duniya.sqlite')) throw fail('Backup has no database');
   writeFileSync(resolve(stage, 'manifest.json'), JSON.stringify({ source, createdAt: bundle.createdAt, files: names }));
   return names;
 }

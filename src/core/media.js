@@ -1,5 +1,6 @@
 // Media for WhatsApp sends (026): load from a URL or base64 with a size limit, a content-type check and an SSRF guard.
 // Baileys can fetch URLs itself; we never let it, so every download goes through this guard.
+import { fail } from './config.js';
 import http from 'node:http';
 import https from 'node:https';
 import { lookup as dnsLookup } from 'node:dns';
@@ -58,7 +59,7 @@ export function sniffType(buf) {
   return '';
 }
 
-const err = (message, status = 400) => Object.assign(new Error(message), { status });
+const err = (message, status = 400) => fail(message, status);
 
 /** Only http(s) URLs without credentials; IP literals are checked here, names at connect time. */
 export function checkUrl(raw, allow = (ip) => !isBlockedAddress(ip)) {

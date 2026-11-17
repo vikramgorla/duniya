@@ -364,7 +364,7 @@ test('Fresh install: restore from a backup file instead of creating an owner (se
 
   // Simulate a brand-new server: no accounts yet, a setup code printed by the installer.
   t.db.db.exec('DELETE FROM sessions; DELETE FROM users;');
-  const { bootstrapAuth } = await import('../src/panel/server.js');
+  const { bootstrapAuth } = await import('../src/panel/routes/auth.js');
   const saved = process.env.ADMIN_PASSWORD; delete process.env.ADMIN_PASSWORD;
   t.config.env.adminPassword = '';
   bootstrapAuth();

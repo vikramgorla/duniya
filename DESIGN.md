@@ -72,7 +72,7 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
   JetBrains Mono for labels and numbers.
 - **Motion:** colour transitions, a press scale, a spinner. Nothing else moves.
 
-## Components (in `src/panel/public/index.html`)
+## Components (in `src/panel/public/app/`: `styles.css`, `core.js` helpers, screen modules)
 
 `card`, `tiles` + stat tile, `table.stack` (cards on phones; every `td` has a `data-label`, empty for a full-width
 cell; `stack flat` for long lists), `.tscroll` (key/value tables that keep their columns), `label.tick` (a checkbox on

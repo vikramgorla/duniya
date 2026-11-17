@@ -1,3 +1,4 @@
+// @ts-check
 import { EventEmitter } from 'node:events';
 import { insertActivity, pruneActivity } from './db.js';
 import { getChatPrefs } from './chat-prefs.js';
@@ -79,6 +80,7 @@ export function logPolicy(type, chat) {
 /** Console lines stay one line, whatever the summary contains (no forged log lines). */
 const oneLine = (s) => String(s).replace(/\n|\r/g, '').replace(/[\u2028\u2029]/g, '');
 
+/** @param {string} type  @param {{ agent?: string, chat?: string, summary?: string, detail?: any }} [entry] */
 export function activity(type, { agent, chat, summary, detail } = {}) {
   const entry = { ts: Date.now(), type, agent: agent || '', chat: chat || '', summary: String(summary ?? '').slice(0, 500) };
   let max = 4000;

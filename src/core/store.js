@@ -1,4 +1,6 @@
+// @ts-check
 // Persistent app data (005): tenants, users, sessions, agents, secrets (encrypted), settings.
+import { fail } from './config.js';
 import { db } from './db.js';
 import { encrypt, decrypt, hashPassword, verifyPassword, sha256, newToken } from './crypto.js';
 
@@ -54,7 +56,7 @@ export function listSecrets() {
   return [...secretCache.keys()].sort().map((name) => ({ name, set: !!secretCache.get(name) }));
 }
 export function setSecret(name, value) {
-  if (!SECRET_NAME_RE.test(name)) throw Object.assign(new Error('Secret names must be UPPER_SNAKE_CASE'), { status: 400 });
+  if (!SECRET_NAME_RE.test(name)) throw fail('Secret names must be UPPER_SNAKE_CASE');
   if (value) {
     db.prepare('INSERT OR REPLACE INTO secrets (tenant_id, name, value_enc, updated_at) VALUES (?, ?, ?, ?)').run(TENANT, name, encrypt(value), Date.now());
     secretCache.set(name, value);
@@ -77,6 +79,13 @@ export function interpolate(value) {
 
 // ---------- settings ----------
 const SETTINGS_DEFAULTS = { paused: false, defaultDmAgent: '', historyLoadCount: 50 }; // #91: earlier messages loaded when a chat goes on
+/**
+ * Panel settings: the defaults above plus what owners changed. Features keep their own block (providers, backup,
+ * webAccess, media, updates, …) and read it through their own module.
+ * @typedef {{ paused: boolean, defaultDmAgent: string, historyLoadCount: number, smallServerMode?: boolean,
+ *   whatsappNumbers?: { id: string, label: string, dmAgent?: string }[], [key: string]: any }} Settings
+ * @returns {Settings}
+ */
 export function getSettings() {
   const out = { ...SETTINGS_DEFAULTS };
   for (const r of db.prepare('SELECT key, value FROM settings WHERE tenant_id = ?').all(TENANT)) {
@@ -104,16 +113,16 @@ export const getUser = (id) => userView(db.prepare('SELECT * FROM users WHERE id
 const ownersCount = () => db.prepare("SELECT COUNT(*) AS n FROM users WHERE tenant_id = ? AND role = 'owner' AND disabled = 0").get(TENANT).n;
 
 function checkPasswordStrength(pw) {
-  if (String(pw || '').length < 12) throw Object.assign(new Error('Password must be at least 12 characters'), { status: 400 });
+  if (String(pw || '').length < 12) throw fail('Password must be at least 12 characters');
 }
 /** noPassword (060): the person sets their own password with a one-time sign-up link. */
 export function createUser({ username, email = '', role = 'admin', password, noPassword = false }) {
   const name = String(username || '').trim().toLowerCase();
-  if (!/^[a-z0-9][a-z0-9._-]{1,39}$/.test(name)) throw Object.assign(new Error('Username: 2–40 letters, digits, . _ -'), { status: 400 });
-  if (!ROLES.includes(role)) throw Object.assign(new Error('Role must be owner, admin or viewer'), { status: 400 });
+  if (!/^[a-z0-9][a-z0-9._-]{1,39}$/.test(name)) throw fail('Username: 2–40 letters, digits, . _ -');
+  if (!ROLES.includes(role)) throw fail('Role must be owner, admin or viewer');
   if (!noPassword) checkPasswordStrength(password);
   if (db.prepare('SELECT 1 FROM users WHERE tenant_id = ? AND username = ?').get(TENANT, name)) {
-    throw Object.assign(new Error('Username already exists'), { status: 409 });
+    throw fail('Username already exists', 409);
   }
   const { salt, hash } = noPassword ? { salt: null, hash: null } : hashPassword(password);
   const r = db.prepare('INSERT INTO users (tenant_id, username, email, role, pw_salt, pw_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
@@ -122,7 +131,7 @@ export function createUser({ username, email = '', role = 'admin', password, noP
 }
 const normEmail = (e) => String(e || '').trim().toLowerCase();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const err = (status, message, field) => Object.assign(new Error(message), { status, field });
+const err = (status, message, field) => fail(message, status, { field });
 
 export function findUserByGoogleSub(sub) {
   return userView(db.prepare('SELECT * FROM users WHERE tenant_id = ? AND google_sub = ?').get(TENANT, String(sub)));
@@ -204,13 +213,14 @@ export function acceptInvite(email, sub) {
   } catch (e) { db.exec('ROLLBACK'); throw e; }
 }
 
+/** @param {number|string} id  @param {{ role?: string, password?: string, disabled?: boolean, email?: string }} change */
 export function updateUser(id, { role, password, disabled, email }) {
   const u = db.prepare('SELECT * FROM users WHERE id = ? AND tenant_id = ?').get(Number(id), TENANT);
-  if (!u) throw Object.assign(new Error('User not found'), { status: 404 });
+  if (!u) throw fail('User not found', 404);
   const losingOwner = u.role === 'owner' && ((role && role !== 'owner') || disabled === true);
-  if (losingOwner && ownersCount() <= 1) throw Object.assign(new Error('At least one owner must remain'), { status: 400 });
+  if (losingOwner && ownersCount() <= 1) throw fail('At least one owner must remain');
   if (role !== undefined) {
-    if (!ROLES.includes(role)) throw Object.assign(new Error('Invalid role'), { status: 400 });
+    if (!ROLES.includes(role)) throw fail('Invalid role');
     db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, u.id);
   }
   if (email !== undefined) db.prepare('UPDATE users SET email = ? WHERE id = ?').run(String(email), u.id);
@@ -228,8 +238,8 @@ export function updateUser(id, { role, password, disabled, email }) {
 }
 export function deleteUser(id) {
   const u = db.prepare('SELECT * FROM users WHERE id = ? AND tenant_id = ?').get(Number(id), TENANT);
-  if (!u) throw Object.assign(new Error('User not found'), { status: 404 });
-  if (u.role === 'owner' && ownersCount() <= 1) throw Object.assign(new Error('At least one owner must remain'), { status: 400 });
+  if (!u) throw fail('User not found', 404);
+  if (u.role === 'owner' && ownersCount() <= 1) throw fail('At least one owner must remain');
   deleteSessionsFor(u.id);
   db.prepare('DELETE FROM users WHERE id = ?').run(u.id);
   for (const fn of userDeletedListeners) fn(u.id); // e.g. AI assistant grants (017): ids can be reused by SQLite

@@ -159,12 +159,17 @@ export function fakeChecklist(next, { done = false } = {}) {
 }
 /** 062: installs a fakeChecklist() result in the panel (run with page.call, so the data is passed as a value, not code). */
 export const FAKE_CHECKLIST = `async function (fc) {
+  const { S, show, h } = await import('/app/core.js');
   const fcf = window.fetch;
   window.fetch = (u, o) => (String(u) === '/api/checklist' && (!o || !o.method || o.method === 'GET') ? Promise.resolve(new Response(JSON.stringify(fc))) : fcf(u, o));
   S.checklist = null;
   S.checklistDone = fc.complete ? { last: h('div', { class: 'chat-mini' }, h('div', { class: 'bubble me' }, 'Any seat to Geneva on Friday?'), h('div', { class: 'bubble agent' }, 'Friday 21 Nov: Marc drives from Morges station at 07:40, 2 seats left. Want me to save one for you?')) } : null;
   show(S.tab);
 }`;
+
+/** 063: the panel is ES modules, nothing is global. Page scripts of the screenshot and responsive checks (async
+ *  functions) start with this to reach the shared state and the router; other functions are imported where needed. */
+export const PANEL = "const { S, show, openFind } = await import('/app/core.js');";
 
 /** Start the seeded demo panel. Returns { base, dataDir }. Call once per process (the app's modules are singletons). */
 /** `small: true` pretends to run on a 1 GB / 1 CPU VM (the free-tier size), so the small-server guardrails show. */

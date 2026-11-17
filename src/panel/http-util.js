@@ -1,3 +1,4 @@
+// @ts-check
 // Small HTTP helpers shared by the panel router and the admin MCP endpoints (017).
 import { env } from '../core/config.js';
 

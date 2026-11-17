@@ -1,3 +1,4 @@
+// @ts-check
 // Owner alerts on WhatsApp (040/041, issues #35 and #38). The app has no phone number for panel users, so the owner
 // enters one in the owner assistant's editor (Agents → Owner assistant → Alerts, 059: alerts are messages of the
 // built-in owner assistant). Without one, alerts are only recorded in Activity. Alerts stay event-driven.

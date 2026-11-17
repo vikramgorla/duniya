@@ -23,7 +23,7 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
       that matches the code (`/speckit-analyze`, `/speckit-converge`).
 - [ ] Behaviour is covered by tests that use fakes (`test/harness.js`): no real WhatsApp, model, MCP, GitHub or S3
       calls.
-- [ ] `npm test`, `npm run lint` and `npm run check:panel` pass.
+- [ ] `npm test`, `npm run lint`, `npm run typecheck` and `npm run check:panel` pass.
 - [ ] UI changed → `npm run check:responsive` passes (375 / 393 / 1440 px, light and dark) and the screens meet the
       `DESIGN.md` checklist.
 
@@ -54,7 +54,8 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 - [ ] One way to do each thing: reuse the resolvers (models, names), the scheduler tick, the small-server switch and
       the shared helpers in `src/core/config.js` instead of a local copy.
 - [ ] `node scripts/ci-checks.mjs` passes: knip (no unused files, exports or dependencies), jscpd (no duplication over
-      its threshold), the `src/panel/public/index.html` size budget (raise it only with a reason in the PR).
+      its threshold), the panel budgets in `scripts/check-panel.mjs` (first screen and total; raise one only with a
+      reason in the PR), `tsc` over the `// @ts-check` files.
 - [ ] Tests check behaviour (panel API, router, fakes), not internals; nothing is exported only for a test.
 - [ ] UI changes keep the panel snappy: no new polling (status and activity come over `/api/events`), screens load
       through `api()` and its cache, simple switches update at once.
@@ -132,14 +133,15 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 | `src/core/owner-assistant.js`, `privacy-notice.js`, `owner-alerts.js`, `weekly.js`, `budget.js`, `silences.js` | Owner assistant, privacy notice, alerts, weekly summary, spending caps, why-quiet |
 | `src/core/backup/`, `updates.js`, `system.js`, `webaccess.js` | Backups (GitHub, S3), updates, server metrics, domains & access |
 | `src/core/store.js`, `db.js` | Settings, users, secrets; SQLite (`node:sqlite`) |
-| `src/panel/server.js`, `http.js`, `routes/` | Panel HTTP API |
-| `src/panel/public/index.html` | The whole panel UI (one file; `npm run check:panel` parses its script); `manifest.webmanifest` and `icons/` make it installable on phones |
+| `src/panel/server.js`, `http.js`, `routes/` | Panel HTTP API: `server.js` is the router (role gates, CSRF guard) and registers `routes/<area>.js` (`auth`, `status`, `agents`, `chats`, `contacts`, `system`, one per feature) |
+| `src/panel/assets.js`, `module-graph.js` | The panel's static files from memory: content-hash URLs, import map (its hash in the CSP), first-screen preload |
+| `src/panel/public/` | The panel UI: `index.html` (shell), `app/*.js` native ES modules (`core.js`, `main.js`, one per screen, loaded on first visit; see `docs/development.md#panel-modules`), `app/styles.css`; `manifest.webmanifest` and `icons/` make it installable on phones |
 | `src/panel/admin-mcp.js`, `admin-tools.js`, `src/core/admin-oauth.js` | Admin MCP server and its OAuth 2.1 |
 | `bin/duniya.js`, `deploy/duniya` | `duniya` CLI |
 | `install.sh`, `deploy/`, `infra/oci/`, `infra/gcp/`, `Dockerfile` | Installer, root maintenance helper (`deploy/ops/`), OCI stack, GCP script, Docker |
 | `templates/` | Agent templates (JSON) |
 | `test/` | `node:test` e2e tests with fakes (`harness.js`) |
-| `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `ci-checks.mjs` (versions, releases, docs, knip, jscpd, panel size), `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails), `render-diagrams.mjs` (`npm run docs:diagrams`: docs/diagrams/*.mmd → SVG) |
+| `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `measure-load.mjs` (`npm run measure:load`), `check-panel.mjs` (modules link, budgets), `ci-checks.mjs` (versions, releases, docs, knip, jscpd, panel budgets, types), `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails), `render-diagrams.mjs` (`npm run docs:diagrams`: docs/diagrams/*.mmd → SVG) |
 | `docs/` | Reference docs (`docs/README.md` index), deploy guides, diagrams (`docs/diagrams/`), the website `docs/site/` |
 | `specs/`, `.specify/` | Spec Kit: one folder per feature; constitution and templates |
 

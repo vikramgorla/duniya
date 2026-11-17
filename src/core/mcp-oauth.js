@@ -2,6 +2,7 @@
 // Uses the MCP SDK's standard flow (RFC 9728 discovery, RFC 8414, dynamic registration, PKCE S256, resource
 // indicator, refresh) with a provider backed by an encrypted table, one connection per agent × service × role
 // (or, for a global tool service, per service × role with agent_id = GLOBAL_SCOPE).
+import { fail } from './config.js';
 import { auth } from '@modelcontextprotocol/sdk/client/auth.js';
 import { db } from './db.js';
 import { TENANT } from './store.js';
@@ -149,7 +150,7 @@ function sweep() {
 
 /** Start a sign-in; returns the service's authorization URL to open in the browser. */
 export async function startSignIn({ agentId, server, role, url, redirectUri, by = '', client = null }) {
-  if (!OAUTH_ROLES.includes(role)) throw Object.assign(new Error('Unknown role'), { status: 400 });
+  if (!OAUTH_ROLES.includes(role)) throw fail('Unknown role');
   sweep();
   const state = newToken(24);
   const p = { state, agentId, server, role, url, redirectUri, by, client, data: {}, expires: Date.now() + PENDING_TTL };
@@ -162,7 +163,7 @@ export async function startSignIn({ agentId, server, role, url, redirectUri, by 
     return { authorizeUrl: prov.authorizeUrl };
   } catch (e) {
     pending.delete(state);
-    throw Object.assign(new Error(`Could not start sign-in to ${server}: ${e.message}`), { status: 400 });
+    throw fail(`Could not start sign-in to ${server}: ${e.message}`);
   }
 }
 
@@ -205,7 +206,7 @@ export async function probeServer(rawUrl, { fetchFn = fetch } = {}) {
     break;
   }
   if (res.ok) return { url, auth: 'none' };
-  if (res.status !== 401 && res.status !== 403) throw Object.assign(new Error(`The server answered ${res.status}`), { status: 400 });
+  if (res.status !== 401 && res.status !== 403) throw fail(`The server answered ${res.status}`);
   const header = res.headers.get('www-authenticate') || '';
   const m = header.match(/resource_metadata="([^"]+)"/);
   const candidates = [m?.[1], new URL(`/.well-known/oauth-protected-resource${new URL(url).pathname}`, url).toString(), new URL('/.well-known/oauth-protected-resource', url).toString()].filter(Boolean);

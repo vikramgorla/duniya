@@ -7,7 +7,7 @@
 //   WhatsApp confirmation is answered again after the restart (a pending report is kept in kv).
 // - The owner can snooze the notice (reminded again after 7 days) or dismiss it (until a newer breaking release).
 import { randomInt } from 'node:crypto';
-import { env } from './config.js';
+import { env, fail } from './config.js';
 import { kvGet, kvSet } from './db.js';
 import { getUser } from './store.js';
 import { activity } from './events.js';
@@ -47,7 +47,7 @@ export function pendingDecision(now = Date.now()) {
 /** "remind me in 7 days" or "dismiss" (until a newer breaking release). */
 export function snoozeDecision({ action = 'snooze', by = '', now = Date.now() } = {}) {
   const d = pendingDecision(now);
-  if (!d) throw Object.assign(new Error('No update is waiting for a decision'), { status: 404 });
+  if (!d) throw fail('No update is waiting for a decision', 404);
   const rec = readKv('updates:notice', null);
   const base = rec && v(rec.version) === d.version ? rec : { version: d.version.slice(1), notifiedAt: now };
   const next = action === 'dismiss' ? { ...base, dismissed: true, snoozeUntil: null } : { ...base, dismissed: false, snoozeUntil: now + SNOOZE_DAYS * DAY };
@@ -114,9 +114,9 @@ export async function announceBreaking(st = updateStatus(), now = Date.now()) {
  * restart. reportTo: a WhatsApp chat that gets the result (after the restart when it worked).
  */
 export async function runConfirmedUpdate({ by = '', backup = true, reportTo = '' } = {}) {
-  if (installKind() === 'docker') throw Object.assign(new Error('Docker install: pull the new image (docker compose pull && docker compose up -d)'), { status: 400 });
+  if (installKind() === 'docker') throw fail('Docker install: pull the new image (docker compose pull && docker compose up -d)');
   const st = await checkForUpdate();
-  if (!st.available) throw Object.assign(new Error('Already up to date'), { status: 400 });
+  if (!st.available) throw fail('Already up to date');
   const from = runningVersion();
   activity('system', { summary: `Update to ${st.target} confirmed by ${by || 'owner'}${st.breaking ? ` (breaking: ${st.steps.map((s) => v(s.version)).join(', ')})` : ''}${backup ? '' : ', without a backup'}` });
   const r = await applyUpdate({ target: st.target, backup, by });

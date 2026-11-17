@@ -1,4 +1,5 @@
 // Panel routes for backups (007). Owner only.
+import { fail } from '../../core/config.js';
 import { readFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import {
@@ -21,7 +22,7 @@ const setupLimit = limiter(10);
 /** Read a finished upload; a missing or expired one gets a plain message. */
 function readUpload(id) {
   try { return readFileSync(uploadPath(id)); } catch (e) {
-    throw Object.assign(new Error(e.status ? e.message : 'The uploaded file is no longer here (uploads are kept for one hour). Choose the file again.'), { status: 400 });
+    throw fail(e.status ? e.message : 'The uploaded file is no longer here (uploads are kept for one hour). Choose the file again.');
   }
 }
 const fileLabel = (req) => String(req.headers['x-file-name'] || 'uploaded file').replace(/[^\w.@ -]/g, '').slice(0, 80) || 'uploaded file';
@@ -74,7 +75,7 @@ export function backupRoutes(route, { restart = () => setTimeout(() => process.e
     const panel = `${baseUrl(req)}/#backups`;
     if (!passphrase) return [400, { error: `No backup passphrase is stored on this server. Restore it in the panel with the passphrase it was made with: ${panel}` }];
     const wrong = (e) => (stored && e.status === 400 && /passphrase/i.test(e.message)
-      ? Object.assign(new Error(`This backup does not open with this server's backup passphrase (made on another server or with an earlier passphrase). Restore it in the panel with its passphrase: ${panel}`), { status: 400 }) : e);
+      ? fail(`This backup does not open with this server's backup passphrase (made on another server or with an earlier passphrase). Restore it in the panel with its passphrase: ${panel}`) : e);
     if (body.check) return openBackup({ source: body.source, file: body.file, passphrase }).catch((e) => { throw wrong(e); });
     let r;
     try {

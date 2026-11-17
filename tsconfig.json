@@ -1,0 +1,27 @@
+{
+  "//": "063: type checking without a build. `npm run typecheck` checks every file that starts with // @ts-check (JSDoc types where they pay off); see docs/development.md#type-checking.",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "es2024",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": [
+      "es2024"
+    ],
+    "types": [
+      "node"
+    ],
+    "strict": false,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "src/**/*.js",
+    "scripts/*.mjs"
+  ],
+  "exclude": [
+    "src/panel/public/**"
+  ]
+}
