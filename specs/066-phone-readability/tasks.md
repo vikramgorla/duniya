@@ -10,6 +10,8 @@
 - [x] T008 Ask conversation: bubble, thinking, live tool chips (`calling` step), streaming markdown with caret, fold, Copy, follow-up, Retry, Stop
 - [x] T009 Server-side Stop: AbortSignal through chat() and the streaming adapters; no further rounds/tools; partial kept; not a provider failure; test
 - [x] T010 Owner assistant *Try it* uses the Ask card; responsive states for every Ask state
+- [x] T011 Recovery: request deadlines, Retry card, sheet import guard, resume after >30 s (`recover()`), stream reconnect when it was closed on `pagehide`
+- [x] T012 Pull to refresh (`pull.js`) and More → Refresh; responsive states `load-failed`, `load-retry` (hung request → Retry → screen), `pull-refresh`
 
 ## Definition of Done
 

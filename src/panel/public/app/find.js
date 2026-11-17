@@ -1,6 +1,6 @@
 // Find anything (062): loaded when first opened. Module of the panel (063).
 // ---------- Find anything (062): / or ⌘K (Ctrl+K), or the search button: jump to a screen, agent, chat, setting or action ----------
-import { $, PRIMARY, S, TABS, api, badgeFor, can, go, h, icon, optimistic, serverBadge, show, signOut, tryApi } from './core.js';
+import { $, PRIMARY, S, TABS, api, badgeFor, can, go, h, icon, optimistic, recover, serverBadge, show, signOut, tryApi } from './core.js';
 import { PROVIDER_NAMES } from './names.js';
 import { SETTINGS_SECTIONS } from './shared.js';
 /** Everything the Find box can open. Agents and chats come from the status and the cached chat list. */
@@ -80,7 +80,8 @@ export function openMore() {
     h('button', { class: 'btn more-find', style: 'margin-top:12px', onclick: () => { close(); openPalette(); } }, icon('search'), 'Find anything'),
     h('div', { class: 'more-list' }, TABS().filter(([id]) => !PRIMARY.includes(id)).map(([id, label]) =>
       h('button', { class: id === S.tab ? 'on' : '', 'aria-current': id === S.tab ? 'page' : null, onclick: () => { close(); go(id); } }, icon(id), label, badgeFor(id)))),
-    h('div', { class: 'more-foot' }, h('span', { class: 'small muted' }, `Signed in as ${S.user.username} · ${S.user.role}`), h('button', { class: 'btn small', onclick: signOut }, 'Sign out')));
+    h('div', { class: 'more-foot' }, h('span', { class: 'small muted' }, `Signed in as ${S.user.username} · ${S.user.role}`),
+      h('div', { class: 'btns' }, h('button', { class: 'btn small', onclick: () => { close(); recover(true); } }, 'Refresh'), h('button', { class: 'btn small', onclick: signOut }, 'Sign out'))));
   document.body.append(dlg); dlg.showModal(); dlg.focus(); // 066: the sheet, not Close, takes focus (no ring on touch)
   serverBadge(S.status?.osUpdates);
 }

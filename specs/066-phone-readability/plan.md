@@ -18,6 +18,7 @@
   - `providers/index.js`, `anthropic.js`, `openai-chat.js`, `chatgpt.js`: `signal` reaches the streaming fetch / SDK; an
     aborted call is not a provider failure.
   - `channels/whatsapp.js`: plain status words.
+- **Recovery:** `core.js` (`deadline`, request timeouts and in-flight set, `loadFailed`, `recover`, the sheet import guard), `main.js` (resume), `pull.js`.
 - **Checks:** icon contrast in `check-responsive.mjs`; Ask states (thinking, streaming, done, error, restarted, owner
   editor); panel budgets +3.5 KB for the conversation (reason in the PR).
 - **Tests:**

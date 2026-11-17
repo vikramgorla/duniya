@@ -38,6 +38,20 @@ Issue #132. The owner tested v2.25.0 on an iPhone (installed app, dark mode).
   - respects reduced motion
   - the same component is *Try it* on the owner assistant's page
 
+- R7 (Addition) The installed iPhone app sometimes stayed on skeleton cards until it was closed. Root causes:
+  - requests had no deadline, and a request or socket left hanging after iOS suspended the app kept the screen waiting
+  - its pending promise sat in the `api()` cache
+  - a failed or stalled render left the skeleton in place (only a toast was shown)
+  - a stalled dynamic import (More, Find anything) can never be retried in the page
+  - `pagehide` set the live stream to null, so a later `visibilitychange` never reconnected it
+  
+  Fix:
+  - deadlines (AbortController) on every request; failed or aborted promises leave the cache
+  - a screen deadline that ends in *Couldn't load* + **Retry** (a stuck module reloads the page)
+  - after more than 30 s away (`visibilitychange` / `pageshow`), drop waiting requests, reconnect and redraw an
+    unfinished screen
+  - pull to refresh on touch screens, and **More → Refresh**
+
 ## Out of scope
 
 Persisting the panel thread across reloads (the server keeps the conversation for the model).

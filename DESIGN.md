@@ -80,6 +80,11 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
   for notes.
 - **Type:** Segoe UI Variable / SF Pro / Inter for text and headings (tight tracking); SF Mono / Cascadia /
   JetBrains Mono for labels and numbers.
+- **Loading never hangs (066):** every request has a deadline (`S.loadTimeout`, 15 s), and a screen that fails or
+  stalls shows *Couldn't load this screen* with the reason and **Retry**, never skeletons forever (a module that never
+  arrived reloads the app). Back from the background after more than 30 s, `recover()` drops waiting requests,
+  reconnects the live stream and redraws a screen that was not finished. Touch screens can pull down to refresh (also
+  **More → Refresh**).
 - **Motion:** colour transitions, a press scale, a spinner, skeleton shimmer while a screen loads, a short fade-in of a
   new screen, sheets that rise, and the live pulse on Overview. All of it stops with *reduce motion*
   (`prefers-reduced-motion`).

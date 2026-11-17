@@ -26,6 +26,10 @@ const { values: opt } = parseArgs({ options: {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- screens and states ----------
+// 066: a request that never answers (a phone that suspended the app): the screen ends in Couldn't load + Retry, not
+// endless placeholder cards; with the server back, Retry draws the screen.
+const HANG_AGENTS = `const { dropCache } = await import('/app/core.js'); dropCache(); S.loadTimeout = 800; window.__realFetch ||= window.fetch;
+  window.fetch = (u, o) => (String(u).startsWith('/api/agents') ? new Promise((_, no) => o?.signal?.addEventListener('abort', () => no(new DOMException('aborted', 'AbortError')))) : window.__realFetch(u, o));`;
 // 045: pretend v3.0.0 (breaking) is available, with v2.10.0 still safe to install.
 const UPDATE_DECISION = `const f0 = window.fetch; window.fetch = async (u, o) => { const r = await f0(u, o);
   if (String(u) === '/api/updates' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json();
@@ -61,6 +65,9 @@ const STATES = [
   { name: 'update-decision-dialog', hash: 'overview', before: UPDATE_DECISION, wait: 1500, js: "await T.click('Review update', 'button', 600);" },
   { name: 'activity', hash: 'activity', js: "document.querySelector('#feed li')?.click();" },
   { name: 'agents', hash: 'agents' },
+  { name: 'load-failed', hash: 'agents', before: HANG_AGENTS, wait: 2500, js: "if (!document.querySelector('.load-failed')) throw new Error('no Retry card after a hung request'); window.fetch = window.__realFetch; S.loadTimeout = 15000;" },
+  { name: 'load-retry', hash: 'agents', before: HANG_AGENTS, wait: 2500, js: "window.fetch = window.__realFetch; S.loadTimeout = 15000; await T.click('Retry', 'button', 1500); if (document.querySelector('.load-failed, .skel') || !document.querySelector('.agent-card')) throw new Error('Retry did not recover the screen');" },
+  { name: 'pull-refresh', hash: 'overview', js: "const m = document.createElement('div'); m.className = 'ptr armed busy'; m.setAttribute('aria-hidden', 'true'); m.append(Object.assign(document.createElement('span'), { className: 'spinner' })); m.style.transform = 'translate(-50%, 64px)'; document.body.append(m); await T.wait(200);" },
   { name: 'agents-ai-draft', hash: 'agents', js: "const ta = document.querySelector('#main textarea'); ta.value = 'A helper for our running club'; await T.click('Draft', 'button', 2500);" },
   { name: 'agent-editor-ai-diff', hash: 'agents/carpool', wait: 2500, js: "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies, make Lea an organizer, weather before rides'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); document.querySelector('.dskip')?.click();" },
   { name: 'agent-editor-ai-side', hash: 'agents/carpool', wait: 2500, js: "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); await T.click('Side by side', 'button', 300);" },

@@ -154,10 +154,24 @@ export async function api(method, path, body) {
   if (method !== 'GET') dropCache();
   return fetchJson(method, path, body);
 }
+// 066: every request has a deadline and can be dropped. A phone that suspends the installed app can leave a request
+// (or its socket) hanging forever: without a deadline the screen waited on it for good, and a pending cached promise
+// kept every later visit waiting too. Requests in flight are dropped when the app comes back after a while (recover()).
+const inflight = new Set();
+/** Wait for `p` at most `ms`; then fail with a plain message (`kind` tells Retry what to do). */
+export const deadline = (p, ms, kind = 'data') => new Promise((resolve, reject) => {
+  const t = setTimeout(() => reject(Object.assign(new Error('The server did not answer in time.'), { kind })), ms);
+  p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+});
 async function fetchJson(method, path, body) {
-  const opts = { method, headers: {} };
+  const ctl = new AbortController(); inflight.add(ctl);
+  const timer = setTimeout(() => ctl.abort(new DOMException('timeout', 'TimeoutError')), method === 'GET' ? S.loadTimeout : 60000);
+  const opts = { method, headers: {}, signal: ctl.signal };
   if (method !== 'GET') { opts.headers['content-type'] = 'application/json'; opts.body = JSON.stringify(body ?? {}); }
-  const res = await fetch(path, opts);
+  let res;
+  try { res = await fetch(path, opts); } catch (e) {
+    throw ctl.signal.aborted ? Object.assign(new Error('The server did not answer in time. Check the connection and try again.'), { kind: 'data' }) : e;
+  } finally { clearTimeout(timer); inflight.delete(ctl); }
   if (res.status === 401 && !['/api/login', '/api/setup'].includes(path)) { renderLogin(); throw new Error('Please sign in'); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { field: data.field, data, status: res.status });
@@ -286,7 +300,7 @@ export const meterEl = () => { const i = h('i', { style: 'width:0%' }); const m 
 // ---------- state ----------
 // Shared screen state. models: the /api/models answer (null = load again); overviewBusy: someone types on Overview, so a
 // status push does not redraw it; dmPrefill (049): Contacts → "Set up chat" opens Chats → "Add a direct chat" with it.
-export const S = { tab: 'overview', user: null, status: null, feed: [], feedAgent: '', es: null, editing: null, models: null, overviewBusy: false, dmPrefill: null };
+export const S = { loadTimeout: 15000, tab: 'overview', user: null, status: null, feed: [], feedAgent: '', es: null, editing: null, models: null, overviewBusy: false, dmPrefill: null };
 const RANK = { viewer: 1, admin: 2, owner: 3 };
 export const can = (role) => S.user && RANK[S.user.role] >= RANK[role];
 // 062: everyday screens first; Pending only while something waits; Secrets live in Settings.
@@ -340,7 +354,7 @@ function drawNav() {
   for (const [id, label] of tabs) LABEL[id] = label;
   nav.replaceChildren(...tabs.map(([id, label]) => h('button', { 'data-tab': id, onclick: () => go(id) }, icon(id), label, badgeFor(id))));
   $('nav.tabbar')?.replaceChildren(...PRIMARY.map((id) => h('button', { 'data-tab': id, onclick: () => go(id) }, icon(id), LABEL[id])),
-    h('button', { 'data-tab': 'more', 'aria-haspopup': 'dialog', onclick: () => import('./find.js').then((m) => m.openMore()) }, icon('more'), 'More', h('span', { class: 'nbadge' }, S.status?.pending ? String(S.status.pending) : '')));
+    h('button', { 'data-tab': 'more', 'aria-haspopup': 'dialog', onclick: () => sheet((m) => m.openMore()) }, icon('more'), 'More', h('span', { class: 'nbadge' }, S.status?.pending ? String(S.status.pending) : '')));
   markTabs();
   serverBadge(S.status?.osUpdates);
 }
@@ -385,7 +399,12 @@ const SCREENS = {
   settings: () => import('./settings.js').then((m) => m.renderSettings()),
 };
 /** Find anything (062), loaded when first opened. */
-export const openFind = () => import('./find.js').then((m) => m.openPalette()).catch((e) => toast(e.message, { bad: true }));
+export const openFind = () => sheet((m) => m.openPalette());
+/** 066: open a sheet from find.js (Find anything, More). If the module never arrives, the page reloads (the browser
+ * would keep waiting on the same import), landing on the same screen. */
+const sheet = (open) => deadline(import('./find.js'), S.loadTimeout, 'screen').then(open).catch(() => {
+  toast('Part of the app did not arrive. Reloading…', { bad: true }); setTimeout(() => location.reload(), 1200);
+});
 export function show(tab) {
   if (Object.hasOwn(MOVED, tab)) { history.replaceState(null, '', `#${MOVED[tab]}`); tab = MOVED[tab].split('/')[0]; }
   if (!TABS().some(([id]) => id === tab) && !(tab === 'pending' && can('viewer'))) tab = 'overview';
@@ -405,7 +424,13 @@ export function show(tab) {
   const moved = from !== tab; // another screen: placeholder cards while it loads; the same one: dim it
   const slow = setTimeout(() => { if (S.renderSeq !== seq || !main) return; if (moved) main.replaceChildren(skeleton()); else main.classList.add('loading'); main.setAttribute('aria-busy', 'true'); }, 120);
   const r = Object.hasOwn(SCREENS, tab) ? SCREENS[tab] : null;
-  Promise.resolve(r?.()).catch((e) => toast(e.message, { bad: true })).finally(() => {
+  // 066: a screen that fails or stalls (a module or request hung after the phone suspended the app) shows why and Retry,
+  // instead of placeholder cards forever.
+  Promise.resolve(r && deadline(r(), S.loadTimeout + 5000, 'screen')).catch((e) => {
+    if (S.renderSeq !== seq || !main) return;
+    if (e?.message === 'Please sign in') return;
+    main.replaceChildren(loadFailed(e, () => show(S.tab)));
+  }).finally(() => {
     clearTimeout(slow);
     if (S.renderSeq === seq) {
       main?.classList.remove('loading'); main?.removeAttribute('aria-busy'); S.renderDone = seq;
@@ -420,6 +445,25 @@ export function show(tab) {
     // A slower, older tab finished after a newer one and drew over it: draw the current tab again.
     if ((S.renderDone || 0) > seq && S.tab) show(S.tab);
   });
+}
+/** 066: "Couldn't load" with the reason and Retry. A screen module that never arrived cannot be asked for again in
+ * this page (the browser keeps the pending import), so its Retry reloads the app; data is simply asked again. */
+export function loadFailed(e, retry) {
+  const stuck = e?.kind === 'screen' || /import|module|dynamically/i.test(e?.message || '');
+  return h('div', { class: 'card load-failed', role: 'alert' }, h('h2', {}, 'Couldn’t load this screen'),
+    h('p', { class: 'small muted' }, stuck ? 'Part of the app did not arrive, probably while the phone was asleep or offline.' : e?.message || 'Something went wrong.'),
+    h('button', { class: 'btn primary', onclick: () => (stuck ? location.reload() : (dropCache(), retry())) }, 'Retry'));
+}
+/** 066: back after a while (or pull to refresh, `force`): drop what is still waiting, reconnect the live stream, draw again. */
+export function recover(force = false) {
+  const main = $('#main');
+  // draw again only when something was waiting or the screen is not drawn (keeps a half-edited form otherwise)
+  const stuck = force || inflight.size > 0 || !!main?.querySelector('.skel, .load-failed') || main?.classList.contains('loading');
+  for (const c of inflight) c.abort(); inflight.clear();
+  dropCache();
+  if (!S.user) return;
+  connectEvents(); refreshStatus();
+  if (stuck) show(S.tab);
 }
 /** 062: #tab/<section> scrolls to the element marked data-jump="<section>" (a settings card, a provider, a chat). */
 export function jumpToSub() {
