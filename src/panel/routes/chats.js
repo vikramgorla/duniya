@@ -2,7 +2,7 @@
 // Panel routes: chats (on/off and per-chat settings, history, binding, stored messages, WhatsApp group tools, memory).
 import { fail } from '../../core/config.js';
 import { agentForChat, bindChat, listAgents } from '../../core/agents.js';
-import { allChatPrefs, ignoredCounts, isChatEnabled, seenChats, setChatPrefs } from '../../core/chat-prefs.js';
+import { allChatPrefs, ignoredCounts, isChatEnabled, isChatPrivate, seenChats, setChatPrefs } from '../../core/chat-prefs.js';
 import { chatTitle, personInfo } from '../../core/contacts.js';
 import { listMessages, namesInChat, searchStored } from '../../core/db.js';
 import { isChatAlias, listDirectChats } from '../../core/direct-chats.js';
@@ -10,6 +10,7 @@ import { activity } from '../../core/events.js';
 import { historyLoadCount, historyStatus, loadChatHistory } from '../../core/history-load.js';
 import { memberTag, personView, tagsInChat } from '../../core/member-tags.js';
 import { eraseChatMemory, maybeSummarize, memoryView } from '../../core/memory.js';
+import { ratingsOf } from '../../core/review.js';
 import { visibleChats } from '../../core/owner-assistant.js';
 import { maybePostNotice, noticePostedAt, setChatNoticeOff } from '../../core/privacy-notice.js';
 import { isGroupChat, whatsappToolCatalog } from '../../core/whatsapp-tools.js';
@@ -99,7 +100,11 @@ export function chatRoutes(route, { channel } = {}) {
     const chat = decodeURIComponent(p.chat);
     const tags = tagsInChat(chat);
     // 057: the sender as the panel knows them (own / address-book name), with their group tag; raw ids are not returned
-    const rows = listMessages(chat, { before: q.get('before'), limit: q.get('limit'), q: q.get('q') || '' }).map(({ senderJid, ...m }) => (m.fromAgent ? m
+    // 072: an agent's answer carries its rating (the same as in Review); answers in chats private to members are not rated
+    const list = listMessages(chat, { before: q.get('before'), limit: q.get('limit'), q: q.get('q') || '', around: q.get('around') });
+    const rated = ratingsOf(list.filter((m) => m.fromAgent).map((m) => m.id));
+    const rateable = !isChatPrivate(chat);
+    const rows = list.map(({ senderJid, ...m }) => (m.fromAgent ? { ...m, rating: rated.get(m.id) || 0, rateable: rateable && !!m.agent && m.id > 0 }
       : { ...m, name: personInfo({ phone: m.sender, jid: senderJid, fallbackName: m.name }).label, ...(memberTag(chat, { phone: m.sender, jid: senderJid }, tags) ? { tag: memberTag(chat, { phone: m.sender, jid: senderJid }, tags) } : {}) }));
     if (!q.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${q.get('q') ? ` (search “${String(q.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;

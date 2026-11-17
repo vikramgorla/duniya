@@ -104,3 +104,30 @@ test('070 review: answers with their question, 👍 / 👎 with counts, filters,
   assert.equal((await tool('rate_agent_answer').run({ agent_id: 'panduga', answer_id: b.id, rating: 1 }, ctx(admin))).counts.up, 1);
   await assert.rejects(tool('rate_agent_answer').run({ agent_id: 'panduga', answer_id: b.id, rating: 1 }, ctx(viewer)), /Read-only|Requires|admin/i);
 });
+
+test('072 one answer everywhere: messages and Activity carry the agent and its rating; opened around an answer', async () => {
+  t.script.push([{ type: 'text', text: 'Meet at the gate at 10.' }]);
+  await t.route(t.msg({ text: '!panduga where do we meet?', msgId: 'x1' }));
+  const enc = encodeURIComponent('g1@g.us');
+  const msgs = async (qs = '') => (await t.api(admin, 'GET', `/api/chats/${enc}/messages?limit=50${qs}`)).body;
+  const ans = (await msgs()).find((m) => m.fromAgent && m.text === 'Meet at the gate at 10.');
+  assert.equal(ans.agent, 'panduga', 'the answer says which agent gave it');
+  assert.equal(ans.rating, 0); assert.equal(ans.rateable, true);
+  // rated in Review → the same rating in the chat's messages and in Activity
+  await t.api(admin, 'PUT', `/api/agents/panduga/review/${ans.id}`, { rating: -1 });
+  assert.equal((await msgs()).find((m) => m.id === ans.id).rating, -1);
+  const reply = (await t.api(admin, 'GET', `/api/activity?limit=50&chat=${enc}`)).body.find((a) => a.type === 'message.out' && a.detail?.msg === ans.id);
+  assert.ok(reply, 'the reply in Activity points at the stored answer');
+  assert.equal(reply.rating, -1);
+  assert.ok((await t.api(admin, 'GET', `/api/activity?limit=50&chat=${encodeURIComponent('g2@g.us')}`)).body.every((a) => a.chat === 'g2@g.us'), 'Activity of one chat');
+  // around: the answer with messages on both sides (Review → In chat, Activity → See in messages)
+  for (let i = 0; i < 40; i++) t.db.logMessage({ chat: 'g1@g.us', text: `after ${i}`, ts: Date.now() + i });
+  const around = await msgs(`&around=${ans.id}`);
+  assert.ok(around.some((m) => m.id === ans.id) && around.some((m) => m.id > ans.id) && around.some((m) => m.id < ans.id));
+  assert.ok(around.length <= 50 && around[0].id > around.at(-1).id, 'newest first, at most a page');
+  // private to members: shown in the chat's own messages, but not rateable (as in Review)
+  t.chatPrefs.setChatPrefs('g1@g.us', { private: true });
+  assert.equal((await msgs(`&around=${ans.id}`)).find((m) => m.id === ans.id).rateable, false);
+  t.chatPrefs.setChatPrefs('g1@g.us', { private: false });
+  assert.equal((await t.api(viewer, 'GET', `/api/chats/${enc}/messages`)).status, 403, 'stored messages stay admin-only');
+});

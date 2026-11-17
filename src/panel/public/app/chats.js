@@ -1,5 +1,6 @@
-// Chats screen: on/off per chat, direct chats, history, WhatsApp settings and memory. Module of the panel (063).
-import { $, S, ago, api, ask, avatar, can, copyRow, emptyState, field, h, menu, refreshStatus, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
+// Chats screen: on/off per chat, direct chats; a chat's page with Messages, Memory and the WhatsApp group (072). Module of the panel (063).
+import { $, S, ago, api, ask, avatar, can, copyRow, emptyState, field, h, icon, menu, refreshStatus, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
+import { answerActions } from './answers.js';
 import { chatFallbackEditor, chatFallbackLine } from './fallback.js';
 import { silenceFix } from './quiet.js';
 import { listDetail } from './listdetail.js';
@@ -125,79 +126,93 @@ const takePrefill = () => { const p = S.dmPrefill; S.dmPrefill = null; return p;
 const emptyChats = () => (!(S.status?.channel?.numbers || []).some((n) => n.status === 'open')
   ? emptyState('chats', 'WhatsApp is not linked yet', 'Your groups and people show up here once your number is linked.', h('a', { class: 'btn small primary', href: '#overview/whatsapp' }, 'Link WhatsApp on Overview'))
   : emptyState('chats', 'No chats yet', 'Groups appear once the linked number is in them.'));
-/** One chat's page (068): its agent (a link to the agent's page), state, settings that save at once, history, intro,
- *  spending cap, Messages & memory and the WhatsApp group tools. */
+/** The sections of a chat's page (072): rows on the page, each its own page (#chats/<id>/<section>) with a back link. */
+const CHAT_SECTIONS = [
+  { id: 'messages', icon: 'chats', c: 'c3', title: 'Messages', admin: true, help: 'chats.md#messages-and-memory', line: 'Who said what, with the 👍 / 👎 of each answer. Each look is recorded in Activity.' },
+  { id: 'memory', icon: 'notes', c: 'c2', title: 'Memory', help: 'chats.md#messages-and-memory', line: 'What the agent remembers here: a running summary and notes.' },
+  { id: 'group', icon: 'contacts', c: 'c4', title: 'WhatsApp group', admin: true, group: true, help: 'chats.md#whatsapp-group-tools', line: 'Changes happen in WhatsApp at once. Most need the agents’ number to be a group admin.' },
+];
+const hasSection = (s, c) => (!s.admin || can('admin')) && (!s.group || c.isGroup);
+/** One chat's page (068, 072): a header (avatar, name, state, switch), why it stayed quiet, its agent, section rows
+ *  (Messages, Memory, WhatsApp group, Activity), then the settings that save at once and the spending cap. */
 function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
   if (!c) return h('div', { class: 'card' }, h('p', { class: 'small muted' }, 'This chat is gone.'));
   const enc = encodeURIComponent(c.id); const admin = can('admin');
-  const savePrefs = (patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${enc}/prefs`, patch)); refresh(c); return true; }, 'Saved');
-  const agentLink = h('span', {});
-  const drawLink = () => agentLink.replaceChildren(c.agent ? h('a', { href: `#agents/${encodeURIComponent(c.agent)}` }, `Open ${agents.find((x) => x.id === c.agent)?.name || 'agent'} ›`) : null);
-  drawLink();
-  const agentSel = h('select', { disabled: !admin, onchange: (e) => tryApi(async () => {
-    // 062: choosing an agent for a chat that is Off switches it on too (one step instead of two)
-    const agent = e.target.value; const r = await api('POST', '/api/chats/bind', { chat: c.id, agent: agent || null, enable: true }); c.agent = agent; drawLink();
-    if (agent && !c.enabled && r.enabled) { c.enabled = true; c.ignored = 0; if (r.history) c.history = r.history; refreshStatus(); refresh(c); watch(); return toast(`${c.name || 'Chat'} is on: ${agents.find((x) => x.id === agent)?.name} answers there`); }
-    refresh(c); toast(agent ? `${agents.find((x) => x.id === agent)?.name} answers in ${c.name || 'this chat'}` : 'No agent here now');
-  }) }, h('option', { value: '' }, c.isGroup ? 'No agent' : 'Default for direct messages'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)));
-  const extra = h('div', {}); // fallback editor, intro, memory open here
-  const open = async (el) => { extra.replaceChildren(await el); extra.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
-  const hist = h('div', {}, historyLine(c));
-  const histBtn = admin ? h('button', { class: 'btn small', type: 'button', disabled: c.history?.state === 'loading', onclick: () => tryApi(async () => { c.history = (await api('POST', `/api/chats/${enc}/history`, {})).status; showHist(); watch(); }) }, 'Load recent messages') : null;
-  const showHist = () => { hist.replaceChildren(historyLine(c) || ''); if (histBtn) histBtn.disabled = c.history?.state === 'loading'; };
-  // #91: while the phone sends recent messages, the status line follows (only on this page, only while loading)
-  let watching = false;
-  const watch = async () => {
-    if (c.history?.state !== 'loading' || watching) return;
-    watching = true;
-    try {
-      while (document.body.contains(hist)) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const r = await api('GET', `/api/chats/${enc}/history`).catch(() => null);
-        if (!r) break;
-        c.history = r.status; showHist();
-        if (r.status?.state !== 'loading') break;
-      }
-    } finally { watching = false; }
-  };
-  watch();
-  const sel = (label, opts, value, key, title) => field(label, h('select', { disabled: !admin, title, onchange: (e) => savePrefs({ [key]: e.target.value }) }, opts.map(([v, l]) => h('option', { value: v, selected: value === v }, l))));
-  const tickPref = (label, on, patch) => h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: on, disabled: !admin, onchange: (e) => savePrefs(patch(e.target.checked)) }), ` ${label}`);
-  const fbLine = h('span', { class: 'small muted' }, chatFallbackLine(c.fallback, models));
-  const openFallback = (ch) => open(chatFallbackEditor(ch, models, { onClose: () => extra.replaceChildren(),
-    onSaved: async (fallback) => { if (await savePrefs({ fallback })) { fbLine.textContent = chatFallbackLine(c.fallback, models); extra.replaceChildren(); } } }));
-  const meta = [c.isGroup ? `Group · ${plural(c.size || 0, 'member')}` : c.phone ? `+${c.phone}` : 'Person', c.lastAt ? `last message ${ago(c.lastAt)} ago` : '', us?.chat?.[c.id] ? usageLine(us.chat[c.id]) : ''].filter(Boolean).join(' · ');
-  return h('div', { class: 'card chat-page', 'data-chat': c.id },
-    h('div', { class: 'ap-head' }, avatar(c.name || c.phone || c.id, c.id, `l${c.enabled ? '' : ' off'}`),
-      h('div', { class: 'ap-title' }, h('h2', {}, c.name || c.id), h('div', { class: 'small muted' }, meta)),
-      toggle(c.enabled, (v) => setOn(c, v), !admin, `${c.name || c.id} on`),
-      menu(`More actions for ${c.name || c.id}`,
-        h('button', { class: 'btn small', type: 'button', onclick: () => open(renderMemory(c)) }, admin ? 'Messages & memory' : 'Memory'),
-        !c.isGroup && admin && c.enabled && c.agent ? h('button', { class: 'btn small', type: 'button', onclick: () => open(introCard(c, { onClose: () => extra.replaceChildren(), onSent: () => extra.replaceChildren() })) }, c.introAt ? 'Send another intro…' : 'Send intro…') : null)),
-    c.waiting ? h('p', { class: 'small', style: 'color:var(--warn)' }, 'Waiting for the first message: it goes to the agent chosen here.') : null,
-    !c.enabled ? h('p', { class: 'small muted' }, `Off: ignored, nothing stored${c.ignored ? ` (${plural(c.ignored, 'message')} since restart)` : ''}. Choosing an agent switches it on.`) : null,
-    quiet.length ? h('div', { class: 'sblock' }, h('h3', {}, 'Why it stayed quiet'), quiet.slice(0, 3).map((q) => h('div', { class: 'quiet row spread' },
-      h('span', { class: `small${q.reason === 'not_addressed' ? ' muted' : ''}`, style: q.reason === 'not_addressed' ? '' : 'color:var(--warn)', title: q.explain }, `${quietLine(q)} · ${q.explain}`), silenceFix(q, () => renderChats(), { onChats: true })))) : null,
-    h('div', { class: 'sblock' }, field('Agent', agentSel), agentLink),
-    c.enabled ? h('div', { class: 'sblock' }, h('h3', {}, 'Recent messages'), hist, histBtn) : null,
-    h('div', { class: 'sblock' }, h('h3', {}, 'Settings'), h('div', { class: 'grid2' },
-      field('Model', modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !admin, onchange: (e) => savePrefs({ model: e.target.value }) }),
-        h('div', { class: 'row', style: 'gap:6px;margin-top:6px' }, fbLine, h('button', { class: 'btn small', type: 'button', 'aria-label': `Model fallback for ${c.name || c.id}`, onclick: () => openFallback(c) }, admin ? 'Fallback…' : 'Fallback'))),
-      sel('Activity log', [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']], c.logging || 'inherit', 'logging'),
-      // 054: "Welcome new members" for this group: the agent setting, or always on / off here
-      c.isGroup ? sel('Welcome new members', [['inherit', `As the agent (${agents.find((x) => x.id === c.agent)?.config?.welcome?.enabled ? 'on' : 'off'})`], ['on', 'On'], ['off', 'Off']], c.welcome || 'inherit', 'welcome') : null),
-    // 044: hidden from the owner assistant / Ask box; per-group opt-out of the privacy notice (recorded)
-    tickPref('Private to members (hidden from Ask and the owner assistant)', !!c.private, (v) => ({ private: v })),
-    c.isGroup ? tickPref(`Privacy notice${c.noticePostedAt ? ` (posted ${ago(c.noticePostedAt)} ago)` : ''}`, !c.noticeOff, (v) => ({ noticeOff: !v })) : null),
-    h('details', { class: 'sblock', ontoggle: async (e) => { const d = e.currentTarget; if (d.open && !d.dataset.loaded) { d.dataset.loaded = '1'; d.append(await capEditor('chat', c.id, models)); } } }, h('summary', {}, 'Spending cap')),
-    extra, openSearchHit(c, open));
+  const root = h('div', {});
+  const name = c.name || c.id;
+  const go = (sid, at = 0) => { history.pushState(null, '', `#chats/${enc}${sid ? `/${sid}` : ''}`); draw(sid, at, true); };
+  function draw(sid, at = 0, push = false) {
+    const s = CHAT_SECTIONS.find((x) => x.id === sid && hasSection(x, c));
+    root.replaceChildren(s ? h('div', { class: 'card ap-sec' },
+      h('a', { class: 'sub-back', href: `#chats/${enc}`, onclick: (e) => { e.preventDefault(); go(''); } }, icon('back'), name),
+      h('div', { class: 'sec-head' }, h('h2', { tabindex: '-1' }, s.title), helpLink(s.help)),
+      h('p', { class: 'small muted sec-line' }, s.line),
+      s.id === 'messages' ? messagesView(c, agents, takeSearch(c), at) : s.id === 'memory' ? memoryView(c) : groupView(c)) : home());
+    document.title = `${s ? `${s.title} · ` : ''}${name} · Duniya`;
+    if (push) { if (matchMedia('(max-width: 640px)').matches) window.scrollTo({ top: 0 }); root.querySelector('h2')?.focus({ preventScroll: true }); }
+  }
+  function home() {
+    const savePrefs = (patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${enc}/prefs`, patch)); refresh(c); return true; }, 'Saved');
+    const agentLink = h('span', {});
+    const drawLink = () => agentLink.replaceChildren(c.agent ? h('a', { href: `#agents/${encodeURIComponent(c.agent)}` }, `Open ${agents.find((x) => x.id === c.agent)?.name || 'agent'} ›`) : null);
+    drawLink();
+    const agentSel = h('select', { disabled: !admin, onchange: (e) => tryApi(async () => {
+      // 062: choosing an agent for a chat that is Off switches it on too (one step instead of two)
+      const agent = e.target.value; const r = await api('POST', '/api/chats/bind', { chat: c.id, agent: agent || null, enable: true }); c.agent = agent; drawLink();
+      if (agent && !c.enabled && r.enabled) { c.enabled = true; c.ignored = 0; if (r.history) c.history = r.history; refreshStatus(); refresh(c); return toast(`${c.name || 'Chat'} is on: ${agents.find((x) => x.id === agent)?.name} answers there`); }
+      refresh(c); toast(agent ? `${agents.find((x) => x.id === agent)?.name} answers in ${c.name || 'this chat'}` : 'No agent here now');
+    }) }, h('option', { value: '' }, c.isGroup ? 'No agent' : 'Default for direct messages'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: c.agent === b.id }, b.name)));
+    const extra = h('div', {}); // fallback editor, intro open here
+    const open = async (el) => { extra.replaceChildren(await el); extra.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    const sel = (label, opts, value, key) => field(label, h('select', { disabled: !admin, onchange: (e) => savePrefs({ [key]: e.target.value }) }, opts.map(([v, l]) => h('option', { value: v, selected: value === v }, l))));
+    const tickPref = (label, on, patch) => h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: on, disabled: !admin, onchange: (e) => savePrefs(patch(e.target.checked)) }), ` ${label}`);
+    const fbLine = h('span', { class: 'small muted' }, chatFallbackLine(c.fallback, models));
+    const openFallback = (ch) => open(chatFallbackEditor(ch, models, { onClose: () => extra.replaceChildren(),
+      onSaved: async (fallback) => { if (await savePrefs({ fallback })) { fbLine.textContent = chatFallbackLine(c.fallback, models); extra.replaceChildren(); } } }));
+    const meta = [c.isGroup ? `Group · ${plural(c.size || 0, 'member')}` : c.phone ? `+${c.phone}` : 'Person', c.lastAt ? `last message ${ago(c.lastAt)} ago` : '', us?.chat?.[c.id] ? usageLine(us.chat[c.id]) : ''].filter(Boolean).join(' · ');
+    const intro = !c.isGroup && admin && c.enabled && c.agent ? h('button', { class: 'btn small', type: 'button', onclick: () => open(introCard(c, { onClose: () => extra.replaceChildren(), onSent: () => extra.replaceChildren() })) }, c.introAt ? 'Send another intro…' : 'Send intro…') : null;
+    // 072: section rows, their current value filled in when the chat's memory arrives
+    const subs = {};
+    const row = (id, title, ic, col, href, sub, onclick) => h('li', {}, h('a', { class: 'lrow', href, onclick },
+      h('span', { class: `lmark ${col}`, 'aria-hidden': 'true' }, icon(ic)),
+      h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, title), (subs[id] = h('span', { class: 'lrow-sub' }, sub))), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
+    const firstSub = { messages: c.history?.state === 'loading' ? 'Loading recent messages from your phone…' : c.lastAt ? `Last message ${ago(c.lastAt)} ago` : 'Stored while the chat is on',
+      memory: 'Summary and notes', group: 'Name, settings, invite link, members' };
+    const rows = CHAT_SECTIONS.filter((s) => hasSection(s, c)).map((s) => row(s.id, s.title, s.icon, s.c, `#chats/${enc}/${s.id}`, firstSub[s.id], (e) => { e.preventDefault(); go(s.id); }));
+    rows.push(row('activity', 'Activity', 'activity', 'c0', `#activity/chat=${enc}`, 'Everything that happened here, newest first'));
+    api('GET', `/api/chats/${enc}/memory`).then((m) => {
+      if (subs.messages && c.history?.state !== 'loading') subs.messages.textContent = [plural(m.messageCount, 'stored message'), c.lastAt ? `last ${ago(c.lastAt)} ago` : ''].filter(Boolean).join(' · ');
+      subs.memory.textContent = [m.summary ? 'Summary' : 'No summary yet', plural(m.notes.length, 'note')].join(' · ');
+    }).catch(() => {});
+    return h('div', { class: 'card chat-page', 'data-chat': c.id },
+      h('div', { class: 'ap-head' }, avatar(c.name || c.phone || c.id, c.id, `l${c.enabled ? '' : ' off'}`),
+        h('div', { class: 'ap-title' }, h('h2', {}, name), h('div', { class: 'small muted' }, meta)),
+        toggle(c.enabled, (v) => setOn(c, v), !admin, `${name} on`),
+        intro ? menu(`More actions for ${name}`, intro) : null),
+      c.waiting ? h('p', { class: 'small', style: 'color:var(--warn)' }, 'Waiting for the first message: it goes to the agent chosen here.') : null,
+      !c.enabled ? h('p', { class: 'small muted' }, `Off: ignored, nothing stored${c.ignored ? ` (${plural(c.ignored, 'message')} since restart)` : ''}. Choosing an agent switches it on.`) : null,
+      quiet.length ? h('div', { class: 'sblock' }, h('h3', {}, 'Why it stayed quiet'), quiet.slice(0, 3).map((q) => h('div', { class: 'quiet row spread' },
+        h('span', { class: `small${q.reason === 'not_addressed' ? ' muted' : ''}`, style: q.reason === 'not_addressed' ? '' : 'color:var(--warn)', title: q.explain }, `${quietLine(q)} · ${q.explain}`), silenceFix(q, () => renderChats(), { onChats: true })))) : null,
+      h('div', { class: 'sblock' }, field('Agent', agentSel), agentLink),
+      h('div', { class: 'lgroup' }, h('ul', {}, rows)),
+      h('div', { class: 'sblock' }, h('h3', {}, 'Settings'), h('div', { class: 'grid2' },
+        field('Model', modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !admin, onchange: (e) => savePrefs({ model: e.target.value }) }),
+          h('div', { class: 'row', style: 'gap:6px;margin-top:6px' }, fbLine, h('button', { class: 'btn small', type: 'button', 'aria-label': `Model fallback for ${name}`, onclick: () => openFallback(c) }, admin ? 'Fallback…' : 'Fallback'))),
+        sel('Activity log', [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']], c.logging || 'inherit', 'logging'),
+        // 054: "Welcome new members" for this group: the agent setting, or always on / off here
+        c.isGroup ? sel('Welcome new members', [['inherit', `As the agent (${agents.find((x) => x.id === c.agent)?.config?.welcome?.enabled ? 'on' : 'off'})`], ['on', 'On'], ['off', 'Off']], c.welcome || 'inherit', 'welcome') : null),
+      // 044: hidden from the owner assistant / Ask box; per-group opt-out of the privacy notice (recorded)
+      tickPref('Private to members (hidden from Ask and the owner assistant)', !!c.private, (v) => ({ private: v })),
+      c.isGroup ? tickPref(`Privacy notice${c.noticePostedAt ? ` (posted ${ago(c.noticePostedAt)} ago)` : ''}`, !c.noticeOff, (v) => ({ noticeOff: !v })) : null),
+      h('details', { class: 'sblock', ontoggle: async (e) => { const d = e.currentTarget; if (d.open && !d.dataset.loaded) { d.dataset.loaded = '1'; d.append(await capEditor('chat', c.id, models)); } } }, h('summary', {}, 'Spending cap')),
+      extra);
+  }
+  const [, , sid, at] = location.hash.split('/');
+  draw(S.msgSearch?.chat === c.id ? 'messages' : decodeURIComponent(sid || ''), Number(at) || 0);
+  return root;
 }
-/** 070: arriving from Search messages (Find anything): open this chat's messages filtered by the search. */
-function openSearchHit(c, open) {
-  const hit = S.msgSearch?.chat === c.id ? S.msgSearch : null;
-  if (hit) { S.msgSearch = null; setTimeout(() => open(renderMemory(c, undefined, hit.q)), 0); }
-  return null;
-}
+/** 070: arriving from Search messages (Find anything): the chat's Messages, filtered by the same words. */
+const takeSearch = (c) => { const q = S.msgSearch?.chat === c.id ? S.msgSearch.q : ''; if (q) S.msgSearch = null; return q; };
 /** #91: status of loading earlier messages from the phone for one chat row (no message content). */
 function historyLine(c) {
   const hs = c.history;
@@ -210,11 +225,11 @@ function historyLine(c) {
   if (hs.state === 'no_anchor') return h('div', { class: 'small muted', role: 'status' }, 'No message from this chat has reached the server yet. Recent messages load by themselves after the next message.');
   return h('div', { class: 'small', role: 'status', style: 'color:var(--warn)' }, `Couldn’t ask your phone: ${hs.error || 'unknown error'}.${retry}`);
 }
-/** WhatsApp group tools for admins (026): members with admin badges, invite link, name/description, settings. */
-function whatsappCard(c) {
+/** WhatsApp group tools for admins (026), the chat's *WhatsApp group* section (072): name, description, settings,
+ *  invite link, members with admin badges. */
+function groupView(c) {
   const enc = encodeURIComponent(c.id);
-  const body = h('div', {}, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Asking WhatsApp…'));
-  const card = h('div', { class: 'card wa-card', style: 'margin-top:16px' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'WhatsApp'), h('span', { class: 'eyebrow' }, 'Group')), body);
+  const body = h('div', { class: 'wa-card' }, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Asking WhatsApp…'));
   const put = (patch, ok) => tryApi(() => api('PUT', `/api/chats/${enc}/whatsapp`, patch), ok);
   async function load() {
     let g;
@@ -243,7 +258,6 @@ function whatsappCard(c) {
     body.replaceChildren(
       h('div', { class: 'row', style: 'gap:6px;margin:6px 0 10px' }, h('span', { class: 'pill' }, `${g.size} members`), h('span', { class: 'pill info' }, `${admins} admin${admins === 1 ? '' : 's'}`)),
       meAdmin,
-      h('p', { class: 'small muted', style: 'margin-top:0' }, 'Changes happen in WhatsApp at once. Most need the agents’ number to be a group admin.'),
       field('Group name', h('div', { class: 'row nowrap' }, subject, h('button', { class: 'btn small', onclick: async () => { if (await put({ subject: subject.value }, 'Group renamed')) g.subject = subject.value; } }, 'Save'))),
       field('Description', desc),
       h('div', { class: 'row', style: 'margin:6px 0 12px' }, h('button', { class: 'btn small', onclick: () => put({ description: desc.value }, 'Description saved') }, 'Save description')),
@@ -260,54 +274,91 @@ function whatsappCard(c) {
           p.admin ? h('span', { class: 'pill ok' }, p.admin === 'superadmin' ? 'owner' : 'admin') : null)))));
   }
   load();
-  return card;
+  return body;
 }
 
-/** Stored messages of a chat (admins): newest at the bottom, search, load older. Viewing is logged. */
-function messagesCard(c, q0 = '') {
-  const enc = encodeURIComponent(c.id);
-  const log = h('div', { class: 'chatlog', style: 'max-height:520px' });
-  const q = h('input', { type: 'search', value: q0, placeholder: 'Search the stored messages', 'aria-label': 'Search the stored messages of this chat', style: 'max-width:320px' });
-  let oldest = 0; let rows = [];
-  const more = h('button', { class: 'btn small', onclick: () => load(true) }, 'Load older');
-  const bubble = (m) => h('div', { class: `bubble ${m.fromAgent ? 'me' : 'agent'}` },
-    h('div', { class: 'small', style: 'opacity:.75;margin-bottom:2px' }, m.fromAgent ? 'Agent' : (m.name || (m.sender ? `+${m.sender}` : 'someone')), m.tag ? ` (${m.tag})` : '', ` · ${time(m.ts)}`, m.addressed ? ' · to the agent' : ''),
-    m.quoted ? h('div', { class: 'small', style: 'opacity:.75;border-left:2px solid currentColor;padding-left:6px;margin:2px 0 4px' }, m.quoted) : null, h('span', {}, highlight(m.text, searchWords(shown))));
-  let shown = '';
-  async function load(older) {
-    const page = await tryApi(() => api('GET', `/api/chats/${enc}/messages?limit=50${older && oldest ? `&before=${oldest}` : ''}${q.value.trim() ? `&q=${encodeURIComponent(q.value.trim())}` : ''}`));
-    if (!page) return;
-    shown = q.value.trim();
-    rows = older ? [...page.reverse(), ...rows] : page.reverse();
-    oldest = rows[0]?.id || 0;
-    log.replaceChildren(...(rows.length ? rows.map(bubble) : [h('p', { class: 'small muted' }, q.value.trim() ? 'No stored message matches.' : 'No stored messages for this chat.')]));
-    more.classList.toggle('hide', page.length < 50);
-    if (!older) log.scrollTop = log.scrollHeight;
-    if (q0 && !older) { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); q0 = ''; } // 070: from Search messages
+
+/** The answer an agent message replies to: the nearest earlier message to the agent (else the nearest earlier one). */
+function questionOf(rows, i) {
+  const before = rows.slice(0, i).reverse().filter((m) => !m.fromAgent && rows[i].ts - m.ts < 30 * 60000);
+  return before.find((m) => m.addressed) || before[0] || null;
+}
+/**
+ * A chat's *Messages* (024, 072): newest at the bottom; each answer with its agent's avatar and colour and the same
+ * 👍 / 👎 · Teach row as Review; search; older pages; the phone's earlier messages (#91). Opened at one answer
+ * (`at`, from Review or Activity) it shows the messages around it, marked. Each look is recorded.
+ */
+function messagesView(c, agents, q0 = '', at = 0) {
+  const enc = encodeURIComponent(c.id); const admin = can('admin');
+  const log = h('div', { class: 'chatlog msgs' });
+  const q = h('input', { type: 'search', value: q0, placeholder: 'Search the stored messages', 'aria-label': 'Search the stored messages of this chat' });
+  let rows = []; let shown = '';
+  const more = h('button', { class: 'btn small', type: 'button', onclick: () => load('older') }, 'Load older');
+  const latest = h('button', { class: 'btn small hide', type: 'button', onclick: () => { at = 0; load(); } }, 'Show the latest');
+  const agentOf = (id) => agents.find((b) => b.id === id)?.name || (id === 'owner-assistant' ? 'Owner assistant' : 'Agent');
+  function bubble(m, i) {
+    const text = highlight(m.text, searchWords(shown));
+    if (!m.fromAgent) {
+      return h('div', { class: `bubble agent${m.id === at ? ' hit' : ''}`, 'data-msg': m.id },
+        h('div', { class: 'small msg-who' }, m.name || (m.sender ? `+${m.sender}` : 'someone'), m.tag ? ` (${m.tag})` : '', ` · ${time(m.ts)}`, m.addressed ? ' · to the agent' : ''),
+        m.quoted ? h('div', { class: 'small msg-quote' }, m.quoted) : null, h('span', {}, text));
+    }
+    const name = agentOf(m.agent); const av = avatar(name, m.agent || 'agent', 's');
+    return h('div', { class: `msg-ans ${[...av.classList].find((k) => /^c\d$/.test(k)) || ''}${m.id === at ? ' hit' : ''}`, 'data-msg': m.id },
+      h('div', { class: 'small msg-who' }, av, m.agent && !m.agent.startsWith('owner') ? h('a', { href: `#agents/${encodeURIComponent(m.agent)}` }, name) : name, ` · ${time(m.ts)}`),
+      h('div', { class: 'bubble ans' }, text),
+      admin && m.rateable ? answerActions({ id: m.id, agent: m.agent, rating: m.rating, text: m.text, question: questionOf(rows, i) }) : null);
   }
-  const card = h('div', { class: 'card', style: 'margin-top:16px' },
-    h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, `Messages · ${c.name}`), h('form', { class: 'row nowrap', style: 'flex:0 1 420px', onsubmit: (e) => { e.preventDefault(); load(false); } }, q, h('button', { class: 'btn small' }, 'Search'))),
-    h('p', { class: 'small muted' }, 'Stored for context. Each look is recorded in Activity.'),
-    h('div', { style: 'text-align:center' }, more), log);
-  load(false);
-  return card;
+  async function load(older) {
+    const term = q.value.trim();
+    const page = await tryApi(() => api('GET', `/api/chats/${enc}/messages?limit=50${older && rows[0] ? `&before=${rows[0].id}` : ''}${term ? `&q=${encodeURIComponent(term)}` : ''}${at && !older && !term ? `&around=${at}` : ''}`));
+    if (!page) return;
+    shown = term;
+    rows = older ? [...page.reverse(), ...rows] : page.reverse();
+    log.replaceChildren(...(rows.length ? rows.map(bubble) : [h('p', { class: 'small muted' }, term ? 'No stored message matches.' : 'No stored messages for this chat yet.')]));
+    more.classList.toggle('hide', page.length < (at && !older && !term ? 26 : 50));
+    latest.classList.toggle('hide', !at || !!term);
+    const hit = at && log.querySelector('.hit');
+    if (hit) hit.scrollIntoView({ block: 'center' }); else if (!older) log.scrollTop = log.scrollHeight;
+  }
+  // #91: earlier messages from the phone; while it sends them the line follows (only on this page, only while loading)
+  const hist = h('div', {}, historyLine(c));
+  const histBtn = admin && c.enabled ? h('button', { class: 'btn small', type: 'button', disabled: c.history?.state === 'loading', onclick: () => tryApi(async () => { c.history = (await api('POST', `/api/chats/${enc}/history`, {})).status; showHist(); watch(); }) }, 'Load earlier from your phone') : null;
+  const showHist = () => { hist.replaceChildren(historyLine(c) || ''); if (histBtn) histBtn.disabled = c.history?.state === 'loading'; };
+  let watching = false;
+  const watch = async () => {
+    if (c.history?.state !== 'loading' || watching) return;
+    watching = true;
+    try {
+      while (document.body.contains(hist)) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const r = await api('GET', `/api/chats/${enc}/history`).catch(() => null);
+        if (!r) break;
+        c.history = r.status; showHist();
+        if (r.status?.state !== 'loading') { load(); break; }
+      }
+    } finally { watching = false; }
+  };
+  setTimeout(watch, 0);
+  load();
+  return h('div', {},
+    h('form', { class: 'row nowrap msg-find', onsubmit: (e) => { e.preventDefault(); at = 0; load(); } }, q, h('button', { class: 'btn small' }, 'Search')),
+    h('div', { style: 'text-align:center' }, more), log, h('div', { style: 'text-align:center' }, latest),
+    histBtn || c.history ? h('div', { class: 'sblock' }, hist, histBtn) : null);
 }
-
-async function renderMemory(c, box = h('div', {}), q0 = '') {
-  const enc = encodeURIComponent(c.id);
-  const m = await api('GET', `/api/chats/${enc}/memory`);
-  box.replaceChildren(h('div', { class: 'card', style: 'margin-top:14px' },
-    h('div', { class: 'row spread' }, h('h2', {}, `Memory · ${c.name}`), h('span', { class: 'pill' }, `${m.messageCount} stored messages`)),
-    h('label', {}, m.updatedAt ? `Running summary (updated ${time(m.updatedAt)})` : 'Running summary'),
-    h('pre', {}, m.summary || '(no summary yet — it starts once older messages accumulate)'),
-    h('label', {}, `Notes (${m.notes.length})`),
-    m.notes.length ? h('ul', { class: 'small' }, m.notes.map((n) => h('li', { style: 'margin:6px 0' }, n.text, h('span', { class: 'muted' }, ` — ${n.author || '?'} (${n.role || 'note'}), ${time(n.ts)} `),
-      h('button', { class: 'btn small mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/notes/${n.id}`); renderMemory(c, box); }, 'Note deleted') }, 'Delete')))) : h('p', { class: 'small muted' }, 'No notes.'),
-    h('div', { class: 'row mut', style: 'margin-top:10px' },
-      h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('POST', `/api/chats/${enc}/memory/summarize`); renderMemory(c, box); }, 'Summary rebuilt') }, 'Rebuild summary'),
-      h('button', { class: 'btn danger', onclick: async () => (await ask({ title: `Erase the memory of “${c.name}”?`, text: 'All stored messages, the running summary and the notes of this chat are deleted. This cannot be undone.', ok: 'Erase memory', danger: true })) && tryApi(async () => { await api('DELETE', `/api/chats/${enc}/memory`); renderMemory(c, box); }, 'Memory erased') }, 'Erase memory'))));
-  if (can('admin') && c.isGroup) box.append(whatsappCard(c));
-  if (can('admin')) box.append(messagesCard(c, q0));
+/** A chat's *Memory* (072): the running summary and the notes the agent keeps here; rebuild or erase. */
+function memoryView(c, box = h('div', {})) {
+  const enc = encodeURIComponent(c.id); const admin = can('admin');
+  box.replaceChildren(h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading…'));
+  tryApi(() => api('GET', `/api/chats/${enc}/memory`)).then((m) => m && box.replaceChildren(
+    h('div', { class: 'sblock' }, h('h3', {}, 'Running summary'), h('p', { class: 'small muted' }, m.updatedAt ? `Updated ${time(m.updatedAt)} · from ${plural(m.messageCount, 'stored message')}` : plural(m.messageCount, 'stored message')),
+      m.summary ? h('pre', {}, m.summary) : h('p', { class: 'small muted' }, 'No summary yet. It starts once older messages pile up.')),
+    h('div', { class: 'sblock' }, h('h3', {}, `Notes (${m.notes.length})`),
+      m.notes.length ? h('ul', { class: 'notes' }, m.notes.map((n) => h('li', { class: 'row spread nowrap' }, h('span', {}, n.text, h('span', { class: 'small muted', style: 'display:block' }, `${n.author || '?'} (${n.role || 'note'}) · ${time(n.ts)}`)),
+        admin ? h('button', { class: 'btn small ghost', type: 'button', 'aria-label': `Delete note: ${n.text.slice(0, 40)}`, onclick: () => tryApi(async () => { await api('DELETE', `/api/notes/${n.id}`); memoryView(c, box); }, 'Note deleted') }, 'Delete') : null)))
+        : h('p', { class: 'small muted' }, 'No notes. People add them in WhatsApp: “remember that …”.')),
+    admin ? h('div', { class: 'row', style: 'margin-top:10px' },
+      h('button', { class: 'btn', type: 'button', onclick: () => tryApi(async () => { await api('POST', `/api/chats/${enc}/memory/summarize`); memoryView(c, box); }, 'Summary rebuilt') }, 'Rebuild summary'),
+      h('button', { class: 'btn danger', type: 'button', onclick: async () => (await ask({ title: `Erase the memory of “${c.name}”?`, text: 'All stored messages, the running summary and the notes of this chat are deleted. This cannot be undone.', ok: 'Erase memory', danger: true })) && tryApi(async () => { await api('DELETE', `/api/chats/${enc}/memory`); memoryView(c, box); }, 'Memory erased') }, 'Erase memory')) : null));
   return box;
 }
-

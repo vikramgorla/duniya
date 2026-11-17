@@ -1,6 +1,6 @@
 // The AI helper (016): describe a change, review it as a friendly diff, apply it. Module of the panel (063).
 import * as D from './diff.js';
-import { api, h } from './core.js';
+import { api, ask as askDialog, h, toast, tryApi } from './core.js';
 import { loadModels, modelLabel, modelSelect, plural, trunc } from './shared.js';
 // ---------- AI helper (016) ----------
 const FIELD_LABEL = { name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', dm: 'Who may message it directly',
@@ -183,3 +183,21 @@ export async function aiHelper({ agentId = '', title, placeholder, applyLabel, o
   return bare ? h('div', {}, parts) : h('div', { class: 'card', style: 'margin-bottom:16px' }, h('h2', {}, title), parts);
 }
 
+/**
+ * "Change with AI" for one agent (068, 072): the helper in a dialog (a sheet on phones). `save(patch)` saves the applied
+ * changes and returns true; without one the change is saved here with Undo in the toast (Teach from a chat's messages
+ * or Activity, away from the agent's page).
+ */
+export async function changeWithAi(agentId, initial = '', save = null) {
+  const enc = encodeURIComponent(agentId);
+  const keep = save || (async (patch) => {
+    const before = (await api('GET', `/api/agents/${enc}`)).config;
+    if (!await tryApi(() => api('PUT', `/api/agents/${enc}`, patch))) return false;
+    toast('Saved', { undo: () => tryApi(() => api('PUT', `/api/agents/${enc}`, Object.fromEntries(Object.keys(patch).map((k) => [k, before[k] ?? null]))), 'Undone') });
+    return true;
+  });
+  const helper = await aiHelper({ agentId, bare: true, applyLabel: 'Apply & save', initial,
+    placeholder: 'What should change? e.g. “Shorter, friendlier replies”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',
+    onApply: async (r) => { if (await keep(Object.fromEntries(r.changes.map((ch) => [ch.field, ch.after])))) helper.closest('dialog')?.close(); } });
+  askDialog({ title: 'Change with AI', body: helper, ok: null, cancel: 'Close', wide: true });
+}

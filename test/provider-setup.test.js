@@ -205,7 +205,7 @@ test('GitHub Copilot: chat round trip with a tool call through the agent (bridge
   assert.ok(t.mcpCalls.some((c) => c.name === 'agenda_list'));
   assert.ok(s.disconnected && cp.deleted.includes(s.sessionId), 'session cleaned up');
   const acts = (await t.api(owner, 'GET', '/api/activity?limit=50')).body;
-  assert.ok(acts.some((a) => a.type === 'model.usage' && /copilot:claude-sonnet-4.5: 14 in \/ 10 out/.test(a.summary)));
+  assert.ok(acts.some((a) => a.type === 'model.usage' && /Claude Sonnet 4.5: 14 in \/ 10 out/.test(a.summary)));
 
   // errors reported by the runtime reach the chat as a clear message, not a crash (fallback off for this agent)
   await t.agents.updateAgent('panduga', { fallback: { mode: 'off' } });

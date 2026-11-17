@@ -40,7 +40,12 @@ async function paletteItems() {
   }
   const names = new Map(agents.map((a) => [a.id, a.name]));
   for (const c of await api('GET', '/api/chats').catch(() => [])) {
-    items.push({ kind: c.isGroup ? 'Group' : 'Person', label: c.name || (c.phone ? `+${c.phone}` : c.id), hint: c.enabled ? `on · ${names.get(c.agent) || 'no agent'}` : 'off', go: `#chats/${encodeURIComponent(c.id)}`, icon: 'chats' });
+    const label = c.name || (c.phone ? `+${c.phone}` : c.id); const kind = c.isGroup ? 'Group' : 'Person';
+    items.push({ kind, label, hint: c.enabled ? `on · ${names.get(c.agent) || 'no agent'}` : 'off', go: `#chats/${encodeURIComponent(c.id)}`, icon: 'chats' });
+    // 072: its sections ("Messages · Book club")
+    for (const [sid, title, words] of [['messages', 'Messages', 'history said rate thumbs'], ['memory', 'Memory', 'summary notes remember']]) {
+      if (sid === 'memory' || can('admin')) items.push({ kind, label: `${title} · ${label}`, words, go: `#chats/${encodeURIComponent(c.id)}/${sid}`, icon: 'chats' });
+    }
   }
   for (const [id, title, words] of SETTINGS_SECTIONS) items.push({ kind: 'Setting', label: title, words, go: `#settings/${id}`, icon: 'settings' });
   for (const p of ['openrouter', 'anthropic', 'openai', 'chatgpt', 'copilot'].map((id) => [id, PROVIDER_NAMES[id]])) items.push({ kind: 'Model', label: p[1], words: 'provider key connect', go: `#models/${p[0]}`, icon: 'models' });
@@ -92,7 +97,7 @@ export async function openPalette() {
     const words = searchWords(q);
     found.items = [...found.items.filter((it) => !it.older), ...r.results.map((m) => ({ kind: 'Message', icon: 'chats',
       node: [h('b', {}, m.chatName), h('small', { class: 'muted' }, ` · ${m.fromAgent ? 'Agent' : m.name || 'someone'} · ${time(m.ts)}`), h('span', { class: 'pal-snip' }, highlight(m.text, words, 140))],
-      run: () => { S.msgSearch = { chat: m.chat, q }; const to = `chats/${encodeURIComponent(m.chat)}`; if (location.hash === `#${to}`) show('chats'); else location.hash = to; } }))];
+      run: () => { S.msgSearch = { chat: m.chat, q }; const to = `chats/${encodeURIComponent(m.chat)}/messages`; if (location.hash === `#${to}`) show('chats'); else location.hash = to; } }))];
     if (r.more) found.items.push({ kind: 'More', icon: 'search', label: 'Show older matches', stay: true, older: true, run: () => searchMessages(q, true) });
     Object.assign(found, { more: r.more, last: r.results.at(-1)?.id || found.last, busy: false, error: r.error, chats: r.chats });
     draw();

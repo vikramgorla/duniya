@@ -6,6 +6,7 @@ import { listActivity, listPending } from '../../core/db.js';
 import { LOG_CATEGORIES, activity, bus, loggingSettings, resetLoggingCache } from '../../core/events.js';
 import { MAX_LOAD } from '../../core/history-load.js';
 import { queueStats } from '../../core/media-queue.js';
+import { ratingsOf } from '../../core/review.js';
 import { serverSize, setSmallServerMode, smallServerMode } from '../../core/resources.js';
 import { getSettings, updateSettings } from '../../core/store.js';
 import { osUpdatesCached, rebootStatus } from '../../core/system.js';
@@ -70,7 +71,12 @@ export function statusRoutes(route, { channel } = {}) {
   });
 
   // ---------- activity ----------
-  route('GET', '/api/activity', async (req, res, body, q) => listActivity({ limit: q.get('limit'), agent: q.get('agent') || '', chat: q.get('chat') || '', before: Number(q.get('before') || 0) }));
+  // 072: a reply carries its rating (detail.msg is the stored answer), the same as in Review and the chat's messages
+  route('GET', '/api/activity', async (req, res, body, q) => {
+    const rows = listActivity({ limit: q.get('limit'), agent: q.get('agent') || '', chat: q.get('chat') || '', before: Number(q.get('before') || 0) });
+    const rated = ratingsOf(rows.filter((r) => r.type === 'message.out' && r.detail?.msg).map((r) => r.detail.msg));
+    return rated.size ? rows.map((r) => (r.type === 'message.out' && rated.has(r.detail?.msg) ? { ...r, rating: rated.get(r.detail.msg) } : r)) : rows;
+  });
   // Live panel (058): activity entries as plain messages, and the status (what GET /api/status returns) as `status`
   // events: shortly after anything changed (activity or a channel state change such as a new QR) and with the
   // keep-alive every 25 s (uptime, memory). Unchanged status is not sent again, except with the keep-alive.

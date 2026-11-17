@@ -38,20 +38,22 @@ function dayLabel(ts) {
   return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', ...(d.getFullYear() === today.getFullYear() ? {} : { year: 'numeric' }) });
 }
 const dayHead = (ts) => h('li', { class: 'fday', 'data-day': dayKey(ts) }, h('h3', {}, dayLabel(ts)));
-/** One entry: marker (agent avatar or type icon) · bold subject · muted type, agent and chat · time on the right. */
+/** One entry: marker (agent avatar or type icon) · bold subject · muted type, agent and chat · time on the right. Open,
+ *  it shows where to go (072: the chat, the answer in its messages, the agent), a reply's 👍 / 👎 row and the details. */
 function feedItem(a) {
   const [label, tone = '', ic = 'activity'] = EVENTS[a.type] || [a.type];
   const agentName = a.agent ? S.status?.agents?.find((b) => b.id === a.agent)?.name || (a.agent === 'owner-assistant' ? 'Owner assistant' : a.agent) : '';
   const chatName = a.chat ? S.chatNames?.get(a.chat) || `chat …${a.chat.split('@')[0].slice(-4)}` : '';
-  const detail = h('pre', { class: 'hide' }, JSON.stringify({ type: a.type, ...(a.detail ? { detail: a.detail } : {}) }, null, 2));
+  const open = h('div', { class: 'fopen hide', onclick: (e) => e.stopPropagation() });
+  const fill = async () => open.replaceChildren(...(await import('./answers.js')).entryOpen(a, chatName, agentName));
   const li = h('li', { class: `fitem ${tone}`, tabindex: '0', 'aria-expanded': 'false', 'data-day': dayKey(a.ts),
-    onclick: () => li.setAttribute('aria-expanded', String(!detail.classList.toggle('hide'))),
-    onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); li.click(); } } },
+    onclick: () => { const show = open.classList.toggle('hide') === false; li.setAttribute('aria-expanded', String(show)); if (show && !open.firstChild) fill(); },
+    onkeydown: (e) => { if (e.target === li && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); li.click(); } } },
     agentName ? avatar(agentName, a.agent, 's') : h('span', { class: 'fmark', 'aria-hidden': 'true' }, icon(ic)),
     h('div', { class: 'fsub' }, subjectOf(a.summary, label)),
     h('time', { datetime: new Date(a.ts).toISOString(), title: new Date(a.ts).toLocaleString() }, new Date(a.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
     h('div', { class: 'fmeta' }, h('span', { class: 'ftype' }, label), agentName ? h('span', {}, agentName) : null, chatName ? h('span', { title: chatName }, chatName) : null),
-    detail);
+    open);
   if (a.id) li.dataset.id = a.id;
   return li;
 }
@@ -77,19 +79,27 @@ export function feedPrepend(list, a, max = 0) {
     list.querySelectorAll('.fday').forEach((d) => { if (!d.nextElementSibling?.classList.contains('fitem')) d.remove(); });
   }
 }
+/** 072: #activity/chat=<id> shows one chat's activity (the chat page's *Activity* row); ✕ shows everything again. */
+const chatFilter = () => decodeURIComponent((/^#activity\/chat=(.+)$/.exec(location.hash) || [])[1] || '');
 export async function renderActivity() {
   const [agents] = await Promise.all([api('GET', '/api/agents'), loadChatNames()]);
+  S.feedChat = chatFilter();
+  const q = () => `/api/activity?limit=200&agent=${encodeURIComponent(S.feedAgent)}&chat=${encodeURIComponent(S.feedChat)}`;
   const sel = h('select', { class: 'compact', 'aria-label': 'Show activity of', onchange: async (e) => { S.feedAgent = e.target.value; await load(); } },
     h('option', { value: '' }, 'All agents'), agents.map((b) => h('option', { value: b.id, selected: S.feedAgent === b.id }, b.name)));
   const list = h('ul', { class: 'feed', id: 'feed' });
-  const more = h('button', { class: 'btn', onclick: async () => { const last = [...list.querySelectorAll('.fitem')].at(-1)?.dataset.id; appendFeed(list, await api('GET', `/api/activity?limit=200&agent=${encodeURIComponent(S.feedAgent)}&before=${last || 0}`)); } }, 'Load older');
+  const more = h('button', { class: 'btn', onclick: async () => { const last = [...list.querySelectorAll('.fitem')].at(-1)?.dataset.id; appendFeed(list, await api('GET', `${q()}&before=${last || 0}`)); } }, 'Load older');
   const empty = h('div', {});
-  $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'Activity'), sel),
-    h('p', { class: 'small muted', style: 'margin:4px 0 6px' }, 'Live, newest first. Tap an entry for details.'), list, empty, h('div', { style: 'margin-top:10px' }, more)));
+  const name = S.chatNames?.get(S.feedChat) || 'this chat';
+  const chip = S.feedChat ? h('div', { class: 'row fchat' }, h('a', { class: 'pill raw', href: `#chats/${encodeURIComponent(S.feedChat)}` }, name),
+    h('a', { class: 'btn small ghost', href: '#activity', 'aria-label': 'Show all chats' }, '✕ All chats')) : null;
+  $('#main').replaceChildren(h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'Activity'), sel), chip,
+    h('p', { class: 'small muted', style: 'margin:4px 0 6px' }, 'Live, newest first. Tap an entry for links and details.'), list, empty, h('div', { style: 'margin-top:10px' }, more)));
   async function load() {
-    const rows = await api('GET', `/api/activity?limit=200&agent=${encodeURIComponent(S.feedAgent)}`);
+    const rows = await api('GET', q());
     list.replaceChildren(); appendFeed(list, rows); more.classList.toggle('hide', rows.length < 200);
-    empty.replaceChildren(rows.length ? '' : emptyState('activity', 'Nothing happened yet', 'Messages your agents read and send, tool calls and changes show up here as they happen.'));
+    empty.replaceChildren(rows.length ? '' : S.feedChat ? emptyState('activity', `Nothing recorded in ${name}`, 'Messages, answers and changes in this chat show up here.')
+      : emptyState('activity', 'Nothing happened yet', 'Messages your agents read and send, tool calls and changes show up here as they happen.'));
   }
   await load();
 }

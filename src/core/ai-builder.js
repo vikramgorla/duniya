@@ -103,7 +103,7 @@ export async function draftAgent({ agent = null, request, model = 'auto', people
     try {
       const { config: proposed, warnings } = validateAgentConfig({ ...(agent || AGENT_DEFAULTS), ...changes, chats: agent?.chats || [] });
       const diff = EDITABLE.filter((k) => !same(proposed[k], current[k])).map((k) => ({ field: k, before: current[k], after: proposed[k] }));
-      activity('config', { agent: agent?.id || '', summary: `AI helper drafted ${diff.length} change(s)${by ? ` for ${by}` : ''} with ${res.model}` });
+      activity('config', { agent: agent?.id || '', summary: `AI helper drafted ${diff.length} change${diff.length === 1 ? '' : 's'}${by ? ` for ${by}` : ''} with ${res.model}` });
       return { summary: String(input.summary || ''), questions: (input.questions || []).slice(0, 2), changes: diff, proposed, warnings, model: res.model };
     } catch (e) {
       lastError = `${e.field ? `${e.field}: ` : ''}${e.message}`;

@@ -1,13 +1,25 @@
 // Pending confirmations screen. Module of the panel (063).
 // ---------- pending ----------
-import { $, api, h, toast, tryApi } from './core.js';
+import { $, S, api, avatar, emptyState, h, toast, tryApi } from './core.js';
+import { loadChatNames } from './activity.js';
+import { toolPhrase } from './names.js';
+import { plural } from './shared.js';
+/** 072: one row per change: the agent's avatar · what it would do · who asked, in which chat (a link), and when it
+ *  expires · Apply / Cancel. Names as everywhere else, never ids. */
 export async function renderPending() {
-  const rows = await api('GET', '/api/pending');
+  const [rows] = await Promise.all([api('GET', '/api/pending'), S.chatNames ? null : loadChatNames()]);
+  const agentName = (id) => S.status?.agents?.find((b) => b.id === id)?.name || id;
+  const done = async (r) => { if (r) { toast(r.result || 'Cancelled'); renderPending(); } };
   $('#main').replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Pending confirmations'),
-    h('p', { class: 'small muted' }, 'Changes an organizer asked for, waiting for “confirm CODE”. You can apply or cancel them here too.'),
-    rows.length ? h('table', { class: 'stack' }, h('tbody', {}, rows.map((p) => h('tr', {},
-      h('td', { 'data-label': '' }, h('b', {}, p.code), h('div', { class: 'small muted' }, `${p.agent} · ${p.tool} · expires in ${Math.max(0, Math.round((p.expires - Date.now()) / 60000))} min`), h('pre', {}, p.summary)),
-      h('td', { style: 'white-space:nowrap', 'data-label': '' }, h('button', { class: 'btn primary mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/pending/${p.code}/apply`)); if (r) toast(r.result); renderPending(); } }, 'Apply'), ' ',
-        h('button', { class: 'btn mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/pending/${p.code}`); renderPending(); }) }, 'Cancel')))))) : h('p', { class: 'muted' }, 'Nothing pending.')));
+    h('p', { class: 'small muted' }, 'Changes an organizer asked for, waiting for “confirm CODE” in the chat. You can apply or cancel them here too.'),
+    rows.length ? h('ul', { class: 'pend' }, rows.map((p) => h('li', {},
+      avatar(agentName(p.agent), p.agent, 's'),
+      h('div', { class: 'pend-main' },
+        h('b', {}, p.summary),
+        h('div', { class: 'small muted' }, [agentName(p.agent), toolPhrase(p.tool)].join(' · '), p.chat ? [' · ', h('a', { href: `#chats/${encodeURIComponent(p.chat)}/messages` }, S.chatNames?.get(p.chat) || 'the chat')] : null,
+          ` · code ${p.code} · expires in ${plural(Math.max(0, Math.round((p.expires - Date.now()) / 60000)), 'minute')}`)),
+      h('div', { class: 'row nowrap pend-act' },
+        h('button', { class: 'btn small primary mut', type: 'button', onclick: async () => done(await tryApi(() => api('POST', `/api/pending/${p.code}/apply`))) }, 'Apply'),
+        h('button', { class: 'btn small mut', type: 'button', onclick: async () => done(await tryApi(() => api('DELETE', `/api/pending/${p.code}`))) }, 'Cancel')))))
+      : emptyState('pending', 'Nothing waiting', 'When an organizer asks an agent for a change that needs a confirm, it waits here.')));
 }
-
