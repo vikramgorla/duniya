@@ -144,7 +144,7 @@ async function fakeRegistry(weatherUrl) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 
-/** 062: page script (for a `before` hook) that makes Getting started show `next` as the current step, as on a fresh
+/** 062: fake /api/checklist data (install with page.call(FAKE_CHECKLIST, data)) that makes Getting started show `next` as the current step, as on a fresh
  *  install, with Car pooling as the new agent; `done: true` shows the closing "All set" card. Screenshots only. */
 export function fakeChecklist(next, { done = false } = {}) {
   const ids = ['whatsapp', 'provider', 'agent', 'chat', 'reply'];
@@ -155,10 +155,16 @@ export function fakeChecklist(next, { done = false } = {}) {
   const n = done ? ids.length : ids.indexOf(next);
   const c = { done: n, total: ids.length, complete: done, dismissed: false, agent: { id: 'carpool', name: 'Car pooling', trigger: '!ride' },
     steps: ids.map((id, i) => ({ id, title: titles[id], hint: hints[id], href: `#${id}`, done: i < n, skipped: false })) };
-  // base64 keeps the data inert inside the evaluated code (no quoting or escaping questions)
-  return `const fc = JSON.parse(atob('${Buffer.from(JSON.stringify(c)).toString('base64')}')); const fcf = window.fetch; window.fetch = (u, o) => (String(u) === '/api/checklist' && (!o || !o.method || o.method === 'GET') ? Promise.resolve(new Response(JSON.stringify(fc))) : fcf(u, o));
-    S.checklist = null; S.checklistDone = ${done ? `{ last: h('div', { class: 'chat-mini' }, h('div', { class: 'bubble me' }, 'Any seat to Geneva on Friday?'), h('div', { class: 'bubble agent' }, 'Friday 21 Nov: Marc drives from Morges station at 07:40, 2 seats left. Want me to save one for you?')) }` : 'null'};`;
+  return c;
 }
+/** 062: installs a fakeChecklist() result in the panel (run with page.call, so the data is passed as a value, not code). */
+export const FAKE_CHECKLIST = `async function (fc) {
+  const fcf = window.fetch;
+  window.fetch = (u, o) => (String(u) === '/api/checklist' && (!o || !o.method || o.method === 'GET') ? Promise.resolve(new Response(JSON.stringify(fc))) : fcf(u, o));
+  S.checklist = null;
+  S.checklistDone = fc.complete ? { last: h('div', { class: 'chat-mini' }, h('div', { class: 'bubble me' }, 'Any seat to Geneva on Friday?'), h('div', { class: 'bubble agent' }, 'Friday 21 Nov: Marc drives from Morges station at 07:40, 2 seats left. Want me to save one for you?')) } : null;
+  show(S.tab);
+}`;
 
 /** Start the seeded demo panel. Returns { base, dataDir }. Call once per process (the app's modules are singletons). */
 /** `small: true` pretends to run on a 1 GB / 1 CPU VM (the free-tier size), so the small-server guardrails show. */

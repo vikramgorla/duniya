@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { startDemo, DEMO_PASSWORD, fakeChecklist } from './demo-panel.mjs';
+import { startDemo, DEMO_PASSWORD, fakeChecklist, FAKE_CHECKLIST } from './demo-panel.mjs';
 import { launch, newPage } from './cdp.mjs';
 
 const { values: opt } = parseArgs({ options: {
@@ -44,7 +44,7 @@ const PRELUDE = `const T = {
 const ASK = `S.ask = { q: '', busy: false, reply: 'This week in your chats:\\n• Morges ↔ Geneva rides: Marc drives Fridays at 07:40 (2 seats left); Sophie gets a lift back with Mia on Thursday.\\n• Class 4B parents: museum trip forms are due Monday 24 Nov; Lea can drive 3 children.\\n• Family ❤️: Diwali dinner Saturday 19:00 at Ravi & Priya’s.\\nThe Book club and Rue du Midi neighbours chats are off, so I can’t see them.',
   confirms: [{ code: 'H4M9', preview: 'Turn off the agent “Office colleagues” (1 chat). It stops answering until you switch it on again.' }],
   steps: [{ step: 'thinking' }, { step: 'tool', tool: 'list_visible_chats', ok: true }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'tool', tool: 'search_messages', ok: true }, { step: 'held', tool: 'set_agent_enabled', ok: true }] };`;
-const START = (step) => `${fakeChecklist(step)} show(S.tab); await T.wait(1500);`; // 062: Getting started, one step open
+const START = 'await T.wait(1500);'; // 062: Getting started, one step open (data installed with page.call, see open())
 const AI_DIFF = "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies, make Lea an organizer, weather before rides'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); document.querySelector('.dskip')?.click(); await T.wait(400);";
 const TEST_AS = "const sel = document.querySelector('select[aria-label=\"Test as role\"]'); sel.value = 'organizer'; sel.dispatchEvent(new Event('change')); await T.wait(1200); const i = document.querySelector('#test-console input[placeholder^=\"Ask the\"]'); if (i) { i.value = 'Who drives to Geneva on Friday?'; await T.click('Send', 'button', 1800); }";
 
@@ -64,9 +64,9 @@ const PAGES = [
 const CARDS = [
   ['card-ask', 'overview', ASK + ' show(S.tab); await T.wait(600);', '#ov-ask', 1100],
   ['card-quiet', 'overview', '', '#ov-silences', 1100],
-  ['card-checklist', 'overview', START('chat'), '#ov-checklist', 1100],
-  ['card-start-model', 'overview', START('provider'), '#ov-checklist', 1100],
-  ['card-start-agent', 'overview', START('agent'), '#ov-checklist', 1100],
+  ['card-checklist', 'overview', START, '#ov-checklist', 1100, fakeChecklist('chat')],
+  ['card-start-model', 'overview', START, '#ov-checklist', 1100, fakeChecklist('provider')],
+  ['card-start-agent', 'overview', START, '#ov-checklist', 1100, fakeChecklist('agent')],
   ['card-find', 'chats', "await openPalette(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'ge'; i.dispatchEvent(new Event('input')); await T.wait(200);", '#palette', 1100],
   ['card-ai-diff', 'agents/carpool', AI_DIFF, '.dreview', 1100],
   ['card-test-as', 'agents/carpool/test', TEST_AS, '#test-console', 1100],
@@ -100,9 +100,10 @@ const login = `fetch('/api/login', { method: 'POST', headers: { 'content-type': 
 const img = join(opt.out, 'img'); const vid = join(opt.out, 'video');
 mkdirSync(img, { recursive: true }); mkdirSync(vid, { recursive: true });
 
-async function open(page, hash, js) {
+async function open(page, hash, js, checklist) {
   await page.goto(`${base}/#${hash}`);
   await sleep(2200);
+  if (checklist) await page.call(FAKE_CHECKLIST, checklist);
   if (js) await page.evaluate(`(async () => { ${PRELUDE} ${js} })()`);
   await sleep(500);
 }
@@ -131,10 +132,10 @@ const jsLiteral = (v) => JSON.stringify(String(v)).replace(/[<>/\u2028\u2029]/g,
 for (const width of [...new Set(CARDS.map((c) => c[4]))]) {
   const page = await newPage(cdp, { width, height: 900, scale: 2, scheme: opt.scheme });
   await page.goto(base); await page.evaluate(login);
-  for (const [name, hash, js, sel, w] of CARDS) {
+  for (const [name, hash, js, sel, w, checklist] of CARDS) {
     if (w !== width || !want(name)) continue;
     try {
-      await open(page, hash, js);
+      await open(page, hash, js, checklist);
       const find = sel.startsWith('box:') ? `T.box(${jsLiteral(sel.slice(4))})` : `document.querySelector(${jsLiteral(sel)})`;
       const r = await page.evaluate(`(() => { ${PRELUDE} const e = ${find}; if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.left + scrollX, y: b.top + scrollY, width: b.width, height: b.height }; })()`);
       if (!r) { console.log('✗', name, 'not found'); continue; }

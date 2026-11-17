@@ -13,7 +13,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { startDemo, DEMO_PASSWORD, fakeChecklist } from './demo-panel.mjs';
+import { startDemo, DEMO_PASSWORD, fakeChecklist, FAKE_CHECKLIST } from './demo-panel.mjs';
 import { launch, newPage } from './cdp.mjs';
 
 const { values: opt } = parseArgs({ options: {
@@ -47,8 +47,8 @@ const STATES = [
   // 061: the install hint without the browser's install prompt (iPhone, Firefox): the manual steps instead of a button
   { name: 'overview-install-steps', hash: 'overview', js: "S.installPrompt = null; localStorage.removeItem('duniya.installHint'); drawInstallHint();" },
   // 062: Getting started, each step open in place (as on a fresh install), and the closing card
-  ...['provider', 'agent', 'chat', 'reply'].map((step) => ({ name: `overview-start-${step}`, hash: 'overview', before: fakeChecklist(step), wait: 2000 })),
-  { name: 'overview-start-done', hash: 'overview', before: fakeChecklist('', { done: true }), wait: 2000 },
+  ...['provider', 'agent', 'chat', 'reply'].map((step) => ({ name: `overview-start-${step}`, hash: 'overview', checklist: fakeChecklist(step), wait: 2000 })),
+  { name: 'overview-start-done', hash: 'overview', checklist: fakeChecklist('', { done: true }), wait: 2000 },
   // 062: Find anything (/ or ⌘K), empty and with a query
   { name: 'find', hash: 'overview', js: 'await openPalette(); await T.wait(600);' },
   { name: 'find-query', hash: 'chats', js: "await openPalette(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'gen'; i.dispatchEvent(new Event('input')); await T.wait(200);" },
@@ -190,6 +190,7 @@ for (const scheme of opt.schemes.split(',')) {
       const key = `${st.name} @ ${width} ${scheme}`;
       try {
         await page.goto(st.path ? `${base}${st.path}` : `${base}/${st.hash ? `#${st.hash}` : ''}`);
+        if (st.checklist) await page.call(FAKE_CHECKLIST, st.checklist);
         if (st.before) await page.evaluate(`(async () => { ${st.before} show(S.tab); })()`);
         await sleep(st.wait || 1500);
         if (st.js) await page.evaluate(`(async () => { ${PRELUDE} ${st.js} })()`);
