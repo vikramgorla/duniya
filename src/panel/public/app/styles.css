@@ -672,6 +672,7 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
   .ld-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; font-weight: 600; text-decoration: none; margin: -6px 0 -8px; }
   .ld-back svg { width: 20px; height: 20px; }
   .lrow { min-height: 52px; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); } /* 068: two small tiles per row on phones */
   /* Tables that turn into cards: each cell shows its column name (data-label) */
   table.stack thead { display: none; }
   table.stack, table.stack tbody, table.stack tr, table.stack td { display: block; width: 100%; }
@@ -696,3 +697,6 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
 .quiet-list li { display: flex; align-items: center; gap: var(--s2); padding: 6px 0; flex-wrap: wrap; }
 .quiet-list li + li { border-top: 1px solid var(--line); }
 .quiet-list .q-main { flex: 1 1 200px; min-width: 0; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.contact-list { list-style: none; margin: var(--s2) 0 0; padding: 0; }
+.contact-list li { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 0; }
+.contact-list li + li { border-top: 1px solid var(--line); }

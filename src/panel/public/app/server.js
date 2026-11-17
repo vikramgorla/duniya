@@ -38,7 +38,7 @@ function hostingCard(hosting) {
       h('a', { class: `btn small${primary ? ' primary' : ''}`, href: DOCS + path, target: '_blank', rel: 'noopener' }, 'Open guide')); };
   const known = HOST_GUIDES[p];
   return h('div', { class: 'card', id: 'hosting-help' }, h('h2', {}, 'Hosting help'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, known ? `This server runs on ${known[0]}. Step-by-step guide with the exact console menus:` : 'Step-by-step guides with the exact console menus. Pick where this server runs:'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, known ? `Runs on ${known[0]}.` : 'Pick where this server runs.'),
     known ? link(p, true) : [link('oci'), link('gcp'), link('server'), link('docker')],
     h('p', { class: 'small muted' }, 'Updates are on Overview. Back up before you recreate or remove a server.'),
     known ? h('details', {}, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Other hosts'), Object.keys(HOST_GUIDES).filter((k) => k !== p).map((k) => link(k))) : null);
