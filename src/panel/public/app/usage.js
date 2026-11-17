@@ -1,7 +1,6 @@
 // Usage screen and spending caps (040). Module of the panel (063).
 import { $, api, can, field, h, tryApi } from './core.js';
 import { fmtCost, fmtTok, meter } from './shared.js';
-import { plansCard } from './plans.js';
 let usageCache = null;
 /** Last-30-days usage per agent, chat, provider and model (cached 60 s) for inline badges. */
 export async function usageSummary() {
@@ -85,7 +84,6 @@ export async function renderUsage() {
       tile('Tokens out', fmtTok(t.output), 'what agents wrote'),
       tile('Estimated cost', fmtCost(t.cost), t.unpriced ? `${t.unpriced} call(s) without a price — set prices under “By model”` : t.plan ? `${t.plan} call(s) included in your plans` : 'from the prices below'),
       tile('Model calls', String(t.calls || 0), `${(byKind.rows.find((r) => r.key === 'reply')?.calls) || 0} replies`)),
-    plansCard(provList), // 067: plans and credit as the providers report them
     caps ? h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Monthly spending caps'),
       caps.caps.length ? h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px' }, caps.caps.map((c) => capBar(c)))
         : h('p', { class: 'small muted' }, 'No caps yet. Set one on an agent’s page (Monthly spending cap) or for a chat under Chats → Spending cap.'),

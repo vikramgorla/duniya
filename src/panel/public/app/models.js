@@ -5,7 +5,6 @@ import { listDetail, mark } from './listdetail.js';
 import { PROVIDER_NAMES } from './names.js';
 import { LINKS, helpLink, loadModels, modelLabel, modelSelect, plural, saveSecretKey, usageLine } from './shared.js';
 import { usageSummary } from './usage.js';
-import { planSection, rowStatus } from './plans.js';
 /** 066: the Add a provider list, in this order: [provider type (names.js) = page id, one short line]. */
 const ADD_PROVIDERS = [['openrouter', 'Many models, some free'], ['anthropic', 'Anthropic API key, pay per use'], ['openai', 'API key, pay per use'],
   ['copilot', 'Your Copilot plan, also works with the free plan'], ['chatgpt', 'Sign in with your ChatGPT plan'], ['compatible', 'Ollama, LM Studio, Groq, Mistral…']];
@@ -37,7 +36,7 @@ function testBox(id) {
 /** One provider card: what it is + cost, then either the steps to connect or the connected state. */
 /** "vikram.gorla@gmail.com" → "v•••a@gmail.com" (068: the account is shown, not spelled out on every screen). */
 const maskAccount = (a) => String(a || '').replace(/^([^@\s])[^@\s]*([^@\s])@/, '$1•••$2@');
-/** One provider page (068): mark, name and its state; one muted line (sign-in, last 30 days); the plan; Test and a ⋯
+/** One provider page (068): mark, name and its state; one muted line (sign-in, last 30 days); Test and a ⋯
  *  with Rename and Disconnect / Remove; other accounts and "Add another account" as one row. Not connected: the
  *  steps to connect. */
 function providerCard({ id, mark, title, cost, tag, p, steps, form, connected, extra, ownerOnly, accounts, account }) {
@@ -64,7 +63,6 @@ function providerCard({ id, mark, title, cost, tag, p, steps, form, connected, e
     isOn && (line.length || u) ? h('div', { class: 'small muted num' }, line.join(' · '), line.length && u ? ' · ' : '', u ? [h('a', { href: '#usage' }, 'last 30 days'), `: ${usageLine(u)}`] : null) : null,
     p?.error ? h('div', { class: 'note bad' }, p.error) : null,
     healthNote(p),
-    isOn ? planSection(p) : null, // 067
     isOn ? h('div', {}, connected, h('div', { class: 'row', style: 'margin-top:10px' }, t.btn, rest), t.out, accounts || null)
       : ownerOnly && !can('owner') ? h('p', { class: 'small muted' }, 'Ask an owner to connect this account.')
         : h('div', {}, h('div', { class: 'eyebrow', style: 'margin-top:14px' }, 'How to connect'), stepList(steps), form));
@@ -138,7 +136,6 @@ function accountsBox({ first, provs, addForm, ownerOnly }) {
       u ? h('div', { class: 'small num' }, 'Last 30 days: ', usageLine(u)) : null,
       p.error ? h('div', { class: 'note bad' }, p.error) : null,
       healthNote(p),
-      p.connected ? planSection(p) : null,
       p.health?.state === 'reconnect' && p.type === 'chatgpt' && can('owner') ? (() => { const f = chatgptFlow({ account: p.id }); return h('div', {}, f.start, f.form); })() : null,
       h('div', { class: 'row', style: 'margin-top:8px' }, t?.btn,
         can('admin') ? Object.assign(menu(`More actions for ${p.name}`,
@@ -311,8 +308,8 @@ export async function renderModels() {
   const names = Object.fromEntries(Object.entries(pages).map(([id, card]) => [id, card.querySelector('h2')?.textContent || id]));
   const state = (p) => (!p?.connected ? (p?.error ? ['bad', 'needs attention'] : ['', 'not connected']) : p.health?.state && p.health.state !== 'ok' ? [p.health.state === 'reconnect' ? 'bad' : 'warn', p.health.text] : ['ok', `Connected · ${plural(p.models, 'model')}`]);
   const row = (id, p, name) => {
-    const [st, text] = state(p); const plan = st === 'ok' ? rowStatus(p) : null; // 067: the tightest plan limit, when the provider reports one
-    return { id, name, mark: mark(...(MARKS[id] || [name[0], 'c0'])), status: h('span', { class: `dot ${st}`, 'aria-hidden': 'true' }), sub: plan || text };
+    const [st, text] = state(p);
+    return { id, name, mark: mark(...(MARKS[id] || [name[0], 'c0'])), status: h('span', { class: `dot ${st}`, 'aria-hidden': 'true' }), sub: text };
   };
   const on = Object.keys(pages).filter((id) => by[id]?.connected || by[id]?.error);
   const off = Object.keys(pages).filter((id) => !on.includes(id));

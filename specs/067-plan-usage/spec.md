@@ -1,5 +1,11 @@
 # Spec 067: Plan usage everywhere
 
+> **Removed (#146, v2.29.3).** Owner: "If we cannot show quota for ChatGPT, remove it for all including Copilot, to keep
+> the code clean — it won't be consistent anyway, and we avoid polling." All of R1–R5 and R7 are gone (no reader, no
+> snapshots, no meters, no plan alerts, no `usage` / `spend_this_month` in `list_model_accounts`). What stays is the
+> error handling of R6 without the plan window's name: a usage or rate-limit error pauses the account until the reset
+> the provider reports ("Paused until 14:20 — usage limit reached") and the fallback answers. The text below is history.
+
 Issue #135. Owner: "Wherever we can, show the usage of the plan (e.g. quota of ChatGPT if possible, same for Copilot…)".
 064 built the slots (list-row meter, the provider page's *Plan usage*); only Copilot's runtime quota fed them.
 

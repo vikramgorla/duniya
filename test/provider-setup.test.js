@@ -43,7 +43,6 @@ function fakeCopilotFactory({ token }) {
           { id: 'o-disabled', name: 'Disabled', capabilities: {}, policy: { state: 'disabled' } },
         ] };
       } },
-      account: { getQuota: async () => ({ quotaSnapshots: { premium_interactions: { isUnlimitedEntitlement: false, entitlementRequests: 50, usedRequests: 12, remainingPercentage: 76, overage: 0, usageAllowedWithExhaustedQuota: false, overageAllowedWithExhaustedQuota: false, resetDate: '2026-12-01' } } }) },
     },
     async getAuthStatus() { return { isAuthenticated: !bad, login: 'vik-gh' }; },
     async createSession(config) {
@@ -163,7 +162,7 @@ test('Test button: sends "Say hi", shows reply and latency; errors are shown, no
   assert.ok(acts.some((a) => /Model test openrouter:.+ ok in \d+ ms/.test(a.summary)));
 });
 
-test('GitHub Copilot: token checks, models, quota, owner only', async () => {
+test('GitHub Copilot: token checks, models, owner only', async () => {
   assert.match((await t.api(owner, 'POST', '/api/providers/copilot', { token: 'ghp_classicclassicclassic' })).body.error, /Classic tokens/);
   assert.equal((await t.api(owner, 'POST', '/api/providers/copilot', { token: 'hello' })).status, 400);
   const bad = await t.api(owner, 'POST', '/api/providers/copilot', { token: 'github_pat_BAD_0123456789abcdef' });
@@ -175,8 +174,7 @@ test('GitHub Copilot: token checks, models, quota, owner only', async () => {
   assert.equal(ok.body.connected, true);
   assert.equal(ok.body.models, 2, 'disabled models hidden');
   assert.equal(ok.body.account, 'vik-gh');
-  // 067: plan usage (GitHub's copilot_internal/user is not answered here, so the runtime's quota)
-  assert.deepEqual(ok.body.usage.limits.map((l) => [l.label, l.used, l.detail]), [['premium requests', 24, '38 of 50 left']]);
+  assert.equal(ok.body.usage, undefined, 'no plan quota is read (#146)');
   assert.equal(cp.tokens.at(-1), 'github_pat_11ABCDEFG0123456789_xyz');
   assert.ok(!JSON.stringify((await t.api(owner, 'GET', '/api/secrets')).body).includes('github_pat_11'));
   const models = (await t.api(owner, 'GET', '/api/models')).body.models.filter((m) => m.provider === 'copilot');

@@ -1,6 +1,13 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.29.3": {
+      "breaking": false,
+      "title": "Plan usage meters removed for every provider",
+      "changes": [
+        { "type": "removed", "text": "Plan and quota meters on Models, Usage and Overview (Copilot's premium requests, OpenRouter's free requests and credit, API rate-limit headroom) and their alerts. When a provider's limit is reached, the account still pauses until the reset and another model answers." }
+      ]
+    },
     "2.29.2": {
       "breaking": false,
       "title": "ChatGPT plan limits removed from Models",

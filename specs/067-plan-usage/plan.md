@@ -1,5 +1,7 @@
 # Plan 067
 
+> Removed in #146 (v2.29.3): see the note at the top of `spec.md`.
+
 - **Server:**
   - `providers/plan-usage.js` (new): parsers (Anthropic and OpenAI rate-limit headers,
     Copilot user, OpenRouter key/credits), the per-account snapshot store (`ttl_state` kind `plan-usage`), `view()`,

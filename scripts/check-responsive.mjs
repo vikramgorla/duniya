@@ -151,8 +151,7 @@ const STATES = [
   // 064: list → page: a provider's page, the Add page, Backups → Restore, Settings sections
   { name: 'models-provider', hash: 'models/chatgpt', js: 'T.openAll();' },
   { name: 'models-add', hash: 'models/add' },
-  { name: 'models-rate-limits', hash: 'models/anthropic' }, // 067: rate-limit headroom and this month's spend
-  { name: 'models-plan-used-up', hash: 'models/openrouter' }, // 067: a used-up plan limit next to the pause
+  { name: 'models-paused', hash: 'models/openrouter' }, // 042: an account paused by its usage limit
   { name: 'backups-restore', hash: 'backups/restore' },
   { name: 'settings-users', hash: 'settings/users', wait: 2000, js: 'T.openAll();' },
   { name: 'models-setup', hash: 'models/chatgpt', before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);

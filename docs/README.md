@@ -86,7 +86,7 @@ The panel's **Server** page has a **Hosting help** card that links to the right 
 <summary>Notes on providers and sign-ins</summary>
 
 - Claude **subscriptions** (Pro/Max) can't be used by third-party apps under Anthropic's terms, so Claude needs an
-  API key. ChatGPT plan usage uses OpenAI's official open-source flow (preview).
+  API key. Using a ChatGPT plan goes through OpenAI's official open-source flow (preview).
 - GitHub *device login* for backups needs a GitHub OAuth App client id (Device Flow enabled); the one-click GitHub App
   or pasting a token always works.
 - Feature specs: [`specs/`](../specs) · design language: [DESIGN.md](../DESIGN.md).

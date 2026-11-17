@@ -76,7 +76,7 @@ export const removeCapsFor = (scope, id) => db.prepare('DELETE FROM budget_caps 
 // ---------- spend ----------
 /** Month-to-date spend of a scope: { cost (priced calls only), tokens, calls, unpriced }. */
 export function spendOf(scope, id, month = monthOf()) {
-  const col = { chat: 'chat', account: 'COALESCE(account, provider)' }[scope] || 'agent'; // account (067): a model account's month on Models
+  const col = scope === 'chat' ? 'chat' : 'agent';
   const r = db.prepare(`SELECT COUNT(*) AS calls, SUM(cost) AS cost, SUM(input + output) AS tokens, SUM(CASE WHEN priced IS NULL THEN 1 ELSE 0 END) AS unpriced
     FROM usage WHERE ${col} = ? AND ts >= ? AND ts < ?`).get(String(id), month.from, month.to);
   return { cost: Math.round((r.cost || 0) * 1e6) / 1e6, tokens: r.tokens || 0, calls: r.calls || 0, unpriced: r.unpriced || 0 };

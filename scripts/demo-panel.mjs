@@ -59,9 +59,6 @@ async function fakeModels() {
     if (u.startsWith('/anthropic/v1/models')) {
       return json({ data: ['Sonnet', 'Haiku', 'Opus'].map((n) => ({ id: `claude-${n.toLowerCase()}-5-5`, display_name: `Claude ${n} 5.5`, type: 'model', created_at: '2026-01-01T00:00:00Z' })), has_more: false, first_id: 'a', last_id: 'c' });
     }
-    // 067: OpenRouter key info — a free key that used today's free requests (matches its pause)
-    if (u.startsWith('/openrouter/key')) return json({ data: { label: 'duniya', limit: null, limit_remaining: null, usage: 0, is_free_tier: true, free_model_daily_requests: { used: 50, limit: 50, remaining: 0 } } });
-    if (u.startsWith('/openrouter/credits')) return json({ data: { total_credits: 0, total_usage: 0 } });
     if (u.startsWith('/chatgpt/models')) return json({ models: [{ slug: 'gpt-5.5', display_name: 'GPT-5.5' }, { slug: 'gpt-5.5-mini', display_name: 'GPT-5.5 mini' }] });
     if (u.startsWith('/openrouter/models')) {
       return json({ data: [
@@ -287,12 +284,6 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   store.updateSettings({ accounts: [{ id: 'chatgpt-sam', type: 'chatgpt', label: 'Sam' }] });
   store.setSecret('PROVIDER_CHATGPT_SAM_CREDENTIALS', JSON.stringify({ access_token: 'demo', refresh_token: 'demo', expires_at: now + 365 * D, email: 'sam@example.org', client_id: 'demo', scopes: [] }));
   (await imp('src/core/providers/breaker.js')).recordFailure('openrouter', { reason: 'quota', retryAfterMs: 3 * H }, { name: 'OpenRouter', message: 'Rate limit exceeded: free-models-per-day' });
-  // 067: plan usage as the providers report it — the headers of the last answer (Claude rate limits); OpenRouter's /key
-  // comes from the fake endpoint when Models opens
-  const planUsage = await imp('src/core/providers/plan-usage.js');
-  planUsage.noteHeaders('anthropic', new Headers({ 'anthropic-ratelimit-requests-limit': '1000', 'anthropic-ratelimit-requests-remaining': '988', 'anthropic-ratelimit-requests-reset': new Date(now + 40000).toISOString(),
-    'anthropic-ratelimit-input-tokens-limit': '450000', 'anthropic-ratelimit-input-tokens-remaining': '441200', 'anthropic-ratelimit-input-tokens-reset': new Date(now + 40000).toISOString() }), { name: 'Claude', now: now - 6 * MIN });
-
   // agents from the templates
   await agents.loadAgents();
   const tpl = (f) => JSON.parse(readFileSync(join(ROOT, 'templates', f), 'utf8'));

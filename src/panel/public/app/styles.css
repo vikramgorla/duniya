@@ -383,17 +383,10 @@ a.choice { text-decoration: none; color: var(--ink) !important; }
 .lmark svg { width: 17px; height: 17px; }
 .lmark.c1 { background: var(--p1); } .lmark.c2 { background: var(--p2); } .lmark.c3 { background: #0f8a7c; } .lmark.c4 { background: var(--p4); } .lmark.c5 { background: #4f7a00; } .lmark.c0 { background: #5d6470; }
 .lmark.add { background: none; color: var(--ink); border: 1.5px dashed var(--line-2); }
-.lmeter { display: block; height: 3px; border-radius: 2px; background: var(--bg-2); margin-top: 3px; overflow: hidden; }
-.lmeter > i { display: block; height: 100%; background: var(--ink); } .lmeter.hot > i { background: var(--bad); }
-@media (prefers-color-scheme: dark) { .lmeter > i { background: var(--signal); } }
 /* 066: Add a provider: rows, hairlines between them */
 .add-list { list-style: none; margin: var(--s2) calc(-1 * var(--s2)) 0; padding: 0; }
 .add-list li + li { border-top: 1px solid var(--line); }
 .add-list .lrow-sub { white-space: normal; }
-.plan-usage { margin: var(--s3) 0; } .plan-usage h3 { margin: 0 0 var(--s2); }
-.plan-usage .limit + .limit { margin-top: var(--s3); }
-.plan-usage .limit .limit { margin-top: var(--s2); } /* 067: rate-limit headroom rows */
-a.capbar.plan { display: block; color: inherit; text-decoration: none; border-radius: 10px; } a.capbar.plan:hover b { text-decoration: underline; }
 .ld-page { min-width: 0; display: grid; gap: var(--s4); }
 .ld-page > .card h2 { font-size: 19px; }
 .ld-back { display: none; }

@@ -39,9 +39,9 @@ loadStored();
 
 const hhmm = (ts) => new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: env.timezone });
 
-/** Why it failed: the plan window that is used up when the provider reported it (067), else the reason. */
-const why = (s) => s.limit || REASON_TEXT[s.reason] || s.reason;
-/** Plain-language status line, e.g. "Paused until 14:20 — usage limit reached" or "… — free requests today used up, resets 01:00". */
+/** Why it failed, in plain words ("usage limit reached"). */
+const why = (s) => REASON_TEXT[s.reason] || s.reason;
+/** Plain-language status line, e.g. "Paused until 14:20 — usage limit reached". */
 function describe(s) {
   if (s.needsReconnect) return 'Sign-in expired or key rejected — reconnect this account';
   if (s.probing) return `Checking again — last error: ${why(s)}`;
@@ -54,7 +54,7 @@ export function accountState(id) {
   const s = states.get(id);
   if (!s) return { state: 'ok' };
   const state = s.needsReconnect ? 'reconnect' : s.probing ? 'probing' : s.until > now() ? 'paused' : 'probing';
-  return { state, until: s.until, since: s.since, reason: s.reason, message: s.message, failures: s.failures, text: describe(s), ...(s.limit ? { limit: s.limit } : {}) };
+  return { state, until: s.until, since: s.since, reason: s.reason, message: s.message, failures: s.failures, text: describe(s) };
 }
 export const allStates = () => Object.fromEntries([...states.keys()].map((id) => [id, accountState(id)]));
 
@@ -86,11 +86,10 @@ export function release(id) { const s = states.get(id); if (s) s.probing = false
 /** Earliest time any of these accounts can be tried again (for "paused until"). */
 export const nextTry = (ids) => Math.min(...ids.map((id) => states.get(id)?.until || 0));
 
-/** `limit` (067): the plan window that is used up, e.g. "premium requests used up, resets 1 Dec". */
-export function recordFailure(id, cls, { name = id, message = '', limit = '' } = {}) {
+export function recordFailure(id, cls, { name = id, message = '' } = {}) {
   const t = now();
   const s = states.get(id) || { failures: 0, since: t, alerted: false, name };
-  s.failures++; s.name = name; s.reason = cls.reason; s.message = String(message).slice(0, 300); s.probing = false; s.limit = String(limit || '').slice(0, 120);
+  s.failures++; s.name = name; s.reason = cls.reason; s.message = String(message).slice(0, 300); s.probing = false;
   let ms = Math.min(BASE_MS * 2 ** (s.failures - 1), MAX_MS);
   if (cls.retryAfterMs) ms = Math.max(Math.min(cls.retryAfterMs, QUOTA_MAX_MS), cls.reason === 'rate_limit' ? 5000 : BASE_MS);
   if (cls.reason === 'auth') { s.needsReconnect = true; ms = MAX_MS; }
@@ -144,11 +143,11 @@ export const resetAllFailedAlert = () => { lastAllFailed = 0; };
 const switches = new Map(); // "from>to:reason" -> ts
 const SWITCH_DEDUP_MS = 15 * 60000;
 /** One activity entry per from → to + reason every 15 minutes. */
-export function noteSwitch({ from, to, reason, limit = '', agent = '', chat = '' }) {
+export function noteSwitch({ from, to, reason, agent = '', chat = '' }) {
   const key = `${from}>${to}:${reason}`;
   if (now() - (switches.get(key) || 0) < SWITCH_DEDUP_MS) return false;
   switches.set(key, now());
-  activity('model.fallback', { agent, chat, summary: `Answered by ${to} after ${from} failed (${limit || REASON_TEXT[reason] || reason})`, detail: { from, to, reason, ...(limit ? { limit } : {}) } });
+  activity('model.fallback', { agent, chat, summary: `Answered by ${to} after ${from} failed (${why({ reason })})`, detail: { from, to, reason } });
   return true;
 }
 export const resetSwitches = () => switches.clear();
