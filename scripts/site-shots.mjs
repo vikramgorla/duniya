@@ -163,9 +163,9 @@ for (const width of [...new Set(CARDS.map((c) => c[4]))]) {
 
 // videos: frames at ~8 fps while a script runs in the page, joined by ffmpeg with their real timing
 const VIDEOS = [
-  // 071: the website's hero: Overview with Ask, a chat's page, an agent and its Review, Models, Server Health, then a message search
+  // 071, 072: the website's hero: Overview with Ask, a chat's page and its Messages, an agent and its Review, Models, Server Health, then a message search
   ['tour', 'overview', `${ASK} show('overview'); await T.wait(3200);
-    for (const t of ['chats', 'chats/120363041122330003%40g.us', 'agents/carpool', 'agents/carpool/review', 'models', 'server']) { location.hash = t; await T.wait(2300); }
+    for (const t of ['chats', 'chats/120363041122330003%40g.us', 'chats/120363041122330003%40g.us/messages', 'agents/carpool', 'agents/carpool/review', 'models', 'server']) { location.hash = t; await T.wait(2300); }
     document.querySelector('#health')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); await T.wait(1800);
     await openFind(); await T.wait(500); const i = document.querySelector('#palette input'); await T.type(i, 'cornavin'); await T.wait(300); [...document.querySelectorAll('#palette li')].at(-1).click(); await T.wait(2600);`, 25000],
   ['chat-on', 'chats/120363041122330006%40g.us', `await T.wait(1200);
