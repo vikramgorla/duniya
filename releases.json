@@ -12,7 +12,7 @@
         { "type": "improved", "text": "Backups are compressed and encrypted while they are written, using a few MB of memory instead of several times the database size; a damaged backup is refused before anything is replaced." },
         { "type": "improved", "text": "The Chats list, Usage by day and every message are handled faster, also with hundreds of chats." },
         { "type": "improved", "text": "The sign-in and consent page for AI assistants looks like the rest of Duniya and runs no inline code." },
-        { "type": "removed", "text": "Restoring backups made by Duniya 2.30 or earlier." }
+        { "type": "removed", "text": "Restoring backups made by Duniya 2.30 or earlier. Right after this update Duniya makes a fresh backup in the new format by itself, so you always have one you can restore." }
       ]
     },
     "2.30.1": {
