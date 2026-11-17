@@ -4,7 +4,7 @@
 // chat's override says so). Joins that arrive together (bulk adds) get one combined message. "Once" is remembered as
 // a hash of the chat and the person's id — never names or numbers in clear. No AI, no tokens.
 import { db, logMessage } from './db.js';
-import { TENANT, getSettings } from './store.js';
+import { TENANT, getSetting } from './store.js';
 import { sha256 } from './crypto.js';
 import { getChatPrefs } from './chat-prefs.js';
 import { agentForChat } from './agents.js';
@@ -38,7 +38,7 @@ function welcomeDecision(chat) {
   const agent = agentForChat(chat);
   if (!agent) return { ok: false, reason: 'no agent' };
   if (!agent.enabled) return { ok: false, reason: 'agent is off', agent };
-  if (getSettings().paused) return { ok: false, reason: 'paused', agent };
+  if (getSetting('paused', false)) return { ok: false, reason: 'paused', agent };
   if (!welcomeOn(agent, chat)) return { ok: false, reason: 'welcome is off', agent };
   return { ok: true, reason: '', agent };
 }

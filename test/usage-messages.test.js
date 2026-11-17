@@ -42,6 +42,21 @@ test('023: plan providers are included, free models cost nothing, published pric
   assert.equal(priceFor('openai', 'gpt-unknown'), null);
 });
 
+test('070: usage by day uses the server\'s local days, also across daylight-saving changes and half-hour zones', async () => {
+  const { db } = await import('../src/core/db.js');
+  const ins = db.prepare("INSERT INTO usage (ts, agent, chat, provider, model, kind, input, output, cost, priced, account, fallback) VALUES (?, 'dst', '', 'anthropic', 'm', 'reply', 1, 1, NULL, NULL, 'anthropic', '')");
+  const base = Date.parse('2026-03-20T00:00:00Z');
+  for (let i = 0; i < 24 * 30; i += 1) ins.run(base + i * 3600000 + 17 * 60000); // hourly for 30 days, across the March change
+  for (const tz of ['Europe/Zurich', 'Asia/Kolkata', 'America/St_Johns']) {
+    process.env.TZ = tz;
+    const want = db.prepare("SELECT strftime('%Y-%m-%d', ts / 1000, 'unixepoch', 'localtime') AS key, COUNT(*) AS calls FROM usage WHERE agent = 'dst' GROUP BY 1 ORDER BY 1").all().map((r) => ({ ...r }));
+    const got = (await t.api(owner, 'GET', '/api/usage?groupBy=day&period=all&agent=dst')).body.rows.map((r) => ({ key: r.key, calls: r.calls }));
+    assert.deepEqual(got, want, tz);
+  }
+  delete process.env.TZ;
+  db.prepare("DELETE FROM usage WHERE agent = 'dst'").run();
+});
+
 test('024: admins can read stored messages (search, paging); viewers cannot; each look is logged', async () => {
   for (let i = 0; i < 3; i++) await t.route(t.msg({ text: `message number ${i} about lunch`, senderName: 'Anu' }));
   const r = await t.api(owner, 'GET', `/api/chats/${encodeURIComponent('g1@g.us')}/messages?limit=2`);
