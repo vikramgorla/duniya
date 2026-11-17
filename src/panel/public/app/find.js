@@ -23,7 +23,7 @@ async function paletteItems() {
   if (admin) {
     act(S.status?.settings?.paused ? 'Resume all agents' : 'Pause all agents', 'stop silence', () => optimistic(() => { S.status.settings.paused = !S.status.settings.paused; }, () => api('POST', '/api/settings', { paused: S.status.settings.paused }), S.status.settings.paused ? 'Paused' : 'Resumed'));
     act('New agent', 'create template ai draft import', () => { location.hash = 'agents/new'; });
-    act('Add a direct chat', 'person phone dm', () => { S.dmPrefill = {}; location.hash = 'chats'; });
+    act('Add a direct chat', 'person phone dm', () => { location.hash = 'chats/add'; });
     if (S.checklist?.dismissed && !S.checklist.complete) act('Show Getting started', 'checklist setup first run', () => tryApi(async () => { S.checklist = await api('PUT', '/api/checklist', { dismissed: false }); location.hash = 'overview'; show('overview'); }));
   }
   if (can('owner')) act('Back up now', 'backup download', () => { location.hash = 'backups'; });

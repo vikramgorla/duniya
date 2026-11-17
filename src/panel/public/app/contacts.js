@@ -1,6 +1,5 @@
 // Contacts screen. Module of the panel (063).
 // ---------- contacts (#11) ----------
-import { renderChats } from './chats.js';
 import { $, S, ago, api, ask, can, field, h, tryApi } from './core.js';
 let contactsQuery = '';
 export async function renderContacts() {
@@ -29,7 +28,7 @@ export async function renderContacts() {
       h('td', { 'data-label': 'Source' }, h('span', { class: 'pill' }, SRC[c.source]), c.whatsappName && c.ownName && c.whatsappName !== c.ownName ? h('div', { class: 'small muted' }, `WhatsApp: ${c.whatsappName}`) : null),
       h('td', { 'data-label': 'Shared' }, h('label', { class: 'tick' }, shared)),
       h('td', { 'data-label': '' }, edit ? h('div', { class: 'row nowrap', style: 'gap:6px' }, editBtn,
-        h('button', { class: 'btn small', title: 'Choose an agent for this person before they write', onclick: () => { S.dmPrefill = { phone: c.phone, name: c.name }; if (location.hash === '#chats') renderChats(); else location.hash = '#chats'; } }, 'Set up chat'),
+        h('button', { class: 'btn small', title: 'Choose an agent for this person before they write', onclick: () => { S.dmPrefill = { phone: c.phone, name: c.name }; location.hash = 'chats/add'; } }, 'Set up chat'),
         c.source !== 'whatsapp' ? h('button', { class: 'btn small mut', onclick: async () => (await ask({ title: `Remove ${c.name}?`, text: 'The contact is removed from Duniya; WhatsApp and your phone are not changed.', ok: 'Remove contact', danger: true })) && tryApi(async () => { await api('DELETE', `/api/contacts/${c.phone}`); renderContacts(); }, 'Removed') }, 'Remove') : null) : null));
   };
   $('#main').replaceChildren(

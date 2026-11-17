@@ -467,6 +467,11 @@ a.help:hover { color: var(--ink) !important; border-color: var(--ink); }
 .test-as select { flex: 1 1 140px; width: auto; }
 .test-path { align-self: flex-start; margin: -2px 0 4px 4px; }
 #test-console .chatlog { margin: var(--s2) 0; }
+.ld-tools { display: flex; gap: var(--s2); align-items: center; padding: 2px 2px var(--s2); }
+.ld-tools .seg { flex: none; } .ld-tools input { flex: 1; min-width: 0; min-height: 36px; }
+.lrow-sub .q { color: var(--muted); } .lrow-sub .q.warn { color: var(--warn); }
+.chat-page .quiet { padding: 6px 0; gap: var(--s2); }
+.chat-page > .sblock .tick, .sbody .tick { display: flex; justify-content: flex-start; margin-top: 4px; }
 /* Quick replies, welcome & FAQ rows (054) */
 .qa-rows { display: grid; gap: 10px; margin: 6px 0 var(--s2); }
 .qa-row { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 10px var(--s3); background: var(--card); min-width: 0; }
