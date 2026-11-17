@@ -223,8 +223,11 @@ export function agentRoutes(route, { channel } = {}) {
       activity('message.out', { agent: agent.id, chat, summary: `${built.text} (${built.label})` });
       return { reply: built.text, path: built.kind, answeredBy: built.label, role, chat: pick || 'new', ...(pick ? { chatOn: isChatEnabled(pick) } : {}) };
     }
+    // #163: the console's conversation so far (last 20 turns, bounded), so a follow-up is understood
+    const thread = (Array.isArray(body.thread) ? body.thread : []).slice(-20)
+      .map((t) => ({ from: t?.from === 'agent' ? 'agent' : 'me', text: String(t?.text || '').slice(0, 2000) })).filter((t) => t.text);
     const ctx = { agent, role, chat, senderName: 'Panel admin', requester: 'panel', text, isGroup, source: 'panel',
-      contextChat: pick, chatName };
+      contextChat: pick, chatName, thread };
     const reply = await runAgent(ctx);
     activity('message.out', { agent: agent.id, chat, summary: reply || '(no reply)' });
     return { reply, path: 'model', usage: ctx.usage, model: ctx.model, answeredBy: ctx.answeredBy || '', fallback: ctx.fallback || null, role, chat: pick || 'new', ...(pick ? { chatOn: isChatEnabled(pick) } : {}) };
