@@ -119,10 +119,39 @@ returns the JSON answer, `[status, answer]`, or throws `fail(message, status)` /
 ## Releases
 
 1. Bump the version in `package.json`, `package-lock.json` and `infra/oci/schema.yaml` (CI checks they match) and add
-   an entry for it to `releases.json` (a one-line `title` is enough; CI fails without one).
+   an entry for it to `releases.json` with its [release notes](#release-notes) (CI fails without a title and changes).
 2. Merge to `main` (or push a `vX.Y.Z` tag, or run the workflow by hand).
-3. The release workflow creates the tag and GitHub release, attaches the OCI stack zip and publishes
-   `ghcr.io/vikramgorla/whatsapp-agent-duniya`.
+3. The release workflow creates the tag and GitHub release (notes built from the entry by `scripts/release-notes.mjs`),
+   attaches the OCI stack zip and publishes `ghcr.io/vikramgorla/whatsapp-agent-duniya`.
+
+### Release notes
+
+Owners read these in the update dialog (every version between theirs and the target), once after an update (*What's
+new*), in Settings → Help → Release notes, on WhatsApp and on GitHub Releases. Write them for the owner, not for
+developers.
+
+```json
+"2.26.0": {
+  "breaking": false,
+  "title": "One line: what the owner gets",
+  "summary": "Optional paragraph. End with what the owner must do, or 'Nothing to do on your server.'",
+  "changes": [
+    { "type": "new", "text": "After an update, Overview shows what's new once." },
+    { "type": "improved", "text": "The update dialog lists every release in between." },
+    { "type": "fixed", "text": "Docker installs show the release notes too." },
+    { "type": "removed", "text": "The old update dialog." }
+  ]
+}
+```
+
+- `type` is one of `new`, `improved`, `fixed`, `removed` (one shape for every bullet; anything else is read as
+  `improved`). The notes group by it in that order.
+- One short sentence per bullet, as the owner sees it: screen and button names, no issue numbers, file names, function
+  names or library versions. Two to eight bullets; a docs-only or tooling release still gets one ("Build tools updated;
+  nothing changes in the app").
+- Breaking releases add `actions` (what the owner must do), `data` and `docs` (see
+  [upgrading](upgrading.md#how-breaking-releases-reach-you)).
+- CI (`scripts/ci-checks.mjs`) fails when the new version has no entry, no title or no changes.
 
 > [!NOTE]
 > The website lives in [`docs/site/`](site/) (plain HTML/CSS, no build step) and is deployed to GitHub Pages by

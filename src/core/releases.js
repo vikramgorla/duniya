@@ -17,6 +17,10 @@ export function compareVersions(a, b) {
 }
 const bare = (v) => String(v || '').replace(/^v/, '');
 const clip = (s, n) => String(s ?? '').slice(0, n);
+/** 065: kinds of change in a release, in the order notes show them. */
+export const CHANGE_TYPES = { new: 'New', improved: 'Improved', fixed: 'Fixed', removed: 'Removed' };
+const changeList = (list) => (Array.isArray(list) ? list : []).filter((c) => c && typeof c === 'object' && typeof c.text === 'string' && c.text.trim())
+  .slice(0, 40).map((c) => ({ type: c.type in CHANGE_TYPES ? c.type : 'improved', text: clip(c.text.trim(), 300) }));
 
 /** Keep only well-formed entries (the file comes from the remote; never trust its shape). */
 export function normalizeReleases(json) {
@@ -31,6 +35,7 @@ export function normalizeReleases(json) {
       actions: Array.isArray(e.actions) ? e.actions.slice(0, 10).map((a) => clip(a, 400)) : [],
       data: ['migrated', 'not-migrated', 'unchanged'].includes(e.data) ? e.data : '',
       docs: typeof e.docs === 'string' && /^[\w./#-]{1,200}$/.test(e.docs) ? e.docs : '',
+      changes: changeList(e.changes),
     };
   }
   return out;
@@ -42,6 +47,13 @@ export function readReleasesAt(root, ref) {
     if (e) return res({});
     try { res(normalizeReleases(JSON.parse(out))); } catch { res({}); }
   }));
+}
+
+/** 065: the entries of the versions after `from` up to and including `to` (newest first), each with its version. */
+export function releaseRange(releases, from, to) {
+  return Object.keys(releases || {})
+    .filter((v) => parseVersion(v) && (!parseVersion(from) || compareVersions(v, from) > 0) && (!parseVersion(to) || compareVersions(v, to) <= 0))
+    .sort(compareVersions).reverse().map((v) => ({ version: v, ...releases[v] }));
 }
 
 /**
@@ -83,15 +95,19 @@ export function releaseNotes(releases, version) {
   if (e.title) lines.push(`### ${e.title}`, '');
   if (e.summary) lines.push(e.summary, '');
   if (e.actions.length) lines.push('**What you need to do**', '', ...e.actions.map((a) => `- ${a}`), '');
+  for (const [type, label] of Object.entries(CHANGE_TYPES)) {
+    const list = (e.changes || []).filter((c) => c.type === type);
+    if (list.length) lines.push(`**${label}**`, '', ...list.map((c) => `- ${c.text}`), '');
+  }
   if (e.data === 'not-migrated') lines.push('**Data:** not migrated: older data, backups or settings named above are not read.', '');
   if (e.data === 'migrated') lines.push('**Data:** migrated automatically.', '');
-  if (e.docs) lines.push(`More: [${e.docs}](https://github.com/vikramgorla/whatsapp-agent-duniya/blob/v${bare(version)}/${e.docs})`, '');
+  lines.push(`More: [${e.docs || 'docs/README.md'}](https://github.com/vikramgorla/whatsapp-agent-duniya/blob/v${bare(version)}/${e.docs || 'docs/README.md'})`, '');
   return lines.join('\n');
 }
 
 /**
- * CI rule (045): a major version bump needs a breaking releases.json entry with actions; every new version should have
- * an entry. previous: the latest release tag (e.g. "v2.8.2") or ''. Returns { errors: [], warnings: [] }.
+ * CI rule (045, 065): a major version bump needs a breaking releases.json entry with actions; every new version needs
+ * an entry with a title and changes. previous: the latest release tag (e.g. "v2.8.2") or ''. Returns { errors: [], warnings: [] }.
  */
 export function releaseCheck({ version, previous = '', releases = {} }) {
   const errors = []; const warnings = [];
@@ -102,9 +118,10 @@ export function releaseCheck({ version, previous = '', releases = {} }) {
     if (!e?.breaking) errors.push(`Version ${bare(version)} is a new major version (previous release ${previous}) but releases.json has no entry for it with "breaking": true. Add one with title, summary and actions (AGENTS.md, Definition of Done), or consider a migration instead.`);
     else if (!e.actions.length) errors.push(`releases.json entry ${bare(version)} is breaking but lists no actions: say what the owner must do.`);
   } else if (!e && (!prev || compareVersions(version, previous) > 0)) {
-    errors.push(`releases.json has no entry for ${bare(version)}. Every version gets one: at least { "breaking": false, "title": "…" } (AGENTS.md, Definition of Done).`);
+    errors.push(`releases.json has no entry for ${bare(version)}. Every version gets one: at least { "breaking": false, "title": "…", "changes": [{ "type": "new", "text": "…" }] } (AGENTS.md, Definition of Done).`);
   }
   if (e && !e.title) errors.push(`releases.json entry ${bare(version)} has no title: add a one-line title.`);
+  if (e && !e.changes.length) errors.push(`releases.json entry ${bare(version)} has no changes: list what is new, improved, fixed or removed as short bullets for owners ("changes": [{ "type": "new", "text": "…" }]).`);
   if (e?.breaking && prev && cur[0] === prev[0] && compareVersions(version, previous) > 0) warnings.push(`releases.json marks ${bare(version)} as breaking without a major version bump: breaking changes should bump the major version.`);
   return { errors, warnings };
 }

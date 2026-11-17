@@ -8,6 +8,7 @@
 - Semver: minor = features, patch = fixes, major = may need a reinstall.
 - Since 2.9.0 the app asks you before a breaking release; older servers: update to 2.9.0 first.
 - Releases that need a step from you are listed [below](#how-breaking-releases-reach-you).
+- Since 2.26.0 every update shows what each release in between brings, and Overview says what's new afterwards.
 
 ## Within 2.x
 
@@ -18,7 +19,9 @@
 
 Step by step per host: [Oracle Cloud](deploy/oci-free-tier.md#update-the-app) ·
 [Google Cloud](deploy/google-cloud.md#update-the-app) · [own server](install.md#managing-your-server) ·
-[Docker](deploy/docker.md#update-the-app). Release notes: [GitHub Releases](https://github.com/vikramgorla/whatsapp-agent-duniya/releases).
+[Docker](deploy/docker.md#update-the-app). Release notes: in the panel (**Settings → Help → Release notes**, and in
+the update dialog for the versions you are about to get) and on
+[GitHub Releases](https://github.com/vikramgorla/whatsapp-agent-duniya/releases).
 
 > [!NOTE]
 > Servers installed with an early 2.x may need one step:
@@ -63,8 +66,9 @@ did not happen: **Server → OS updates & maintenance → Update maintenance hel
 
 ## How breaking releases reach you
 
-`releases.json` in the repository lists, per version, whether it is breaking, what changes, what to do and whether
-old data is carried over; the app reads it from the newest release with git. Automatic updates stop before a breaking
+`releases.json` in the repository lists, per version, its changes (new, improved, fixed, removed), whether it is
+breaking, what to do and whether old data is carried over; the app reads it from the newest release with git and shows
+the releases between yours and the new one before you update. Automatic updates stop before a breaking
 release (or a new major) and you are asked on the panel and on WhatsApp.
 [How the decision works →](backups-and-updates.md#updates)
 

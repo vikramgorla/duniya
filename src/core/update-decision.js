@@ -11,7 +11,8 @@ import { env, fail } from './config.js';
 import { kvGet, kvSet } from './db.js';
 import { getUser } from './store.js';
 import { activity } from './events.js';
-import { updateStatus, checkForUpdate, applyUpdate, getUpdateSettings, installKind, runningVersion, backupConfigured } from './updates.js';
+import { updateStatus, checkForUpdate, applyUpdate, getUpdateSettings, installKind, runningVersion, backupConfigured, installedReleases } from './updates.js';
+import { releaseRange } from './releases.js';
 import { sendOwnerAlert, ownerNumber } from './owner-alerts.js';
 import { listLinks, registerConfirmHandler } from './owner-assistant.js';
 import { whatsappChannel } from './whatsapp-tools.js';
@@ -64,6 +65,10 @@ function noticeText(st) {
     if (s.summary) lines.push(s.summary);
     if (s.actions.length) lines.push('What you need to do:', ...s.actions.map((a) => `- ${a}`));
   }
+  // 065: the key changes of the whole jump, briefly (new first); the full list is in the panel
+  const all = (st.notes || []).flatMap((n) => n.changes || []);
+  const key = [...all.filter((c) => c.type === 'new'), ...all.filter((c) => c.type !== 'new')].slice(0, 5);
+  if (key.length) lines.push('', `*Also in this update* (${st.notes.length} release${st.notes.length > 1 ? 's' : ''}):`, ...key.map((c) => `- ${c.text}`), ...(all.length > key.length ? [`…and ${all.length - key.length} more in the panel.`] : []));
   if (st.safeTarget) lines.push('', `${st.safeTarget} can still be installed without this decision.`);
   lines.push('', 'Review it in the panel: Overview → Server → Updates.');
   return lines.join('\n');
@@ -160,7 +165,8 @@ export async function deliverUpdateReport(now = Date.now()) {
   if (!ch) return false;
   const running = runningVersion();
   const ok = running !== rec.from;
-  const text = ok ? `✓ Updated to ${running} (from ${rec.from}). Everything restarted.${rec.backup ? ` Backup made first: ${rec.backup}.` : ''}`
+  const news = ok ? releaseRange(installedReleases(), rec.from, running).slice(0, 3).map((n) => `- v${n.version}: ${n.title}`) : []; // 065
+  const text = ok ? `✓ Updated to ${running} (from ${rec.from}). Everything restarted.${rec.backup ? ` Backup made first: ${rec.backup}.` : ''}${news.length ? `\n\nWhat's new:\n${news.join('\n')}\nAll changes: panel → Settings → Release notes.` : ''}`
     : `The update to ${rec.target} did not finish: still running ${running}. Check Overview → Server → Updates.`;
   try { await ch.send(rec.chat, text); } catch { return false; }
   kvSet('updates:report', 'null');

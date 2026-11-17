@@ -18,7 +18,7 @@
 
 - [x] T100 Docs: `DESIGN.md` (on-accent rule, labels, activity rows, Ask, focus, checklist), `docs/owner-assistant.md`, `docs/models.md`, `docs/phone.md`, README, website
 - [x] T101 Website screenshots retaken (`npm run site:shots`) and checked
-- [x] T102 Version bumped in three files (minor: the Ask conversation is a feature)
+- [x] T102 Version 2.27.0 in three files (minor: the Ask conversation is a feature; 2.26.0 went to the change logs, #133)
 - [x] T103 `releases.json` entry
 - [x] T104 `npm test`, lint, typecheck, `check:panel`, `check:responsive`, `ci-checks.mjs`
 - [x] T105 PR via REST, required checks green, squash merge

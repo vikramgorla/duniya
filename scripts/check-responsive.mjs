@@ -49,13 +49,23 @@ const NAV_STRESS = `window.__realFetch ||= window.fetch; const { dropCache } = a
   if (S.tab === 'activity' && !document.getElementById('feed')?.isConnected) throw new Error('activity list not on screen; shown: ' + main.textContent.trim().slice(0, 60));`;
 const HANG_AGENTS = `const { dropCache } = await import('/app/core.js'); dropCache(); S.loadTimeout = 800; window.__realFetch ||= window.fetch;
   window.fetch = (u, o) => (String(u).startsWith('/api/agents') ? new Promise((_, no) => o?.signal?.addEventListener('abort', () => no(new DOMException('aborted', 'AbortError')))) : window.__realFetch(u, o));`;
-// 045: pretend v3.0.0 (breaking) is available, with v2.10.0 still safe to install.
+// 045: pretend v3.0.0 (breaking) is available, with v2.26.0 still safe to install; 065: the notes of the range are the
+// demo's own release notes since v2.23.0 plus the breaking v3.0.0.
 const UPDATE_DECISION = `const f0 = window.fetch; window.fetch = async (u, o) => { const r = await f0(u, o);
   if (String(u) === '/api/updates' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json();
     const steps = [{ version: '3.0.0', title: 'New memory format (fresh memory)', summary: 'Chat memory moves to a new format. Running summaries start fresh; messages and agents stay.', actions: ['Check the running summaries of your main chats after the update.', 'Re-run the installer once so the maintenance helper knows the new options.'], data: 'not-migrated', docs: 'docs/upgrading.md' }];
-    return new Response(JSON.stringify({ ...j, status: { ...j.status, available: true, latest: 'v3.0.0', target: 'v3.0.0', breaking: true, steps, safeTarget: 'v2.10.0', decisionVersion: '3.0.0' },
-      decision: { version: 'v3.0.0', target: 'v3.0.0', current: j.status?.current || 'v2.9.0', steps, safeTarget: 'v2.10.0', notifiedAt: Date.now() - 3600000, snoozedUntil: null, dismissed: false, show: true, backup: true, docker: false } })); }
+    const older = (await (await f0('/api/releases?from=v2.23.0')).json()).versions;
+    const notes = [{ ...steps[0], breaking: true, changes: [{ type: 'new', text: 'Memory keeps a separate summary per topic.' }, { type: 'removed', text: 'The old memory format.' }] }, ...older];
+    return new Response(JSON.stringify({ ...j, status: { ...j.status, current: 'v2.23.0', available: true, latest: 'v3.0.0', target: 'v3.0.0', breaking: true, steps, notes, safeTarget: 'v2.26.0', decisionVersion: '3.0.0' },
+      decision: { version: 'v3.0.0', target: 'v3.0.0', current: 'v2.23.0', steps, safeTarget: 'v2.26.0', notifiedAt: Date.now() - 3600000, snoozedUntil: null, dismissed: false, show: true, backup: true, docker: false } })); }
   return r; };`;
+// 065: an ordinary update from v2.22.0 to the demo's version, with the notes in between
+const UPDATE_AVAILABLE = `const f0 = window.fetch; window.fetch = async (u, o) => { const r = await f0(u, o);
+  if (String(u) === '/api/updates' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json();
+    const notes = (await (await f0('/api/releases?from=v2.22.0')).json()).versions;
+    return new Response(JSON.stringify({ ...j, decision: null, status: { ...j.status, current: 'v2.22.0', available: true, latest: 'v' + notes[0].version, target: 'v' + notes[0].version, breaking: false, steps: [], notes, safeTarget: 'v' + notes[0].version } })); }
+  return r; };`;
+const WHATS_NEW = "S.status.whatsNew = { from: 'v2.24.0', to: S.status.version.split(' ')[0] }; show('overview'); await T.wait(400);";
 // 052: the Add answer of Browse tool services, without changing the demo data (states run several times).
 const REGISTRY_ADDED = `const f1 = window.fetch; window.fetch = async (u, o) => {
   if (String(u) === '/api/tool-services/registry/add') return new Response(JSON.stringify({ key: 'forecast', kind: 'remote', target: 'all', registry: { name: 'io.github.example-weather/forecast-mcp', version: '1.4.0' },
@@ -81,7 +91,12 @@ const STATES = [
   { name: 'chats-find', hash: 'chats', js: "const i = document.querySelector('input.chat-find'); i.value = 'car'; i.dispatchEvent(new Event('input')); await T.wait(200);" },
   // 045: a breaking release waits for the owner (banner on Overview, the dialog with release notes)
   { name: 'overview-update-decision', hash: 'overview', before: UPDATE_DECISION, wait: 1500 },
-  { name: 'update-decision-dialog', hash: 'overview', before: UPDATE_DECISION, wait: 1500, js: "await T.click('Review update', 'button', 600);" },
+  { name: 'update-decision-dialog', hash: 'overview', before: UPDATE_DECISION, wait: 1500, js: "await T.click('Review update', 'button', 1200);" },
+  // 065: the update dialog lists every release in between; What's new after an update; Settings → Release notes
+  { name: 'update-dialog', hash: 'overview', before: UPDATE_AVAILABLE, wait: 1500, js: "await T.click('Update to v', 'button', 1200);" },
+  { name: 'overview-whats-new', hash: 'overview', wait: 1500, js: WHATS_NEW },
+  { name: 'whats-new-dialog', hash: 'overview', wait: 1500, js: `${WHATS_NEW} await T.click("See what's new", 'button', 1200);` },
+  { name: 'settings-release-notes', hash: 'settings/release-notes', wait: 2000 },
   { name: 'activity', hash: 'activity', js: "document.querySelector('#feed li')?.click();" },
   { name: 'agents', hash: 'agents' },
   // 066: fast tab switching (bottom tab bar, More sheet, top tabs), on a slow network, must always end on the chosen

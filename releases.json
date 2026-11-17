@@ -1,85 +1,673 @@
 {
-  "$comment": "Release notes the app reads (045). Every version has an entry (a one-line title is enough; CI fails without it). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it). data: migrated | not-migrated | unchanged. Read from the target release tag with `git show <tag>:releases.json`. See docs/upgrading.md and AGENTS.md (Definition of Done).",
+  "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.27.0": {
+      "breaking": false,
+      "title": "Ask is a live conversation; Activity, Overview and the phone app are easier to read and never get stuck",
+      "summary": "Ask, on Overview and on the owner assistant's page, now works like a chat. Your question appears as a bubble, then 'Thinking…'. Each lookup shows as it runs ('Checking server metrics…') and gets a tick when done. The answer appears word by word, with lists and bold drawn properly. Stop ends an answer, Copy copies it, and you can ask a follow-up or Retry after an error. Activity is grouped by day, with one clear row per entry in plain words ('Checked maintenance status · via admin', not tool names). Overview's status reads '2 agents live', '3 chats on'. On a phone, the active tab icon is dark on lime so you can see it, and Find anything in More is a normal row. Add a provider lists providers by name (OpenRouter, Claude, OpenAI, GitHub Copilot, ChatGPT, Custom), with one line each. Switching screens quickly no longer leaves grey placeholder cards: the screen you chose always finishes drawing, a screen that cannot load says why with Retry, and you can pull down to refresh (or More → Refresh). Nothing to do on your server.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Ask is a conversation: your question as a bubble, \"Thinking…\", each lookup as it runs (\"Checking server metrics…\" → ✓), and the answer word by word with lists and bold. Stop, Copy, Retry and follow-ups; the same box is Try it on the owner assistant's page."
+        },
+        {
+          "type": "new",
+          "text": "Pull down at the top of a screen on your phone to refresh it, or More → Refresh."
+        },
+        {
+          "type": "fixed",
+          "text": "Switching screens quickly (Activity, More → a screen) could leave grey placeholder cards until you reopened the app. The screen you chose now always finishes drawing; one that cannot load says why with Retry."
+        },
+        {
+          "type": "fixed",
+          "text": "On the phone, the active tab's icon is dark on the lime pill (it was white and hard to see), and Find anything in More is a normal row instead of a giant icon."
+        },
+        {
+          "type": "improved",
+          "text": "Activity is grouped by day with one clear row per entry, in plain words: \"Checked maintenance status · via admin\" instead of tool names."
+        },
+        {
+          "type": "improved",
+          "text": "Overview's status reads as plain chips (\"2 agents live\", \"3 chats on\"); labels across the panel are in normal case instead of capitals."
+        },
+        {
+          "type": "improved",
+          "text": "Add a provider lists providers by name (OpenRouter, Claude, OpenAI, GitHub Copilot, ChatGPT, Custom) with one line each; connected ones stay listed to add another account."
+        }
+      ]
+    },
     "2.26.0": {
       "breaking": false,
-      "title": "Ask is a live conversation, and Activity, Overview and the phone tab bar are easier to read",
-      "summary": "Ask, on Overview and on the owner assistant's page, now works like a chat. Your question appears as a bubble, then 'Thinking…'. Each lookup shows as it runs ('Checking server metrics…') and gets a tick when done. The answer appears word by word, with lists and bold drawn properly. Stop ends an answer, Copy copies it, and you can ask a follow-up or Retry after an error. Activity is grouped by day, with one clear row per entry in plain words ('Checked maintenance status · via admin', not tool names). Overview's status reads '2 agents live', '3 chats on'. On a phone, the active tab icon is dark on lime so you can see it, and Find anything in More is a normal row. Add a provider lists providers by name (OpenRouter, Claude, OpenAI, GitHub Copilot, ChatGPT, Custom), with one line each. The phone app no longer gets stuck on grey placeholder cards after it was in the background: screens load again by themselves, a screen that cannot load says why with Retry, and you can pull down to refresh (or More → Refresh). Nothing to do on your server."
+      "title": "Every release has a change log: see what's new before you update and right after",
+      "summary": "Clicking Update now shows every release between your version and the new one, newest first, with what is new, improved, fixed or removed, and releases that need your OK clearly marked with what to do. After an update the panel says once \"Updated to vX — see what's new\". Settings → Help → Release notes lists every version. The WhatsApp messages about updates name the key changes too. Nothing to do on your server.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "The update dialog lists every release between your version and the new one, newest first, with what is new, improved, fixed or removed."
+        },
+        {
+          "type": "new",
+          "text": "After an update, Overview shows \"Updated to vX — see what's new\" once, with the changes you just got."
+        },
+        {
+          "type": "new",
+          "text": "Settings → Help → Release notes lists what each version brought; Find anything finds it too."
+        },
+        {
+          "type": "improved",
+          "text": "Ordinary and breaking updates use the same dialog: releases that need your OK are marked and say what you need to do, with the backup choice for both."
+        },
+        {
+          "type": "improved",
+          "text": "The WhatsApp message about a breaking release names the key changes of the update, and the \"Updated\" message after a WhatsApp-confirmed update lists what is new."
+        },
+        {
+          "type": "improved",
+          "text": "Release notes on GitHub list the changes grouped by kind, for every 2.x version."
+        },
+        {
+          "type": "improved",
+          "text": "AI assistants connected to the panel can read the release notes and see the changes of an update before they install it."
+        },
+        {
+          "type": "fixed",
+          "text": "The Docker image now contains the release notes, so Docker installs show them too."
+        }
+      ]
     },
     "2.25.0": {
       "breaking": false,
       "title": "A calmer, denser panel that feels like an app on your phone, with its own questions and plain names",
-      "summary": "On a phone the panel has a tab bar at the bottom (Overview, Chats, Agents, Activity, More). Models, Settings and Backups are short lists that open into pages, side by side on a computer. Chats shows one row per chat, with the rest under More settings. Agents get avatars, and Overview shows live 'reading… / answered' per agent. Activity speaks in plain words with names instead of ids. Questions such as 'Unlink this number?' open in the panel's own dialog, with the action on the button. Switching a chat off or pausing agents can be undone. Providers have short names everywhere (ChatGPT, Claude, OpenAI, GitHub Copilot, OpenRouter). The panel works with a keyboard and a screen reader and meets contrast guidelines in light and dark. Nothing to do on your server."
+      "summary": "On a phone the panel has a tab bar at the bottom (Overview, Chats, Agents, Activity, More). Models, Settings and Backups are short lists that open into pages, side by side on a computer. Chats shows one row per chat, with the rest under More settings. Agents get avatars, and Overview shows live 'reading… / answered' per agent. Activity speaks in plain words with names instead of ids. Questions such as 'Unlink this number?' open in the panel's own dialog, with the action on the button. Switching a chat off or pausing agents can be undone. Providers have short names everywhere (ChatGPT, Claude, OpenAI, GitHub Copilot, OpenRouter). The panel works with a keyboard and a screen reader and meets contrast guidelines in light and dark. Nothing to do on your server.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "On a phone the panel has a tab bar at the bottom (Overview, Chats, Agents, Activity, More)."
+        },
+        {
+          "type": "new",
+          "text": "Questions open in the panel's own dialog with the action named on the button; switching a chat off or pausing agents can be undone."
+        },
+        {
+          "type": "new",
+          "text": "Agents have avatars, and Overview shows live per agent when it is reading, using tools or has answered."
+        },
+        {
+          "type": "improved",
+          "text": "Models, Settings and Backups are short lists that open into pages, side by side on a computer."
+        },
+        {
+          "type": "improved",
+          "text": "Chats shows one row per chat; the rest is under More settings."
+        },
+        {
+          "type": "improved",
+          "text": "Activity speaks in plain words, with agent and chat names instead of ids."
+        },
+        {
+          "type": "improved",
+          "text": "Providers have short names everywhere: ChatGPT, Claude, OpenAI, GitHub Copilot, OpenRouter."
+        },
+        {
+          "type": "improved",
+          "text": "The panel works with a keyboard and a screen reader and meets contrast guidelines in light and dark."
+        }
+      ]
     },
     "2.24.0": {
       "breaking": false,
       "title": "The panel opens faster: Overview first, other screens when you open them, only changed files after an update",
-      "summary": "The panel is now split into small files your browser keeps: Overview needs about half the download it did and one round trip less, so it shows up to a third sooner on a slow phone connection; each other screen loads the first time you open it, and after an update only the files that changed are downloaded again. The page also runs only scripts from your own server (a stricter browser security policy). Everything looks and works as before. Nothing to do on your server."
+      "summary": "The panel is now split into small files your browser keeps: Overview needs about half the download it did and one round trip less, so it shows up to a third sooner on a slow phone connection; each other screen loads the first time you open it, and after an update only the files that changed are downloaded again. The page also runs only scripts from your own server (a stricter browser security policy). Everything looks and works as before. Nothing to do on your server.",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Overview needs about half the download and shows up to a third sooner on a slow phone connection."
+        },
+        {
+          "type": "improved",
+          "text": "Other screens load the first time you open them; after an update only changed files are downloaded again."
+        },
+        {
+          "type": "improved",
+          "text": "The panel runs only scripts from your own server (a stricter browser security policy)."
+        }
+      ]
     },
     "2.23.0": {
       "breaking": false,
       "title": "Getting started opens each first step right on Overview, and / finds any agent, chat or setting",
-      "summary": "A new owner links WhatsApp, pastes any model key (it is recognised) or starts free, taps a template, switches a group on and sends a test without leaving Overview; steps can be skipped, and the card ends with the test answer. The built-in owner assistant no longer counts as your first agent. Press / or ⌘K (the search button on a phone) to jump to any agent, chat, setting or action. Tabs are in everyday order, Pending shows only while something waits, Secrets moved into Settings (old links still work), Settings has a section index, and choosing an agent for a chat that is off switches it on. Nothing to do on your server."
+      "summary": "A new owner links WhatsApp, pastes any model key (it is recognised) or starts free, taps a template, switches a group on and sends a test without leaving Overview; steps can be skipped, and the card ends with the test answer. The built-in owner assistant no longer counts as your first agent. Press / or ⌘K (the search button on a phone) to jump to any agent, chat, setting or action. Tabs are in everyday order, Pending shows only while something waits, Secrets moved into Settings (old links still work), Settings has a section index, and choosing an agent for a chat that is off switches it on. Nothing to do on your server.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Getting started opens each first step right on Overview: link WhatsApp, connect a model, pick a template, switch a group on, send a test."
+        },
+        {
+          "type": "new",
+          "text": "Press / or ⌘K (or the search button on a phone) to jump to any agent, chat, setting or action."
+        },
+        {
+          "type": "improved",
+          "text": "One box recognises any model key you paste, or start free with OpenRouter."
+        },
+        {
+          "type": "improved",
+          "text": "Tabs are in everyday order; Pending shows only while something waits; Secrets moved into Settings."
+        },
+        {
+          "type": "improved",
+          "text": "Choosing an agent for a chat that is off switches it on."
+        },
+        {
+          "type": "fixed",
+          "text": "The built-in owner assistant no longer counts as your first agent."
+        }
+      ]
     },
     "2.22.0": {
       "breaking": false,
       "title": "The panel is your phone app: install it on the home screen; the preview mobile app (Expo Go) is gone",
-      "summary": "Open the panel on your phone and add it to the home screen (Overview shows how, or an Install button): it opens full screen with the Duniya icon, live status, Ask and confirmations, and form fields no longer zoom on iPhone. The preview mobile app that ran in Expo Go was removed with Settings → Mobile app; phones that were signed in to it are signed out, and the panel API now accepts only the panel's own sign-in. Connected AI assistants (ChatGPT, Claude) are not affected. Nothing to do on your server."
+      "summary": "Open the panel on your phone and add it to the home screen (Overview shows how, or an Install button): it opens full screen with the Duniya icon, live status, Ask and confirmations, and form fields no longer zoom on iPhone. The preview mobile app that ran in Expo Go was removed with Settings → Mobile app; phones that were signed in to it are signed out, and the panel API now accepts only the panel's own sign-in. Connected AI assistants (ChatGPT, Claude) are not affected. Nothing to do on your server.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Install the panel on your phone's home screen: it opens full screen like an app, with live status, Ask and confirmations."
+        },
+        {
+          "type": "improved",
+          "text": "Form fields no longer zoom on iPhone, and the panel keeps clear of notches."
+        },
+        {
+          "type": "improved",
+          "text": "The live status reconnects at once when the phone wakes the app."
+        },
+        {
+          "type": "removed",
+          "text": "The preview mobile app (Expo Go) and Settings → Mobile app; phones signed in to it are signed out."
+        }
+      ]
     },
     "2.21.0": {
       "breaking": false,
       "title": "No secrets in chats: keys are entered on one-time panel links, new users set their own password, restores use the stored passphrase",
-      "summary": "The owner assistant (WhatsApp and the Ask box) and AI assistants can now set keys, add users and restore backups without ever seeing a secret. set_secret returns a one-time link (15 minutes) where a signed-in owner or admin pastes the value; add_user creates the person with a one-time sign-up link (48 hours) where they choose their own password; restore_backup uses this server's stored backup passphrase. A key or password pasted into the owner assistant is not read, stored or sent to the AI. AI assistants that passed a value to set_secret or a password to add_user now get a link instead."
+      "summary": "The owner assistant (WhatsApp and the Ask box) and AI assistants can now set keys, add users and restore backups without ever seeing a secret. set_secret returns a one-time link (15 minutes) where a signed-in owner or admin pastes the value; add_user creates the person with a one-time sign-up link (48 hours) where they choose their own password; restore_backup uses this server's stored backup passphrase. A key or password pasted into the owner assistant is not read, stored or sent to the AI. AI assistants that passed a value to set_secret or a password to add_user now get a link instead.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Keys are entered on one-time panel links: the owner assistant and AI assistants never see a secret."
+        },
+        {
+          "type": "new",
+          "text": "New users get a one-time sign-up link and choose their own password."
+        },
+        {
+          "type": "improved",
+          "text": "Restoring a backup from a chat uses this server's stored backup passphrase."
+        },
+        {
+          "type": "improved",
+          "text": "A key or password pasted into the owner assistant is not read, stored or sent to the AI."
+        }
+      ]
     },
     "2.20.0": {
       "breaking": false,
       "title": "The owner assistant is your own super agent: a built-in agent with its own editor, tools, GIFs, photos & voice, and sends into your chats after you confirm",
       "summary": "In your own WhatsApp chat the owner assistant now has everything an agent has: global tool services (\"send me a gif\"), WhatsApp actions, photos, PDFs and voice notes, voice replies, pictures and memory. Owners and admins can have it send messages, GIFs, polls and more into chats that are on, always after confirm CODE. It is a built-in agent (Agents → Owner assistant): give it a character, choose its tools and model, and add scheduled messages to you. The weekly summary is now one of its schedules and the alert number is in its Alerts section: enter the number there again, and set the model again if you had chosen one.",
-      "docs": "docs/owner-assistant.md"
+      "docs": "docs/owner-assistant.md",
+      "changes": [
+        {
+          "type": "new",
+          "text": "The owner assistant is a built-in agent (Agents → Owner assistant): give it a character, tools, a model and scheduled messages."
+        },
+        {
+          "type": "new",
+          "text": "In your own chat it does what an agent does: tool services (\"send me a gif\"), photos, PDFs, voice notes and voice replies."
+        },
+        {
+          "type": "new",
+          "text": "It can send messages, GIFs and polls into chats that are on, always after you confirm."
+        },
+        {
+          "type": "improved",
+          "text": "The weekly summary is one of its schedules, and the alert number is in its Alerts section: enter the number there again."
+        }
+      ]
     },
     "2.19.2": {
       "breaking": false,
-      "title": "Member tags no longer looked for in the group member list (WhatsApp does not put them there); smaller WhatsApp code"
+      "title": "Member tags no longer looked for in the group member list (WhatsApp does not put them there); smaller WhatsApp code",
+      "changes": [
+        {
+          "type": "removed",
+          "text": "Member tags are no longer looked for in the group member list (WhatsApp does not put them there); they still come from messages."
+        }
+      ]
     },
     "2.19.1": {
       "breaking": false,
       "title": "Faster panel (compressed page, live status instead of polling, quicker screen switches) and a leaner code base",
-      "summary": "The panel page is sent compressed and cached, the status arrives live instead of every 5 seconds, and switching screens reuses what was just loaded. Old upgrade code from earlier versions was removed: agent models must be named with their account (auto or account:model), as the panel always does."
+      "summary": "The panel page is sent compressed and cached, the status arrives live instead of every 5 seconds, and switching screens reuses what was just loaded. Old upgrade code from earlier versions was removed: agent models must be named with their account (auto or account:model), as the panel always does.",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "The panel page is sent compressed, so it loads several times faster on a slow link."
+        },
+        {
+          "type": "improved",
+          "text": "Status arrives live instead of every 5 seconds, and switching screens reuses what was just loaded."
+        },
+        {
+          "type": "fixed",
+          "text": "The live status no longer hangs after going back and forward in the browser."
+        },
+        {
+          "type": "removed",
+          "text": "Old upgrade code: agent models must be named with their account (Auto or account · model), as the panel always does."
+        }
+      ]
     },
     "2.19.0": {
       "breaking": false,
-      "title": "Agents use the names from your phone contacts (profile names are often incomplete); owner can switch this off on the Contacts page"
+      "title": "Agents use the names from your phone contacts (profile names are often incomplete); owner can switch this off on the Contacts page",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Agents use the names from your phone contacts, like the panel (profile names are often incomplete)."
+        },
+        {
+          "type": "new",
+          "text": "Owner switch on the Contacts page: \"Agents may use the names from your phone contacts\"."
+        }
+      ]
     },
     "2.18.0": {
       "breaking": false,
       "title": "Names instead of numbers, group member tags, and automatic retries",
       "summary": "The panel shows people by the name you gave them, then your phone contact name, business name or profile name, instead of numbers; a profile-name change no longer replaces your contact name, and people WhatsApp shows only by a hidden id get their name once the number is known. Contact names refresh by themselves (one full refresh after this update, then daily). Group member tags (\"Driver\") show next to names and agents see them, for chats that are on. Loading recent messages retries by itself when your phone was offline. Existing synced names start as profile names until the first refresh brings back your contact names.",
       "data": "migrated",
-      "docs": "docs/agents.md#which-name-is-shown"
+      "docs": "docs/agents.md#which-name-is-shown",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "People are shown by the name you gave them, then your phone contact name, business name or profile name, instead of numbers."
+        },
+        {
+          "type": "new",
+          "text": "Group member tags (\"Driver\") show next to names, and agents see them, for chats that are on."
+        },
+        {
+          "type": "improved",
+          "text": "Contact names refresh by themselves after connecting and then daily."
+        },
+        {
+          "type": "improved",
+          "text": "Loading recent messages retries by itself when your phone was offline."
+        },
+        {
+          "type": "fixed",
+          "text": "A profile-name change no longer replaces your contact name."
+        }
+      ]
     },
     "2.17.1": {
       "breaking": false,
-      "title": "Activity log names only the agent settings that actually changed (old → new for short values)"
+      "title": "Activity log names only the agent settings that actually changed (old → new for short values)",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "Activity names only the agent settings that actually changed, with old → new for short values."
+        }
+      ]
     },
     "2.17.0": {
       "breaking": false,
       "title": "Small server mode in Settings → Server; local tool services refused on small servers everywhere; the maintenance helper updates itself",
       "summary": "On a small server (1 GB / 1 CPU) local tool services are now refused on every path, not only in Browse; ones saved before stay but are not started. One switch, Small server mode (Settings → Server, owner), allows on-server speech and local tool services anyway (moved from Photos & voice; your setting is kept). The root maintenance helper now updates itself from the release after an app update (or Update maintenance helper on the Server page). Servers whose helper predates 2.17 need one sudo duniya update (or a reinstall without SSH) to get this.",
       "data": "unchanged",
-      "docs": "docs/upgrading.md#the-maintenance-helper"
+      "docs": "docs/upgrading.md#the-maintenance-helper",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Small server mode is one switch in Settings → Server: allow on-server speech and local tool services on a small server anyway."
+        },
+        {
+          "type": "new",
+          "text": "The maintenance helper updates itself after an app update (or with Update maintenance helper on the Server page)."
+        },
+        {
+          "type": "improved",
+          "text": "Local tool services are refused on small servers everywhere, and the panel says why a saved one is not started."
+        }
+      ]
     },
     "2.16.0": {
       "breaking": false,
       "title": "Quick replies, welcome messages and FAQ answers without AI; code plugins removed",
       "summary": "Agents can answer commands like !rides or !rules, greet new group members once (with the group rules) and answer clear FAQ matches from text you write: no AI, no tokens (agent editor → Quick replies, welcome & FAQ; per-group welcome override on Chats). The templates include !rules, !help and a welcome. The optional code plugins (the plugins/ folder, example-dice) are gone; nobody used them. An agent that still lists a plugin keeps working: the setting is dropped on the next save. For extra tools, add an MCP tool service.",
       "data": "unchanged",
-      "docs": "docs/agents.md#quick-replies-welcome--faq"
+      "docs": "docs/agents.md#quick-replies-welcome--faq",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Quick replies: commands like !rides or !rules answered from text you write, without AI."
+        },
+        {
+          "type": "new",
+          "text": "Welcome message for new group members, once per person, with a per-group override on Chats."
+        },
+        {
+          "type": "new",
+          "text": "FAQ answers for clear matches without AI; the FAQ also helps the model when nothing matches."
+        },
+        {
+          "type": "improved",
+          "text": "Templates come with !rules, !help and a short welcome."
+        },
+        {
+          "type": "removed",
+          "text": "Code plugins (the plugins folder and example-dice); use a tool service for extra tools."
+        }
+      ]
+    },
+    "2.15.1": {
+      "breaking": false,
+      "title": "OS updates install new kernels, explain gradual Ubuntu roll-outs and ask for a restart",
+      "summary": "Install OS updates now uses apt full-upgrade (kept-back kernel packages install) and removes packages no longer needed. The Server page groups updates (will install / rolling out gradually / held back with the reason), offers Include gradual updates now, shows a one-line result and a Restart needed banner. Run sudo duniya update on the server once (or re-run the installer): the in-panel update cannot refresh the root maintenance helper.",
+      "actions": [
+        "Run sudo duniya update on the server once (or re-run the installer) so the maintenance helper is refreshed"
+      ],
+      "data": "unchanged",
+      "docs": "docs/backups-and-updates.md#os-updates-installer-servers",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Install OS updates also installs new kernels and removes packages no longer needed."
+        },
+        {
+          "type": "improved",
+          "text": "The Server page groups OS updates: will install, rolling out gradually (with Include gradual updates now), held back with the reason."
+        },
+        {
+          "type": "new",
+          "text": "A Restart needed banner with a Restart button, and a one-line result of the last OS update."
+        }
+      ]
+    },
+    "2.15.0": {
+      "breaking": false,
+      "title": "Browse tool services: add an MCP server from the MCP Registry in one click",
+      "summary": "Agents → Tool services and Settings → Tool services get Browse tool services: search the official MCP Registry (or a private one), see the publisher, hosted or local, keys needed and a trust hint, and add it with keys stored as secrets. Tools are listed right away with organizers on and participants off. Local packages are owner-only and refused on small servers.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/agents.md#browse-tool-services-mcp-registry",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Browse tool services: search the official MCP Registry and add a tool service in one click."
+        },
+        {
+          "type": "improved",
+          "text": "Keys a service needs are stored as secrets; its tools are listed at once, on for organizers and off for participants."
+        },
+        {
+          "type": "improved",
+          "text": "Local packages are owner-only and refused on small servers."
+        }
+      ]
+    },
+    "2.14.0": {
+      "breaking": false,
+      "title": "Set up a person's chat before they write",
+      "summary": "Chats → Add a direct chat (or Contacts → Set up chat) assigns an agent, on/off, private, model and caps to a phone number before any message; their first message goes to that agent, whichever form WhatsApp uses. The owner assistant does it in one go (\"assign Mochi to Vedika\"). The agent can send an intro, only after you confirm.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/agents.md#set-up-a-direct-chat-before-the-person-writes",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Set up a person's chat before they write: agent, on/off, private, model and cap (Chats → Add a direct chat, or Contacts → Set up chat)."
+        },
+        {
+          "type": "new",
+          "text": "The agent can send an intro message, only after you confirm."
+        },
+        {
+          "type": "improved",
+          "text": "The owner assistant does it in one go: \"assign Mochi to Vedika\"."
+        }
+      ]
+    },
+    "2.13.1": {
+      "breaking": false,
+      "title": "Plugin help text",
+      "summary": "The agent editor explains what plugins are and that example-dice is a developer sample; docs point to MCP tool services for ready-made tools.",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "The agent editor explains plugins; the docs point to tool services for ready-made tools."
+        }
+      ]
+    },
+    "2.13.0": {
+      "breaking": false,
+      "title": "Triggers work anywhere in a message",
+      "summary": "\"can mochi help?\" now wakes the agent whose trigger is mochi; only whole words count. A trigger at the start is still removed from what the agent reads.",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Triggers work anywhere in a message (\"can mochi help?\"); only whole words count."
+        },
+        {
+          "type": "improved",
+          "text": "A trigger at the start is still removed from what the agent reads."
+        }
+      ]
+    },
+    "2.12.1": {
+      "breaking": false,
+      "title": "Switching a chat on loads its recent messages from your phone",
+      "summary": "Chats that are off still store no messages (only the id and time of the newest one). When you switch a chat on, its recent messages (50 by default) are loaded from your phone and summarised, so the agent starts with context; keep the phone online. Chats → “Load recent messages” asks again or goes further back. Agents now say plainly what history they have.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Switching a chat on loads its recent messages from your phone (50 by default) and summarises them, so the agent starts with context."
+        },
+        {
+          "type": "new",
+          "text": "Chats → Load recent messages asks again or goes further back."
+        },
+        {
+          "type": "improved",
+          "text": "Agents say plainly what history they have."
+        }
+      ]
+    },
+    "2.12.0": {
+      "breaking": false,
+      "title": "The Ask box writes its answer word by word",
+      "summary": "In the panel and the mobile app, the owner assistant's text now appears as the model writes it (Anthropic, OpenAI, OpenRouter, other OpenAI-compatible endpoints, ChatGPT; GitHub Copilot still shows it after each step). If a stream breaks half-way, the partial text is replaced by a fresh answer; fallback to other models works as before. WhatsApp replies are unchanged.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/owner-assistant.md#owner-assistant-and-the-ask-box",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "The Ask box shows the owner assistant's answer word by word as the model writes it."
+        },
+        {
+          "type": "improved",
+          "text": "If an answer breaks half-way, it is replaced by a fresh one."
+        }
+      ]
+    },
+    "2.11.2": {
+      "breaking": false,
+      "title": "Mobile demo fix",
+      "summary": "The mobile app's demo mode shows the Ask box's final answer again (a missing await, found by code scanning).",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "The mobile app's demo mode shows the Ask box's final answer again."
+        }
+      ]
+    },
+    "2.11.1": {
+      "breaking": false,
+      "title": "Security alerts handled automatically",
+      "summary": "Reviewed false-positive code-scanning alerts are dismissed automatically from a reviewed list; real findings are fixed in code.",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Reviewed false-positive security alerts are dismissed automatically; real findings are fixed in code."
+        }
+      ]
+    },
+    "2.11.0": {
+      "breaking": false,
+      "title": "Streaming Ask box, per-chat fallback editor, friendlier mobile app",
+      "summary": "The Ask box (panel and mobile app) shows each step and the assistant's text as it works. Chats → Fallback… edits a chat's own ordered list of models. The mobile app shows AI-proposed changes as a word-level diff and has the chat privacy settings and the owner assistant link.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/owner-assistant.md",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "The Ask box shows each step and the assistant's text as it works."
+        },
+        {
+          "type": "new",
+          "text": "Chats → Fallback… edits a chat's own ordered list of models."
+        },
+        {
+          "type": "improved",
+          "text": "The mobile app shows AI-proposed changes word by word and has chat privacy settings and the owner assistant link."
+        }
+      ]
     },
     "2.10.0": {
       "breaking": false,
       "title": "Confirm codes and provider pauses survive restarts; photos never go to a model that can't see them",
       "summary": "Pending confirm codes (owner assistant, admin MCP) and provider pauses are kept across restarts and updates. When a model fails on a photo, fallback only moves to models that can see images (then the vision fallback model); otherwise the agent answers without the photo and says so.",
-      "data": "unchanged"
+      "data": "unchanged",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Pending confirm codes and provider pauses are kept across restarts and updates."
+        },
+        {
+          "type": "fixed",
+          "text": "Photos never go to a model that can't see them: fallback moves only to models that can, or the agent says it could not look."
+        },
+        {
+          "type": "fixed",
+          "text": "A rare random test failure."
+        }
+      ]
+    },
+    "2.9.8": {
+      "breaking": false,
+      "title": "Security fixes",
+      "summary": "Fixed CodeQL findings: linear-time bearer token parsing, race-free creation of the master key and setup code, and result pages that redirect without inline scripts.",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "Security: faster, safer token parsing; race-free creation of the master key and setup code; result pages without inline scripts."
+        }
+      ]
+    },
+    "2.9.7": {
+      "breaking": false,
+      "title": "Security housekeeping",
+      "summary": "Mobile app tooling uses a patched minimatch; console log lines can no longer be split by message text.",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "Security: patched minimatch in the mobile app tooling; log lines can no longer be split by message text."
+        }
+      ]
+    },
+    "2.9.6": {
+      "breaking": false,
+      "title": "Sign-in fixes: Google on every panel address, ChatGPT paste on iPad",
+      "summary": "Sign in with Google now returns to the panel address you started on, so it works on a new domain or alias once that address is registered in Google Cloud. The panel lists the exact origins (no slash at the end) and redirect URIs for every address, shows them while you change the domain, and explains a sign-in that came back to another address. The Sign in with ChatGPT paste also accepts the address without http:// (as iPad Safari copies it).",
+      "actions": [
+        "Using Sign in with Google with more than one panel address (or changing the domain)? Add every origin and redirect URI shown under Settings → Sign in with Google to your OAuth client in Google Cloud Console → APIs & Services → Credentials."
+      ],
+      "data": "unchanged",
+      "docs": "docs/google-sign-in.md",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "Sign in with Google returns to the panel address you started on, so it works on a new domain or alias."
+        },
+        {
+          "type": "improved",
+          "text": "The panel lists the exact Google origins and redirect addresses for every panel address, also while you change the domain."
+        },
+        {
+          "type": "fixed",
+          "text": "The ChatGPT sign-in paste accepts the address without http:// (as iPad Safari copies it)."
+        }
+      ]
+    },
+    "2.9.5": {
+      "breaking": false,
+      "title": "Install fix: web server could not read its config",
+      "summary": "Fresh installs failed at 'Setting up HTTPS' because the web server's config file was written unreadable for the web server (installer umask 027). Fixed; redeploy to pick it up.",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "Fresh installs no longer fail at \"Setting up HTTPS\" (the web server could not read its config)."
+        }
+      ]
+    },
+    "2.9.4": {
+      "breaking": false,
+      "title": "Diagrams show everywhere",
+      "summary": "Docs diagrams are now images with a text version, so they show on github.com, in the GitHub mobile app and on phones. Nothing changes on your server.",
+      "actions": [],
+      "data": "unchanged",
+      "docs": "docs/architecture.md",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Docs diagrams are images with a text version, so they show on github.com, in the GitHub app and on phones."
+        }
+      ]
+    },
+    "2.9.3": {
+      "breaking": false,
+      "title": "Visual docs",
+      "summary": "README and guides rewritten as short, visual pages with diagrams, screenshots and clear next steps; a link check keeps them connected.",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "README and guides are short, visual pages with diagrams, screenshots and clear next steps."
+        }
+      ]
+    },
+    "2.9.2": {
+      "breaking": false,
+      "title": "Install: clearer web server start",
+      "summary": "The installer waits for port 80 to be free before starting the web server, retries once, and shows the web server's own error if it still fails.",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "The installer waits for port 80, retries the web server once and shows the web server's own error if it still fails."
+        }
+      ]
+    },
+    "2.9.1": {
+      "breaking": false,
+      "title": "Clearer first install",
+      "summary": "The install progress page stays live until the final web server is ready and comes back with the error if the install fails; ffmpeg installs after the panel is up; one-click buttons open in a new tab.",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "If an install fails late, the progress page comes back with the error instead of a blank web server page."
+        }
+      ]
     },
     "2.9.0": {
       "breaking": false,
@@ -87,7 +675,103 @@
       "summary": "Automatic updates install only releases that need no action and stop before a breaking one. You are asked on the panel and on WhatsApp (alert number, or the owner assistant with a confirm code). A local backup is made before every update when a backup passphrase is set.",
       "actions": [],
       "data": "unchanged",
-      "docs": "docs/backups-and-updates.md#updates"
+      "docs": "docs/backups-and-updates.md#updates",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Breaking releases wait for your OK, in the panel or on WhatsApp with a confirm code; automatic updates stop before them."
+        },
+        {
+          "type": "new",
+          "text": "A local backup is made before every update when a backup passphrase is set."
+        },
+        {
+          "type": "new",
+          "text": "Remind me in 7 days or Dismiss for a release that waits."
+        }
+      ]
+    },
+    "2.8.4": {
+      "breaking": false,
+      "title": "Clearer first install: live progress until the panel is ready",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "The install progress page no longer stops at the web server's default page."
+        },
+        {
+          "type": "improved",
+          "text": "ffmpeg installs in the background after the panel is up (faster first start on small servers)."
+        },
+        {
+          "type": "improved",
+          "text": "The progress page re-checks when you come back to it on an iPad or phone; one-click buttons on the website open in a new tab."
+        }
+      ]
+    },
+    "2.8.3": {
+      "breaking": false,
+      "title": "Step-by-step hosting guides and where to find your panel",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Guides per host: update the app or the stack, recreate a server, remove everything, common errors."
+        },
+        {
+          "type": "new",
+          "text": "Server page: a Hosting help card for the host this server runs on."
+        },
+        {
+          "type": "improved",
+          "text": "Oracle stack outputs show an Open the panel button and the panel address."
+        }
+      ]
+    },
+    "2.8.2": {
+      "breaking": false,
+      "title": "Refreshed docs, README and website",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "README rewritten; docs split into topic pages with an index, including upgrading."
+        },
+        {
+          "type": "improved",
+          "text": "Website sections for all new features with fresh screenshots and videos."
+        }
+      ]
+    },
+    "2.8.1": {
+      "breaking": false,
+      "title": "Small server mode for on-server speech",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Small server mode (owner opt-in): on-server speech on about 1 GB servers, one job at a time and only with enough free memory."
+        },
+        {
+          "type": "fixed",
+          "text": "Security: background jobs no longer run through a shell."
+        }
+      ]
+    },
+    "2.8.0": {
+      "breaking": false,
+      "title": "Owner assistant in WhatsApp and the panel; privacy notice on by default",
+      "changes": [
+        {
+          "type": "new",
+          "text": "The owner assistant: ask about your chats in your own WhatsApp chat or in the Ask box on Overview; every change needs a confirm code."
+        },
+        {
+          "type": "new",
+          "text": "Chats can be private to members: never seen by the owner assistant."
+        },
+        {
+          "type": "new",
+          "text": "Privacy notice on by default when a group is switched on (editable, with opt-out), and one line in the first direct reply per person."
+        }
+      ]
     },
     "2.7.0": {
       "breaking": false,
@@ -97,7 +781,53 @@
         "To use voice replies or on-server speech: run the installer once more (it adds ffmpeg and bzip2), or `sudo apt install ffmpeg bzip2`. Docker images include them."
       ],
       "data": "unchanged",
-      "docs": "docs/upgrading.md#within-2x"
+      "docs": "docs/upgrading.md#within-2x",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Agents read photos and PDFs (with models that can see images) and understand voice notes."
+        },
+        {
+          "type": "new",
+          "text": "Agents can create images and reply with voice notes."
+        },
+        {
+          "type": "new",
+          "text": "Small-server guardrails: heavy work waits in a queue (⏳ reaction), optional work pauses when memory is tight."
+        }
+      ]
+    },
+    "2.6.0": {
+      "breaking": false,
+      "title": "Automatic fallback to other models and several accounts per provider",
+      "changes": [
+        {
+          "type": "new",
+          "text": "When a model hits a limit or fails, the same model on another account or the next model in the fallback chain answers."
+        },
+        {
+          "type": "new",
+          "text": "Several accounts per provider, used in order or spread."
+        },
+        {
+          "type": "new",
+          "text": "Paused accounts show on Models with Try again now, and the owner gets a WhatsApp alert."
+        },
+        {
+          "type": "improved",
+          "text": "Usage and the test console show which account and model answered, and why it switched."
+        }
+      ]
+    },
+    "2.5.1": {
+      "breaking": false,
+      "title": "Tooling updates",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Build and check tools updated; nothing changes in the app."
+        }
+      ]
     },
     "2.5.0": {
       "breaking": false,
@@ -108,7 +838,99 @@
         "If you limited access to Cloudflare: open Settings → Web address & access, choose Cloudflare again and apply."
       ],
       "data": "not-migrated",
-      "docs": "docs/domains-and-access.md"
+      "docs": "docs/domains-and-access.md",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Automatic HTTPS for your domain, directly or through any proxy (CloudFront, Bunny, Cloudflare, Fastly, Gcore or your own)."
+        },
+        {
+          "type": "new",
+          "text": "Safe domain switching: the new address works alongside the old one until you turn the old one off."
+        },
+        {
+          "type": "new",
+          "text": "Limiting access to your proxy starts as a 10-minute trial that undoes itself unless you confirm."
+        },
+        {
+          "type": "improved",
+          "text": "Google Cloud installs can run without open ports (Cloudflare Tunnel or Tailscale)."
+        }
+      ]
+    },
+    "2.4.1": {
+      "breaking": false,
+      "title": "New app icon: a robot in a chat bubble",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "New Duniya icon everywhere: panel, favicon, install page, website."
+        }
+      ]
+    },
+    "2.4.0": {
+      "breaking": false,
+      "title": "Spending caps with WhatsApp alerts and a weekly summary",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Monthly spending caps per agent or chat (cost or tokens): alert at 80 % and 100 %, then quiet or a cheaper model."
+        },
+        {
+          "type": "new",
+          "text": "A weekly summary to the owner on WhatsApp (counts only)."
+        },
+        {
+          "type": "new",
+          "text": "Owner setting: where alerts go."
+        }
+      ]
+    },
+    "2.3.0": {
+      "breaking": false,
+      "title": "Why agents stay quiet, a first-run checklist and Test as…",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Why agents stayed quiet: counts per chat and reason (no message text), with one-click fixes."
+        },
+        {
+          "type": "new",
+          "text": "A Get started checklist on Overview."
+        },
+        {
+          "type": "new",
+          "text": "Test console: test as an organizer or participant in a chosen chat."
+        },
+        {
+          "type": "fixed",
+          "text": "The test console can no longer post into a real group."
+        }
+      ]
+    },
+    "2.1.0": {
+      "breaking": false,
+      "title": "The AI helper shows its changes as a friendly visual diff",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "The AI helper shows each proposed change in plain words, with added and removed words marked in the instructions."
+        },
+        {
+          "type": "improved",
+          "text": "Switch between Changes only, Side by side and Whole new text."
+        }
+      ]
+    },
+    "2.0.1": {
+      "breaking": false,
+      "title": "The panel fits phones (375 and 393 px)",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "Every screen fits a phone: no sideways scrolling, bigger tap targets, wide tables become cards."
+        }
+      ]
     },
     "2.0.0": {
       "breaking": true,
@@ -120,122 +942,21 @@
         "Update scripts and AI assistants that call /api/bots or bot tool names to the agent names."
       ],
       "data": "not-migrated",
-      "docs": "docs/upgrading.md"
-    },
-    "2.9.2": {
-      "breaking": false,
-      "title": "Install: clearer web server start",
-      "summary": "The installer waits for port 80 to be free before starting the web server, retries once, and shows the web server's own error if it still fails."
-    },
-    "2.9.1": {
-      "breaking": false,
-      "title": "Clearer first install",
-      "summary": "The install progress page stays live until the final web server is ready and comes back with the error if the install fails; ffmpeg installs after the panel is up; one-click buttons open in a new tab."
-    },
-    "2.9.3": {
-      "breaking": false,
-      "title": "Visual docs",
-      "summary": "README and guides rewritten as short, visual pages with diagrams, screenshots and clear next steps; a link check keeps them connected."
-    },
-    "2.9.4": {
-      "breaking": false,
-      "title": "Diagrams show everywhere",
-      "summary": "Docs diagrams are now images with a text version, so they show on github.com, in the GitHub mobile app and on phones. Nothing changes on your server.",
-      "actions": [],
-      "data": "unchanged",
-      "docs": "docs/architecture.md"
-    },
-    "2.9.5": {
-      "breaking": false,
-      "title": "Install fix: web server could not read its config",
-      "summary": "Fresh installs failed at 'Setting up HTTPS' because the web server's config file was written unreadable for the web server (installer umask 027). Fixed; redeploy to pick it up."
-    },
-    "2.9.6": {
-      "breaking": false,
-      "title": "Sign-in fixes: Google on every panel address, ChatGPT paste on iPad",
-      "summary": "Sign in with Google now returns to the panel address you started on, so it works on a new domain or alias once that address is registered in Google Cloud. The panel lists the exact origins (no slash at the end) and redirect URIs for every address, shows them while you change the domain, and explains a sign-in that came back to another address. The Sign in with ChatGPT paste also accepts the address without http:// (as iPad Safari copies it).",
-      "actions": [
-        "Using Sign in with Google with more than one panel address (or changing the domain)? Add every origin and redirect URI shown under Settings → Sign in with Google to your OAuth client in Google Cloud Console → APIs & Services → Credentials."
-      ],
-      "data": "unchanged",
-      "docs": "docs/google-sign-in.md"
-    },
-    "2.9.7": {
-      "breaking": false,
-      "title": "Security housekeeping",
-      "summary": "Mobile app tooling uses a patched minimatch; console log lines can no longer be split by message text."
-    },
-    "2.9.8": {
-      "breaking": false,
-      "title": "Security fixes",
-      "summary": "Fixed CodeQL findings: linear-time bearer token parsing, race-free creation of the master key and setup code, and result pages that redirect without inline scripts."
-    },
-    "2.11.0": {
-      "breaking": false,
-      "title": "Streaming Ask box, per-chat fallback editor, friendlier mobile app",
-      "summary": "The Ask box (panel and mobile app) shows each step and the assistant's text as it works. Chats → Fallback… edits a chat's own ordered list of models. The mobile app shows AI-proposed changes as a word-level diff and has the chat privacy settings and the owner assistant link.",
-      "actions": [],
-      "data": "unchanged",
-      "docs": "docs/owner-assistant.md"
-    },
-    "2.11.1": {
-      "breaking": false,
-      "title": "Security alerts handled automatically",
-      "summary": "Reviewed false-positive code-scanning alerts are dismissed automatically from a reviewed list; real findings are fixed in code."
-    },
-    "2.11.2": {
-      "breaking": false,
-      "title": "Mobile demo fix",
-      "summary": "The mobile app's demo mode shows the Ask box's final answer again (a missing await, found by code scanning)."
-    },
-    "2.12.0": {
-      "breaking": false,
-      "title": "The Ask box writes its answer word by word",
-      "summary": "In the panel and the mobile app, the owner assistant's text now appears as the model writes it (Anthropic, OpenAI, OpenRouter, other OpenAI-compatible endpoints, ChatGPT; GitHub Copilot still shows it after each step). If a stream breaks half-way, the partial text is replaced by a fresh answer; fallback to other models works as before. WhatsApp replies are unchanged.",
-      "actions": [],
-      "data": "unchanged",
-      "docs": "docs/owner-assistant.md#owner-assistant-and-the-ask-box"
-    },
-    "2.12.1": {
-      "breaking": false,
-      "title": "Switching a chat on loads its recent messages from your phone",
-      "summary": "Chats that are off still store no messages (only the id and time of the newest one). When you switch a chat on, its recent messages (50 by default) are loaded from your phone and summarised, so the agent starts with context; keep the phone online. Chats → “Load recent messages” asks again or goes further back. Agents now say plainly what history they have."
-    },
-    "2.13.0": {
-      "breaking": false,
-      "title": "Triggers work anywhere in a message",
-      "summary": "\"can mochi help?\" now wakes the agent whose trigger is mochi; only whole words count. A trigger at the start is still removed from what the agent reads."
-    },
-    "2.13.1": {
-      "breaking": false,
-      "title": "Plugin help text",
-      "summary": "The agent editor explains what plugins are and that example-dice is a developer sample; docs point to MCP tool services for ready-made tools."
-    },
-    "2.14.0": {
-      "breaking": false,
-      "title": "Set up a person's chat before they write",
-      "summary": "Chats → Add a direct chat (or Contacts → Set up chat) assigns an agent, on/off, private, model and caps to a phone number before any message; their first message goes to that agent, whichever form WhatsApp uses. The owner assistant does it in one go (\"assign Mochi to Vedika\"). The agent can send an intro, only after you confirm.",
-      "actions": [],
-      "data": "unchanged",
-      "docs": "docs/agents.md#set-up-a-direct-chat-before-the-person-writes"
-    },
-    "2.15.0": {
-      "breaking": false,
-      "title": "Browse tool services: add an MCP server from the MCP Registry in one click",
-      "summary": "Agents → Tool services and Settings → Tool services get Browse tool services: search the official MCP Registry (or a private one), see the publisher, hosted or local, keys needed and a trust hint, and add it with keys stored as secrets. Tools are listed right away with organizers on and participants off. Local packages are owner-only and refused on small servers.",
-      "actions": [],
-      "data": "unchanged",
-      "docs": "docs/agents.md#browse-tool-services-mcp-registry"
-    },
-    "2.15.1": {
-      "breaking": false,
-      "title": "OS updates install new kernels, explain gradual Ubuntu roll-outs and ask for a restart",
-      "summary": "Install OS updates now uses apt full-upgrade (kept-back kernel packages install) and removes packages no longer needed. The Server page groups updates (will install / rolling out gradually / held back with the reason), offers Include gradual updates now, shows a one-line result and a Restart needed banner. Run sudo duniya update on the server once (or re-run the installer): the in-panel update cannot refresh the root maintenance helper.",
-      "actions": [
-        "Run sudo duniya update on the server once (or re-run the installer) so the maintenance helper is refreshed"
-      ],
-      "data": "unchanged",
-      "docs": "docs/backups-and-updates.md#os-updates-installer-servers"
+      "docs": "docs/upgrading.md",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Tool services for all agents (Settings): add one once, every agent can use it, each agent can switch it off."
+        },
+        {
+          "type": "improved",
+          "text": "Bots are called agents everywhere."
+        },
+        {
+          "type": "removed",
+          "text": "Data, backups and agent exports from 1.x cannot be read: reinstall."
+        }
+      ]
     }
   }
 }

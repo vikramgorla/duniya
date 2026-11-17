@@ -64,7 +64,7 @@ Always include, for this repository:
 | Docs | [`docs/*.md` pages, `docs/README.md`, `README.md` highlights, `DESIGN.md`, diagrams in `docs/diagrams/` (`npm run docs:diagrams`)] |
 | Website | [section/tile in `docs/site/index.html`; shots to retake with `npm run site:shots`] |
 | Version | [x.y.z] (minor feature / patch fix / major breaking) in `package.json`, `package-lock.json`, `infra/oci/schema.yaml` |
-| Releases | `releases.json` entry (every version, one-line title at least); breaking? → major bump, `breaking: true`, actions for the owner (or a migration instead) |
+| Releases | `releases.json` entry (every version: one-line title + `changes`, owner-facing bullets typed new / improved / fixed / removed); breaking? → major bump, `breaking: true`, actions for the owner (or a migration instead) |
 
 ## Project Structure
 

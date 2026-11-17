@@ -167,7 +167,18 @@ text says what will happen, and the button names the action ("Delete agent", "In
 never "OK"). `danger` (destructive or disruptive) makes the button red and focuses Cancel, so Enter does not confirm it
 by accident; Esc, Cancel and a tap outside cancel. `body` holds details (the packages an OS update installs, the
 release notes of an update, form fields). `typed` asks to type a word first; use it only for the rare irreversible
-action that already asked for it. It is a centred dialog on wide screens and a bottom sheet on phones.
+action that already asked for it. It is a centred dialog on wide screens and a bottom sheet on phones. `wide` gives a
+long details area room (release notes); `ok: null` makes a dialog to read, with only the `cancel` button ("Close").
+
+## Release notes (065)
+
+`releaseList(versions)` in `releases.js` (loaded on demand) is the one way to show what versions bring: a row per
+version (mono version · title, a *Needs your OK* pill on breaking ones), folding open into its changes grouped under
+eyebrow labels *New*, *Improved*, *Fixed*, *Removed*; breaking releases are open and show a warn note with what to
+do. The newest one or two start open, so a long range stays a short list. It is used in the update dialog (every
+release between the running version and the target), *What's new* after an update (a one-line card on Overview,
+shown once per person, ✕ hides it) and Settings → Help → Release notes. Bullets are owner-facing plain sentences
+(`docs/development.md#release-notes`).
 
 ## Activity rows (066)
 

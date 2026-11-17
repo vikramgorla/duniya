@@ -80,8 +80,10 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 - [ ] Version bumped in `package.json`, `package-lock.json` (both `version` fields) and `infra/oci/schema.yaml`
       (`version:`), semver: **minor** for features, **patch** for fixes and docs, **major** for breaking changes.
       CI fails when `package.json` and `schema.yaml` differ.
-- [ ] `releases.json` has an entry for **every** new version: at least `"breaking": false` and a one-line `title`
-      (add a `summary` when owners should know more). CI fails when it is missing.
+- [ ] `releases.json` has an entry for **every** new version: `"breaking": false`, a one-line `title` and `changes`:
+      short, plain, owner-facing bullets `{ "type": "new" | "improved" | "fixed" | "removed", "text": "…" }` (no issue
+      numbers, no internal names; the panel shows them before and after an update, GitHub Releases list them). Add a
+      `summary` when owners should know more. CI fails when the entry or its `changes` is missing.
       **Breaking change → major version + a `releases.json` entry with `"breaking": true`, title, summary and
       `actions` (what the owner must do), `data` and `docs`; consider a migration instead.** CI fails on a major bump
       without it. Breaking releases are never installed automatically: owners confirm them (panel or WhatsApp).

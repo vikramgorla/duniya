@@ -23,8 +23,8 @@ const sentTo = (chat) => t.sent.filter((m) => m.chat === chat);
 const appVersion = (app) => JSON.parse(readFileSync(join(app, 'package.json'), 'utf8')).version;
 
 const RELEASES = { versions: {
-  '1.2.0': { breaking: true, title: 'New storage', summary: 'Chats move to a new table.', actions: ['Re-run the installer'], data: 'not-migrated', docs: 'docs/upgrading.md#x' },
-  '1.1.0': { breaking: false, title: 'Small things', summary: '', actions: [] },
+  '1.2.0': { breaking: true, title: 'New storage', summary: 'Chats move to a new table.', actions: ['Re-run the installer'], data: 'not-migrated', docs: 'docs/upgrading.md#x', changes: [{ type: 'improved', text: 'Chats load faster' }] },
+  '1.1.0': { breaking: false, title: 'Small things', summary: '', actions: [], changes: [{ type: 'fixed', text: 'A typo' }, { type: 'new', text: 'Polls in groups' }] },
 } };
 
 /** remote with v1.0.0, v1.1.0, v1.2.0 (marked breaking), v1.3.0 and v2.0.0 (major, no entry); app cloned at v1.0.0. */
@@ -67,19 +67,21 @@ test('045: breaking detection — major bump, marked minor, safe target (pure)',
   a = rel.analyzeJump({ current: 'v1.1.0', target: 'v1.3.0', versions, releases });
   assert.deepEqual([a.breaking, a.safeTarget], [true, null], 'nothing safe left');
   // hostile file shapes are dropped
-  assert.deepEqual(rel.normalizeReleases({ versions: { nope: {}, '1.0.0': 'x', '3.0.0': { breaking: 'yes', docs: 'javascript:alert(1)' } } }), { '3.0.0': { breaking: false, title: '', summary: '', actions: [], data: '', docs: '' } });
+  assert.deepEqual(rel.normalizeReleases({ versions: { nope: {}, '1.0.0': 'x', '3.0.0': { breaking: 'yes', docs: 'javascript:alert(1)' } } }), { '3.0.0': { breaking: false, title: '', summary: '', actions: [], data: '', docs: '', changes: [] } });
 });
 
 test('045: CI rule and release notes', () => {
-  const releases = rel.normalizeReleases({ versions: { '3.0.0': { breaking: true, title: 'Big', summary: 'S', actions: ['Do X'] }, '2.9.0': { breaking: false, title: 'Small' } } });
+  const changes = [{ type: 'new', text: 'Polls' }, { type: 'fixed', text: 'Typo' }];
+  const releases = rel.normalizeReleases({ versions: { '3.0.0': { breaking: true, title: 'Big', summary: 'S', actions: ['Do X'], changes }, '2.9.0': { breaking: false, title: 'Small', changes } } });
   assert.deepEqual(rel.releaseCheck({ version: '3.0.0', previous: 'v2.9.0', releases }).errors, []);
   assert.match(rel.releaseCheck({ version: '4.0.0', previous: 'v3.0.0', releases }).errors[0], /new major version/);
   assert.match(rel.releaseCheck({ version: '3.0.0', previous: 'v2.9.0', releases: rel.normalizeReleases({ versions: { '3.0.0': { breaking: true } } }) }).errors[0], /no actions/);
   assert.match(rel.releaseCheck({ version: '2.9.1', previous: 'v2.9.0', releases }).errors[0], /no entry/, 'every version needs an entry (#71)');
   assert.match(rel.releaseCheck({ version: '2.9.1', previous: '', releases }).errors[0], /no entry/, 'also without a release tag');
   assert.match(rel.releaseCheck({ version: '2.9.1', previous: 'v2.9.0', releases: rel.normalizeReleases({ versions: { '2.9.1': { breaking: false } } }) }).errors[0], /no title/);
+  assert.match(rel.releaseCheck({ version: '2.9.1', previous: 'v2.9.0', releases: rel.normalizeReleases({ versions: { '2.9.1': { breaking: false, title: 'T' } } }) }).errors[0], /no changes/, '065: every version lists its changes');
   assert.deepEqual(rel.releaseCheck({ version: '2.9.0', previous: 'v2.8.2', releases }), { errors: [], warnings: [] });
-  assert.match(rel.releaseNotes(releases, 'v3.0.0'), /Breaking release[\s\S]*### Big[\s\S]*- Do X/);
+  assert.match(rel.releaseNotes(releases, 'v3.0.0'), /Breaking release[\s\S]*### Big[\s\S]*- Do X[\s\S]*\*\*New\*\*\n\n- Polls[\s\S]*\*\*Fixed\*\*\n\n- Typo[\s\S]*More: /);
   assert.equal(rel.releaseNotes(releases, 'v1.0.0'), '');
   // the repository's own file is valid and passes for the current version
   const own = rel.normalizeReleases(JSON.parse(readFileSync(resolve(import.meta.dirname, '../releases.json'), 'utf8')));
@@ -114,7 +116,7 @@ test('045: auto mode installs the safe release (backup first), announces the bre
   // notified once: alert number + the linked owner (with a code), never the admin
   const toOwner = sentTo(ownerDm);
   assert.equal(toOwner.length, 1);
-  assert.match(toOwner[0].text, /v2\.0\.0 needs your decision[\s\S]*v1\.2\.0: New storage[\s\S]*- Re-run the installer[\s\S]*confirm [A-Z2-9]{4}\* to update to v2\.0\.0 — a backup is made first/);
+  assert.match(toOwner[0].text, /v2\.0\.0 needs your decision[\s\S]*v1\.2\.0: New storage[\s\S]*- Re-run the installer[\s\S]*Also in this update\* \(2 releases\):\n- Polls in groups\n- Chats load faster\n- A typo[\s\S]*confirm [A-Z2-9]{4}\* to update to v2\.0\.0 — a backup is made first/);
   assert.equal(sentTo(alertDm).length, 1);
   assert.doesNotMatch(sentTo(alertDm)[0].text, /confirm/);
   assert.equal(sentTo('41790000003@s.whatsapp.net').length, 0);
@@ -141,6 +143,8 @@ test('045: panel — decision, 409 without confirmation, snooze re-notifies afte
   assert.equal(g.decision.target, 'v2.0.0');
   assert.equal(g.decision.show, true);
   assert.deepEqual(g.decision.steps.map((s) => s.version), ['1.2.0', '2.0.0']);
+  // 065: the notes of every release in the range (running v1.1.0 → v2.0.0, which has no entry), with their changes
+  assert.deepEqual(g.status.notes.map((n) => [n.version, n.breaking, n.changes.map((c) => c.text)]), [['1.2.0', true, ['Chats load faster']]]);
   assert.equal(g.backup, true);
   const ap = await t.api(owner, 'POST', '/api/updates/apply', {});
   assert.equal(ap.status, 409);

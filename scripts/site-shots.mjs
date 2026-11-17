@@ -47,6 +47,14 @@ const ASK = `S.ask = { draft: '', busy: false, turns: [{ q: 'What did the famili
 const START = 'await T.wait(1500);'; // 062: Getting started, one step open (data installed with page.call, see open())
 const AI_DIFF = "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies, make Lea an organizer, weather before rides'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); document.querySelector('.dskip')?.click(); await T.wait(400);";
 const TEST_AS = "const sel = document.querySelector('select[aria-label=\"Test as role\"]'); sel.value = 'organizer'; sel.dispatchEvent(new Event('change')); await T.wait(1200); const i = document.querySelector('#test-console input[placeholder^=\"Ask the\"]'); if (i) { i.value = 'Who drives to Geneva on Friday?'; await T.click('Send', 'button', 1800); }";
+// 065: an update from v2.22.0 to the demo's version: the dialog lists every release in between
+const UPDATE_NOTES = `const f0 = window.fetch; window.fetch = async (u, o) => { const r = await f0(u, o);
+  if (String(u) === '/api/updates' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json();
+    const notes = (await (await f0('/api/releases?from=v2.22.0')).json()).versions;
+    return new Response(JSON.stringify({ ...j, decision: null, status: { ...j.status, current: 'v2.22.0', available: true, latest: 'v' + notes[0].version, target: 'v' + notes[0].version, breaking: false, steps: [], notes, safeTarget: 'v' + notes[0].version } })); }
+  return r; }; show(S.tab); await T.wait(1500);
+  document.head.append(Object.assign(document.createElement('style'), { textContent: 'dialog.dlg[open] { animation: none !important; }' })); // a still frame, not the fade-in
+  await T.click('Update to v', 'button', 1500);`;
 
 // [name, hash, js before the shot, phone too?]
 const PAGES = [
@@ -65,6 +73,7 @@ const PAGES = [
 const CARDS = [
   ['card-ask', 'overview', ASK + ' show(S.tab); await T.wait(600);', '#ov-ask', 1100],
   ['card-quiet', 'overview', '', '#ov-silences', 1100],
+  ['card-update-notes', 'overview', UPDATE_NOTES, 'dialog.ask', 900],
   ['card-checklist', 'overview', START, '#ov-checklist', 1100, fakeChecklist('chat')],
   ['card-start-model', 'overview', START, '#ov-checklist', 1100, fakeChecklist('provider')],
   ['card-start-agent', 'overview', START, '#ov-checklist', 1100, fakeChecklist('agent')],
