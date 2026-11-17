@@ -1,5 +1,6 @@
 // Agents → one agent: the editor (instructions, chats, people, tools, schedules, quick answers, test console). Module of the panel (063).
 import { aiHelper } from './ai-helper.js';
+import { askCard } from './ask.js';
 import { $, S, api, ask, can, field, fieldError, h, lines, menu, splitLines, tagPill, time, toast, tryApi, whoLabel } from './core.js';
 import { fallbackLine, fallbackPicker } from './fallback.js';
 import { browseButton } from './registry.js';
@@ -320,7 +321,7 @@ export async function renderAgentEditor(id) {
         h('fieldset', {}, h('legend', {}, 'Advanced'),
           field('Timezone', F.timezone), h('div', { class: 'row' }, field('Recent messages in context', F.historySize), field('Max reply tokens', F.maxTokens))),
         h('div', { class: 'row mut' }, h('button', { class: 'btn primary', onclick: save }, 'Save'))),
-      bi ? h('div', { class: 'card', id: 'test-console' }, h('h2', {}, 'Try it'), h('p', { class: 'small muted' }, 'Ask it in the Ask box on ', h('a', { href: '#overview' }, 'Overview'), ' or in your WhatsApp chat with an agent number; it uses what you saved here.'))
+      bi ? askCard({ id: 'test-console', title: 'Try it', wide: false }) // 066: the same Ask conversation as on Overview, with what you saved here
         : h('div', { class: 'card', id: 'test-console', style: 'position:sticky;top:110px;scroll-margin-top:110px' }, h('h2', {}, 'Test console'),
           h('p', { class: 'small muted' }, 'Uses real tools and the saved settings; nothing is posted to WhatsApp. Pick a role and a chat to see what each person would get.'),
           testAs, hintBox, toolsBox, log, testForm)));

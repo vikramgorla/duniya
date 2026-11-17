@@ -39,7 +39,7 @@ character.
 
 **Agents → Owner assistant** (or **Settings → Owner assistant → Character, tools, voice, schedules & alerts**) is the
 normal agent editor without the parts that do not apply (chats, triggers, people, quick replies, welcome, confirmation
-setup, test console — try it in the Ask box instead). The AI helper and its visual diff work here too.
+setup, test console — its *Try it* card is the Ask box). The AI helper and its visual diff work here too.
 
 | Section | What it does |
 |---|---|
@@ -87,10 +87,10 @@ setup, test console — try it in the Ask box instead). The AI helper and its vi
 | | |
 |---|---|
 | **Photos & voice notes** | go through the media queue like agents' (one at a time on a small server, picked up after a restart); only `[image] caption` or `🎤 transcript` is kept |
-| **Ask box** | the answer streams in: each step shows as it happens (✓ looked up, ⏸ change held, ✕ failed; tool names only) and the text appears word by word; changes wait for **Confirm**. WhatsApp replies stay whole |
+| **Ask box** | a conversation for this session: your question as a bubble, *Thinking…*, each tool as a live chip in plain words ("Checking server metrics…" → "✓ Checked server metrics", folded to *Used 3 tools* afterwards), then the answer streaming word by word with lists and bold drawn as text. **Stop** ends the answer (the model call stops, no further tool runs, the partial text is kept). After an answer: **Copy**, and the box asks for a follow-up, which sees the earlier turns. A failed answer shows the reason and **Retry**. Changes wait for **Confirm**. The same box is *Try it* on the owner assistant's page. WhatsApp replies stay whole |
 | **Storage** | its conversation and notes are stored separately, never in chat memory |
-| **Audit** | every question and action is in Activity (`owner.*`, `whatsapp.action`, always recorded) |
-| **API** | `POST /api/owner/ask` (whole answer) or `POST /api/owner/ask/stream` (newline-delimited JSON: `step`, `delta`, `restarted`, `text`, `done`, `error`; see below); the record is `GET`/`PUT /api/agents/owner-assistant` |
+| **Audit** | every question and action is in Activity (`owner.*`, `whatsapp.action`, always recorded), in plain words: "Checked maintenance status · via admin" (the tool's name is in the entry's details) |
+| **API** | `POST /api/owner/ask` (whole answer) or `POST /api/owner/ask/stream` (newline-delimited JSON: `step` (`thinking`, `calling` before a tool runs, `tool`, `held`), `delta`, `restarted`, `text`, `done`, `error`; closing the request stops the answer; see below); the record is `GET`/`PUT /api/agents/owner-assistant` |
 | **Admin MCP** | `get_owner_assistant` (link), `get_agent` / `update_agent` / `run_schedule_now` with `owner-assistant`, `preview_weekly_summary`, `set_chat_private` |
 | **People who never wrote** | "assign Mochi to Vedika" works in one go: it looks up the contact and prepares the direct chat (`prepare_direct_chat`, see [Agents](agents.md#set-up-a-direct-chat-before-the-person-writes)); you confirm once |
 

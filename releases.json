@@ -1,6 +1,45 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.27.0": {
+      "breaking": false,
+      "title": "Ask is a live conversation; Activity, Overview and the phone app are easier to read and never get stuck",
+      "summary": "Ask, on Overview and on the owner assistant's page, now works like a chat. Your question appears as a bubble, then 'Thinking…'. Each lookup shows as it runs ('Checking server metrics…') and gets a tick when done. The answer appears word by word, with lists and bold drawn properly. Stop ends an answer, Copy copies it, and you can ask a follow-up or Retry after an error. Activity is grouped by day, with one clear row per entry in plain words ('Checked maintenance status · via admin', not tool names). Overview's status reads '2 agents live', '3 chats on'. On a phone, the active tab icon is dark on lime so you can see it, and Find anything in More is a normal row. Add a provider lists providers by name (OpenRouter, Claude, OpenAI, GitHub Copilot, ChatGPT, Custom), with one line each. Switching screens quickly no longer leaves grey placeholder cards: the screen you chose always finishes drawing, a screen that cannot load says why with Retry, and you can pull down to refresh (or More → Refresh). On iPhone, a blank top of the screen after switching screens is fixed. Nothing to do on your server.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Ask is a conversation: your question as a bubble, \"Thinking…\", each lookup as it runs (\"Checking server metrics…\" → ✓), and the answer word by word with lists and bold. Stop, Copy, Retry and follow-ups; the same box is Try it on the owner assistant's page."
+        },
+        {
+          "type": "new",
+          "text": "Pull down at the top of a screen on your phone to refresh it, or More → Refresh."
+        },
+        {
+          "type": "fixed",
+          "text": "Switching screens quickly (Activity, More → a screen) could leave grey placeholder cards until you reopened the app. The screen you chose now always finishes drawing; one that cannot load says why with Retry."
+        },
+        {
+          "type": "fixed",
+          "text": "On iPhone, switching screens could leave the top of the screen blank (even the header) until you scrolled. A new screen now starts at the top, and the phone app's bars no longer use the blur effect that caused it."
+        },
+        {
+          "type": "fixed",
+          "text": "On the phone, the active tab's icon is dark on the lime pill (it was white and hard to see), and Find anything in More is a normal row instead of a giant icon."
+        },
+        {
+          "type": "improved",
+          "text": "Activity is grouped by day with one clear row per entry, in plain words: \"Checked maintenance status · via admin\" instead of tool names."
+        },
+        {
+          "type": "improved",
+          "text": "Overview's status reads as plain chips (\"2 agents live\", \"3 chats on\"); labels across the panel are in normal case instead of capitals."
+        },
+        {
+          "type": "improved",
+          "text": "Add a provider lists providers by name (OpenRouter, Claude, OpenAI, GitHub Copilot, ChatGPT, Custom) with one line each; connected ones stay listed to add another account."
+        }
+      ]
+    },
     "2.26.0": {
       "breaking": false,
       "title": "Every release has a change log: see what's new before you update and right after",

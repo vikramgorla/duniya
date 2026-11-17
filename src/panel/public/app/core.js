@@ -1,6 +1,6 @@
 // Panel core: the DOM helper, api() and its cache, shared state, the shell (tabs, router, live stream). Module of the panel (063).
 // ---------- DOM helper: untrusted text only ever goes through textContent ----------
-import { feedItem } from './activity.js';
+import { feedPrepend } from './activity.js';
 import { renderLogin, renderSecretLink } from './login.js';
 export function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -36,6 +36,7 @@ const ICONS = {
   lock: 'M7 11V8a5 5 0 0 1 10 0v3M6 11h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM12 15v2',
   globe: 'M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17zM3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z',
   more: 'M5 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM12 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM19 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z',
+  send: 'M12 19V5M5.5 11.5 12 5l6.5 6.5',
   search: 'M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zM15.5 15.5 20 20',
   pending: 'M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 8v4.5l3 2',
   secrets: 'M14.5 4a5.5 5.5 0 1 1-4.9 8L4 17.6V20h2.5v-2h2v-2h2l.9-.9A5.5 5.5 0 0 1 14.5 4zM15.5 8.5h.01',
@@ -98,7 +99,8 @@ export function ask({ title, text = '', ok = 'Continue', danger = false, body = 
       h('div', { class: 'ask-actions' }, no, yes)));
     dlg.addEventListener('close', () => { dlg.remove(); if (back instanceof HTMLElement && back.isConnected) back.focus(); resolve(dlg.returnValue === 'yes'); });
     document.body.append(dlg); dlg.showModal();
-    (typedIn || (danger || !yes ? no : yes)).focus();
+    // 066: on touch screens the dialog itself takes focus (a ring on a button nobody touched looks like a bug); keyboards get Cancel/OK
+    if (!typedIn && matchMedia('(pointer: coarse)').matches) { dlg.tabIndex = -1; dlg.focus(); } else (typedIn || (danger || !yes ? no : yes)).focus();
   });
 }
 /** A ⋯ menu (064): secondary actions of a row behind one button instead of a row of buttons. `label` names it for
@@ -155,19 +157,33 @@ export async function api(method, path, body) {
   if (method !== 'GET') dropCache();
   return fetchJson(method, path, body);
 }
+// 066: every request has a deadline and can be dropped. A phone that suspends the installed app can leave a request
+// (or its socket) hanging forever: without a deadline the screen waited on it for good, and a pending cached promise
+// kept every later visit waiting too. Requests in flight are dropped when the app comes back after a while (recover()).
+const inflight = new Set();
+/** Wait for `p` at most `ms`; then fail with a plain message (`kind` tells Retry what to do). */
+const deadline = (p, ms, kind = 'data') => new Promise((resolve, reject) => {
+  const t = setTimeout(() => reject(Object.assign(new Error('The server did not answer in time.'), { kind })), ms);
+  p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+});
 async function fetchJson(method, path, body) {
-  const opts = { method, headers: {} };
+  const ctl = new AbortController(); inflight.add(ctl);
+  const timer = setTimeout(() => ctl.abort(new DOMException('timeout', 'TimeoutError')), method === 'GET' ? S.loadTimeout : 60000);
+  const opts = { method, headers: {}, signal: ctl.signal };
   if (method !== 'GET') { opts.headers['content-type'] = 'application/json'; opts.body = JSON.stringify(body ?? {}); }
-  const res = await fetch(path, opts);
+  let res;
+  try { res = await fetch(path, opts); } catch (e) {
+    throw ctl.signal.aborted ? Object.assign(new Error('The server did not answer in time. Check the connection and try again.'), { kind: 'data' }) : e;
+  } finally { clearTimeout(timer); inflight.delete(ctl); }
   if (res.status === 401 && !['/api/login', '/api/setup'].includes(path)) { renderLogin(); throw new Error('Please sign in'); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { field: data.field, data, status: res.status });
   return data;
 }
 /** POST answered with newline-delimited JSON events (#66 Ask box). onEvent gets 'step' / 'delta' / 'restarted' / 'text'; returns the 'done' event. */
-export async function apiStream(path, body, onEvent) {
+export async function apiStream(path, body, onEvent, signal = undefined) {
   dropCache();
-  const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/x-ndjson' }, body: JSON.stringify(body ?? {}) });
+  const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/x-ndjson' }, body: JSON.stringify(body ?? {}), signal });
   if (res.status === 401) { renderLogin(); throw new Error('Please sign in'); }
   if (!res.ok) { const data = await res.json().catch(() => ({})); throw Object.assign(new Error(data.error || res.statusText), { status: res.status }); }
   let done = null; let buf = '';
@@ -287,7 +303,7 @@ export const meterEl = () => { const i = h('i', { style: 'width:0%' }); const m 
 // ---------- state ----------
 // Shared screen state. models: the /api/models answer (null = load again); overviewBusy: someone types on Overview, so a
 // status push does not redraw it; dmPrefill (049): Contacts → "Set up chat" opens Chats → "Add a direct chat" with it.
-export const S = { tab: 'overview', user: null, status: null, feed: [], feedAgent: '', es: null, editing: null, models: null, overviewBusy: false, dmPrefill: null };
+export const S = { loadTimeout: 15000, tab: 'overview', user: null, status: null, feed: [], feedAgent: '', es: null, editing: null, models: null, overviewBusy: false, dmPrefill: null };
 const RANK = { viewer: 1, admin: 2, owner: 3 };
 export const can = (role) => S.user && RANK[S.user.role] >= RANK[role];
 // 062: everyday screens first; Pending only while something waits; Secrets live in Settings.
@@ -341,7 +357,7 @@ function drawNav() {
   for (const [id, label] of tabs) LABEL[id] = label;
   nav.replaceChildren(...tabs.map(([id, label]) => h('button', { 'data-tab': id, onclick: () => go(id) }, icon(id), label, badgeFor(id))));
   $('nav.tabbar')?.replaceChildren(...PRIMARY.map((id) => h('button', { 'data-tab': id, onclick: () => go(id) }, icon(id), LABEL[id])),
-    h('button', { 'data-tab': 'more', 'aria-haspopup': 'dialog', onclick: () => import('./find.js').then((m) => m.openMore()) }, icon('more'), 'More', h('span', { class: 'nbadge' }, S.status?.pending ? String(S.status.pending) : '')));
+    h('button', { 'data-tab': 'more', 'aria-haspopup': 'dialog', onclick: () => sheet((m) => m.openMore()) }, icon('more'), 'More', h('span', { class: 'nbadge' }, S.status?.pending ? String(S.status.pending) : '')));
   markTabs();
   serverBadge(S.status?.osUpdates);
 }
@@ -361,7 +377,7 @@ function applyStatus(next) {
   const dot = $('#wa-dot'); if (dot) { dot.className = `dot ${st === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(st) ? 'warn' : 'bad'}`; dot.setAttribute('aria-label', `WhatsApp: ${st === 'open' ? 'connected' : st.replace('_', ' ')}`); }
   const sub = $('#brand-sub'); if (sub) sub.textContent = S.status.settings.paused ? 'paused' : `${S.status.agents.filter((b) => b.enabled).length} agents live`;
   serverBadge(S.status.osUpdates);
-  if (S.tab === 'overview') import('./overview.js').then((m) => m.renderOverview(true));
+  if (S.tab === 'overview') import('./overview.js').then((m) => { if (S.tab === 'overview' && S.renderDone === S.renderSeq) m.renderOverview(true); }); // 066: never over another screen, never mid-navigation
 }
 // #96: the Server tab counts only OS updates that will install now (not gradual roll-outs or held packages); "!" when
 // a restart is needed to finish updates.
@@ -386,7 +402,12 @@ const SCREENS = {
   settings: () => import('./settings.js').then((m) => m.renderSettings()),
 };
 /** Find anything (062), loaded when first opened. */
-export const openFind = () => import('./find.js').then((m) => m.openPalette()).catch((e) => toast(e.message, { bad: true }));
+export const openFind = () => sheet((m) => m.openPalette());
+/** 066: open a sheet from find.js (Find anything, More). If the module never arrives, the page reloads (the browser
+ * would keep waiting on the same import), landing on the same screen. */
+const sheet = (open) => deadline(import('./find.js'), S.loadTimeout, 'screen').then(open).catch(() => {
+  toast('Part of the app did not arrive. Reloading…', { bad: true }); setTimeout(() => location.reload(), 1200);
+});
 export function show(tab) {
   if (Object.hasOwn(MOVED, tab)) { history.replaceState(null, '', `#${MOVED[tab]}`); tab = MOVED[tab].split('/')[0]; }
   if (!TABS().some(([id]) => id === tab) && !(tab === 'pending' && can('viewer'))) tab = 'overview';
@@ -404,23 +425,63 @@ export function show(tab) {
   const seq = (S.renderSeq = (S.renderSeq || 0) + 1);
   const main = $('#main');
   const moved = from !== tab; // another screen: placeholder cards while it loads; the same one: dim it
-  const slow = setTimeout(() => { if (S.renderSeq !== seq || !main) return; if (moved) main.replaceChildren(skeleton()); else main.classList.add('loading'); main.setAttribute('aria-busy', 'true'); }, 120);
+  // 066: a new screen starts at the top *before* its content changes. Left deep in a long screen, a shorter one was drawn
+  // far below the top and iPhone (WebKit) painted the area above blank, header included, until the next scroll.
+  if (moved && !location.hash.includes('/')) window.scrollTo(0, 0);
+  // 066: placeholders only while nothing new is drawn. A screen that draws and then waits for more (Activity draws its
+  // card, then loads the list) used to have its card replaced by the placeholders for good.
+  const shown = main?.firstElementChild;
+  const slow = setTimeout(() => { if (S.renderSeq !== seq || !main || main.firstElementChild !== shown) return; if (moved) main.replaceChildren(skeleton()); else main.classList.add('loading'); main.setAttribute('aria-busy', 'true'); }, 120);
   const r = Object.hasOwn(SCREENS, tab) ? SCREENS[tab] : null;
-  Promise.resolve(r?.()).catch((e) => toast(e.message, { bad: true })).finally(() => {
+  // 066: a screen that fails or stalls (a module or request hung after the phone suspended the app) shows why and Retry,
+  // instead of placeholder cards forever.
+  Promise.resolve(r && deadline(r(), S.loadTimeout + 5000, 'screen')).catch((e) => {
+    console.error('Duniya: a screen did not load:', String(tab), e);
+    if (S.renderSeq !== seq || !main || e?.message === 'Please sign in') return;
+    // A screen module that is missing (the app was updated while this page was open: new file names) → load the new app
+    // once; a second failure within a minute shows Retry instead of looping.
+    const missing = /dynamically imported module|importing a module script failed|module script/i.test(e?.message || '');
+    if (missing && Date.now() - Number(sessionStorage.getItem('duniya.reloadedAt') || 0) > 60000) { sessionStorage.setItem('duniya.reloadedAt', String(Date.now())); location.reload(); return; }
+    main.replaceChildren(loadFailed(e, () => show(S.tab)));
+  }).finally(() => {
     clearTimeout(slow);
     if (S.renderSeq === seq) {
       main?.classList.remove('loading'); main?.removeAttribute('aria-busy'); S.renderDone = seq;
+      if (main) main.dataset.screen = tab;
+      if (S.overdrawn === seq) { S.overdrawn = 0; show(S.tab); return; } // an older screen finished meanwhile and may have drawn over this one
+      if (main?.querySelector(':scope > .skel')) { console.error('Duniya: a screen finished without drawing:', String(tab)); main.replaceChildren(loadFailed(new Error('This screen did not finish drawing.'), () => show(S.tab))); }
       if (moved && from && main) {
         main.classList.remove('enter'); void main.offsetWidth; main.classList.add('enter');
         // Keyboard and screen-reader users land on the new screen, not on the tab they left (064).
         if ((document.activeElement?.closest?.('nav, dialog') || document.activeElement === document.body) && !location.hash.includes('/')) main.focus({ preventScroll: true });
-        if (!location.hash.includes('/')) window.scrollTo({ top: 0 });
+        if (!location.hash.includes('/')) { window.scrollTo(0, 0); requestAnimationFrame(() => window.scrollTo(0, 0)); }
       }
       jumpToSub(); return;
     }
-    // A slower, older tab finished after a newer one and drew over it: draw the current tab again.
-    if ((S.renderDone || 0) > seq && S.tab) show(S.tab);
+    // A slower, older screen finished after a newer one started: it may have drawn over it. If the newer one is done,
+    // draw it again now; otherwise when it is done (066: before, only the first case was handled, and an older screen
+    // that drew while the newer one was still loading stayed under the newer tab).
+    if (S.renderDone === S.renderSeq) { if (S.tab) show(S.tab); } else S.overdrawn = S.renderSeq;
   });
+}
+/** 066: "Couldn't load" with the reason and Retry. A screen module that never arrived cannot be asked for again in
+ * this page (the browser keeps the pending import), so its Retry reloads the app; data is simply asked again. */
+function loadFailed(e, retry) {
+  const stuck = e?.kind === 'screen' || /import|module|dynamically/i.test(e?.message || '');
+  return h('div', { class: 'card load-failed', role: 'alert' }, h('h2', {}, 'Couldn’t load this screen'),
+    h('p', { class: 'small muted' }, stuck ? 'Part of the app did not arrive, probably while the phone was asleep or offline.' : e?.message || 'Something went wrong.'),
+    h('button', { class: 'btn primary', onclick: () => (stuck ? location.reload() : (dropCache(), retry())) }, 'Retry'));
+}
+/** 066: back after a while (or pull to refresh, `force`): drop what is still waiting, reconnect the live stream, draw again. */
+export function recover(force = false) {
+  const main = $('#main');
+  // draw again only when something was waiting or the screen is not drawn (keeps a half-edited form otherwise)
+  const stuck = force || inflight.size > 0 || !!main?.querySelector('.skel, .load-failed') || main?.classList.contains('loading');
+  for (const c of inflight) c.abort(); inflight.clear();
+  dropCache();
+  if (!S.user) return;
+  connectEvents(); refreshStatus();
+  if (stuck) show(S.tab);
 }
 /** 062: #tab/<section> scrolls to the element marked data-jump="<section>" (a settings card, a provider, a chat). */
 export function jumpToSub() {
@@ -459,8 +520,8 @@ export function connectEvents() {
     const a = JSON.parse(e.data);
     dropCache();
     S.feed.unshift(a); S.feed.length = Math.min(S.feed.length, 500);
-    if (S.tab === 'activity' && (!S.feedAgent || a.agent === S.feedAgent)) $('#feed')?.prepend(feedItem(a));
-    if (S.tab === 'overview') { const r = $('#recent'); if (r) { r.prepend(feedItem(a)); $('#recent + .empty')?.remove(); while (r.children.length > 8) r.lastChild.remove(); } livePulse(a); }
+    if (S.tab === 'activity' && (!S.feedAgent || a.agent === S.feedAgent)) { const f = $('#feed'); if (f) feedPrepend(f, a); }
+    if (S.tab === 'overview') { const r = $('#recent'); if (r) { feedPrepend(r, a, 8); $('#recent + .empty')?.remove(); } livePulse(a); }
   };
 }
 

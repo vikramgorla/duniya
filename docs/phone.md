@@ -37,6 +37,9 @@
 | **Offline** | the panel needs the server: without a connection it shows the browser's offline page (no data is cached on the phone) |
 | **Alerts** | owner alerts and the weekly summary come in WhatsApp from the [owner assistant](owner-assistant.md) |
 | **Finding your way** | the tab bar at the bottom; **More** (with a badge when a change waits for a confirm) holds the other screens; the search button in the header finds any screen, agent, chat or setting |
+| **Activity** | grouped by day (*Today*, *Yesterday*, …), one row per entry: a coloured type mark, what happened in plain words, the agent and chat underneath, the time on the right; tap a row for its details |
+| **Refresh** | pull down at the top of a screen (or **More** → **Refresh**) to load it again. Back after a while in the background, the app drops anything still waiting, reconnects and redraws a screen that was not finished; a screen that cannot load says why with **Retry**, never endless grey cards |
+| **Switching screens** | a new screen always opens at its top with the header in view |
 | **Undo** | switching a chat off or pausing all agents shows **Undo** for a few seconds |
 | **Sign out** | **More** → **Sign out** (on a computer: in the header) |
 

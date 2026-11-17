@@ -20,7 +20,7 @@ npm install && ADMIN_PASSWORD=dev-password-123 npm start     # panel on http://1
 | `npm run knip` / `npm run jscpd` | unused files, exports and dependencies / duplicated code ([Lean code](#lean-code)) |
 | `node scripts/demo-panel.mjs` | seeded demo panel on :8099 (admin / demo-password-123), no network |
 | `DEMO_EMPTY=1 node scripts/demo-panel.mjs` | a fresh install (no provider, no agent, WhatsApp waiting for a scan; *Get code* links it): check the first run |
-| `npm run check:responsive` | every screen at 375 / 393 / 1440 px, light + dark: layout, tap targets, text size, and accessibility (every control named, AA contrast) (needs Chrome) |
+| `npm run check:responsive` | every screen at 375 / 393 / 1440 px, light + dark: layout, tap targets, text size, and accessibility (every control named, AA text contrast, 3:1 for icons) (needs Chrome). CI runs its navigation states: `nav-stress` (fast tab switching on a slow network ends on the chosen screen, fully drawn), `load-failed` / `load-retry` (a hung request ends in Retry, and Retry recovers) |
 | `npm run site:shots` | retake the website screenshots and videos (needs Chrome + ffmpeg) |
 | `npm run measure:load` | first load of Overview in headless Chrome on slow and fast networks and a phone-speed CPU: bytes and time, cold and warm |
 

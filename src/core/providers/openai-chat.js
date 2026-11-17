@@ -123,11 +123,11 @@ export async function readChatStream(res, onText) {
   return { choices: [{ message, finish_reason: finish || 'stop' }], usage: usage || {} };
 }
 
-async function streamRequest(url, key, body, onText, { timeout = 120000 } = {}) {
+async function streamRequest(url, key, body, onText, { timeout = 120000, signal = undefined } = {}) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { ...(key ? { authorization: `Bearer ${key}` } : {}), 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify(body), signal: AbortSignal.timeout(timeout),
+    body: JSON.stringify(body), signal: signal ? AbortSignal.any([AbortSignal.timeout(timeout), signal]) : AbortSignal.timeout(timeout), // 066: Stop
   });
   if (!res.ok) {
     const text = await res.text();
@@ -221,7 +221,7 @@ export function chatCompletionsProvider({ baseUrl, key, official = false }) {
       }).filter((m) => m.id);
     },
     streams: true,
-    async chat({ model, system, messages, tools, maxTokens, onText = null }) {
+    async chat({ model, system, messages, tools, maxTokens, onText = null, signal = undefined }) {
       const body = {
         model, messages: toChatMessages(system, messages),
         ...(tools?.length ? { tools: toChatTools(tools) } : {}),
@@ -231,11 +231,11 @@ export function chatCompletionsProvider({ baseUrl, key, official = false }) {
         let started = false;
         const forward = (d) => { started = true; onText(d); };
         try {
-          return fromChatResponse(await streamRequest(`${base}/chat/completions`, key(), { ...body, stream: true, stream_options: { include_usage: true } }, forward));
+          return fromChatResponse(await streamRequest(`${base}/chat/completions`, key(), { ...body, stream: true, stream_options: { include_usage: true } }, forward, { signal }));
         } catch (e) {
           // Some OpenAI-compatible servers refuse `stream` / `stream_options` (400 / 422): ask the same account once more
           // without streaming. Any other failure goes to the fallback chain.
-          if (started || !(e.status === 400 || e.status === 422)) throw e;
+          if (started || signal?.aborted || !(e.status === 400 || e.status === 422)) throw e;
         }
       }
       return fromChatResponse(await request(`${base}/chat/completions`, key(), body));

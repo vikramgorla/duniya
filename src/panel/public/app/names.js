@@ -31,3 +31,28 @@ export function modelName(/** @type {string} */ id, label = '') {
   const text = nice[0] === 'Gpt' ? `GPT-${nice.slice(1).join(' ')}`.replace(/^GPT-$/, 'GPT') : nice.join(' ');
   return `${text || raw}${free ? ' · free' : ''}`;
 }
+
+// 066: what a tool does, in plain words ("get_maintenance_status" → "Checked maintenance status" in Activity, "Checking
+// maintenance status" while the Ask box waits for it). One mapping for the admin tools (verb_object names) and any other
+// tool (MCP "server:tool" names). [past, now] per verb.
+const TOOL_VERBS = Object.freeze({
+  get: ['Checked', 'Checking'], list: ['Looked at', 'Looking at'], set: ['Changed', 'Changing'], update: ['Updated', 'Updating'],
+  create: ['Created', 'Creating'], add: ['Added', 'Adding'], remove: ['Removed', 'Removing'], delete: ['Deleted', 'Deleting'],
+  run: ['Ran', 'Running'], send: ['Sent', 'Sending'], test: ['Tested', 'Testing'], refresh: ['Refreshed', 'Refreshing'],
+  rebuild: ['Rebuilt', 'Rebuilding'], restore: ['Restored', 'Restoring'], install: ['Installed', 'Installing'], apply: ['Applied', 'Applying'],
+  erase: ['Erased', 'Erasing'], confirm: ['Confirmed', 'Confirming'], cancel: ['Cancelled', 'Cancelling'], check: ['Checked', 'Checking'],
+  search: ['Searched', 'Searching'], draft: ['Drafted', 'Drafting'], export: ['Exported', 'Exporting'], duplicate: ['Duplicated', 'Duplicating'],
+  assign: ['Assigned', 'Assigning'], load: ['Loaded', 'Loading'], preview: ['Previewed', 'Previewing'], prepare: ['Prepared', 'Preparing'],
+  reset: ['Reset', 'Resetting'], snooze: ['Snoozed', 'Snoozing'], retry: ['Retried', 'Retrying'], restart: ['Restarted', 'Restarting'], save: ['Saved', 'Saving'],
+});
+const TOOL_WORDS = Object.freeze({ mcp: 'tool service', os: 'OS', ai: 'AI', whatsapp: 'WhatsApp', faq: 'FAQ', dm: 'direct chat', url: 'URL', id: 'ID' });
+/** "get_server_metrics" → "Checked server metrics" (now: "Checking server metrics"); "transport:connections" → "Connections (transport)". */
+export function toolPhrase(/** @type {string} */ name, now = false) {
+  const raw = String(name || '');
+  const [server, tool] = raw.includes(':') ? raw.split(/:(.*)/s) : ['', raw];
+  const words = tool.split(/[_\s-]+/).filter(Boolean).map((w) => TOOL_WORDS[w.toLowerCase()] || w.toLowerCase());
+  const verb = !server && words.length > 1 ? TOOL_VERBS[words[0]]?.[now ? 1 : 0] : '';
+  const text = verb ? `${verb} ${words.slice(1).join(' ')}` : `${now ? 'Using ' : ''}${words.join(' ')}`;
+  const nice = text ? text[0].toUpperCase() + text.slice(1) : raw;
+  return server ? `${nice} (${server})` : nice;
+}

@@ -1,4 +1,5 @@
-// Responsive check of the admin panel (issue #1). Not part of CI: it needs a local Chrome or Chromium.
+// Responsive check of the admin panel (issue #1). Needs Chrome or Chromium. CI runs the navigation states only (066):
+// nav-stress, load-failed, load-retry (see .github/workflows/ci.yml).
 //
 //   npm run check:responsive                      all screens at 375 / 393 / 1440 px, light and dark
 //   npm run check:responsive -- --shots /tmp/rs   … and save a full-page screenshot of every screen and state
@@ -10,7 +11,8 @@
 //   - no horizontal page scrolling (only tab bars, tables in a scroll box and code may scroll sideways)
 //   - phones (< 600 px): tap targets at least 40 × 40 px, text at least 13 px
 //   - accessibility (064): every control has a name (the browser's accessibility tree, as a screen reader reads it) and
-//     text meets WCAG AA contrast against what is behind it (4.5:1, 3:1 for large text), in light and dark
+//     text meets WCAG AA contrast against what is behind it (4.5:1, 3:1 for large text), in light and dark; (066) icons
+//     reach 3:1 against what is behind them, pills drawn by ::before included
 // Exit code 1 lists what failed.
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -25,6 +27,29 @@ const { values: opt } = parseArgs({ options: {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- screens and states ----------
+// 066: a request that never answers (a phone that suspended the app): the screen ends in Couldn't load + Retry, not
+// endless placeholder cards; with the server back, Retry draws the screen.
+const NAV_STRESS = `window.__realFetch ||= window.fetch; const { dropCache } = await import('/app/core.js');
+  // slow lists, and a screen whose second request is slower than the first (it draws, then waits: the 064 skeleton timer
+  // used to replace what was drawn)
+  window.fetch = async (u, o) => { await T.wait(String(u).startsWith('/api/activity') ? 300 + Math.random() * 300 : Math.random() < 0.5 ? 0 : Math.random() * 400); return window.__realFetch(u, o); };
+  const phone = innerWidth < 641; const tabs = ['activity', 'chats', 'agents', 'overview', 'usage', 'models', 'server', 'activity', 'contacts', 'settings', 'activity'];
+  const go = async (id) => {
+    const bar = document.querySelector(phone ? 'nav.tabbar' : 'nav.tabs');
+    const b = bar.querySelector('button[data-tab="' + id + '"]');
+    if (b) return b.click();
+    bar.querySelector('button[data-tab="more"]').click(); await T.until('dialog.more', 3000);
+    [...document.querySelectorAll('dialog.more .more-list button')].find((x) => x.textContent.toLowerCase().startsWith(id))?.click();
+  };
+  for (let round = 0; round < 3; round++) for (const id of tabs) { dropCache(); window.scrollTo(0, 99999); const was = S.tab; await go(id); await T.wait(20); if (was !== S.tab && scrollY !== 0 && !location.hash.includes('/')) throw new Error('switching to ' + id + ' kept the page scrolled to ' + scrollY); await T.wait([0, 30, 130, 260, 600][Math.floor(Math.random() * 5)]); }
+  await T.wait(3500); window.fetch = window.__realFetch;
+  const main = document.getElementById('main');
+  const hd = document.querySelector('header').getBoundingClientRect(); if (hd.top < 0 || hd.bottom <= 0) throw new Error('header not in view after switching');
+  if (main.querySelector('.skel') || main.classList.contains('loading')) throw new Error('stuck on placeholders on ' + S.tab);
+  if (main.dataset.screen !== S.tab) throw new Error('screen ' + main.dataset.screen + ' drawn under tab ' + S.tab);
+  if (S.tab === 'activity' && !document.getElementById('feed')?.isConnected) throw new Error('activity list not on screen; shown: ' + main.textContent.trim().slice(0, 60));`;
+const HANG_AGENTS = `const { dropCache } = await import('/app/core.js'); dropCache(); S.loadTimeout = 800; window.__realFetch ||= window.fetch;
+  window.fetch = (u, o) => (String(u).startsWith('/api/agents') ? new Promise((_, no) => o?.signal?.addEventListener('abort', () => no(new DOMException('aborted', 'AbortError')))) : window.__realFetch(u, o));`;
 // 045: pretend v3.0.0 (breaking) is available, with v2.26.0 still safe to install; 065: the notes of the range are the
 // demo's own release notes since v2.23.0 plus the breaking v3.0.0.
 const UPDATE_DECISION = `const f0 = window.fetch; window.fetch = async (u, o) => { const r = await f0(u, o);
@@ -75,6 +100,13 @@ const STATES = [
   { name: 'settings-release-notes', hash: 'settings/release-notes', wait: 2000 },
   { name: 'activity', hash: 'activity', js: "document.querySelector('#feed li')?.click();" },
   { name: 'agents', hash: 'agents' },
+  // 066: fast tab switching (bottom tab bar, More sheet, top tabs), on a slow network, from deep down a long screen, must
+  // always start the new screen at the top (iPhone painted the area above blank otherwise) and end on the chosen screen
+  // fully drawn: no placeholder cards left, no screen drawn under another tab, header in view. Throws otherwise.
+  { name: 'nav-stress', hash: 'overview', wait: 2000, js: NAV_STRESS },
+  { name: 'load-failed', hash: 'agents', before: HANG_AGENTS, wait: 2500, js: "if (!document.querySelector('.load-failed')) throw new Error('no Retry card after a hung request'); window.fetch = window.__realFetch; S.loadTimeout = 15000;" },
+  { name: 'load-retry', hash: 'agents', before: HANG_AGENTS, wait: 2500, js: "window.fetch = window.__realFetch; S.loadTimeout = 15000; await T.click('Retry', 'button', 1500); if (document.querySelector('.load-failed, .skel') || !document.querySelector('.agent-card')) throw new Error('Retry did not recover the screen');" },
+  { name: 'pull-refresh', hash: 'overview', js: "const m = document.createElement('div'); m.className = 'ptr armed busy'; m.setAttribute('aria-hidden', 'true'); m.append(Object.assign(document.createElement('span'), { className: 'spinner' })); m.style.transform = 'translate(-50%, 64px)'; document.body.append(m); await T.wait(200);" },
   { name: 'agents-ai-draft', hash: 'agents', js: "const ta = document.querySelector('#main textarea'); ta.value = 'A helper for our running club'; await T.click('Draft', 'button', 2500);" },
   { name: 'agent-editor-ai-diff', hash: 'agents/carpool', wait: 2500, js: "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies, make Lea an organizer, weather before rides'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); document.querySelector('.dskip')?.click();" },
   { name: 'agent-editor-ai-side', hash: 'agents/carpool', wait: 2500, js: "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); await T.click('Side by side', 'button', 300);" },
@@ -87,8 +119,13 @@ const STATES = [
   { name: 'agent-editor-quick', hash: 'agents/carpool', wait: 2500, js: "document.querySelector('#quick-answers')?.scrollIntoView(); await T.wait(300);" },
   { name: 'agent-editor-quick-test', hash: 'agents/carpool/test', wait: 2500, js: "const i = document.querySelector('#test-console input[placeholder^=\"Ask the\"]'); i.value = '!rides'; await T.click('Send', 'button', 900);" },
   { name: 'agent-editor-empty', hash: 'agents/neighbours', wait: 2500, js: 'T.openAll();' },
-  { name: 'overview-ask-streaming', hash: 'overview', js: "S.ask = { q: 'What did the families decide?', busy: true, reply: 'Let me look at the carpool and the class chats first.', confirms: [], steps: [{ step: 'thinking' }, { step: 'tool', tool: 'list_visible_chats', ok: true }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'thinking' }, { step: 'tool', tool: 'search_messages', ok: false }] }; show(S.tab); await T.wait(600); S.ask.busy = false;" },
-  { name: 'overview-ask-restarted', hash: 'overview', js: "S.ask = { q: 'Who is driving on Friday?', busy: true, restarted: true, reply: '', confirms: [], steps: [{ step: 'thinking' }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'thinking' }] }; show(S.tab); await T.wait(600); S.ask.busy = false;" },
+  // 066: the Ask conversation — thinking, a tool running, streaming with markdown, done with a follow-up and a confirm, an error
+  { name: 'overview-ask-thinking', hash: 'overview', js: "S.ask = { draft: '', busy: true, turns: [{ q: 'How is the server doing?', state: 'thinking', steps: [], confirms: [], reply: '' }] }; show(S.tab); await T.wait(600); S.ask.busy = false;" },
+  { name: 'overview-ask-streaming', hash: 'overview', js: "S.ask = { draft: '', busy: true, turns: [{ q: 'What did the families decide?', state: 'streaming', steps: [{ step: 'tool', tool: 'list_visible_chats', ok: true }, { step: 'calling', tool: 'chat_recap' }], confirms: [], reply: 'Here is what I found so far:\\n\\n- **Carpool:** Luca drives on Friday\\n- Class 4B: forms' }] }; show(S.tab); await T.wait(600); S.ask.busy = false;" },
+  { name: 'overview-ask-done', hash: 'overview', js: "S.ask = { draft: '', busy: false, turns: [{ q: 'What did the families decide this week?', state: 'done', steps: [{ step: 'tool', tool: 'list_visible_chats', ok: true }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'tool', tool: 'search_messages', ok: false }], confirms: [], reply: 'Two decisions this week:\\n\\n- **Carpool:** Luca drives on Friday, Mia back from Cornavin.\\n- **Class 4B:** museum forms are due **Monday 24 Nov**.\\n\\nNothing else needs you.' }, { q: 'Remind the class group on Sunday', state: 'done', steps: [{ step: 'held', tool: 'send_chat_intro', ok: true }], confirms: [{ code: 'K7Q2', preview: 'Post in Class 4B parents on Sunday 23 Nov at 18:00: “Reminder: museum forms are due tomorrow.”' }], reply: 'Here is what I prepared:' }] }; show(S.tab); await T.wait(600);" },
+  { name: 'overview-ask-error', hash: 'overview', js: "S.ask = { draft: 'How is the server doing?', busy: false, turns: [{ q: 'How is the server doing?', state: 'error', error: 'All usable AI providers are paused (Claude: usage limit reached, tries again at 10:05).', steps: [], confirms: [], reply: '' }] }; show(S.tab); await T.wait(600);" },
+  { name: 'overview-ask-restarted', hash: 'overview', js: "S.ask = { draft: '', busy: true, turns: [{ q: 'Who is driving on Friday?', state: 'streaming', restarted: true, steps: [{ step: 'tool', tool: 'chat_recap', ok: true }], confirms: [], reply: '' }] }; show(S.tab); await T.wait(600); S.ask.busy = false;" },
+  { name: 'agent-editor-owner-ask', hash: 'agents/owner-assistant', wait: 2500, js: "S.ask = { draft: '', busy: false, turns: [{ q: 'What did the families decide this week?', state: 'done', steps: [{ step: 'tool', tool: 'list_visible_chats', ok: true }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'tool', tool: 'search_messages', ok: false }], confirms: [], reply: 'Two decisions this week:\\n\\n- **Carpool:** Luca drives on Friday, Mia back from Cornavin.\\n- **Class 4B:** museum forms are due **Monday 24 Nov**.\\n\\nNothing else needs you.' }] }; show(S.tab); await T.wait(1500); document.getElementById('test-console')?.scrollIntoView(); await T.wait(300);" },
   // 052: Browse tool services — the search sheet, the Add form with a key, and the result with its tools
   { name: 'registry-browse', hash: 'agents/carpool', wait: 2500, js: "await T.click('Browse tool services', 'button', 1500);" },
   { name: 'registry-add', hash: 'agents/carpool', wait: 2500, js: "await T.click('Browse tool services', 'button', 1500); [...document.querySelectorAll('.reg-card')].find((c) => c.textContent.includes('Recipe box')).querySelector('button').click(); await T.until('dialog form input[type=password]'); await T.wait(300);" },
@@ -228,6 +265,18 @@ function audit(W, phone) {
     const size = parseFloat(cs.fontSize); const large = size >= 24 || (size >= 18.66 && Number(cs.fontWeight) >= 700);
     const r = ratio(text, bg);
     if (r < (large ? 3 : 4.5)) out.contrast.push(`${desc(e)} ${r.toFixed(2)}:1`);
+  }
+  // 066: icons (SVG drawn in currentColor) reach 3:1 against what is behind them (WCAG 1.4.11), including a pill drawn by
+  // an ancestor's ::before (the active phone tab) — a white icon on lime failed this on a real iPhone.
+  const pill = (p) => { const b = getComputedStyle(p, '::before'); const c = rgba(b.backgroundColor); return b.content !== 'none' && b.position === 'absolute' && c && c[3] > 0 ? c : null; };
+  for (const svg of document.querySelectorAll('svg')) {
+    if (!visible(svg) || svg.closest('.cue, .logo, .spark, .bars, .empty, .qr, .lmark, .av') || !svg.querySelector('[stroke=currentColor], [fill=currentColor]')) continue;
+    const cs = getComputedStyle(svg); const fg = rgba(cs.color); if (!fg) continue;
+    let op = 1; for (let p = svg; p; p = p.parentElement) op *= Number(getComputedStyle(p).opacity);
+    let bg = behind(svg);
+    for (let p = svg.parentElement; p && p !== document.body; p = p.parentElement) { const c = pill(p); if (c) { bg = over(c, bg); break; } }
+    const r = ratio(over([...fg.slice(0, 3), fg[3] * op], bg), bg);
+    if (r < 3) out.contrast.push(`icon in ${desc(svg.parentElement)} ${r.toFixed(2)}:1`);
   }
   const uniq = (a) => [...new Set(a)].slice(0, 12);
   return { overflow: out.overflow, wide: uniq(out.wide), taps: uniq(out.taps), text: uniq(out.text), contrast: uniq(out.contrast) };

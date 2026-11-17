@@ -61,20 +61,37 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
 - **Ink + one signal:** primary actions and the active tab are **ink** (`#101216`); the single signal colour is
   electric lime `--signal #c6f432`, used for "live" — the active-tab dot, LED status lights, the knob of an "on"
   toggle, focus rings, the `AI` chip. In dark mode lime becomes the primary colour.
-- **Instrument details:** eyebrow labels, table headers, LED labels and numbers in monospace (uppercase, wide
-  tracking for labels); stats in large mono figures; LED dots with a glow for live state.
+- **Instrument details:** stats in large mono figures, LED dots with a glow for live state. Labels (eyebrows, table
+  headers, legends, card-table labels, status chips) are **sentence case in the text font**, muted and semibold — never
+  `UPPERCASE` monospace (066: it read as shouting on a phone). Monospace is for numbers, codes, keys and ids.
 - **Pills** are short states in sentence case with the text font ("Connected", "2 chats", "Memory"), never
   `UPPERCASE` and never `(s)` plurals (`plural()` in `shared.js`). A user's own label (a member tag, a model id) keeps
   its case: `pill raw`.
 - **Avatars** (`avatar(name, id)`): initials on one of the five "people" colours, the same colour for the same agent
   or chat everywhere (agent cards, Overview, Chats, Activity); grey when off.
 - **Status console:** Overview opens with one sentence about the state ("Everything is running", "A WhatsApp
-  number needs attention"; on a fresh install the first missing thing: "Link your WhatsApp number to begin") and LEDs
-  for WhatsApp, Agents and Waiting changes.
+  number needs attention"; on a fresh install the first missing thing: "Link your WhatsApp number to begin") and
+  compact status chips with an LED, written as a phrase: "WhatsApp connected", "2 agents live", "3 chats on",
+  "Nothing waiting".
+- **On the accent:** anything drawn on lime (`--signal`, and `--accent` in dark mode) — text, icons, badges — uses the
+  dark on-accent ink (`--signal-ink` / `--accent-ink`), never `--ink` (it is near-white in dark mode). Icons need 3:1
+  against what is behind them, text 4.5:1; `check:responsive` measures both, pills drawn by `::before` included.
 - **States:** ok = deep lime, warn = amber, bad = crimson, info = indigo — soft tinted backgrounds with a left rule
   for notes.
 - **Type:** Segoe UI Variable / SF Pro / Inter for text and headings (tight tracking); SF Mono / Cascadia /
   JetBrains Mono for labels and numbers.
+- **No blur on the phone app's bars (066):** on phones and the installed app the header and tab bar are near-solid
+  (no `backdrop-filter`), the page has no `background-attachment: fixed`, screens fade in without a transform, and a
+  new screen starts at the top before its content changes. iPhone (WebKit) otherwise left the top of the screen
+  unpainted after a switch. `nav-stress` checks the scroll position and that the header is in view.
+- **Navigation never sticks (066):** an older screen that finishes after you moved on is drawn over by the current one
+  again; placeholders never replace a screen that has started drawing; live updates never redraw another screen.
+  `nav-stress` in `check:responsive` (run in CI) switches tabs fast on a slow network and fails on leftovers.
+- **Loading never hangs (066):** every request has a deadline (`S.loadTimeout`, 15 s), and a screen that fails or
+  stalls shows *Couldn't load this screen* with the reason and **Retry**, never skeletons forever (a module that never
+  arrived reloads the app). Back from the background after more than 30 s, `recover()` drops waiting requests,
+  reconnects the live stream and redraws a screen that was not finished. Touch screens can pull down to refresh (also
+  **More → Refresh**).
 - **Motion:** colour transitions, a press scale, a spinner, skeleton shimmer while a screen loads, a short fade-in of a
   new screen, sheets that rise, and the live pulse on Overview. All of it stops with *reduce motion*
   (`prefers-reduced-motion`).
@@ -167,12 +184,34 @@ release between the running version and the target), *What's new* after an updat
 shown once per person, ✕ hides it) and Settings → Help → Release notes. Bullets are owner-facing plain sentences
 (`docs/development.md#release-notes`).
 
+## Activity rows (066)
+
+Activity (and Overview's *Recent activity*) is grouped under day headings (*Today*, *Yesterday*, *Mon 16 Nov*). Each
+entry is one row: a marker (the agent's avatar, or a tinted icon for the type) · **one bold subject line** (what
+happened, in plain words, at most three lines until tapped) · the time, small and right-aligned; underneath, muted: the
+type with its colour dot, the agent, the chat. Never repeat the type in the subject ("Stayed quiet: …" shows "Chat is
+off…"), never show raw tool names: `toolPhrase()` in `names.js` is the one mapping ("get_maintenance_status" →
+"Checked maintenance status"). Rows are separated by hairlines and get a soft band on hover or when open.
+
+## Ask (066)
+
+The Ask box is a conversation (`askCard()` in `ask.js`; Overview and the owner assistant's *Try it*). The question is
+a bubble on the right; then *Thinking…* (muted shimmer and three dots) until the first token; each tool is a chip that
+appears with a spinner ("Checking server metrics…") and turns into ✓ / ⏸ / ✕ with `toolPhrase()`, folded to *Used N
+tools* when the answer is done; the answer streams as a safe markdown subset (paragraphs, lists, bold, code) built
+from text nodes, with a blinking caret. The thread scrolls inside the card and follows the answer until the reader
+scrolls up. While it streams the button is **Stop**; after it: **Copy**, and the box asks for a follow-up. Errors show
+the reason and **Retry**. Every animation stops with *reduce motion*.
+
 ## Accessibility (064)
 
 - Every control has a name: a `<label>` (`field()` connects it), visible text, or `aria-label` for icon buttons and
   for controls without visible text. Switches are `role=switch` and take their name (`toggle(…, label)`).
 - Keyboard: everything is reachable with Tab and shows a focus ring (`:focus-visible`); *Skip to content* is the first
-  stop; after a screen change, focus moves to the screen; dialogs trap focus and return it.
+  stop; after a screen change, focus moves to the screen; dialogs trap focus and return it. A sheet opened by touch
+  (More, `ask()` on a touch screen) focuses itself, not its first button, so no ring appears on a button nobody
+  touched (066).
+- Icons inside buttons are always icon-sized (`.btn svg`, 18 px): an unsized SVG fills its button.
 - The current tab has `aria-current="page"`; filters are buttons with `aria-pressed`; error toasts are `role=alert`.
 - `npm run check:responsive` fails on a control without a name (Chrome's accessibility tree) and on text below AA.
 
@@ -218,4 +257,5 @@ shown once per person, ✕ hides it) and Settings → Help → Release notes. Bu
 - [ ] Empty states use `emptyState()`; first loads show skeletons (the router does this for screens).
 - [ ] Simple items are rows, not cards; secondary actions sit behind ⋯ or on the item's page; lists with pages use
   `listDetail()` and deep links.
-- [ ] Provider, account and model names come from `names.js`.
+- [ ] Provider, account and model names come from `names.js`; tool names are shown with `toolPhrase()`.
+- [ ] Nothing on lime uses `--ink`; labels are sentence case, not mono caps; icons in buttons are sized.

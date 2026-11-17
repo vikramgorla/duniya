@@ -2,7 +2,11 @@
 
 **Use any model you already pay for (or a free one), with an automatic backup when it fails.**
 
-**Do it:** panel → **Models** → **Add a provider** → pick one (OpenRouter is one tap).
+**Do it:** panel → **Models** → **Add a provider** → pick one by name (OpenRouter is one tap). Each row says in one line
+how you connect: *OpenRouter — many models, some free*, *Claude — Anthropic API key, pay per use*, *OpenAI — API key,
+pay per use*, *GitHub Copilot — your Copilot plan, also works with the free plan*, *ChatGPT — sign in with your ChatGPT
+plan*, *Custom (OpenAI-compatible) — Ollama, LM Studio, Groq, Mistral…*. A provider already connected stays in the
+list ("Connected · add another account").
 
 **In 30 seconds**
 - Pick a model per agent and per chat, or *Auto*.
