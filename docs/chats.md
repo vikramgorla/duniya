@@ -121,7 +121,7 @@ remove entries.
 ### Which name is shown
 
 A group is shown by its WhatsApp name (remembered, so it shows while WhatsApp is offline; *Unnamed group* until it is
-known), never by its id. Everywhere in the panel, the admin MCP tools, the owner assistant and for agents, one rule
+known; a rename on WhatsApp shows at once), never by its id. Everywhere in the panel, the admin MCP tools, the owner assistant and for agents, one rule
 picks a person's name:
 
 <p align="center"><img src="diagrams/contact-names.svg" alt="Which name is shown: for a hidden id (LID) the number WhatsApp shared is looked up first; then the first known of: the name you set in Duniya, the phone contact name from your address book, the business name, the profile name the person chose, else +number or Unknown (hidden number). Member tags come per group from each message the person sends, tag changes and loaded history" width="483"></p>
