@@ -63,7 +63,7 @@ function quickProviderBox() {
   return h('div', {},
     h('form', { class: 'row', onsubmit: connect }, key, go), msg,
     h('div', { class: 'row small', style: 'gap:8px' }, h('span', { class: 'muted' }, 'No key yet?'),
-      extLink(LINKS.openrouterKeys, 'Free key from OpenRouter'), h('a', { class: 'btn small', href: '#models/chatgpt' }, 'Use my ChatGPT plan'), h('a', { class: 'btn small', href: '#models' }, 'All options')));
+      extLink(LINKS.openrouterKeys, 'Free key from OpenRouter'), h('a', { class: 'btn small', href: '#models/chatgpt' }, 'Use my ChatGPT plan'), h('a', { class: 'btn small', href: '#models/add' }, 'All providers')));
 }
 async function quickAgentBox() {
   const templates = (await api('GET', '/api/templates').catch(() => [])).filter((t) => t.id !== 'blank');

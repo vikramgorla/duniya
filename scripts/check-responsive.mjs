@@ -10,7 +10,8 @@
 //   - no horizontal page scrolling (only tab bars, tables in a scroll box and code may scroll sideways)
 //   - phones (< 600 px): tap targets at least 40 × 40 px, text at least 13 px
 //   - accessibility (064): every control has a name (the browser's accessibility tree, as a screen reader reads it) and
-//     text meets WCAG AA contrast against what is behind it (4.5:1, 3:1 for large text), in light and dark
+//     text meets WCAG AA contrast against what is behind it (4.5:1, 3:1 for large text), in light and dark; (066) icons
+//     reach 3:1 against what is behind them, pills drawn by ::before included
 // Exit code 1 lists what failed.
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -213,6 +214,18 @@ function audit(W, phone) {
     const size = parseFloat(cs.fontSize); const large = size >= 24 || (size >= 18.66 && Number(cs.fontWeight) >= 700);
     const r = ratio(text, bg);
     if (r < (large ? 3 : 4.5)) out.contrast.push(`${desc(e)} ${r.toFixed(2)}:1`);
+  }
+  // 066: icons (SVG drawn in currentColor) reach 3:1 against what is behind them (WCAG 1.4.11), including a pill drawn by
+  // an ancestor's ::before (the active phone tab) — a white icon on lime failed this on a real iPhone.
+  const pill = (p) => { const b = getComputedStyle(p, '::before'); const c = rgba(b.backgroundColor); return b.content !== 'none' && b.position === 'absolute' && c && c[3] > 0 ? c : null; };
+  for (const svg of document.querySelectorAll('svg')) {
+    if (!visible(svg) || svg.closest('.cue, .logo, .spark, .bars, .empty, .qr, .lmark, .av') || !svg.querySelector('[stroke=currentColor], [fill=currentColor]')) continue;
+    const cs = getComputedStyle(svg); const fg = rgba(cs.color); if (!fg) continue;
+    let op = 1; for (let p = svg; p; p = p.parentElement) op *= Number(getComputedStyle(p).opacity);
+    let bg = behind(svg);
+    for (let p = svg.parentElement; p && p !== document.body; p = p.parentElement) { const c = pill(p); if (c) { bg = over(c, bg); break; } }
+    const r = ratio(over([...fg.slice(0, 3), fg[3] * op], bg), bg);
+    if (r < 3) out.contrast.push(`icon in ${desc(svg.parentElement)} ${r.toFixed(2)}:1`);
   }
   const uniq = (a) => [...new Set(a)].slice(0, 12);
   return { overflow: out.overflow, wide: uniq(out.wide), taps: uniq(out.taps), text: uniq(out.text), contrast: uniq(out.contrast) };

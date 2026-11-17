@@ -73,7 +73,7 @@ test('044: linked DMs go to the owner assistant, stored in its own scope; trigge
   assert.equal(t.claudeReqs.length, before + 1);
   assert.ok(!t.db.listMessages(ownerDm, { limit: 200 }).some((m) => /anything new|All quiet/.test(m.text)), 'not in chat memory');
   assert.deepEqual(oa.ownerHistory(1, 'whatsapp').map((m) => m.text), ['anything new?', 'All quiet today.']);
-  assert.ok(acts('owner.question').some((a) => /admin \(owner, WhatsApp\) asked: anything new\?/.test(a.summary)));
+  assert.ok(acts('owner.question').some((a) => /“anything new\?” · asked by admin \(owner\) in WhatsApp/.test(a.summary)));
 
   t.script.push([{ type: 'text', text: 'dice ready' }]);
   await t.route(dm(OWNER_PHONE, '!help roll'));

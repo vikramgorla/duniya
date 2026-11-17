@@ -3,7 +3,7 @@
 // OpenAI-compatible endpoint with per-key scripts and failures). A failure is { status, message?, code?, retryAfter? }
 // (e.g. 429 with Retry-After, 500, 401, 400, 404 model not found) or { network: true } (connection dropped).
 // Streaming (047): both fakes answer `stream: true` requests with SSE (Anthropic-style events / Chat Completions chunks),
-// one text piece per word. `t.claudeStreamFail` / `f.streamFail` queue mid-stream failures { after: n pieces, network }
+// one text piece per word. `t.claudeStreamFail` / `f.streamFail` queue mid-stream failures { after: n pieces, network, hang (066: wait for the client to stop) }
 // (socket dropped) or { after, error: { type, message } } (an SSE error event); `f.refuseStream` answers streamed
 // requests with 400 (servers without streaming). Streamed requests are counted in t.claudeStreams / f.streams.
 // Phone history (#91): `t.phone` and `t.historyAsks` fake the linked phone answering fetchHistory (see below).
@@ -44,6 +44,7 @@ export async function sendAnthropicStream(req, res, content, { usage = { input_t
   let sent = 0;
   const cut = async () => {
     if (!fail || sent < (fail.after ?? 1)) return false;
+    if (fail.hang) { await new Promise((r) => res.on('close', r)); return true; } // 066: a slow model; the client stops it
     await tick();
     if (fail.network) req.socket.destroy();
     else { res.write(ev('error', { error: fail.error || { type: 'overloaded_error', message: 'Overloaded' } })); res.end(); }

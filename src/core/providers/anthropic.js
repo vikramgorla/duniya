@@ -29,13 +29,13 @@ export function anthropicAdapter(secret = SECRET) {
     },
     streams: true,
     /** onText (047, #83): stream the answer's text; deltas go to onText, the final message (content, usage) is returned. */
-    async chat({ model, system, messages, tools, maxTokens, onText = null }) {
+    async chat({ model, system, messages, tools, maxTokens, onText = null, signal = undefined }) {
       const params = { model, max_tokens: maxTokens, system, tools, messages };
       if (!onText) {
         const res = await sdk().messages.create(params);
         return { content: res.content, stop_reason: res.stop_reason, usage: res.usage || {} };
       }
-      const stream = sdk().messages.stream(params);
+      const stream = sdk().messages.stream(params, { signal }); // 066: Stop in the Ask box ends the call
       stream.on('text', (delta) => { if (delta) onText(delta); });
       const res = await stream.finalMessage();
       return { content: res.content, stop_reason: res.stop_reason, usage: res.usage || {} };

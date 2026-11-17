@@ -2,8 +2,12 @@
 import { $, S, api, ask, can, field, h, toast, toggle, tryApi } from './core.js';
 import { chainEditor } from './fallback.js';
 import { listDetail, mark } from './listdetail.js';
+import { PROVIDER_NAMES } from './names.js';
 import { LINKS, loadModels, meter, modelLabel, modelSelect, plural, saveSecretKey, usageLine } from './shared.js';
 import { usageSummary } from './usage.js';
+/** 066: the Add a provider list, in this order: [provider type (names.js) = page id, one short line]. */
+const ADD_PROVIDERS = [['openrouter', 'Many models, some free'], ['anthropic', 'Anthropic API key, pay per use'], ['openai', 'API key, pay per use'],
+  ['copilot', 'Your Copilot plan, also works with the free plan'], ['chatgpt', 'Sign in with your ChatGPT plan'], ['compatible', 'Ollama, LM Studio, Groq, Mistral…']];
 const ext = (href, text) => h('a', { href, target: '_blank', rel: 'noopener' }, text, ' ↗');
 // Small drawings of what to look for on the other site (no images from the web).
 const cue = {
@@ -312,10 +316,13 @@ export async function renderModels() {
   for (const p of compat) pages[`x-${p.id}`] = otherCard;
   pages.add = h('div', { class: 'card start' }, h('h2', {}, anyOn ? 'Add a provider' : 'Connect a model so your agents can answer'),
     h('p', { class: 'small muted', style: 'margin-top:-6px' }, anyOn ? 'Pick one; you choose the model per agent.' : 'Pick one to begin. You can add more later and choose per agent.'),
-    h('div', { class: 'choices' }, [['openrouter', 'Free to start', 'OpenRouter free models. No card needed, about 50 messages a day.'], ['anthropic', 'Best answers', 'Claude API key from the Anthropic Console. Pay per use.'],
-      ['openai', 'OpenAI API key', 'Pay per use with OpenAI credit.'], ['chatgpt', 'I pay for ChatGPT', 'Use your ChatGPT Plus or Pro plan.'], ['copilot', 'I have GitHub Copilot', 'Use your Copilot allowance.']]
-      .filter(([id]) => off.includes(id)).map(([id, t, d]) => h('a', { class: 'choice', href: `#models/${id}` }, h('b', {}, t), h('span', {}, d))),
-    h('a', { class: 'choice', href: '#models/endpoints' }, h('b', {}, 'Another endpoint'), h('span', {}, 'Ollama, LM Studio, Groq, Mistral… any OpenAI-style API.'))));
+    // 066: compact rows named by provider (names.js), one short line each; connected ones stay listed (another account)
+    h('ul', { class: 'add-list' }, ADD_PROVIDERS.map(([id, line]) => {
+      const isOn = by[id]?.connected; const [letter, c] = MARKS[id] || ['E', 'c0'];
+      return h('li', {}, h('a', { class: 'lrow', href: `#models/${id === 'compatible' ? 'endpoints' : id}` }, mark(letter, c),
+        h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, PROVIDER_NAMES[id]), h('span', { class: 'lrow-sub' }, isOn ? 'Connected · add another account' : line)),
+        isOn ? h('span', { class: 'dot ok', 'aria-hidden': 'true' }) : null, h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
+    })));
   pages.endpoints = otherCard; pages.fallback = fallbackCard; pages.defaults = defaults;
   if (media && anyOn) pages.abilities = mediaCapsCard(media);
   $('#main').replaceChildren(listDetail({ screen: 'models', title: 'Models', known: (id) => Object.hasOwn(pages, id), first: anyOn ? on[0] : 'add', page: (id) => pages[id] || pages.add, groups: [

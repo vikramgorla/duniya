@@ -1,6 +1,6 @@
 // Panel core: the DOM helper, api() and its cache, shared state, the shell (tabs, router, live stream). Module of the panel (063).
 // ---------- DOM helper: untrusted text only ever goes through textContent ----------
-import { feedItem } from './activity.js';
+import { feedPrepend } from './activity.js';
 import { renderLogin, renderSecretLink } from './login.js';
 export function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -95,7 +95,8 @@ export function ask({ title, text = '', ok = 'Continue', danger = false, body = 
       h('div', { class: 'ask-actions' }, no, yes)));
     dlg.addEventListener('close', () => { dlg.remove(); if (back instanceof HTMLElement && back.isConnected) back.focus(); resolve(dlg.returnValue === 'yes'); });
     document.body.append(dlg); dlg.showModal();
-    (typedIn || (danger ? no : yes)).focus();
+    // 066: on touch screens the dialog itself takes focus (a ring on a button nobody touched looks like a bug); keyboards get Cancel/OK
+    if (!typedIn && matchMedia('(pointer: coarse)').matches) { dlg.tabIndex = -1; dlg.focus(); } else (typedIn || (danger ? no : yes)).focus();
   });
 }
 /** A ⋯ menu (064): secondary actions of a row behind one button instead of a row of buttons. `label` names it for
@@ -456,8 +457,8 @@ export function connectEvents() {
     const a = JSON.parse(e.data);
     dropCache();
     S.feed.unshift(a); S.feed.length = Math.min(S.feed.length, 500);
-    if (S.tab === 'activity' && (!S.feedAgent || a.agent === S.feedAgent)) $('#feed')?.prepend(feedItem(a));
-    if (S.tab === 'overview') { const r = $('#recent'); if (r) { r.prepend(feedItem(a)); $('#recent + .empty')?.remove(); while (r.children.length > 8) r.lastChild.remove(); } livePulse(a); }
+    if (S.tab === 'activity' && (!S.feedAgent || a.agent === S.feedAgent)) { const f = $('#feed'); if (f) feedPrepend(f, a); }
+    if (S.tab === 'overview') { const r = $('#recent'); if (r) { feedPrepend(r, a, 8); $('#recent + .empty')?.remove(); } livePulse(a); }
   };
 }
 

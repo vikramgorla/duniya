@@ -21,6 +21,8 @@ const NAMES_FIRST_MS = Number(process.env.NAMES_REFRESH_FIRST_MS ?? 30000);
 const NAMES_EVERY_MS = 24 * 3600000;
 const NAMES_MIN_GAP_MS = 10 * 60000;
 const AUTH_DIR = resolve(DATA_DIR, 'whatsapp-auth');
+/** 066: a number's state in Activity, in plain words (the pill already says WhatsApp). */
+const STATUS_WORDS = { open: 'Connected', qr: 'Waiting for the QR scan', reconnecting: 'Reconnecting', starting: 'Starting', logged_out: 'Unlinked from the phone', closed: 'Disconnected' };
 
 /**
  * WhatsApp channel (linked device via Baileys).
@@ -57,7 +59,7 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     state = { ...state, ...patch };
     if (patch.status && patch.status !== before) {
       state.since = Date.now();
-      activity('channel.status', { summary: `WhatsApp${number === 'main' ? '' : ` (${label})`}: ${patch.status}`, detail: { number, me: state.me, error: state.lastError } });
+      activity('channel.status', { summary: `${STATUS_WORDS[patch.status] || patch.status.replace(/_/g, ' ')}${number === 'main' ? '' : ` · ${label}`}`, detail: { number, me: state.me, error: state.lastError } }); // 066: plain words
     }
     bus.emit('status'); // live panel (058): a new QR or pairing code shows without polling
   };

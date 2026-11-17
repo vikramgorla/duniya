@@ -31,3 +31,24 @@ export function modelName(/** @type {string} */ id, label = '') {
   const text = nice[0] === 'Gpt' ? `GPT-${nice.slice(1).join(' ')}`.replace(/^GPT-$/, 'GPT') : nice.join(' ');
   return `${text || raw}${free ? ' · free' : ''}`;
 }
+
+// 066: what a tool did, in plain words ("get_maintenance_status" → "Checked maintenance status"), for Activity and the
+// Ask step chips. One mapping for the admin tools (verb_object names) and any other tool (MCP "server:tool" names).
+const TOOL_VERBS = Object.freeze({
+  get: 'Checked', list: 'Looked at', set: 'Changed', update: 'Updated', create: 'Created', add: 'Added', remove: 'Removed', delete: 'Deleted',
+  run: 'Ran', send: 'Sent', test: 'Tested', refresh: 'Refreshed', rebuild: 'Rebuilt', restore: 'Restored', install: 'Installed', apply: 'Applied',
+  erase: 'Erased', confirm: 'Confirmed', cancel: 'Cancelled', check: 'Checked', search: 'Searched', draft: 'Drafted', export: 'Exported',
+  duplicate: 'Duplicated', assign: 'Assigned', load: 'Loaded', preview: 'Previewed', prepare: 'Prepared', reset: 'Reset', snooze: 'Snoozed',
+  retry: 'Retried', restart: 'Restarted', save: 'Saved',
+});
+const TOOL_WORDS = Object.freeze({ mcp: 'tool service', os: 'OS', ai: 'AI', whatsapp: 'WhatsApp', faq: 'FAQ', dm: 'direct chat', url: 'URL', id: 'ID' });
+/** "get_server_metrics" → "Checked server metrics"; "transport:connections" → "Connections (transport)". */
+export function toolPhrase(/** @type {string} */ name) {
+  const raw = String(name || '');
+  const [server, tool] = raw.includes(':') ? raw.split(/:(.*)/s) : ['', raw];
+  const words = tool.split(/[_\s-]+/).filter(Boolean).map((w) => TOOL_WORDS[w.toLowerCase()] || w.toLowerCase());
+  const verb = !server && words.length > 1 ? TOOL_VERBS[words[0]] : '';
+  const text = verb ? `${verb} ${words.slice(1).join(' ')}` : words.join(' ');
+  const nice = text ? text[0].toUpperCase() + text.slice(1) : raw;
+  return server ? `${nice} (${server})` : nice;
+}

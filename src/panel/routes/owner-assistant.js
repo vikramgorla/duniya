@@ -38,8 +38,11 @@ export function ownerAssistantRoutes(route, { channel }) {
     res.writeHead(200, { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no', 'x-content-type-options': 'nosniff' });
     const write = (e) => { if (!res.writableEnded && !res.destroyed) res.write(`${JSON.stringify(e)}\n`); };
     const ping = setInterval(() => write({ type: 'ping' }), 15000);
+    // 066: Stop in the panel closes the request: the model call is aborted and no further tool runs
+    const stop = new AbortController();
+    res.on('close', () => { if (!res.writableFinished) stop.abort(); });
     try {
-      const out = await ask({ user, text: body.question, source: 'panel', surface: 'panel', onEvent: write });
+      const out = await ask({ user, text: body.question, source: 'panel', surface: 'panel', onEvent: write, signal: stop.signal });
       write({ type: 'done', reply: out.reply, confirms: out.confirms });
     } catch (e) {
       write({ type: 'error', error: e.message || 'Something went wrong', status: e.status || 400 });

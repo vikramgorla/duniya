@@ -1,6 +1,6 @@
 // Overview screen (the landing screen) and the install-on-your-phone hint. Module of the panel (063).
 // ---------- overview ----------
-import { feedItem, loadChatNames } from './activity.js';
+import { feedList, loadChatNames } from './activity.js';
 import { askCard } from './ask.js';
 import { $, S, ago, api, ask, avatar, can, emptyState, h, logo, menu, optimistic, pulse, refreshStatus, show, time, toggle, tryApi } from './core.js';
 import { plural } from './shared.js';
@@ -64,13 +64,13 @@ export async function renderOverview(soft) {
       .map(([k, v, id]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', id ? { id } : {}, v)))))),
     reusedUpdates || h('div', { id: 'updates-box' }));
   const recent = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('div', { class: 'row spread' }, h('h2', {}, 'Recent activity'), h('button', { class: 'btn small', onclick: () => show('activity') }, 'All activity')),
-    h('ul', { class: 'feed', id: 'recent' }, S.feed.slice(0, 8).map(feedItem)),
+    feedList('recent', S.feed.slice(0, 8)),
     S.feed.length ? null : emptyState('activity', 'Quiet so far', 'What your agents read, answer and change shows up here live.'));
   const hr = new Date().getHours();
   const hello = hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
   const live = st.agents.filter((b) => b.enabled).length; const open = numbers.filter((n) => n.status === 'open').length;
   const allGood = !st.settings.paused && open === numbers.length && live > 0;
-  const led = (label, ok, value) => h('div', { class: 'led' }, h('span', { class: `dot ${ok === true ? 'ok' : ok === false ? 'bad' : 'warn'}` }), label, h('b', {}, value));
+  const led = (ok, text) => h('span', { class: 'led' }, h('span', { class: `dot ${ok === true ? 'ok' : ok === false ? 'bad' : 'warn'}`, 'aria-hidden': 'true' }), text);
   // 062: the first thing that is missing, in the order Getting started asks for it
   const noModel = S.checklist?.steps?.find((x) => x.id === 'provider')?.done === false;
   const headline = st.settings.paused ? 'All agents are paused' : !open ? 'Link your WhatsApp number to begin' : noModel ? 'Connect an AI model so agents can answer'
@@ -80,17 +80,18 @@ export async function renderOverview(soft) {
     h('div', {}, h('div', { class: 'eyebrow' }, `${hello} · ${S.user.username}`),
       h('h2', {}, headline)),
     h('div', { class: 'leds' },
-      led('WhatsApp', open === numbers.length ? true : open ? null : false, `${open}/${numbers.length}`),
-      led('Agents', st.settings.paused ? false : live ? true : null, st.settings.paused ? 'paused' : `${live} live`),
-      led('Chats on', st.enabledChats ? true : null, String(st.enabledChats ?? 0)),
-      led('Waiting', st.pending ? null : true, String(st.pending || 0))),
+      // 066: plain sentence-case chips ("2 agents live"), not mono caps
+      led(open === numbers.length ? true : open ? null : false, numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : open ? 'WhatsApp connected' : 'WhatsApp not linked'),
+      led(st.settings.paused ? false : live ? true : null, st.settings.paused ? 'Agents paused' : live ? `${plural(live, 'agent')} live` : 'No agent live'),
+      led(st.enabledChats ? true : null, st.enabledChats ? `${plural(st.enabledChats, 'chat')} on` : 'No chat on'),
+      led(st.pending ? null : true, st.pending ? `${st.pending} waiting for a confirm` : 'Nothing waiting')),
     st.enabledChats === 0 && open && st.agents.length && !checklistActive() ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
   const silencesSlot = h('div', { id: 'ov-silences-slot', 'data-jump': 'quiet', style: `grid-column:1/-1${S.silences?.length ? '' : ';display:none'}` }, S.silences?.length ? silencesCard(S.silences, refreshSilences) : null);
   $('#main').replaceChildren(hero, updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), wa, control, server, silencesSlot, recent));
   refreshSilences();
   // the feed and the chat names it shows (064) load after the first paint
   Promise.all([S.feed.length ? S.feed : api('GET', '/api/activity?limit=50'), soft ? null : loadChatNames()])
-    .then(([rows]) => { S.feed = rows; if (rows.length) { $('#recent')?.replaceChildren(...rows.slice(0, 8).map(feedItem)); $('#recent + .empty')?.remove(); } }).catch(() => {});
+    .then(([rows]) => { S.feed = rows; if (rows.length) { $('#recent')?.replaceWith(feedList('recent', rows.slice(0, 8))); $('#recent + .empty')?.remove(); } }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
 }
 // ---------- install on your phone (061): the panel is an installable web app ----------

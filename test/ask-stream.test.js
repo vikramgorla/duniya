@@ -87,3 +87,30 @@ test('#66: roles, empty questions and sign-in are checked before the stream star
   const form = await fetch(`${t.base}/api/owner/ask/stream`, { method: 'POST', headers: { cookie: owner, 'content-type': 'text/plain' }, body: 'question=hi' });
   assert.equal(form.status, 415, 'JSON only (CSRF guard)');
 });
+
+test('066: Stop closes the stream: the model call ends, no further tool or round runs, the partial answer is kept', async () => {
+  const reqs = t.claudeReqs.length;
+  const toolRuns = () => t.db.listActivity({ limit: 200 }).filter((a) => a.type === 'owner.tool').length;
+  const runs = toolRuns();
+  t.claudeStreamFail.push({ after: 3, hang: true });
+  t.script.push(
+    [{ type: 'text', text: 'Let me look at the chats first, one moment.' }, { type: 'tool_use', id: 's1', name: 'list_visible_chats', input: {} }],
+    [{ type: 'text', text: 'This round never runs.' }],
+  );
+  const stop = new AbortController();
+  const r = await fetch(`${t.base}/api/owner/ask/stream`, { method: 'POST', headers: { cookie: owner, 'content-type': 'application/json' }, body: JSON.stringify({ question: 'stop me' }), signal: stop.signal });
+  const dec = new TextDecoder(); let buf = '';
+  try { for await (const c of r.body) { buf += dec.decode(c, { stream: true }); if (buf.includes('"delta"')) stop.abort(); } } catch { /* aborted */ }
+  let last = null;
+  for (let i = 0; i < 50 && !/Stopped/.test(last?.text || ''); i++) {
+    await new Promise((res) => setTimeout(res, 50));
+    last = (await t.api(owner, 'GET', '/api/owner/ask/history?limit=2')).body.at(-1);
+  }
+  assert.equal(last.role, 'assistant');
+  assert.match(last.text, /^Let me\b.*\n\n\(Stopped\.\)$/s, 'partial text, then the stop note');
+  assert.equal(t.claudeReqs.length - reqs, 1, 'no second round');
+  assert.equal(t.script.length, 1, 'the next round was never asked'); t.script.length = 0;
+  assert.equal(toolRuns(), runs, 'the tool did not run');
+  const { accountState } = await import('../src/core/providers/breaker.js');
+  assert.equal(accountState('anthropic').state, 'ok', 'Stop does not pause the account');
+});

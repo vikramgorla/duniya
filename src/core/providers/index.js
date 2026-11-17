@@ -417,8 +417,9 @@ const describeFailures = (failures) => failures.map((f) => `${f.name} (${f.pause
  * token, so a stream that fails before it falls back as usual. A failure after the first token calls
  * onRestart({ reason, account }) — the caller drops the partial text — and the same account is asked once more without
  * streaming, then the chain continues without streaming. Usage is recorded once, from the answer that is returned.
+ * signal (066): an AbortSignal (Stop in the Ask box); it ends a streaming call, nothing falls back, the account is not blamed.
  */
-export async function chat({ model = 'auto', purpose = 'agent', system, messages, tools = [], maxTokens = 1024, usage = {}, fallback, turn = null, direct = false, accept = null, lastResort = [], onText = null, onRestart = null }) {
+export async function chat({ model = 'auto', purpose = 'agent', system, messages, tools = [], maxTokens = 1024, usage = {}, fallback, turn = null, direct = false, accept = null, lastResort = [], onText = null, onRestart = null, signal = undefined }) {
   let streamOn = typeof onText === 'function';
   if (!direct && (!parseRef(model) || parseRef(model).model === 'auto')) await warmModels();
   const fb = direct ? { enabled: false, chain: [] } : (fallback || fallbackSettings());
@@ -444,6 +445,7 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
     if (pass === 1 && (lastErr || !paused.some((x) => TRANSIENT.has(breaker.accountState(x.id).reason)))) break;
     const force = pass === 1 ? new Set(paused.filter((x) => TRANSIENT.has(breaker.accountState(x.id).reason)).map((x) => x.id)) : new Set();
     for (const c of cands) {
+      if (signal?.aborted) throw Object.assign(new Error('Stopped'), { code: 'aborted' });
       if (pass === 1 && !force.has(c.id)) continue;
       const p = providerById(c.id);
       if (pass === 0 && (!p || !p.configured)) {
@@ -471,12 +473,12 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
       let res;
       const args = { model: modelId, system, messages, tools, maxTokens };
       let started = false; // 047: this account already sent text to onText
-      const streamed = streamOn && p.adapter.streams ? { ...args, onText: (d) => { started = true; try { onText(d); } catch { /* a closed stream must not break the call */ } } } : null;
+      const streamed = streamOn && p.adapter.streams ? { ...args, signal, onText: (d) => { started = true; try { onText(d); } catch { /* a closed stream must not break the call */ } } } : null;
       try {
         try {
           res = await p.adapter.chat(streamed || args);
         } catch (e) {
-          if (!started) throw e;
+          if (!started || signal?.aborted) throw e;
           // Failed after the first token (047): the caller drops the partial text (onRestart) and this account is asked
           // once more without streaming; if that fails too, the normal fallback continues, without streaming.
           streamOn = false;
@@ -484,6 +486,7 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
           res = await p.adapter.chat(args);
         }
       } catch (e) {
+        if (signal?.aborted) { breaker.release(p.id); throw Object.assign(new Error('Stopped'), { code: 'aborted' }); } // 066: the asker pressed Stop; not the provider's fault
         const cls = classify(e);
         if (cls.breaker) breaker.recordFailure(p.id, cls, { name: p.name, message: e.message });
         else breaker.release(p.id);

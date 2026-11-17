@@ -230,14 +230,14 @@ function fromOutputItems(items = []) {
   return content;
 }
 
-async function chatFor(secret, { model, system, messages, tools, onText = null }) {
+async function chatFor(secret, { model, system, messages, tools, onText = null, signal = undefined }) {
   const body = {
     model, instructions: system, input: toResponsesInput(messages), store: false, stream: true,
     ...(tools?.length ? { tools: tools.map((t) => ({ type: 'function', name: t.name, description: t.description || '', parameters: t.input_schema || { type: 'object', properties: {} }, strict: false })) } : {}),
   };
   const res = await fetch(`${API_BASE()}/responses`, {
     method: 'POST', headers: { authorization: `Bearer ${await accessToken(secret)}`, 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify(body), signal: AbortSignal.timeout(180000),
+    body: JSON.stringify(body), signal: signal ? AbortSignal.any([AbortSignal.timeout(180000), signal]) : AbortSignal.timeout(180000), // 066: Stop
   });
   if (!res.ok) {
     const json = await res.json().catch(() => ({}));

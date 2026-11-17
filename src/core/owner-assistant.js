@@ -21,6 +21,7 @@ import { getUser, onUserDeleted, TENANT } from './store.js';
 import { listAgents, agentForChat, getAgent, OWNER_AGENT_ID } from './agents.js';
 import { getChatPrefs, enabledChats, privateChats, seenChats } from './chat-prefs.js';
 import { activity } from './events.js';
+import { toolPhrase } from '../panel/public/app/names.js';
 import { chat as modelChat, effectiveFallback } from './providers/index.js';
 import { friendlyModelError } from './runner.js';
 import { randomInt } from 'node:crypto';
@@ -453,7 +454,7 @@ function systemPrompt(user, source) {
  * 'thinking' step starts a new text), { type: 'restarted', reason } when a broken stream is asked again (drop the partial
  * text). The round's whole { type: 'text' } still follows and is the source of truth.
  */
-export async function ask({ user, text, source, surface, onEvent = null, dm = {} }) {
+export async function ask({ user, text, source, surface, onEvent = null, dm = {}, signal = undefined }) {
   const emit = (e) => { try { onEvent?.(e); } catch { /* a closed stream must not break the turn */ } };
   if (!wiring) throw fail('The owner assistant is not ready yet', 503);
   const question = String(text || '').trim().slice(0, 4000);
@@ -462,7 +463,7 @@ export async function ask({ user, text, source, surface, onEvent = null, dm = {}
     activity('owner.question', { summary: `${user.username} (${source === 'panel' ? 'panel' : 'WhatsApp'}) sent what looks like a key or password: not read, not stored, not sent to a model` });
     return { reply: SECRET_REPLY, confirms: [] };
   }
-  activity('owner.question', { summary: `${user.username} (${user.role}, ${source === 'panel' ? 'panel' : 'WhatsApp'}) asked: ${clip(question, 140)}` });
+  activity('owner.question', { summary: `“${clip(question, 140)}” · asked by ${user.username} (${user.role}) in ${source === 'panel' ? 'the panel' : 'WhatsApp'}` });
   // 059: `dm` = the WhatsApp turn ({ chat, phone, msgId, senderJid, attachments, mediaNote }); agent tools act there.
   const tools = await toolsFor(user, { ...dm, text: question });
   const byName = new Map(tools.map((t) => [t.name, t]));
@@ -490,21 +491,26 @@ export async function ask({ user, text, source, surface, onEvent = null, dm = {}
   const links = [];
   const turn = { ref: '' };
   let reply = '';
+  let partial = ''; // 066: what was streamed in this round, kept when the asker presses Stop
+  let stopped = false;
   const fallback = effectiveFallback({ agent: rec });
   // 047 (#83): with a stream listener, the model's text arrives token by token ({ type: 'delta', text }); when a stream
   // breaks after its first token, { type: 'restarted', reason } tells the client to drop the partial text of this round.
   // Nothing is buffered here: deltas go straight to the listener. WhatsApp (no onEvent) gets whole replies as before.
   const streaming = onEvent ? {
-    onText: (d) => emit({ type: 'delta', text: d }),
+    onText: (d) => { partial += d; emit({ type: 'delta', text: d }); },
     onRestart: ({ reason }) => emit({ type: 'restarted', reason }),
   } : {};
   for (let round = 0; round <= MAX_ROUNDS; round++) {
     let res;
+    if (signal?.aborted) { stopped = true; break; } // 066: Stop: no further model calls or tools
+    partial = '';
     emit({ type: 'step', step: 'thinking', round });
     try {
       res = await modelChat({ model, purpose: 'agent', maxTokens: rec.maxTokens, system: systemPrompt(user, source), tools: defs, messages, fallback, turn,
-        usage: { agent: OWNER_AGENT, chat: '', kind: 'owner' }, ...streaming, ...(vision || {}) });
+        usage: { agent: OWNER_AGENT, chat: '', kind: 'owner' }, ...streaming, ...(vision || {}), signal });
     } catch (e) {
+      if (e.code === 'aborted' || signal?.aborted) { stopped = true; reply = partial.trim(); break; }
       if (vision && e.skipped?.length) { // no model that sees photos could answer: ask again without them (#67)
         vision = null;
         messages[messages.length - 1] = { role: 'user', content: `${turnText}\n${noVisionNote(plan.attachments)}` };
@@ -523,6 +529,7 @@ export async function ask({ user, text, source, surface, onEvent = null, dm = {}
     messages.push({ role: 'assistant', content: res.content });
     const results = [];
     for (const call of calls) {
+      if (signal?.aborted) break; // 066: Stop: the remaining tools do not run
       const tool = byName.get(call.name);
       let args = call.input || {};
       let content; let isError = false;
@@ -548,12 +555,13 @@ export async function ask({ user, text, source, surface, onEvent = null, dm = {}
       content = content.slice(0, 12000);
       if (isError) hold = false;
       emit({ type: 'step', step: hold ? 'held' : 'tool', tool: call.name, ok: !isError });
-      activity('owner.tool', { summary: `Owner assistant (${user.username}): ${call.name}${isError ? ` failed — ${clip(content, 120)}` : hold ? ' (held for confirmation)' : ''}`.slice(0, 480),
+      activity('owner.tool', { summary: `${toolPhrase(call.name)}${isError ? ` failed — ${clip(content, 120)}` : hold ? ', held for your confirm' : ''} · via ${user.username}`.slice(0, 480), // 066: plain words; the tool name is in detail
         detail: { tool: call.name, args: scrub(args), ok: !isError } });
       results.push({ type: 'tool_result', tool_use_id: call.id, is_error: isError, content });
     }
     messages.push({ role: 'user', content: results });
   }
+  if (stopped) reply = `${reply ? `${reply}\n\n` : ''}(Stopped.)`;
   reply = reply || (held.length ? 'Here is what I prepared:' : 'I have no answer for that.');
   for (const l of links) if (!reply.includes(l)) reply += `\n\n${l}`;
   if (source !== 'panel') {

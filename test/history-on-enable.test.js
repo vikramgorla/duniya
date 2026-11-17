@@ -213,5 +213,5 @@ test('admin MCP tool load_chat_history; the owner assistant runs it without a co
   assert.equal(r.body.reply, 'Asked your phone.');
   assert.ok(!r.body.confirms?.length, 'no confirm code');
   assert.equal((await settle(C)).loaded, 12, 'q1–q9 and three older ones');
-  assert.ok(t.db.listActivity({ limit: 40 }).some((a) => a.type === 'owner.tool' && /load_chat_history/.test(a.summary)));
+  assert.ok(t.db.listActivity({ limit: 40 }).some((a) => a.type === 'owner.tool' && a.detail?.tool === 'load_chat_history' && /^Loaded chat history · via /.test(a.summary)));
 });
