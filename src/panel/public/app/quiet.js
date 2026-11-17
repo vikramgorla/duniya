@@ -1,43 +1,50 @@
 // Why agents stayed silent (#34): Overview card and fixes. Module of the panel (063).
-// ---------- why agents stayed silent (#34) ----------
-import { $, S, ago, api, can, h, refreshStatus, tryApi } from './core.js';
-import { quietLine } from './shared.js';
-/** One-click fix for a silence, or null. `after` runs once fixed (the record is cleared). */
-export function silenceFix(s, after, { onChats = false } = {}) {
+import { $, S, ago, api, avatar, can, h, menu, refreshStatus, tryApi } from './core.js';
+/** One-click fix for a silence, or null: a small text link (073: never a bordered button). `after` runs once fixed
+ *  (the record is cleared). Overview's why-quiet card and the chat page use it. */
+function silenceFix(s, after, { onChats = false } = {}) {
   if (!can('admin')) return null;
   const agentHref = (sub = '') => `#agents/${encodeURIComponent(s.agent)}${sub}`;
-  const act = (label, fn, ok) => h('button', { class: 'btn small', onclick: () => tryApi(async () => {
+  const act = (label, fn, ok) => h('button', { class: 'qfix', type: 'button', onclick: () => tryApi(async () => {
     await fn(); await api('DELETE', `/api/silences?chat=${encodeURIComponent(s.chat)}&reason=${s.reason}`); refreshStatus(); after?.();
   }, ok) }, label);
-  const link = (label, href) => h('a', { class: 'btn small', href }, label);
+  const link = (label, href) => h('a', { class: 'qfix', href }, label);
   switch (s.fix) {
-    case 'chat_on': return act('Switch chat on', () => api('PUT', `/api/chats/${encodeURIComponent(s.chat)}/prefs`, { enabled: true }), 'On — agents may answer here');
+    case 'chat_on': return act('Switch on', () => api('PUT', `/api/chats/${encodeURIComponent(s.chat)}/prefs`, { enabled: true }), 'On — agents may answer here');
     case 'agent_on': return s.agent ? act(`Switch ${s.agentName || 'agent'} on`, () => api('PUT', `/api/agents/${encodeURIComponent(s.agent)}`, { enabled: true }), 'Agent on') : null;
     case 'resume': return act('Resume agents', () => api('POST', '/api/settings', { paused: false }), 'Resumed');
     case 'triggers': return s.agent ? link('Open triggers', agentHref('/triggers')) : null;
     case 'agent': return s.agent ? link('Who may message it', agentHref('/dm')) : null;
-    case 'assign': return onChats ? null : link('Choose an agent', '#chats');
+    case 'assign': return onChats ? null : link('Choose an agent', `#chats/${encodeURIComponent(s.chat)}`);
     case 'models': return link('Open Models', '#models');
     case 'usage': return link('Open Usage', '#usage');
     case 'server': return link('Open Server', '#server');
     default: return null;
   }
 }
-/** Why agents stayed quiet (068): one row per chat and reason, the fix on the row; the explanation is its tooltip. */
+/** One reason as a line: plain words · count · its fix (073). Not mentioned is muted, everything else amber. */
+export const quietReason = (s, after, { onChats = false } = {}) => h('div', { class: 'q-line' },
+  h('span', { class: s.reason === 'not_addressed' ? 'muted' : 'q-warn', title: `${s.explain} Last ${ago(s.lastTs)} ago.` }, `${s.label[0].toUpperCase()}${s.label.slice(1)} · ${s.count}×`),
+  silenceFix(s, after, { onChats }), onChats ? h('span', { class: 'small muted q-why' }, s.explain) : null);
+/** Why agents stayed quiet (073): grouped by chat — the chat's name (its page) and ⋯ Clear, then one line per reason. */
 export function silencesCard(rows, after) {
-  const top = rows.slice(0, 6);
+  const byChat = new Map();
+  for (const s of rows) { if (!byChat.has(s.chat)) byChat.set(s.chat, []); byChat.get(s.chat).push(s); }
+  const top = [...byChat].slice(0, 5);
   if (!top.length) return null;
+  const clear = (chat, name) => h('button', { class: 'btn small', type: 'button', onclick: () => tryApi(async () => { await api('DELETE', `/api/silences?chat=${encodeURIComponent(chat)}`); after?.(); }, `Cleared ${name}`) }, 'Clear');
   return h('div', { class: 'card', id: 'ov-silences' },
     h('div', { class: 'sec-head' }, h('h2', {}, 'Why agents stayed quiet'), h('span', { class: 'small muted' }, 'last 7 days')),
-    h('ul', { class: 'quiet-list' }, top.map((s) => h('li', {},
-      h('a', { class: 'q-main', href: `#chats/${encodeURIComponent(s.chat)}`, title: `${s.explain} Last ${ago(s.lastTs)} ago.` }, h('b', {}, s.chatName || 'Unnamed chat'),
-        h('span', { class: `small${s.reason === 'not_addressed' ? ' muted' : ''}`, style: s.reason === 'not_addressed' ? '' : 'color:var(--warn)' }, ` ${quietLine(s).replace(/^Quiet: /, '')}`)),
-      h('div', { class: 'btns' }, silenceFix(s, after),
-        can('admin') ? h('button', { class: 'btn small ghost', title: 'Forget this record', 'aria-label': `Clear: ${s.chatName || 'Unnamed chat'}, ${quietLine(s)}`, onclick: () => tryApi(async () => { await api('DELETE', `/api/silences?chat=${encodeURIComponent(s.chat)}&reason=${s.reason}${s.agent ? `&agent=${encodeURIComponent(s.agent)}` : ''}`); after?.(); }, 'Cleared') }, 'Clear') : null)))));
+    h('ul', { class: 'quiet-list' }, top.map(([chat, list]) => {
+      const name = list[0].chatName || 'Unnamed chat';
+      return h('li', {}, avatar(name, chat, 's'),
+        h('div', { class: 'q-main' }, h('a', { class: 'q-chat', href: `#chats/${encodeURIComponent(chat)}` }, name), list.map((s) => quietReason(s, after))),
+        can('admin') ? menu(`More for ${name}`, clear(chat, name)) : null);
+    })));
 }
 export async function refreshSilences() {
   const slot = $('#ov-silences-slot'); if (!slot) return;
-  const r = await api('GET', '/api/silences?days=7&limit=6').catch(() => null);
+  const r = await api('GET', '/api/silences?days=7&limit=20').catch(() => null);
   if (!r) return;
   const sig = JSON.stringify(r.silences.map((s) => [s.chat, s.agent, s.reason, s.count, s.chatName]));
   if (sig === S.silencesSig && (slot.childElementCount > 0) === (r.silences.length > 0)) return;

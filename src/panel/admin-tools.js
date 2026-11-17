@@ -58,7 +58,7 @@ export const TOOLS = [
       if (a.agent_id) q.set('agent', a.agent_id);
       if (a.chat) q.set('chat', a.chat);
       if (a.before_id) q.set('before', String(a.before_id));
-      return (await x.call('GET', `/api/activity?${q}`)).map((r) => ({ id: r.id, time: iso(r.ts), type: r.type, agent: r.agent || undefined, chat: r.chat || undefined, summary: r.summary, ...(a.include_details && r.detail ? { detail: r.detail } : {}) }));
+      return (await x.call('GET', `/api/activity?${q}`)).map((r) => ({ id: r.id, time: iso(r.ts), type: r.type, agent: r.agent || undefined, chat: r.chat || undefined, chatName: r.chatName || undefined, summary: r.summary, ...(a.include_details && r.detail ? { detail: r.detail } : {}) }));
     } },
 
   // ---------- agents ----------
@@ -136,7 +136,7 @@ export const TOOLS = [
       if (a.chat) q.set('chat', a.chat);
       if (a.agent_id) q.set('agent', a.agent_id);
       if (a.reason) q.set('reason', a.reason);
-      return (await x.call('GET', `/api/silences?${q}`)).silences.map((r) => ({ chat: r.chat, agent: r.agent || undefined, reason: r.reason, label: r.label, explain: r.explain, count: r.count, last: iso(r.lastTs), sampleSender: r.sampleSender || undefined }));
+      return (await x.call('GET', `/api/silences?${q}`)).silences.map((r) => ({ chat: r.chat, chatName: r.chatName, agent: r.agent || undefined, reason: r.reason, label: r.label, explain: r.explain, count: r.count, last: iso(r.lastTs), sampleSender: r.sampleSender || undefined }));
     } },
   { name: 'list_chats', readOnly: true, calls: [['GET', '/api/chats']], description: 'WhatsApp groups and 1:1 chats the numbers know, with their agent, model and logging settings. Settings at their default (off, model/logging/welcome "inherit", not private) are left out.', input: {},
     run: (a, x) => x.call('GET', '/api/chats') },
@@ -255,6 +255,9 @@ export const TOOLS = [
   { name: 'list_contacts', readOnly: true, calls: [['GET', '/api/contacts']], description: 'Contacts (WhatsApp names synced from the phone + own entries). Each has bookName (the phone\'s address book), businessName, profileName (chosen by the person) and ownName; name is the one shown (own > address book > business > profile > number). Shared ones can be looked up by participants through agents.',
     input: { query: str('Name, note or number to filter by (optional)'), shared_only: { type: 'boolean' }, offset: { type: 'number', description: 'Skip this many (paging; 500 per call)' } },
     run: (a, x) => x.call('GET', `/api/contacts?q=${enc(a.query || '')}${a.shared_only ? '&shared=1' : ''}${a.offset ? `&offset=${Number(a.offset) || 0}` : ''}`) },
+  { name: 'get_contact', readOnly: true, calls: [['GET', '/api/contacts/x/person']], description: 'One person, as on their page in the panel: name, number, where the name comes from, note, shared, their direct chat (with its agent and on/off) and the groups they wrote in (chats that are on). Works for people who are not saved as contacts (notSaved).',
+    input: { phone: str('Phone number with country code') }, required: ['phone'],
+    run: (a, x) => x.call('GET', `/api/contacts/${enc(a.phone)}/person`) },
   { name: 'contact_names_status', readOnly: true, calls: [['GET', '/api/contacts/summary']], description: 'How many contact names of each kind are known (address book, business, profile, own), how many people WhatsApp shows only by a hidden number, and when names were last refreshed. Names refresh by themselves after WhatsApp connects and daily.',
     input: {}, run: (a, x) => x.call('GET', '/api/contacts/summary') },
   { name: 'set_contact_names_for_agents', risky: true, calls: [['GET', '/api/contacts/summary'], ['PUT', '/api/contacts/agent-names']],

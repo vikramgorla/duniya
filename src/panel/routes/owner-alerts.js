@@ -1,24 +1,17 @@
 // Panel routes for spending caps (040, #35). Owner alerts and the weekly summary (041) belong to the built-in owner
 // assistant (059): its Alerts section and its weekly-summary schedule in the agent editor.
-import { budgetOverview, setCap, getCap, capStatus, CURRENCY, SCOPES } from '../../core/budget.js';
-import { chatTitle } from '../../core/contacts.js';
+import { budgetOverview, setCap, getCap, capStatus, listCaps, CURRENCY, SCOPES } from '../../core/budget.js';
+import { chatLabels } from '../../core/chat-names.js';
 import { ownerNumber } from '../../core/owner-alerts.js';
 import { listAgents, getAgent } from '../../core/agents.js';
-import { seenChats } from '../../core/chat-prefs.js';
 import { activity } from '../../core/events.js';
 
 export function ownerAlertRoutes(route, { channel } = {}) {
-  const chatNames = async () => {
-    const names = new Map(seenChats().map((c) => [c.id, chatTitle(c)]));
-    for (const g of await channel?.listChats?.().catch(() => []) || []) names.set(g.id, g.name);
-    return names;
-  };
-
   // ---------- spending caps ----------
   route('GET', '/api/budget', async () => {
-    const chats = await chatNames();
+    const chats = await chatLabels(listCaps().filter((c) => c.scope === 'chat').map((c) => c.id), channel);
     const agents = new Map(listAgents().map((a) => [a.id, a.name]));
-    return { ...budgetOverview({ agentName: (id) => agents.get(id) || `${id} (deleted)`, chatName: (id) => chats.get(id) || id.replace(/@.*/, '') }), alertsTo: ownerNumber() };
+    return { ...budgetOverview({ agentName: (id) => agents.get(id) || `${id} (deleted)`, chatName: (id) => chats.get(id) }), alertsTo: ownerNumber() };
   });
   route('GET', '/api/budget/:scope/:id', async (req, res, body, q, p) => {
     if (!SCOPES.includes(p.scope)) return [404, { error: 'Not found' }];

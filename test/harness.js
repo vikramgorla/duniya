@@ -231,7 +231,7 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
     id: 'whatsapp',
     send: async (chat, text, opts) => { t.sent.push({ chat, text, ...(opts?.mentions ? { mentions: opts.mentions } : {}) }); return { msgId: `out-${++seq}` }; },
     typing: async () => {},
-    chatName: async (chat) => (chat === 'g1@g.us' ? 'Panduga families' : ''),
+    chatName: async (chat) => ({ 'g1@g.us': 'Panduga families', 'g2@g.us': 'Carpool' })[chat] || '', // the same subjects as listChats
     listChats: async () => [{ id: 'g1@g.us', name: 'Panduga families', size: 12 }, { id: 'g2@g.us', name: 'Carpool', size: 6 }],
     isMember: async (chat, phone) => chat === 'g1@g.us' && phone === '41790000002',
     groupMembers: async (chat) => (chat === 'g1@g.us' ? [{ phone: '41790000001', jid: 'a', admin: true }, { phone: '41790000002', jid: 'b', admin: false }, { phone: '41790000003', jid: 'c', admin: true }, { phone: '', jid: 'x@lid', admin: false }] : []),

@@ -83,7 +83,7 @@ chat's newest message). When you switch a chat **on**, the server asks your phon
 
 ## Set up a direct chat before the person writes
 
-1. **Chats → Add a direct chat** (or **Contacts → ⋯ → Set up chat**).
+1. **Chats → Add a direct chat** (or **Contacts → the person → Set up a direct chat**).
 2. Enter the number with country code (`+41 79 123 45 67`) or pick a contact; pick the WhatsApp number if you have
    several.
 3. Choose the agent, **On** and, if you like, **Private to members** → **Set up chat**.
@@ -109,12 +109,20 @@ remove entries.
 - Phone contact names **refresh by themselves** (after a number connects, then daily). **Refresh now** is optional.
 - **Agents may use the names from your phone contacts** (owner, on by default): switch it off if your address book
   holds private labels ("Raj plumber, don't answer"); agents then see business or profile names.
-- Admin MCP: `list_contacts`, `save_contact`, `remove_contact`, `contact_names_status`, `refresh_contact_names`,
-  `set_contact_names_for_agents`.
+- Each person has a **page** (tap the row, or `#contacts/<number>`): name, number and where the name comes from, the
+  note, **Shared**, their **direct chat** with its agent (or **Set up a direct chat**) and the **groups they wrote
+  in**, each opening the chat. A direct chat's page links back with **Contact page ›**. People who wrote but are not
+  saved have a page too (**⋯ → Save as contact…**). **⋯** holds **Edit…** and **Remove…**.
+- Admin MCP: `list_contacts`, `get_contact` (a person's page), `save_contact`, `remove_contact`, `contact_names_status`,
+  `refresh_contact_names`, `set_contact_names_for_agents`.
+
+![A person's page: name and number, Shared, their direct chat with its agent and the groups they wrote in](site/img/card-person.webp)
 
 ### Which name is shown
 
-Everywhere in the panel and for agents, one rule picks a person's name:
+A group is shown by its WhatsApp name (remembered, so it shows while WhatsApp is offline; *Unnamed group* until it is
+known), never by its id. Everywhere in the panel, the admin MCP tools, the owner assistant and for agents, one rule
+picks a person's name:
 
 <p align="center"><img src="diagrams/contact-names.svg" alt="Which name is shown: for a hidden id (LID) the number WhatsApp shared is looked up first; then the first known of: the name you set in Duniya, the phone contact name from your address book, the business name, the profile name the person chose, else +number or Unknown (hidden number). Member tags come per group from each message the person sends, tag changes and loaded history" width="483"></p>
 

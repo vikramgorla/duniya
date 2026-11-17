@@ -2,6 +2,7 @@
 // Panel routes: status (Overview and the live stream), Small server mode, general settings, activity and its logging settings.
 import { isBuiltin, listAgents } from '../../core/agents.js';
 import { enabledChats } from '../../core/chat-prefs.js';
+import { chatLabel, withChatNames } from '../../core/chat-names.js';
 import { listActivity, listPending } from '../../core/db.js';
 import { LOG_CATEGORIES, activity, bus, loggingSettings, resetLoggingCache } from '../../core/events.js';
 import { MAX_LOAD } from '../../core/history-load.js';
@@ -47,7 +48,8 @@ export const statusFor = async (user, channel) => ({
 
 // 069: an entry is serialized once, however many panels are open
 const frames = new WeakMap();
-const frameOf = (a) => { let f = frames.get(a); if (!f) { f = `data: ${JSON.stringify(a)}\n\n`; frames.set(a, f); } return f; };
+// 073: live entries carry the chat's name like GET /api/activity (the one chat-name resolver)
+const frameOf = (a) => { let f = frames.get(a); if (!f) { f = `data: ${JSON.stringify(a.chat ? { ...a, chatName: chatLabel(a.chat) } : a)}\n\n`; frames.set(a, f); } return f; };
 
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
 export function statusRoutes(route, { channel } = {}) {
@@ -75,7 +77,7 @@ export function statusRoutes(route, { channel } = {}) {
   route('GET', '/api/activity', async (req, res, body, q) => {
     const rows = listActivity({ limit: q.get('limit'), agent: q.get('agent') || '', chat: q.get('chat') || '', before: Number(q.get('before') || 0) });
     const rated = ratingsOf(rows.filter((r) => r.type === 'message.out' && r.detail?.msg).map((r) => r.detail.msg));
-    return rated.size ? rows.map((r) => (r.type === 'message.out' && rated.has(r.detail?.msg) ? { ...r, rating: rated.get(r.detail.msg) } : r)) : rows;
+    return withChatNames(rated.size ? rows.map((r) => (r.type === 'message.out' && rated.has(r.detail?.msg) ? { ...r, rating: rated.get(r.detail.msg) } : r)) : rows, channel);
   });
   // Live panel (058): activity entries as plain messages, and the status (what GET /api/status returns) as `status`
   // events: shortly after anything changed (activity or a channel state change such as a new QR) and with the

@@ -31,7 +31,7 @@ file changes nothing.
 
 > [!NOTE]
 > **Pre-update backups** stay on this server only, are listed with the local backups and kept apart from the normal
-> retention: the last 3 (*Update settings → keep the last N pre-update backups*, 1–20). If one fails, the update is
+> retention: the last 3 (**Settings → Updates** → *keep the last N pre-update backups*, 1–20). If one fails, the update is
 > not installed.
 
 ### Restore
@@ -54,11 +54,17 @@ elsewhere is restored here in the panel).
 
 ## Updates
 
-**Overview → Server → Updates** → **Update to vX.Y.Z** opens what you get first: every release between your version
+Overview's **Server** card has one update row: *Up to date · v2.33.0 · checked 2m ago* (or *Update available*), with
+**Release notes**, the one action and ⋯ (**Check now**, **Update settings**). **Settings → Updates** has the whole story:
+the last update with the backup made before it, **Check now**, the settings and **Restart service**.
+
+![Settings → Updates: up to date, Check now, Release notes, the update settings and Restart service](site/img/card-updates.webp)
+
+**Update to vX.Y.Z** (on the row or the page) opens what you get first: every release between your version
 and the new one, newest first, with what is **new**, **improved**, **fixed** or **removed** (long lists fold; releases
 that need your OK are marked, with what to do), and *Make a backup first*. Confirm with **Update to vX.Y.Z**: it
 installs in place, keeps all data, survives a reload.
-**Update settings**: *Notify me*, *Install automatically* (time of day) or *Off*; stable or latest `main`
+**Settings → Updates**: *Notify me*, *Install automatically* (time of day) or *Off*; stable or latest `main`
 (`--update-mode off|notify|auto`). Also `sudo duniya update [--check]` or re-running the installer.
 
 ### What's new after an update

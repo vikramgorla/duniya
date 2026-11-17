@@ -3,7 +3,8 @@
 import { fail } from '../../core/config.js';
 import { agentForChat, bindChat, listAgents } from '../../core/agents.js';
 import { allChatPrefs, ignoredCounts, isChatEnabled, isChatPrivate, seenChats, setChatPrefs } from '../../core/chat-prefs.js';
-import { chatTitle, personInfo } from '../../core/contacts.js';
+import { personInfo } from '../../core/contacts.js';
+import { chatLabel, chatLabels } from '../../core/chat-names.js';
 import { listMessages, namesInChat, searchStored } from '../../core/db.js';
 import { isChatAlias, listDirectChats } from '../../core/direct-chats.js';
 import { activity } from '../../core/events.js';
@@ -30,7 +31,7 @@ export function chatRoutes(route, { channel } = {}) {
     const known = new Set(groups.map((c) => c.id));
     // 1:1 chats the numbers have seen (name and number only) and any bound chat we can't see right now
     /** @type {any[]} */
-    const people = seenChats({ groups: false }).filter((c) => !known.has(c.id)).map((c) => ({ id: c.id, name: chatTitle(c), phone: c.phone || personInfo({ jid: String(c.id).split('#').pop() }).phone, number: c.number, isGroup: false, lastAt: c.lastAt }));
+    const people = seenChats({ groups: false }).filter((c) => !known.has(c.id)).map((c) => ({ id: c.id, name: chatLabel(c.id), phone: c.phone || personInfo({ jid: String(c.id).split('#').pop() }).phone, number: c.number, isGroup: false, lastAt: c.lastAt }));
     for (const c of people) known.add(c.id);
     // 049: direct chats prepared before the person wrote ("Waiting for the first message"); LID aliases are not listed.
     const prepared = listDirectChats();
@@ -41,7 +42,7 @@ export function chatRoutes(route, { channel } = {}) {
       known.add(d.chat);
     }
     for (let i = people.length - 1; i >= 0; i--) if (isChatAlias(people[i].id)) people.splice(i, 1);
-    const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: '(not a member / offline)', size: 0, isGroup: !/@(s\.whatsapp\.net|lid)$/.test(id) }));
+    const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: chatLabel(id), offline: true, size: 0, isGroup: !/@(s\.whatsapp\.net|lid)$/.test(id) }));
     // 070: settings that are at their default are left out (model, logging, welcome "inherit", fallback inherit, off,
     // not private…): the list stays small with hundreds of chats; the panel and the admin tools fill in the defaults.
     return [...groups, ...people, ...missing].map((c) => {
@@ -116,12 +117,11 @@ export function chatRoutes(route, { channel } = {}) {
     if (query.length < 2) return { results: [], more: false };
     const chats = visibleChats();
     const rows = searchStored({ chats, query, before: q.get('before'), limit: 31 });
-    const names = new Map(seenChats().map((c) => [c.id, chatTitle(c)]));
-    try { for (const g of await channel.listChats()) names.set(g.id, g.name); } catch { /* offline: ids */ }
+    const names = await chatLabels(rows.slice(0, 30).map((m) => m.chat), channel);
     if (!q.get('before')) activity('config', { summary: `Messages searched by ${user.username} (“${query.slice(0, 40)}”, ${rows.length > 30 ? '30+' : rows.length} found in ${chats.length} chats)` });
     return {
       chats: chats.length, more: rows.length > 30,
-      results: rows.slice(0, 30).map((m) => ({ id: m.id, chat: m.chat, chatName: names.get(m.chat) || m.chat, ts: m.ts, agent: m.agent || '', fromAgent: !!m.from_agent,
+      results: rows.slice(0, 30).map((m) => ({ id: m.id, chat: m.chat, chatName: names.get(m.chat), ts: m.ts, agent: m.agent || '', fromAgent: !!m.from_agent,
         name: m.from_agent ? '' : personInfo({ phone: m.sender, jid: m.sender_jid, fallbackName: m.name }).label, text: String(m.text || '').slice(0, 600) })),
     };
   }, { role: 'owner' });

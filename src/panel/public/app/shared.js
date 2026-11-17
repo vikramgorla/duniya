@@ -50,6 +50,7 @@ export const SETTINGS_SECTIONS = [
   ['my-google', 'Your Google account', 'google link'],
   ['logging', 'Activity log', 'logging retention verbose minimal'],
   ['small-mode', 'Server size', 'small server mode 1 gb memory'],
+  ['updates', 'Updates', 'update upgrade version automatic install check restart backup before update'],
   ['getting-started', 'Getting started', 'checklist first run setup guide'],
   ['whatsapp-helpers', 'WhatsApp helpers', 'groupid groups commands'],
   ['release-notes', 'Release notes', "what's new whats changelog changes version update"],

@@ -9,6 +9,7 @@ import {
   logMessage, messageByMsgId, lastAgentMessage, setMessageText, searchMessages, namesInChat, getPoll, latestPoll, recentPolls, pollTally,
 } from './db.js';
 import { activity } from './events.js';
+import { toolPhrase } from '../panel/public/app/names.js';
 
 let channel = null;
 /** The channel the tools act through (set by the router and the panel at startup). */
@@ -328,7 +329,7 @@ export const whatsappTools = DEFS.map((d) => ({
     if (!d.roles.includes(ctx.role)) throw fail('Only organizers can do this');
     try {
       const out = await d.run(input || {}, ctx);
-      activity('whatsapp.action', { agent: ctx.agent.id, chat: out.chat, summary: `${d.name} by ${ctx.senderName || 'someone'} (${ctx.role}): ${out.summary}`,
+      activity('whatsapp.action', { agent: ctx.agent.id, chat: out.chat, summary: `${toolPhrase(d.name)} by ${ctx.senderName || 'someone'} (${ctx.role}): ${out.summary}`,
         detail: { tool: d.name, input: scrubInput(input), role: ctx.role, by: ctx.senderName || '', from: ctx.chat } });
       return out.result;
     } catch (e) {

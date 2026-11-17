@@ -192,6 +192,10 @@ it for the names its API returns, and panel modules import it.
   only where a generic endpoint must be named. No explanations in brackets: how you connect (sign in or key) belongs
   on the provider's page.
 - Accounts: the provider's name, with the label only when there are several accounts: "ChatGPT · work".
+- Chats: their name, never an id — a group's WhatsApp subject (remembered; *Unnamed group* until known), a person's
+  name from the contacts resolver (else *+number* or *Unknown (hidden number)*). One server resolver,
+  `src/core/chat-names.js` (`chatLabel`, `chatLabels`, `withChatNames`); every API that lists chats returns `chatName`
+  (silences, activity and the live stream, pending, usage, caps, Review, search, admin MCP, owner assistant) (073).
 - Models: as people know them ("GPT-5.5", "Claude Sonnet 4.5"). The provider's own display name wins; a raw id is
   tidied. The raw id appears only as small print on detail pages.
 
@@ -244,6 +248,23 @@ The same thing looks and behaves the same wherever it appears, and every place l
 - **States.** Every section page has a back link to its item, a loading line, an empty state that says what fills it
   ("No stored messages for this chat yet."), and errors through `tryApi()`.
 
+## Calm rows (073)
+
+- **Actions as text links.** A row's fix or next step is a small underlined link (`.qfix`: accent text, 40 px tap
+  height, no border), never a bordered button per row: *Open triggers*, *Switch on*, *Review*. Rare actions (Clear,
+  Check now, Set price…) go in a quiet ⋯ (no border).
+- **Why agents stayed quiet** is grouped by chat: avatar · the chat's name (its page) · ⋯ *Clear*; under it one line
+  per reason: plain words · count · its fix (`quietReason()` in `quiet.js`, also on the chat's page).
+- **Update** on Overview is one row: LED · *Up to date · v2.33.0 · checked 2m ago* · *Release notes* · the one action
+  (*Update to…*, *Review…*) · ⋯ (*Check now*, *Update settings*). The last update, its backup, the settings and
+  *Restart service* live on **Settings → Updates**.
+- **Breakdowns** (Usage) are one card with a `seg` over rows: name (its page) · calls and tokens muted · cost right ·
+  ⋯ for the row's rare action. Details tables become muted summary lines with a *Details* disclosure (Server → Health,
+  This server); Logs start as one row and load when opened.
+- **A person's page** (`#contacts/<phone>`): header (avatar, name, *+number · where the name comes from*, ⋯ Edit /
+  Remove), note, Shared, then rows: their direct chat (or *Set up a direct chat*) and the groups they wrote in. A
+  direct chat's page links back (*Contact page ›*).
+
 ## Standalone pages (064, 070)
 
 Pages the server renders outside the panel (sign-in results, Google and GitHub hand-offs, the admin MCP sign-in and
@@ -293,7 +314,9 @@ the reason and **Retry**. Every animation stops with *reduce motion*.
 
 - Every control has a name: a `<label>` (`field()` connects it), visible text, or `aria-label` for icon buttons and
   for controls without visible text. Switches are `role=switch` and take their name (`toggle(…, label)`).
-- Keyboard: everything is reachable with Tab and shows a focus ring (`:focus-visible`); *Skip to content* is the first
+- Keyboard: everything is reachable with Tab and shows a focus ring (`:focus-visible`, 073: only while the keyboard
+  is in use — `html.kbd`, set by Tab / arrows / Esc, cleared by any tap or click — because Chrome on Android also
+  matched `:focus-visible` when script moved focus after a tap; `focus-ring-touch` in `check:responsive` checks both); *Skip to content* is the first
   stop; after a screen change, focus moves to the screen; dialogs trap focus and return it. A sheet opened by touch
   (More, `ask()` on a touch screen) focuses itself, not its first button, so no ring appears on a button nobody
   touched (066).

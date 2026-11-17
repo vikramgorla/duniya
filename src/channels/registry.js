@@ -7,6 +7,7 @@ import { DATA_DIR, fail } from '../core/config.js';
 import { getSetting, updateSettings } from '../core/store.js';
 import { activity } from '../core/events.js';
 import { noteChat } from '../core/chat-prefs.js';
+import { rememberGroupNames } from '../core/chat-names.js';
 import { resolveDirectChat, MAIN, chatKey, splitChat } from '../core/direct-chats.js';
 import { createWhatsAppChannel } from './whatsapp.js';
 
@@ -91,7 +92,9 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
     },
     async send(chat, text, opts) { const { ch, jid } = route(chat); return ch.send(jid, text, opts); },
     async typing(chat) { try { const { ch, jid } = route(chat); await ch.typing?.(jid); } catch { /* ignore */ } },
-    async chatName(chat) { try { const { ch, jid } = route(chat); return await ch.chatName?.(jid); } catch { return ''; } },
+    async chatName(chat) { // 073: every subject WhatsApp tells us is remembered for the one chat-name resolver
+      try { const { ch, jid } = route(chat); const name = await ch.chatName?.(jid); rememberGroupNames([{ id: chat, name }]); return name; } catch { return ''; }
+    },
     async groupMembers(chat) { const { ch, jid } = route(chat); return ch.groupMembers ? ch.groupMembers(jid) : []; },
     async isMember(chat, phone, senderJid) { try { const { ch, jid } = route(chat); return await ch.isMember(jid, phone, senderJid); } catch { return false; } },
     async listChats() {
@@ -100,6 +103,7 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
         const ch = sessions.get(n.id); if (!ch) continue;
         for (const g of await ch.listChats().catch(() => [])) out.push({ ...g, id: chatKey(n.id, g.id), number: n.id, numberLabel: n.label });
       }
+      rememberGroupNames(out);
       return out;
     },
     /** First number's status at the top level (as before) plus every number under `numbers`. */

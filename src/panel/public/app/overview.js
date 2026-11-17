@@ -1,6 +1,6 @@
 // Overview screen (the landing screen) and the install-on-your-phone hint. Module of the panel (063).
 // ---------- overview ----------
-import { feedList, loadChatNames } from './activity.js';
+import { feedList } from './activity.js';
 import { askCard } from './ask.js';
 import { $, S, ago, api, ask, avatar, can, emptyState, field, h, logo, menu, optimistic, pulse, refreshStatus, show, time, toggle, tryApi } from './core.js';
 import { plural } from './shared.js';
@@ -52,13 +52,15 @@ export async function renderOverview(soft) {
       toggle(st.settings.paused, pause, false, 'Pause all agents')),
     st.agents.length ? h('ul', { class: 'ctl-list' }, st.agents.map((b) => h('li', {},
       avatar(b.name, b.id, b.enabled && !st.settings.paused ? '' : 'off'),
-      h('div', {}, h('b', {}, b.name), h('div', { class: 'small muted' }, plural(b.chats, 'chat'), ' ', pulse(b.id))),
+      // 073: the name opens the agent; Review is one tap away
+      h('div', {}, h('a', { class: 'ctl-name', href: `#agents/${encodeURIComponent(b.id)}` }, b.name), h('div', { class: 'small muted' }, plural(b.chats, 'chat'), ' ', pulse(b.id))),
+      can('admin') ? h('a', { class: 'qfix', href: `#agents/${encodeURIComponent(b.id)}/review`, 'aria-label': `Review ${b.name}'s answers` }, 'Review') : null,
       toggle(b.enabled, (v) => optimistic(() => { b.enabled = v; }, () => api('PUT', `/api/agents/${b.id}`, { enabled: v }), `${b.name} ${v ? 'on' : 'off'}`), false, `${b.name} on`))))
       : emptyState('agents', 'No agents yet', 'An agent answers in the chats you give it.', h('a', { class: 'btn small', href: '#agents' }, 'Create an agent')),
     st.pending ? h('p', {}, h('a', { class: 'pill warn', href: '#pending' }, `${plural(st.pending, 'change')} waiting for a confirm`)) : null);
   const reusedUpdates = soft && $('#updates-box')?.childElementCount ? $('#updates-box') : null;
   const updateBanner = (reusedUpdates && $('#ov-update-banner')) || h('div', { id: 'ov-update-banner' });
-  // 068: one calm line instead of a table; details are on the Server screen
+  // 068: one calm line instead of a table; details are on the Server screen. 073: updates are one row too.
   const server = h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'Server'), h('a', { class: 'small', href: '#server' }, 'Details ›')),
     h('p', { class: 'small muted num', style: 'margin:6px 0 0' }, `${st.version} · up `, h('span', { id: 'ov-uptime' }, ago(Date.now() - st.uptimeSec * 1000)), ' · ', h('span', { id: 'ov-memory' }, `${st.memoryMb} MB`)),
     reusedUpdates || h('div', { id: 'updates-box' }));
@@ -89,8 +91,8 @@ export async function renderOverview(soft) {
   $('#main').replaceChildren(hero, whatsNewBox(), updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), wa, control, server, silencesSlot, recent));
   refreshSilences();
   // the feed and the chat names it shows (064) load after the first paint
-  Promise.all([S.feed.length ? S.feed : api('GET', '/api/activity?limit=50'), soft ? null : loadChatNames()])
-    .then(([rows]) => { S.feed = rows; if (rows.length) { $('#recent')?.replaceWith(feedList('recent', rows.slice(0, 5))); $('#recent + .empty')?.remove(); } }).catch(() => {});
+  Promise.resolve(S.feed.length ? S.feed : api('GET', '/api/activity?limit=50'))
+    .then((rows) => { S.feed = rows; if (rows.length) { $('#recent')?.replaceWith(feedList('recent', rows.slice(0, 5))); $('#recent + .empty')?.remove(); } }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
 }
 // 065: release notes load on demand (./releases.js).

@@ -2,10 +2,10 @@
 // Panel routes that explain the app to its owner: why agents stayed silent (#34), the first-run checklist (#36) and
 // the tools a role gets in the test console (#37).
 import { db } from '../../core/db.js';
-import { chatTitle } from '../../core/contacts.js';
+import { withChatNames } from '../../core/chat-names.js';
 import { listSilences, clearSilences, SILENCE_REASONS } from '../../core/silences.js';
 import { listAgents, getAgent, isBuiltin, OWNER_AGENT_ID } from '../../core/agents.js';
-import { enabledChats, seenChats } from '../../core/chat-prefs.js';
+import { enabledChats } from '../../core/chat-prefs.js';
 import { getSetting, updateSettings } from '../../core/store.js';
 import { status as providerStatus } from '../../core/providers/index.js';
 import { toolsFor } from '../../core/tools.js';
@@ -48,15 +48,9 @@ export function insightRoutes(route, { channel }) {
   // ---------- why agents stayed silent (#34) ----------
   route('GET', '/api/silences', async (req, res, body, q) => {
     const rows = listSilences({ chat: q.get('chat') || '', agent: q.get('agent') || '', reason: q.get('reason') || '', days: q.get('days') || 7, limit: q.get('limit') || 200 });
-    // Names as the owner sees them (never ids alone): people from the chats seen, groups from WhatsApp.
-    const seen = new Map(seenChats().map((c) => [c.id, chatTitle(c)]));
-    const names = new Map();
-    for (const r of rows) {
-      if (names.has(r.chat)) continue;
-      names.set(r.chat, seen.get(r.chat) || (r.chat.endsWith('@g.us') ? await channel.chatName?.(r.chat).catch(() => '') : '') || '');
-    }
+    // 073: names from the one chat-name resolver, never ids
     const agentNames = new Map(listAgents().map((a) => [a.id, a.name]));
-    return { reasons: SILENCE_REASONS, silences: rows.map((r) => ({ ...r, chatName: names.get(r.chat) || '', agentName: agentNames.get(r.agent) || '' })) };
+    return { reasons: SILENCE_REASONS, silences: (await withChatNames(rows, channel)).map((r) => ({ ...r, agentName: agentNames.get(r.agent) || '' })) };
   });
   route('DELETE', '/api/silences', async (req, res, body, q, p, user) => {
     const f = { chat: q.get('chat') || '', agent: q.get('agent') || '', reason: q.get('reason') || '' };
