@@ -10,6 +10,7 @@ import { serverSize, setSmallServerMode, smallServerMode } from '../../core/reso
 import { getSettings, updateSettings } from '../../core/store.js';
 import { osUpdatesCached, rebootStatus } from '../../core/system.js';
 import { whatsNew } from '../../core/updates.js';
+import { warnings as planWarnings } from '../../core/providers/plan-usage.js';
 import { ROOT } from '../../core/config.js';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -40,6 +41,8 @@ export const statusFor = async (user, channel) => ({
   agents: listAgents().filter((b) => !isBuiltin(b)).map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })), // 059: chat agents
   pending: listPending().length,
   whatsNew: whatsNew(user), // 065: { from, to } once after an update, until this user opened or hid it
+  // 067: plans and credit at 80 %+ (Overview hint): [{ account, name, label, used, resetAt, text }], from the stored snapshots
+  plans: planWarnings().map(({ account, name, label, used, resetAt, text }) => ({ account, name, label, used: Math.round(used), resetAt: resetAt || null, text })),
   // #96: Server tab badge — only updates that will install now (from the last check; never runs apt here)
   osUpdates: ['admin', 'owner'].includes(user?.role) ? { ...(osUpdatesCached() || { count: 0, security: 0, at: null }), restart: rebootStatus().required } : null,
 });

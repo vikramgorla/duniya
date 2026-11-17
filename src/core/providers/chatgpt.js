@@ -245,6 +245,7 @@ async function chatFor(secret, { model, system, messages, tools, onText = null, 
   }
   const items = [];
   let completed = null;
+  let planEvent = null; // 067: the plan's rate-limit windows, when the backend sends them as a stream event
   let buf = '';
   const decoder = new TextDecoder();
   const handle = (data) => {
@@ -253,6 +254,7 @@ async function chatFor(secret, { model, system, messages, tools, onText = null, 
     if (ev.type === 'response.output_text.delta') { if (onText && typeof ev.delta === 'string' && ev.delta) onText(ev.delta); } // 047: Ask box streaming
     else if (ev.type === 'response.output_item.done' && ev.item) items.push(ev.item);
     else if (ev.type === 'response.completed') completed = ev.response || {};
+    else if (ev.type === 'codex.rate_limits') planEvent = ev;
     else if (ev.type === 'response.failed' || ev.type === 'error') {
       const e = ev.response?.error || ev.error || {};
       throw Object.assign(new Error(e.message || 'ChatGPT request failed'), { code: e.code, error: { error: e } });
@@ -270,7 +272,8 @@ async function chatFor(secret, { model, system, messages, tools, onText = null, 
   if (!completed) throw new Error('ChatGPT stream ended before completion');
   const content = fromOutputItems(completed.output?.length ? completed.output : items);
   const stop = content.some((b) => b.type === 'tool_use') ? 'tool_use' : completed.incomplete ? 'max_tokens' : 'end_turn';
-  return { content, stop_reason: stop, usage: { input_tokens: completed.usage?.input_tokens || 0, output_tokens: completed.usage?.output_tokens || 0 } };
+  // 067: headers (x-codex-*-used-percent …) and the stream event carry the plan's usage windows (plan-usage.js)
+  return { content, stop_reason: stop, usage: { input_tokens: completed.usage?.input_tokens || 0, output_tokens: completed.usage?.output_tokens || 0 }, headers: res.headers, planEvent };
 }
 
 /** Adapter for one ChatGPT account (042). */

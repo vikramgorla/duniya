@@ -1,7 +1,9 @@
 // Shared e2e harness: fake MCP server, scripted fake Claude API, fake WhatsApp channel, real core + panel.
 // Failing providers (042): `t.claudeFail` (a queue of failures for the fake Claude API) and `fakeChatProvider()` (an
 // OpenAI-compatible endpoint with per-key scripts and failures). A failure is { status, message?, code?, retryAfter? }
-// (e.g. 429 with Retry-After, 500, 401, 400, 404 model not found) or { network: true } (connection dropped).
+// (e.g. 429 with Retry-After, 500, 401, 400, 404 model not found) or { network: true } (connection dropped); `headers` are sent too.
+// Plan usage (067): `t.claudeHeaders` / `f.headers` are added to successful answers (rate-limit headers); `f.keyInfo` /
+// `f.credits` answer OpenRouter's GET /key and /credits (null → 404 / 403).
 // Streaming (047): both fakes answer `stream: true` requests with SSE (Anthropic-style events / Chat Completions chunks),
 // one text piece per word. `t.claudeStreamFail` / `f.streamFail` queue mid-stream failures { after: n pieces, network, hang (066: wait for the client to stop) }
 // (socket dropped) or { after, error: { type, message } } (an SSE error event); `f.refuseStream` answers streamed
@@ -23,7 +25,7 @@ export const FAKE_OGG = Buffer.concat([Buffer.from('OggS'), Buffer.alloc(40, 1)]
 /** Answer a request with a scripted failure (see the header). */
 export function sendFailure(req, res, f, style = 'openai') {
   if (f.network) { req.socket.destroy(); return; }
-  const headers = { 'content-type': 'application/json', ...(f.retryAfter != null ? { 'retry-after': String(f.retryAfter) } : {}) };
+  const headers = { 'content-type': 'application/json', ...(f.retryAfter != null ? { 'retry-after': String(f.retryAfter) } : {}), ...(f.headers || {}) };
   res.writeHead(f.status || 500, headers);
   const message = f.message || `fake failure ${f.status || 500}`;
   res.end(JSON.stringify(style === 'anthropic'
@@ -37,8 +39,8 @@ const sse = (res, frames) => { for (const f of frames) res.write(f); };
 const tick = () => new Promise((r) => setTimeout(r, 2)); // let each piece reach the client, like a real stream
 
 /** Anthropic Messages SSE for one scripted answer; `fail` cuts it after `fail.after` text pieces. */
-export async function sendAnthropicStream(req, res, content, { usage = { input_tokens: 3, output_tokens: 2 }, fail = null } = {}) {
-  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+export async function sendAnthropicStream(req, res, content, { usage = { input_tokens: 3, output_tokens: 2 }, fail = null, headers = {} } = {}) {
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', ...headers });
   const ev = (type, data) => `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`;
   sse(res, [ev('message_start', { message: { id: 'm', type: 'message', role: 'assistant', model: 'f', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: usage.input_tokens, output_tokens: 0 } } })]);
   let sent = 0;
@@ -72,8 +74,8 @@ export async function sendAnthropicStream(req, res, content, { usage = { input_t
 }
 
 /** Chat Completions SSE for one scripted `message`; `fail` cuts it after `fail.after` text pieces. */
-async function sendChatStream(req, res, message, { usage, includeUsage, fail }) {
-  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+async function sendChatStream(req, res, message, { usage, includeUsage, fail, headers = {} }) {
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', ...headers });
   const chunk = (o) => `data: ${JSON.stringify({ id: 'c', object: 'chat.completion.chunk', ...o })}\n\n`;
   let sent = 0;
   for (const piece of streamPieces(message.content)) {
@@ -132,7 +134,7 @@ export async function serveFakeMcp(req, res, raw, { name = 'fake', tools = [], c
  */
 export function fakeChatProvider({ name = 'fake', models = ['fake-large', 'fake-mini'] } = {}) {
   const f = { name, reqs: [], fail: {}, script: [], models, media: [], mediaFail: [], transcript: 'see you at the station at nine', imageModels: [], mediaCost: null,
-    streams: 0, streamFail: [], refuseStream: false };
+    streams: 0, streamFail: [], refuseStream: false, headers: {}, keyInfo: null, credits: null, keyReqs: 0 };
   f.server = http.createServer(async (req, res) => {
     let d = ''; for await (const c of req) d += c;
     const key = String(req.headers.authorization || '').replace(/^Bearer /, '');
@@ -141,6 +143,9 @@ export function fakeChatProvider({ name = 'fake', models = ['fake-large', 'fake-
     // Photos & voice (043): the documented media endpoints, recorded in f.media as { path, key, body }.
     const media = (path, body) => { f.media.push({ path, key, body }); const failure = f.mediaFail.shift(); if (failure) { sendFailure(req, res, failure); return true; } return false; };
     const route = req.url.replace(/^.*\/v1|^.*\/api\/v1/, '');
+    // 067: OpenRouter's key info and credits (null → 404, like an endpoint without them)
+    if (route === '/key') { f.keyReqs++; return f.keyInfo ? json(200, f.keyInfo) : json(404, { error: { message: 'not found' } }); }
+    if (route === '/credits') return f.credits ? json(200, f.credits) : json(403, { error: { message: 'management key required' } });
     if (route === '/audio/transcriptions') {
       const isJson = String(req.headers['content-type'] || '').includes('json');
       if (media(route, isJson ? JSON.parse(d) : { multipart: true, model: (d.match(/name="model"\r\n\r\n([^\r]+)/) || [])[1] })) return;
@@ -163,8 +168,9 @@ export function fakeChatProvider({ name = 'fake', models = ['fake-large', 'fake-
       if (body.stream && f.refuseStream) return json(400, { error: { message: 'stream is not supported', type: 'invalid_request_error' } });
       const message = f.script.shift() || { content: `${name} (${key}) says hi` };
       const usage = { prompt_tokens: 4, completion_tokens: 3 };
-      if (body.stream) { f.streams++; return sendChatStream(req, res, message, { usage, includeUsage: !!body.stream_options?.include_usage, fail: f.streamFail.shift() }); }
-      return json(200, { choices: [{ message, finish_reason: message.tool_calls ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 4, completion_tokens: 3 } });
+      if (body.stream) { f.streams++; return sendChatStream(req, res, message, { usage, includeUsage: !!body.stream_options?.include_usage, fail: f.streamFail.shift(), headers: f.headers }); }
+      res.writeHead(200, { 'content-type': 'application/json', ...f.headers });
+      return res.end(JSON.stringify({ choices: [{ message, finish_reason: message.tool_calls ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 4, completion_tokens: 3 } }));
     }
     json(404, { error: { message: 'not found' } });
   }).listen(0);
@@ -175,7 +181,7 @@ export function fakeChatProvider({ name = 'fake', models = ['fake-large', 'fake-
 
 export async function setup({ bindings = {}, env = {}, seed = true, extend = null, beforeImport = null, chatsOn = true, privacyNotice = false } = {}) {
   const t = {
-    mcpCalls: [], claudeReqs: [], summaryReqs: [], script: [], sent: [], claudeFail: [], claudeStreamFail: [], claudeStreams: 0,
+    mcpCalls: [], claudeReqs: [], summaryReqs: [], script: [], sent: [], claudeFail: [], claudeStreamFail: [], claudeStreams: 0, claudeHeaders: {},
     summaryText: 'Decisions: take the 9:10 train. Rao family arrives Saturday.', summaryFail: false,
   };
 
@@ -219,8 +225,8 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
       if (f) return sendFailure(req, res, f, 'anthropic');
     }
     const content = isSummary ? [{ type: 'text', text: t.summaryText }] : (t.script.shift() || [{ type: 'text', text: '(script empty)' }]);
-    if (body.stream) { t.claudeStreams++; return sendAnthropicStream(req, res, content, { fail: t.claudeStreamFail.shift() }); }
-    res.writeHead(200, { 'content-type': 'application/json' });
+    if (body.stream) { t.claudeStreams++; return sendAnthropicStream(req, res, content, { fail: t.claudeStreamFail.shift(), headers: t.claudeHeaders }); }
+    res.writeHead(200, { 'content-type': 'application/json', ...t.claudeHeaders });
     res.end(JSON.stringify({ id: 'm', type: 'message', role: 'assistant', model: 'f', usage: { input_tokens: 3, output_tokens: 2 },
       stop_reason: content.some((b) => b.type === 'tool_use') ? 'tool_use' : 'end_turn', content }));
   }).listen(0);

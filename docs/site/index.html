@@ -178,7 +178,7 @@
           <span class="pill">Claude</span><span class="pill">OpenAI</span><span class="pill">Ollama / any OpenAI-compatible</span>
         </div>
         <ul class="ticks">
-          <li>ChatGPT Plus/Pro plan usage via OpenAI's official sign-in flow</li>
+          <li>ChatGPT Plus/Pro plan usage via OpenAI's official sign-in flow, with its 5-hour and weekly limits shown</li>
           <li>Copilot allowance via the official Copilot SDK (downloaded only if you connect it)</li>
           <li>OpenRouter in one tap with a “Free models only” switch</li>
           <li><b>Automatic fallback</b>: on a usage limit, outage, timeout or expired sign-in the agent answers with the next model; the failing account pauses and you get a WhatsApp alert</li>
@@ -348,6 +348,12 @@
         <h3>When a model fails.</h3>
         <p>Paused accounts show why and until when (“Paused until 13:57 — usage limit reached”). Refused requests never switch; tools never run twice. Each agent and each chat can keep its own ordered list of models.</p>
         <a class="shot tall" href="img/card-fallback.webp"><img src="img/card-fallback.webp" width="1488" height="750" loading="lazy" alt="When a model fails: OpenRouter paused until 13:57 because of a usage limit; switch automatically to the next model."></a>
+      </div>
+      <div class="tile span-3">
+        <span class="label">Plan usage</span>
+        <h3>See how much of each plan is left.</h3>
+        <p>The ChatGPT plan's 5-hour and weekly limits, Copilot's premium requests, OpenRouter's credit and an API key's rate-limit headroom, with reset times — only what each provider reports, never a guess. A WhatsApp alert at 90% and when a limit runs out; the agent moves to the next model until it resets.</p>
+        <a class="shot" href="img/card-plan-usage.webp"><img src="img/card-plan-usage.webp" width="1012" height="364" loading="lazy" alt="Models, ChatGPT: Plan usage with the 5-hour limit 62% used and the weekly limit 41% used, each with its reset time."></a>
       </div>
       <div class="tile span-3">
         <span class="label">Group tools</span>

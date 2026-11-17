@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { getSecret, setSecret, onSecretChange } from '../store.js';
 import { DATA_DIR, fail } from '../config.js';
 import { netEnv } from '../mcp-local.js';
+import { parseCopilotUser } from './plan-usage.js';
 
 export const id = 'copilot';
 export const SECRET = 'COPILOT_GITHUB_TOKEN';
@@ -134,7 +135,7 @@ export const friendlyError = (e) => {
   return e instanceof Error ? e : new Error(m);
 };
 
-// ---------- models & quota ----------
+// ---------- models & plan usage ----------
 async function listModelsFor(secret) {
   try {
     const cl = await client(secret);
@@ -145,18 +146,28 @@ async function listModelsFor(secret) {
   } catch (e) { throw friendlyError(e); }
 }
 
-/** Remaining Copilot allowance, when the account reports it. */
-export async function quota(secret = SECRET) {
-  const cl = await client(secret);
-  const res = await cl.rpc.account.getQuota({});
-  const snaps = res?.quotaSnapshots || {};
-  const key = ['premium_interactions', 'chat'].find((k) => snaps[k]) || Object.keys(snaps)[0];
-  const s = key && snaps[key];
-  if (!s) return null;
-  return {
-    kind: key, unlimited: !!s.isUnlimitedEntitlement, used: s.usedRequests ?? null, total: s.entitlementRequests ?? null,
-    remainingPercent: s.remainingPercentage != null ? Math.round(s.remainingPercentage) : null, resetDate: s.resetDate || null,
-  };
+const GITHUB_API = () => (process.env.GITHUB_API_BASE || 'https://api.github.com').replace(/\/+$/, '');
+/**
+ * 067: plan usage as limits (plan-usage.js): GitHub's copilot_internal/user, the quota the editors show (premium
+ * requests, and chat messages on the free plan). If GitHub does not answer it for this token, the runtime's quota —
+ * only when the runtime already runs or `allowStart` (Models open), never started just for this on the tick.
+ */
+export async function planLimits(secret = SECRET, { allowStart = true } = {}) {
+  const token = getSecret(secret);
+  if (!token) return null;
+  try {
+    const res = await fetch(`${GITHUB_API()}/copilot_internal/user`, { headers: { authorization: `token ${token}`, accept: 'application/json', 'user-agent': 'duniya' }, signal: AbortSignal.timeout(15000) });
+    const limits = res.ok ? parseCopilotUser(await res.json().catch(() => null)) : null;
+    if (limits) return limits;
+  } catch { /* try the runtime */ }
+  if (!allowStart && !clients.has(secret)) return null;
+  const q = await (await client(secret)).rpc.account.getQuota({});
+  const snaps = q?.quotaSnapshots;
+  if (!snaps) return null;
+  const one = (s) => s && { entitlement: s.entitlementRequests, remaining: s.entitlementRequests != null && s.usedRequests != null ? s.entitlementRequests - s.usedRequests : null,
+    percent_remaining: s.remainingPercentage, unlimited: !!s.isUnlimitedEntitlement };
+  const reset = Object.values(snaps).find((s) => s?.resetDate)?.resetDate;
+  return parseCopilotUser({ quota_reset_date: reset, quota_snapshots: { premium_interactions: one(snaps.premium_interactions), chat: one(snaps.chat) } });
 }
 
 /** Signed-in GitHub login, when the runtime reports it. */

@@ -49,7 +49,7 @@ setup, test console — its *Try it* card is the Ask box). The AI helper and its
 | **Tool services** | Global services are on by default (switch one off here); it can have its own services too. Each service's role defaults decide its tools |
 | **WhatsApp actions** | Send pictures, GIFs, files, locations, contact cards, polls, reactions, replies. Group administration stays with the admin tools |
 | **Photos & voice** | Look at photos and PDFs, listen to voice notes, answer with voice, create pictures (in your own chat) |
-| **Alerts** | The number spending-cap, model-provider and update alerts go to. Only the owner can change it |
+| **Alerts** | The number spending-cap, model-provider, plan-usage and update alerts go to. Only the owner can change it |
 | **Scheduled messages to you** | The **weekly summary** (on, Monday 09:00) and your own, e.g. a morning brief. Sent to every linked owner and admin in their own chat; they run even while agents are paused |
 | **Monthly spending cap** | Like any agent |
 
@@ -116,6 +116,8 @@ setup, test console — its *Try it* card is the Ask box). The AI helper and its
 **Agents → Owner assistant → Alerts**: enter your number.
 
 - **Cap alerts** and model-provider alerts go there as they happen ([spending caps](spending.md)).
+- **Plan usage**: once per window when a plan or credit reaches 90 % and when it is used up ("ChatGPT has used 91% of
+  its 5-hour limit (resets 14:20)") ([plan usage](models.md#plan-usage)).
 - **Weekly summary**: the owner assistant's `weekly-summary` schedule (on, Monday 09:00; change day, time or switch it
   off in **Scheduled messages to you**). Messages handled, replies and cost per agent this week vs last, ignored
   chats, pending confirmations, update available, backup failures, a server restart waiting more than 7 days to

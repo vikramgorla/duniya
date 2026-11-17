@@ -10,6 +10,7 @@ people and AI agents alike). In short:
 - **Pull requests only.** `main` is protected: changes land through a PR from a branch named `<type>/<issue>-<slug>`
   (e.g. `feat/10-silent-by-default`), squash-merged after all required checks pass — test, quality (lint, panel
   script, dependency audit, version consistency), scripts & infra, Docker build, CodeQL. No direct or force pushes.
+- **Commits and PRs.** No attribution trailers or footers in commits and PRs (no Co-Authored-By, session links or 'Generated with' lines). Commits are authored by the repository owner's identity; no AI co-author trailers or signatures; squash merges use an explicit message.
 - **Checks you run locally:** `npm test`, `npm run lint`, `npm run typecheck`, `npm run check:panel`; for UI also
   `npm run check:responsive` (needs Chrome). The demo panel: `node scripts/demo-panel.mjs`.
 - **Design.** UI follows `DESIGN.md` and its checklist (light/dark, phones at 375/393 px).

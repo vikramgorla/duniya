@@ -39,12 +39,14 @@ loadStored();
 
 const hhmm = (ts) => new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: env.timezone });
 
-/** Plain-language status line, e.g. "Paused until 14:20 — usage limit reached". */
+/** Why it failed: the plan window that is used up when the provider reported it (067), else the reason. */
+const why = (s) => s.limit || REASON_TEXT[s.reason] || s.reason;
+/** Plain-language status line, e.g. "Paused until 14:20 — usage limit reached" or "… — 5-hour limit used up, resets 14:20". */
 function describe(s) {
   if (s.needsReconnect) return 'Sign-in expired or key rejected — reconnect this account';
-  if (s.probing) return `Checking again — last error: ${REASON_TEXT[s.reason] || s.reason}`;
-  if (s.until > now()) return `Paused until ${hhmm(s.until)} — ${REASON_TEXT[s.reason] || s.reason}`;
-  return `Will be tried again on the next message — last error: ${REASON_TEXT[s.reason] || s.reason}`;
+  if (s.probing) return `Checking again — last error: ${why(s)}`;
+  if (s.until > now()) return `Paused until ${hhmm(s.until)} — ${why(s)}`;
+  return `Will be tried again on the next message — last error: ${why(s)}`;
 }
 
 /** Status of one account for the panel: { state: ok|paused|probing|reconnect, until?, reason?, message?, text? }. */
@@ -52,7 +54,7 @@ export function accountState(id) {
   const s = states.get(id);
   if (!s) return { state: 'ok' };
   const state = s.needsReconnect ? 'reconnect' : s.probing ? 'probing' : s.until > now() ? 'paused' : 'probing';
-  return { state, until: s.until, since: s.since, reason: s.reason, message: s.message, failures: s.failures, text: describe(s) };
+  return { state, until: s.until, since: s.since, reason: s.reason, message: s.message, failures: s.failures, text: describe(s), ...(s.limit ? { limit: s.limit } : {}) };
 }
 export const allStates = () => Object.fromEntries([...states.keys()].map((id) => [id, accountState(id)]));
 
@@ -84,10 +86,11 @@ export function release(id) { const s = states.get(id); if (s) s.probing = false
 /** Earliest time any of these accounts can be tried again (for "paused until"). */
 export const nextTry = (ids) => Math.min(...ids.map((id) => states.get(id)?.until || 0));
 
-export function recordFailure(id, cls, { name = id, message = '' } = {}) {
+/** `limit` (067): the plan window that is used up, e.g. "weekly limit used up, resets Thu 14:20". */
+export function recordFailure(id, cls, { name = id, message = '', limit = '' } = {}) {
   const t = now();
   const s = states.get(id) || { failures: 0, since: t, alerted: false, name };
-  s.failures++; s.name = name; s.reason = cls.reason; s.message = String(message).slice(0, 300); s.probing = false;
+  s.failures++; s.name = name; s.reason = cls.reason; s.message = String(message).slice(0, 300); s.probing = false; s.limit = String(limit || '').slice(0, 120);
   let ms = Math.min(BASE_MS * 2 ** (s.failures - 1), MAX_MS);
   if (cls.retryAfterMs) ms = Math.max(Math.min(cls.retryAfterMs, QUOTA_MAX_MS), cls.reason === 'rate_limit' ? 5000 : BASE_MS);
   if (cls.reason === 'auth') { s.needsReconnect = true; ms = MAX_MS; }
@@ -107,7 +110,7 @@ export function recordSuccess(id, { name = id } = {}) {
   if (!s) return;
   states.delete(id);
   deleteTtl(KIND, id);
-  activity('model.provider', { summary: `${name} is answering again (was paused ${Math.max(1, Math.round((now() - s.since) / 60000))} min: ${REASON_TEXT[s.reason] || s.reason})`, detail: { account: id, recovered: true } });
+  activity('model.provider', { summary: `${name} is answering again (was paused ${Math.max(1, Math.round((now() - s.since) / 60000))} min: ${why(s)})`, detail: { account: id, recovered: true } });
   if (s.alerted) sendOwnerAlert(`Duniya: ${name} is answering again.`, { kind: 'provider' }).catch(() => {});
 }
 
@@ -122,7 +125,7 @@ function maybeAlert(id, s, name) {
   if (states.get(id) === s) save(id, s); // one alert per outage, also across a restart
   const text = s.needsReconnect
     ? `Duniya: ${name} needs to be reconnected (sign-in expired or key rejected). Open Models in the panel and reconnect it. Other connected providers answer meanwhile.`
-    : `Duniya: ${name} has been failing for ${Math.round((now() - s.since) / 60000)} minutes (${REASON_TEXT[s.reason] || s.reason}). ${s.until > now() ? `It is paused until ${hhmm(s.until)}; ` : ''}other connected providers answer meanwhile. See Models in the panel.`;
+    : `Duniya: ${name} has been failing for ${Math.round((now() - s.since) / 60000)} minutes (${why(s)}). ${s.until > now() ? `It is paused until ${hhmm(s.until)}; ` : ''}other connected providers answer meanwhile. See Models in the panel.`;
   sendOwnerAlert(text, { kind: 'provider' }).catch(() => {});
 }
 
@@ -141,11 +144,11 @@ export const resetAllFailedAlert = () => { lastAllFailed = 0; };
 const switches = new Map(); // "from>to:reason" -> ts
 const SWITCH_DEDUP_MS = 15 * 60000;
 /** One activity entry per from → to + reason every 15 minutes. */
-export function noteSwitch({ from, to, reason, agent = '', chat = '' }) {
+export function noteSwitch({ from, to, reason, limit = '', agent = '', chat = '' }) {
   const key = `${from}>${to}:${reason}`;
   if (now() - (switches.get(key) || 0) < SWITCH_DEDUP_MS) return false;
   switches.set(key, now());
-  activity('model.fallback', { agent, chat, summary: `Answered by ${to} after ${from} failed (${REASON_TEXT[reason] || reason})`, detail: { from, to, reason } });
+  activity('model.fallback', { agent, chat, summary: `Answered by ${to} after ${from} failed (${limit || REASON_TEXT[reason] || reason})`, detail: { from, to, reason, ...(limit ? { limit } : {}) } });
   return true;
 }
 export const resetSwitches = () => switches.clear();
