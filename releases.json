@@ -1,6 +1,15 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.31.1": {
+      "breaking": false,
+      "title": "Clearer guides and a new website",
+      "changes": [
+        { "type": "improved", "text": "The guides follow the path you take: install, connect WhatsApp, add a model, first agent, chats, owner assistant, everyday use, then server and reference. Shorter pages with current screenshots." },
+        { "type": "improved", "text": "A new website: what Duniya is in one line, a short tour, how it works in three steps, the features that matter, one-click install and straight answers." },
+        { "type": "removed", "text": "The one-time backup in the new format at startup (it ran once after updating to 2.31.0). Backups made by 2.30 or earlier still can't be restored: make a new one under Backups if you haven't since updating." }
+      ]
+    },
     "2.31.0": {
       "breaking": false,
       "title": "Search what was said in every chat, and teach agents from their real answers",
@@ -12,7 +21,7 @@
         { "type": "improved", "text": "Backups are compressed and encrypted while they are written, using a few MB of memory instead of several times the database size; a damaged backup is refused before anything is replaced." },
         { "type": "improved", "text": "The Chats list, Usage by day and every message are handled faster, also with hundreds of chats." },
         { "type": "improved", "text": "The sign-in and consent page for AI assistants looks like the rest of Duniya and runs no inline code." },
-        { "type": "removed", "text": "Restoring backups made by Duniya 2.30 or earlier. Right after this update Duniya makes a fresh backup in the new format by itself, so you always have one you can restore." }
+        { "type": "removed", "text": "Restoring backups made by Duniya 2.30 or earlier. Make a new backup after updating (Backups → Back up now, or wait for the next scheduled one) so you always have one you can restore." }
       ]
     },
     "2.30.1": {
