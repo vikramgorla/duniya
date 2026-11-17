@@ -127,6 +127,7 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     /** Start every channel that is set up and on. */
     async start(h) {
       handlers = h;
+      for (const l of live.values()) await l.adapter.start(wrapped()); // switched on in the panel before the app finished starting
       for (const c of CHANNELS) if (setUp(c.id) && !offList().includes(c.id)) await load(c.id).catch(() => {});
     },
     async typing(chat) { try { await route(chat).typing?.(chat); } catch { /* best effort */ } },
