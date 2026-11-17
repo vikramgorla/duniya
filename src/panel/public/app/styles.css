@@ -512,7 +512,7 @@ label.welcome-pick { gap: 6px; justify-content: flex-start; } label.welcome-pick
 .phead h2 { margin: 0; flex: 1; min-width: 0; }
 .pcost { margin-top: var(--s2); }
 .pstate { display: flex; gap: 6px; flex-wrap: wrap; margin-top: var(--s2); }
-.pcost .help { width: 20px; height: 20px; font-size: 11px; vertical-align: middle; margin-left: 2px; }
+.pcost .help { width: 22px; height: 22px; vertical-align: middle; margin-left: 2px; }
 details.add-acct { margin-top: var(--s3); border-top: 1px solid var(--line); padding-top: var(--s2); }
 details.add-acct > summary { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; list-style: none; }
 details.add-acct > summary::-webkit-details-marker { display: none; }

@@ -141,9 +141,9 @@ function accountsBox({ first, provs, addForm, ownerOnly }) {
       p.connected ? planSection(p) : null,
       p.health?.state === 'reconnect' && p.type === 'chatgpt' && can('owner') ? (() => { const f = chatgptFlow({ account: p.id }); return h('div', {}, f.start, f.form); })() : null,
       h('div', { class: 'row', style: 'margin-top:8px' }, t?.btn,
-        can('admin') ? menu(`More actions for ${p.name}`,
+        can('admin') ? Object.assign(menu(`More actions for ${p.name}`,
           h('button', { class: 'btn small', type: 'button', onclick: async () => { if (await ask({ title: `Rename ${p.name}`, ok: 'Rename', body: field('Label', name) }) && await tryApi(() => api('PUT', `/api/accounts/${encodeURIComponent(p.id)}`, { label: name.value.trim() }), 'Renamed')) { S.models = null; renderModels(); } } }, 'Rename'),
-          can('owner') ? h('button', { class: 'btn small danger', type: 'button', onclick: async () => (await ask({ title: `Remove ${p.name}?`, text: 'Its key or sign-in is deleted. Agents set to its models switch to the next model in the fallback chain.', ok: 'Remove account', danger: true })) && tryApi(async () => { await api('DELETE', `/api/accounts/${encodeURIComponent(p.id)}`); S.models = null; renderModels(); }, 'Removed') }, 'Remove') : null) : null),
+          can('owner') ? h('button', { class: 'btn small danger', type: 'button', onclick: async () => (await ask({ title: `Remove ${p.name}?`, text: 'Its key or sign-in is deleted. Agents set to its models switch to the next model in the fallback chain.', ok: 'Remove account', danger: true })) && tryApi(async () => { await api('DELETE', `/api/accounts/${encodeURIComponent(p.id)}`); S.models = null; renderModels(); }, 'Removed') }, 'Remove') : null), { style: 'margin-left:auto' }) : null),
       t?.out);
   });
   const strat = first.strategy || 'order';
