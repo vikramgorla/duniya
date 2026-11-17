@@ -324,10 +324,14 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     [0, 'Car pooling', 'Tomorrow (Thu 20 Nov): Luca 07:15 from Morges (full), Mia back from Cornavin at 18:10 (1 seat). Sophie, Mia could take you.', false, true],
     [9, 'Mia', 'Yes Sophie, meet at Cornavin 18:10 👍', false, false],
   ];
-  let lastId = 0;
+  let lastId = 0; const answers = [];
   conv.forEach(([p, name, text, addressed, fromAgent], i) => {
     lastId = db.logMessage({ chat: G(3), agent: fromAgent ? 'carpool' : '', msgId: `m${i}`, sender: fromAgent ? '' : P(p), name, text, addressed, fromAgent, ts: now - (conv.length - i) * 23 * MIN });
+    if (fromAgent) answers.push(lastId);
   });
+  // 070: Review — one answer rated good, one wrong (shows Teach)
+  const review = await imp('src/core/review.js');
+  review.rateAnswer('carpool', answers[0], 1, 'admin'); review.rateAnswer('carpool', answers[1], -1, 'admin');
   db.setChatMemory(G(3), 'Regular rides: Marc (Mon/Wed/Fri 07:40 Morges station → Geneva), Luca (Tue/Thu 07:15). Mia returns from Cornavin around 18:10. Lea needs Friday mornings.', lastId);
   for (const [text, author] of [['Fri 21 Nov — Marc, 07:40 Morges station → Geneva, seats: Lea + 1 free', 'Marc'], ['Thu 20 Nov — Mia, 18:10 Geneva Cornavin → Morges, seats: Sophie', 'Mia'], ['Sophie needs a ride back on Thursdays (Cornavin → Morges)', 'Sophie']]) {
     db.addNote({ chat: G(3), agent: 'carpool', text, author, role: 'participant' });

@@ -55,6 +55,8 @@ const SECTIONS = [
     sub: (x) => (x.c.alerts?.to ? `+${x.c.alerts.to}` : 'Only in Activity'), build: buildAlerts },
   { group: 'How it works', id: 'advanced', icon: 'settings', c: 'c0', title: () => 'Advanced', help: 'agents.md', line: () => 'Timezone and how much it reads and writes.',
     sub: (x) => [x.c.timezone || 'Server timezone', plural(x.c.historySize, 'message'), `${x.c.maxTokens} tokens`].join(' · '), build: buildAdvanced },
+  { group: 'Try it', id: 'review', agent: true, icon: 'activity', c: 'c3', title: () => 'Review', help: 'agents.md#review-and-teach', line: () => 'Its recent answers. Rate them, and teach it where it went wrong.',
+    sub: (x) => reviewLine(x.review), build: buildReview },
   { group: 'Try it', id: 'test', icon: 'send', c: 'c5', title: (x) => (x.bi ? 'Try it' : 'Test'), help: 'agents.md', line: (x) => (x.bi ? 'The same conversation as Ask on Overview.' : 'Real tools and saved settings; nothing is posted to WhatsApp.'),
     sub: (x) => (x.bi ? 'Ask it something' : 'Ask it as a participant or an organizer'), build: buildTest },
 ];
@@ -70,7 +72,7 @@ export function agentPage(id, { onChange } = {}) {
     const enc = encodeURIComponent(id);
     const [b, models, us, bud, chats] = await Promise.all([api('GET', `/api/agents/${enc}`), loadModels().catch(() => ({ models: [] })), usageSummary(),
       api('GET', '/api/budget').catch(() => null), api('GET', '/api/chats').catch(() => [])]);
-    const x = { id, enc, b, c: structuredClone(b.config), bi: !!b.builtin, models, us, cap: (bud?.caps || []).find((k) => k.scope === 'agent' && k.id === id) || null,
+    const x = { id, enc, b, c: structuredClone(b.config), bi: !!b.builtin, models, us, review: b.review, cap: (bud?.caps || []).find((k) => k.scope === 'agent' && k.id === id) || null,
       chats: chats.filter((ch) => (b.config.chats || []).includes(ch.id)) };
     const route = location.hash.split('/');
     const [want, focus] = OLD[route[2]] || [route[2], ''];
@@ -127,7 +129,7 @@ export function agentPage(id, { onChange } = {}) {
     const s = SECTIONS.find((y) => y.id === sid);
     redraw = (y) => openSection(y, sid, false);
     if (push) history.pushState(null, '', `#agents/${x.enc}/${sid}`);
-    const built = s.build(x, { save: (patch, F, o) => save(x, patch, F, o) });
+    const built = s.build(x, { save: (patch, F, o) => save(x, patch, F, o), teach: (text) => changeWithAi(x, text) });
     let base = built.value ? JSON.stringify(built.value()) : '';
     // One save model (068): nothing changed → a quiet "All changes saved"; a change → a bar with Save that stays in reach
     const saveBtn = built.value && can('admin') ? h('button', { class: 'btn primary', type: 'button' }, 'Save') : null;
@@ -157,8 +159,8 @@ export function agentPage(id, { onChange } = {}) {
     if (focus && built.F?.[focus]) { built.F[focus].scrollIntoView({ block: 'center' }); built.F[focus].focus({ preventScroll: true }); }
   }
   /** "Change with AI": describe a change, review the visual diff, apply (the shared dialog; a sheet on phones). */
-  async function changeWithAi(x) {
-    const helper = await aiHelper({ agentId: id, bare: true, applyLabel: 'Apply & save',
+  async function changeWithAi(x, initial = '') {
+    const helper = await aiHelper({ agentId: id, bare: true, applyLabel: 'Apply & save', initial,
       placeholder: 'What should change? e.g. “Shorter, friendlier replies”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',
       onApply: async (r) => { if (await save(x, Object.fromEntries(r.changes.map((ch) => [ch.field, ch.after])))) { helper.closest('dialog')?.close(); redraw(x); } } });
     ask({ title: 'Change with AI', body: helper, ok: null, cancel: 'Close', wide: true });
@@ -167,6 +169,42 @@ export function agentPage(id, { onChange } = {}) {
 }
 
 // ---------- sections ----------
+/** 070: "👍 3 · 👎 1 this week" on the Review row. */
+const reviewLine = (r) => (!r ? 'Rate its answers' : r.up || r.down ? `👍 ${r.up} · 👎 ${r.down} this week` : r.answers ? `${plural(r.answers, 'answer')} this week, none rated` : 'No answers this week');
+/** 070: Review & teach — its answers with the question, 👍 / 👎, and Teach (the AI helper, pre-filled). */
+function buildReview(x, { teach }) {
+  if (!can('admin')) return { el: h('p', { class: 'small muted' }, 'Admins and the owner can read and rate its answers.') };
+  const list = h('div', { class: 'rv-list' }, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading answers…'));
+  const more = h('button', { class: 'btn small hide', type: 'button' }, 'Show older answers');
+  const admin = can('admin');
+  let only = ''; let last = 0;
+  const thumb = (a, v, label, rowEl) => h('button', { class: `btn small rv-t${a.rating === v ? ' on' : ''}`, type: 'button', 'aria-label': label, 'aria-pressed': String(a.rating === v), disabled: !admin,
+    onclick: () => tryApi(async () => { const r = await api('PUT', `/api/agents/${x.enc}/review/${a.id}`, { rating: a.rating === v ? 0 : v }); a.rating = r.rating; x.review = r.counts; rowEl.replaceWith(item(a)); }) }, v > 0 ? '👍' : '👎');
+  function item(a) {
+    const el = h('div', { class: 'rv' });
+    const prompt = `Someone asked: “${trunc(a.question?.text || '(no question found)', 300)}”\nIt answered: “${trunc(a.text, 400)}”\nBetter answer: `;
+    el.append(
+      h('div', { class: 'small muted' }, [a.question?.name, a.chatName, time(a.ts)].filter(Boolean).join(' · ')),
+      a.question ? h('div', { class: 'rv-q' }, a.question.text) : null,
+      h('div', { class: 'rv-a', title: 'Tap to show all', onclick: (e) => e.currentTarget.classList.toggle('open') }, a.text),
+      h('div', { class: 'row' }, thumb(a, 1, 'Good answer', el), thumb(a, -1, 'Wrong or unhelpful answer', el),
+        admin && a.rating < 0 ? h('button', { class: 'btn small', type: 'button', onclick: () => teach(prompt) }, h('span', { class: 'ai-chip' }, 'AI'), ' Teach…') : null));
+    return el;
+  }
+  async function load(older) {
+    const r = await tryApi(() => api('GET', `/api/agents/${x.enc}/review?only=${only}${older && last ? `&before=${last}` : ''}`));
+    if (!r) return;
+    x.review = r.counts;
+    const items = r.answers.map(item);
+    if (older) list.append(...items);
+    else list.replaceChildren(...(items.length ? items : [h('p', { class: 'small muted' }, only === 'down' ? 'No answer is rated 👎.' : only ? 'Every answer is rated.' : 'No answers yet. They appear here after the agent answers in a chat.')]));
+    last = r.answers.at(-1)?.id || last; more.classList.toggle('hide', !r.more);
+  }
+  more.onclick = () => load(true);
+  const filter = seg('Show', [['', 'All'], ['down', '👎'], ['unrated', 'Not rated']], only, (v) => { only = v; last = 0; load(false); });
+  load(false);
+  return { el: h('div', {}, h('div', { class: 'ld-tools' }, filter), list, h('div', { style: 'text-align:center;margin-top:10px' }, more)) };
+}
 function buildCharacter(x) {
   const F = { name: h('input', { value: x.c.name || '' }), description: h('input', { value: x.c.description || '' }),
     prompt: h('textarea', { class: 'prose', style: 'min-height:min(52vh,420px)', value: x.c.prompt || '', placeholder: x.bi ? 'e.g. Answer in English, short; call me Vik.' : '' }) };

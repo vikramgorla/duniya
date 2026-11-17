@@ -8,7 +8,7 @@ import { activity } from '../../core/events.js';
 import { globalServers } from '../../core/global-mcp.js';
 import { applyPending } from '../../core/runner.js';
 import { referencedSecrets } from '../../core/schema.js';
-import { getSettings, listSecrets, setSecret, updateSettings } from '../../core/store.js';
+import { getSetting, listSecrets, setSecret, updateSettings } from '../../core/store.js';
 import { logs as sysLogs, metricsHistory, opsStatus, osUpdates, requestOp, snapshot as sysSnapshot } from '../../core/system.js';
 import { PLAN_PROVIDERS, listPrices, setPrice, usageReport } from '../../core/usage.js';
 
@@ -74,7 +74,7 @@ export function systemRoutes(route, { channel } = {}) {
   }, { role: 'owner' });
   route('PUT', '/api/whatsapp/numbers/:id', async (req, res, body, q, p) => {
     if (body.dmAgent !== undefined) {
-      const list = (getSettings().whatsappNumbers || [{ id: 'main', label: 'Main' }]).map((n) => (n.id === p.id ? { ...n, dmAgent: String(body.dmAgent || '') } : n));
+      const list = (getSetting('whatsappNumbers', null) || [{ id: 'main', label: 'Main' }]).map((n) => (n.id === p.id ? { ...n, dmAgent: String(body.dmAgent || '') } : n));
       updateSettings({ whatsappNumbers: list });
     }
     if (body.label) await channel.renameNumber?.(p.id, body.label);

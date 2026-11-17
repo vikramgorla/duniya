@@ -73,6 +73,10 @@ Press **/** or **⌘K** (Ctrl+K), or tap the search button in the header, and ty
 agent*, *add a direct chat*). ↑ ↓ and Enter, or tap. Links like `#settings/secrets`, `#models/chatgpt` or
 `#chats/<chat id>` open the screen at that spot.
 
+As the owner, the last row is **Search messages for "…"**: what was said in any chat that is on (word beginnings
+match, any order), with the words marked; tap a result to open that chat's messages
+([Agents → Chats](agents.md#the-chats-screen-and-a-chats-page)).
+
 ![Find anything](site/img/card-find.webp)
 
 ## Trying an agent: test console and *Test as*

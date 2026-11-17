@@ -30,7 +30,7 @@
 
 <table>
 <tr>
-<td width="33%" valign="top"><a href="docs/agents.md"><img src="docs/img/thumb-agents.webp" alt="AI helper showing a visual diff of an agent change" width="100%"></a><br><b>Agents in plain words</b><br>Templates or describe it; review a visual diff. Calm lists, one row per agent and chat; each agent's settings as short sections. Quick replies, welcomes and FAQ answers without AI.</td>
+<td width="33%" valign="top"><a href="docs/agents.md"><img src="docs/img/thumb-agents.webp" alt="AI helper showing a visual diff of an agent change" width="100%"></a><br><b>Agents in plain words</b><br>Templates or describe it; review a visual diff. Calm lists, one row per agent and chat; each agent's settings as short sections. Quick replies, welcomes and FAQ answers without AI. <b>Review</b> its real answers with 👍/👎 and teach it a better one in two taps.</td>
 <td width="33%" valign="top"><a href="docs/privacy.md"><img src="docs/img/thumb-privacy.webp" alt="Privacy notice settings" width="100%"></a><br><b>Silent by default</b><br>Chats are off until you switch them on; then recent messages load from your phone (retried by itself). Set up a person's chat before they write.</td>
 <td width="33%" valign="top"><a href="docs/owner-assistant.md"><img src="docs/img/thumb-ask.webp" alt="Ask box with a weekly recap" width="100%"></a><br><b>Your own super agent</b><br>Recaps, GIFs, voice and pictures in your own WhatsApp chat, or the Ask conversation in the panel (live thinking, tool steps and streaming answers, Stop and follow-ups); posts into your groups after you confirm. Keys and passwords never go through the chat: one-time links instead.</td>
 </tr>
@@ -42,11 +42,11 @@
 <tr>
 <td valign="top"><a href="docs/agents.md#tool-services-mcp"><img src="docs/img/thumb-mcp.webp" alt="Adding an MCP tool service" width="100%"></a><br><b>Real tools via MCP</b><br>Browse the MCP Registry and add in one click; per-role allow lists, confirm step for changes.</td>
 <td valign="top"><a href="docs/agents.md#whatsapp-actions"><img src="docs/img/thumb-wa-group.webp" alt="WhatsApp group settings card" width="100%"></a><br><b>WhatsApp powers</b><br>Media, polls, reactions, group admin per role. Names from your phone contacts and group member tags.</td>
-<td valign="top"><a href="docs/getting-started.md#why-didnt-it-answer"><img src="docs/img/thumb-quiet.webp" alt="Why agents stayed quiet, with fixes" width="100%"></a><br><b>"Why didn't it answer?"</b><br>Reasons per chat, one-click fixes. Press <b>/</b> to find anything.</td>
+<td valign="top"><a href="docs/getting-started.md#why-didnt-it-answer"><img src="docs/img/thumb-quiet.webp" alt="Why agents stayed quiet, with fixes" width="100%"></a><br><b>"Why didn't it answer?"</b><br>Reasons per chat, one-click fixes. Press <b>/</b> to find anything, or search what was said in every chat.</td>
 </tr>
 <tr>
 <td valign="top"><a href="docs/domains-and-access.md"><img src="docs/img/thumb-web-access.webp" alt="Web address and access settings" width="100%"></a><br><b>Your domain, any proxy</b><br>Automatic HTTPS, a switch that never locks you out.</td>
-<td valign="top"><a href="docs/backups-and-updates.md"><img src="docs/img/thumb-backups.webp" alt="Backups page" width="100%"></a><br><b>Backups &amp; updates</b><br>Encrypted to GitHub or S3; every update shows what's new before and after; breaking ones wait for your OK; no SSH needed.</td>
+<td valign="top"><a href="docs/backups-and-updates.md"><img src="docs/img/thumb-backups.webp" alt="Backups page" width="100%"></a><br><b>Backups &amp; updates</b><br>Encrypted while written (a few MB of memory) to GitHub or S3; every update shows what's new before and after; breaking ones wait for your OK; no SSH needed.</td>
 <td valign="top"><a href="docs/admin-mcp.md"><img src="docs/img/thumb-assistants.webp" alt="Connected AI assistants card" width="100%"></a><br><b>From ChatGPT, Claude or your phone</b><br>The app is an MCP server too, and the panel <a href="docs/phone.md">installs on your home screen</a> (tab bar at your thumb, works with a keyboard and a screen reader) and opens fast on a slow connection.</td>
 </tr>
 </table>

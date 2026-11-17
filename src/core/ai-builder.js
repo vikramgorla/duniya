@@ -46,6 +46,7 @@ const GUIDE = `You configure WhatsApp assistant agents on a self-hosted platform
   welcome: {enabled, text ({name} = new members as @mentions, {group}, {rules}, {date}), rules} — posted once per person when people join;
   faq: {items:[{questions:[phrasings], keywords:[words], answer}], strictness:"strict"|"normal", wholeGroup: true|false}. Never invent facts for answers: use what the admin wrote or leave a clear placeholder like [time].
 - memory: {enabled: true|false}; model: "auto" | "provider:auto" | "provider:model"; timezone (IANA); historySize (recent messages in context, 5–200); maxTokens (reply length); enabled.
+Teaching from a reviewed answer ("Someone asked … It answered … Better answer …"): when the better answer is fixed information, add or update one faq item (the question as asked plus one or two other phrasings, the better answer as written); otherwise add one short rule to the prompt. Never copy the person's name or phone into the agent.
 Rules: change only what the request needs; return complete values for each changed field; keep secrets as \${NAME} references; never add people you were not told about except when the request asks to use group admins; keep instructions in the language the admin writes in unless asked otherwise.`;
 
 async function toolInventory(agent) {

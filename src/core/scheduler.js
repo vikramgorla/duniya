@@ -1,7 +1,7 @@
 // @ts-check
 import { isChatEnabled } from './chat-prefs.js';
 import { env } from './config.js';
-import { getSettings } from './store.js';
+import { getSetting } from './store.js';
 import { listAgents, isBuiltin } from './agents.js';
 import { runAgent } from './runner.js';
 import { kvGet, kvSet, logMessage } from './db.js';
@@ -54,7 +54,7 @@ export async function runSchedule(agent, sched, channel, { force = false } = {})
 export function startScheduler(channel) {
   setInterval(async () => {
     upkeepTick(channel).catch(() => {}); // 057: names, member lists, history retries — bounded, never blocks schedules
-    const paused = getSettings().paused;
+    const paused = getSetting('paused', false);
     for (const agent of listAgents()) {
       if (!agent.enabled || (paused && !isBuiltin(agent))) continue; // 059: the owner assistant's schedules run even while paused
       const { hhmm, day } = nowParts(agent.timezone || env.timezone);

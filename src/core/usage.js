@@ -58,12 +58,29 @@ export function recordUsage({ agent = '', chat = '', provider, account = '', mod
 }
 
 const GROUPS = { agent: 'agent', chat: 'chat', provider: 'provider', account: "COALESCE(account, provider)", model: "COALESCE(account, provider) || ':' || model", kind: 'kind',
-  fallback: "CASE WHEN fallback IS NULL OR fallback = '' THEN 'first choice' ELSE 'fallback' END", day: "strftime('%Y-%m-%d', ts / 1000, 'unixepoch', 'localtime')" };
+  fallback: "CASE WHEN fallback IS NULL OR fallback = '' THEN 'first choice' ELSE 'fallback' END" };
+const DAY = 86400000;
+/**
+ * 070: the local day of a row as integer math. The server's UTC offset is constant between daylight-saving changes,
+ * so the offset is a short CASE over the changes in [lo, hi] (found here, to the second); a strftime(…'localtime')
+ * per row cost twice as much. The key is the local day number: key * DAY as a UTC date is the local date.
+ */
+function localDayKey(lo, hi) {
+  const off = (t) => -new Date(t).getTimezoneOffset() * 60000;
+  const segs = []; let cur = off(lo);
+  for (let t = lo + DAY; t < hi + DAY; t += DAY) {
+    const at = Math.min(t, hi); const o = off(at);
+    if (o === cur) continue;
+    let a = t - DAY; let b = at;
+    while (b - a > 1000) { const m = Math.floor((a + b) / 2); if (off(m) === cur) a = m; else b = m; }
+    segs.push(`WHEN ts < ${Math.trunc(b)} THEN ${cur}`); cur = o;
+  }
+  return `(ts + ${segs.length ? `CASE ${segs.join(' ')} ELSE ${cur} END` : cur}) / ${DAY}`;
+}
 
 /** Totals and breakdowns for a period. */
 export function usageReport({ from = 0, to = Date.now(), groupBy = 'agent', agent = '', chat = '' } = {}) {
-  const key = GROUPS[groupBy];
-  if (!key) throw fail('groupBy must be one of agent, chat, provider, account, model, kind, fallback, day');
+  if (!GROUPS[groupBy] && groupBy !== 'day') throw fail('groupBy must be one of agent, chat, provider, account, model, kind, fallback, day');
   const where = ['ts >= ?', 'ts <= ?'];
   /** @type {(string|number)[]} */
   const args = [Number(from) || 0, Number(to) || Date.now()];
@@ -71,8 +88,10 @@ export function usageReport({ from = 0, to = Date.now(), groupBy = 'agent', agen
   if (chat) { where.push('chat = ?'); args.push(chat); }
   const cols = `COUNT(*) AS calls, SUM(input) AS input, SUM(output) AS output, SUM(cost) AS cost,
     SUM(CASE WHEN priced IS NULL THEN 1 ELSE 0 END) AS unpriced, SUM(CASE WHEN priced = 'plan' THEN 1 ELSE 0 END) AS plan`;
-  const total = db.prepare(`SELECT ${cols} FROM usage WHERE ${where.join(' AND ')}`).get(...args);
+  const total = db.prepare(`SELECT MIN(ts) AS lo, ${cols} FROM usage WHERE ${where.join(' AND ')}`).get(...args);
+  const key = groupBy === 'day' ? localDayKey(Math.trunc(Number(total.lo ?? args[1])), Math.trunc(Number(args[1]))) : GROUPS[groupBy];
   const rows = db.prepare(`SELECT ${key} AS key, ${cols} FROM usage WHERE ${where.join(' AND ')} GROUP BY 1 ORDER BY ${groupBy === 'day' ? '1' : 'input + output DESC'} LIMIT 500`).all(...args);
-  const clean = (r) => ({ ...r, input: r.input || 0, output: r.output || 0, cost: r.cost == null ? null : Math.round(r.cost * 1e6) / 1e6 });
+  const clean = ({ lo: _lo, ...r }) => ({ ...r, ...(groupBy === 'day' && 'key' in r ? { key: new Date(r.key * DAY).toISOString().slice(0, 10) } : {}),
+    input: r.input || 0, output: r.output || 0, cost: r.cost == null ? null : Math.round(r.cost * 1e6) / 1e6 });
   return { from: args[0], to: args[1], groupBy, total: clean(total), rows: rows.map(clean) };
 }

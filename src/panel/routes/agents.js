@@ -2,7 +2,8 @@
 // Panel routes: agents (create, edit, import/export, AI draft, people, tool services and their sign-in, test console, schedules) and shared agent memory.
 import { agentView, createAgent, deleteAgent, exportAgent, getAgent, importAgent, isBuiltin, listAgents, listTemplates, loadAgents, templateConfig, updateAgent } from '../../core/agents.js';
 import { draftAgent } from '../../core/ai-builder.js';
-import { isChatEnabled } from '../../core/chat-prefs.js';
+import { isChatEnabled, seenChats } from '../../core/chat-prefs.js';
+import { chatTitle, personInfo } from '../../core/contacts.js';
 import { digits, fail } from '../../core/config.js';
 import { deleteNote, getNote, listNotes, namesInChat } from '../../core/db.js';
 import { activity } from '../../core/events.js';
@@ -13,6 +14,7 @@ import { personView, tagsInChat } from '../../core/member-tags.js';
 import { builtinAnswer, todayText } from '../../core/quick.js';
 import { stripTriggers } from '../../core/router.js';
 import { handleConfirmCommand, runAgent } from '../../core/runner.js';
+import { listAnswers, rateAnswer, reviewCounts } from '../../core/review.js';
 import { runSchedule } from '../../core/scheduler.js';
 import { interpolate } from '../../core/store.js';
 import { oauthClientOf, organizerConnection } from '../../core/tools.js';
@@ -45,7 +47,27 @@ export function agentRoutes(route, { channel } = {}) {
     return [201, { ...agentView(agent), warnings }];
   });
   route('POST', '/api/agents/reload', async () => { await loadAgents(); await resetMcpPool(); activity('system', { summary: 'Agents reloaded' }); return listAgents().map(agentView); });
-  route('GET', '/api/agents/:id', async (req, res, body, q, p) => { const b = getAgent(p.id); return b ? agentView(b) : [404, { error: 'Not found' }]; });
+  route('GET', '/api/agents/:id', async (req, res, body, q, p) => { const b = getAgent(p.id); return b ? { ...agentView(b), ...(isBuiltin(p.id) ? {} : { review: reviewCounts(p.id) }) } : [404, { error: 'Not found' }]; });
+  // 070: Review & teach. The agent's answers with the message that asked (admins, like stored messages; private chats
+  // left out); the first page of a look is recorded in Activity. Ratings: 1, -1 or 0 (clear).
+  route('GET', '/api/agents/:id/review', async (req, res, body, q, p, user) => {
+    const b = getAgent(p.id);
+    if (!b || isBuiltin(p.id)) return [404, { error: 'Not found' }];
+    const rows = listAnswers(p.id, { before: q.get('before'), only: q.get('only') || '', limit: 21 });
+    const seen = new Map(seenChats().map((c) => [c.id, chatTitle(c)]));
+    const names = new Map();
+    for (const chat of new Set(rows.map((r) => r.chat))) names.set(chat, (await channel.chatName?.(chat).catch(() => '')) || seen.get(chat) || chat);
+    if (!q.get('before')) activity('config', { agent: p.id, summary: `Answers of ${b.name} reviewed by ${user.username}` });
+    return {
+      counts: reviewCounts(p.id), more: rows.length > 20,
+      answers: rows.slice(0, 20).map(({ question: qn, ...r }) => ({ ...r, chatName: names.get(r.chat),
+        question: qn && { text: qn.text, ts: qn.ts, name: personInfo({ phone: qn.sender, jid: qn.senderJid, fallbackName: qn.name }).label } })),
+    };
+  }, { role: 'admin' });
+  route('PUT', '/api/agents/:id/review/:msg', async (req, res, body, q, p, user) => {
+    if (!getAgent(p.id) || isBuiltin(p.id)) return [404, { error: 'Not found' }];
+    return { ...rateAnswer(p.id, p.msg, body.rating, user.username), counts: reviewCounts(p.id) };
+  }, { role: 'admin' });
   route('PUT', '/api/agents/:id', async (req, res, body, q, p, user) => {
     const before = getAgent(p.id);
     if (body.mcpServers !== undefined) guardLocal(user, before, body);

@@ -4,7 +4,7 @@ import { storeLoadedBatch, setHistoryChannel, historyChatActive } from './histor
 import { personInfo, agentName } from './contacts.js';
 import { memberTag } from './member-tags.js';
 import { env, clip } from './config.js';
-import { getSettings } from './store.js';
+import { getSetting } from './store.js';
 import { listAgents as allAgents, getAgent, agentForChat, roleIn, isBuiltin } from './agents.js';
 import { runAgent, handleConfirmCommand } from './runner.js';
 import { logMessage, messageByMsgId, saveReaction, savePollVote, pollTally, setMessageText } from './db.js';
@@ -95,15 +95,15 @@ async function agentForDm(msg, channel, { openOnly = false } = {}) {
   if (openOnly) { // chat is off: only an agent that explicitly answers anyone may take it
     const open = listAgents().filter((b) => b.enabled && b.dm === 'anyone');
     const lower = msg.text.trim().toLowerCase();
-    const numberDefault = (getSettings().whatsappNumbers || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
-    return earliestTriggered(open, lower) || open.find((b) => b.id === numberDefault) || open.find((b) => b.id === getSettings().defaultDmAgent) || open[0] || null;
+    const numberDefault = (getSetting('whatsappNumbers', null) || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
+    return earliestTriggered(open, lower) || open.find((b) => b.id === numberDefault) || open.find((b) => b.id === getSetting('defaultDmAgent', '')) || open[0] || null;
   }
   const lower = msg.text.trim().toLowerCase();
   const enabled = listAgents().filter((b) => b.enabled);
   const byTrigger = earliestTriggered(enabled, lower);
-  const numberDefault = (getSettings().whatsappNumbers || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
+  const numberDefault = (getSetting('whatsappNumbers', null) || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
   const candidates = byTrigger ? [byTrigger]
-    : [getAgent(numberDefault), getAgent(getSettings().defaultDmAgent), ...enabled].filter((b) => b?.enabled);
+    : [getAgent(numberDefault), getAgent(getSetting('defaultDmAgent', '')), ...enabled].filter((b) => b?.enabled);
   for (const agent of candidates) {
     if (agent.dm === 'none') continue;
     const role = await resolveRole(agent, msg, channel);
@@ -125,8 +125,8 @@ function dmSilence(msg) {
   const enabled = all.filter((b) => b.enabled);
   if (!enabled.length) return { agent: all[0]?.id || '', reason: all.length ? 'agent_disabled' : 'no_agent' };
   const lower = msg.text.trim().toLowerCase();
-  const numberDefault = (getSettings().whatsappNumbers || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
-  const c = earliestTriggered(enabled, lower) || [getAgent(numberDefault), getAgent(getSettings().defaultDmAgent)].find((b) => b?.enabled) || enabled[0];
+  const numberDefault = (getSetting('whatsappNumbers', null) || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
+  const c = earliestTriggered(enabled, lower) || [getAgent(numberDefault), getAgent(getSetting('defaultDmAgent', ''))].find((b) => b?.enabled) || enabled[0];
   return { agent: c.id, reason: c.dm === 'none' ? 'dm_not_allowed' : 'role_not_allowed' };
 }
 
@@ -258,7 +258,7 @@ export function createRouter(channel) {
       });
       summarizeLater(msg.chat, groupAgent);
     }
-    if (getSettings().paused) { if (wakes) quiet('paused'); return; }
+    if (getSetting('paused', false)) { if (wakes) quiet('paused'); return; }
 
     // Admin helpers for organizers of any agent
     if (isAnyOrganizer(msg.phone)) {
@@ -447,7 +447,7 @@ function registerMediaHandlers(channel) {
   registerJobHandler('turn', {
     async run(p) {
       const agent = getAgent(p.agent);
-      if (!agent?.enabled || getSettings().paused) return;
+      if (!agent?.enabled || getSetting('paused', false)) return;
       const msg = unpackMsg(channel, p.msg);
       await runTurn(channel, msg, { agent, role: p.role, addressed: p.addressed, rowId: p.rowId, quiet: quietFor(msg), queued: true });
     },

@@ -11,7 +11,7 @@
 // - Data: only what the app already stores for chats that are on; chats marked "private to members" are invisible.
 // - Its own conversation is stored in `owner_messages` (never in group/agent memory or cross-chat search).
 // - Audit: every question (clipped) and every tool call or action is recorded in Activity (`owner.*`, always on).
-import { db, peekPending, getChatMemory, logMessage, kvGet, kvSet } from './db.js';
+import { db, peekPending, getChatMemory, logMessage, kvGet, kvSet, searchStored } from './db.js';
 import { buildContext } from './memory.js';
 import { weeklyText } from './weekly.js';
 import { sendOwnerAlert } from './owner-alerts.js';
@@ -171,7 +171,6 @@ function parseSince(v, fallbackMs = 7 * 86400000) {
   if (Number.isNaN(t)) throw fail('since: use a date (2026-11-01) or a period like 24h, 3d, 2w');
   return t;
 }
-const like = (q) => `%${String(q).replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
 const msgLine = (m, names) => ({ chat: m.chat, chatName: names.get(m.chat) || m.chat, time: iso(m.ts), from: m.from_agent ? 'Assistant' : personInfo({ phone: m.sender, jid: m.sender_jid, fallbackName: m.name }).label, text: clip(m.text, 400) });
 
 /** Cross-chat read tools (core). role = minimum panel role. */
@@ -190,7 +189,7 @@ const CORE_TOOLS = [
       }).sort((x, y) => y.messages - x.messages);
     } },
   { name: 'search_messages', role: 'admin', readOnly: true,
-    description: 'Search stored messages across all visible chats (or one chat): who said what about a topic. query matches the text; person matches the sender name or number; since limits the time (date or 24h / 3d / 2w, default 30d). Newest last.',
+    description: 'Search stored messages across all visible chats (or one chat): who said what about a topic. query: words that must all appear (word beginnings match: "ride" finds "rides"); person matches the sender name or number; since limits the time (date or 24h / 3d / 2w, default 30d). Newest last.',
     input: { query: { type: 'string', description: 'Words to look for (optional when person is given)' }, person: { type: 'string', description: 'Sender name or number (optional)' },
       chat: { type: 'string', description: 'Only this chat id (optional)' }, since: { type: 'string', description: 'Date or period (optional)' }, limit: { type: 'integer', minimum: 1, maximum: 50 } },
     run: async (a) => {
@@ -198,10 +197,8 @@ const CORE_TOOLS = [
       if (a.chat && !isVisible(a.chat)) throw fail('That chat is not visible to the assistant (off or private to members)', 403);
       const chats = a.chat ? [a.chat] : visibleChats();
       if (!chats.length) return [];
-      const where = [`chat IN (${chats.map(() => '?').join(',')})`, 'ts >= ?']; const args = [...chats, parseSince(a.since, 30 * 86400000)];
-      if (a.query) { where.push("text LIKE ? ESCAPE '\\'"); args.push(like(a.query)); }
-      if (a.person) { where.push("(name LIKE ? ESCAPE '\\' OR sender LIKE ? ESCAPE '\\')"); args.push(like(a.person), like(digits(a.person) || a.person)); }
-      const rows = db.prepare(`SELECT * FROM messages WHERE ${where.join(' AND ')} ORDER BY id DESC LIMIT ?`).all(...args, Math.min(Number(a.limit) || 25, 50)).reverse();
+      // 070: the same full-text search as the panel's Search messages
+      const rows = searchStored({ chats, query: a.query, person: a.person, since: parseSince(a.since, 30 * 86400000), limit: Math.min(Number(a.limit) || 25, 50) }).reverse();
       const names = await chatNames();
       return rows.map((m) => msgLine(m, names));
     } },

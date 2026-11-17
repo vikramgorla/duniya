@@ -1,6 +1,20 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.31.0": {
+      "breaking": false,
+      "title": "Search what was said in every chat, and teach agents from their real answers",
+      "summary": "Backups now use a new file format that needs only a few MB of memory. Backups made by 2.30 or earlier can't be restored by this version: your next scheduled backup (or Backups → Back up now) makes a new one.",
+      "changes": [
+        { "type": "new", "text": "Search messages: in Find anything (press /), search the stored messages of every chat that is on, with the words marked. A result opens that chat's messages." },
+        { "type": "new", "text": "Review on each agent's page: its recent answers with the question, 👍 or 👎, and Teach… to fix a wrong answer with the AI helper (usually a new FAQ entry)." },
+        { "type": "new", "text": "Your AI assistant (ChatGPT, Claude) can search messages and list and rate an agent's answers too." },
+        { "type": "improved", "text": "Backups are compressed and encrypted while they are written, using a few MB of memory instead of several times the database size; a damaged backup is refused before anything is replaced." },
+        { "type": "improved", "text": "The Chats list, Usage by day and every message are handled faster, also with hundreds of chats." },
+        { "type": "improved", "text": "The sign-in and consent page for AI assistants looks like the rest of Duniya and runs no inline code." },
+        { "type": "removed", "text": "Restoring backups made by Duniya 2.30 or earlier. Right after this update Duniya makes a fresh backup in the new format by itself, so you always have one you can restore." }
+      ]
+    },
     "2.30.1": {
       "breaking": false,
       "title": "Plan usage meters removed for every provider",

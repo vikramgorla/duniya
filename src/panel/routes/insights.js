@@ -6,7 +6,7 @@ import { chatTitle } from '../../core/contacts.js';
 import { listSilences, clearSilences, SILENCE_REASONS } from '../../core/silences.js';
 import { listAgents, getAgent, isBuiltin, OWNER_AGENT_ID } from '../../core/agents.js';
 import { enabledChats, seenChats } from '../../core/chat-prefs.js';
-import { getSettings, updateSettings } from '../../core/store.js';
+import { getSetting, updateSettings } from '../../core/store.js';
 import { status as providerStatus } from '../../core/providers/index.js';
 import { toolsFor } from '../../core/tools.js';
 import { activity } from '../../core/events.js';
@@ -27,7 +27,7 @@ async function checklist(channel) {
     || !!db.prepare("SELECT 1 FROM usage WHERE kind IN ('reply', 'test') AND agent != ? LIMIT 1").get(OWNER_AGENT_ID);
   const pick = agents.find((a) => a.chats.some((c) => on.has(c))) || agents.at(-1);
   const first = pick?.id || '';
-  const skipped = new Set(getSettings().checklistSkipped || []);
+  const skipped = new Set(getSetting('checklistSkipped', null) || []);
   const steps = [
     { id: 'whatsapp', title: 'Link your WhatsApp number', done: numbers.some((n) => n.status === 'open'), href: '#overview/whatsapp',
       hint: 'Use the phone of the number your agents answer from (best a number just for them). Duniya links like WhatsApp on a computer.' },
@@ -40,7 +40,7 @@ async function checklist(channel) {
       hint: 'Ask your agent something here, or write to it in the chat you switched on.' },
   ].map((s) => ({ ...s, skipped: !s.done && skipped.has(s.id) }));
   const done = steps.filter((s) => s.done || s.skipped).length;
-  return { steps, done, total: steps.length, complete: done === steps.length, dismissed: !!getSettings().checklistDismissed,
+  return { steps, done, total: steps.length, complete: done === steps.length, dismissed: !!getSetting('checklistDismissed', false),
     agent: pick ? { id: pick.id, name: pick.name, trigger: pick.triggers?.[0] || '' } : null };
 }
 
@@ -73,7 +73,7 @@ export function insightRoutes(route, { channel }) {
     if (body.skip !== undefined || body.unskip !== undefined) { // 062: a step can be skipped (and brought back)
       const id = String(body.skip ?? body.unskip);
       if (!STEP_IDS.includes(id)) return [400, { error: 'Unknown step', field: 'skip' }];
-      const cur = new Set(getSettings().checklistSkipped || []);
+      const cur = new Set(getSetting('checklistSkipped', null) || []);
       if (body.skip !== undefined) cur.add(id); else cur.delete(id);
       updateSettings({ checklistSkipped: [...cur] });
     }

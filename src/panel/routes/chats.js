@@ -4,16 +4,21 @@ import { fail } from '../../core/config.js';
 import { agentForChat, bindChat, listAgents } from '../../core/agents.js';
 import { allChatPrefs, ignoredCounts, isChatEnabled, seenChats, setChatPrefs } from '../../core/chat-prefs.js';
 import { chatTitle, personInfo } from '../../core/contacts.js';
-import { listMessages, namesInChat } from '../../core/db.js';
+import { listMessages, namesInChat, searchStored } from '../../core/db.js';
 import { isChatAlias, listDirectChats } from '../../core/direct-chats.js';
 import { activity } from '../../core/events.js';
 import { historyLoadCount, historyStatus, loadChatHistory } from '../../core/history-load.js';
 import { memberTag, personView, tagsInChat } from '../../core/member-tags.js';
 import { eraseChatMemory, maybeSummarize, memoryView } from '../../core/memory.js';
+import { visibleChats } from '../../core/owner-assistant.js';
 import { maybePostNotice, noticePostedAt, setChatNoticeOff } from '../../core/privacy-notice.js';
 import { isGroupChat, whatsappToolCatalog } from '../../core/whatsapp-tools.js';
 
+/** Leave out empty values and settings at their default. */
+const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && v !== '' && v !== false && v !== 0 && v !== 'inherit'));
+
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
+
 export function chatRoutes(route, { channel } = {}) {
   // ---------- chats + memory ----------
   route('GET', '/api/chats', async () => {
@@ -36,11 +41,14 @@ export function chatRoutes(route, { channel } = {}) {
     }
     for (let i = people.length - 1; i >= 0; i--) if (isChatAlias(people[i].id)) people.splice(i, 1);
     const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: '(not a member / offline)', size: 0, isGroup: !/@(s\.whatsapp\.net|lid)$/.test(id) }));
+    // 070: settings that are at their default are left out (model, logging, welcome "inherit", fallback inherit, off,
+    // not private…): the list stays small with hundreds of chats; the panel and the admin tools fill in the defaults.
     return [...groups, ...people, ...missing].map((c) => {
       const number = c.number || (c.id.includes('#') ? c.id.split('#')[0] : 'main');
-      return { ...c, number, numberLabel: numbers.get(number) || number, agent: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit',
-        fallback: prefs[c.id]?.fallback || { mode: 'inherit', chain: [] }, enabled: !!prefs[c.id]?.enabled, ignored: ignoredCounts.get(c.id) || 0,
-        private: !!prefs[c.id]?.private, noticeOff: !!prefs[c.id]?.noticeOff, welcome: prefs[c.id]?.welcome || 'inherit', noticePostedAt: c.isGroup ? noticePostedAt(c.id) : null, history: historyStatus(c.id) };
+      const pr = prefs[c.id];
+      return compact({ ...c, number, numberLabel: numbers.get(number) || number, agent: owner.get(c.id), model: pr?.model, logging: pr?.logging,
+        fallback: pr?.fallback && (pr.fallback.mode !== 'inherit' || pr.fallback.chain?.length) ? pr.fallback : null, enabled: pr?.enabled, ignored: ignoredCounts.get(c.id),
+        private: pr?.private, noticeOff: pr?.noticeOff, welcome: pr?.welcome, noticePostedAt: c.isGroup ? noticePostedAt(c.id) : null, history: historyStatus(c.id) });
     });
   });
   /** Switch a chat on or off: recorded, the privacy notice (044) and the phone's recent messages (#91) when it goes on. */
@@ -96,6 +104,22 @@ export function chatRoutes(route, { channel } = {}) {
     if (!q.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${q.get('q') ? ` (search “${String(q.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;
   }, { role: 'admin' });
+  // 070: Search messages across chats. Owner only; the chats the owner assistant may read (on, not private to
+  // members); newest first, 30 at a time (`before` = the last id). Each search is recorded like a look at messages.
+  route('GET', '/api/search/messages', async (req, res, body, q, p, user) => {
+    const query = String(q.get('q') || '').trim().slice(0, 100);
+    if (query.length < 2) return { results: [], more: false };
+    const chats = visibleChats();
+    const rows = searchStored({ chats, query, before: q.get('before'), limit: 31 });
+    const names = new Map(seenChats().map((c) => [c.id, chatTitle(c)]));
+    try { for (const g of await channel.listChats()) names.set(g.id, g.name); } catch { /* offline: ids */ }
+    if (!q.get('before')) activity('config', { summary: `Messages searched by ${user.username} (“${query.slice(0, 40)}”, ${rows.length > 30 ? '30+' : rows.length} found in ${chats.length} chats)` });
+    return {
+      chats: chats.length, more: rows.length > 30,
+      results: rows.slice(0, 30).map((m) => ({ id: m.id, chat: m.chat, chatName: names.get(m.chat) || m.chat, ts: m.ts, agent: m.agent || '', fromAgent: !!m.from_agent,
+        name: m.from_agent ? '' : personInfo({ phone: m.sender, jid: m.sender_jid, fallbackName: m.name }).label, text: String(m.text || '').slice(0, 600) })),
+    };
+  }, { role: 'owner' });
   // ---------- WhatsApp group tools for admins (026): same channel functions as the agents' whatsapp tools ----------
   route('GET', '/api/whatsapp/tools', async () => whatsappToolCatalog());
   const ADMIN_RANK = { superadmin: 2, admin: 1 };

@@ -20,6 +20,15 @@ without you.**
 3. Turn on the schedule (e.g. daily at 04:00, keep 14).
 4. **Download** a backup any time.
 
+A backup is a `.dbk` file: a snapshot of the database, the master key and the WhatsApp sessions, compressed and
+encrypted (AES-256-GCM with a key from your passphrase) while it is written, so it needs only a few MB of memory even
+for a large database. A restore checks the whole file before anything is replaced: a wrong passphrase or a damaged
+file changes nothing.
+
+> [!IMPORTANT]
+> Since 2.31 backups use a new file format. Backups made by **2.30 or earlier can't be restored** by 2.31 or later:
+> after updating, make a new backup (**Backups → Back up now**; scheduled backups do it by themselves).
+
 > [!NOTE]
 > **Pre-update backups** stay on this server only, are listed with the local backups and kept apart from the normal
 > retention: the last 3 (*Update settings → keep the last N pre-update backups*, 1–20). If one fails, the update is

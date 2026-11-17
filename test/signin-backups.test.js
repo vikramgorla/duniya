@@ -336,7 +336,7 @@ test('Download a local backup; restore from an uploaded file (streamed, checked,
   assert.equal((await up(bytes, { cookie: adm })).status, 403, 'owner only');
   const junk = await up(Buffer.from('PK\u0003\u0004 not a backup'));
   assert.equal(junk.status, 400); assert.match((await junk.json()).error, /not a Duniya backup/);
-  const big = await up(Buffer.concat([Buffer.from('DUNIYA1\n'), Buffer.alloc(6 * 1024 * 1024)]));
+  const big = await up(Buffer.concat([Buffer.from('DUNIYA2\n'), Buffer.alloc(6 * 1024 * 1024)]));
   assert.equal(big.status, 413);
   assert.deepEqual(readdirSync(join(t.tmp, 'data', 'uploads')).filter((f) => f.endsWith('.part')), [], 'partial files cleaned up');
 

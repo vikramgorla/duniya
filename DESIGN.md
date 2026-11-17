@@ -198,9 +198,33 @@ it for the names its API returns, and panel modules import it.
 ## Meters (064)
 
 `meter(percent)` is a 6 px track; the fill is ink in light mode and lime in dark mode. From 85 % the fill turns red
-(`hot`). It shows what Duniya measures itself: spending caps on Usage, memory, disk and swap on Server. Provider plan
-quotas are not shown (#146); a used-up limit appears as the account's pause ("Paused until 14:20 — usage limit
-reached").
+(`hot`). It is used for what Duniya measures itself: spending caps (Usage, an agent's or chat's *Spending cap*) and the
+Server tiles (memory, disk, swap). Never draw a meter from a guess.
+
+## Search results (070)
+
+*Search messages* lives in Find anything, not on a screen of its own: for the owner, the last row is *Search messages
+for "…"*; choosing it turns the list into results (a spinner row while it searches). A result is one row: the chat in
+bold · the sender and time muted, then a snippet of about 140 characters around the first hit. Searched words are
+marked with `<mark>` built from text nodes (`highlight()` in `find.js`, never HTML): lime with the on-accent ink and a
+1 px ink outline, so a mark also shows inside a lime bubble. *Show older matches* is the last row. A result opens the
+chat's page at *Messages & memory*, filtered by the same words and scrolled to the messages. An empty result says
+where it looked ("No stored message in the 6 chats that are on matches …").
+
+## Review (070)
+
+An agent's *Review* section is a list of answers separated by hairlines (no cards): one muted line (who asked · chat ·
+time), the question as a quote (2 px rule on the left, muted, small), the answer (six lines, tap to show all), then
+the actions on one row: 👍 and 👎 as small toggle buttons (`aria-pressed`; grey until chosen) and, on a 👎 answer, the
+one primary next step **Teach…** with the `AI` chip. Teach opens the AI helper pre-filled with the cursor at *Better
+answer:*; the result is the usual visual diff with *Apply & save* and Undo. Filters are a `seg` above the list (*All ·
+👎 · Not rated*); *Show older answers* is centred below it.
+
+## Standalone pages (064, 070)
+
+Pages the server renders outside the panel (sign-in results, Google and GitHub hand-offs, the admin MCP sign-in and
+consent) use `pageHead()`, `/page.css` and `/page.js` with the strict page CSP: no inline style or script. They use
+the same ground, ink buttons (lime in dark mode), notes and 16 px form fields as the panel, and the mark at 40 px.
 
 ## Confirmations (064)
 
@@ -263,7 +287,8 @@ the reason and **Retry**. Every animation stops with *reduce motion*.
   A tab that is usually empty appears only when it has something (Pending, with a count). Small lists are a section of
   a bigger screen, not a tab (Secrets lives in Settings).
 - **Find anything** (`openPalette()`): `/` or ⌘K / Ctrl+K, or the search button in the header. Every new screen,
-  Settings section (`SETTINGS_SECTIONS`) or frequent action should be findable there.
+  Settings section (`SETTINGS_SECTIONS`) or frequent action should be findable there. For the owner it also searches
+  stored messages (see *Search results*).
 - **Deep links**:
   - On list → page screens, `#tab/<id>` opens that page (Agents, Chats, Models, Settings, Backups); an item's sections
     are `#tab/<id>/<section>` (`#agents/carpool/tools`), and Find anything lists them ("Tools · Car pooling"). A new Settings section goes in
@@ -301,3 +326,4 @@ the reason and **Retry**. Every animation stops with *reduce motion*.
   `listDetail()` and deep links.
 - [ ] Provider, account and model names come from `names.js`; tool names are shown with `toolPhrase()`.
 - [ ] Nothing on lime uses `--ink`; labels are sentence case, not mono caps; icons in buttons are sized.
+- [ ] Text from WhatsApp, tools or models is built from text nodes (marks with `highlight()`), never HTML.

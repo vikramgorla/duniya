@@ -67,6 +67,55 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS wa_polls_chat ON wa_polls(chat, ts);
 `);
 
+// 070: full-text index of stored messages (SQLite FTS5, part of node:sqlite) for Search messages and the owner
+// assistant. External content: the text lives once, in `messages`; triggers keep the index in step with inserts,
+// edits and deletes (retention, erase memory). A database from before 2.31 gets its index built once, here.
+const ftsIsNew = !db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'messages_fts'").get();
+db.exec(`
+  CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(text, content = 'messages', content_rowid = 'id', tokenize = 'unicode61 remove_diacritics 2');
+  CREATE TRIGGER IF NOT EXISTS messages_fts_ins AFTER INSERT ON messages BEGIN
+    INSERT INTO messages_fts (rowid, text) VALUES (new.id, new.text);
+  END;
+  CREATE TRIGGER IF NOT EXISTS messages_fts_del AFTER DELETE ON messages BEGIN
+    INSERT INTO messages_fts (messages_fts, rowid, text) VALUES ('delete', old.id, old.text);
+  END;
+  CREATE TRIGGER IF NOT EXISTS messages_fts_upd AFTER UPDATE OF text ON messages BEGIN
+    INSERT INTO messages_fts (messages_fts, rowid, text) VALUES ('delete', old.id, old.text);
+    INSERT INTO messages_fts (rowid, text) VALUES (new.id, new.text);
+  END;
+`);
+if (ftsIsNew) db.exec("INSERT INTO messages_fts (messages_fts) VALUES ('rebuild')");
+
+/** Words of a search as an FTS5 query: every word must appear, each as a word prefix ("rid" finds "rides"). */
+function ftsQuery(q) {
+  const words = String(q || '').toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+  return words.slice(0, 8).map((w) => `"${w}"*`).join(' ');
+}
+const likeArg = (q) => `%${String(q).replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
+/**
+ * @param {{ chats: string[], query?: string, person?: string, since?: number, before?: number | string | null, limit?: number }} o
+ * Stored messages of `chats` matching `query` (words, any order, word prefixes) and/or `person` (sender name or
+ * number), newest first. `before`: a row id for the next page. Returns rows like listMessages's source rows.
+ */
+export function searchStored({ chats, query = '', person = '', since = 0, before = 0, limit = 25 }) {
+  if (!chats?.length) return [];
+  const match = ftsQuery(query);
+  if (!match && !person) return [];
+  const where = [`m.chat IN (${chats.map(() => '?').join(',')})`, 'm.ts >= ?'];
+  /** @type {(string|number)[]} */
+  const args = [...chats, Math.trunc(Number(since) || 0)];
+  const order = match ? 'f.rowid' : 'm.id'; // FTS5 walks its rowids backwards itself: a common word stays fast
+  if (Number(before)) { where.push(`${order} < ?`); args.push(Math.trunc(Number(before))); }
+  if (person) {
+    where.push("(m.name LIKE ? ESCAPE '\\' OR m.sender LIKE ? ESCAPE '\\')");
+    args.push(likeArg(person), likeArg(String(person).replace(/\D/g, '') || person));
+  }
+  const from = match ? 'messages_fts f JOIN messages m ON m.id = f.rowid' : 'messages m';
+  if (match) { where.unshift('messages_fts MATCH ?'); args.unshift(match); }
+  return db.prepare(`SELECT m.* FROM ${from} WHERE ${where.join(' AND ')} ORDER BY ${order} DESC LIMIT ?`)
+    .all(...args, Math.min(Math.max(Math.trunc(Number(limit)) || 25, 1), 100));
+}
+
 // ---- chat history ----
 const insMsg = db.prepare(`INSERT OR IGNORE INTO messages
   (channel, chat, agent, msg_id, sender, name, text, quoted, addressed, from_agent, ts, sender_jid)
@@ -126,11 +175,9 @@ export const messageCount = (chat) => db.prepare('SELECT COUNT(*) AS n FROM mess
 export const countBetween = (chat, afterId, beforeId) => db.prepare('SELECT COUNT(*) AS n FROM messages WHERE chat = ? AND id > ? AND id < ?').get(chat, afterId, beforeId).n;
 export const messagesAfter = (chat, afterId, beforeId) =>
   db.prepare('SELECT * FROM messages WHERE chat = ? AND id > ? AND id < ? ORDER BY id').all(chat, afterId, beforeId);
-export function searchMessages(chat, query, limit = 15) {
-  const like = `%${String(query).replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
-  return db.prepare(`SELECT * FROM (SELECT * FROM messages WHERE chat = ? AND (text LIKE ? ESCAPE '\\' OR quoted LIKE ? ESCAPE '\\')
-    ORDER BY id DESC LIMIT ?) ORDER BY id`).all(chat, like, like, Math.min(Math.max(Number(limit) || 15, 1), 30));
-}
+/** Messages of one chat matching the words of `query` (070: the full-text index), oldest first. */
+export const searchMessages = (chat, query, limit = 15) =>
+  searchStored({ chats: [chat], query, limit: Math.min(Math.max(Number(limit) || 15, 1), 30) }).reverse();
 
 // ---- chat memory (rolling summary) ----
 export const getChatMemory = (chat) => db.prepare('SELECT * FROM chat_memory WHERE chat = ?').get(chat) || null;
@@ -238,9 +285,9 @@ export function listMessages(chat, { before = 0, limit = 50, q = '' } = {}) {
   const args = [chat];
   let where = 'chat = ?';
   if (Number(before)) { where += ' AND id < ?'; args.push(Number(before)); }
-  if (q) { where += ' AND text LIKE ?'; args.push(`%${String(q).slice(0, 100)}%`); }
-  return db.prepare(`SELECT id, sender, sender_jid AS senderJid, name, text, quoted, from_agent AS fromAgent, addressed, ts FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim)
-    .map((m) => ({ ...m, fromAgent: !!m.fromAgent, addressed: !!m.addressed }));
+  const rows = q ? searchStored({ chats: [chat], query: String(q).slice(0, 100), before, limit: lim })
+    : db.prepare(`SELECT * FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim);
+  return rows.map((m) => ({ id: m.id, sender: m.sender, senderJid: m.sender_jid, name: m.name, text: m.text, quoted: m.quoted, fromAgent: !!m.from_agent, addressed: !!m.addressed, ts: m.ts }));
 }
 
 // ---- WhatsApp reactions and polls (026) ----

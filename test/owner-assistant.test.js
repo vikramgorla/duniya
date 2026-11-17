@@ -221,7 +221,7 @@ test('044: privacy notice — posted once when a group is switched on; text chan
   await t.api(admin, 'PUT', `/api/chats/${enc(g)}/prefs`, { enabled: true });
   assert.equal(sentTo(g).length, 1, 'not again for the same text within 90 days');
   assert.ok(notice.noticePostedAt(g));
-  assert.equal((await t.api(owner, 'GET', '/api/chats')).body.find((c) => c.id === 'g1@g.us').noticePostedAt, null);
+  assert.equal((await t.api(owner, 'GET', '/api/chats')).body.find((c) => c.id === 'g1@g.us').noticePostedAt, undefined);
 
   assert.equal((await t.api(viewer, 'PUT', '/api/privacy-notice', { text: 'x' })).status, 403);
   assert.equal((await t.api(admin, 'PUT', '/api/privacy-notice', { text: 'Stored for context. Ask Vik.' })).body.text, 'Stored for context. Ask Vik.');

@@ -79,6 +79,25 @@ export function interpolate(value) {
 
 // ---------- settings ----------
 const SETTINGS_DEFAULTS = { paused: false, defaultDmAgent: '', historyLoadCount: 50 }; // #91: earlier messages loaded when a chat goes on
+// 070: parsed once and cached. updateSettings drops the cache; a change from another process (the `duniya` command
+// line) changes SQLite's data_version, which is checked on every read (a cheap pragma). Callers get copies, so
+// changing a returned object never changes the cache.
+/** @type {Record<string, any> | null} */
+let cached = null;
+let cachedVersion = -1;
+const dataVersion = db.prepare('PRAGMA data_version');
+function settingsMap() {
+  const v = dataVersion.get().data_version;
+  if (v !== cachedVersion) { cached = null; cachedVersion = v; }
+  if (!cached) {
+    const out = { ...SETTINGS_DEFAULTS };
+    for (const r of db.prepare('SELECT key, value FROM settings WHERE tenant_id = ?').all(TENANT)) {
+      try { out[r.key] = JSON.parse(r.value); } catch { /* ignore */ }
+    }
+    cached = out;
+  }
+  return cached;
+}
 /**
  * Panel settings: the defaults above plus what owners changed. Features keep their own block (providers, backup,
  * webAccess, media, updates, …) and read it through their own module.
@@ -87,18 +106,19 @@ const SETTINGS_DEFAULTS = { paused: false, defaultDmAgent: '', historyLoadCount:
  * @returns {Settings}
  */
 export function getSettings() {
-  const out = { ...SETTINGS_DEFAULTS };
-  for (const r of db.prepare('SELECT key, value FROM settings WHERE tenant_id = ?').all(TENANT)) {
-    try { out[r.key] = JSON.parse(r.value); } catch { /* ignore */ }
-  }
-  return out;
+  return /** @type {Settings} */ (structuredClone(settingsMap()));
 }
 export function updateSettings(patch) {
   const stmt = db.prepare('INSERT OR REPLACE INTO settings (tenant_id, key, value) VALUES (?, ?, ?)');
-  for (const [k, v] of Object.entries(patch)) stmt.run(TENANT, k, JSON.stringify(v));
+  try { for (const [k, v] of Object.entries(patch)) stmt.run(TENANT, k, JSON.stringify(v)); } finally { cached = null; }
   return getSettings();
 }
-export const getSetting = (key, fallback) => getSettings()[key] ?? fallback;
+/** One setting (a copy), or `fallback` when it is not set. Cheaper than getSettings() on hot paths. */
+export function getSetting(key, fallback) {
+  const v = settingsMap()[key];
+  if (v == null) return fallback;
+  return typeof v === 'object' ? structuredClone(v) : v;
+}
 
 // ---------- users ----------
 export const ROLES = ['owner', 'admin', 'viewer'];

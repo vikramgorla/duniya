@@ -157,9 +157,11 @@ function newAgentReview(r, ctx) {
     rows, h('p', { class: 'small muted' }, 'Everything else uses the defaults; you can change any of it in the editor afterwards.'));
 }
 /** "Describe it → AI drafts → review the changes → apply". onApply(result) does the saving. */
-export async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply, bare = false }) {
+export async function aiHelper({ agentId = '', title, placeholder, applyLabel, onApply, bare = false, initial = '' }) {
   const models = await loadModels().catch(() => ({ models: [] }));
-  const ask = h('textarea', { class: 'prose', style: 'min-height:90px', placeholder, 'aria-label': 'What you want, in your own words' });
+  const ask = h('textarea', { class: 'prose', style: 'min-height:90px', placeholder, value: initial, 'aria-label': 'What you want, in your own words' });
+  // 070: Teach pre-fills the request; the cursor waits at the end ("Better answer: ")
+  if (initial) setTimeout(() => { ask.focus(); ask.setSelectionRange(initial.length, initial.length); }, 50);
   const model = modelSelect(models, 'auto', { 'aria-label': 'Model for the AI helper', autoLabel: `Default model${models.resolvedDefault ? ` (${models.resolvedDefault})` : ''}` });
   const out = h('div', {});
   const go = h('button', { class: 'btn primary', onclick: async () => {

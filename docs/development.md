@@ -142,8 +142,21 @@ Before and after 069 (#143), same machine:
 
 What made the difference: WAL with `synchronous = NORMAL` (no fsync per write), no pruning on the write path (one
 bounded pass on the upkeep tick, `src/core/retention.js`), indexes for the chat filter and the age prunes, one date
-formatter per time zone, and counting before loading rows to summarize. Still open: a backup holds the whole
-database in memory several times (base64 + gzip) — about 170 MB extra for a 36 MB database.
+formatter per time zone, and counting before loading rows to summarize.
+
+Before and after 070 (#148), same fixture:
+
+| | v2.30.0 | v2.31.0 |
+|---|---|---|
+| One backup | 1 s, 6.7 MB, +163 MB RSS | 1.2 s, 6.9 MB, **+32 MB RSS** (streamed: snapshot file → gzip → AES-GCM → file) |
+| `/api/chats` (300 chats) | 97 KB | **36 KB** (settings at their default left out) |
+| Usage by day, all time | 23.5 ms | **13.3 ms** (integer local days instead of `strftime(…'localtime')` per row) |
+| Search messages: one hit / a word in every message | – | 2.1 ms / 13.3 ms (FTS5, walked newest first) |
+| Agent review (first page) | – | 1.4 ms |
+| Router: stored, not addressed / answered | 769 / 202 msg/s | 824 / 218 msg/s (the FTS trigger is within the noise) |
+| Database after retention (79k messages) | 36.3 MB | 48.4 MB (+12 MB full-text index) |
+
+A database from before 2.31 builds its full-text index once at start (about 0.2 s per 80 000 messages on one CPU).
 
 ## Commits and pull requests
 

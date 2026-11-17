@@ -8,7 +8,7 @@
 // phone) — only while the chat is on, and stops once messages arrive. Pending retries survive a restart (kv); they
 // are due times the shared upkeep tick checks, not timers.
 import { fail } from './config.js';
-import { getSettings } from './store.js';
+import { getSetting } from './store.js';
 import { isChatEnabled, latestKey } from './chat-prefs.js';
 import { oldestStoredMessage, insertEarlierMessages, kvGet, kvSet } from './db.js';
 import { agentForChat } from './agents.js';
@@ -100,7 +100,7 @@ export function resumeHistoryRetries() {
 
 /** How many earlier messages to ask for when a chat is switched on (setting historyLoadCount; 0 = don't). */
 export function historyLoadCount() {
-  const v = getSettings().historyLoadCount;
+  const v = getSetting('historyLoadCount', 50);
   return v === undefined || v === null || v === '' ? DEFAULT_LOAD : Math.max(0, Math.min(MAX_LOAD, Math.round(Number(v)) || 0));
 }
 

@@ -14,7 +14,7 @@
 import { db } from './db.js';
 import { digits, fail } from './config.js';
 import { activity } from './events.js';
-import { getSettings, updateSettings } from './store.js';
+import { getSetting, updateSettings } from './store.js';
 
 const TENANT = 'default';
 db.exec(`
@@ -127,7 +127,7 @@ export function personInfo({ phone = '', jid = '', fallbackName = '' } = {}) {
  * profile), because profile names are often incomplete; the owner can switch phone-contact names off for agents
  * (Contacts page), then agents get own > business > profile. Never a number or a hidden id: '' when nothing is known.
  */
-export const contactNamesForAgents = () => getSettings().contactNamesForAgents !== false;
+export const contactNamesForAgents = () => getSetting('contactNamesForAgents', true) !== false;
 export function setContactNamesForAgents(on) { updateSettings({ contactNamesForAgents: !!on }); return contactNamesForAgents(); }
 export function agentName({ phone = '', jid = '', fallbackName = '' } = {}) {
   const info = personInfo({ phone, jid, fallbackName });

@@ -1,6 +1,6 @@
 // Find anything (062): loaded when first opened. Module of the panel (063).
 // ---------- Find anything (062): / or ⌘K (Ctrl+K), or the search button: jump to a screen, agent, chat, setting or action ----------
-import { $, PRIMARY, S, TABS, api, askSignOut, avatar, badgeFor, can, go, h, icon, optimistic, recover, serverBadge, show, tryApi } from './core.js';
+import { $, PRIMARY, S, TABS, api, askSignOut, avatar, badgeFor, can, go, h, icon, optimistic, recover, serverBadge, show, time, tryApi } from './core.js';
 import { PROVIDER_NAMES } from './names.js';
 import { SETTINGS_SECTIONS } from './shared.js';
 /** 068: the sections of an agent's page that Find anything lists ([id, title, words, only for normal agents]). */
@@ -8,7 +8,27 @@ const AGENT_SECTIONS = [['character', 'Character', 'instructions prompt descript
   ['people', 'People', 'organizers participants roles', true], ['quick', 'Quick replies & FAQ', 'commands help faq', true], ['welcome', 'Welcome', 'new members greet rules', true],
   ['schedules', 'Schedules', 'scheduled posts weekly summary'], ['model', 'Model', 'fallback provider'], ['tools', 'Tools', 'mcp tool services whatsapp actions confirm'],
   ['memory', 'Memory', 'notes shared'], ['media', 'Photos & voice', 'images pictures voice notes'], ['cap', 'Spending cap', 'budget limit cost'],
-  ['advanced', 'Advanced', 'timezone history tokens'], ['test', 'Test', 'try console']];
+  ['advanced', 'Advanced', 'timezone history tokens'], ['review', 'Review', 'answers rate thumbs teach feedback quality', true], ['test', 'Test', 'try console']];
+/** 070: the words of a search, as the server matches them (word beginnings, any order). */
+export const searchWords = (q) => (String(q || '').toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).slice(0, 8);
+/**
+ * Text with the searched words marked (<mark>, built from text nodes: message text is never HTML). `around`: show
+ * about that many characters around the first hit, with … at cut ends.
+ */
+export function highlight(text, words, around = 0) {
+  let t = String(text || '').replace(/\s+/g, ' ').trim();
+  // the words are letters and digits only (searchWords), so they need no escaping
+  const re = words.length ? new RegExp(`(?<![\\p{L}\\p{N}])(${words.join('|')})[\\p{L}\\p{N}]*`, 'giu') : null;
+  if (around && t.length > around) {
+    const at = re ? Math.max(0, t.search(re) - Math.round(around / 3)) : 0;
+    t = `${at ? '…' : ''}${t.slice(at, at + around)}${at + around < t.length ? '…' : ''}`;
+  }
+  if (!re) return [t];
+  const out = []; let last = 0;
+  for (const m of t.matchAll(re)) { out.push(t.slice(last, m.index), h('mark', {}, m[0])); last = m.index + m[0].length; }
+  out.push(t.slice(last));
+  return out;
+}
 /** Everything the Find box can open. Agents and chats come from the status and the cached chat list. */
 async function paletteItems() {
   const items = TABS().map(([id, label]) => ({ kind: 'Screen', label, go: `#${id}`, icon: id }));
@@ -52,7 +72,7 @@ function paletteScore(it, words) {
 }
 export async function openPalette() {
   if ($('#palette')) return;
-  const input = h('input', { type: 'search', placeholder: 'Find an agent, chat, setting or action', 'aria-label': 'Find anything', autocomplete: 'off', spellcheck: 'false' });
+  const input = h('input', { type: 'search', placeholder: can('owner') ? 'Find anything, or search messages' : 'Find an agent, chat, setting or action', 'aria-label': 'Find anything', autocomplete: 'off', spellcheck: 'false' });
   const list = h('ul', { class: 'pal-list', role: 'listbox', 'aria-label': 'Results' });
   const dlg = h('dialog', { class: 'dlg palette', id: 'palette', 'aria-label': 'Find anything' }, input, list,
     h('div', { class: 'small muted pal-help desk-only' }, '↑ ↓ to move · Enter to open · Esc to close'));
@@ -62,16 +82,35 @@ export async function openPalette() {
   dlg.showModal(); input.focus();
   const items = await paletteItems();
   let hits = []; let sel = 0;
-  const open = (it) => { dlg.close(); if (it.run) it.run(); else if (location.hash === it.go) { show(it.go.slice(1).split('/')[0]); } else location.hash = it.go.slice(1); };
+  let found = null; // 070: Search messages results ({ q, items, more, last }) while they are shown
+  const open = (it) => { if (it.stay) return it.run(); dlg.close(); if (it.run) it.run(); else if (location.hash === it.go) { show(it.go.slice(1).split('/')[0]); } else location.hash = it.go.slice(1); };
+  /** 070: stored messages across the chats that are on (owner); a hit opens the chat's messages with the search. */
+  const searchMessages = async (q, older = false) => {
+    if (!older) { found = { q, items: [], more: false, last: 0, busy: true }; draw(); }
+    const r = await api('GET', `/api/search/messages?q=${encodeURIComponent(q)}${older ? `&before=${found.last}` : ''}`).catch((e) => ({ error: e.message, results: [] }));
+    if (found?.q !== q) return; // typed on meanwhile
+    const words = searchWords(q);
+    found.items = [...found.items.filter((it) => !it.older), ...r.results.map((m) => ({ kind: 'Message', icon: 'chats',
+      node: [h('b', {}, m.chatName), h('small', { class: 'muted' }, ` · ${m.fromAgent ? 'Agent' : m.name || 'someone'} · ${time(m.ts)}`), h('span', { class: 'pal-snip' }, highlight(m.text, words, 140))],
+      run: () => { S.msgSearch = { chat: m.chat, q }; const to = `chats/${encodeURIComponent(m.chat)}`; if (location.hash === `#${to}`) show('chats'); else location.hash = to; } }))];
+    if (r.more) found.items.push({ kind: 'More', icon: 'search', label: 'Show older matches', stay: true, older: true, run: () => searchMessages(q, true) });
+    Object.assign(found, { more: r.more, last: r.results.at(-1)?.id || found.last, busy: false, error: r.error, chats: r.chats });
+    draw();
+  };
   const draw = () => {
     const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
-    hits = (words.length ? items.map((it) => [paletteScore(it, words), it]).filter(([sc]) => sc !== null).sort((a, b) => a[0] - b[0]).map(([, it]) => it) : [...items.filter((it) => it.kind === 'Action'), ...items.filter((it) => it.kind === 'Screen')]).slice(0, 14);
+    const q = input.value.trim();
+    const msgAction = can('owner') && q.length >= 2 ? [{ kind: 'Messages', icon: 'search', label: `Search messages for “${q}”`, stay: true, run: () => searchMessages(q) }] : [];
+    hits = found ? found.items : [...(words.length ? items.map((it) => [paletteScore(it, words), it]).filter(([sc]) => sc !== null).sort((a, b) => a[0] - b[0]).map(([, it]) => it) : [...items.filter((it) => it.kind === 'Action'), ...items.filter((it) => it.kind === 'Screen')]).slice(0, 14), ...msgAction];
     sel = Math.min(sel, Math.max(0, hits.length - 1));
-    list.replaceChildren(...hits.map((it, i) => h('li', { role: 'option', 'aria-selected': String(i === sel), class: i === sel ? 'on' : '', onclick: () => open(it), onmousemove: () => { if (sel !== i) { sel = i; draw(); } } },
-      icon(it.icon || 'search'), h('span', { class: 'pal-label' }, it.label, it.hint ? h('small', { class: 'muted' }, ` · ${it.hint}`) : null), h('span', { class: 'pill' }, it.kind))),
-    hits.length ? null : h('li', { class: 'muted small' }, 'Nothing found. Try a group, an agent or a word like “backup”.'));
+    const empty = found ? (found.busy ? h('li', { class: 'muted small', role: 'status' }, h('span', { class: 'spinner' }), ' Searching stored messages…')
+      : h('li', { class: 'muted small' }, found.error || (found.chats ? `No stored message in the ${found.chats} chats that are on matches “${found.q}”.` : 'No chat is on yet, so no messages are stored.')))
+      : h('li', { class: 'muted small' }, 'Nothing found. Try a group, an agent or a word like “backup”.');
+    list.replaceChildren(...hits.map((it, i) => h('li', { role: 'option', 'aria-selected': String(i === sel), class: `${i === sel ? 'on' : ''}${it.node ? ' pal-msg' : ''}`, onclick: () => open(it), onmousemove: () => { if (sel !== i) { sel = i; draw(); } } },
+      icon(it.icon || 'search'), h('span', { class: 'pal-label', style: it.node ? 'white-space:normal' : null }, it.node || [it.label, it.hint ? h('small', { class: 'muted' }, ` · ${it.hint}`) : null]), it.node ? null : h('span', { class: 'pill' }, it.kind))),
+    hits.length ? null : empty);
   };
-  input.oninput = () => { sel = 0; draw(); };
+  input.oninput = () => { sel = 0; found = null; draw(); };
   input.onkeydown = (e) => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + hits.length) % Math.max(1, hits.length); draw(); list.children[sel]?.scrollIntoView({ block: 'nearest' }); }
     if (e.key === 'Enter' && hits[sel]) { e.preventDefault(); open(hits[sel]); }
