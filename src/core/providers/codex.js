@@ -79,7 +79,8 @@ export function startLogin(onDone) {
     child.on('exit', (code) => {
       cur.done = true;
       const ok = code === 0 && !!readAuth()?.tokens;
-      const msg = out.trim().split('\n').filter((l) => l.trim() && !/^WARNING:/.test(l)).slice(-1)[0] || '';
+      const lines = out.trim().split('\n').map((l) => l.trim()).filter((l) => l && !/^WARNING:/.test(l));
+      const msg = lines.reverse().find((l) => /error|fail|expired|denied|cancel/i.test(l)) || lines[0] || '';
       if (!cur.sent) reject(fail(`The Codex sign-in did not start: ${msg.slice(0, 200) || `code ${code}`}`, 502));
       if (login === cur) login = null;
       try { onDone?.(ok, ok ? '' : msg.slice(0, 200)); } catch { /* reporting only */ }
