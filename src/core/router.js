@@ -204,6 +204,11 @@ export function createRouter(channel) {
   setHistoryChannel(channel);
   registerMediaHandlers(channel);
   return async function onMessage(incoming) {
+    if (closing) return; // 069: shutting down (a few seconds at most): no new turn starts
+    inFlight++;
+    try { await route(incoming); } finally { if (--inFlight === 0) for (const r of idleWaiters.splice(0)) r(); }
+  };
+  async function route(incoming) {
     // 049 (#92): a direct message from a prepared person may arrive from their LID; use the prepared chat id.
     const msg = resolveDirectChat(incoming);
     // #91: newest message key per chat (metadata only, also while the chat is off) to load history when it goes on.
@@ -328,7 +333,17 @@ export function createRouter(channel) {
       return;
     }
     await runTurn(channel, msg, { agent, role, addressed, rowId, quiet });
-  };
+  }
+}
+
+// 069: graceful shutdown — new messages are left for after the restart; turns already running may finish.
+let inFlight = 0; let closing = false;
+const idleWaiters = [];
+/** Stop taking messages and wait (at most `ms`) for the turns that are running. Resolves true when all finished. */
+export function closeRouter(ms = 6000) {
+  closing = true;
+  if (!inFlight) return Promise.resolve(true);
+  return new Promise((resolve) => { const t = setTimeout(() => resolve(false), ms); idleWaiters.push(() => { clearTimeout(t); resolve(true); }); });
 }
 
 const hasBuiltins = (agent) => !!(agent.quickReplies?.length || agent.help || agent.faq?.items?.length);

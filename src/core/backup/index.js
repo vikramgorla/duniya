@@ -6,12 +6,14 @@ import { DATA_DIR, env, fail } from '../config.js';
 import { getSecret, setSecret, getSetting, updateSettings } from '../store.js';
 import { kvGet, kvSet } from '../db.js';
 import { activity } from '../events.js';
+import { assertDiskRoom } from '../retention.js';
 import { createBundle, encryptBundle, decryptBundle, stageRestore } from './bundle.js';
 import * as gh from './github.js';
 import { s3Client } from './s3.js';
 
 export const LOCAL_DIR = resolve(process.env.BACKUP_DIR || resolve(DATA_DIR, 'backups'));
-const FILE_RE = /^duniya-\d{8}-\d{6}\.dbk$/;
+// 069: milliseconds in the name (two backups in one second never overwrite each other); older names stay valid
+const FILE_RE = /^duniya-\d{8}-\d{6}(?:-\d{3})?\.dbk$/;
 
 const DEFAULTS = {
   enabled: false, schedule: 'daily', at: '03:30', weekday: 'sun', keep: 14, includeWhatsApp: true,
@@ -79,7 +81,7 @@ const s3For = (s) => s3Client({ ...s.s3, accessKeyId: getSecret('S3_ACCESS_KEY_I
 
 function stampName(d = new Date()) {
   const p = (n) => String(n).padStart(2, '0');
-  return `duniya-${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}.dbk`;
+  return `duniya-${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}-${String(d.getUTCMilliseconds()).padStart(3, '0')}.dbk`;
 }
 
 export function listLocal() {
@@ -107,9 +109,10 @@ export function runBackup({ reason = 'manual', appVersion = '', preUpdate = fals
       const pass = getSecret('BACKUP_PASSPHRASE');
       if (!pass) throw bad('passphrase', 'set a backup passphrase first');
       const buf = encryptBundle(createBundle({ includeWhatsApp: s.includeWhatsApp, appVersion }), pass);
+      assertDiskRoom(); // 069: never fill the last of the disk with a backup
       let file = stampName();
-      // two backups in the same second (e.g. a scheduled one right before an update): wait for the next stamp
-      while (existsSync(resolve(LOCAL_DIR, file))) { await new Promise((r) => setTimeout(r, 250)); file = stampName(); }
+      // the same millisecond (a clock that went back): wait for the next stamp
+      while (existsSync(resolve(LOCAL_DIR, file))) { await new Promise((r) => setTimeout(r, 5)); file = stampName(); }
       const results = {};
       mkdirSync(LOCAL_DIR, { recursive: true, mode: 0o700 });
       writeFileSync(resolve(LOCAL_DIR, file), buf, { mode: 0o600 });

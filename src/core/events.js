@@ -1,6 +1,6 @@
 // @ts-check
 import { EventEmitter } from 'node:events';
-import { insertActivity, pruneActivity } from './db.js';
+import { diskFullError, insertActivity, writesPaused } from './db.js';
 import { getChatPrefs } from './chat-prefs.js';
 import { getSetting } from './store.js';
 
@@ -90,10 +90,10 @@ export function activity(type, { agent, chat, summary, detail } = {}) {
     return null;
   }
   if (detail !== undefined) entry.detail = trim(detail, max);
-  try {
-    entry.id = insertActivity(entry);
-    if (Math.random() < 0.02) { const c = loggingSettings(); pruneActivity({ days: c.retentionDays, max: c.maxEntries }); }
-  } catch (e) { console.error('activity insert failed', e.message); }
+  // 069: disk almost full: only what is always recorded (errors, changes, channel status) is still written
+  if (!writesPaused() || ALWAYS.has(categoryOf(type))) {
+    try { entry.id = insertActivity(entry); } catch (e) { diskFullError(e); console.error('activity insert failed', e.message); }
+  }
   bus.emit('activity', entry);
   if (type === 'error') console.error(`[${oneLine(agent || 'core')}] ${oneLine(entry.summary)}`);
   return entry;

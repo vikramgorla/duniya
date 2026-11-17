@@ -1,11 +1,12 @@
 name: Release
 
 # A release is made when package.json on main has a version that has no tag yet (bump the version → release),
-# when a vX.Y.Z tag is pushed, or manually from the Actions tab.
+# when a vX.Y.Z tag is pushed, or manually from the Actions tab. Afterwards (069) every existing release's title and
+# notes are brought in line with releases.json (idempotent; never creates or deletes releases or tags).
 on:
   push:
     branches: [main]
-    paths: ["package.json", ".github/workflows/release.yml"]
+    paths: ["package.json", "releases.json", ".github/workflows/release.yml"]
     tags: ["v*.*.*"]
   workflow_dispatch:
 
@@ -80,3 +81,20 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:${{ steps.v.outputs.version }}
             ghcr.io/${{ github.repository }}:latest
+
+  # 069: older release pages had short notes; keep every release's text equal to its releases.json entry.
+  notes:
+    needs: release
+    if: github.ref == 'refs/heads/main' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Update release notes from releases.json
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release-notes.mjs --sync

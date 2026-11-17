@@ -64,7 +64,17 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
     bus.emit('status'); // live panel (058): a new QR or pairing code shows without polling
   };
 
-  async function connect() {
+  let shut = false; // 069: the app is shutting down; never reconnect
+  /** 069: reconnect with exponential backoff (2 s … 60 s) and ±20 % jitter, so several numbers never retry in lockstep. */
+  const retryLater = (msg) => {
+    if (stopping || removed || shut) return;
+    const delay = Math.round(Math.min(60000, 2000 * 2 ** Math.min(retries++, 5)) * (0.8 + Math.random() * 0.4));
+    setState({ status: 'reconnecting', lastError: msg });
+    setTimeout(() => { if (!removed && !shut) connect(); }, delay);
+  };
+  /** Open a session; a failure before the socket exists (auth files, version lookup) retries like a dropped connection. */
+  async function connect() { try { await open(); } catch (e) { retryLater(e.message); } }
+  async function open() {
     stopping = false;
     const { state: auth, saveCreds } = await authState(AUTH);
     const { version } = await fetchVersion().catch(() => ({ version: undefined }));
@@ -100,10 +110,7 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
           setTimeout(connect, 2000);
           return;
         }
-        if (removed) return;
-        const delay = Math.min(60000, 2000 * 2 ** retries++);
-        setState({ status: 'reconnecting', lastError: msg });
-        setTimeout(() => { if (mySock === sock) connect(); }, delay);
+        retryLater(msg);
       }
     });
 
@@ -682,6 +689,11 @@ export function createWhatsAppChannel({ number = 'main', label = 'Main', authDir
       try { await sock?.logout(); } catch { /* ignore */ }
       try { sock?.end(undefined); } catch { /* ignore */ }
       rmSync(AUTH, { recursive: true, force: true });
+    },
+    /** 069: graceful shutdown: close the socket without unlinking; no reconnect. */
+    async stop() {
+      shut = true; stopping = true; namesDueAt = 0;
+      try { sock?.end(undefined); } catch { /* ignore */ }
     },
     async restart() {
       stopping = true;

@@ -179,7 +179,7 @@ test('029: on a fresh server show-setup-code prints the code; status says the se
 test('029: backup-now makes a backup while the service runs; Docker-only hints for logs/update', async () => {
   t.store.setSecret('BACKUP_PASSPHRASE', 'a long backup passphrase');
   const r = await duniya(['backup-now']);
-  assert.equal(r.code, 0, r.err + r.out); assert.match(r.out, /✓ duniya-\d{8}-\d{6}\.dbk \(\d+ KB\): local ok/);
+  assert.equal(r.code, 0, r.err + r.out); assert.match(r.out, /✓ duniya-\d{8}-\d{6}-\d{3}\.dbk \(\d+ KB\): local ok/);
   assert.match((await duniya(['logs'], { DUNIYA_INSTALL: 'docker' })).out, /docker compose logs -f app/);
   assert.match((await duniya(['update', '--check'], { DUNIYA_INSTALL: 'docker' })).out, /docker compose pull/);
 });

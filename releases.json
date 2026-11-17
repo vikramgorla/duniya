@@ -1,6 +1,23 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.30.0": {
+      "breaking": false,
+      "title": "Fast and dependable on a small server with months of history: old data is pruned by itself, a Health card, and recovery without you",
+      "summary": "Duniya was measured with 300 chats, 30 agents and 200 000 stored messages on one CPU: replies are stored about 3 times faster and the panel answers in milliseconds. Old data now goes by itself every hour (you choose how long on Server → Health), a full disk or a wrong clock never breaks anything, and restarts and reconnects take care of themselves. Nothing to do on your server.",
+      "changes": [
+        { "type": "new", "text": "Server → Health: database size, how many messages, activity entries and model calls are kept and since when, the last automatic clean-up and the photos & voice queue." },
+        { "type": "new", "text": "Choose how long stored messages and usage detail are kept (Server → Health → Change how long data is kept). Old data goes by itself every hour; chat summaries, notes and contacts are never pruned." },
+        { "type": "improved", "text": "Messages are stored about 3 times faster and busy servers stay calm: the database writes less often to disk and old data is no longer cleaned up while a message comes in." },
+        { "type": "new", "text": "When the disk gets full you are told; when it is almost full, stored messages and backups pause (agents keep answering) and everything resumes by itself when space is back." },
+        { "type": "improved", "text": "WhatsApp reconnects with growing pauses and tells you once if a number stays down for 15 minutes." },
+        { "type": "improved", "text": "Restarts and updates stop cleanly: replies already being written finish and the database is closed properly; after a crash the app starts again by itself." },
+        { "type": "new", "text": "When too many photos and voice notes are waiting, you hear about it (at most once an hour)." },
+        { "type": "improved", "text": "Contacts load 100 at a time with Show more, so long address books open quickly; search still covers everyone." },
+        { "type": "fixed", "text": "Two backups made in the same second no longer overwrite each other." },
+        { "type": "fixed", "text": "A server clock that jumps can no longer make Duniya delete history." }
+      ]
+    },
     "2.29.2": {
       "breaking": false,
       "title": "ChatGPT plan limits removed from Models",

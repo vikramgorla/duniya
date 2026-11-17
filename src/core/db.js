@@ -3,16 +3,26 @@ import { DatabaseSync } from 'node:sqlite';
 import { resolve } from 'node:path';
 import { DATA_DIR, env } from './config.js';
 
+export const DB_FILE = resolve(DATA_DIR, 'duniya.sqlite');
 /**
  * Rows are plain objects whose columns the SQL decides, so statements hand them out untyped (063, type checking).
  * @typedef {{ run: (...params: any[]) => import('node:sqlite').StatementResultingChanges, get: (...params: any[]) => any,
  *   all: (...params: any[]) => any[], iterate: (...params: any[]) => IterableIterator<any> }} Statement
  * @type {Omit<DatabaseSync, 'prepare'> & { prepare: (sql: string) => Statement }}
  */
-export const db = new DatabaseSync(resolve(DATA_DIR, 'duniya.sqlite'));
+export const db = new DatabaseSync(DB_FILE);
+// 069: pragmas for a small server. WAL with synchronous = NORMAL is crash-safe (a power cut can lose only the last
+// moments, never corrupt the file) and avoids an fsync per write; the WAL file is trimmed after checkpoints; temp
+// tables stay in memory; the page cache is 8 MB. auto_vacuum = INCREMENTAL only takes effect on a new database (or
+// after the next VACUUM, which retention.js runs when it is cheap): freed pages then go back in small steps.
 db.exec(`
+  PRAGMA auto_vacuum = INCREMENTAL;
   PRAGMA journal_mode = WAL;
+  PRAGMA synchronous = NORMAL;
   PRAGMA busy_timeout = 5000;
+  PRAGMA temp_store = MEMORY;
+  PRAGMA cache_size = -8000;
+  PRAGMA journal_size_limit = 33554432;
   CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY, channel TEXT, chat TEXT, agent TEXT, msg_id TEXT, sender TEXT, sender_jid TEXT, name TEXT,
     text TEXT, quoted TEXT, addressed INTEGER DEFAULT 0, from_agent INTEGER DEFAULT 0, ts INTEGER
@@ -21,6 +31,8 @@ db.exec(`
     id INTEGER PRIMARY KEY, ts INTEGER, type TEXT, agent TEXT, chat TEXT, summary TEXT, detail TEXT
   );
   CREATE INDEX IF NOT EXISTS activity_agent ON activity(agent, id);
+  CREATE INDEX IF NOT EXISTS activity_chat ON activity(chat, id);
+  CREATE INDEX IF NOT EXISTS activity_ts ON activity(ts);
   CREATE TABLE IF NOT EXISTS pending (
     code TEXT PRIMARY KEY, agent TEXT, server TEXT, confirm_tool TEXT, confirm_id TEXT,
     tool TEXT, chat TEXT, requester TEXT, summary TEXT, expires INTEGER
@@ -41,6 +53,7 @@ db.exec(`
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS messages_chat ON messages(chat, id);
+  CREATE INDEX IF NOT EXISTS messages_chat_ts ON messages(chat, ts);
   CREATE UNIQUE INDEX IF NOT EXISTS messages_chat_msgid ON messages(chat, msg_id) WHERE msg_id IS NOT NULL;
   -- 026: reactions and polls (WhatsApp features)
   CREATE TABLE IF NOT EXISTS wa_reactions (
@@ -59,14 +72,22 @@ const insMsg = db.prepare(`INSERT OR IGNORE INTO messages
   (channel, chat, agent, msg_id, sender, name, text, quoted, addressed, from_agent, ts, sender_jid)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 const recent = db.prepare('SELECT * FROM (SELECT * FROM messages WHERE chat = ? ORDER BY id DESC LIMIT ?) ORDER BY id');
-const pruneCap = db.prepare('DELETE FROM messages WHERE chat = ? AND id <= (SELECT id FROM messages WHERE chat = ? ORDER BY id DESC LIMIT 1 OFFSET ?)');
-const pruneAge = db.prepare('DELETE FROM messages WHERE ts < ?');
 
-/** Store a message once (dedup by chat + msgId). Returns the row id, or 0 if it was a duplicate. */
+// 069: disk almost full (retention.js) or SQLite said so: stored messages and optional activity pause, never crash.
+let paused = false;
+export const writesPaused = () => paused;
+export const setWritesPaused = (on) => { paused = !!on; };
+/** A write failed because the disk is full: pause optional writes (retention.js resumes them when space is back). */
+export const diskFullError = (e) => { const full = /SQLITE_FULL|disk is full|ENOSPC/i.test(String(e?.message || e)); if (full) paused = true; return full; };
+
+/** Store a message once (dedup by chat + msgId). Returns the row id, or 0 if it was a duplicate or writes are paused. */
 export function logMessage({ channel = 'whatsapp', chat, agent = '', msgId = null, sender = '', name = '', text, quoted = '', addressed = false, fromAgent = false, ts = Date.now(), senderJid = '' }) {
-  const r = insMsg.run(channel, chat, agent, msgId, sender, name, String(text ?? ''), String(quoted || '').slice(0, 500),
-    addressed ? 1 : 0, fromAgent ? 1 : 0, ts, senderJid || '');
-  if (Math.random() < 0.02) pruneMessages(chat);
+  if (paused) return 0;
+  let r;
+  try {
+    r = insMsg.run(channel, chat, agent, msgId, sender, name, String(text ?? ''), String(quoted || '').slice(0, 500),
+      addressed ? 1 : 0, fromAgent ? 1 : 0, ts, senderJid || '');
+  } catch (e) { if (diskFullError(e)) return 0; throw e; }
   return r.changes ? Number(r.lastInsertRowid) : 0;
 }
 /**
@@ -99,12 +120,10 @@ export function insertEarlierMessages(chat, rows) {
 export const oldestStoredMessage = (chat) => db.prepare('SELECT * FROM messages WHERE chat = ? AND msg_id IS NOT NULL ORDER BY id LIMIT 1').get(chat) || null;
 /** #91: how much of a chat is stored: { count, since } (since = time of the oldest stored message). */
 export const storedSpan = (chat) => { const r = db.prepare('SELECT COUNT(*) AS n, MIN(ts) AS since FROM messages WHERE chat = ?').get(chat); return { count: r.n, since: r.since || null }; };
-export function pruneMessages(chat) {
-  if (chat) pruneCap.run(chat, chat, env.memory.maxMessagesPerChat);
-  pruneAge.run(Date.now() - env.memory.retentionDays * 86400000);
-}
 export const history = (chat, n = 30) => recent.all(chat, n);
 export const messageCount = (chat) => db.prepare('SELECT COUNT(*) AS n FROM messages WHERE chat = ?').get(chat).n;
+/** 069: how many messages lie between two row ids (cheap check before loading them). */
+export const countBetween = (chat, afterId, beforeId) => db.prepare('SELECT COUNT(*) AS n FROM messages WHERE chat = ? AND id > ? AND id < ?').get(chat, afterId, beforeId).n;
 export const messagesAfter = (chat, afterId, beforeId) =>
   db.prepare('SELECT * FROM messages WHERE chat = ? AND id > ? AND id < ? ORDER BY id').all(chat, afterId, beforeId);
 export function searchMessages(chat, query, limit = 15) {
@@ -160,11 +179,6 @@ const insAct = db.prepare('INSERT INTO activity (ts, type, agent, chat, summary,
 export function insertActivity(a) {
   const r = insAct.run(a.ts, a.type, a.agent || '', a.chat || '', a.summary || '', a.detail ? JSON.stringify(a.detail) : '');
   return Number(r.lastInsertRowid);
-}
-/** Keep at most `max` entries and nothing older than `days`. */
-export function pruneActivity({ days = 30, max = 5000 } = {}) {
-  db.prepare('DELETE FROM activity WHERE id <= (SELECT id FROM activity ORDER BY id DESC LIMIT 1 OFFSET ?)').run(Math.max(100, max));
-  db.prepare('DELETE FROM activity WHERE ts < ?').run(Date.now() - Math.max(1, days) * 86400000);
 }
 /** @param {{ limit?: number|string, agent?: string, chat?: string, before?: number }} [o]  limit: as sent (a query string is fine) */
 export function listActivity({ limit = 200, agent = '', chat = '', before = 0 } = {}) {

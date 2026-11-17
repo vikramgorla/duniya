@@ -85,7 +85,8 @@ key (or start free), tap a template, switch a group on, send a test. Afterwards 
 setting. [Getting started →](docs/getting-started.md)
 
 A free 1 GB VM is enough: heavier extras (on-server speech, local tool services) stay off there unless you switch on
-**Small server mode** in Settings → Server. [Small servers →](docs/small-servers.md)
+**Small server mode** in Settings → Server. Old data is pruned by itself and **Server → Health** shows what is kept;
+a full disk, a wrong clock, dropped connections and crashes are handled without you. [Small servers →](docs/small-servers.md)
 
 > [!IMPORTANT]
 > **Where is my panel?** Open `http://<server-ip>/`: a live progress page that turns into the panel at

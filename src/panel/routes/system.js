@@ -1,6 +1,8 @@
 // @ts-check
 // Panel routes: pending confirmations, secrets, usage & prices, server metrics & maintenance, WhatsApp numbers, restart.
 import { getAgent, listAgents } from '../../core/agents.js';
+import { restartSoon } from '../../core/config.js';
+import { healthView, setRetention } from '../../core/retention.js';
 import { dropPending, listPending, takePending } from '../../core/db.js';
 import { activity } from '../../core/events.js';
 import { globalServers } from '../../core/global-mcp.js';
@@ -81,5 +83,12 @@ export function systemRoutes(route, { channel } = {}) {
   route('DELETE', '/api/whatsapp/numbers/:id', async (req, res, body, q, p) => channel.removeNumber(p.id), { role: 'owner' });
 
   // ---------- system ----------
-  route('POST', '/api/system/restart', async () => { setTimeout(() => process.exit(0), 300); return { ok: true }; }, { role: 'owner' });
+  // 069: Server → Health: database size, oldest kept data, retention, last clean-up, disk, queue, clock
+  route('GET', '/api/server/health', async () => healthView());
+  route('PUT', '/api/server/retention', async (req, res, body, q, p, user) => {
+    const next = setRetention(body);
+    activity('config', { summary: `Keep stored messages ${next.messagesDays} days (at most ${next.messagesPerChat} per chat), usage detail ${next.usageDays} days (${user.username})` });
+    return healthView();
+  }, { role: 'owner' });
+  route('POST', '/api/system/restart', async () => { restartSoon(300); return { ok: true }; }, { role: 'owner' });
 }

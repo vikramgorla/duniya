@@ -181,7 +181,7 @@ action is logged (`whatsapp.action`). Admins get the same group tools on **Chats
 
 | | What | Who writes |
 |---|---|---|
-| **Chat memory** | recent messages, a running summary and notes per chat; limits `MEMORY_RETENTION_DAYS`, `MEMORY_MAX_MESSAGES` | the agent |
+| **Chat memory** | recent messages, a running summary and notes per chat; limits on **Server → Health** (default 90 days, 5 000 per chat) | the agent |
 | **Shared memory** | notes across all of an agent's chats (agent page → **Memory**) | organizers only, so one group can't plant facts for another |
 
 Admins can read, search (each look logged), rebuild or erase it. Tools:

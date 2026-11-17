@@ -28,7 +28,8 @@ const PRELUDE = `const T = {
   async until(sel, ms = 15000) { for (let t = 0; t < ms && !document.querySelector(sel); t += 100) await T.wait(100); },
   openAll: (root = document) => root.querySelectorAll('details').forEach((d) => { d.open = true; }),
   async click(text, sel = 'button,a,summary', ms = 900) {
-    const el = [...document.querySelectorAll(sel)].find((e) => e.textContent.trim().includes(text) && e.offsetParent);
+    let el = null; // 069: wait up to 5 s for it (a screen still drawing made models-setup flaky)
+    for (let t = 0; t < 5000 && !(el = [...document.querySelectorAll(sel)].find((e) => e.textContent.trim().includes(text) && e.offsetParent)); t += 100) await T.wait(100);
     if (!el) throw new Error('nothing to click: ' + text);
     el.click(); await T.wait(ms);
   },
@@ -92,6 +93,7 @@ const CARDS = [
   ['card-web-access', 'settings/web-access', '', 'box:Web address & access', 900],
   ['card-small-server', 'server', '', 'box:This server', 1100],
   ['card-small-mode', 'settings/small-mode', '', '#small-mode', 900],
+  ['card-health', 'server', '', '#health', 1100], // 069: Server → Health
   ['card-assistants', 'settings/assistants', '', 'box:Connected AI assistants', 900],
   ['card-logging', 'settings/logging', '', 'box:Activity log', 600],
   ['card-mcp', 'agents/carpool/tools', '', '.ap-sec', 600],

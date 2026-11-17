@@ -3,7 +3,7 @@ import { optionalPaused } from './resources.js';
 import { env, clip } from './config.js';
 import {
   history, messagesAfter, getChatMemory, setChatMemory, addNote, listNotes, deleteNote, getNote, updateNote, searchNotes,
-  searchMessages, messageCount, eraseChat, recentReactions, recentPolls, pollTally, storedSpan,
+  searchMessages, messageCount, eraseChat, recentReactions, recentPolls, pollTally, storedSpan, countBetween,
 } from './db.js';
 import { chat as modelChat } from './providers/index.js';
 import { activity } from './events.js';
@@ -14,8 +14,11 @@ export const DEFAULT_WINDOW = 30;
 export const memoryEnabled = (agent) => agent?.memory?.enabled !== false;
 const windowFor = (agent) => agent?.historySize || DEFAULT_WINDOW;
 
+// 069: one formatter per time zone (building one per message was the slowest part of a turn with a long history)
+const stampFmt = new Map();
 function stamp(ts, tz = env.timezone) {
-  return new Date(ts).toLocaleString('en-GB', { timeZone: tz, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  if (!stampFmt.has(tz)) stampFmt.set(tz, new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }));
+  return stampFmt.get(tz).format(new Date(ts));
 }
 export function formatMessage(m, tz, tags = null) {
   const tag = !m.from_agent && tags?.size ? tags.get(m.sender) || tags.get(m.sender_jid) || '' : '';
@@ -89,8 +92,9 @@ export async function maybeSummarize(chat, agent, { force = false } = {}) {
   if (!windowRows.length) return null;
   const boundary = force ? Number.MAX_SAFE_INTEGER : windowRows[0].id;
   const mem = getChatMemory(chat) || { summary: '', upto_id: Number.MIN_SAFE_INTEGER }; // #91: earlier messages have ids <= 0
+  if (!force && countBetween(chat, mem.upto_id ?? 0, boundary) < env.memory.summarizeBatch) return null; // 069: count before loading
   const older = messagesAfter(chat, mem.upto_id ?? 0, boundary);
-  if (!older.length || (!force && older.length < env.memory.summarizeBatch)) return null;
+  if (!older.length) return null;
 
   const tz = agent?.timezone || env.timezone;
   return summarize(chat, agent, {

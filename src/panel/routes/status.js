@@ -47,6 +47,10 @@ export const statusFor = async (user, channel) => ({
   osUpdates: ['admin', 'owner'].includes(user?.role) ? { ...(osUpdatesCached() || { count: 0, security: 0, at: null }), restart: rebootStatus().required } : null,
 });
 
+// 069: an entry is serialized once, however many panels are open
+const frames = new WeakMap();
+const frameOf = (a) => { let f = frames.get(a); if (!f) { f = `data: ${JSON.stringify(a)}\n\n`; frames.set(a, f); } return f; };
+
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
 export function statusRoutes(route, { channel } = {}) {
   route('GET', '/api/status', async (req, res, body, q, p, user) => statusFor(user, channel));
@@ -88,7 +92,7 @@ export function statusRoutes(route, { channel } = {}) {
       res.write(`event: status\ndata: ${JSON.stringify(st)}\n\n`);
     };
     const changed = () => { if (!soon) soon = setTimeout(pushStatus, 250); };
-    const onAct = (a) => { res.write(`data: ${JSON.stringify(a)}\n\n`); changed(); };
+    const onAct = (a) => { res.write(frameOf(a)); changed(); };
     const ping = setInterval(() => pushStatus(true), 25000);
     bus.on('activity', onAct);
     bus.on('status', changed);

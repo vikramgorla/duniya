@@ -1,5 +1,5 @@
-// Server screen: metrics, OS updates, maintenance helper, logs, hosting. Module of the panel (063).
-import { $, S, ago, api, ask, can, h, serverBadge, time, tryApi } from './core.js';
+// Server screen: metrics, health, OS updates, maintenance helper, logs, hosting. Module of the panel (063).
+import { $, S, ago, api, ask, can, field, h, serverBadge, time, tryApi } from './core.js';
 import { DOCS, SIZE_LABEL, bytes, meter, pct, plural } from './shared.js';
 function spark(values, max) {
   const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg');
@@ -43,12 +43,45 @@ function hostingCard(hosting) {
     h('p', { class: 'small muted' }, 'Updates are on Overview. Back up before you recreate or remove a server.'),
     known ? h('details', {}, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Other hosts'), Object.keys(HOST_GUIDES).filter((k) => k !== p).map((k) => link(k))) : null);
 }
+// 069: Health — how big the data is, what is kept and that the server cleans up by itself. Loaded once per visit.
+const day = (ts) => new Date(ts).toLocaleDateString([], { day: 'numeric', month: 'short', ...(new Date(ts).getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }) });
+const n = (x) => Number(x || 0).toLocaleString();
+function healthCard(x, redraw) {
+  const r = x.retention; const q = x.queue; const d = x.disk;
+  const state = d.level === 'full' ? ['bad', `The disk is almost full (${bytes(d.free)} free): stored messages and backups are paused until space is freed. Agents keep answering.`]
+    : d.level === 'low' ? ['warn', `The disk is getting full (${bytes(d.free)} free). Old data is pruned by itself; fewer local backups or a bigger disk help.`]
+      : !x.clock.ok ? ['warn', 'The server clock jumped, so nothing old is pruned until it is steady again (usually fixes itself within an hour).']
+        : q.queued >= q.max ? ['warn', 'The photos & voice queue is full: new ones are refused for a few minutes and the senders are told.'] : null;
+  const rows = [
+    ['Database', `${bytes(x.database.bytes)}${x.database.freeBytes > 1048576 ? ` · ${bytes(x.database.freeBytes)} reusable` : ''}`],
+    // one row per kind: how many, since when, how long it is kept
+    ['Stored messages', `${n(x.database.rows.messages)}${x.oldest.messages ? ` · since ${day(x.oldest.messages)}` : ''} · kept ${r.messagesDays} days`],
+    ['Activity', `${n(x.database.rows.activity)}${x.oldest.activity ? ` · since ${day(x.oldest.activity)}` : ''} · kept ${r.activityDays} days`],
+    ['Usage detail', `${n(x.database.rows.usage)}${x.oldest.usage ? ` · since ${day(x.oldest.usage)}` : ''} · kept ${r.usageDays} days`],
+    ['Last clean-up', x.lastPrune ? `${ago(x.lastPrune.at)} ago · ${((k) => (k ? `${n(k)} old rows removed` : 'nothing old to remove'))(x.lastPrune.removed.messages + x.lastPrune.removed.activity + x.lastPrune.removed.usage)}${x.vacuumAt ? ` · compacted ${day(x.vacuumAt)}` : ''}` : 'soon after the app starts'],
+    ['Photos & voice queue', q.queued || q.running ? `${q.running} working · ${q.queued} waiting (at most ${q.max})` : 'empty'],
+  ];
+  const owner = can('owner');
+  const num = (k, v) => h('input', { type: 'number', inputmode: 'numeric', name: k, value: v, min: r.limits[k][0], max: r.limits[k][1], style: 'max-width:120px' });
+  const F = { messagesDays: num('messagesDays', r.messagesDays), messagesPerChat: num('messagesPerChat', r.messagesPerChat), usageDays: num('usageDays', r.usageDays) };
+  return h('div', { class: 'card', id: 'health' },
+    h('h2', {}, 'Health'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Old data is pruned by itself every hour and the database is kept compact. Summaries, notes, contacts and settings are never pruned.'),
+    state ? h('div', { class: `note ${state[0]}`, role: 'status' }, state[1]) : null,
+    h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {}, rows.map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v)))))),
+    owner ? h('details', { style: 'margin-top:8px' }, h('summary', { class: 'small' }, 'Change how long data is kept'),
+      field('Stored messages: days', F.messagesDays, 'Agents remember older talk through the chat summary.'), field('Stored messages: at most per chat', F.messagesPerChat),
+      field('Usage detail: days', F.usageDays, 'Spending caps and the Usage screen need the last month; the weekly summary keeps its own counts.'),
+      h('p', { class: 'small muted' }, 'Activity is kept as set in ', h('a', { href: '#settings/logging' }, 'Settings → Activity log'), '.'),
+      h('button', { class: 'btn primary', type: 'button', onclick: () => tryApi(async () => {
+        redraw(await api('PUT', '/api/server/retention', Object.fromEntries(Object.entries(F).map(([k, i]) => [k, Number(i.value)])))); }, 'Saved: applies on the next clean-up') }, 'Save')) : null);
+}
 export async function renderServer() {
   clearInterval(serverTimer); clearTimeout(opsTimer);
   const tilesBox = h('div', { class: 'tiles' }); const infoBox = h('div', { class: 'card' }); const opsBox = h('div', { class: 'card' }); const logBox = h('div', { class: 'card', style: 'margin-top:16px' });
-  const hostBox = h('div', { style: 'display:grid' });
+  const hostBox = h('div', { style: 'display:grid' }); const healthBox = h('div', { style: 'display:grid' });
   opsBox.append(h('h2', {}, 'OS updates & maintenance'), h('p', { class: 'muted small' }, h('span', { class: 'spinner' }), ' Checking for OS updates…'));
-  $('#main').replaceChildren(tilesBox, h('div', { class: 'grid', style: 'margin-top:16px' }, infoBox, opsBox, hostBox), can('admin') ? logBox : null);
+  $('#main').replaceChildren(tilesBox, h('div', { class: 'grid', style: 'margin-top:16px' }, infoBox, healthBox, opsBox, hostBox), can('admin') ? logBox : null);
   async function tiles() {
     if (S.tab !== 'server') return clearInterval(serverTimer);
     const [x, hist] = await Promise.all([api('GET', '/api/system'), api('GET', '/api/system/history')]).catch(() => [null, []]);
@@ -143,7 +176,8 @@ export async function renderServer() {
       h('div', { style: 'margin:10px 0;overflow-x:auto' }, seg), pre);
     pre.scrollTop = pre.scrollHeight;
   }
-  await tiles(); opsCard(); logsCard();
+  const health = (x) => { if (x) healthBox.replaceChildren(healthCard(x, health)); };
+  await tiles(); api('GET', '/api/server/health').then(health).catch(() => {}); opsCard(); logsCard();
   serverTimer = setInterval(tiles, 10000);
 }
 

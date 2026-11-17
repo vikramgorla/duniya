@@ -153,13 +153,14 @@ export function contactSummary() {
   return { total: r.total || 0, own: r.own || 0, book: r.book || 0, business: r.business || 0, profile: r.profile || 0, hiddenNumbers: hidden || 0 };
 }
 
-export function listContacts({ q = '', sharedOnly = false, limit = 500 } = {}) {
+/** Contacts by name; `limit` + `offset` page through them (069: the panel loads 100 at a time). */
+export function listContacts({ q = '', sharedOnly = false, limit = 500, offset = 0 } = {}) {
   const like = `%${String(q).trim().toLowerCase()}%`;
   const d = digits(q);
   return db.prepare(`SELECT * FROM contacts WHERE tenant_id = ? ${sharedOnly ? 'AND shared = 1' : ''}
       AND (lower(name) LIKE ? OR lower(book_name) LIKE ? OR lower(biz_name) LIKE ? OR lower(push_name) LIKE ? OR lower(note) LIKE ? ${d.length >= 3 ? 'OR phone LIKE ?' : ''})
-      ORDER BY lower(COALESCE(NULLIF(name, ''), NULLIF(book_name, ''), NULLIF(biz_name, ''), NULLIF(push_name, ''), phone)) LIMIT ?`)
-    .all(...[TENANT, like, like, like, like, like, ...(d.length >= 3 ? [`%${d}%`] : []), Math.min(Number(limit) || 500, 2000)]).map(view);
+      ORDER BY lower(COALESCE(NULLIF(name, ''), NULLIF(book_name, ''), NULLIF(biz_name, ''), NULLIF(push_name, ''), phone)) LIMIT ? OFFSET ?`)
+    .all(...[TENANT, like, like, like, like, like, ...(d.length >= 3 ? [`%${d}%`] : []), Math.min(Number(limit) || 500, 2000), Math.max(0, Number(offset) || 0)]).map(view);
 }
 
 export function getContact(phone) {
