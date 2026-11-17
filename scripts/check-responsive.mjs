@@ -13,7 +13,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { startDemo, DEMO_PASSWORD, fakeChecklist, FAKE_CHECKLIST } from './demo-panel.mjs';
+import { startDemo, DEMO_PASSWORD, fakeChecklist, FAKE_CHECKLIST, PANEL } from './demo-panel.mjs';
 import { launch, newPage } from './cdp.mjs';
 
 const { values: opt } = parseArgs({ options: {
@@ -40,18 +40,18 @@ const REGISTRY_ADDED = `const f1 = window.fetch; window.fetch = async (u, o) => 
   return f1(u, o); };`;
 // js runs in the page after the screen loaded; T.* helpers are defined in PRELUDE.
 const STATES = [
-  { name: 'login', hash: '', js: "await fetch('/api/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); await renderLogin();", relogin: true },
-  { name: 'setup', hash: '', js: "clearInterval(statusTimer); S.tab = ''; renderSetup(document.querySelector('#app'), () => []);" },
-  { name: 'setup-restore', hash: '', js: "clearInterval(statusTimer); S.tab = ''; renderSetup(document.querySelector('#app'), () => []); await T.click('Restore a backup');" },
+  { name: 'login', hash: '', js: "await fetch('/api/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); await (await import('/app/login.js')).renderLogin();", relogin: true },
+  { name: 'setup', hash: '', js: "S.es?.close(); S.tab = ''; (await import('/app/login.js')).renderSetup(document.querySelector('#app'), () => []);" },
+  { name: 'setup-restore', hash: '', js: "S.es?.close(); S.tab = ''; (await import('/app/login.js')).renderSetup(document.querySelector('#app'), () => []); await T.click('Restore a backup');" },
   { name: 'overview', hash: 'overview' },
   // 061: the install hint without the browser's install prompt (iPhone, Firefox): the manual steps instead of a button
-  { name: 'overview-install-steps', hash: 'overview', js: "S.installPrompt = null; localStorage.removeItem('duniya.installHint'); drawInstallHint();" },
+  { name: 'overview-install-steps', hash: 'overview', js: "S.installPrompt = null; localStorage.removeItem('duniya.installHint'); (await import('/app/overview.js')).drawInstallHint();" },
   // 062: Getting started, each step open in place (as on a fresh install), and the closing card
   ...['provider', 'agent', 'chat', 'reply'].map((step) => ({ name: `overview-start-${step}`, hash: 'overview', checklist: fakeChecklist(step), wait: 2000 })),
   { name: 'overview-start-done', hash: 'overview', checklist: fakeChecklist('', { done: true }), wait: 2000 },
   // 062: Find anything (/ or ⌘K), empty and with a query
-  { name: 'find', hash: 'overview', js: 'await openPalette(); await T.wait(600);' },
-  { name: 'find-query', hash: 'chats', js: "await openPalette(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'gen'; i.dispatchEvent(new Event('input')); await T.wait(200);" },
+  { name: 'find', hash: 'overview', js: 'await openFind(); await T.wait(600);' },
+  { name: 'find-query', hash: 'chats', js: "await openFind(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'gen'; i.dispatchEvent(new Event('input')); await T.wait(200);" },
   { name: 'chats-find', hash: 'chats', js: "const i = document.querySelector('input.chat-find'); i.value = 'car'; i.dispatchEvent(new Event('input')); await T.wait(200);" },
   // 045: a breaking release waits for the owner (banner on Overview, the dialog with release notes)
   { name: 'overview-update-decision', hash: 'overview', before: UPDATE_DECISION, wait: 1500 },
@@ -85,7 +85,7 @@ const STATES = [
   { name: 'models', hash: 'models', js: 'T.openAll();' },
   { name: 'models-setup', hash: 'models', before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u).startsWith('/api/providers') && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); if (Array.isArray(j)) return new Response(JSON.stringify(j.filter((x) => x.id !== 'openrouter').map((x) => ({ ...x, connected: false, models: 0 })))); }
-      return r; }; modelsCache = null;`, js: "await T.click('Sign in with ChatGPT', 'button', 1200); T.openAll();" },
+      return r; }; S.models = null;`, js: "await T.click('Sign in with ChatGPT', 'button', 1200); T.openAll();" },
   { name: 'usage', hash: 'usage' },
   { name: 'server', hash: 'server', wait: 2000, js: 'T.openAll();' },
   // #96: OS updates grouped (will install / rolling out gradually / held back), the restart banner and last-run summary
@@ -106,9 +106,9 @@ const STATES = [
   { name: 'pending', hash: 'pending' },
   { name: 'settings-secrets', hash: 'secrets' }, // 062: #secrets opens Settings → Secrets
   // 060: one-time links — enter a secret (signed in), a new user's sign-up page (before sign-in), the link in Users.
-  { name: 'secret-link', hash: 'secrets', js: "const r = await (await fetch('/api/secret-links', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'OPENAI_API_KEY' }) })).json(); await renderSecretLink(r.link.split('=')[1]);" },
-  { name: 'signup-link', hash: '', js: "const r = await (await fetch('/api/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: `lea${Date.now() % 1e6}`, role: 'admin' }) })).json(); clearInterval(statusTimer); S.tab = ''; S.es?.close(); const app = document.querySelector('#app'); app.replaceChildren(); await renderSignup(app, () => [], r.signup.link.split('=')[1]);" },
-  { name: 'settings-signup-link', hash: 'settings', wait: 2000, js: "S.signupLink = { username: 'lea', link: `${location.origin}/#signup=${'a1'.repeat(32)}` }; await renderSettings(); document.querySelector('.note code')?.scrollIntoView(); await T.wait(300);" },
+  { name: 'secret-link', hash: 'secrets', js: "const r = await (await fetch('/api/secret-links', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'OPENAI_API_KEY' }) })).json(); await (await import('/app/login.js')).renderSecretLink(r.link.split('=')[1]);" },
+  { name: 'signup-link', hash: '', js: "const r = await (await fetch('/api/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: `lea${Date.now() % 1e6}`, role: 'admin' }) })).json(); S.tab = ''; S.es?.close(); const app = document.querySelector('#app'); app.replaceChildren(); await (await import('/app/login.js')).renderSignup(app, () => [], r.signup.link.split('=')[1]);" },
+  { name: 'settings-signup-link', hash: 'settings', wait: 2000, js: "S.signupLink = { username: 'lea', link: `${location.origin}/#signup=${'a1'.repeat(32)}` }; await (await import('/app/settings.js')).renderSettings(); document.querySelector('.note code')?.scrollIntoView(); await T.wait(300);" },
   { name: 'settings', hash: 'settings', wait: 2000, js: 'T.openAll();' },
   // 055: Settings → Server, Small server mode (one switch for heavier features on a small server)
   { name: 'settings-small-mode', hash: 'settings', wait: 2000, js: "document.getElementById('small-mode')?.scrollIntoView(); await T.wait(300);" },
@@ -191,9 +191,9 @@ for (const scheme of opt.schemes.split(',')) {
       try {
         await page.goto(st.path ? `${base}${st.path}` : `${base}/${st.hash ? `#${st.hash}` : ''}`);
         if (st.checklist) await page.call(FAKE_CHECKLIST, st.checklist);
-        if (st.before) await page.evaluate(`(async () => { ${st.before} show(S.tab); })()`);
+        if (st.before) await page.evaluate(`(async () => { ${PANEL} ${st.before} show(S.tab); })()`);
         await sleep(st.wait || 1500);
-        if (st.js) await page.evaluate(`(async () => { ${PRELUDE} ${st.js} })()`);
+        if (st.js) await page.evaluate(`(async () => { ${PRELUDE} ${PANEL} ${st.js} })()`);
         await sleep(300);
         const r = await page.evaluate(`(${audit})(${width}, ${width < 600})`);
         const bad = r.overflow > 0 || r.wide.length || r.taps.length || r.text.length;

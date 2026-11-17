@@ -1,9 +1,10 @@
 // 058: the panel shell and its scripts come from memory, compressed, with ETag/304 and versioned script links; the
-// live stream pushes the status (no 5-second polling).
+// live stream pushes the status (no 5-second polling). 063: the scripts are native ES modules behind an import map.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 import { setup } from './harness.js';
@@ -22,15 +23,18 @@ test('058: the panel shell is compressed, keeps its security headers and holds n
   const br = await get('/', { 'accept-encoding': 'gzip, br' });
   assert.equal(br.status, 200);
   assert.equal(br.headers['content-encoding'], 'br');
-  assert.ok(br.body.length < shellFile.length / 3, 'much smaller on the wire');
   assert.match(br.headers['content-security-policy'], /default-src 'self'/);
   assert.equal(br.headers['x-frame-options'], 'DENY');
   assert.equal(br.headers['x-content-type-options'], 'nosniff');
   assert.equal(br.headers['cache-control'], 'no-cache');
   assert.equal(br.headers.vary, 'accept-encoding');
   const html = brotliDecompressSync(br.body).toString('utf8');
-  // the same bytes as the file (nothing inlined: no user data, no secrets), except the versioned script/asset links
-  assert.equal(html.replace(/\?v=[A-Za-z0-9_-]{16}"/g, '"'), shellFile);
+  assert.ok(br.body.length < html.length / 2, 'much smaller on the wire');
+  // the same bytes as the file (nothing inlined: no user data, no secrets), except the versioned links and the module
+  // list the server fills in (063: import map + modulepreload)
+  const modules = html.slice(html.indexOf('<script type="importmap">'), html.lastIndexOf('<link rel="modulepreload"'));
+  assert.equal(html.replace(/<script type="importmap">[\s\S]*<link rel="modulepreload" [^>]*>/, '<!--modules-->').replace(/\?v=[A-Za-z0-9_-]{16}"/g, '"'), shellFile);
+  assert.ok(modules.length > 100);
 
   const gz = await get('/', { 'accept-encoding': 'gzip' });
   assert.equal(gz.headers['content-encoding'], 'gzip');
@@ -52,7 +56,7 @@ test('058: a repeat load is a 304 without a body; a changed ETag gets the page a
 
 test('058/061: scripts, the web app manifest and icons are linked by version and cached for good under that version only', async () => {
   const html = (await get('/')).body.toString('utf8');
-  const files = { 'diff.js': 'text/javascript; charset=utf-8', 'manifest.webmanifest': 'application/manifest+json', 'icons/apple-touch-icon.png': 'image/png' };
+  const files = { 'app/main.js': 'text/javascript; charset=utf-8', 'app/styles.css': 'text/css; charset=utf-8', 'manifest.webmanifest': 'application/manifest+json', 'icons/apple-touch-icon.png': 'image/png' };
   for (const [name, type] of Object.entries(files)) {
     const v = html.match(new RegExp(` (?:src|href)="/${name.replace(/\./g, '\\.')}\\?v=([A-Za-z0-9_-]+)"`))?.[1];
     assert.ok(v, `${name} linked with a version`);
@@ -64,6 +68,34 @@ test('058/061: scripts, the web app manifest and icons are linked by version and
     assert.equal((await get(`/${name}`, { 'if-none-match': pinned.headers.etag })).status, 304);
   }
   assert.equal((await get('/qr.js')).status, 404, 'the mobile app QR encoder is gone');
+});
+
+test('063: modules behind an import map: every module pinned by its content hash, the first screen preloaded, strict CSP', async () => {
+  const r = await get('/');
+  const html = r.body.toString('utf8');
+  const json = html.match(/<script type="importmap">([^<]*)<\/script>/)[1];
+  const map = JSON.parse(json).imports;
+  const files = readdirSync(resolve(import.meta.dirname, '../src/panel/public/app')).filter((f) => f.endsWith('.js'));
+  assert.deepEqual(Object.keys(map).sort(), files.map((f) => `/app/${f}`).sort(), 'every module, nothing else');
+  for (const [path, pinned] of Object.entries(map)) {
+    const v = pinned.match(/^\/app\/[a-z0-9-]+\.js\?v=([A-Za-z0-9_-]{16})$/)?.[1];
+    assert.ok(v && pinned.startsWith(`${path}?`), pinned);
+    const got = await get(pinned, { 'accept-encoding': 'br' });
+    assert.equal(got.headers['cache-control'], 'public, max-age=31536000, immutable');
+    assert.equal(got.headers['content-type'], 'text/javascript; charset=utf-8');
+    assert.equal(createHash('sha256').update(brotliDecompressSync(got.body)).digest('base64url').slice(0, 16), v, 'the version is the content hash');
+  }
+  // only the import map is inline, allowed by its hash; no 'unsafe-inline' for scripts
+  const csp = r.headers['content-security-policy'];
+  const scriptSrc = csp.match(/script-src ([^;]*)/)[1];
+  assert.equal(scriptSrc, `'self' 'sha256-${createHash('sha256').update(json).digest('base64')}'`);
+  assert.equal([...html.matchAll(/<script(?! type="importmap")[^>]*>[^<]/g)].length, 0, 'no other inline script');
+  assert.match(html, new RegExp(`<script type="module" src="${map['/app/main.js'].replace(/[?.]/g, '\\$&')}"></script>`));
+  // the entry and Overview with their imports are preloaded; other screens load on their first visit
+  const preloaded = [...html.matchAll(/<link rel="modulepreload" href="\/app\/([a-z0-9-]+\.js)\?v=/g)].map((m) => m[1]);
+  for (const f of ['main.js', 'core.js', 'login.js', 'overview.js']) assert.ok(preloaded.includes(f), f);
+  for (const f of ['settings.js', 'agent-editor.js', 'models.js', 'backups.js']) assert.ok(!preloaded.includes(f), f);
+  assert.equal((await get('/app/missing.js')).status, 404);
 });
 
 test('061: the panel is an installable web app: manifest, icons that exist, iOS tags, no service worker', async () => {
@@ -136,7 +168,7 @@ test('058: a channel state change (a new QR) pushes the status without an activi
 });
 
 test('058: the panel uses the live stream instead of polling the status', () => {
-  const script = shellFile.slice(shellFile.lastIndexOf('<script>'));
+  const script = readFileSync(resolve(import.meta.dirname, '../src/panel/public/app/core.js'), 'utf8');
   assert.doesNotMatch(script, /setInterval\(refreshStatus, 5000\)/);
   assert.match(script, /addEventListener\('status'/);
   assert.match(script, /setInterval\(refreshStatus, 30000\)/, 'slow fallback while the stream is down');

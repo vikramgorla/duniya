@@ -7,11 +7,12 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/index.js",
-    "test": "node --test --test-concurrency=1 --disable-warning=ExperimentalWarning test/*.test.js",
+    "test": "node --test --test-concurrency=4 --disable-warning=ExperimentalWarning test/*.test.js",
     "lint": "eslint .",
-    "check:panel": "node -e \"const s=require('fs').readFileSync('src/panel/public/index.html','utf8');const m=[...s.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)].pop();require('fs').writeFileSync('/tmp/panel-check.mjs',m[1])\" && node --check /tmp/panel-check.mjs",
+    "check:panel": "node --experimental-vm-modules --disable-warning=ExperimentalWarning scripts/check-panel.mjs",
     "check:responsive": "node --disable-warning=ExperimentalWarning scripts/check-responsive.mjs",
     "site:shots": "node --disable-warning=ExperimentalWarning scripts/site-shots.mjs",
+    "measure:load": "node --disable-warning=ExperimentalWarning scripts/measure-load.mjs",
     "docs:diagrams": "node --disable-warning=ExperimentalWarning scripts/render-diagrams.mjs",
     "knip": "knip",
     "jscpd": "jscpd"

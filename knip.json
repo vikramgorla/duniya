@@ -6,7 +6,7 @@
     "test/*.test.js",
     "deploy/ops/*.mjs",
     "src/core/speech-worker.cjs",
-    "src/panel/public/*.js"
+    "src/panel/public/app/main.js"
   ],
   "project": [
     "src/**/*.{js,cjs}",

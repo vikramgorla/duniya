@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { startDemo, DEMO_PASSWORD, fakeChecklist, FAKE_CHECKLIST } from './demo-panel.mjs';
+import { startDemo, DEMO_PASSWORD, fakeChecklist, FAKE_CHECKLIST, PANEL } from './demo-panel.mjs';
 import { launch, newPage } from './cdp.mjs';
 
 const { values: opt } = parseArgs({ options: {
@@ -67,7 +67,7 @@ const CARDS = [
   ['card-checklist', 'overview', START, '#ov-checklist', 1100, fakeChecklist('chat')],
   ['card-start-model', 'overview', START, '#ov-checklist', 1100, fakeChecklist('provider')],
   ['card-start-agent', 'overview', START, '#ov-checklist', 1100, fakeChecklist('agent')],
-  ['card-find', 'chats', "await openPalette(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'ge'; i.dispatchEvent(new Event('input')); await T.wait(200);", '#palette', 1100],
+  ['card-find', 'chats', "await openFind(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'ge'; i.dispatchEvent(new Event('input')); await T.wait(200);", '#palette', 1100],
   ['card-ai-diff', 'agents/carpool', AI_DIFF, '.dreview', 1100],
   ['card-test-as', 'agents/carpool/test', TEST_AS, '#test-console', 1100],
   ['card-caps', 'usage', '', 'box:Monthly spending caps', 1100],
@@ -104,7 +104,7 @@ async function open(page, hash, js, checklist) {
   await page.goto(`${base}/#${hash}`);
   await sleep(2200);
   if (checklist) await page.call(FAKE_CHECKLIST, checklist);
-  if (js) await page.evaluate(`(async () => { ${PRELUDE} ${js} })()`);
+  if (js) await page.evaluate(`(async () => { ${PRELUDE} ${PANEL} ${js} })()`);
   await sleep(500);
 }
 const capture = async (page, file, clip, quality = 80) => {
@@ -167,7 +167,7 @@ if (!opt['no-video']) {
     await open(page, hash, '');
     await capture(page, join(vid, `${name}-poster.webp`), null, 70);
     const dir = mkdtempSync(join(tmpdir(), 'duniya-frames-'));
-    await page.evaluate(`(async () => { ${PRELUDE} window.__done = false; try { ${js} } finally { window.__done = true; } })(); 0`);
+    await page.evaluate(`(async () => { ${PRELUDE} ${PANEL} window.__done = false; try { ${js} } finally { window.__done = true; } })(); 0`);
     const frames = []; const t0 = Date.now();
     while (Date.now() - t0 < ms) {
       const { data } = await page.send('Page.captureScreenshot', { format: 'jpeg', quality: 88 });

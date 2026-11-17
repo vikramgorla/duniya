@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { env, ROOT, DATA_DIR, digits } from '../core/config.js';
@@ -40,13 +40,14 @@ function guardLocal(user, before, after) {
   }
 }
 import {
-  CSP, clientIp, isHttps, cookie, send, staticFile, setSessionCookie, limiter, uploadAllowed, setSetupCode, checkSetupCode,
+  CSP, clientIp, isHttps, cookie, send, setSessionCookie, limiter, uploadAllowed, setSetupCode, checkSetupCode,
 } from './http.js';
 import { googleRoutes, googleReady } from './routes/google.js';
 import { webRoutes } from './routes/web.js';
 import { domainCheckResponse } from '../core/webaccess.js';
 import { passwordLoginAllowed } from '../core/google-signin.js';
 import { createAdminMcp } from './admin-mcp.js';
+import { panelAssets } from './assets.js';
 import { toolServiceRoutes } from './routes/tool-services.js';
 import { ownerAlertRoutes } from './routes/owner-alerts.js';
 import { directChatRoutes } from './routes/direct-chats.js';
@@ -69,7 +70,7 @@ import { TOOLS as ADMIN_TOOLS } from './admin-tools.js';
 import { globalServers } from '../core/global-mcp.js';
 import { probeServer, startSignIn, finishSignIn, listConnections, disconnect as disconnectOAuth, OAUTH_ROLES, GLOBAL_SCOPE } from '../core/mcp-oauth.js';
 
-const PUBLIC = resolve(import.meta.dirname, 'public');
+
 const startedAt = Date.now();
 const ROLE_RANK = { viewer: 1, admin: 2, owner: 3 };
 const SETUP_FILE = resolve(DATA_DIR, 'setup-code.txt');
@@ -747,13 +748,8 @@ ${ok ? `<meta http-equiv=refresh content="1;url=${esc(back)}">` : ''}`;
   setOwnerToolRunner({ invoke, routeRole, tools: ADMIN_TOOLS }); // the owner assistant runs the same tools in-process (044)
   adminMcp.panelRoutes(route);
 
-  // The static panel shell and its scripts: from memory, compressed, ETag/304 (058).
-  // 061: the web app manifest and home-screen icons make the panel installable on a phone (no service worker needed).
-  const TYPES = { js: 'text/javascript; charset=utf-8', webmanifest: 'application/manifest+json', png: 'image/png' };
-  const files = ['diff.js', 'manifest.webmanifest', ...readdirSync(resolve(PUBLIC, 'icons')).map((f) => `icons/${f}`)];
-  const assets = Object.fromEntries(files.map((f) => [`/${f}`, staticFile(readFileSync(resolve(PUBLIC, f)), { 'content-type': TYPES[f.split('.').pop()] })]));
-  const shellHtml = readFileSync(resolve(PUBLIC, 'index.html'), 'utf8').replace(/ (src|href)="(\/[a-z0-9/-]+\.[a-z]+)"/g, (m, attr, f) => (assets[f] ? ` ${attr}="${f}?v=${assets[f].version}"` : m));
-  const shell = staticFile(Buffer.from(shellHtml), { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'x-frame-options': 'DENY' });
+  // The panel shell, its modules and icons: from memory, compressed, ETag/304 (058, 063: assets.js).
+  const { shell, assets } = panelAssets();
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     try {

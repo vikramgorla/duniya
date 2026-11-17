@@ -178,7 +178,7 @@ test('056 app: a helper older than the self-updating one cannot be asked; the pa
   assert.match(r.body.error, /run sudo duniya update on the server once, or reinstall if you have no SSH access/);
   assert.equal(existsSync(join(ops, 'req/request')), false);
   assert.deepEqual(sys.maybeUpdateHelper(), { requested: false, reason: 'too_old' });
-  const html = readFileSync(join(ROOT, 'src/panel/public/index.html'), 'utf8');
+  const html = readFileSync(join(ROOT, 'src/panel/public/app/server.js'), 'utf8');
   assert.match(html, /cannot update itself yet\. Run ', h\('code', \{\}, 'sudo duniya update'\)/);
   assert.match(html, /No SSH access \(for example an Oracle server created without an SSH key\)\? Reinstall instead/);
   assert.match(html, /upgrading\.md#the-maintenance-helper/);

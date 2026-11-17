@@ -55,7 +55,7 @@ test('#65: set_chat_settings stores the same shape, and a partial change keeps t
 });
 
 test('#65: the Chats page uses the shared picker and chain editor (no separate select)', () => {
-  const html = readFileSync(new URL('../src/panel/public/index.html', import.meta.url), 'utf8');
+  const html = ['fallback.js', 'chats.js'].map((f) => readFileSync(new URL(`../src/panel/public/app/${f}`, import.meta.url), 'utf8')).join('\n');
   assert.match(html, /function chatFallbackEditor\(c, models[^)]*\) \{\n\s+const pick = fallbackPicker\(models, c\.fallback, \{ what: 'chat'/);
   assert.doesNotMatch(html, /'If unavailable: switch model'\], \['off'/, 'the old one-line select is gone');
   assert.match(html, /openFallback\(c\)/);
