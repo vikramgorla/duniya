@@ -1,6 +1,6 @@
 // Agents → one agent: the editor (instructions, chats, people, tools, schedules, quick answers, test console). Module of the panel (063).
 import { aiHelper } from './ai-helper.js';
-import { $, S, api, ask, can, field, fieldError, h, lines, splitLines, tagPill, time, toast, tryApi, whoLabel } from './core.js';
+import { $, S, api, ask, can, field, fieldError, h, lines, menu, splitLines, tagPill, time, toast, tryApi, whoLabel } from './core.js';
 import { fallbackLine, fallbackPicker } from './fallback.js';
 import { browseButton } from './registry.js';
 import { loadModels, modelLabel, modelSelect, openAgent, plural } from './shared.js';
@@ -267,9 +267,11 @@ export async function renderAgentEditor(id) {
     h('div', { class: 'row spread editor-bar', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: () => { location.hash = 'agents'; } }, '← All agents'),
       h('div', { class: 'row actions' },
         h('a', { class: 'btn phone-only', href: '#test-console', onclick: (e) => { e.preventDefault(); $('#test-console')?.scrollIntoView({ behavior: 'smooth' }); } }, 'Test ↓'),
-        h('a', { class: 'btn', href: `/api/agents/${encodeURIComponent(id)}/export`, download: `${id}.agent.json` }, 'Export'),
-        bi ? null : h('button', { class: 'btn mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/agents/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openAgent(r.id); } }, 'Duplicate'),
-        bi ? null : h('button', { class: 'btn danger mut', onclick: async () => { if (await ask({ title: `Delete “${c.name}”?`, text: 'Its chats no longer have this agent. Chat memory stays until you erase it.', ok: 'Delete agent', danger: true }) && await tryApi(() => api('DELETE', `/api/agents/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'agents'; } } }, 'Delete'),
+        // 064: secondary actions behind ⋯; Save stays in reach
+        menu(`More actions for ${c.name}`,
+        h('a', { class: 'btn small', href: `/api/agents/${encodeURIComponent(id)}/export`, download: `${id}.agent.json` }, 'Export'),
+        bi ? null : h('button', { class: 'btn small mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/agents/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openAgent(r.id); } }, 'Duplicate'),
+        bi ? null : h('button', { class: 'btn small danger mut', onclick: async () => { if (await ask({ title: `Delete “${c.name}”?`, text: 'Its chats no longer have this agent. Chat memory stays until you erase it.', ok: 'Delete agent', danger: true }) && await tryApi(() => api('DELETE', `/api/agents/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'agents'; } } }, 'Delete')),
         h('button', { class: 'btn primary mut', onclick: save }, 'Save'))),
     can('admin') ? await aiHelper({ agentId: id, title: [h('span', { class: 'ai-chip' }, 'AI'), 'Change this agent with AI'], applyLabel: 'Apply & save',
       placeholder: 'What should change? e.g. “Make the replies shorter and friendlier”, “Let participants also see the shopping list”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',
