@@ -116,6 +116,34 @@ returns the JSON answer, `[status, answer]`, or throws `fail(message, status)` /
 - SQLite rows are untyped (`db.prepare()` hands out plain rows, `src/core/db.js`); settings have a `Settings` typedef
   (`src/core/store.js`); route modules type their registrar with `Route` / `RouteContext` (`src/panel/http.js`).
 
+## Scale measurements
+
+`npm run measure:scale` (dev only, `scripts/measure-scale.mjs`) runs the real core and panel through the test fakes
+against a seeded data directory: **300 chats (20 on) over 3 numbers, 30 agents, 200 000 stored messages over 80 days,
+50 000 activity entries, 20 000 usage rows, 5 000 contacts**. It prints startup in a fresh process pinned to one CPU
+(`taskset -c 0`, `--max-old-space-size=700`), panel API latencies (median / p95 of 15), live-stream fan-out to 20
+panels, router throughput, a retention pass, one backup, the database size and the query plans of the hot queries.
+`--small` runs a tenth of the fixture. Run it before and after a change that touches the database, the router or the
+panel API, and put both tables in the PR.
+
+Before and after 069 (#143), same machine:
+
+| | v2.29.1 | v2.30.0 |
+|---|---|---|
+| Startup to panel ready (1 CPU) / RSS | 416 ms / 158 MB | AFTER_STARTUP |
+| Router: stored, not addressed | 257 msg/s | AFTER_QUIET msg/s |
+| Router: chat off | 1 923 msg/s | AFTER_OFF msg/s |
+| Router: answered by the fake model | 64 msg/s | AFTER_ASK msg/s |
+| Panel API (status, chats, agents, activity pages, contacts) | 1–7 ms median | AFTER_API |
+| Usage by day, all time | 21 ms | AFTER_USAGE |
+| Activity for one chat / age prunes | `SCAN activity` / `SCAN messages` | index searches |
+| Retention (messages kept 30 days) | pruned on the write path | AFTER_PRUNE |
+| One backup | – | AFTER_BACKUP |
+
+What made the difference: WAL with `synchronous = NORMAL` (no fsync per write), no pruning on the write path (one
+bounded pass on the upkeep tick, `src/core/retention.js`), indexes for the chat filter and the age prunes, one date
+formatter per time zone, and counting before loading rows to summarize.
+
 ## Commits and pull requests
 
 No attribution trailers or footers in commits and PRs (no Co-Authored-By, session links or 'Generated with' lines).

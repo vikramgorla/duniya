@@ -16,7 +16,7 @@
 | `DATA_DIR` | `data` | SQLite database, WhatsApp sessions, local backups |
 | `TZ_DEFAULT` | `Europe/Zurich` | Default timezone for schedules |
 | `RATE_LIMIT_PER_MIN` | 6 | Requests one person may make to one agent per minute |
-| `MEMORY_RETENTION_DAYS` / `MEMORY_MAX_MESSAGES` | 90 / 5000 | Stored-message limits per chat |
+| `MEMORY_RETENTION_DAYS` / `MEMORY_MAX_MESSAGES` | 90 / 5000 | Default stored-message limits per chat; the owner changes them on **Server → Health** ([Health](small-servers.md#health-data-that-stays-small)) |
 | `HISTORY_WAIT_MS` | 45000 | How long to wait for the phone to send a chat's recent messages after it is switched on (per 50 messages) |
 | `WA_MEDIA_MAX_MB` | 16 | Largest media file an agent may send or receive (photos, PDFs, voice notes) |
 | `MEDIA_JOB_MAX_AGE_MIN` | 15 | Photo / voice-note jobs older than this get a short apology instead of a late answer |

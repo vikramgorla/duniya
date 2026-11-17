@@ -93,6 +93,7 @@ const CARDS = [
   ['card-web-access', 'settings/web-access', '', 'box:Web address & access', 900],
   ['card-small-server', 'server', '', 'box:This server', 1100],
   ['card-small-mode', 'settings/small-mode', '', '#small-mode', 900],
+  ['card-health', 'server', '', '#health', 1100], // 069: Server → Health
   ['card-assistants', 'settings/assistants', '', 'box:Connected AI assistants', 900],
   ['card-logging', 'settings/logging', '', 'box:Activity log', 600],
   ['card-mcp', 'agents/carpool/tools', '', '.ap-sec', 600],

@@ -44,7 +44,7 @@ function hostingCard(hosting) {
     known ? h('details', {}, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Other hosts'), Object.keys(HOST_GUIDES).filter((k) => k !== p).map((k) => link(k))) : null);
 }
 // 069: Health — how big the data is, what is kept and that the server cleans up by itself. Loaded once per visit.
-const day = (ts) => (ts ? new Date(ts).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : 'nothing yet');
+const day = (ts) => new Date(ts).toLocaleDateString([], { day: 'numeric', month: 'short', ...(new Date(ts).getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }) });
 const n = (x) => Number(x || 0).toLocaleString();
 function healthCard(x, redraw) {
   const r = x.retention; const q = x.queue; const d = x.disk;
@@ -54,11 +54,11 @@ function healthCard(x, redraw) {
         : q.queued >= q.max ? ['warn', 'The photos & voice queue is full: new ones are refused for a few minutes and the senders are told.'] : null;
   const rows = [
     ['Database', `${bytes(x.database.bytes)}${x.database.freeBytes > 1048576 ? ` · ${bytes(x.database.freeBytes)} reusable` : ''}`],
-    ['Stored messages', `${n(x.database.rows.messages)} · oldest ${day(x.oldest.messages)}`],
-    ['Activity', `${n(x.database.rows.activity)} entries · oldest ${day(x.oldest.activity)}`],
-    ['Usage detail', `${n(x.database.rows.usage)} model calls · oldest ${day(x.oldest.usage)}`],
-    ['Kept', `messages ${r.messagesDays} days (at most ${n(r.messagesPerChat)} per chat) · activity ${r.activityDays} days or ${n(r.activityEntries)} entries · usage ${r.usageDays} days`],
-    ['Last clean-up', x.lastPrune ? `${ago(x.lastPrune.at)} ago · ${n(x.lastPrune.removed.messages + x.lastPrune.removed.activity + x.lastPrune.removed.usage)} rows removed${x.vacuumAt ? ` · compacted ${day(x.vacuumAt)}` : ''}` : 'within an hour of starting'],
+    // one row per kind: how many, since when, how long it is kept
+    ['Stored messages', `${n(x.database.rows.messages)}${x.oldest.messages ? ` · since ${day(x.oldest.messages)}` : ''} · kept ${r.messagesDays} days`],
+    ['Activity', `${n(x.database.rows.activity)}${x.oldest.activity ? ` · since ${day(x.oldest.activity)}` : ''} · kept ${r.activityDays} days`],
+    ['Usage detail', `${n(x.database.rows.usage)}${x.oldest.usage ? ` · since ${day(x.oldest.usage)}` : ''} · kept ${r.usageDays} days`],
+    ['Last clean-up', x.lastPrune ? `${ago(x.lastPrune.at)} ago · ${n(x.lastPrune.removed.messages + x.lastPrune.removed.activity + x.lastPrune.removed.usage)} rows removed${x.vacuumAt ? ` · compacted ${day(x.vacuumAt)}` : ''}` : 'soon after the app starts'],
     ['Photos & voice queue', q.queued || q.running ? `${q.running} working · ${q.queued} waiting (at most ${q.max})` : 'empty'],
   ];
   const owner = can('owner');

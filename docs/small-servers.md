@@ -11,6 +11,8 @@
 - Under memory pressure optional work pauses; replies continue.
 - On-server speech and local tool services are off on small servers; **Small server mode** (Settings → Server)
   allows them anyway, slower and one at a time.
+- Old data is pruned by itself and the server recovers by itself (reconnects, restarts, a full disk): see
+  [Health](#health-data-that-stays-small).
 
 Examples: OCI `VM.Standard.E2.1.Micro`, Google `e2-micro`. Size also in `/api/status` (`server.size`).
 
@@ -91,6 +93,39 @@ Max age: `MEDIA_JOB_MAX_AGE_MIN` (15). [Settings](settings.md)
   but are **not started** while the server is small and the switch is off: the agent answers without their tools,
   the agent's Tools section says *Not started on this server* and why, the activity log says it once, and Install is refused.
   Switch on Small server mode, move to a bigger server, or remove them.
+
+## Health: data that stays small
+
+**Server → Health** shows the database size, how many stored messages, activity entries and model calls are kept and
+since when, how long each kind is kept, the last automatic clean-up and the photos & voice queue. Nothing to click:
+
+- **Every hour** old data goes, in small batches so replies never wait: stored messages older than **90 days** or
+  beyond **5 000 per chat**, activity as set in **Settings → Activity log** (30 days / 5 000 entries), usage detail
+  older than **400 days**, why-quiet rows after 90 days, daily counters after 60 days. Chat summaries, notes,
+  contacts and settings are never pruned, so agents keep what older talk decided. The owner changes the numbers under
+  **Change how long data is kept** (or with the admin MCP tool `set_retention`). Backups stay small with it.
+- The database is kept compact (freed space is reused and handed back in small steps).
+- **Disk:** below 500 MB free (or 5 %) the owner is told once a day. Below 100 MB, stored messages and optional
+  activity pause (errors and changes are still recorded), backups wait with a clear reason, and agents keep
+  answering; everything resumes by itself when space is back.
+- **Clock:** if the server clock jumps, nothing old is pruned until it is steady again (a wrong clock never deletes
+  history); Health says so.
+
+> [!NOTE]
+> Measured on a seeded server (300 chats, 30 agents, 200 000 stored messages, 50 000 activity entries) with 1 CPU:
+> panel ready in about 0.4 s at ~160 MB, every panel request in a few milliseconds. Details:
+> [development.md](development.md#scale-measurements).
+
+## Recovering by itself
+
+- **WhatsApp** reconnects with growing pauses (2 s up to 1 minute, a little random so several numbers never retry at
+  the same moment). A number that keeps reconnecting for 15 minutes is reported to the owner once.
+- **Restarts** (updates, the Restart button, systemd) are graceful: no new replies start, running ones get a few
+  seconds, WhatsApp closes without unlinking and the database is closed cleanly. A crash restarts the app
+  (systemd `Restart=always` with no start limit, or Docker `restart: unless-stopped`); `MemoryMax=700M` keeps a
+  runaway process from taking the server down.
+- **Photos & voice queue:** when it is full, new ones are refused for a few minutes (the sender is told) and the owner
+  hears about it at most once an hour; waiting work is never dropped.
 
 > [!TIP]
 > Try it locally: `DEMO_SMALL=1 node scripts/demo-panel.mjs` pretends to be a 1 GB / 1 CPU server.
