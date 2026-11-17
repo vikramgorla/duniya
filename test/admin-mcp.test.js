@@ -208,9 +208,9 @@ test('tools via the SDK client: read and write as the approving user, logged as 
   const secrets = text(await c.callTool({ name: 'list_secrets', arguments: {} }));
   assert.ok(secrets.includes('PANDUGA_TOKEN_ORGANIZER') && !secrets.includes('"org"'), 'secret names only');
 
-  const log = t.db.listActivity({ limit: 50 }).find((a) => a.type === 'mcp.call' && a.summary.startsWith('set_agent_enabled'));
+  const log = t.db.listActivity({ limit: 50 }).find((a) => a.type === 'mcp.call' && a.detail?.tool === 'set_agent_enabled');
   assert.ok(log, 'tool call logged');
-  assert.match(log.summary, /admin via Test assistant/);
+  assert.match(log.summary, /^Changed agent enabled · admin via Test assistant/, 'plain words (#136)');
   assert.equal(t.events.categoryOf('mcp.call'), 'mcp');
   assert.equal(t.events.LOG_CATEGORIES.mcp, 'AI assistants (MCP)');
 

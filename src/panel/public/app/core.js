@@ -21,6 +21,8 @@ export function h(tag, attrs, ...kids) {
 export const $ = (s) => document.querySelector(s);
 /** Small line icons for the tabs (24×24, stroke = currentColor). */
 const ICONS = {
+  copy: 'M9 9h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zM5 15V5a1 1 0 0 1 1-1h10',
+  done: 'M5 12.5l4.5 4.5L19 7.5',
   overview: 'M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z',
   activity: 'M3 12h4l2.5-6 4 12 2.5-6H21',
   agents: 'M8 8V6.5a4 4 0 0 1 8 0V8M5 10a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3zM9.5 14h.01M14.5 14h.01',
@@ -257,7 +259,15 @@ async function copyText(text) {
     try { document.execCommand('copy'); } catch {} ta.remove();
   }
 }
-export const copyBtn = (text, label = 'Copy') => h('button', { class: 'btn small', type: 'button', onclick: async (e) => { await copyText(typeof text === 'function' ? text() : text); const b = e.currentTarget; b.textContent = 'Copied ✓'; setTimeout(() => (b.textContent = label), 1600); } }, label);
+/** Copy button; `quiet: true` is a small icon-only button (answers in Ask), with its label for screen readers. */
+export const copyBtn = (text, label = 'Copy', { quiet = false } = {}) => {
+  const face = (ok) => (quiet ? [icon(ok ? 'done' : 'copy')] : [ok ? 'Copied ✓' : label]);
+  const b = h('button', { class: quiet ? 'btn ghost icon quiet' : 'btn small', type: 'button', title: label, 'aria-label': label, onclick: async () => {
+    await copyText(typeof text === 'function' ? text() : text);
+    b.replaceChildren(...face(true)); b.setAttribute('aria-label', 'Copied'); setTimeout(() => { b.replaceChildren(...face(false)); b.setAttribute('aria-label', label); }, 1600);
+  } }, ...face(false));
+  return b;
+};
 export const copyRow = (value) => h('div', { class: 'copyrow' }, h('code', {}, value), copyBtn(value));
 export const extLink = (href, label, cls = 'btn small') => h('a', { class: cls, href, target: '_blank', rel: 'noopener' }, label, ' ↗');
 /** Google "G" mark for the Sign in with Google button. */
