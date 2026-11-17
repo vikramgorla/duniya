@@ -1,5 +1,6 @@
 // @ts-check
 // Agent configuration: defaults, validation and normalisation (005). Single source of truth for agent shape.
+import { GROUP_REPLIES } from './group-replies.js';
 import { validPackageSpec } from './mcp-local.js';
 import { digits } from './config.js';
 import { cleanOverride, REF_RE } from './providers/fallback-config.js';
@@ -16,6 +17,7 @@ export const AGENT_DEFAULTS = Object.freeze({
   prompt: 'You are a helpful assistant in a WhatsApp group.',
   triggers: [],
   respondToMentions: true,
+  groupReplies: 'followups', // 076: wake | followups | auto
   dm: 'members',
   organizers: [],
   participants: [],
@@ -160,6 +162,8 @@ export function validateAgentConfig(input) {
   out.triggers = [...new Set(list(c.triggers, 'triggers').map((t) => t.toLowerCase()))];
   if (out.triggers.some((t) => t.length > 40)) fail('triggers', 'each trigger must be at most 40 characters');
   out.respondToMentions = !!c.respondToMentions;
+  out.groupReplies = c.groupReplies ?? 'followups';
+  if (!GROUP_REPLIES.includes(out.groupReplies)) fail('groupReplies', 'must be wake, followups or auto');
   if (!['none', 'organizers', 'members', 'anyone'].includes(c.dm)) fail('dm', 'must be none, organizers, members or anyone');
   out.dm = c.dm;
   out.organizers = phones(c.organizers, 'organizers');

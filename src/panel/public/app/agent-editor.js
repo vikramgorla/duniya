@@ -12,6 +12,8 @@ import { ROLE_LABEL, globRe, markSaved, serverConfig, serverState, toolGrid, too
 import { capEditor, usageSummary } from './usage.js';
 
 const DM_LABEL = { members: 'Members of its groups', organizers: 'Organizers only', anyone: 'Anyone', none: 'Nobody' };
+// 076: how an agent answers in groups
+const GROUP_REPLIES = { followups: 'When woken + follow-ups', wake: 'Only when woken', auto: 'Whenever needed' };
 const tick = (input, label) => h('label', { class: 'tick' }, input, ` ${label}`);
 const check = (on, disabled = !can('admin')) => h('input', { type: 'checkbox', checked: !!on, disabled });
 const seg = (label, options, value, onPick) => {
@@ -33,7 +35,7 @@ const SECTIONS = [
     line: (x) => (x.bi ? 'Tone, language and habits, added to its built-in instructions.' : 'Who it is and how it answers.'),
     sub: (x) => trunc(x.c.description || x.c.prompt || 'Not written yet', 60), build: buildCharacter },
   { group: 'What it does', id: 'where', agent: true, icon: 'chats', c: 'c3', title: () => 'Where it answers', help: 'agents.md#create-and-change-agents', line: () => 'The chats it serves, the words that wake it and who may write to it directly.',
-    sub: (x) => [plural(x.chats.length, 'chat'), x.c.triggers?.length ? x.c.triggers.join(', ') : 'no trigger', `direct: ${DM_LABEL[x.c.dm]?.toLowerCase() || x.c.dm}`].join(' · '), build: buildWhere },
+    sub: (x) => [plural(x.chats.length, 'chat'), x.c.triggers?.length ? x.c.triggers.join(', ') : 'no wake word', `direct: ${DM_LABEL[x.c.dm]?.toLowerCase() || x.c.dm}`].join(' · '), build: buildWhere },
   { group: 'What it does', id: 'people', agent: true, icon: 'contacts', c: 'c4', title: () => 'People', help: 'agents.md#roles', line: () => 'Organizers use organizer tools and confirm changes; everyone else is a participant.',
     sub: (x) => (x.c.organizers?.length ? plural(x.c.organizers.length, 'organizer') : 'Group admins are organizers'), build: buildPeople },
   { group: 'What it does', id: 'quick', agent: true, icon: 'send', c: 'c2', title: () => 'Quick replies & FAQ', help: 'agents.md#quick-replies-welcome--faq', line: () => 'Instant answers from your text: no AI, no tokens.',
@@ -200,16 +202,18 @@ function buildCharacter(x) {
     value: () => ({ name: F.name.value, ...(x.bi ? {} : { description: F.description.value }), prompt: F.prompt.value }) };
 }
 function buildWhere(x) {
-  const F = { triggers: h('input', { value: (x.c.triggers || []).join(', '), placeholder: 'mochi, !panduga' }), respondToMentions: check(x.c.respondToMentions),
+  const F = { triggers: tagInput(x.c.triggers || [], { placeholder: 'Add a word, e.g. silku', label: 'Add a wake word' }), respondToMentions: check(x.c.respondToMentions),
+    groupReplies: h('select', {}, Object.entries(GROUP_REPLIES).map(([v, l]) => h('option', { value: v, selected: (x.c.groupReplies || 'followups') === v }, l))),
     dm: h('select', {}, Object.entries({ members: 'Members of its groups + listed participants', organizers: 'Organizers only', anyone: 'Anyone, even people whose chat is off', none: 'Nobody' }).map(([v, l]) => h('option', { value: v, selected: x.c.dm === v }, l))) };
   return { F, el: h('div', {},
     block('Chats', x.chats.length ? h('ul', { class: 'mini-list' }, x.chats.map((ch) => h('li', {}, h('a', { class: 'lrow', href: `#chats/${encodeURIComponent(ch.id)}` },
       avatar(ch.name || ch.id, ch.id, ch.enabled ? 's' : 's off'), h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, ch.name || ch.id), h('span', { class: 'lrow-sub' }, ch.enabled ? 'On' : 'Off')),
       h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))))
       : h('p', { class: 'small muted' }, 'No chat yet. ', h('a', { href: '#chats' }, 'Choose this agent for a chat on Chats'), '.')),
-    block('Wake words', field('Triggers', F.triggers, 'A message with one of these words wakes it, anywhere in the message.'), tick(F.respondToMentions, 'Reply when @mentioned')),
+    block('Wake words', field('Words', F.triggers.box, 'Any case, anywhere in the message. Press Enter after each.'), tick(F.respondToMentions, 'Reply when @mentioned or replied to'),
+      field('In groups', F.groupReplies, 'Follow-ups: after it speaks, it reads the replies and answers the ones for it. Whenever needed: it reads every message (costs more).')),
     block('Direct messages', field('Who may message it directly', F.dm))),
-  value: () => ({ triggers: splitLines(F.triggers.value), respondToMentions: F.respondToMentions.checked, dm: F.dm.value }) };
+  value: () => ({ triggers: F.triggers.values(), respondToMentions: F.respondToMentions.checked, groupReplies: F.groupReplies.value, dm: F.dm.value }) };
 }
 function buildPeople(x) {
   const orgSet = new Set(x.c.organizers || []);
@@ -484,4 +488,31 @@ function buildTest(x) {
   } }, input, h('button', { class: 'btn primary' }, 'Send'));
   const restart = h('button', { class: 'btn small ghost', type: 'button', onclick: () => { fresh(); input.focus(); } }, 'New conversation');
   return { el: h('div', { id: 'test-console' }, h('div', { class: 'row test-as' }, h('span', { class: 'small' }, 'As'), role, h('span', { class: 'small' }, 'in'), where, restart), hintBox, toolsBox, log, form) };
+}
+
+/** 076: words as tags — Enter, comma or leaving the box adds one, × or Backspace in an empty box removes one.
+ *  Returns the input (for field errors) with .values() for saving. */
+function tagInput(list, { placeholder = '', label = '' } = {}) {
+  let tags = [...list];
+  const box = h('div', { class: 'tags' });
+  const input = h('input', { placeholder, 'aria-label': label, enterkeyhint: 'enter' });
+  const changed = () => box.dispatchEvent(new Event('input', { bubbles: true })); // the section's unsaved-changes bar
+  const add = () => {
+    const words = input.value.split(',').map((w) => w.trim().toLowerCase()).filter(Boolean);
+    input.value = '';
+    if (!words.length) return false;
+    tags = [...new Set([...tags, ...words])]; draw(); return true;
+  };
+  const draw = () => box.replaceChildren(...tags.map((w) => h('span', { class: 'tag' }, w,
+    h('button', { type: 'button', class: 'tag-x', 'aria-label': `Remove ${w}`, onclick: () => { tags = tags.filter((y) => y !== w); draw(); input.focus(); changed(); } }, '×'))), input);
+  input.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ',') && !e.isComposing) { e.preventDefault(); if (add()) changed(); }
+    else if (e.key === 'Backspace' && !input.value && tags.length) { tags = tags.slice(0, -1); draw(); input.focus(); changed(); }
+  });
+  input.addEventListener('blur', () => { if (add()) changed(); });
+  box.onclick = (e) => { if (e.target === box) input.focus(); };
+  draw();
+  input.values = () => [...new Set([...tags, ...input.value.split(',').map((w) => w.trim().toLowerCase()).filter(Boolean)])];
+  input.box = box;
+  return input;
 }

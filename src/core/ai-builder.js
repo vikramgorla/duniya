@@ -10,7 +10,7 @@ import { globalServers } from './global-mcp.js';
 import { GLOBAL_SCOPE } from './mcp-oauth.js';
 import { activity } from './events.js';
 
-const EDITABLE = ['name', 'description', 'prompt', 'triggers', 'respondToMentions', 'dm', 'organizers', 'participants',
+const EDITABLE = ['name', 'description', 'prompt', 'triggers', 'respondToMentions', 'groupReplies', 'dm', 'organizers', 'participants',
   'mcpServers', 'globalMcp', 'tools', 'confirm', 'schedules', 'memory', 'model', 'timezone', 'historySize', 'maxTokens', 'enabled', 'media',
   'quickReplies', 'help', 'welcome', 'faq'];
 
@@ -31,7 +31,8 @@ const TOOL = {
 const GUIDE = `You configure WhatsApp assistant agents on a self-hosted platform. Agent config fields:
 - name, description (one line)
 - prompt: the agent's instructions (system prompt). Write it well: role, tone, languages, what to use tools for, what never to do, privacy in groups, brevity for WhatsApp.
-- triggers: words that wake the agent in groups, e.g. ["!panduga"] (lowercase, start with ! or @). Mentions (@agent) and replies to the agent also wake it when respondToMentions is true.
+- triggers: words that wake the agent in groups, e.g. ["silku", "!panduga"] (any word, matched case-insensitively anywhere as a whole word; no ! needed). Mentions (@agent) and replies to the agent also wake it when respondToMentions is true.
+- groupReplies: "followups" (default: when woken, and messages right after it speaks — it judges whether they are for it), "wake" (only when woken) or "auto" (judges every group message; costs more).
 - dm: who may message it directly: "none" | "organizers" | "members" (members of its groups) | "anyone".
 - organizers / participants: phone numbers, digits with country code. Organizers get organizer tools and confirm changes; everyone else is a participant.
 - mcpServers: tool services {key: {type:"remote", url, auth:"oauth"|"token"|"none"}}. Never invent URLs; keep existing ones.

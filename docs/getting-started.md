@@ -41,7 +41,7 @@ through five steps; the one you are on opens in place:
 4. **Switch a chat on**: tap **Switch on** next to a group. The agent is chosen for it, the group gets a short privacy
    notice once, and its recent messages are loaded from your phone (keep the phone online). [Chats](chats.md)
 5. **Send a test message**: ask the agent something; the answer shows right there (nothing is posted to WhatsApp).
-   Then try it in the group: `!yourtrigger hello` or @mention the agent.
+   Then try it in the group: `yourwakeword hello` or @mention the agent, then just reply to what it says.
 
 ![Getting started: connect a model](site/img/card-start-model.webp)
 

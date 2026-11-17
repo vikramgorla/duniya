@@ -12,7 +12,7 @@ const ORG = '41790000001'; const MEMBER = '41790000002';
 const CHAT = 'g7@g.us';
 before(async () => {
   t = await setup({ env: { RATE_LIMIT_PER_MIN: '1000' } }); owner = await t.login();
-  const r = await t.api(owner, 'POST', '/api/agents', { template: 'blank', config: { name: 'Rides', triggers: ['carpool'], organizers: [ORG], timezone: 'Europe/Zurich',
+  const r = await t.api(owner, 'POST', '/api/agents', { template: 'blank', config: { name: 'Rides', triggers: ['carpool'], groupReplies: 'wake', organizers: [ORG], timezone: 'Europe/Zurich',
     quickReplies: [
       { command: '!rides', text: 'Hi {name}! Rides in {group} on {date}: Anu drives Monday.' },
       { command: '!admin', text: 'Organizer tools: …', who: 'organizers' },

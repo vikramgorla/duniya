@@ -7,7 +7,8 @@ tools it uses.**
 
 **In 30 seconds**
 - Start from a template or a sentence; every change comes back as a visual diff before it is saved.
-- People wake it with a trigger (`!rides`, `mochi`), an @mention, a reply or a direct message.
+- People wake it with a wake word (`silku`, `!rides`; any case, no `!` needed), an @mention, a reply or a direct
+  message. After it speaks, the group can just carry on: it reads the replies and answers the ones meant for it.
 - Tools are allowed per role **in code**; changes wait for an organizer's `confirm CODE`.
 - **Test** it before the group does; **Review** its real answers afterwards and teach it in two taps.
 
@@ -66,6 +67,19 @@ Admin MCP: `test_agent`.
 > same as "mochi, help". Only whole words count (`mochiko` doesn't), case doesn't matter, and when several agents'
 > triggers appear, the first one in the message wins. In your own direct chat with the owner assistant, a trigger only
 > hands the message to that agent when the message *starts* with it, so you can talk *about* agents freely.
+
+**Wake words** are tags: type a word and press Enter (or a comma) to add it, tap × to remove it.
+
+**In groups** decides what happens without a wake word:
+
+| Choice | What the agent does |
+|---|---|
+| **When woken + follow-ups** (default) | Answers when woken. After it speaks, it reads the next messages and answers or acts on the ones meant for it (e.g. "For now assign it to Chary"); it stays quiet otherwise and stops reading once the group moves to another topic (at most 15 messages or 30 minutes after it last spoke). |
+| **Only when woken** | Wake word, @mention, reply to it or direct message only. |
+| **Whenever needed** | Reads every message of its groups and answers the ones meant for it, no wake word needed. Each message is a model call, so it costs more in busy groups. |
+
+Messages it read and left alone show in *Why quiet* as **not for it**. Admin MCP: `update_agent` with `groupReplies`
+(`followups`, `wake`, `auto`).
 
 > [!NOTE]
 > **The Owner assistant is an agent too** (built in, always there): your own agent in your own WhatsApp chat. Its

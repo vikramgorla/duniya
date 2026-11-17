@@ -6,7 +6,7 @@ import { setup } from './harness.js';
 let t; let owner;
 before(async () => {
   t = await setup(); owner = await t.login();
-  await t.api(owner, 'POST', '/api/agents', { template: 'blank', config: { name: 'Mochi', triggers: ['mochi'] } });
+  await t.api(owner, 'POST', '/api/agents', { template: 'blank', config: { name: 'Mochi', triggers: ['mochi'], groupReplies: 'wake' } });
   await t.api(owner, 'POST', '/api/chats/bind', { chat: 'g7@g.us', agent: 'mochi' });
 });
 after(() => t.close());

@@ -1,5 +1,6 @@
 // @ts-check
 import { isChatEnabled, ignoredCounts, noteLatestKeys } from './chat-prefs.js';
+import { agentSpoke, shouldJudge, verdictOf, closeFollowups } from './group-replies.js';
 import { storeLoadedBatch, setHistoryChannel, historyChatActive } from './history-load.js';
 import { personInfo, agentName } from './contacts.js';
 import { memberTag } from './member-tags.js';
@@ -317,8 +318,10 @@ export function createRouter(channel) {
         return;
       }
     }
-    if (!triggered) { quiet('not_addressed', agent.id); return; }
-    if (rateLimited(`${agent.id}:${msg.phone || msg.senderJid}`)) { quiet('rate_limited', agent.id); return; }
+    // 076: not woken, but maybe for the agent (a follow-up to it, or "answer when needed"): it judges, text only
+    const judge = !triggered && !msg.mediaInfo && shouldJudge(agent, msg);
+    if (!triggered && !judge) { quiet('not_addressed', agent.id); return; }
+    if (rateLimited(judge ? `${agent.id}:${msg.chat}:judge` : `${agent.id}:${msg.phone || msg.senderJid}`)) { quiet('rate_limited', agent.id); return; }
 
     // Photos & voice (043): photos, PDFs and voice notes addressed to the agent go through the media queue (a small
     // server does one at a time; nobody has to resend). Only chats that are on get this far.
@@ -336,7 +339,7 @@ export function createRouter(channel) {
       }
       return;
     }
-    await runTurn(channel, msg, { agent, role, addressed, rowId, quiet });
+    await runTurn(channel, msg, { agent, role, addressed, rowId, quiet, judge });
   }
 }
 
@@ -366,6 +369,7 @@ const overloadedAt = new Map();
 
 /** Send a reply (as a voice note when the agent's setting asks for it) and remember it. */
 async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false, textOnly = false } = {}) {
+  if (msg.isGroup) agentSpoke(msg.chat, agent.id); // 076: replies right after this may be follow-ups
   if (textOnly) { /* built-in answers (054): always text */ } else if (voiceNow && wantsVoice(agent, { voiceIn, text })) {
     const v = await speak(text, { agent, chat: msg.chat }).catch(() => null);
     if (v) {
@@ -396,7 +400,7 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
 }
 
 /** One agent turn for a routed message (inline for text; from the media queue for photos and voice notes). */
-async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, queued = false }) {
+async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, queued = false, judge = false }) {
   let media = null;
   try {
     if (queued) {
@@ -409,13 +413,13 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
     const base = voiceIn ? media.transcript : msg.caption ? `${msg.text.replace(/:.*$/s, ']')} ${stripTriggers(agent, msg.caption)}`.trim() : stripTriggers(agent, msg.text);
     const text = voiceIn ? stripTriggers(agent, base) || base : base;
     let out = await handleConfirmCommand({ agent, text, role, chat: msg.chat });
-    if (out === undefined && !addressed) return; // looked like "cancel ABCD" but isn't ours
-    countStat('handled', { agent: agent.id });
-    activity('message.in', {
+    if (out === undefined && !addressed && !judge) return; // looked like "cancel ABCD" but isn't ours
+    const logIn = () => activity('message.in', {
       agent: agent.id, chat: msg.chat,
       summary: `${whoOf(msg)} (${role}): ${voiceIn ? `🎤 ${text}` : text}`,
-      detail: { phone: msg.phone, isGroup: msg.isGroup, quoted: msg.quoted || undefined, ...(media?.blocks?.length ? { attachments: media.blocks.map((b) => b.type) } : {}) },
+      detail: { phone: msg.phone, isGroup: msg.isGroup, quoted: msg.quoted || undefined, ...(judge ? { judged: true } : {}), ...(media?.blocks?.length ? { attachments: media.blocks.map((b) => b.type) } : {}) },
     });
+    if (!judge) { countStat('handled', { agent: agent.id }); logIn(); } // 076: a judged message is logged only when answered
 
     if (out === undefined) {
       if (!text) return;
@@ -427,7 +431,7 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
         senderTag: msg.isGroup ? memberTag(msg.chat, { phone: msg.phone, jid: msg.senderJid }) : '',
         text, isGroup: msg.isGroup, source: msg.channel, msgRowId: rowId, msgId: msg.msgId, senderJid: msg.senderJid,
         chatName: msg.isGroup ? await channel.chatName?.(msg.chat) : '',
-        attachments: media?.blocks || [], mediaNote: media?.note || '',
+        attachments: media?.blocks || [], mediaNote: media?.note || '', unaddressed: judge,
       };
       // 074: an agent app waiting for its turn on a small server: ⏳ on the message, taken back when the answer is out
       const mref = msg.msgId ? { msgId: msg.msgId, fromMe: false, participant: msg.senderJid || undefined } : null;
@@ -438,9 +442,13 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
       } catch (e) {
         activity('error', { agent: agent.id, chat: msg.chat, summary: `Agent failed: ${e.message}` });
         quiet('model_error', agent.id);
-        out = 'Sorry, I hit an error. Please try again in a minute.';
+        out = judge ? '' : 'Sorry, I hit an error. Please try again in a minute.'; // nobody asked it: no error message
       }
       if (waited) channel.react?.(msg.chat, mref, '')?.catch?.(() => {});
+      const v = judge ? verdictOf(out) : null;
+      if (v) { if (v === 'done') closeFollowups(msg.chat); quiet('not_for_me', agent.id); return; }
+      if (judge && ctx.modelError) out = '';
+      if (judge && out) { countStat('handled', { agent: agent.id }); logIn(); }
       if (ctx.modelError) quiet('model_error', agent.id);
       else if (!out) quiet('no_reply', agent.id);
     }
