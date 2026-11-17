@@ -393,7 +393,7 @@ a.choice { text-decoration: none; color: var(--ink) !important; }
 .u-name { font-weight: 600; overflow-wrap: anywhere; } .u-name a { color: var(--ink) !important; text-decoration: none; } .u-name a:hover { text-decoration: underline; }
 .u-cost { font-weight: 600; white-space: nowrap; }
 /* 073: Server — Logs start as one row; Health details behind a disclosure */
-.card details.logs { margin: 0; } .card details.logs > summary { color: var(--ink); padding: 8px 0; }
+.card details.logs { margin: 0; } .card details.logs > summary { color: var(--ink); padding: 8px 0; min-height: 44px; }
 .install-hint { margin-bottom: var(--s3); }
 /* Agents */
 /* Chats: one row per chat; its less-used settings open in place (064) */

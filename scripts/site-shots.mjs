@@ -92,7 +92,10 @@ const CARDS = [
   ['card-web-access', 'settings/web-access', '', 'box:Web address & access', 900],
   ['card-small-server', 'server', '', 'box:This server', 1100],
   ['card-small-mode', 'settings/small-mode', '', '#small-mode', 900],
-  ['card-health', 'server', '', '#health', 1100], // 069: Server → Health
+  ['card-health', 'server', 'T.openAll(document.querySelector("#health"));', '#health', 1100], // 069: Server → Health (073: its details open)
+  ['card-person', 'contacts/41790000004', '', '.person-page', 600], // 073: a person's page
+  ['card-usage-breakdown', 'usage', '', 'box:Breakdown', 900], // 073: Usage breakdown rows
+  ['card-updates', 'settings/updates', '', 'box:Updates', 900], // 073: Settings → Updates
   ['card-assistants', 'settings/assistants', '', 'box:Connected AI assistants', 900],
   ['card-logging', 'settings/logging', '', 'box:Activity log', 600],
   ['card-mcp', 'agents/carpool/tools', '', '.ap-sec', 600],

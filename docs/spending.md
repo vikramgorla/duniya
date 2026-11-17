@@ -5,11 +5,20 @@
 **Do it:** agent page or **Chats → Spending cap** → set a monthly cap.
 
 **In 30 seconds**
-- **Usage**: tokens and cost by agent, chat, provider, account, model, kind, and first choice vs fallback.
+- **Usage**: the totals, your caps, a bar per day, then **Breakdown**: *Agents · Chats · Models · Accounts · Kind*, one
+  row each (name · calls and tokens · cost), and how many calls a fallback model answered.
 - Prices are yours, published, plans ("included") or free: never guessed.
 - Caps: one alert at 80 %; quiet (or a cheaper model) at 100 %.
 
 ![Usage page](site/img/usage-desktop.webp)
+
+## Prices
+
+![Usage breakdown: one row per agent with calls, tokens and cost](site/img/card-usage-breakdown.webp)
+
+**Usage → Breakdown → Models** shows each model's price per million tokens (*price not set*, *free*, or the plan that
+includes it). To set or change one: the model's **⋯ → Set price…** (input and output, in USD per million tokens; empty
+removes it). Admin MCP: `set_model_price`.
 
 ## Spending caps
 

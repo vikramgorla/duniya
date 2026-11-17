@@ -69,9 +69,10 @@ export async function renderUsage() {
   days.forEach((d, i) => { const hgt = ((d.input + d.output) / max) * 56; const r = document.createElementNS(ns, 'rect'); r.setAttribute('x', i * 10 + 1.5); r.setAttribute('y', 60 - hgt); r.setAttribute('width', 7); r.setAttribute('height', Math.max(hgt, 0.5)); r.setAttribute('rx', 1.5);
     const tt = document.createElementNS(ns, 'title'); tt.textContent = `${d.key}: ${fmtTok(d.input + d.output)} tokens, ${fmtCost(d.cost)}`; r.append(tt); chart.append(r); });
   const cost = (r) => (r.plan === r.calls ? 'in plan' : r.unpriced === r.calls ? 'no price' : fmtCost(r.cost));
-  const price = (ref) => {
+  const price = (ref, r) => {
     const [prov] = ref.split(':');
     if (sum?.plans?.[prov]) return sum.plans[prov];
+    if (r.plan === r.calls) return ''; // an account with a plan (ChatGPT, Copilot): the cost already says "in plan"
     if (/:free$/.test(ref)) return 'free';
     const cur = sum?.prices?.[ref];
     return cur ? `$${cur.in} / $${cur.out} per 1M` : 'price not set';
@@ -84,7 +85,7 @@ export async function renderUsage() {
       body: h('div', { class: 'grid2' }, field('Input (read)', i), field('Output (written)', o)) })) return;
     if (await tryApi(() => api('PUT', '/api/usage/prices', { model: ref, input: i.value, output: o.value }), 'Price saved')) { usageCache = null; renderUsage(); }
   };
-  const priceable = (ref) => !sum?.plans?.[ref.split(':')[0]] && !/:free$/.test(ref);
+  const priceable = (ref, r) => !sum?.plans?.[ref.split(':')[0]] && r.plan !== r.calls && !/:free$/.test(ref);
   // one row: name (a link where the item has a page) · muted calls and tokens (+ a model's price) · cost · ⋯
   const row = (name, r, extra = '', more = null) => h('li', {}, h('div', { class: 'u-main' }, h('span', { class: 'u-name' }, name),
     h('span', { class: 'small muted num' }, [plural(r.calls, 'call'), `${fmtTok(r.input)} in / ${fmtTok(r.output)} out`, extra].filter(Boolean).join(' · '))),
@@ -92,8 +93,8 @@ export async function renderUsage() {
   const BY = {
     agent: ['Agents', byAgent, (r) => row(r.key ? h('a', { href: `#agents/${encodeURIComponent(r.key)}` }, agentName[r.key] || r.key) : 'No agent', r)],
     chat: ['Chats', byChat, (r) => row(r.key ? h('a', { href: `#chats/${encodeURIComponent(r.key)}` }, r.chatName || 'a chat') : 'No chat (tests, AI helper)', r)],
-    model: ['Models', byModel, (r) => row(modelName(r.key.replace(/^[\w-]+:(?=.)/, '')), r, price(r.key),
-      can('admin') && priceable(r.key) ? menu(`Price of ${r.key}`, h('button', { class: 'btn small', type: 'button', onclick: () => setPrice(r.key) }, 'Set price…')) : null)],
+    model: ['Models', byModel, (r) => row(modelName(r.key.replace(/^[\w-]+:(?=.)/, '')), r, price(r.key, r),
+      can('admin') && priceable(r.key, r) ? menu(`Price of ${r.key}`, h('button', { class: 'btn small', type: 'button', onclick: () => setPrice(r.key) }, 'Set price…')) : null)],
     account: ['Accounts', byAcct, (r) => row(acctName[r.key] || accountName(r.key), r)],
     kind: ['Kind', byKind, (r) => row(KIND[r.key] || r.key, r)],
   };

@@ -19,8 +19,8 @@
 | **Header** | *Everything is running* or what needs you: WhatsApp numbers, agents live, chats on, changes waiting for a confirm |
 | **Ask** | the [owner assistant](owner-assistant.md) as a conversation: "what did the families decide this week?" |
 | **WhatsApp numbers** | each number's state and its direct-message agent ([Connect WhatsApp](whatsapp.md)) |
-| **Control** | **Pause all agents** and a switch per agent, with a live *reading… / answered* pulse |
-| **Server** | version, memory, updates ([Backups & updates](backups-and-updates.md)) |
+| **Control** | **Pause all agents** and a switch per agent, with a live *reading… / answered* pulse; the name opens the agent, **Review** its answers |
+| **Server** | version, memory and one update row: *Up to date · v2.33.0 · checked 2m ago*, **Release notes**, the one action when there is one, ⋯ for **Check now** and the settings ([Backups & updates](backups-and-updates.md#updates)) |
 | **Why agents stayed quiet** | the last 7 days, [below](#why-didnt-it-answer) |
 | **Recent activity** | the newest entries, live |
 
@@ -40,8 +40,10 @@ Every screen has its own address, e.g. `#settings/secrets`, `#models/chatgpt`, `
 
 ## Why didn't it answer?
 
-**Overview → Why agents stayed quiet** (and a hint on each chat's row) shows the reasons of the last 7 days, with
-counts and one-click fixes such as **Switch chat on** or **Open triggers**.
+**Overview → Why agents stayed quiet** (and a hint on each chat's row) shows the reasons of the last 7 days, grouped
+by chat: the chat's name (tap it for the chat's page), then one line per reason with its count and the fix as a small
+link, such as **Switch on** or **Open triggers**. **⋯ → Clear** forgets a chat's records. Chats are always shown by
+their name (the group's WhatsApp name, or the person's), never by an id.
 
 ![Why agents stayed quiet, with fixes](site/img/card-quiet.webp)
 
