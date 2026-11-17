@@ -164,7 +164,8 @@ for (const width of [...new Set(CARDS.map((c) => c[4]))]) {
 
 // videos: frames at ~8 fps while a script runs in the page, joined by ffmpeg with their real timing
 const VIDEOS = [
-  ['tour', 'overview', `for (const t of ['overview', 'chats', 'agents', 'models', 'models/chatgpt', 'settings', 'activity']) { location.hash = t; await T.wait(2100); }`, 15500],
+  ['tour', 'overview', `for (const t of ['overview', 'chats', 'agents', 'agents/carpool/review', 'models', 'models/chatgpt', 'settings', 'activity']) { location.hash = t; await T.wait(2100); }
+    await openFind(); await T.wait(500); const i = document.querySelector('#palette input'); await T.type(i, 'cornavin'); await T.wait(300); [...document.querySelectorAll('#palette li')].at(-1).click(); await T.wait(2200);`, 21000],
   ['chat-on', 'chats/120363041122330006%40g.us', `await T.wait(1200);
     const sel = document.querySelector('.chat-page select'); if (sel) { sel.focus(); await T.wait(600); sel.value = [...sel.options].find((o) => /family/i.test(o.textContent))?.value || sel.value; sel.dispatchEvent(new Event('change', { bubbles: true })); }`, 6500],
   ['ai-create', 'agents/new', `await T.wait(1500); const ta = document.querySelector('#main textarea'); await T.wait(500);
