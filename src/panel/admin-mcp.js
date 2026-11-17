@@ -20,6 +20,7 @@ import {
   saveGrant, listGrants, revokeGrant, createConfirm, takeConfirm, redirectAllowed,
 } from '../core/admin-oauth.js';
 import { baseUrl, clientIp, cookie, isHttps, minuteLimiter } from './http-util.js';
+import { PAGE_CSP, pageHead } from './http.js';
 
 /** The token of an `Authorization: Bearer <token>` header (linear-time parsing, no regex backtracking). */
 function bearerToken(header) {
@@ -105,28 +106,11 @@ export function createAdminMcp({ invoke, routeRole }) {
   const hidden = (p) => PARAMS.filter((k) => p[k] != null && p[k] !== '').map((k) => `<input type=hidden name="${k}" value="${esc(p[k])}">`).join('');
   // The Duniya mark (docs/site/img/logo.svg): robot in a chat bubble.
   const LOGO = '<svg viewBox="0 0 64 64" width="40" height="40" aria-hidden="true"><path d="M23 5H41A17 17 0 0 1 58 22V44L59.5 59.5L44 55H23A17 17 0 0 1 6 38V22A17 17 0 0 1 23 5Z" fill="#4d9b00" stroke="#4d9b00" stroke-width="4" stroke-linejoin="round"/><g fill="#101216"><rect x="11.8" y="28.3" width="9" height="13.4" rx="4"/><rect x="43.2" y="28.3" width="9" height="13.4" rx="4"/><circle cx="32" cy="12.6" r="2.8"/></g><path d="M32 14.8v6.7" stroke="#101216" stroke-width="2.7" stroke-linecap="round"/><rect x="18" y="21.5" width="28" height="27" rx="13" fill="#fff" stroke="#101216" stroke-width="2.7"/><rect x="20.8" y="29.4" width="22.4" height="12.3" rx="6.15" fill="#101216"/><path d="M23.6 37.2a2.9 2.9 0 0 1 5.8 0M34.6 37.2a2.9 2.9 0 0 1 5.8 0" fill="none" stroke="#c6f432" stroke-width="2" stroke-linecap="round"/></svg>';
-  function page(res, status, { title, body, formTo = '', script = '' }) {
-    const csp = `default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'unsafe-inline'; form-action 'self'${formTo ? ` ${formTo}` : ''}; frame-ancestors 'none'; base-uri 'none'`;
+  // 070: the shared page look (/page.css, /page.js) under PAGE_CSP: no inline style or script.
+  function page(res, status, { title, body, formTo = '', bounce = false }) {
+    const csp = PAGE_CSP.replace("form-action 'self'", `form-action 'self'${formTo ? ` ${formTo}` : ''}`);
     res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-frame-options': 'DENY', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'content-security-policy': csp });
-    res.end(`<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>${esc(title)} · Duniya</title>
-<style>
-:root{--bg:#f7f3ec;--card:#fffdf9;--ink:#1c2030;--muted:#6d6a73;--line:#e6dfd3;--accent:#0b7a75;--accent-ink:#fff;--accent-soft:#dff1ee;--marigold:#e39b2d;--marigold-soft:#fbefd9;--bad:#b53a4e;--info:#2f5fb3;--info-soft:#e7eefb;color-scheme:light dark}
-@media (prefers-color-scheme:dark){:root{--bg:#11131c;--card:#1a1d2a;--ink:#ece9e2;--muted:#9a98a3;--line:#2a2e3e;--accent:#3cc4b7;--accent-ink:#0b1a19;--accent-soft:#0f3431;--marigold-soft:#3a2c14;--bad:#f08a9b;--info:#8db3f5;--info-soft:#18264a}}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:var(--ink);
-background:radial-gradient(1200px 500px at 85% -120px,var(--marigold-soft),transparent 70%),radial-gradient(900px 500px at -10% -160px,var(--accent-soft),transparent 70%),var(--bg)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px;max-width:460px;width:100%;box-shadow:0 1px 2px rgba(28,32,48,.05),0 6px 24px -8px rgba(28,32,48,.1)}
-h1{font-family:ui-rounded,"SF Pro Rounded",Nunito,system-ui,sans-serif;font-size:21px;margin:10px 0 6px;letter-spacing:-.01em}
-.muted{color:var(--muted)}.small{font-size:13px}ul{padding-left:20px;margin:6px 0 12px}li{margin:3px 0}
-.note{background:var(--info-soft);color:var(--info);border-radius:12px;padding:10px 12px;font-size:13px;margin:12px 0}
-.note.bad{background:#fbe6e9;color:var(--bad)}
-.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-.btn{font:inherit;font-weight:600;padding:10px 18px;min-height:40px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
-label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px;font-weight:500}
-input[type=text],input[type=password]{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;width:100%}
-.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
-code{font-size:13px}
-</style><body><main class=card>${LOGO}${body}</main>${script ? `<script>${script}</script>` : ''}</body></html>`);
+    res.end(`${pageHead(`${title} · Duniya`)}<body${bounce ? ' data-bounce' : ''}><main class=consent>${LOGO}${body}</main><script src="/page.js"></script></body></html>`);
   }
   const errorPage = (res, msg) => page(res, 400, { title: 'Cannot connect', body: `<h1>This connection link does not work</h1><div class="note bad">${esc(msg)}</div><p class="small muted">Go back to your AI assistant and add the connector again.</p>` });
 
@@ -163,7 +147,7 @@ code{font-size:13px}
 <ul>${abilities.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
 ${user.role === 'viewer' ? '' : '<div class=note>Risky actions (deleting an agent, erasing memory, removing secrets or users, removing a WhatsApp number, restoring a backup, updates and restarts) always need a second confirmation step.</div>'}
 <p class="small muted">Only approve if you just added this connector yourself. You can disconnect it any time in Settings → Connected AI assistants.</p>
-<form method=post action="/oauth/authorize" class=row>${hidden(p)}<input type=hidden name=csrf value="${csrfFor(sessionToken)}">
+<form method=post action="/oauth/authorize" class=actions>${hidden(p)}<input type=hidden name=csrf value="${csrfFor(sessionToken)}">
 <button class="btn primary" name=action value=approve>Approve</button><button class="btn danger" name=action value=deny>Deny</button></form>` });
   }
   function loginPage(res, p, chk, { error = '', bounce = false } = {}) {
@@ -174,12 +158,12 @@ ${user.role === 'viewer' ? '' : '<div class=note>Risky actions (deleting an agen
 <p class="muted small">Use your Duniya panel account. Next you will see what ${esc(chk.client.name)} will be allowed to do.</p>
 ${error ? `<div class="note bad">${esc(error)}</div>` : ''}
 ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched off on this panel. Sign in with Google in a new tab, then come back and press Continue.</div>
-<div class=row><a class="btn primary" href="/auth/google/start" target=_blank rel=noopener>Sign in with Google</a><a class=btn href="" onclick="location.reload();return false">Continue</a></div>`}
+<div class=actions><a class="btn primary" href="/auth/google/start" target=_blank rel=noopener>Sign in with Google</a><a class=btn href="">Continue</a></div>`}
 <form method=post action="/oauth/authorize"${passwordLoginAllowed() ? '' : ' hidden'}>${hidden(p)}
 <label for=u>Username</label><input type=text id=u name=username autocomplete=username autocapitalize=none required value="admin">
 <label for=pw>Password</label><input type=password id=pw name=password autocomplete=current-password required autofocus>
-<div class=row><button class="btn primary" name=action value=login>Sign in</button><button class="btn" name=action value=deny formnovalidate>Cancel</button></div></form>`,
-    script: bounce ? 'if(!/[?&]_s=1/.test(location.search)){document.body.style.visibility="hidden";location.replace(location.href+"&_s=1")}' : '' });
+<div class=actions><button class="btn primary" name=action value=login>Sign in</button><button class="btn" name=action value=deny formnovalidate>Cancel</button></div></form>`,
+    bounce });
   }
 
   async function authorize(req, res, url) {
@@ -189,7 +173,7 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
     if (chk.error) { res.writeHead(302, { location: redirectTo(chk.redirectUri, { error: chk.error, error_description: chk.description, state: p.state, iss: baseUrl(req) }) }); return res.end(); }
     let token = cookie(req, 'duniya_session');
     let user = sessionUser(token);
-    if (req.method === 'GET') return user ? consentPage(req, res, p, chk, user, token) : loginPage(res, p, chk, { bounce: true });
+    if (req.method === 'GET') return user ? consentPage(req, res, p, chk, user, token) : loginPage(res, p, chk, { bounce: p._s !== '1' });
 
     if (p.action === 'deny') {
       res.writeHead(302, { location: redirectTo(chk.redirectUri, { error: 'access_denied', error_description: 'The user denied access', state: p.state, iss: baseUrl(req) }) });

@@ -114,6 +114,12 @@ test('authorize: login form without a session, then consent shows client, host a
   assert.equal(anon.status, 200);
   assert.match(html, /Sign in to connect Claude/);
   assert.match(anon.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+  // 070: the shared page style and script as files, so no 'unsafe-inline'; the page reloads itself once for the cookie
+  assert.doesNotMatch(anon.headers.get('content-security-policy'), /unsafe-inline/);
+  assert.doesNotMatch(html, /<style|<script>|onclick=/);
+  assert.match(html, /<body data-bounce>/);
+  const again = await (await fetch(`${authorizationUrl}&_s=1`)).text();
+  assert.doesNotMatch(again, /data-bounce/, 'not after the reload');
   const params = Object.fromEntries(authorizationUrl.searchParams);
   const wrong = await post('/oauth/authorize', { ...params, action: 'login', username: 'admin', password: 'nope-nope-nope' });
   assert.equal(wrong.status, 401);
