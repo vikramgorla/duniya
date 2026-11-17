@@ -14,12 +14,25 @@ export function findChrome() {
   if (!hit) { console.error('No Chrome or Chromium found. Set CHROME_PATH=/path/to/chrome and run again.'); process.exit(2); }
   return hit;
 }
+/** Start Chrome and wait for its DevTools port. 069: a start that never writes DevToolsActivePort (seen on busy CI
+ *  runners) is retried with a fresh profile, up to 3 times. */
+async function startChrome() {
+  for (let attempt = 1; ; attempt++) {
+    const profile = mkdtempSync(join(tmpdir(), 'duniya-chrome-'));
+    const proc = spawn(findChrome(), ['--headless=new', '--no-sandbox', '--disable-gpu', '--hide-scrollbars', '--force-color-profile=srgb', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
+    let exited = false; proc.on('exit', () => { exited = true; });
+    const portFile = join(profile, 'DevToolsActivePort');
+    for (let i = 0; i < 150 && !exited && !existsSync(portFile); i++) await sleep(100);
+    if (existsSync(portFile)) return { proc, profile, text: readFileSync(portFile, 'utf8') };
+    proc.kill(); rmSync(profile, { recursive: true, force: true });
+    if (attempt >= 3) throw new Error(`Chrome did not start (no DevToolsActivePort after ${attempt} tries)`);
+    console.error(`Chrome did not start (try ${attempt}); trying again`);
+    await sleep(1000 * attempt);
+  }
+}
 export async function launch() {
-  const profile = mkdtempSync(join(tmpdir(), 'duniya-chrome-'));
-  const proc = spawn(findChrome(), ['--headless=new', '--no-sandbox', '--disable-gpu', '--hide-scrollbars', '--force-color-profile=srgb', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
-  const portFile = join(profile, 'DevToolsActivePort');
-  for (let i = 0; i < 100 && !existsSync(portFile); i++) await sleep(100);
-  const [port, path] = readFileSync(portFile, 'utf8').trim().split('\n');
+  const { proc, profile, text } = await startChrome();
+  const [port, path] = text.trim().split('\n');
   // Only a local DevTools endpoint written by the Chrome we just started.
   if (!/^\d{2,5}$/.test(port) || !/^\/devtools\/browser\/[A-Za-z0-9-]+$/.test(path)) throw new Error('Unexpected DevToolsActivePort content');
   const ws = new WebSocket(`ws://127.0.0.1:${Number(port)}/devtools/browser/${path.split('/').pop()}`);

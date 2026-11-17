@@ -7,7 +7,7 @@ import { activity } from '../../core/events.js';
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
 export function contactRoutes(route, { channel } = {}) {
   // ---------- contacts (#11) ----------
-  route('GET', '/api/contacts', async (req, res, body, q) => listContacts({ q: q.get('q') || '', sharedOnly: q.get('shared') === '1' }));
+  route('GET', '/api/contacts', async (req, res, body, q) => listContacts({ q: q.get('q') || '', sharedOnly: q.get('shared') === '1', limit: Number(q.get('limit')) || 500, offset: Number(q.get('offset')) || 0 }));
   // 057: counts per kind of name and when names were last refreshed (refreshes run by themselves after connect and daily)
   route('GET', '/api/contacts/summary', async () => {
     const numbers = ((await channel.status()).numbers || [{ id: 'main' }]).map((n) => n.id);

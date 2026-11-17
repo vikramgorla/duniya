@@ -301,7 +301,8 @@ details.rel > .note, .rel-sum, .rel-group, .rel-more { margin: 0 0 var(--s3) 18p
 .feed .fday { position: relative; padding: var(--s3) 2px var(--s1); }
 .feed .fday:first-child { padding-top: var(--s1); }
 .feed .fday h3 { margin: 0; font: 650 var(--fs-s) var(--font); color: var(--muted); }
-.feed .fitem { --tone: var(--muted); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px var(--s3); align-items: start; padding: 10px var(--s2); margin: 0 calc(-1 * var(--s2)); border-top: 1px solid var(--line); border-radius: var(--radius-xs); cursor: pointer; transition: background var(--fast); }
+.feed .fitem { --tone: var(--muted); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px var(--s3); align-items: start; padding: 10px var(--s2); margin: 0 calc(-1 * var(--s2)); border-top: 1px solid var(--line); border-radius: var(--radius-xs); cursor: pointer; transition: background var(--fast);
+  content-visibility: auto; contain-intrinsic-size: auto 56px; /* 069: long feeds skip entries off screen */ }
 .feed .fday + .fitem { border-top-color: transparent; }
 .feed .fitem:hover, .feed .fitem[aria-expanded=true] { background: color-mix(in srgb, var(--ink) 4%, transparent); }
 .feed .fitem.ok { --tone: var(--ok); } .feed .fitem.info { --tone: var(--info); } .feed .fitem.warn { --tone: var(--warn); } .feed .fitem.bad { --tone: var(--bad); }

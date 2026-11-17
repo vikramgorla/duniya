@@ -7,7 +7,7 @@
 //   WhatsApp confirmation is answered again after the restart (a pending report is kept in kv).
 // - The owner can snooze the notice (reminded again after 7 days) or dismiss it (until a newer breaking release).
 import { randomInt } from 'node:crypto';
-import { env, fail } from './config.js';
+import { env, fail, restartSoon } from './config.js';
 import { kvGet, kvSet } from './db.js';
 import { getUser } from './store.js';
 import { activity } from './events.js';
@@ -26,7 +26,7 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const readKv = (k, d) => { try { return JSON.parse(kvGet(k) || 'null') ?? d; } catch { return d; } };
 const v = (x) => (String(x || '').startsWith('v') ? x : `v${x}`);
 
-let restartFn = () => setTimeout(() => process.exit(0), 1000);
+let restartFn = () => restartSoon(1000);
 /** How the process restarts after an update (the panel passes its own; tests count restarts). */
 export function setUpdateRestart(fn) { restartFn = fn; }
 

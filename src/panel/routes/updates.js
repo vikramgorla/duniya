@@ -1,12 +1,13 @@
 // @ts-check
 // Panel routes for updates (008, 045; owner only) and the installed release notes (065; everyone signed in).
 import { getUpdateSettings, setUpdateSettings, updateStatus, checkForUpdate, applyUpdate, installKind, updateRunning, backupConfigured, installedReleases, runningVersion, markSeen } from '../../core/updates.js';
+import { restartSoon } from '../../core/config.js';
 import { releaseRange } from '../../core/releases.js';
 import { pendingDecision, snoozeDecision, runConfirmedUpdate, setUpdateRestart } from '../../core/update-decision.js';
 
 const OWNER = { role: 'owner' };
 
-export function updateRoutes(route, { restart = () => setTimeout(() => process.exit(0), 500) } = {}) {
+export function updateRoutes(route, { restart = () => restartSoon(500) } = {}) {
   setUpdateRestart(restart);
   route('GET', '/api/updates', async () => ({ settings: getUpdateSettings(), status: updateStatus(), install: installKind(), running: updateRunning(), decision: pendingDecision(), backup: backupConfigured() }), OWNER);
   // 065: release notes of the installed version: all of them, or the versions after `from` up to `to` (newest first)

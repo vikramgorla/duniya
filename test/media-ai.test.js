@@ -389,6 +389,8 @@ test('queue: jobs survive a restart, run in order per chat, ⏳ when waiting, ap
   await t.route(groupPhoto());
   assert.match(lastSent(), /overloaded right now/);
   assert.throws(() => queue.enqueue({ kind: 'test-gate', chat: 'y@g.us', payload: {} }), { code: 'overloaded' });
+  // 069: the owner hears about a full queue once an hour, not per refused request
+  assert.equal(t.db.listActivity({ limit: 100 }).filter((a) => /requests are waiting, so new ones are refused/.test(a.summary)).length, 1);
   release2();
   await queue.drain(10000);
 });

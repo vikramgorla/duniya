@@ -1,5 +1,5 @@
 // Panel routes for backups (007). Owner only.
-import { fail } from '../../core/config.js';
+import { fail, restartSoon } from '../../core/config.js';
 import { readFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import {
@@ -39,7 +39,7 @@ function appView() {
   };
 }
 
-export function backupRoutes(route, { restart = () => setTimeout(() => process.exit(0), 500) } = {}) {
+export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
   route('GET', '/api/backups', async () => {
     const token = getSecret('GITHUB_BACKUP_TOKEN');
     const app = appView();

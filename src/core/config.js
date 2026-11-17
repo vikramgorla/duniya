@@ -54,6 +54,8 @@ export const bad = (message, field, status = 400) => fail(message, status, field
 export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 export const iso = (ts) => (ts ? new Date(ts).toISOString() : null);
 export const isGroup = (chat) => String(chat).endsWith('@g.us');
+/** 069: restart the app after `ms` through the graceful shutdown (src/index.js); systemd or Docker starts it again. */
+export const restartSoon = (ms = 500) => setTimeout(() => process.kill(process.pid, 'SIGTERM'), ms);
 
 /** Small JSON file store with atomic writes. */
 export function readJson(file, fallback) {

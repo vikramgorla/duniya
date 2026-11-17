@@ -58,7 +58,6 @@ export function silenceReason(reason, { chat = '', agent = '', sender = '' } = {
       const r = SILENCE_REASONS[reason];
       activity('silence', { agent, chat, summary: `Stayed quiet: ${r.label} (${row.count}×). ${r.explain}`, detail: { reason, count: row.count } });
     }
-    if (Math.random() < 0.001) pruneSilences();
     return { reason, count: row.count };
   } catch (e) {
     console.error('silence record failed', e.message);
@@ -92,6 +91,3 @@ export function clearSilences({ chat = '', agent = '', reason = '' } = {}) {
   if (reason) { where.push('reason = ?'); args.push(reason); }
   return Number(db.prepare(`DELETE FROM silences WHERE ${where.join(' AND ')}`).run(...args).changes);
 }
-
-/** Old rows go after 90 days. */
-const pruneSilences = () => db.prepare('DELETE FROM silences WHERE last_ts < ?').run(Date.now() - 90 * 86400000);
