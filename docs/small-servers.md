@@ -84,12 +84,12 @@ Max age: `MEDIA_JOB_MAX_AGE_MIN` (15). [Settings](settings.md)
   resume.
 - **Copilot** helper (~400 MB download): refused below 2 GB, with or without Small server mode.
 - **Local tool services** (each one an extra Node.js process): on a small server, adding or changing one is refused
-  on every path (agent editor, Settings → Tool services, Browse tool services, import, duplicate, AI assistants)
+  on every path (agent page → Tools, Settings → Tool services, Browse tool services, import, duplicate, AI assistants)
   with the same message, unless [Small server mode](#small-server-mode) is on. Hosted services work as usual. Over the
   limit, the least recently used one stops until needed.
 - **Local tool services saved before** (on a bigger server, before 2.17, or from a backup) stay in the configuration
   but are **not started** while the server is small and the switch is off: the agent answers without their tools,
-  the agent editor says *Not started on this server* and why, the activity log says it once, and Install is refused.
+  the agent's Tools section says *Not started on this server* and why, the activity log says it once, and Install is refused.
   Switch on Small server mode, move to a bigger server, or remove them.
 
 > [!TIP]

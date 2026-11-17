@@ -9,7 +9,7 @@ character.
 **In 30 seconds**
 - A built-in agent: your DMs to any agent number, the **Ask** box (also on your phone). Always there, cannot be deleted.
 - Everything an agent can have: tool services (e.g. GIF search), WhatsApp actions, photos, PDFs, voice notes, voice
-  replies, pictures, memory, schedules — set in the normal agent editor.
+  replies, pictures, memory, schedules — set on the normal agent page.
 - Sees only chats that are on and not **Private to members**; never answers in groups.
 - Changes, and anything sent into another chat, need `confirm CODE` (valid 10 minutes, also across a restart).
 - Alerts and the weekly summary (counts only) are its messages too.
@@ -38,8 +38,8 @@ character.
 ## Its editor: character, tools, voice, schedules, alerts
 
 **Agents → Owner assistant** (or **Settings → Owner assistant → Character, tools, voice, schedules & alerts**) is the
-normal agent editor without the parts that do not apply (chats, triggers, people, quick replies, welcome, confirmation
-setup, test console — its *Try it* card is the Ask box). The AI helper and its visual diff work here too.
+normal agent page without the sections that do not apply (where it answers, people, quick replies, welcome,
+confirmation setup; its *Try it* section is the Ask box). It adds **Alerts**. The AI helper and its visual diff work here too.
 
 | Section | What it does |
 |---|---|

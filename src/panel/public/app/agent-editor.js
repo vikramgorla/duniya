@@ -1,405 +1,451 @@
-// Agents → one agent: the editor (instructions, chats, people, tools, schedules, quick answers, test console). Module of the panel (063).
+// Agents → one agent's page (068): a compact header (avatar, name, state, switch, ⋯) and a short list of sections, each
+// a row with its current value that opens the section's own page (#agents/<id>/<section>). Every section saves on its
+// own: one Save, disabled until something changed, then "Saved" and Undo in the toast. Module of the panel (063).
 import { aiHelper } from './ai-helper.js';
 import { askCard } from './ask.js';
-import { $, S, api, ask, can, field, fieldError, h, lines, menu, splitLines, tagPill, time, toast, tryApi, whoLabel } from './core.js';
+import { S, api, ask, avatar, can, field, fieldError, h, icon, lines, menu, splitLines, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
 import { fallbackLine, fallbackPicker } from './fallback.js';
 import { browseButton } from './registry.js';
-import { loadModels, modelLabel, modelSelect, openAgent, plural } from './shared.js';
+import { helpLink, loadModels, modelLabel, modelSelect, openAgent, plural, trunc, usageLine } from './shared.js';
 import { ROLE_LABEL, globRe, markSaved, serverConfig, serverState, toolGrid, toolServiceEditor } from './tool-editor.js';
-import { capEditor } from './usage.js';
-export async function renderAgentEditor(id) {
-  const [b, models, conns, locals, waTools] = await Promise.all([api('GET', `/api/agents/${encodeURIComponent(id)}`), loadModels().catch(() => ({ models: [] })), api('GET', `/api/agents/${encodeURIComponent(id)}/connections`).catch(() => []), api('GET', `/api/agents/${encodeURIComponent(id)}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => [])]);
-  const mediaCaps = await api('GET', '/api/media').catch(() => null);
-  const registry = can('admin') ? await api('GET', '/api/tool-services/registry/settings').catch(() => null) : null; // 052: Browse
-  const c = structuredClone(b.config);
-  const bi = !!b.builtin; // 059: the built-in owner assistant — fields about chats and people don't apply
-  if (bi) waTools.splice(0, waTools.length, ...waTools.filter((t) => t.owner));
-  const F = {};
-  const inp = (key, attrs = {}) => (F[key] = h('input', { value: c[key] ?? '', ...attrs }));
-  // General
-  const modelSel = (F.model = modelSelect(models, c.model, { autoLabel: `Auto${models.resolvedDefault ? ` (now ${models.resolvedDefault})` : ''}` }));
-  const fbPick = fallbackPicker(models, c.fallback, { what: 'agent' });
-  F.dm = h('select', {}, [['members', 'Members of its groups + listed participants'], ['organizers', 'Organizers only'], ['anyone', 'Anyone — even people whose chat is off'], ['none', 'Nobody']].map(([v, l]) => h('option', { value: v, selected: c.dm === v }, l)));
-  F.enabled = h('input', { type: 'checkbox', checked: c.enabled }); F.respondToMentions = h('input', { type: 'checkbox', checked: c.respondToMentions });
-  F.memory = h('input', { type: 'checkbox', checked: c.memory?.enabled !== false });
-  F.prompt = h('textarea', { class: 'prose', 'aria-label': 'Instructions', value: c.prompt });
-  F.triggers = h('input', { value: (c.triggers || []).join(', ') });
-  F.organizers = h('textarea', { value: lines(c.organizers), style: 'min-height:60px' });
-  F.participants = h('textarea', { value: lines(c.participants), style: 'min-height:50px' });
-  // People & roles (015): members of the agent's groups, tap a role. Organizers not in these groups stay in the text box.
-  const orgSet = new Set(c.organizers || []);
-  const peopleBox = h('div', {}, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading group members…'));
+import { capEditor, usageSummary } from './usage.js';
+
+const DM_LABEL = { members: 'Members of its groups', organizers: 'Organizers only', anyone: 'Anyone', none: 'Nobody' };
+const tick = (input, label) => h('label', { class: 'tick' }, input, ` ${label}`);
+const check = (on, disabled = !can('admin')) => h('input', { type: 'checkbox', checked: !!on, disabled });
+const seg = (label, options, value, onPick) => {
+  const el = h('div', { class: 'seg', role: 'group', 'aria-label': label }, options.map(([v, l]) => h('button', {
+    type: 'button', class: value === v ? 'on' : '', 'aria-pressed': String(value === v), disabled: !can('admin'),
+    onclick: (e) => { onPick(v); el.querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === e.currentTarget); x.setAttribute('aria-pressed', String(x === e.currentTarget)); }); } }, l)));
+  return el;
+};
+/** A titled block inside a section page: hairline above, no box in a box. */
+const block = (title, ...kids) => h('div', { class: 'sblock' }, title ? h('h3', {}, title) : null, kids);
+
+/**
+ * The sections of an agent's page, in order. `sub(ctx)`: the one-line current value on the row; `build(ctx)` returns
+ * { el, value?() } — value() is the part of the agent this section saves (no value: the section saves itself or has
+ * nothing to save). `bi`: shown for the built-in owner assistant; `agent`: shown for normal agents.
+ */
+const SECTIONS = [
+  { group: 'What it does', id: 'character', icon: 'agents', c: 'c5', title: () => 'Character', help: 'agents.md#create-and-change-agents',
+    line: (x) => (x.bi ? 'Tone, language and habits, added to its built-in instructions.' : 'Who it is and how it answers.'),
+    sub: (x) => trunc(x.c.description || x.c.prompt || 'Not written yet', 60), build: buildCharacter },
+  { group: 'What it does', id: 'where', agent: true, icon: 'chats', c: 'c3', title: () => 'Where it answers', help: 'agents.md#create-and-change-agents', line: () => 'The chats it serves, the words that wake it and who may write to it directly.',
+    sub: (x) => [plural(x.chats.length, 'chat'), x.c.triggers?.length ? x.c.triggers.join(', ') : 'no trigger', `direct: ${DM_LABEL[x.c.dm]?.toLowerCase() || x.c.dm}`].join(' · '), build: buildWhere },
+  { group: 'What it does', id: 'people', agent: true, icon: 'contacts', c: 'c4', title: () => 'People', help: 'agents.md#roles', line: () => 'Organizers use organizer tools and confirm changes; everyone else is a participant.',
+    sub: (x) => (x.c.organizers?.length ? plural(x.c.organizers.length, 'organizer') : 'Group admins are organizers'), build: buildPeople },
+  { group: 'What it does', id: 'quick', agent: true, icon: 'send', c: 'c2', title: () => 'Quick replies & FAQ', help: 'agents.md#quick-replies-welcome--faq', line: () => 'Instant answers from your text: no AI, no tokens.',
+    sub: (x) => { const n = (x.c.quickReplies || []).length; const f = (x.c.faq?.items || []).length; return n || f ? [n ? plural(n, 'quick reply', 'quick replies') : '', f ? plural(f, 'question') : ''].filter(Boolean).join(' · ') : 'None'; }, build: buildQuick },
+  { group: 'What it does', id: 'welcome', agent: true, icon: 'contacts', c: 'c3', title: () => 'Welcome', help: 'agents.md#quick-replies-welcome--faq', line: () => 'Greets people who join a group, once per person.',
+    sub: (x) => (x.c.welcome?.enabled ? 'On' : 'Off'), build: buildWelcome },
+  { group: 'What it does', id: 'schedules', icon: 'pending', c: 'c1', title: (x) => (x.bi ? 'Scheduled messages' : 'Schedules'), help: 'agents.md', line: (x) => (x.bi ? 'Sent to you in your own chat, even while agents are paused.' : 'Posts it writes by itself at set times.'),
+    sub: (x) => { const s = x.c.schedules || []; return s.length ? `${plural(s.length, 'schedule')} · ${s.map((y) => y.at).join(', ')}` : 'None'; }, build: buildSchedules },
+  { group: 'How it works', id: 'model', icon: 'models', c: 'c4', title: () => 'Model', help: 'models.md', line: () => 'Which model answers, and what happens when it is unavailable.',
+    sub: (x) => `${x.c.model === 'auto' ? 'Auto' : modelLabel(x.c.model, x.models)}${x.c.fallback?.mode === 'off' ? ' · no fallback' : ''}`, build: buildModel },
+  { group: 'How it works', id: 'tools', icon: 'settings', c: 'c0', title: () => 'Tools', help: 'agents.md#tool-services-mcp', line: () => 'Tool services and WhatsApp actions, allowed per role in code.',
+    sub: (x) => { const t = [...Object.keys(x.c.mcpServers || {}), ...(x.b.globalTools || []).filter((g) => g.on).map((g) => g.name)]; return t.length ? t.join(', ') : 'None'; }, build: buildTools },
+  { group: 'How it works', id: 'memory', icon: 'notes', c: 'c2', title: () => 'Memory', help: 'agents.md#memory', line: (x) => (x.bi ? 'Notes it saves when you ask, private to you.' : 'Chat memory and notes shared across its chats.'),
+    sub: (x) => (x.c.memory?.enabled === false ? 'Off' : 'On'), build: buildMemory },
+  { group: 'How it works', id: 'media', icon: 'image', c: 'c1', title: () => 'Photos & voice', help: 'settings.md', line: () => 'What it does with photos and voice notes, and whether it speaks.',
+    sub: (x) => { const m = { photos: true, voiceNotes: true, voiceReply: 'never', ...(x.c.media || {}) }; return [m.photos ? 'Photos' : '', m.voiceNotes ? 'voice notes' : '', m.voiceReply !== 'never' ? 'speaks' : ''].filter(Boolean).join(', ') || 'Off'; }, build: buildMedia },
+  { group: 'How it works', id: 'cap', icon: 'pending', c: 'c0', title: () => 'Spending cap', help: 'spending.md', line: () => 'A monthly limit; at 80 % you get an alert.',
+    sub: (x) => (x.cap ? `${Math.round(x.cap.used * 100)}% of this month's cap` : 'No cap'), build: buildCap },
+  { group: 'How it works', id: 'alerts', only: 'bi', icon: 'shield', c: 'c1', title: () => 'Alerts', help: 'owner-assistant.md', line: () => 'Spending, provider and update alerts go to this WhatsApp number.',
+    sub: (x) => (x.c.alerts?.to ? `+${x.c.alerts.to}` : 'Only in Activity'), build: buildAlerts },
+  { group: 'How it works', id: 'advanced', icon: 'settings', c: 'c0', title: () => 'Advanced', help: 'agents.md', line: () => 'Timezone and how much it reads and writes.',
+    sub: (x) => [x.c.timezone || 'Server timezone', plural(x.c.historySize, 'message'), `${x.c.maxTokens} tokens`].join(' · '), build: buildAdvanced },
+  { group: 'Try it', id: 'test', icon: 'send', c: 'c5', title: (x) => (x.bi ? 'Try it' : 'Test'), help: 'agents.md', line: (x) => (x.bi ? 'The same conversation as Ask on Overview.' : 'Real tools and saved settings; nothing is posted to WhatsApp.'),
+    sub: (x) => (x.bi ? 'Ask it something' : 'Ask it as a participant or an organizer'), build: buildTest },
+];
+const shown = (sec, bi) => (bi ? sec.only === 'bi' || !sec.agent : sec.only !== 'bi');
+/** Old deep links (first-run guide, why-quiet fixes) land in the section that now holds them. */
+const OLD = { triggers: ['where', 'triggers'], dm: ['where', 'dm'] };
+
+/** The page of one agent inside the Agents list → page. `onChange(agent)` keeps the list row in step. */
+export function agentPage(id, { onChange } = {}) {
+  const root = h('div', { class: 'ap', 'data-agent': id }, h('div', { class: 'card' }, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading…')));
+  load().catch((e) => root.replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Couldn’t load this agent'), h('p', { class: 'small muted' }, e.message))));
+  async function load() {
+    const enc = encodeURIComponent(id);
+    const [b, models, us, bud, chats] = await Promise.all([api('GET', `/api/agents/${enc}`), loadModels().catch(() => ({ models: [] })), usageSummary(),
+      api('GET', '/api/budget').catch(() => null), api('GET', '/api/chats').catch(() => [])]);
+    const x = { id, enc, b, c: structuredClone(b.config), bi: !!b.builtin, models, us, cap: (bud?.caps || []).find((k) => k.scope === 'agent' && k.id === id) || null,
+      chats: chats.filter((ch) => (b.config.chats || []).includes(ch.id)) };
+    const route = location.hash.split('/');
+    const [want, focus] = OLD[route[2]] || [route[2], ''];
+    if (want && SECTIONS.some((s) => s.id === want && shown(s, x.bi))) openSection(x, want, false, focus); else drawHome(x);
+  }
+  /** Saves a part of the agent; Undo puts the previous values back. Returns true when saved. */
+  async function save(x, patch, F = {}, { quiet = false } = {}) {
+    const before = Object.fromEntries(Object.keys(patch).map((k) => [k, structuredClone(x.b.config[k] ?? null)]));
+    let r;
+    try { r = await api('PUT', `/api/agents/${x.enc}`, patch); } catch (e) { fieldError(e, F); return false; }
+    x.b = r; x.c = structuredClone(r.config); onChange?.(r);
+    if (!quiet) toast(r.warnings?.length ? `Saved — ${r.warnings.join('; ')}` : 'Saved', { undo: () => tryApi(async () => { const u = await api('PUT', `/api/agents/${x.enc}`, before); x.b = u; x.c = structuredClone(u.config); onChange?.(u); redraw(x); }, 'Undone') });
+    return true;
+  }
+  let redraw = () => {};
+  function header(x) {
+    const b = x.b;
+    const state = () => [x.bi ? 'Built in' : b.enabled ? 'On' : 'Off', x.bi ? null : plural(x.chats.length, 'chat'), x.us?.agent?.[id] ? `${usageLine(x.us.agent[id])} in 30 days` : null].filter(Boolean).join(' · ');
+    const line = h('div', { class: 'small muted' }, state());
+    const av = avatar(b.name, b.id, `l${b.enabled || x.bi ? '' : ' off'}`);
+    const flip = async (v) => {
+      const ok = await save(x, { enabled: v }, {}, { quiet: true });
+      if (!ok) return;
+      line.textContent = state(); av.classList.toggle('off', !v);
+      toast(`${b.name} ${v ? 'on' : 'off'}`, { undo: () => flip(!v).then(() => { const sw = root.querySelector('.ap-head input[role=switch]'); if (sw) sw.checked = !v; }) });
+    };
+    const admin = can('admin');
+    return h('div', { class: 'ap-head' }, av,
+      h('div', { class: 'ap-title' }, h('h2', {}, b.name), line),
+      x.bi ? null : toggle(b.enabled, flip, !admin, `${b.name} on`),
+      menu(`More actions for ${b.name}`,
+        h('button', { class: 'btn small', type: 'button', onclick: () => openSection(x, 'test', true) }, x.bi ? 'Try it' : 'Test'),
+        admin ? h('button', { class: 'btn small', type: 'button', onclick: () => changeWithAi(x) }, 'Change with AI') : null,
+        x.bi || !admin ? null : h('button', { class: 'btn small', type: 'button', onclick: async () => { const r = await tryApi(() => api('POST', `/api/agents/${x.enc}/duplicate`), 'Duplicated'); if (r) openAgent(r.id); } }, 'Duplicate'),
+        h('a', { class: 'btn small', href: `/api/agents/${x.enc}/export`, download: `${id}.agent.json` }, 'Export'),
+        x.bi || !admin ? null : h('button', { class: 'btn small danger', type: 'button', onclick: async () => {
+          if (await ask({ title: `Delete “${b.name}”?`, text: 'Its chats no longer have this agent. Chat memory stays until you erase it.', ok: 'Delete agent', danger: true }) && await tryApi(() => api('DELETE', `/api/agents/${x.enc}`), 'Deleted')) location.hash = 'agents';
+        } }, 'Delete')));
+  }
+  function drawHome(x) {
+    redraw = drawHome;
+    const groups = [...new Set(SECTIONS.map((s) => s.group))];
+    const row = (s) => h('li', {}, h('a', { class: 'lrow', href: `#agents/${x.enc}/${s.id}`, onclick: (e) => { e.preventDefault(); openSection(x, s.id, true); } },
+      h('span', { class: `lmark ${s.c}`, 'aria-hidden': 'true' }, icon(s.icon)),
+      h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, s.title(x)), h('span', { class: 'lrow-sub' }, s.sub(x))),
+      h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
+    root.replaceChildren(h('div', { class: 'card ap-card' }, header(x),
+      x.b.needs?.length ? h('div', { class: 'note warn' }, `Needs secrets: ${x.b.needs.join(', ')}. `, h('a', { href: '#settings/secrets' }, 'Set them in Settings')) : null,
+      x.bi ? h('p', { class: 'small muted ap-note' }, 'Your own assistant in your WhatsApp chat and in Ask. ', helpLink('owner-assistant.md')) : null,
+      can('admin') ? h('button', { class: 'ai-entry', type: 'button', onclick: () => changeWithAi(x) }, h('span', { class: 'ai-chip' }, 'AI'), 'Change with AI', h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')) : null,
+      groups.map((g) => { const items = SECTIONS.filter((s) => s.group === g && shown(s, x.bi)); return items.length ? h('div', { class: 'lgroup' }, h('div', { class: 'eyebrow' }, g), h('ul', {}, items.map(row))) : null; })));
+  }
+  function openSection(x, sid, push, focus = '') {
+    const s = SECTIONS.find((y) => y.id === sid);
+    redraw = (y) => openSection(y, sid, false);
+    if (push) history.pushState(null, '', `#agents/${x.enc}/${sid}`);
+    const built = s.build(x, { save: (patch, F, o) => save(x, patch, F, o) });
+    let base = built.value ? JSON.stringify(built.value()) : '';
+    // One save model (068): nothing changed → a quiet "All changes saved"; a change → a bar with Save that stays in reach
+    const saveBtn = built.value && can('admin') ? h('button', { class: 'btn primary', type: 'button' }, 'Save') : null;
+    const state = h('span', { class: 'small muted', role: 'status' });
+    const bar = saveBtn ? h('div', { class: 'sec-save' }, state, saveBtn) : null;
+    const dirty = () => !!built.value && JSON.stringify(built.value()) !== base;
+    const sync = () => { if (!bar) return; const d = dirty(); bar.classList.toggle('dirty', d); saveBtn.disabled = !d; state.textContent = d ? 'Unsaved changes' : 'All changes saved'; };
+    built.rebase = () => { base = built.value ? JSON.stringify(built.value()) : ''; sync(); };
+    if (saveBtn) saveBtn.onclick = async () => { saveBtn.disabled = true; if (await save(x, built.value(), built.F)) built.rebase(); else sync(); };
+    const back = async (e) => {
+      e.preventDefault();
+      if (dirty() && !await ask({ title: 'Leave without saving?', text: 'Your changes in this section are not saved.', ok: 'Leave', danger: true })) return;
+      history.pushState(null, '', `#agents/${x.enc}`); drawHome(x); root.querySelector('.ap-head h2')?.focus?.();
+    };
+    const body = h('div', { class: 'sbody' }, built.el);
+    ['input', 'change', 'click'].forEach((ev) => body.addEventListener(ev, () => queueMicrotask(sync)));
+    root.replaceChildren(h('div', { class: 'card ap-sec' },
+      h('a', { class: 'sub-back', href: `#agents/${x.enc}`, onclick: back }, icon('back'), x.b.name),
+      h('div', { class: 'sec-head' }, h('h2', { tabindex: '-1' }, s.title(x)), helpLink(s.help)),
+      h('p', { class: 'small muted sec-line' }, s.line(x)),
+      body,
+      bar));
+    sync();
+    built.ready?.then(() => built.rebase());
+    document.title = `${s.title(x)} · ${x.b.name} · Duniya`;
+    if (push) { if (matchMedia('(max-width: 640px)').matches) window.scrollTo({ top: 0 }); root.querySelector('.sec-head h2')?.focus({ preventScroll: true }); }
+    if (focus && built.F?.[focus]) { built.F[focus].scrollIntoView({ block: 'center' }); built.F[focus].focus({ preventScroll: true }); }
+  }
+  /** "Change with AI": describe a change, review the visual diff, apply (the shared dialog; a sheet on phones). */
+  async function changeWithAi(x) {
+    const helper = await aiHelper({ agentId: id, bare: true, applyLabel: 'Apply & save',
+      placeholder: 'What should change? e.g. “Shorter, friendlier replies”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',
+      onApply: async (r) => { if (await save(x, Object.fromEntries(r.changes.map((ch) => [ch.field, ch.after])))) { helper.closest('dialog')?.close(); redraw(x); } } });
+    ask({ title: 'Change with AI', body: helper, ok: null, cancel: 'Close', wide: true });
+  }
+  return root;
+}
+
+// ---------- sections ----------
+function buildCharacter(x) {
+  const F = { name: h('input', { value: x.c.name || '' }), description: h('input', { value: x.c.description || '' }),
+    prompt: h('textarea', { class: 'prose', style: 'min-height:min(52vh,420px)', value: x.c.prompt || '', placeholder: x.bi ? 'e.g. Answer in English, short; call me Vik.' : '' }) };
+  return { F, el: h('div', {}, field('Name', F.name), x.bi ? null : field('Description', F.description, 'One line, shown in lists.'), field(x.bi ? 'Character' : 'Instructions', F.prompt)),
+    value: () => ({ name: F.name.value, ...(x.bi ? {} : { description: F.description.value }), prompt: F.prompt.value }) };
+}
+function buildWhere(x) {
+  const F = { triggers: h('input', { value: (x.c.triggers || []).join(', '), placeholder: 'mochi, !panduga' }), respondToMentions: check(x.c.respondToMentions),
+    dm: h('select', {}, Object.entries({ members: 'Members of its groups + listed participants', organizers: 'Organizers only', anyone: 'Anyone, even people whose chat is off', none: 'Nobody' }).map(([v, l]) => h('option', { value: v, selected: x.c.dm === v }, l))) };
+  return { F, el: h('div', {},
+    block('Chats', x.chats.length ? h('ul', { class: 'mini-list' }, x.chats.map((ch) => h('li', {}, h('a', { class: 'lrow', href: `#chats/${encodeURIComponent(ch.id)}` },
+      avatar(ch.name || ch.id, ch.id, ch.enabled ? 's' : 's off'), h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, ch.name || ch.id), h('span', { class: 'lrow-sub' }, ch.enabled ? 'On' : 'Off')),
+      h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))))
+      : h('p', { class: 'small muted' }, 'No chat yet. ', h('a', { href: '#chats' }, 'Choose this agent for a chat on Chats'), '.')),
+    block('Wake words', field('Triggers', F.triggers, 'A message with one of these words wakes it, anywhere in the message.'), tick(F.respondToMentions, 'Reply when @mentioned')),
+    block('Direct messages', field('Who may message it directly', F.dm))),
+  value: () => ({ triggers: splitLines(F.triggers.value), respondToMentions: F.respondToMentions.checked, dm: F.dm.value }) };
+}
+function buildPeople(x) {
+  const orgSet = new Set(x.c.organizers || []);
   const groupPhones = new Set();
+  const F = { organizers: h('textarea', { style: 'min-height:60px', 'aria-label': 'More organizers' }), participants: h('textarea', { value: lines(x.c.participants), style: 'min-height:50px', 'aria-label': 'Extra participants' }) };
   const syncOthers = () => { F.organizers.value = [...orgSet].filter((p) => !groupPhones.has(p)).join('\n'); };
+  syncOthers();
   F.organizers.addEventListener('input', () => {
     for (const p of [...orgSet]) if (!groupPhones.has(p)) orgSet.delete(p);
     for (const l of splitLines(F.organizers.value)) { const d = l.replace(/\D/g, ''); if (d) orgSet.add(d); }
   });
-  api('GET', `/api/agents/${encodeURIComponent(id)}/people`).then((pp) => {
+  const box = h('div', {}, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading group members…'));
+  const ready = api('GET', `/api/agents/${x.enc}/people`).then((pp) => {
     if (pp.suggested) for (const g of pp.groups) for (const m of g.members) if (m.suggested) orgSet.add(m.phone);
     for (const g of pp.groups) for (const m of g.members) if (m.phone) groupPhones.add(m.phone);
     syncOthers();
-    const roleSeg = (m) => {
-      if (!m.phone) return h('span', { class: 'small muted' }, 'number hidden by WhatsApp (roles need a number)');
-      const seg = h('div', { class: 'seg' }, [['participant', 'Participant'], ['organizer', 'Organizer']].map(([v, l]) => h('button', {
-        class: (orgSet.has(m.phone) ? 'organizer' : 'participant') === v ? 'on' : '', disabled: !can('admin'),
-        onclick: (e) => { if (v === 'organizer') orgSet.add(m.phone); else orgSet.delete(m.phone); seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.target)); syncOthers(); dirty.classList.remove('hide'); } }, l)));
-      return seg;
-    };
-    const dirty = h('div', { class: 'note warn hide' }, 'Roles changed — click Save at the bottom to apply.');
-    peopleBox.replaceChildren(
-      pp.suggested && pp.groups.some((g) => g.members.some((m) => m.suggested)) ? h('div', { class: 'note' }, 'No roles saved yet, so the group admins (ticked) are this agent’s organizers. Change anyone you like and Save to set roles yourself.') : null,
-      dirty,
-      pp.groups.length ? pp.groups.map((g) => h('div', { class: 'number-card' },
-        h('div', { class: 'row spread' }, h('b', {}, g.name), h('span', { class: 'pill' }, `${g.members.length} members`)),
-        g.error ? h('div', { class: 'small', style: 'color:var(--bad)' }, g.error) : null,
-        h('table', { class: 'stack flat' }, h('tbody', {}, g.members.map((m) => h('tr', {},
-          h('td', { 'data-label': '' }, h('b', {}, whoLabel(m)), tagPill(m.tag), m.admin ? h('span', { class: 'pill info', style: 'margin-left:6px' }, 'group admin') : null,
-            h('div', { class: 'small muted' }, m.phone && m.name ? `+${m.phone}` : '')),
-          h('td', { 'data-label': '', style: 'text-align:right' }, roleSeg(m)))))))) : h('p', { class: 'small muted' }, 'Bind this agent to a group on the Chats page to pick people from its members.'));
-  }).catch((e) => peopleBox.replaceChildren(h('p', { class: 'small muted' }, `Could not load members: ${e.message}`)));
-  // Tool services: the agent's own, and the global ones (035) it uses unless switched off here.
-  const servers = Object.entries(c.mcpServers || {}).map(([key, sv]) => serverState(key, sv));
-  const isOwner = S.user?.role === 'owner';
-  const rules = { participant: [...(c.tools?.participant || [])], organizer: [...(c.tools?.organizer || [])], deny: [...(c.tools?.deny || [])] };
-  const rulesBox = { participant: h('textarea', { value: lines(rules.participant), style: 'min-height:60px' }), organizer: h('textarea', { value: lines(rules.organizer), style: 'min-height:60px' }), deny: h('textarea', { value: lines(rules.deny), style: 'min-height:40px' }) };
-  const glob = globRe;
-  const allowed = (role, fq) => splitLines(rulesBox[role].value).some((r) => glob(r).test(fq));
-  // WhatsApp actions (026): a tick per role. No whatsapp: rule for a role = the defaults; ticking writes explicit rules
-  // (whatsapp:- = none). Organizer-only actions cannot be given to participants (enforced on the server too).
-  const waBox = h('div', {});
-  const waOn = (role, t) => {
-    const mine = splitLines(rulesBox[role].value).filter((r) => r.startsWith('whatsapp:'));
-    if (!mine.length) return role === 'organizer' || t.participantDefault;
-    return mine.some((r) => glob(r).test(`whatsapp:${t.name}`));
+    const role = (m) => (!m.phone ? h('span', { class: 'small muted' }, 'number hidden') : seg(`Role of ${whoLabel(m)}`, [['participant', 'Participant'], ['organizer', 'Organizer']],
+      orgSet.has(m.phone) ? 'organizer' : 'participant', (v) => { if (v === 'organizer') orgSet.add(m.phone); else orgSet.delete(m.phone); syncOthers(); }));
+    box.replaceChildren(
+      pp.suggested && pp.groups.some((g) => g.members.some((m) => m.suggested)) ? h('p', { class: 'small muted' }, 'No roles saved yet: the group admins are its organizers.') : null,
+      pp.groups.length ? pp.groups.map((g) => block(`${g.name} · ${plural(g.members.length, 'member')}`, g.error ? h('div', { class: 'small', style: 'color:var(--bad)' }, g.error) : null,
+        h('ul', { class: 'people' }, g.members.map((m) => h('li', {}, h('span', { class: 'who' }, h('b', {}, whoLabel(m)), tagPill(m.tag), m.admin ? h('span', { class: 'small muted' }, ' · admin') : null), role(m))))))
+        : h('p', { class: 'small muted' }, 'Choose this agent for a group on Chats to pick people from its members.'));
+  }).catch((e) => box.replaceChildren(h('p', { class: 'small muted' }, `Could not load members: ${e.message}`)));
+  return { F, ready, el: h('div', {}, box,
+    h('details', { class: 'sblock' }, h('summary', {}, 'People outside these groups'),
+      field('More organizers (one number per line, with country code)', F.organizers), field('Extra participants who may message it directly', F.participants))),
+  value: () => ({ organizers: [...orgSet], participants: splitLines(F.participants.value) }) };
+}
+function buildModel(x) {
+  const F = { model: modelSelect(x.models, x.c.model, { autoLabel: `Auto${x.models.resolvedDefault ? ` (now ${x.models.resolvedDefault})` : ''}` }) };
+  const fb = fallbackPicker(x.models, x.c.fallback, { what: 'agent' });
+  return { F, el: h('div', {}, field('Model', F.model, x.models.problem || null), block('When the model is unavailable', fb.el)),
+    value: () => ({ model: F.model.value, fallback: fb.value() }) };
+}
+function buildCap(x) {
+  const box = h('div', {});
+  capEditor('agent', x.id, x.models).then((el) => box.replaceChildren(el));
+  return { el: box };
+}
+function buildAlerts(x) {
+  const F = { 'alerts.to': h('input', { type: 'tel', inputmode: 'tel', value: x.c.alerts?.to ? `+${x.c.alerts.to}` : '', placeholder: '+41 79 123 45 67', disabled: S.user?.role !== 'owner' }) };
+  return { F, el: field('Alerts go to', F['alerts.to'], S.user?.role === 'owner' ? 'With country code; empty: only in Activity.' : 'Only the owner can change this.'),
+    value: () => ({ alerts: { to: F['alerts.to'].value } }) };
+}
+function buildAdvanced(x) {
+  const F = { timezone: h('input', { value: x.c.timezone || '', placeholder: 'Europe/Zurich (default)' }), historySize: h('input', { type: 'number', value: x.c.historySize }), maxTokens: h('input', { type: 'number', value: x.c.maxTokens }) };
+  return { F, el: h('div', { class: 'grid2' }, field('Timezone', F.timezone), field('Recent messages it reads', F.historySize), field('Longest reply (tokens)', F.maxTokens)),
+    value: () => ({ timezone: F.timezone.value.trim(), historySize: Number(F.historySize.value), maxTokens: Number(F.maxTokens.value) }) };
+}
+function buildMemory(x) {
+  const F = { memory: check(x.c.memory?.enabled !== false) };
+  const notesBox = h('div', {});
+  const loadNotes = async () => {
+    const { notes } = await api('GET', `/api/agents/${x.enc}/memory`).catch(() => ({ notes: [] }));
+    notesBox.replaceChildren(block(`Shared notes (${notes.length})`, notes.length ? h('ul', { class: 'notes' }, notes.map((n) => h('li', {}, h('span', {}, n.text, h('span', { class: 'small muted' }, ` · ${n.author || '?'}, ${time(n.ts)}`)),
+      can('admin') ? h('button', { class: 'btn small ghost', type: 'button', 'aria-label': `Delete note: ${trunc(n.text, 40)}`, onclick: () => tryApi(async () => { await api('DELETE', `/api/notes/${n.id}`); loadNotes(); }, 'Note deleted') }, 'Delete') : null)))
+      : h('p', { class: 'small muted' }, 'None yet. Organizers add them in WhatsApp: “remember for all groups: …”.')));
   };
-  function setWa(role, name, on) {
-    const can = waTools.filter((t) => role === 'organizer' || !t.organizerOnly);
-    const next = can.filter((t) => (t.name === name ? on : waOn(role, t))).map((t) => t.name);
-    const rest = splitLines(rulesBox[role].value).filter((r) => !r.startsWith('whatsapp:'));
-    const out = !next.length ? ['whatsapp:-'] : role === 'organizer' && next.length === can.length ? ['whatsapp:*'] : next.map((n) => `whatsapp:${n}`);
-    rulesBox[role].value = [...rest, ...out].join('\n');
-  }
-  function drawWa() {
-    if (!waTools.length) return waBox.replaceChildren();
-    const tick = (role, t) => h('label', { class: 'inline wa-tick' }, h('input', { type: 'checkbox', checked: (role === 'organizer' || !t.organizerOnly) && waOn(role, t),
-      disabled: role === 'participant' && t.organizerOnly, onchange: (e) => setWa(role, t.name, e.target.checked) }), ROLE_LABEL[role]);
-    waBox.replaceChildren(h('ul', { class: 'wa-tools' }, waTools.map((t) => h('li', {},
-      h('div', {}, h('b', {}, t.name.replace(/_/g, ' ')), t.organizerOnly ? h('span', { class: 'pill warn', style: 'margin-left:6px' }, 'organizers only') : null),
-      h('div', { class: 'small muted' }, t.description),
-      h('div', { class: 'row', style: 'gap:4px;margin-top:4px' }, tick('participant', t), tick('organizer', t))))));
-  }
-  drawWa();
-  const agentBase = `/api/agents/${encodeURIComponent(id)}`;
-  /** Ticks in "Discover tools" write this agent's rules: key:* or key:tool lines. */
+  if (!x.bi) loadNotes();
+  return { F, el: h('div', {}, tick(F.memory, x.bi ? 'Keep notes when asked' : 'Remember each chat (summary and notes)'), notesBox), value: () => ({ memory: { enabled: F.memory.checked } }) };
+}
+function buildMedia(x) {
+  const md = { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', ...structuredClone(x.c.media || {}) };
+  md.createImages = { organizer: true, participant: false, ...(md.createImages || {}) };
+  const box = h('div', {}, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Checking what your models can do…'));
+  const mt = (key, label, obj = md) => { const i = check(obj[key]); i.onchange = () => { obj[key] = i.checked; }; return tick(i, label); };
+  const hint = (ok, text) => (ok ? null : h('div', { class: 'small muted cap-hint' }, text, ' ', h('a', { href: '#models' }, 'Models')));
+  const ready = api('GET', '/api/media').catch(() => null).then((caps) => {
+    const ms = caps?.summary || {};
+    box.replaceChildren(
+      block('What it takes in', mt('photos', 'Look at photos'), hint(ms.sees !== false, 'No connected model can see photos.'), mt('documents', 'Read PDF files'), mt('stickers', 'Look at stickers too'),
+        mt('voiceNotes', 'Listen to voice notes'), hint(ms.hears, 'Nothing connected can listen yet.')),
+      block('Reply with voice', seg('Reply with voice', [['never', 'Never'], ['voice', 'To voice notes'], ['always', 'Always']], md.voiceReply, (v) => { md.voiceReply = v; }), hint(ms.speaks, 'Nothing connected can speak yet.')),
+      block('Who may ask for pictures', mt('organizer', 'Organizers', md.createImages), mt('participant', 'Participants', md.createImages), hint(ms.creates, 'Nothing connected can create pictures yet.')));
+  });
+  return { ready, el: box, value: () => ({ media: md }) };
+}
+function buildSchedules(x) {
+  const scheds = structuredClone(x.c.schedules || []);
+  const box = h('div', {}); const out = h('div', {});
+  const draw = () => box.replaceChildren(...scheds.map((s, i) => h('div', { class: 'sblock sched' },
+    h('div', { class: 'row' }, h('input', { value: s.at || '08:00', 'aria-label': 'Time (HH:MM)', placeholder: 'HH:MM', style: 'max-width:96px', oninput: (e) => (s.at = e.target.value) }),
+      h('input', { value: s.days || 'daily', 'aria-label': 'Days', placeholder: 'daily or mon,wed', style: 'max-width:170px', oninput: (e) => (s.days = e.target.value) }),
+      h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: s.enabled !== false, onchange: (e) => (s.enabled = e.target.checked) }), ' On'),
+      Object.assign(menu(`Actions for schedule ${s.id || i + 1}`,
+        h('button', { class: 'btn small', type: 'button', onclick: () => tryApi(async () => { const r = await api('POST', `/api/agents/${x.enc}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${plural(r.length, 'chat')}` : x.bi ? 'Nobody to send it to yet' : 'No chats bound'); }) }, 'Run now'),
+        s.kind === 'weekly-summary' ? h('button', { class: 'btn small', type: 'button', onclick: () => tryApi(async () => { const r = await api('GET', '/api/owner-assistant/weekly-preview'); out.replaceChildren(h('pre', { class: 'small' }, r.text)); }) }, 'Preview') : null,
+        h('button', { class: 'btn small danger', type: 'button', onclick: () => { scheds.splice(i, 1); draw(); } }, 'Remove')), { style: 'margin-left:auto' })),
+    s.kind === 'weekly-summary' ? h('div', { class: 'small muted' }, 'The weekly summary: counts and costs, never message contents.')
+      : h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', 'aria-label': x.bi ? 'What to send you' : 'What to post', value: s.prompt || '', placeholder: x.bi ? 'e.g. a morning brief of my groups' : 'e.g. a short summary of today’s agenda', oninput: (e) => (s.prompt = e.target.value) }))),
+  scheds.length ? null : h('p', { class: 'small muted' }, 'No schedules yet.'));
+  draw();
+  return { el: h('div', {}, box, out, can('admin') ? h('button', { class: 'btn small', type: 'button', onclick: () => { scheds.push({ id: `s${Date.now().toString(36)}`, at: '08:00', days: 'daily', prompt: '', chats: 'all', enabled: true }); draw(); } }, '+ Add schedule') : null),
+    value: () => ({ schedules: scheds }) };
+}
+function buildTools(x, { save }) {
+  const c = x.c; const bi = x.bi;
+  const servers = Object.entries(c.mcpServers || {}).map(([key, sv]) => serverState(key, sv));
+  const rulesBox = Object.fromEntries(['participant', 'organizer', 'deny'].map((r) => [r, h('textarea', { value: lines(c.tools?.[r]), style: 'min-height:60px' })]));
+  const allowed = (role, fq) => splitLines(rulesBox[role].value).some((r) => globRe(r).test(fq));
   const writeRules = (key, role, names, tools, explicitNone = false) => {
     const keep = splitLines(rulesBox[role].value).filter((r) => !r.startsWith(`${key}:`));
     const mine = names.length === tools.length ? [`${key}:*`] : !names.length && explicitNone ? [`${key}:-`] : names.map((n) => `${key}:${n}`);
     rulesBox[role].value = [...keep, ...mine].join('\n');
   };
-  const agentRules = (s) => ({ has: (role, name) => allowed(role, `${s.key}:${name}`), write: (role, names, tools) => writeRules(s.key, role, names, tools) });
-  const srvList = h('div', {});
-  function drawServers() {
-    srvList.replaceChildren(...servers.map((s, i) => toolServiceEditor(s, {
-      base: agentBase, conns, locals, isOwner, save, saveHint: 'Save the agent to connect', rules: agentRules(s), redraw: drawServers,
-      remove: () => { servers.splice(i, 1); drawServers(); },
-    })));
-  }
-  drawServers();
-  // Global tool services (035): on/off per agent; explicit rules of this agent win over the service's defaults.
-  const globalOff = new Set(c.globalMcp?.disabled || []);
-  const globalBox = h('div', {});
   const explicitFor = (key, role) => splitLines(rulesBox[role].value).filter((r) => r.startsWith(`${key}:`));
+  const globalOff = new Set(c.globalMcp?.disabled || []);
+  const confirm = { on: !!c.confirm, preview: c.confirm?.preview || '', tool: c.confirm?.tool || '', idField: c.confirm?.idField || 'confirm_id', ttl: c.confirm?.ttlMinutes || 9 };
+  const value = () => ({
+    mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, serverConfig(s)])), globalMcp: { disabled: [...globalOff] },
+    tools: { participant: splitLines(rulesBox.participant.value), organizer: splitLines(rulesBox.organizer.value), deny: splitLines(rulesBox.deny.value) },
+    ...(bi ? {} : { confirm: confirm.on ? { preview: confirm.preview.trim(), tool: confirm.tool.trim(), idField: confirm.idField.trim(), ttlMinutes: Number(confirm.ttl) } : null }),
+  });
+  const saveAll = async () => { const ok = await save(value()); if (ok) for (const sv of servers) markSaved(sv); return ok; };
+  const srvList = h('div', {}); const globalBox = h('div', {}); const waBox = h('div', {});
+  let conns = []; let locals = []; let waTools = []; let registry = null;
+  function drawServers() {
+    srvList.replaceChildren(...servers.map((s, i) => toolServiceEditor(s, { base: `/api/agents/${x.enc}`, conns, locals, isOwner: S.user?.role === 'owner', save: saveAll, saveHint: 'Save to connect',
+      rules: { has: (role, name) => allowed(role, `${s.key}:${name}`), write: (role, names, tools) => writeRules(s.key, role, names, tools) }, redraw: drawServers, remove: () => { servers.splice(i, 1); drawServers(); } })),
+    servers.length ? null : h('p', { class: 'small muted' }, 'No tool service of its own.'));
+  }
   function drawGlobals() {
-    if (!b.globalTools?.length) return globalBox.replaceChildren(h('p', { class: 'small muted', style: 'margin:0' }, 'No global tool services yet. Add services every agent can use under ', h('a', { href: '#settings' }, 'Settings → Tool services'), '.'));
-    globalBox.replaceChildren(...b.globalTools.map((g) => {
+    if (!x.b.globalTools?.length) return globalBox.replaceChildren(h('p', { class: 'small muted' }, 'None yet. ', h('a', { href: '#settings/tool-services' }, 'Add services for every agent in Settings'), '.'));
+    globalBox.replaceChildren(h('ul', { class: 'gtools' }, x.b.globalTools.map((g) => {
       const grid = h('div', {});
       const replaced = servers.some((sv) => sv.key === g.name);
       const custom = ['organizer', 'participant'].some((role) => explicitFor(g.name, role).length);
-      const rules = {
-        has: (role, name) => { const ex = explicitFor(g.name, role); return ex.length ? ex.some((r) => glob(r).test(`${g.name}:${name}`)) : (g.defaults?.[role] || []).some((x) => glob(x).test(name)); },
-        write: (role, names, tools) => writeRules(g.name, role, names, tools, true), // none = "<name>:-", so the defaults no longer apply
-      };
-      const sum = (role) => { const d = g.defaults?.[role] || []; return !d.length ? 'none' : d.includes('*') ? 'all tools' : d.join(', '); };
-      return h('div', { class: 'number-card' },
-        h('div', { class: 'row spread nowrap' }, h('div', {}, h('b', {}, g.name), h('span', { class: 'pill', style: 'margin-left:6px' }, g.type === 'local' ? 'local' : 'remote')),
-          replaced ? h('span', { class: 'pill warn' }, 'replaced by this agent’s own service')
-            : h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: !globalOff.has(g.name), disabled: !can('admin'), onchange: (e) => { if (e.target.checked) globalOff.delete(g.name); else globalOff.add(g.name); drawGlobals(); } }), 'Use in this agent')),
-        h('div', { class: 'small muted', style: 'margin-top:4px' }, custom ? 'This agent has its own tool choices for this service (Advanced: tool rules).' : `Global defaults: organizers ${sum('organizer')}; participants ${sum('participant')}.`),
-        !replaced && !globalOff.has(g.name) ? h('div', { class: 'row', style: 'margin-top:6px' },
-          h('button', { class: 'btn small', onclick: async () => {
-            const tools = await tryApi(() => api('POST', '/api/tool-services/discover', { server: g.name }));
-            if (tools) toolGrid(grid, tools, rules);
-          } }, 'Choose tools for this agent'),
-          custom ? h('button', { class: 'btn small mut', onclick: () => { for (const role of ['organizer', 'participant']) rulesBox[role].value = splitLines(rulesBox[role].value).filter((r) => !r.startsWith(`${g.name}:`)).join('\n'); drawGlobals(); } }, 'Use the global defaults') : null) : null,
-        grid);
-    }));
+      const rules = { has: (role, name) => { const ex = explicitFor(g.name, role); return ex.length ? ex.some((r) => globRe(r).test(`${g.name}:${name}`)) : (g.defaults?.[role] || []).some((y) => globRe(y).test(name)); },
+        write: (role, names, tools) => writeRules(g.name, role, names, tools, true) };
+      const use = check(!globalOff.has(g.name)); use.setAttribute('aria-label', `Use ${g.name}`);
+      use.onchange = () => { if (use.checked) globalOff.delete(g.name); else globalOff.add(g.name); drawGlobals(); };
+      return h('li', {}, h('div', { class: 'row spread nowrap' }, h('span', {}, h('b', {}, g.name), h('span', { class: 'small muted' }, custom ? ' · own tool choices' : ` · ${g.type === 'local' ? 'local' : 'remote'}`)),
+        replaced ? h('span', { class: 'small muted' }, 'replaced by its own') : h('label', { class: 'tick' }, use)),
+      !replaced && !globalOff.has(g.name) ? h('div', { class: 'row', style: 'gap:6px' },
+        h('button', { class: 'btn small', type: 'button', onclick: async () => { const tools = await tryApi(() => api('POST', '/api/tool-services/discover', { server: g.name })); if (tools) toolGrid(grid, tools, rules); } }, 'Choose tools'),
+        custom ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { for (const role of ['organizer', 'participant']) rulesBox[role].value = splitLines(rulesBox[role].value).filter((r) => !r.startsWith(`${g.name}:`)).join('\n'); drawGlobals(); } }, 'Use the defaults') : null) : null, grid);
+    })));
   }
-  drawGlobals();
-  // Confirmation
-  F.confirmOn = h('input', { type: 'checkbox', checked: !!c.confirm });
-  F.cPreview = h('input', { value: c.confirm?.preview || '', placeholder: 'panduga:*_preview' });
-  F.cTool = h('input', { value: c.confirm?.tool || '', placeholder: 'panduga:confirm' });
-  F.cId = h('input', { value: c.confirm?.idField || 'confirm_id' });
-  F.cTtl = h('input', { type: 'number', value: c.confirm?.ttlMinutes || 9, style: 'max-width:90px' });
-  // Schedules
-  const scheds = structuredClone(c.schedules || []);
-  const schedBox = h('div', {});
-  function drawScheds() {
-    schedBox.replaceChildren(...scheds.map((s, i) => h('fieldset', {},
-      h('legend', {}, s.id || `schedule ${i + 1}`),
-      h('div', { class: 'row' }, h('input', { value: s.id || '', placeholder: 'id', style: 'max-width:140px', oninput: (e) => (s.id = e.target.value) }),
-        h('input', { value: s.at || '08:00', placeholder: 'HH:MM', style: 'max-width:90px', oninput: (e) => (s.at = e.target.value) }),
-        h('input', { value: s.days || 'daily', placeholder: 'daily or mon,wed', style: 'max-width:160px', oninput: (e) => (s.days = e.target.value) }),
-        h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: s.enabled !== false, onchange: (e) => (s.enabled = e.target.checked) }), 'on')),
-      s.kind === 'weekly-summary' ? h('div', { class: 'small muted', style: 'margin-top:6px' }, 'The weekly summary: messages, replies and costs per agent, ignored chats, caps and what needs you. Counts only, never message contents.')
-        : h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', 'aria-label': bi ? 'What to send you' : 'What to post', value: s.prompt || '', placeholder: bi ? 'What to send you, e.g. a morning brief: what happened overnight in my groups' : 'What to post, e.g. a short summary of today’s agenda', oninput: (e) => (s.prompt = e.target.value) }),
-      h('div', { class: 'row', style: 'margin-top:6px' },
-        h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${plural(r.length, 'chat')}` : bi ? 'Nobody to send it to: link your WhatsApp under Settings → Owner assistant' : 'No chats bound'); }) }, 'Run now'),
-        s.kind === 'weekly-summary' ? h('button', { class: 'btn small', onclick: () => tryApi(async () => { const r = await api('GET', '/api/owner-assistant/weekly-preview'); schedOut.replaceChildren(h('pre', { class: 'small' }, r.text)); }) }, 'Preview') : null,
-        h('button', { class: 'btn small danger mut', onclick: () => { scheds.splice(i, 1); drawScheds(); } }, 'Remove')))));
-  }
-  const schedOut = h('div', {});
-  drawScheds();
-  F.alertsTo = h('input', { type: 'tel', inputmode: 'tel', value: c.alerts?.to ? `+${c.alerts.to}` : '', placeholder: '+41 79 123 45 67', 'aria-label': 'Alerts go to', disabled: S.user?.role !== 'owner' });
-  F.timezone = h('input', { value: c.timezone || '', placeholder: 'Europe/Zurich (default)' });
-  // Photos & voice (043)
-  const md = { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', ...(c.media || {}), createImages: { organizer: true, participant: false, ...(c.media?.createImages || {}) } };
-  const mtick = (key, label, obj = md) => h('div', {}, h('label', { class: 'inline', style: 'min-height:40px' }, h('input', { type: 'checkbox', checked: !!obj[key], disabled: !can('admin'), onchange: (e) => { obj[key] = e.target.checked; } }), label));
-  const vr = h('div', { class: 'seg', role: 'group', 'aria-label': 'Reply with voice' }, [['never', 'Never'], ['voice', 'To voice notes'], ['always', 'Always']].map(([v, l]) => h('button', {
-    type: 'button', class: md.voiceReply === v ? 'on' : '', disabled: !can('admin'), onclick: (e) => { md.voiceReply = v; vr.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); } }, l)));
-  const ms = mediaCaps?.summary || {};
-  const capHint = (ok, text) => (ok ? null : h('div', { class: 'small muted', style: 'margin:-2px 0 6px 2px' }, text, ' ', h('a', { href: '#models' }, 'Models')));
-  const mediaBox = h('fieldset', {}, h('legend', {}, 'Photos & voice'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'What the agent does with photos and voice notes people send it (only in chats that are on and when it is addressed), and whether it answers with voice. Photos and voice notes go to the AI provider; only a short placeholder or the transcript stays in the chat history.'),
-    mtick('photos', 'Look at photos'), capHint(ms.sees !== false, 'No connected model can see photos.'),
-    mtick('documents', 'Read PDF files'), mtick('stickers', 'Look at stickers too'),
-    mtick('voiceNotes', 'Listen to voice notes (turned into text)'), capHint(ms.hears, 'Nothing connected can listen yet: add an OpenAI key or OpenRouter, or switch on on-server listening in Settings.'),
-    field('Reply with voice', vr, ms.speaks ? '“To voice notes”: only when they sent one. Voice replies are WhatsApp voice notes; the text is kept in the history. Replies with a confirm code or a link stay text.' : 'Nothing connected can speak yet (OpenAI key, OpenRouter, or on-server speaking in Settings).'),
-    h('div', { style: 'margin-top:8px' }, h('label', {}, 'Who may ask for pictures'),
-      mtick('organizer', 'Organizers', md.createImages), mtick('participant', 'Participants', md.createImages),
-      capHint(ms.creates, 'No connected provider can create pictures yet (OpenAI key with image models, or OpenRouter).')));
-  F.historySize = h('input', { type: 'number', value: c.historySize, style: 'max-width:110px' });
-  F.maxTokens = h('input', { type: 'number', value: c.maxTokens, style: 'max-width:110px' });
-
-  async function save() {
-    const config = {
-      name: F.name.value, description: F.description.value, enabled: F.enabled.checked, model: F.model.value, fallback: fbPick.value(), prompt: F.prompt.value,
-      triggers: splitLines(F.triggers.value), respondToMentions: F.respondToMentions.checked, dm: F.dm.value,
-      organizers: [...orgSet], participants: splitLines(F.participants.value), timezone: F.timezone.value.trim(),
-      historySize: Number(F.historySize.value), maxTokens: Number(F.maxTokens.value), memory: { enabled: F.memory.checked },
-      mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, serverConfig(s)])), globalMcp: { disabled: [...globalOff] },
-      tools: { participant: splitLines(rulesBox.participant.value), organizer: splitLines(rulesBox.organizer.value), deny: splitLines(rulesBox.deny.value) },
-      confirm: F.confirmOn.checked ? { preview: F.cPreview.value.trim(), tool: F.cTool.value.trim(), idField: F.cId.value.trim(), ttlMinutes: Number(F.cTtl.value) } : null,
-      schedules: scheds,
-      media: md, ...quickBox.value(), ...(bi ? { alerts: { to: F.alertsTo.value } } : {}),
-    };
-    try {
-      const r = await api('PUT', `/api/agents/${encodeURIComponent(id)}`, config);
-      toast(r.warnings?.length ? `Saved — ${r.warnings.join('; ')}` : 'Saved');
-      for (const sv of servers) markSaved(sv);
-      return true;
-    } catch (e) { return fieldError(e, F); }
-  }
-
-  // Test console — "Test as…" (#37): a role and a chat; shows the tools that role gets. Never sends to WhatsApp.
-  const log = h('div', { class: 'chatlog' });
-  const role = h('select', { 'aria-label': 'Test as role', onchange: () => { loadTools(); } }, h('option', { value: 'participant' }, 'a participant'), h('option', { value: 'organizer' }, 'an organizer'));
-  const testChat = h('select', { 'aria-label': 'Test in chat', onchange: () => chatHint() }, h('option', { value: 'new' }, 'a new direct chat'));
-  const chatInfo = new Map();
-  const hintBox = h('div', {});
-  const chatHint = () => {
-    const ci = chatInfo.get(testChat.value);
-    hintBox.replaceChildren(ci && !ci.enabled ? h('div', { class: 'note warn' }, `“${ci.name}” is Off in Chats, so in WhatsApp the agent stays silent there. The test still answers, using that chat’s memory.`) : null);
+  const waOn = (role, t) => { const mine = splitLines(rulesBox[role].value).filter((r) => r.startsWith('whatsapp:')); return !mine.length ? role === 'organizer' || t.participantDefault : mine.some((r) => globRe(r).test(`whatsapp:${t.name}`)); };
+  const setWa = (role, name, on) => {
+    const may = waTools.filter((t) => role === 'organizer' || !t.organizerOnly);
+    const next = may.filter((t) => (t.name === name ? on : waOn(role, t))).map((t) => t.name);
+    const rest = splitLines(rulesBox[role].value).filter((r) => !r.startsWith('whatsapp:'));
+    rulesBox[role].value = [...rest, ...(!next.length ? ['whatsapp:-'] : role === 'organizer' && next.length === may.length ? ['whatsapp:*'] : next.map((n) => `whatsapp:${n}`))].join('\n');
   };
-  api('GET', '/api/chats').then((all) => {
-    for (const ch of all.filter((x) => (b.config.chats || []).includes(x.id))) {
-      chatInfo.set(ch.id, ch);
-      testChat.append(h('option', { value: ch.id }, `${ch.isGroup ? 'group' : 'chat'}: ${ch.name || ch.id}`));
-    }
-  }).catch(() => {});
-  const toolsBox = h('details', { class: 'small' }, h('summary', { style: 'cursor:pointer' }, 'Tools for this role…'));
+  const drawWa = () => waBox.replaceChildren(waTools.length ? h('details', {}, h('summary', {}, `Choose per role (${waTools.length})`), h('ul', { class: 'wa-tools' }, waTools.map((t) => h('li', {},
+    h('div', {}, h('b', {}, t.name.replace(/_/g, ' ')), t.organizerOnly ? h('span', { class: 'small muted' }, ' · organizers only') : null), h('div', { class: 'small muted' }, t.description),
+    h('div', { class: 'row', style: 'gap:4px;margin-top:4px' }, ['participant', 'organizer'].map((role) => h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: (role === 'organizer' || !t.organizerOnly) && waOn(role, t), disabled: !can('admin') || (role === 'participant' && t.organizerOnly),
+      onchange: (e) => setWa(role, t.name, e.target.checked) }), ` ${ROLE_LABEL[role]}`))))))) : h('p', { class: 'small muted' }, 'None.'));
+  const ready = Promise.all([api('GET', `/api/agents/${x.enc}/connections`).catch(() => []), api('GET', `/api/agents/${x.enc}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => []),
+    can('admin') ? api('GET', '/api/tool-services/registry/settings').catch(() => null) : null]).then(([cn, lo, wa, reg]) => {
+    conns = cn; locals = lo; waTools = bi ? wa.filter((t) => t.owner) : wa; registry = reg;
+    drawServers(); drawGlobals(); drawWa();
+    addRow.replaceChildren(browseButton({ target: x.id, targetName: c.name || x.id, onAdded: () => location.reload() }, registry),
+      can('admin') ? h('button', { class: 'btn small', type: 'button', onclick: () => { servers.push(serverState('', {})); drawServers(); } }, '+ Add by address') : null);
+  });
+  const addRow = h('div', { class: 'row', style: 'gap:6px' });
+  const confirmBox = bi ? null : (() => {
+    const on = check(confirm.on); on.onchange = () => { confirm.on = on.checked; };
+    const inp = (k, ph) => h('input', { value: confirm[k], placeholder: ph, oninput: (e) => { confirm[k] = e.target.value; } });
+    return h('details', { class: 'sblock' }, h('summary', {}, `Changes need confirmation${confirm.on ? ' · on' : ''}`),
+      tick(on, 'Hold changes until an organizer replies “confirm CODE”'),
+      h('div', { class: 'grid2' }, field('Preview tools', inp('preview', 'panduga:*_preview')), field('Confirm tool', inp('tool', 'panduga:confirm')),
+        field('Confirmation id field', inp('idField', 'confirm_id')), field('Valid for (minutes)', h('input', { type: 'number', value: confirm.ttl, oninput: (e) => { confirm.ttl = e.target.value; } }))));
+  })();
+  return { ready, value, el: h('div', {},
+    block('Its own tool services', srvList, addRow),
+    block('Tool services for all agents', globalBox),
+    block('WhatsApp actions', h('p', { class: 'small muted' }, bi ? 'In your own chat it acts at once; anything sent elsewhere waits for your confirm.' : 'Organizer-only actions happen at once when an organizer asks. Every action is in Activity.'), waBox),
+    confirmBox,
+    h('details', { class: 'sblock' }, h('summary', {}, 'Tool rules (advanced)'), field('Participant rules', rulesBox.participant), field('Organizer rules', rulesBox.organizer), field('Never allowed', rulesBox.deny))) };
+}
+/** Quick replies, !help and FAQ (054): rows with a live preview filled with sample values. */
+const SAMPLE = () => ({ name: 'Anu', group: 'your group', date: new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(',', '') });
+const fill = (t, v) => String(t || '').replace(/\{(name|group|date|rules)\}/g, (m, k) => (v[k] === undefined ? m : v[k])).trim();
+const preview = (text, v = SAMPLE()) => h('div', { class: 'qa-preview small' }, h('span', { class: 'eyebrow' }, 'Preview'), h('div', {}, fill(text, v) || '—'));
+function buildQuick(x) {
+  const ro = !can('admin');
+  const qr = structuredClone(x.c.quickReplies || []);
+  const faq = { items: [], strictness: 'normal', wholeGroup: false, ...structuredClone(x.c.faq || {}) };
+  const help = check(x.c.help);
+  const qrBox = h('div', { class: 'qa-rows' }); const faqBox = h('div', { class: 'qa-rows' });
+  const drawQr = () => qrBox.replaceChildren(...qr.map((q, i) => {
+    const prev = h('div', {}, preview(q.text));
+    return h('div', { class: 'qa-row' },
+      h('div', { class: 'row' }, h('input', { value: q.command || '', placeholder: '!rides', 'aria-label': 'Command', class: 'mono', style: 'max-width:160px', disabled: ro, oninput: (e) => { q.command = e.target.value.trim(); } }),
+        h('select', { disabled: ro, 'aria-label': 'Who may use it', onchange: (e) => { q.who = e.target.value; } }, [['everyone', 'Everyone'], ['organizers', 'Organizers only']].map(([v, l]) => h('option', { value: v, selected: (q.who || 'everyone') === v }, l))),
+        ro ? null : h('button', { type: 'button', class: 'btn small ghost', 'aria-label': `Remove ${q.command || 'quick reply'}`, onclick: () => { qr.splice(i, 1); drawQr(); } }, 'Remove')),
+      h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', value: q.text || '', disabled: ro, 'aria-label': 'Answer', placeholder: 'The answer. Placeholders: {name} {group} {date}', oninput: (e) => { q.text = e.target.value; prev.replaceChildren(preview(q.text)); } }), prev);
+  }), qr.length ? '' : h('p', { class: 'small muted' }, 'No quick replies yet.'));
+  const drawFaq = () => faqBox.replaceChildren(...faq.items.map((it, i) => {
+    const prev = h('div', {}, preview(it.answer));
+    return h('div', { class: 'qa-row' },
+      field('Questions (one way of asking per line)', h('textarea', { class: 'prose', style: 'min-height:50px', value: (it.questions || []).join('\n'), disabled: ro, oninput: (e) => { it.questions = e.target.value.split('\n').map((y) => y.trim()).filter(Boolean); } })),
+      field('Keywords (optional)', h('input', { value: (it.keywords || []).join(', '), disabled: ro, placeholder: 'bus, departure', oninput: (e) => { it.keywords = e.target.value.split(',').map((y) => y.trim()).filter(Boolean); } })),
+      field('Answer', h('textarea', { class: 'prose', style: 'min-height:56px', value: it.answer || '', disabled: ro, oninput: (e) => { it.answer = e.target.value; prev.replaceChildren(preview(it.answer)); } })),
+      prev, ro ? null : h('button', { type: 'button', class: 'btn small ghost', onclick: () => { faq.items.splice(i, 1); drawFaq(); } }, 'Remove question'));
+  }), faq.items.length ? '' : h('p', { class: 'small muted' }, 'No questions yet.'));
+  drawQr(); drawFaq();
+  const whole = check(faq.wholeGroup, ro); whole.onchange = () => { faq.wholeGroup = whole.checked; };
+  return { el: h('div', { id: 'quick-answers' },
+    block('Quick replies', h('p', { class: 'small muted' }, 'A command as the whole message or its first word, e.g. !rides.'), qrBox,
+      ro ? null : h('button', { type: 'button', class: 'btn small', onclick: () => { qr.push({ command: '', text: '', who: 'everyone' }); drawQr(); } }, '+ Add quick reply'),
+      tick(help, '“!help” lists these commands')),
+    block('FAQ', h('p', { class: 'small muted' }, 'A message that clearly matches gets your answer; the agent knows the rest.'), faqBox,
+      ro ? null : h('button', { type: 'button', class: 'btn small', onclick: () => { faq.items.push({ questions: [], keywords: [], answer: '' }); drawFaq(); } }, '+ Add question'),
+      field('Match', seg('How closely a message must match', [['normal', 'Normal'], ['strict', 'Strict']], faq.strictness, (v) => { faq.strictness = v; })),
+      tick(whole, 'Answer in the whole group, not only when addressed'))),
+  value: () => ({ quickReplies: qr.filter((q) => q.command || q.text), help: help.checked, faq: { ...faq, items: faq.items.filter((it) => (it.questions || []).length || (it.keywords || []).length || it.answer) } }) };
+}
+function buildWelcome(x) {
+  const ro = !can('admin');
+  const wel = { enabled: false, text: '', rules: '', ...structuredClone(x.c.welcome || {}) };
+  const prev = h('div', {});
+  const drawPrev = () => { const t = wel.text || 'Welcome {name} to {group}! 👋'; prev.replaceChildren(preview(wel.rules && !t.includes('{rules}') ? `${t}\n\n{rules}` : t, { ...SAMPLE(), name: '@Mia', rules: wel.rules })); };
+  const on = check(wel.enabled, ro); on.onchange = () => { wel.enabled = on.checked; };
+  drawPrev();
+  return { el: h('div', {}, tick(on, 'Greet people who join a group'),
+    field('Message', h('textarea', { class: 'prose', style: 'min-height:56px', value: wel.text, disabled: ro, placeholder: 'Welcome {name} to {group}! 👋', oninput: (e) => { wel.text = e.target.value; drawPrev(); } }), '{name} becomes an @mention; {rules} the rules below. A chat can override this.'),
+    field('Group rules', h('textarea', { class: 'prose', style: 'min-height:56px', value: wel.rules, disabled: ro, placeholder: 'Optional, e.g. Be kind. Rides are posted on Sundays.', oninput: (e) => { wel.rules = e.target.value; drawPrev(); } })), prev),
+  value: () => ({ welcome: wel }) };
+}
+/** Test console (#37): a role and a chat; shows the tools that role gets. Never sends to WhatsApp. The owner assistant
+ *  gets the Ask conversation instead (066). */
+function buildTest(x) {
+  if (x.bi) return { el: askCard({ id: 'test-console', title: 'Try it', wide: false }) };
+  const log = h('div', { class: 'chatlog' });
+  const role = h('select', { 'aria-label': 'Test as role', onchange: () => loadTools() }, h('option', { value: 'participant' }, 'a participant'), h('option', { value: 'organizer' }, 'an organizer'));
+  const where = h('select', { 'aria-label': 'Test in chat', onchange: () => hintBox.replaceChildren(x.chats.find((ch) => ch.id === where.value && !ch.enabled) ? h('div', { class: 'small', style: 'color:var(--warn)' }, 'This chat is Off: in WhatsApp the agent stays silent there.') : null) },
+    h('option', { value: 'new' }, 'a new direct chat'), x.chats.map((ch) => h('option', { value: ch.id }, `${ch.isGroup ? 'group' : 'chat'}: ${ch.name || ch.id}`)));
+  const hintBox = h('div', {});
+  const toolsBox = h('details', { class: 'small' }, h('summary', {}, 'Tools for this role…'));
   async function loadTools() {
     const r0 = role.value;
-    toolsBox.replaceChildren(h('summary', { style: 'cursor:pointer' }, h('span', { class: 'spinner' }), ' Loading tools…'));
-    const r = await api('GET', `/api/agents/${encodeURIComponent(id)}/test-tools?role=${r0}`).catch((x) => ({ error: x.message }));
-    if (role.value !== r0) return; // changed meanwhile
+    toolsBox.replaceChildren(h('summary', {}, h('span', { class: 'spinner' }), ' Loading tools…'));
+    const r = await api('GET', `/api/agents/${x.enc}/test-tools?role=${r0}`).catch((e) => ({ error: e.message }));
+    if (role.value !== r0) return;
     const who = r0 === 'organizer' ? 'organizers' : 'participants';
-    toolsBox.replaceChildren(h('summary', { style: 'cursor:pointer' }, r.error ? `Tools for ${who}: could not load` : `Tools ${who} get (${r.count})`),
+    toolsBox.replaceChildren(h('summary', {}, r.error ? `Tools for ${who}: could not load` : `Tools ${who} get (${r.count})`),
       r.error ? h('div', { class: 'note bad' }, r.error) : null,
-      (r.errors || []).map((x) => h('div', { class: 'note warn' }, `A tool service did not answer: ${x}`)),
-      r.services?.length ? r.services.map((sv) => h('div', { style: 'margin-top:8px' }, h('b', {}, sv.name), sv.global ? h('span', { class: 'pill', style: 'margin-left:6px' }, 'global') : null,
+      (r.errors || []).map((e) => h('div', { class: 'note warn' }, `A tool service did not answer: ${e}`)),
+      r.services?.length ? r.services.map((sv) => h('div', { style: 'margin-top:8px' }, h('b', {}, sv.name), sv.global ? h('span', { class: 'small muted' }, ' · for all agents') : null,
         h('ul', { class: 'toolset' }, sv.tools.map((t) => h('li', {}, h('code', {}, t.name), t.description && t.description !== t.name ? h('span', { class: 'muted' }, ` — ${t.description}`) : null)))))
-        : r.error ? null : h('p', { class: 'muted' }, `No tools: ${who} only get answers from the instructions and memory.`),
-      h('p', { class: 'muted', style: 'margin-bottom:0' }, 'WhatsApp actions are not carried out here: the test shows what the agent would do.'));
+        : r.error ? null : h('p', { class: 'muted' }, `No tools: ${who} get answers from the instructions and memory.`));
   }
-  if (!bi) loadTools();
-  const input = h('input', { placeholder: 'Ask the agent something…' });
-  const testForm = h('form', { class: 'row mut', onsubmit: async (e) => {
+  loadTools();
+  const input = h('input', { placeholder: 'Ask the agent something…', 'aria-label': 'Message to the agent' });
+  const form = h('form', { class: 'row nowrap', onsubmit: async (e) => {
     e.preventDefault(); const text = input.value.trim(); if (!text) return;
-    const as = role.value === 'organizer' ? 'organizer' : 'participant'; const where = testChat.value;
+    const as = role.value === 'organizer' ? 'organizer' : 'participant';
     log.append(h('div', { class: 'bubble me', title: `as ${as}` }, text)); input.value = '';
     const wait = h('div', { class: 'bubble agent muted' }, '…'); log.append(wait); log.scrollTop = 1e9;
     try {
-      const r = await api('POST', `/api/agents/${encodeURIComponent(id)}/test`, { text, role: as, chat: where });
+      const r = await api('POST', `/api/agents/${x.enc}/test`, { text, role: as, chat: where.value });
       wait.textContent = r.reply || '(no reply)'; wait.classList.remove('muted'); if (r.model) wait.title = `${r.answeredBy || r.model} · as ${as}`;
-      // 054: which path answered — a quick reply, the FAQ (no AI, no tokens) or the model
-      const path = r.path === 'quick' ? `${r.answeredBy || 'Quick reply'} · no AI` : r.path === 'faq' ? 'FAQ answer · no AI' : r.path === 'model' ? `Model${r.model ? ` · ${modelLabel(r.answeredBy && r.answeredBy.includes(':') ? r.answeredBy : r.model, models)}` : ''}` : '';
-      if (path) wait.after(h('div', { class: 'small muted test-path', style: 'align-self:flex-start;margin:-2px 0 4px 4px' }, path.charAt(0).toUpperCase() + path.slice(1)));
-      const fbl = fallbackLine(r.fallback); // 042: which model really answered, and why it switched
-      if (fbl) wait.after(h('div', { class: 'small muted', style: 'align-self:flex-start;margin:-2px 0 4px 4px' }, `${fbl}.`));
-    } catch (x) { wait.textContent = `Error: ${x.message}`; }
+      const path = r.path === 'quick' ? `${r.answeredBy || 'Quick reply'} · no AI` : r.path === 'faq' ? 'FAQ answer · no AI' : r.path === 'model' ? `Model${r.model ? ` · ${modelLabel(r.answeredBy && r.answeredBy.includes(':') ? r.answeredBy : r.model, x.models)}` : ''}` : '';
+      if (path) wait.after(h('div', { class: 'small muted test-path' }, path.charAt(0).toUpperCase() + path.slice(1)));
+      const fbl = fallbackLine(r.fallback);
+      if (fbl) wait.after(h('div', { class: 'small muted test-path' }, `${fbl}.`));
+    } catch (err) { wait.textContent = `Error: ${err.message}`; }
     log.scrollTop = 1e9;
-  } }, input, h('button', { class: 'btn' }, 'Send'));
-  const testAs = h('div', { class: 'row mut' }, h('label', { class: 'small', style: 'flex:0 0 auto;margin:0' }, 'Test as'), role, h('label', { class: 'small', style: 'flex:0 0 auto;margin:0' }, 'in'), testChat);
-
-  const quickBox = quickAnswersEditor(c, b);
-  // Shared memory (#8): notes the agent keeps across all its chats; organizers save them from WhatsApp.
-  const sharedMemBox = h('fieldset', {}, h('legend', {}, 'Shared memory'));
-  const loadSharedMem = async () => {
-    const { notes } = await api('GET', `/api/agents/${encodeURIComponent(id)}/memory`).catch(() => ({ notes: [] }));
-    sharedMemBox.replaceChildren(h('legend', {}, `Shared memory (${notes.length})`),
-      h('p', { class: 'small muted', style: 'margin-top:0' }, 'Notes this agent knows in every chat. Organizers add them in WhatsApp, e.g. “remember for all groups: the pickup point is the north gate”. Notes of a single chat are under Chats.'),
-      notes.length ? h('ul', { class: 'small' }, notes.map((n) => h('li', { style: 'margin:6px 0' }, n.text, h('span', { class: 'muted' }, ` — ${n.author || '?'}, ${time(n.ts)} `),
-        can('admin') ? h('button', { class: 'btn small mut', onclick: () => tryApi(async () => { await api('DELETE', `/api/notes/${n.id}`); loadSharedMem(); }, 'Note deleted') }, 'Delete') : null))) : h('p', { class: 'small muted' }, 'No shared notes yet.'));
-  };
-  if (!bi) loadSharedMem(); // 059: the owner assistant's notes are per user (private), not shared notes
-  $('#main').replaceChildren(
-    h('div', { class: 'row spread editor-bar', style: 'margin-bottom:12px' }, h('button', { class: 'btn', onclick: () => { location.hash = 'agents'; } }, '← All agents'),
-      h('div', { class: 'row actions' },
-        h('a', { class: 'btn phone-only', href: '#test-console', onclick: (e) => { e.preventDefault(); $('#test-console')?.scrollIntoView({ behavior: 'smooth' }); } }, 'Test ↓'),
-        // 064: secondary actions behind ⋯; Save stays in reach
-        menu(`More actions for ${c.name}`,
-        h('a', { class: 'btn small', href: `/api/agents/${encodeURIComponent(id)}/export`, download: `${id}.agent.json` }, 'Export'),
-        bi ? null : h('button', { class: 'btn small mut', onclick: async () => { const r = await tryApi(() => api('POST', `/api/agents/${encodeURIComponent(id)}/duplicate`), 'Duplicated'); if (r) openAgent(r.id); } }, 'Duplicate'),
-        bi ? null : h('button', { class: 'btn small danger mut', onclick: async () => { if (await ask({ title: `Delete “${c.name}”?`, text: 'Its chats no longer have this agent. Chat memory stays until you erase it.', ok: 'Delete agent', danger: true }) && await tryApi(() => api('DELETE', `/api/agents/${encodeURIComponent(id)}`), 'Deleted')) { location.hash = 'agents'; } } }, 'Delete')),
-        h('button', { class: 'btn primary mut', onclick: save }, 'Save'))),
-    can('admin') ? await aiHelper({ agentId: id, title: [h('span', { class: 'ai-chip' }, 'AI'), 'Change this agent with AI'], applyLabel: 'Apply & save',
-      placeholder: 'What should change? e.g. “Make the replies shorter and friendlier”, “Let participants also see the shopping list”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',
-      onApply: async (r) => { const patch = Object.fromEntries(r.changes.map((ch) => [ch.field, ch.after])); if (await tryApi(() => api('PUT', `/api/agents/${encodeURIComponent(id)}`, patch), 'Saved')) renderAgentEditor(id); } }) : null,
-    h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));align-items:start' },
-      h('div', { class: 'card' },
-        b.needs.length ? h('div', { class: 'note warn' }, `Set these in Settings → Secrets: ${b.needs.join(', ')}`) : null,
-        h('fieldset', {}, h('legend', {}, 'General'),
-          field('Name', inp('name')), field('Description', inp('description')),
-          bi ? h('div', { class: 'note', style: 'margin-top:8px' }, 'Built in: it answers linked panel users in their own WhatsApp chat and in the Ask box on Overview (link your number under ', h('a', { href: '#settings' }, 'Settings → Owner assistant'), '). Owners and admins get the organizer tools, viewers the participant tools. Its built-in instructions, permissions and confirm codes stay in code; what you set here is added.') : null,
-          h('div', { class: 'row', style: 'margin-top:8px' }, bi ? null : h('label', { class: 'inline' }, F.enabled, 'Enabled'), h('label', { class: 'inline' }, F.memory, bi ? 'Memory (notes it saves when asked)' : 'Group memory'), bi ? null : h('label', { class: 'inline' }, F.respondToMentions, 'Reply when @mentioned')),
-          field('Model', modelSel, models.problem || 'Auto uses the default model set under Models.'),
-          field('When the model is unavailable', fbPick.el, 'Usage limit, outage or expired sign-in: answer with another model instead of failing. Refused requests never switch, and tools never run twice.'),
-          bi ? null : field('Triggers', F.triggers, 'A message containing one of these words (anywhere, as a whole word) wakes the agent, e.g. mochi or !panduga'),
-          bi ? null : field('Who may message it directly', F.dm)),
-        h('fieldset', {}, h('legend', {}, bi ? 'Character' : 'Instructions'), bi ? h('p', { class: 'small muted', style: 'margin-top:0' }, 'Tone, language and habits, e.g. “Answer in English, short; call me Vik; start mornings with the weather in Aigle.” Added to the built-in instructions; it never widens what it may do.') : null, F.prompt),
-        bi ? null : quickBox.el,
-        bi ? null : sharedMemBox,
-        bi ? null : h('fieldset', {}, h('legend', {}, 'People & roles'),
-          h('p', { class: 'small muted', style: 'margin-top:0' }, 'Organizers can use organizer tools and confirm changes. Everyone else in the agent’s groups is a participant.'),
-          peopleBox,
-          h('details', { style: 'margin-top:8px' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'People outside these groups'),
-            field('More organizers (phone numbers with country code, one per line)', F.organizers),
-            field('Extra participants allowed to message the agent directly', F.participants))),
-        h('fieldset', {}, h('legend', {}, 'Tool services (MCP)'),
-          h('p', { class: 'small muted', style: 'margin-top:0' }, 'Enter the service URL and click Check: services that support sign-in (OAuth) get a Connect button; others use a token stored under Secrets, like ${MY_TOKEN}. Then discover tools and tick what each role may use.'),
-          srvList, h('div', { class: 'row' }, browseButton({ target: id, targetName: c.name || id, onAdded: () => renderAgentEditor(id) }, registry),
-            h('button', { class: 'btn small mut', onclick: () => { servers.push(serverState('', {})); drawServers(); } }, '+ Add tool service')),
-          registry?.enabled !== false && can('admin') ? h('p', { class: 'small muted', style: 'margin:4px 0 0' }, 'Adding from Browse saves to this agent right away: save other changes on this page first.') : null,
-          h('h3', { style: 'margin:14px 0 6px' }, 'Global tool services'), globalBox,
-          h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small muted' }, 'Advanced: tool rules'),
-            field('Participant rules', rulesBox.participant), field('Organizer rules', rulesBox.organizer), field('Never allowed', rulesBox.deny))),
-        waTools.length ? h('fieldset', {}, h('legend', {}, 'WhatsApp actions'),
-          bi ? h('p', { class: 'small muted', style: 'margin-top:0' }, 'What it may do in WhatsApp besides answering (owners & admins = organizer, viewers = participant). In your own chat it acts right away; anything sent into another chat waits for your “confirm CODE”. Group administration stays with the admin tools.') : h('p', { class: 'small muted', style: 'margin-top:0' }, 'What the agent may do in WhatsApp besides answering: send pictures and files, react, post polls, manage the group. Actions marked “organizers only” happen right away when an organizer asks — no confirm code — so give the agent’s number group-admin rights only where you want that. Every action is recorded in Activity.'),
-          h('details', {}, h('summary', { class: 'small', style: 'cursor:pointer;min-height:36px' }, `Choose actions per role (${waTools.length})`), waBox)) : null,
-        mediaBox,
-        bi ? null : h('fieldset', {}, h('legend', {}, 'Changes need confirmation'),
-          h('label', { class: 'inline' }, F.confirmOn, 'Hold changes until an organizer replies “confirm CODE”'),
-          h('div', { class: 'row' }, field('Preview tools', F.cPreview), field('Confirm tool', F.cTool)),
-          h('div', { class: 'row' }, field('Confirmation id field', F.cId), field('Valid for (minutes)', F.cTtl))),
-        bi ? h('fieldset', { id: 'alerts' }, h('legend', {}, 'Alerts'),
-          h('p', { class: 'small muted', style: 'margin-top:0' }, 'Spending-cap, model-provider and update alerts are sent as they happen to this WhatsApp number. Without a number they are only written to Activity.'),
-          field('Alerts go to', F.alertsTo, S.user?.role === 'owner' ? 'With country code. Save to apply.' : 'Only the owner can change this.')) : null,
-        h('fieldset', {}, h('legend', {}, 'Monthly spending cap'), await capEditor('agent', id, models)),
-        h('fieldset', {}, h('legend', {}, bi ? 'Scheduled messages to you' : 'Scheduled posts'), bi ? h('p', { class: 'small muted', style: 'margin-top:0' }, 'Sent to every linked owner and admin in their own chat (with nobody linked, the weekly summary goes to the Alerts number). They run even while agents are paused.') : null, schedBox, schedOut, h('button', { class: 'btn small mut', onclick: () => { scheds.push({ id: `s${scheds.length + 1}`, at: '08:00', days: 'daily', prompt: '', chats: 'all', enabled: true }); drawScheds(); } }, '+ Add schedule')),
-        h('fieldset', {}, h('legend', {}, 'Advanced'),
-          field('Timezone', F.timezone), h('div', { class: 'row' }, field('Recent messages in context', F.historySize), field('Max reply tokens', F.maxTokens))),
-        h('div', { class: 'row mut' }, h('button', { class: 'btn primary', onclick: save }, 'Save'))),
-      bi ? askCard({ id: 'test-console', title: 'Try it', wide: false }) // 066: the same Ask conversation as on Overview, with what you saved here
-        : h('div', { class: 'card', id: 'test-console', style: 'position:sticky;top:110px;scroll-margin-top:110px' }, h('h2', {}, 'Test console'),
-          h('p', { class: 'small muted' }, 'Uses real tools and the saved settings; nothing is posted to WhatsApp. Pick a role and a chat to see what each person would get.'),
-          testAs, hintBox, toolsBox, log, testForm)));
-  // Deep links: #agents/<id>/test, /triggers, /dm (first-run checklist, quiet reasons)
-  const sub = location.hash.split('/')[2];
-  const target = { test: $('#test-console'), triggers: F.triggers, dm: F.dm }[sub];
-  if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (sub !== 'test') target.focus({ preventScroll: true }); else input.focus({ preventScroll: true }); }
+  } }, input, h('button', { class: 'btn primary' }, 'Send'));
+  return { el: h('div', { id: 'test-console' }, h('div', { class: 'row test-as' }, h('span', { class: 'small' }, 'As'), role, h('span', { class: 'small' }, 'in'), where), hintBox, toolsBox, log, form) };
 }
-
-/**
- * 054: "Quick replies, welcome & FAQ" — built-in answers without AI. Rows to add / edit / remove, a live preview with
- * sample values, phone-friendly (every row stacks). value() returns { quickReplies, help, welcome, faq } for save().
- */
-function quickAnswersEditor(c, b) {
-  const ro = !can('admin');
-  const qr = structuredClone(c.quickReplies || []);
-  const faq = { items: [], strictness: 'normal', wholeGroup: false, ...structuredClone(c.faq || {}) };
-  const wel = { enabled: false, text: '', rules: '', ...structuredClone(c.welcome || {}) };
-  const sample = { name: 'Anu', group: 'your group', date: new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(',', '') };
-  const fill = (t, v) => String(t || '').replace(/\{(name|group|date|rules)\}/g, (m, k) => (v[k] === undefined ? m : v[k])).trim();
-  const preview = (text) => h('div', { class: 'qa-preview small' }, h('span', { class: 'eyebrow' }, 'Preview'), h('div', {}, fill(text, sample) || '—'));
-  const help = h('input', { type: 'checkbox', checked: !!c.help, disabled: ro });
-  const qrBox = h('div', { class: 'qa-rows' });
-  function drawQr() {
-    qrBox.replaceChildren(...qr.map((q, i) => {
-      const prev = h('div', {}, preview(q.text));
-      const who = h('select', { disabled: ro, 'aria-label': 'Who may use it', onchange: (e) => { q.who = e.target.value; } },
-        [['everyone', 'Everyone'], ['organizers', 'Organizers only']].map(([v, l]) => h('option', { value: v, selected: (q.who || 'everyone') === v }, l)));
-      return h('div', { class: 'qa-row' },
-        h('div', { class: 'row' }, h('input', { value: q.command || '', placeholder: '!rides', 'aria-label': 'Command', class: 'mono', style: 'max-width:160px', disabled: ro, oninput: (e) => { q.command = e.target.value.trim(); } }), who,
-          ro ? null : h('button', { type: 'button', class: 'btn small danger mut', onclick: () => { qr.splice(i, 1); drawQr(); } }, 'Remove')),
-        h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', value: q.text || '', disabled: ro, 'aria-label': 'Answer', placeholder: 'The answer, e.g. Rides this week: Mon Anu, Tue Ravi… Placeholders: {name} {group} {date}',
-          oninput: (e) => { q.text = e.target.value; prev.replaceChildren(preview(q.text)); } }), prev);
-    }), qr.length ? '' : h('p', { class: 'small muted' }, 'No quick replies yet.'));
-  }
-  drawQr();
-  // Welcome
-  const welOn = h('input', { type: 'checkbox', checked: !!wel.enabled, disabled: ro, onchange: (e) => { wel.enabled = e.target.checked; } });
-  const welPrev = h('div', {});
-  const drawWelPrev = () => { const t = wel.text || 'Welcome {name} to {group}! 👋'; welPrev.replaceChildren(preview(fill(wel.rules && !t.includes('{rules}') ? `${t}\n\n{rules}` : t, { ...sample, name: '@Mia', rules: wel.rules }))); };
-  const welText = h('textarea', { class: 'prose', style: 'min-height:56px', 'aria-label': 'Welcome text', value: wel.text, disabled: ro, placeholder: 'Welcome {name} to {group}! 👋', oninput: (e) => { wel.text = e.target.value; drawWelPrev(); } });
-  const welRules = h('textarea', { class: 'prose', style: 'min-height:56px', 'aria-label': 'House rules', value: wel.rules, disabled: ro, placeholder: 'Optional, e.g. Be kind. Rides are posted on Sundays.', oninput: (e) => { wel.rules = e.target.value; drawWelPrev(); } });
-  drawWelPrev();
-  // FAQ
-  const faqBox = h('div', { class: 'qa-rows' });
-  function drawFaq() {
-    faqBox.replaceChildren(...faq.items.map((it, i) => {
-      const prev = h('div', {}, preview(it.answer));
-      return h('div', { class: 'qa-row' },
-        field('Questions (one way of asking per line)', h('textarea', { class: 'prose', style: 'min-height:50px', value: (it.questions || []).join('\n'), disabled: ro, placeholder: 'When does the bus leave?', oninput: (e) => { it.questions = e.target.value.split('\n').map((x) => x.trim()).filter(Boolean); } })),
-        field('Keywords (optional, comma separated)', h('input', { value: (it.keywords || []).join(', '), disabled: ro, placeholder: 'bus, departure', oninput: (e) => { it.keywords = e.target.value.split(',').map((x) => x.trim()).filter(Boolean); } })),
-        field('Answer', h('textarea', { class: 'prose', style: 'min-height:56px', value: it.answer || '', disabled: ro, oninput: (e) => { it.answer = e.target.value; prev.replaceChildren(preview(it.answer)); } })),
-        prev, ro ? null : h('div', { class: 'row', style: 'margin-top:6px' }, h('button', { type: 'button', class: 'btn small danger mut', onclick: () => { faq.items.splice(i, 1); drawFaq(); } }, 'Remove')));
-    }), faq.items.length ? '' : h('p', { class: 'small muted' }, 'No questions yet.'));
-  }
-  drawFaq();
-  const strict = h('div', { class: 'seg', role: 'group', 'aria-label': 'How closely a message must match' }, [['normal', 'Normal'], ['strict', 'Strict']].map(([v, l]) => h('button', {
-    type: 'button', class: faq.strictness === v ? 'on' : '', disabled: ro, onclick: (e) => { faq.strictness = v; strict.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === e.currentTarget)); } }, l)));
-  const whole = h('input', { type: 'checkbox', checked: !!faq.wholeGroup, disabled: ro, onchange: (e) => { faq.wholeGroup = e.target.checked; } });
-  const el = h('fieldset', { id: 'quick-answers' }, h('legend', {}, 'Quick replies, welcome & FAQ'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Answered instantly from text you write: no AI, no tokens. Placeholders: {name} (who asked), {group}, {date}. Test them in the test console.'),
-    h('h3', { class: 'qa-h' }, 'Quick replies'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'A command as the whole message or its first word (any case), e.g. !rides — no trigger needed.'),
-    qrBox, ro ? null : h('button', { type: 'button', class: 'btn small mut', onclick: () => { qr.push({ command: '', text: '', who: 'everyone' }); drawQr(); } }, '+ Add quick reply'),
-    h('div', { style: 'margin-top:8px' }, h('label', { class: 'inline' }, help, '“!help” lists these commands and the triggers')),
-    h('h3', { class: 'qa-h' }, 'Welcome new members'),
-    h('label', { class: 'inline' }, welOn, 'Greet people who join a group (once per person)'),
-    field('Message', welText, '{name} becomes an @mention of the new members (people added together get one message), {rules} the rules below. Chats that are off get nothing; a single chat can override this under Chats.'),
-    field('Group rules', welRules), welPrev,
-    h('h3', { class: 'qa-h' }, 'FAQ auto-answers'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'When a message to the agent clearly matches a question, it gets your answer. Otherwise the agent answers as usual and knows these answers too.'),
-    faqBox, ro ? null : h('button', { type: 'button', class: 'btn small mut', onclick: () => { faq.items.push({ questions: [], keywords: [], answer: '' }); drawFaq(); } }, '+ Add question'),
-    field('Match', strict, 'Normal: most of a question\'s words or all keywords. Strict: the whole question or every keyword.'),
-    h('div', { style: 'margin-top:8px' }, h('label', { class: 'inline' }, whole, 'Answer FAQ in the whole group (not only when the agent is addressed)')));
-  return {
-    el,
-    value: () => ({ quickReplies: qr.filter((q) => q.command || q.text), help: help.checked, welcome: wel,
-      faq: { ...faq, items: faq.items.filter((it) => (it.questions || []).length || (it.keywords || []).length || it.answer) } }),
-  };
-}
-

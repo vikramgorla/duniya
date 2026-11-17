@@ -1,6 +1,23 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.29.0": {
+      "breaking": false,
+      "title": "Calm Agents and Chats: one row each, an agent's settings as short sections, less text everywhere",
+      "summary": "Agents and Chats are now simple lists: one row per agent or chat with its switch, and the page of the one you tap beside the list (or over it on a phone). An agent's page has a short header and sections that show their current value (Character, Where it answers, People, Model, Tools…); each section saves on its own with Undo. A chat's page holds all its settings and links to its agent. Overview, More, Contacts and Settings say less and show more. Nothing to do on your server.",
+      "changes": [
+        { "type": "improved", "text": "Agents is a calm list: one row per agent (name, “On · 1 chat · Auto model”, switch); the owner assistant has its own section and New agent is the last row. On a computer the agent's page opens beside the list." },
+        { "type": "improved", "text": "An agent's page is short: a header with its switch and ⋯ (Test, Change with AI, Duplicate, Export, Delete), then sections that show their current value. Each section opens its own page and saves on its own, with Undo." },
+        { "type": "new", "text": "Links and Find anything reach every section of an agent, e.g. “Tools · Car pooling”." },
+        { "type": "improved", "text": "Chats is one row per chat (its agent and members, or Off, with a short hint when an agent stayed quiet) and a page per chat with all its settings; tap the agent's name to open the agent, and the agent lists its chats." },
+        { "type": "improved", "text": "“Load the last N messages when a chat is switched on” moved to Settings → Chats & direct messages." },
+        { "type": "improved", "text": "Overview is calmer: one status line when everything is fine, Ask without the paragraph, shorter WhatsApp, server and why-quiet cards." },
+        { "type": "improved", "text": "More on the phone: compact rows, Refresh as a small icon and your account row; Sign out now asks first, so it can't be tapped by mistake." },
+        { "type": "improved", "text": "Less explanatory text on every screen: one short line, with a small ? that opens the guide. Contacts is one row per person." },
+        { "type": "improved", "text": "A provider's page in Models is calmer: the account you signed in with in one short line (partly hidden), Rename and Disconnect behind ⋯, and Add another account as one row. The list says “Connected · 8 models”." },
+        { "type": "fixed", "text": "On iPhone, text could show through the top bar while scrolling; the bar is now solid." }
+      ]
+    },
     "2.28.0": {
       "breaking": false,
       "title": "See how much of each AI plan is left: ChatGPT's 5-hour and weekly limits, Copilot's premium requests, OpenRouter credit",

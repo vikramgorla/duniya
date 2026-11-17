@@ -7,3 +7,4 @@ infra/oci/*.tfstate*
 infra/oci/backend.tf
 infra/oci/*.tfvars
 
+.expo/

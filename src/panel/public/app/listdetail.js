@@ -1,9 +1,10 @@
 // List → detail (064): a list of rows (icon · name · short status · chevron) and the page of the chosen row.
 // Two panes on wide screens (list left, page right); on phones the list, then the page pushed over it with a back
-// arrow. Deep links: #<screen>/<id> (Find anything and the back button work). Used by Models and Settings.
+// arrow. Deep links: #<screen>/<id> (Find anything and the back button work); a page may have its own sub-pages
+// (#<screen>/<id>/<section>, 068). Used by Agents, Chats, Models, Settings and Backups.
 import { h, icon } from './core.js';
 /**
- * @param {{ screen: string, title: string, groups: { title?: string, items: { id: string, name: string, sub?: any, mark?: any, status?: any }[] }[],
+ * @param {{ screen: string, title: string, groups: { title?: string, items: { id: string, name: string, sub?: any, mark?: any, status?: any, end?: any }[] }[],
  *   page: (id: string) => any, first?: string, known?: (id: string) => boolean }} o
  */
 export function listDetail({ screen, title, groups, page, first, known }) {
@@ -35,7 +36,8 @@ export function listDetail({ screen, title, groups, page, first, known }) {
         it.mark || null, h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, it.name), it.sub ? h('span', { class: 'lrow-sub' }, it.sub) : null),
         it.status || null, h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'));
       rows.set(it.id, a);
-      return h('li', {}, a);
+      // 068: `end` (a switch) sits next to the row, outside the link: a control inside a link is not reachable
+      return h('li', { class: it.end ? 'has-end' : null }, a, it.end || null);
     })))));
   root.append(list, pane);
   open(chosen || first || ids[0], false);
