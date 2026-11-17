@@ -269,10 +269,10 @@ function buildSchedules(x) {
     h('div', { class: 'row' }, h('input', { value: s.at || '08:00', 'aria-label': 'Time (HH:MM)', placeholder: 'HH:MM', style: 'max-width:96px', oninput: (e) => (s.at = e.target.value) }),
       h('input', { value: s.days || 'daily', 'aria-label': 'Days', placeholder: 'daily or mon,wed', style: 'max-width:170px', oninput: (e) => (s.days = e.target.value) }),
       h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: s.enabled !== false, onchange: (e) => (s.enabled = e.target.checked) }), ' On'),
-      menu(`Actions for schedule ${s.id || i + 1}`,
+      Object.assign(menu(`Actions for schedule ${s.id || i + 1}`,
         h('button', { class: 'btn small', type: 'button', onclick: () => tryApi(async () => { const r = await api('POST', `/api/agents/${x.enc}/schedules/${encodeURIComponent(s.id)}/run`); toast(r.length ? `Ran for ${plural(r.length, 'chat')}` : x.bi ? 'Nobody to send it to yet' : 'No chats bound'); }) }, 'Run now'),
         s.kind === 'weekly-summary' ? h('button', { class: 'btn small', type: 'button', onclick: () => tryApi(async () => { const r = await api('GET', '/api/owner-assistant/weekly-preview'); out.replaceChildren(h('pre', { class: 'small' }, r.text)); }) }, 'Preview') : null,
-        h('button', { class: 'btn small danger', type: 'button', onclick: () => { scheds.splice(i, 1); draw(); } }, 'Remove'))),
+        h('button', { class: 'btn small danger', type: 'button', onclick: () => { scheds.splice(i, 1); draw(); } }, 'Remove')), { style: 'margin-left:auto' })),
     s.kind === 'weekly-summary' ? h('div', { class: 'small muted' }, 'The weekly summary: counts and costs, never message contents.')
       : h('textarea', { class: 'prose', style: 'min-height:60px;margin-top:6px', 'aria-label': x.bi ? 'What to send you' : 'What to post', value: s.prompt || '', placeholder: x.bi ? 'e.g. a morning brief of my groups' : 'e.g. a short summary of today’s agenda', oninput: (e) => (s.prompt = e.target.value) }))),
   scheds.length ? null : h('p', { class: 'small muted' }, 'No schedules yet.'));

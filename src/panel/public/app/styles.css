@@ -232,8 +232,6 @@ details.menu > summary { list-style: none; } details.menu > summary::-webkit-det
 .av.c1 { --c: var(--p1); } .av.c2 { --c: var(--p2); } .av.c3 { --c: var(--p3); } .av.c4 { --c: var(--p4); } .av.c5 { --c: var(--p5); }
 .av.off { filter: grayscale(1); opacity: .55; }
 @media (prefers-color-scheme: light) { .av.c5 { color: #fff; } }
-.who-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.who-line > div { min-width: 0; }
 /* live pulse on Overview (064): "reading…" when a message arrives, "answered" when the reply went out */
 .pulse { font: 600 var(--fs-xs) var(--font); color: var(--muted); display: inline-flex; align-items: center; gap: 6px; animation: fadeout 9s forwards; }
 .pulse::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
@@ -366,22 +364,7 @@ a.choice { text-decoration: none; color: var(--ink) !important; }
 .ctl-list li > div { flex: 1; min-width: 0; }
 .install-hint { margin-bottom: var(--s3); }
 /* Agents */
-.tags { display: flex; flex-wrap: wrap; gap: 6px; }
 /* Chats: one row per chat; its less-used settings open in place (064) */
-.chat-row { padding: var(--s3) 0; border-top: 1px solid var(--line); }
-.chat-row:first-child { border-top: 0; }
-.chat-main { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(300px, 380px); gap: var(--s3); align-items: start; }
-.chat-main > .toggle { margin-top: 4px; }
-.chat-main .who-line { align-items: flex-start; }
-.chat-main .chat-name { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 650; }
-.chat-more { margin-top: var(--s1); padding-left: 96px; }
-.chat-more > summary { display: inline-flex; gap: 6px; align-items: center; }
-.chat-more[open] > summary { color: var(--ink); }
-.chat-set { display: grid; gap: 10px var(--s4); grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); margin: var(--s2) 0 var(--s1); padding: var(--s3) 14px; border: 1px solid var(--line); border-radius: var(--radius-s); background: color-mix(in srgb, var(--bg) 45%, var(--card)); }
-.chat-set label { margin-top: 0; }
-.chat-head { display: flex; gap: var(--s3); align-items: center; flex-wrap: wrap; margin-bottom: var(--s2); }
-.chat-head h2 { margin: 0; flex: 1 1 auto; }
-.chat-find { margin: 0 0 10px; }
 /* List → detail (064): rows (mark · name · status · chevron); two panes on wide screens, list → page on phones */
 .ld { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); gap: var(--s4); align-items: start; }
 .ld-list { position: sticky; top: 120px; max-height: calc(100vh - 136px); overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--s2); box-shadow: var(--shadow); }
@@ -450,7 +433,7 @@ a.help:hover { color: var(--ink) !important; border-color: var(--ink); }
 /* inside a section page, a tool service is a block under a hairline, not a box in a box */
 .sbody fieldset { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: var(--s3) 0 0; margin: var(--s3) 0 0; background: none; box-shadow: none; min-width: 0; }
 .sbody fieldset:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
-.sbody legend { padding: 0; font-weight: 600; float: left; width: 100%; margin-bottom: var(--s2); }
+.sbody legend { padding: 0; font-weight: 600; margin-bottom: var(--s2); color: var(--ink); }
 .people li { flex-wrap: nowrap; }
 .people .who { flex: 1; }
 .people .seg { flex: none; }
@@ -478,7 +461,6 @@ a.help:hover { color: var(--ink) !important; border-color: var(--ink); }
 .qa-row .row > input, .qa-row .row > select { flex: 1 1 140px; width: auto; }
 .qa-preview { margin-top: 6px; padding: var(--s2) 10px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--bg-2) 70%, transparent); white-space: pre-wrap; overflow-wrap: anywhere; }
 .qa-preview .eyebrow { display: block; margin-bottom: 2px; }
-h3.qa-h { margin: var(--s4) 0 var(--s1); font-size: var(--fs); }
 label.welcome-pick { gap: 6px; justify-content: flex-start; } label.welcome-pick select { width: auto; padding: 4px 8px; min-height: 40px; }
 .chainlist { margin: 6px 0 var(--s2); padding-left: 22px; } .chainlist li { display: flex; align-items: center; gap: 6px; margin: var(--s1) 0; }
 .chainlist .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; } .acct { margin-top: var(--s2); } .acct .row { flex-wrap: wrap; }
@@ -517,7 +499,6 @@ label.welcome-pick { gap: 6px; justify-content: flex-start; } label.welcome-pick
 .wa-settings { display: grid; gap: 10px; }
 .wa-tools { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 18px; }
 .wa-tools li { padding: 10px 0; border-bottom: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
-.wa-tick { min-height: 36px; }
 .wa-setting { display: flex; align-items: flex-start; gap: 10px; min-height: 36px; font-size: 14px; }
 .wa-members { list-style: none; padding: 0; margin: var(--s2) 0 0; }
 .wa-members li { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); padding: 7px 0; border-bottom: 1px solid var(--line); min-width: 0; }
@@ -691,10 +672,6 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
   .ld-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; font-weight: 600; text-decoration: none; margin: -6px 0 -8px; }
   .ld-back svg { width: 20px; height: 20px; }
   .lrow { min-height: 52px; }
-  .chat-main { grid-template-columns: auto minmax(0, 1fr); }
-  .chat-main > .chat-agent { grid-column: 1 / -1; }
-  .chat-more { padding-left: 0; }
-  .chat-head .seg { width: 100%; } .chat-head .seg button { flex: 1; }
   /* Tables that turn into cards: each cell shows its column name (data-label) */
   table.stack thead { display: none; }
   table.stack, table.stack tbody, table.stack tr, table.stack td { display: block; width: 100%; }

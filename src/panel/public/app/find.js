@@ -2,7 +2,13 @@
 // ---------- Find anything (062): / or ⌘K (Ctrl+K), or the search button: jump to a screen, agent, chat, setting or action ----------
 import { $, PRIMARY, S, TABS, api, askSignOut, avatar, badgeFor, can, go, h, icon, optimistic, recover, serverBadge, show, tryApi } from './core.js';
 import { PROVIDER_NAMES } from './names.js';
-import { AGENT_SECTIONS, SETTINGS_SECTIONS } from './shared.js';
+import { SETTINGS_SECTIONS } from './shared.js';
+/** 068: the sections of an agent's page that Find anything lists ([id, title, words, only for normal agents]). */
+const AGENT_SECTIONS = [['character', 'Character', 'instructions prompt description name'], ['where', 'Where it answers', 'triggers mention direct dm chats', true],
+  ['people', 'People', 'organizers participants roles', true], ['quick', 'Quick replies & FAQ', 'commands help faq', true], ['welcome', 'Welcome', 'new members greet rules', true],
+  ['schedules', 'Schedules', 'scheduled posts weekly summary'], ['model', 'Model', 'fallback provider'], ['tools', 'Tools', 'mcp tool services whatsapp actions confirm'],
+  ['memory', 'Memory', 'notes shared'], ['media', 'Photos & voice', 'images pictures voice notes'], ['cap', 'Spending cap', 'budget limit cost'],
+  ['advanced', 'Advanced', 'timezone history tokens'], ['test', 'Test', 'try console']];
 /** Everything the Find box can open. Agents and chats come from the status and the cached chat list. */
 async function paletteItems() {
   const items = TABS().map(([id, label]) => ({ kind: 'Screen', label, go: `#${id}`, icon: id }));

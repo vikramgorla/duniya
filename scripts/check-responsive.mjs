@@ -89,7 +89,7 @@ const STATES = [
   // 062: Find anything (/ or ⌘K), empty and with a query
   { name: 'find', hash: 'overview', js: 'await openFind(); await T.wait(600);' },
   { name: 'find-query', hash: 'chats', js: "await openFind(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'gen'; i.dispatchEvent(new Event('input')); await T.wait(200);" },
-  { name: 'chats-find', hash: 'chats', js: "const i = document.querySelector('input.chat-find'); i.value = 'car'; i.dispatchEvent(new Event('input')); await T.wait(200);" },
+  { name: 'chats-find', hash: 'chats', js: "const i = document.querySelector('.ld-tools input'); i.value = 'car'; i.dispatchEvent(new Event('input')); await T.wait(200);" },
   // 045: a breaking release waits for the owner (banner on Overview, the dialog with release notes)
   { name: 'overview-update-decision', hash: 'overview', before: UPDATE_DECISION, wait: 1500 },
   { name: 'update-decision-dialog', hash: 'overview', before: UPDATE_DECISION, wait: 1500, js: "await T.click('Review update', 'button', 1200);" },
@@ -107,18 +107,22 @@ const STATES = [
   { name: 'load-failed', hash: 'agents', before: HANG_AGENTS, wait: 2500, js: "if (!document.querySelector('.load-failed')) throw new Error('no Retry card after a hung request'); window.fetch = window.__realFetch; S.loadTimeout = 15000;" },
   { name: 'load-retry', hash: 'agents', before: HANG_AGENTS, wait: 2500, js: "window.fetch = window.__realFetch; S.loadTimeout = 15000; await T.click('Retry', 'button', 1500); if (document.querySelector('.load-failed, .skel') || !document.querySelector('.ld-list .lrow')) throw new Error('Retry did not recover the screen');" },
   { name: 'pull-refresh', hash: 'overview', js: "const m = document.createElement('div'); m.className = 'ptr armed busy'; m.setAttribute('aria-hidden', 'true'); m.append(Object.assign(document.createElement('span'), { className: 'spinner' })); m.style.transform = 'translate(-50%, 64px)'; document.body.append(m); await T.wait(200);" },
-  { name: 'agents-ai-draft', hash: 'agents', js: "const ta = document.querySelector('#main textarea'); ta.value = 'A helper for our running club'; await T.click('Draft', 'button', 2500);" },
-  { name: 'agent-editor-ai-diff', hash: 'agents/carpool', wait: 2500, js: "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies, make Lea an organizer, weather before rides'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); document.querySelector('.dskip')?.click();" },
-  { name: 'agent-editor-ai-side', hash: 'agents/carpool', wait: 2500, js: "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); await T.click('Side by side', 'button', 300);" },
-  { name: 'agent-editor-ai-whole', hash: 'agents/carpool', wait: 2500, js: "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); await T.click('Whole new text', 'button', 300);" },
-  { name: 'agent-editor', hash: 'agents/carpool', wait: 2500, js: 'T.openAll();' },
-  { name: 'agent-editor-owner', hash: 'agents/owner-assistant', wait: 2500, js: 'T.openAll();' }, // 059: the built-in owner assistant
-  { name: 'agent-editor-tools', hash: 'agents/carpool', wait: 2500, js: "await T.click('Choose tools for this agent', 'button', 1500); T.openAll();" },
-  { name: 'agent-editor-test', hash: 'agents/school', wait: 2500, js: "const i = document.querySelector('input[placeholder^=\"Ask the\"]'); i.value = 'When are the museum trip forms due?'; await T.click('Send', 'button', 1800);" },
+  { name: 'agents-new', hash: 'agents/new', wait: 2000 },
+  { name: 'agents-ai-draft', hash: 'agents/new', wait: 2000, js: "const ta = document.querySelector('#main textarea'); ta.value = 'A helper for our running club'; await T.click('Draft', 'button', 2500);" },
+  { name: 'agent-editor-ai-diff', hash: 'agents/carpool', wait: 2500, js: "await T.click('Change with AI', 'button', 600); const ta = document.querySelector('dialog textarea'); ta.value = 'Shorter replies, make Lea an organizer, weather before rides'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); document.querySelector('.dskip')?.click();" },
+  { name: 'agent-editor-ai-side', hash: 'agents/carpool', wait: 2500, js: "await T.click('Change with AI', 'button', 600); const ta = document.querySelector('dialog textarea'); ta.value = 'Shorter replies'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); await T.click('Side by side', 'button', 300);" },
+  { name: 'agent-editor-ai-whole', hash: 'agents/carpool', wait: 2500, js: "await T.click('Change with AI', 'button', 600); const ta = document.querySelector('dialog textarea'); ta.value = 'Shorter replies'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); await T.click('Whole new text', 'button', 300);" },
+  // 068: the agent page (header + section rows) and each section page; the owner assistant uses the same page
+  { name: 'agent-editor', hash: 'agents/carpool', wait: 2500 },
+  { name: 'agent-editor-owner', hash: 'agents/owner-assistant', wait: 2500 }, // 059: the built-in owner assistant
+  ...['character', 'where', 'people', 'quick', 'welcome', 'schedules', 'model', 'memory', 'media', 'cap', 'advanced'].map((sec) => ({ name: `agent-sec-${sec}`, hash: `agents/carpool/${sec}`, wait: 2500, js: 'T.openAll();' })),
+  { name: 'agent-sec-alerts', hash: 'agents/owner-assistant/alerts', wait: 2500 },
+  { name: 'agent-sec-dirty', hash: 'agents/carpool/character', wait: 2500, js: "const i = document.querySelector('.sbody input'); i.value += ' 2'; i.dispatchEvent(new Event('input', { bubbles: true })); await T.wait(200); if (!document.querySelector('.sec-save.dirty')) throw new Error('no Save bar after a change');" },
+  { name: 'agent-editor-tools', hash: 'agents/carpool/tools', wait: 2500, js: "await T.click('Choose tools', 'button', 1500); T.openAll();" },
+  { name: 'agent-editor-test', hash: 'agents/school/test', wait: 2500, js: "const i = document.querySelector('input[placeholder^=\"Ask the\"]'); i.value = 'When are the museum trip forms due?'; await T.click('Send', 'button', 1800);" },
   { name: 'agent-editor-test-as', hash: 'agents/carpool/test', wait: 2500, js: "const sel = document.querySelector('select[aria-label=\"Test as role\"]'); sel.value = 'organizer'; sel.dispatchEvent(new Event('change')); await T.wait(1500); T.openAll();" },
-  { name: 'agent-editor-quick', hash: 'agents/carpool', wait: 2500, js: "document.querySelector('#quick-answers')?.scrollIntoView(); await T.wait(300);" },
   { name: 'agent-editor-quick-test', hash: 'agents/carpool/test', wait: 2500, js: "const i = document.querySelector('#test-console input[placeholder^=\"Ask the\"]'); i.value = '!rides'; await T.click('Send', 'button', 900);" },
-  { name: 'agent-editor-empty', hash: 'agents/neighbours', wait: 2500, js: 'T.openAll();' },
+  { name: 'agent-editor-empty', hash: 'agents/neighbours', wait: 2500 },
   // 066: the Ask conversation — thinking, a tool running, streaming with markdown, done with a follow-up and a confirm, an error
   { name: 'overview-ask-thinking', hash: 'overview', js: "S.ask = { draft: '', busy: true, turns: [{ q: 'How is the server doing?', state: 'thinking', steps: [], confirms: [], reply: '' }] }; show(S.tab); await T.wait(600); S.ask.busy = false;" },
   { name: 'overview-ask-streaming', hash: 'overview', js: "S.ask = { draft: '', busy: true, turns: [{ q: 'What did the families decide?', state: 'streaming', steps: [{ step: 'tool', tool: 'list_visible_chats', ok: true }, { step: 'calling', tool: 'chat_recap' }], confirms: [], reply: 'Here is what I found so far:\\n\\n- **Carpool:** Luca drives on Friday\\n- Class 4B: forms' }] }; show(S.tab); await T.wait(600); S.ask.busy = false;" },
@@ -127,25 +131,21 @@ const STATES = [
   // #136: sending empties the box (the question moves into the thread)
   { name: 'overview-ask-sent', hash: 'overview', wait: 2000, js: "const t = () => document.querySelector('#ov-ask textarea'); t().value = 'How is the server doing?'; t().dispatchEvent(new Event('input')); [...document.querySelectorAll('#ov-ask button')].find((b) => b.getAttribute('aria-label') === 'Ask').click(); await T.wait(400); if (t().value) throw new Error('Ask kept the question in the box'); await T.wait(2500);" },
   { name: 'overview-ask-restarted', hash: 'overview', js: "S.ask = { draft: '', busy: true, turns: [{ q: 'Who is driving on Friday?', state: 'streaming', restarted: true, steps: [{ step: 'tool', tool: 'chat_recap', ok: true }], confirms: [], reply: '' }] }; show(S.tab); await T.wait(600); S.ask.busy = false;" },
-  { name: 'agent-editor-owner-ask', hash: 'agents/owner-assistant', wait: 2500, js: "S.ask = { draft: '', busy: false, turns: [{ q: 'What did the families decide this week?', state: 'done', steps: [{ step: 'tool', tool: 'list_visible_chats', ok: true }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'tool', tool: 'search_messages', ok: false }], confirms: [], reply: 'Two decisions this week:\\n\\n- **Carpool:** Luca drives on Friday, Mia back from Cornavin.\\n- **Class 4B:** museum forms are due **Monday 24 Nov**.\\n\\nNothing else needs you.' }] }; show(S.tab); await T.wait(1500); document.getElementById('test-console')?.scrollIntoView(); await T.wait(300);" },
+  { name: 'agent-editor-owner-ask', hash: 'agents/owner-assistant/test', wait: 2500, js: "S.ask = { draft: '', busy: false, turns: [{ q: 'What did the families decide this week?', state: 'done', steps: [{ step: 'tool', tool: 'list_visible_chats', ok: true }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'tool', tool: 'search_messages', ok: false }], confirms: [], reply: 'Two decisions this week:\\n\\n- **Carpool:** Luca drives on Friday, Mia back from Cornavin.\\n- **Class 4B:** museum forms are due **Monday 24 Nov**.\\n\\nNothing else needs you.' }] }; show(S.tab); await T.wait(1500); document.getElementById('test-console')?.scrollIntoView(); await T.wait(300);" },
   // 052: Browse tool services — the search sheet, the Add form with a key, and the result with its tools
-  { name: 'registry-browse', hash: 'agents/carpool', wait: 2500, js: "await T.click('Browse tool services', 'button', 1500);" },
-  { name: 'registry-add', hash: 'agents/carpool', wait: 2500, js: "await T.click('Browse tool services', 'button', 1500); [...document.querySelectorAll('.reg-card')].find((c) => c.textContent.includes('Recipe box')).querySelector('button').click(); await T.until('dialog form input[type=password]'); await T.wait(300);" },
+  { name: 'registry-browse', hash: 'agents/carpool/tools', wait: 2500, js: "await T.click('Browse tool services', 'button', 1500);" },
+  { name: 'registry-add', hash: 'agents/carpool/tools', wait: 2500, js: "await T.click('Browse tool services', 'button', 1500); [...document.querySelectorAll('.reg-card')].find((c) => c.textContent.includes('Recipe box')).querySelector('button').click(); await T.until('dialog form input[type=password]'); await T.wait(300);" },
   { name: 'registry-added', hash: 'settings/tool-services', wait: 2000, before: REGISTRY_ADDED, js: "await T.click('Browse tool services', 'button', 1500); [...document.querySelectorAll('.reg-card')].find((c) => c.textContent.includes('Weather forecasts')).querySelector('button').click(); await T.until('dialog form'); await T.click('Add to all agents', 'button', 1200);" },
   { name: 'chats', hash: 'chats' },
   // 064: a chat's less-used settings open in place; the phone tab bar's More sheet; toasts (undo, error)
-  { name: 'chats-more-settings', hash: 'chats', js: "document.querySelectorAll('.chat-more').forEach((d, i) => { d.open = i < 2; }); await T.wait(200);" },
-  { name: 'more-sheet', hash: 'overview', js: "document.querySelector('nav.tabbar button[data-tab=more]').click(); await T.until('dialog.more'); await T.wait(500);" },
-  // 064: the panel's own confirmation: a normal one, a destructive one (red, Cancel focused), one with details
-  { name: 'ask-dialog', hash: 'settings', wait: 2000, js: "const { ask } = await import('/app/core.js'); ask({ title: 'Add https://agents.example.org?', text: 'It is added next to the current address: both work, nothing is switched off.\\n\\nThen you open the panel at the new address and confirm it there.', ok: 'Add address' }); await T.wait(500);" },
-  { name: 'ask-danger', hash: 'overview', js: "document.querySelector('details.menu').open = true; await T.click('Unlink', 'button', 600);" },
-  { name: 'row-menu', hash: 'overview', js: "const m = document.querySelector('#ov-whatsapp details.menu'); m.open = true; m.scrollIntoView({ block: 'center' }); await T.wait(300);" },
-  { name: 'ask-details', hash: 'server', wait: 2500, js: "await T.click('Install OS updates', 'button', 600);" },
+  { name: 'chat-page', hash: 'chats/120363041122330003%40g.us', wait: 2000 },
   { name: 'toasts', hash: 'chats', js: "const { toast } = await import('/app/core.js'); toast('Book club off — agents ignore it', { undo: () => {} }); toast('The server did not answer. Try again.', { bad: true }); await T.wait(400);" },
-  { name: 'chats-fallback', hash: 'chats', js: "[...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);" },
-  { name: 'chats-add-dm', hash: 'chats', js: "[...document.querySelectorAll('button')].find((b) => b.textContent.includes('Add a direct chat'))?.click(); await T.wait(300); const i = document.querySelector('input[inputmode=tel]'); if (i) { i.value = '+41 79 000 00 30'; i.dispatchEvent(new Event('change')); } await T.wait(600);" },
-  { name: 'chats-intro', hash: 'chats', js: "[...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Waiting for the first message'))?.querySelectorAll('button')?.forEach((b) => { if (b.textContent.startsWith('Send intro')) b.click(); }); await T.until('textarea[aria-label=\"Intro text\"]'); await T.wait(400);" },
-  { name: 'chats-memory', hash: 'chats', js: "[...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button')?.click(); await T.wait(1800); T.openAll();" },
+  { name: 'chats-fallback', hash: 'chats/120363041122330003%40g.us', wait: 2000, js: "document.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);" },
+  { name: 'chats-add-dm', hash: 'chats/add', wait: 2000, js: "const i = document.querySelector('input[inputmode=tel]'); if (i) { i.value = '+41 79 000 00 30'; i.dispatchEvent(new Event('change')); } await T.wait(600);" },
+  { name: 'chats-intro', hash: 'chats/41790000009%40s.whatsapp.net', wait: 2000, js: "document.querySelector('.chat-page details.menu summary')?.click(); await T.click('Send intro', 'button', 100); await T.until('textarea[aria-label=\"Intro text\"]'); await T.wait(400);" },
+  { name: 'chats-memory', hash: 'chats/120363041122330003%40g.us', wait: 2000, js: "document.querySelector('.chat-page details.menu summary')?.click(); await T.click('Messages & memory', 'button', 1800); T.openAll();" },
+  { name: 'more-sheet', hash: 'overview', js: "(await import('/app/find.js')).openMore(); await T.wait(400);" },
+  { name: 'more-sheet-account', hash: 'overview', js: "const { askSignOut } = await import('/app/core.js'); askSignOut(); await T.wait(400);" },
   { name: 'contacts', hash: 'contacts' },
   { name: 'models', hash: 'models', js: 'T.openAll();' },
   // 064: list → page: a provider's page, the Add page, Backups → Restore, Settings sections
@@ -183,7 +183,7 @@ const STATES = [
   // 055: Settings → Server, Small server mode (one switch for heavier features on a small server)
   { name: 'settings-small-mode', hash: 'settings/small-mode', wait: 2000, js: "document.getElementById('small-mode')?.scrollIntoView(); await T.wait(300);" },
   // 055: Small server mode off on a small server: a saved local tool service is shown as not started, with why
-  { name: 'agent-local-blocked', hash: 'agents/carpool', wait: 2000, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
+  { name: 'agent-local-blocked', hash: 'agents/carpool/tools', wait: 2000, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u) === '/api/status') { const j = await r.clone().json(); return new Response(JSON.stringify({ ...j, server: { ...j.server, size: 'small', smallMode: false } })); }
       return r; };`, js: "T.openAll(); document.getElementById('local-blocked')?.scrollIntoView(); await T.wait(300);" },
   // #77: a new domain was added while Google sign-in is on (callout with the values for Google Cloud)
