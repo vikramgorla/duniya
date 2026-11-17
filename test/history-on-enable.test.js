@@ -215,3 +215,24 @@ test('admin MCP tool load_chat_history; the owner assistant runs it without a co
   assert.equal((await settle(C)).loaded, 12, 'q1–q9 and three older ones');
   assert.ok(t.db.listActivity({ limit: 40 }).some((a) => a.type === 'owner.tool' && a.detail?.tool === 'load_chat_history' && /^Loaded chat history · via /.test(a.summary)));
 });
+
+test('#167: the phone answers one chat but not another → "nothing earlier", no endless retries', async () => {
+  hl.resetHistoryLoads();
+  const A = 'g9@g.us', B = 'g10@g.us';
+  t.phone.chats[A] = phoneMsgs(A, 6, { prefix: 'a9' });
+  await t.onHistory(t.phone.chats[A].slice(-1));
+  t.chatPrefs.setChatPrefs(A, { enabled: true });
+  await hl.loadChatHistory(A, { reason: 'switch_on' });
+  assert.equal((await settle(A)).loaded, 5);
+  // B: the number joined late; the phone has nothing before the first message we know
+  t.chatPrefs.setChatPrefs(B, { enabled: true });
+  await t.onHistory([t.msg({ chat: B, msgId: 'b-first', ts: Date.now() - 1000, text: 'hello' })]);
+  t.phone.online = false; // stands in for "no answer"
+  await hl.loadChatHistory(B, { reason: 'switch_on' });
+  const s = await settle(B);
+  t.phone.online = true;
+  assert.equal(s.state, 'loaded');
+  assert.equal(s.loaded, 0);
+  assert.ok(!s.retryAt, 'no automatic retries');
+  assert.ok(!JSON.parse(t.db.kvGet('historyRetries') || '{}')[B]);
+});
