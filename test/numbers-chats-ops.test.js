@@ -70,7 +70,7 @@ test('013: a 1:1 chat assigned to an agent is answered (even when its DM policy 
   const chats = (await t.api(owner, 'GET', '/api/chats')).body;
   const row = chats.find((c) => c.id === stranger);
   assert.ok(row, 'seen 1:1 chat listed');
-  assert.equal(row.isGroup, false); assert.equal(row.agent, 'helper'); assert.equal(row.number, 'shop'); assert.equal(row.name, 'Stranger');
+  assert.ok(!row.isGroup); assert.equal(row.agent, 'helper'); assert.equal(row.number, 'shop'); assert.equal(row.name, 'Stranger');
 });
 
 test('013: model per chat — specific model, provider:auto, back to inherit', async () => {
@@ -89,7 +89,7 @@ test('013: model per chat — specific model, provider:auto, back to inherit', a
   assert.equal(t.claudeReqs[n].model, 'claude-sonnet-5-5', 'provider:auto = that provider’s recommended model');
   await t.api(owner, 'PUT', `/api/chats/${encodeURIComponent(chat)}/prefs`, { model: 'inherit' });
   const row = (await t.api(owner, 'GET', '/api/chats')).body.find((c) => c.id === chat);
-  assert.equal(row.model, 'inherit');
+  assert.equal(row.model ?? 'inherit', 'inherit', 'the default is left out of the list');
 });
 
 test('011: logging levels, categories and per-chat override; errors and config always kept', async () => {

@@ -138,7 +138,7 @@ export const TOOLS = [
       if (a.reason) q.set('reason', a.reason);
       return (await x.call('GET', `/api/silences?${q}`)).silences.map((r) => ({ chat: r.chat, agent: r.agent || undefined, reason: r.reason, label: r.label, explain: r.explain, count: r.count, last: iso(r.lastTs), sampleSender: r.sampleSender || undefined }));
     } },
-  { name: 'list_chats', readOnly: true, calls: [['GET', '/api/chats']], description: 'WhatsApp groups and 1:1 chats the numbers know, with their agent, model and logging settings.', input: {},
+  { name: 'list_chats', readOnly: true, calls: [['GET', '/api/chats']], description: 'WhatsApp groups and 1:1 chats the numbers know, with their agent, model and logging settings. Settings at their default (off, model/logging/welcome "inherit", not private) are left out.', input: {},
     run: (a, x) => x.call('GET', '/api/chats') },
   { name: 'assign_chat', calls: [['POST', '/api/chats/bind']], description: 'Choose which agent answers in a chat. Empty agent_id removes the agent from the chat. A chat that is off stays off unless switch_on is true (as in the panel, where choosing an agent switches the chat on).',
     input: { chat: str('Chat id (see list_chats)'), agent_id: str('Agent id, or empty to unassign'), switch_on: bool('Also switch the chat on if it is off (posts the privacy notice once in groups)') }, required: ['chat'],

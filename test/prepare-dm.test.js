@@ -71,7 +71,7 @@ test('049: prepared before any message; the first message arrives from the LID a
   assert.equal(stored(chat).length, 2, 'message + reply stored under the prepared chat');
   assert.equal(stored('v701@lid').length, 0);
   row = await chatRow(chat);
-  assert.equal(row.waiting, false);
+  assert.ok(!row.waiting);
   assert.ok(!(await chatRow('v701@lid')), 'the LID chat is not listed separately');
 
   // later messages from the LID with the phone hidden still find the chat (alias)
@@ -124,7 +124,7 @@ test('049: nothing is stored or sent to a model before the prepared chat is on',
   assert.equal(t.claudeReqs.length, reqs);
   assert.equal(t.sent.length, sent);
   assert.equal(stored('41790000705@s.whatsapp.net').length + stored('v705@lid').length, 0);
-  assert.equal((await chatRow('41790000705@s.whatsapp.net')).waiting, false, 'it did arrive (time only, no text)');
+  assert.ok(!(await chatRow('41790000705@s.whatsapp.net')).waiting, 'it did arrive (time only, no text)');
 });
 
 test('049: a number that is not on WhatsApp gets a warning but is still prepared', async () => {

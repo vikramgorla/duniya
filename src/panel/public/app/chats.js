@@ -81,7 +81,9 @@ async function introCard(c, { onClose, onSent } = {}) {
 const chatLine = (c, agentName) => [c.waiting ? 'Waiting for the first message' : c.enabled ? agentName || 'No agent' : 'Off',
   c.isGroup ? plural(c.size || 0, 'member') : c.phone ? `+${c.phone}` : ''].filter(Boolean).join(' · ');
 export async function renderChats() {
-  const [chats, agents, models, us, quiet] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/agents'), loadModels().catch(() => ({ models: [] })), usageSummary(), api('GET', '/api/silences?days=7').catch(() => ({ silences: [] }))]);
+  const [list, agents, models, us, quiet] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/agents'), loadModels().catch(() => ({ models: [] })), usageSummary(), api('GET', '/api/silences?days=7').catch(() => ({ silences: [] }))]);
+  // 070: the list leaves out settings at their default
+  const chats = list.map((c) => ({ model: 'inherit', logging: 'inherit', welcome: 'inherit', fallback: { mode: 'inherit', chain: [] }, ...c }));
   const quietBy = new Map(); // #34: why agents stayed quiet, per chat (most frequent first)
   for (const q of quiet.silences) { if (!quietBy.has(q.chat)) quietBy.set(q.chat, []); quietBy.get(q.chat).push(q); }
   const agentName = (c) => agents.find((x) => x.id === c.agent)?.name;

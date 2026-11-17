@@ -14,6 +14,9 @@ import { maybePostNotice, noticePostedAt, setChatNoticeOff } from '../../core/pr
 import { isGroupChat, whatsappToolCatalog } from '../../core/whatsapp-tools.js';
 
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
+/** Leave out empty values and settings at their default. */
+const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && v !== '' && v !== false && v !== 0 && v !== 'inherit'));
+
 export function chatRoutes(route, { channel } = {}) {
   // ---------- chats + memory ----------
   route('GET', '/api/chats', async () => {
@@ -36,11 +39,14 @@ export function chatRoutes(route, { channel } = {}) {
     }
     for (let i = people.length - 1; i >= 0; i--) if (isChatAlias(people[i].id)) people.splice(i, 1);
     const missing = [...owner.keys()].filter((c) => !known.has(c)).map((id) => ({ id, name: '(not a member / offline)', size: 0, isGroup: !/@(s\.whatsapp\.net|lid)$/.test(id) }));
+    // 070: settings that are at their default are left out (model, logging, welcome "inherit", fallback inherit, off,
+    // not private…): the list stays small with hundreds of chats; the panel and the admin tools fill in the defaults.
     return [...groups, ...people, ...missing].map((c) => {
       const number = c.number || (c.id.includes('#') ? c.id.split('#')[0] : 'main');
-      return { ...c, number, numberLabel: numbers.get(number) || number, agent: owner.get(c.id) || '', model: prefs[c.id]?.model || 'inherit', logging: prefs[c.id]?.logging || 'inherit',
-        fallback: prefs[c.id]?.fallback || { mode: 'inherit', chain: [] }, enabled: !!prefs[c.id]?.enabled, ignored: ignoredCounts.get(c.id) || 0,
-        private: !!prefs[c.id]?.private, noticeOff: !!prefs[c.id]?.noticeOff, welcome: prefs[c.id]?.welcome || 'inherit', noticePostedAt: c.isGroup ? noticePostedAt(c.id) : null, history: historyStatus(c.id) };
+      const pr = prefs[c.id];
+      return compact({ ...c, number, numberLabel: numbers.get(number) || number, agent: owner.get(c.id), model: pr?.model, logging: pr?.logging,
+        fallback: pr?.fallback && (pr.fallback.mode !== 'inherit' || pr.fallback.chain?.length) ? pr.fallback : null, enabled: pr?.enabled, ignored: ignoredCounts.get(c.id),
+        private: pr?.private, noticeOff: pr?.noticeOff, welcome: pr?.welcome, noticePostedAt: c.isGroup ? noticePostedAt(c.id) : null, history: historyStatus(c.id) });
     });
   });
   /** Switch a chat on or off: recorded, the privacy notice (044) and the phone's recent messages (#91) when it goes on. */

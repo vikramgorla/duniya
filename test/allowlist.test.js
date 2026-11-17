@@ -17,7 +17,7 @@ test('a group that is off: nothing stored, no model call, no reply; the Chats pa
   assert.equal(t.sent.length, sent, 'no reply');
   assert.equal(stored('g1@g.us').length, 0, 'nothing stored');
   const row = (await chats()).find((c) => c.id === 'g1@g.us');
-  assert.equal(row.enabled, false);
+  assert.ok(!row.enabled, 'off (left out of the list: the default)');
   assert.equal(row.ignored, 2);
   assert.equal((await t.api(owner, 'GET', '/api/status')).body.enabledChats, 0);
 });

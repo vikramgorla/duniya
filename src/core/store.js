@@ -79,11 +79,16 @@ export function interpolate(value) {
 
 // ---------- settings ----------
 const SETTINGS_DEFAULTS = { paused: false, defaultDmAgent: '', historyLoadCount: 50 }; // #91: earlier messages loaded when a chat goes on
-// 070: parsed once and cached; updateSettings is the only writer and drops the cache. Callers get copies, so changing
-// a returned object never changes the cache.
+// 070: parsed once and cached. updateSettings drops the cache; a change from another process (the `duniya` command
+// line) changes SQLite's data_version, which is checked on every read (a cheap pragma). Callers get copies, so
+// changing a returned object never changes the cache.
 /** @type {Record<string, any> | null} */
 let cached = null;
+let cachedVersion = -1;
+const dataVersion = db.prepare('PRAGMA data_version');
 function settingsMap() {
+  const v = dataVersion.get().data_version;
+  if (v !== cachedVersion) { cached = null; cachedVersion = v; }
   if (!cached) {
     const out = { ...SETTINGS_DEFAULTS };
     for (const r of db.prepare('SELECT key, value FROM settings WHERE tenant_id = ?').all(TENANT)) {
