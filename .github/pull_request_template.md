@@ -37,7 +37,8 @@ Tick each item or write "n/a – reason".
 **Version & release**
 - [ ] Version bumped in `package.json`, `package-lock.json`, `infra/oci/schema.yaml` (minor feature / patch fix / major breaking)
 - [ ] `releases.json` entry for the version (required for every version: one-line title + `changes`, short owner-facing bullets with a type new / improved / fixed / removed); breaking → major + `"breaking": true` with actions (or a migration instead)
-- [ ] Opened via REST, not pushed to `main`; squash merge after required checks
+- [ ] Opened via REST, not pushed to `main`; squash merge after required checks, with an explicit title and message
+- [ ] No attribution trailers or footers in commits and this PR (no Co-Authored-By, session links or 'Generated with' lines)
 
 ## Risk
 <!-- security impact, data changes, anything a reviewer should look at first -->

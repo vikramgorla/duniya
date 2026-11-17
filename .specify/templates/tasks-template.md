@@ -183,7 +183,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Version bump (semver) in `package.json`, `package-lock.json`, `infra/oci/schema.yaml`
 - [ ] TXXX `releases.json` entry for the new version (every version: one-line title + `changes`, short owner-facing bullets typed new / improved / fixed / removed; CI fails without them); breaking change → major version + `"breaking": true` with
       actions (consider a migration instead)
-- [ ] TXXX PR via REST with `Closes #N` + spec link + attribution; required checks green; squash merge; never push to `main`
+- [ ] TXXX PR via REST with `Closes #N` + spec link, no attribution trailers or footers (no Co-Authored-By, session links or 'Generated with' lines); required checks green; squash merge with an explicit message; never push to `main`
 - [ ] TXXX Issue done comment (what shipped, version, open items) and close with the release
 
 ---

@@ -87,8 +87,10 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
       **Breaking change → major version + a `releases.json` entry with `"breaking": true`, title, summary and
       `actions` (what the owner must do), `data` and `docs`; consider a migration instead.** CI fails on a major bump
       without it. Breaking releases are never installed automatically: owners confirm them (panel or WhatsApp).
-- [ ] PR opened via REST with `Closes #N`, the spec link and the attribution lines your harness requires.
-- [ ] Never pushed to `main`; squash-merged after all required checks passed.
+- [ ] PR opened via REST with `Closes #N` and the spec link. No attribution trailers or footers in commits and PRs (no
+      Co-Authored-By, session links or 'Generated with' lines).
+- [ ] Never pushed to `main`; squash-merged after all required checks passed, with an explicit title and message
+      (`commit_title`, `commit_message`), so no co-author trailers from branch commits are appended.
 - [ ] Issue closed with the release version in the done comment.
 
 ## Workflow
@@ -96,7 +98,7 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 - **GitHub through REST.** GraphQL is blocked in some harnesses: use `gh api` (REST) for issues, labels, comments
   and PRs, e.g. `gh api repos/{owner}/{repo}/issues -f title=… -f body=…`, `gh api -X POST repos/{o}/{r}/pulls -f
   head=… -f base=main -f title=… -f body=…`, merge with `gh api -X PUT repos/{o}/{r}/pulls/N/merge -f
-  merge_method=squash`.
+  merge_method=squash -f commit_title=… -f commit_message=…` (explicit message, no trailers).
 - **Branches:** `<type>/<issue>-<slug>`, e.g. `feat/10-silent-by-default`, `docs/54-refresh-dod`. Never push to `main`
   (the ruleset blocks it; don't try to work around it).
 - **Labels** (exact names, with a space after the colon — GitHub creates a new label if you mistype one):
@@ -117,7 +119,10 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
   Rules. When one changes, change the other in the same week.
 - **Dependencies:** runtime deps are limited (Baileys, Anthropic SDK, MCP SDK, pino, qrcode); a new one needs a stated
   reason in the plan. Other providers use `fetch`.
-- **Commits:** clear messages; end with the attribution lines your harness requires.
+- **Commits:** clear messages. No attribution trailers or footers in commits and PRs (no Co-Authored-By, session links
+  or 'Generated with' lines). Commits are authored by the repository owner's identity; no AI co-author trailers or
+  signatures; squash merges use an explicit message: `gh api -X PUT repos/{o}/{r}/pulls/N/merge -f merge_method=squash
+  -f commit_title="<PR title> (#N)" -f commit_message="<short summary>"`.
 
 ## Architecture map
 
