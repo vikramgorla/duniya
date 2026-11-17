@@ -53,6 +53,8 @@ Names are the same everywhere (panel, admin MCP tools, activity): *ChatGPT*, *Cl
 
 </details>
 
+- **Several accounts of one provider:** on the provider's page, **Add another account** (the last row), then *In order* or
+  *Spread*. **⋯** on an account renames it (*ChatGPT · work*) or disconnects / removes it (it asks first).
 - **Models → When a model fails** sets the chain. Default: any other connected provider's *Auto*. Per agent and per
   chat: inherit / switch / don't switch, or an own chain.
 - **Per chat:** Chats → the chat's page → **Fallback…** (under its model) opens the same editor as the agent's **Model** section:

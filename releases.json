@@ -14,6 +14,7 @@
         { "type": "improved", "text": "Overview is calmer: one status line when everything is fine, Ask without the paragraph, shorter WhatsApp, server and why-quiet cards." },
         { "type": "improved", "text": "More on the phone: compact rows, Refresh as a small icon and your account row; Sign out now asks first, so it can't be tapped by mistake." },
         { "type": "improved", "text": "Less explanatory text on every screen: one short line, with a small ? that opens the guide. Contacts is one row per person." },
+        { "type": "improved", "text": "A provider's page in Models is calmer: the account you signed in with in one short line (partly hidden), Rename and Disconnect behind ⋯, and Add another account as one row. The list says “Connected · 8 models”." },
         { "type": "fixed", "text": "On iPhone, text could show through the top bar while scrolling; the bar is now solid." }
       ]
     },
