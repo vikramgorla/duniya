@@ -140,7 +140,7 @@ export async function runAgent(ctx) {
     try {
       res = await modelChat({
         model, purpose: 'agent', maxTokens: agent.maxTokens, usage: { agent: agent.id, chat, kind: ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : 'reply' },
-        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName }), tools: defs, messages, fallback, turn, ...(vision || {}),
+        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName }), tools: defs, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
       });
     } catch (e) {
       if (vision && e.skipped?.length) {

@@ -7,18 +7,18 @@
 //  - when the model calls our tools, the SDK invokes their handlers; we hold those calls open and return them as
 //    tool_use blocks; the next chat() call carrying the matching tool_result blocks answers them, and we wait again;
 //  - when the session goes idle we return the final text and delete the session.
-// The runtime is started on first use and stopped after IDLE_MS without calls, so it costs nothing when unused.
-import { mkdirSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
-import { execFile } from 'node:child_process';
+// The runtime is started on first use and stopped by the upkeep tick when idle (agent apps, 074), so it costs nothing
+// when unused; each conversation holds one agent-app slot (one at a time on small servers).
+import { mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { getSecret, setSecret, onSecretChange } from '../store.js';
 import { DATA_DIR, fail } from '../config.js';
 import { netEnv } from '../mcp-local.js';
+import { appDir, installApp, startCheck, acquireSlot, registerResident, touchResident, forgetResident } from './apps.js';
 
 export const id = 'copilot';
 export const SECRET = 'COPILOT_GITHUB_TOKEN';
-const IDLE_MS = 10 * 60000;
 const STEP_TIMEOUT_MS = 180000;
 const ABANDONED_MS = 5 * 60000;
 const TOOL_NAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -35,10 +35,11 @@ export function checkToken(token) {
 }
 
 // ---------- client (injectable for tests) ----------
-// The SDK is large (~420 MB with its helper), so it is not part of the app: it is downloaded into DATA_DIR the first
-// time someone connects Copilot, and loaded from there. (A dev checkout may also have it in node_modules.)
+// The SDK (~220 MB with its runtime) is not part of the app: it is downloaded into DATA_DIR/apps/copilot the first
+// time someone connects Copilot (074: the agent apps' on-demand install), and loaded from there. (A dev checkout may
+// also have it in node_modules.) Its runtime is about 60 MB RSS idle (measured, SDK 1.0.34).
 export const SDK_SPEC = '@github/copilot-sdk@1.0.34';
-const SDK_DIR = join(DATA_DIR, 'copilot-sdk');
+const SDK_DIR = appDir('copilot');
 function sdkEntry() {
   const pkgDir = join(SDK_DIR, 'node_modules', '@github', 'copilot-sdk');
   try {
@@ -49,21 +50,8 @@ function sdkEntry() {
   } catch { return null; }
 }
 export const sdkInstalled = () => !!sdkEntry() && existsSync(sdkEntry());
-let installing = null;
 /** Download the official Copilot SDK into DATA_DIR (once). */
-export function installSdk() {
-  if (sdkInstalled()) return Promise.resolve();
-  if (installing) return installing;
-  installing = new Promise((res, rej) => {
-    mkdirSync(SDK_DIR, { recursive: true });
-    if (!existsSync(join(SDK_DIR, 'package.json'))) writeFileSync(join(SDK_DIR, 'package.json'), '{"name":"duniya-copilot-sdk","private":true}');
-    execFile(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['install', '--no-audit', '--no-fund', '--omit=dev', '--no-package-lock', SDK_SPEC], {
-      cwd: SDK_DIR, timeout: 15 * 60 * 1000, maxBuffer: 8 * 1024 * 1024,
-      env: { ...netEnv(), PATH: process.env.PATH, HOME: SDK_DIR, npm_config_cache: join(SDK_DIR, '.npm-cache'), npm_config_update_notifier: 'false' },
-    }, (err, stdout, stderr) => (err ? rej(fail(`Could not download Copilot support: ${(stderr || err.message).trim().split('\n').slice(-2).join(' ')}`)) : res()));
-  }).finally(() => { installing = null; });
-  return installing;
-}
+export const installSdk = () => installApp({ id: 'copilot', name: 'GitHub Copilot', spec: SDK_SPEC, ready: sdkInstalled });
 async function loadSdk() {
   try { return await import('@github/copilot-sdk'); } catch { /* not in node_modules: use the downloaded copy */ }
   if (!sdkInstalled()) await installSdk();
@@ -88,15 +76,12 @@ export function setClientFactory(fn) { stopClient(); factory = fn || defaultFact
 
 // 042: one runtime per connected Copilot account (each account's token lives in its own secret).
 const clients = new Map(); // secret -> { token, started: Promise }
-let idleTimer = null;
-function touch() {
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => { if (!conversations.size) stopClient(); }, IDLE_MS);
-  idleTimer.unref?.();
-}
+// 074: the runtime stays up between turns as a "resident" agent app; the upkeep tick stops it when idle (2 minutes on
+// small servers, 10 otherwise), when memory gets tight, or when another app needs the slot on a small server.
+const touch = () => touchResident('copilot');
 /** Stop one account's runtime (or all of them). */
 export function stopClient(secret) {
-  if (!secret) clearTimeout(idleTimer);
+  if (!secret) forgetResident('copilot');
   for (const [k, c] of [...conversations]) {
     if (secret && c.secret !== secret) continue;
     c.abandon('Copilot connection closed');
@@ -116,7 +101,9 @@ async function client(secret = SECRET) {
   let cur = clients.get(secret);
   if (!cur || cur.token !== token) {
     if (cur) stopClient(secret);
+    if (!clients.size) startCheck('GitHub Copilot', 150);
     const started = (async () => { const cl = await factory({ token }); await cl.start?.(); return cl; })();
+    registerResident('copilot', { idle: () => !conversations.size, stop: () => stopClient() });
     cur = { token, started };
     clients.set(secret, cur);
     started.catch(() => { if (clients.get(secret)?.started === started) clients.delete(secret); });
@@ -253,6 +240,7 @@ class Conversation {
   }
   close() {
     if (this.closed) return; this.closed = true;
+    this.release?.();
     clearTimeout(this.abandonTimer); clearTimeout(this.timer); clearTimeout(this.grace);
     for (const idv of this.pending.keys()) if (conversations.get(idv) === this) conversations.delete(idv);
     try { this.off?.(); } catch { /* ignore */ }
@@ -274,7 +262,7 @@ async function run(conv) {
   return { content, stop_reason: 'end_turn', usage: r.usage };
 }
 
-async function chatFor(secret, { model, system, messages, tools = [] }) {
+async function chatFor(secret, { model, system, messages, tools = [], onWait }) {
   // Continuing a conversation: the last user turn answers tool calls the runtime is waiting for.
   const last = messages.at(-1);
   const results = last?.role === 'user' ? blocksOf(last).filter((b) => b.type === 'tool_result') : [];
@@ -286,8 +274,9 @@ async function chatFor(secret, { model, system, messages, tools = [] }) {
     return run(conv);
   }
 
+  const release = await acquireSlot('copilot', 'GitHub Copilot', { onWait });
   let cl;
-  try { cl = await client(secret); } catch (e) { throw friendlyError(e); }
+  try { cl = await client(secret); } catch (e) { release(); throw friendlyError(e); }
   const toolNames = new Map(); // SDK-safe name -> our name
   const sdkTools = tools.map((t) => {
     let safe = TOOL_NAME_RE.test(t.name) ? t.name : t.name.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -306,8 +295,9 @@ async function chatFor(secret, { model, system, messages, tools = [] }) {
     infiniteSessions: { enabled: false },
     enableSessionStore: false,
     onPermissionRequest: cl.approveAll || (() => ({ kind: 'approved' })),
-  }).catch((e) => { throw friendlyError(e); });
+  }).catch((e) => { release(); throw friendlyError(e); });
   c = new Conversation(session, cl, toolNames, secret);
+  c.release = release;
   const done = run(c);
   try { await session.send({ prompt: toPrompt(messages) }); } catch (e) { c.close(); c.finish({ error: e }); }
   return done;

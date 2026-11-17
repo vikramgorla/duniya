@@ -444,12 +444,12 @@ export const TOOLS = [
     input: { paused: bool('true = pause all agents') }, required: ['paused'],
     run: async (a, x) => ({ paused: !!(await x.call('POST', '/api/settings', { paused: !!a.paused })).paused }) },
   { name: 'set_small_server_mode', risky: true, calls: [['GET', '/api/server/small-mode'], ['PUT', '/api/server/small-mode']],
-    description: 'Small server mode (owner only): on a small server (under 2 GB or 1 CPU) allow heavier features anyway: on-server speech and local tool services, each one at a time / at most 2, started only when memory allows and stopped when it is tight. Slower and may be refused at busy moments. Does not cover GitHub Copilot sign-in (needs 2 GB). Needs confirm_action.',
+    description: 'Small server mode (owner only): on a small server (under 2 GB or 1 CPU) allow heavier features anyway: on-server speech, local tool services and agent apps (Claude Code, Codex, GitHub Copilot) — one voice note / at most 2 services / one agent app at a time, started only when memory allows and stopped when it is tight. Slower and may be refused at busy moments. Needs confirm_action.',
     input: { enabled: bool('true = allow heavier features on this small server') }, required: ['enabled'],
     preview: async (a, x) => {
       const cur = await x.call('GET', '/api/server/small-mode');
       const size = `${cur.server.size} server, ${cur.server.effectiveMb} MB, ${cur.server.cpus} CPU`;
-      return a.enabled ? `Switch Small server mode on (${size}; now ${cur.enabled ? 'on' : 'off'}). Allows: ${cur.covers.join('; ')}. Slower; heavier work waits or is refused when memory is tight. Not covered: ${cur.notCovered.join('; ')}.`
+      return a.enabled ? `Switch Small server mode on (${size}; now ${cur.enabled ? 'on' : 'off'}). Allows: ${cur.covers.join('; ')}. Slower; heavier work waits or is refused when memory is tight.`
         : `Switch Small server mode off (${size}; now ${cur.enabled ? 'on' : 'off'}). On a small server, on-server speech stops being used and local tool services stop starting (they stay saved).`;
     },
     run: (a, x) => x.call('PUT', '/api/server/small-mode', { enabled: !!a.enabled }) },

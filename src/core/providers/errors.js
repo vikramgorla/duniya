@@ -28,6 +28,7 @@ const NET_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EAI_AGAIN
 const QUOTA_CODES = new Set(['insufficient_quota', 'subscription_sharing_usage_limit_exceeded', 'subscription_sharing_usage_unavailable', 'copilot_limit', 'usage_limit_reached', 'billing_hard_limit_reached', 'credits_exhausted']);
 const RATE_CODES = new Set(['rate_limit_exceeded', 'rate_limit_error', 'overloaded_error']);
 const AUTH_CODES = new Set(['invalid_api_key', 'authentication_error', 'permission_error', 'invalid_grant', 'signin_expired', 'token_expired', 'unauthorized']);
+const APP_CODES = new Set(['low_memory', 'app_busy', 'app_missing', 'app_start', 'small_server']);
 const MODEL_CODES = new Set(['model_not_found', 'not_found_error', 'unknown_model']);
 
 /** Milliseconds until a provider says we may try again, from a Retry-After header or a reset time in the body. */
@@ -78,7 +79,8 @@ export function classify(e) {
     retryAfterMs: ['rate_limit', 'quota'].includes(reason) ? retryAfterMs(e) : null,
   });
 
-  if (code === 'no_model' || code === 'free_only') return out('unavailable');
+  // 074: an agent app that could not start here (memory, busy, not downloaded) — the next model answers, no pause
+  if (code === 'no_model' || code === 'free_only' || APP_CODES.has(code)) return out('unavailable');
   if (QUOTA_CODES.has(code)) return out('quota');
   if (AUTH_CODES.has(code)) return out('auth');
   if (MODEL_CODES.has(code) && status !== 401 && status !== 403) return out('model_not_found');

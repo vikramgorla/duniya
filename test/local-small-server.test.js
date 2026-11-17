@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { setup } from './harness.js';
 
 const t = await setup();
-const { setResourceProbe, setSmallServerMode, smallServerMode, heavyCheck, optionalPaused } = await import('../src/core/resources.js');
+const { setResourceProbe, setSmallServerMode, smallServerMode, optionalPaused } = await import('../src/core/resources.js');
 const { localServiceCheck, addedLocalServices } = await import('../src/core/mcp-local.js');
 const { localRegistryCheck } = await import('../src/core/mcp-registry.js');
 const { toolsFor } = await import('../src/core/tools.js');
@@ -162,19 +162,11 @@ test('memory pressure on a small server stops running local tool services', asyn
   setResourceProbe(SMALL); optionalPaused();
 });
 
-test('Copilot (heavyCheck) stays refused below 2 GB even with Small server mode, and says why', () => {
-  setResourceProbe(SMALL);
-  setSmallServerMode(true);
-  const c = heavyCheck('GitHub Copilot');
-  assert.equal(c.ok, false);
-  assert.match(c.reason, /Small server mode does not cover this/);
-});
-
 test('admin MCP: set_small_server_mode needs confirm_action and previews what it covers', async () => {
   const st = tool('set_small_server_mode');
   assert.ok(st.risky);
   setResourceProbe(SMALL);
-  assert.match(await st.preview({ enabled: true }, x), /Switch Small server mode on .*small server.*Local tool services.*Not covered: GitHub Copilot/);
+  assert.match(await st.preview({ enabled: true }, x), /Switch Small server mode on .*small server.*Local tool services.*Agent apps/);
   assert.equal((await st.run({ enabled: true }, x)).enabled, true);
   assert.equal((await st.run({ enabled: false }, x)).enabled, false);
 });

@@ -24,8 +24,8 @@ const startedAt = Date.now();
 /** What Small server mode is and what it covers here (055). */
 const smallModeView = () => ({ enabled: smallServerMode(), server: serverSize(),
   covers: ['On-server speech (about 900 MB minimum, one voice note at a time, only with enough free memory)',
-    'Local tool services (at most 2 at once, started when first used, stopped when memory is tight)'],
-  notCovered: ['GitHub Copilot sign-in (its ~400 MB download and helper do not fit next to the app; needs 2 GB)'] });
+    'Local tool services (at most 2 at once, started when first used, stopped when memory is tight)',
+    'Agent apps: Claude Code, Codex, GitHub Copilot (one at a time, each started for a turn only with enough free memory)'] });
 
 /** What Overview and the shell show (GET /api/status, the live stream, and the panel's first load with the session). */
 export const statusFor = async (user, channel) => ({

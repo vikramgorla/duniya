@@ -18,7 +18,6 @@ import { activity } from './events.js';
 const MB = 1024 * 1024;
 export const LOCAL_MIN_TOTAL_MB = 2048; // on-server engines need at least this much RAM in total
 export const LOCAL_MIN_FREE_MB = 600; // … and this much free before each job
-export const HEAVY_MIN_TOTAL_MB = 2048; // Copilot helper (~400 MB disk, ~60–150 MB RSS) and similar downloads
 export const SOFT_LIMIT = 0.7; // app RSS above 70 % of RAM pauses optional work
 
 const readNum = (file) => { try { const v = readFileSync(file, 'utf8').trim(); return v === 'max' ? Infinity : Number(v); } catch { return NaN; } };
@@ -132,16 +131,6 @@ export function localEngineCheck({ forEnable = false, needMb = LOCAL_MIN_FREE_MB
   if (forEnable) return { ok: true, small: s.effectiveMb < LOCAL_MIN_TOTAL_MB };
   if (paused || s.pressure) return { ok: false, code: 'pressure', reason: 'Memory is tight right now, so on-server speech is paused.' };
   if (s.availableMb < need) return { ok: false, code: 'low_memory', reason: `Only ${s.availableMb} MB of memory is free right now (needs ${need} MB).` };
-  return { ok: true };
-}
-/**
- * Big downloads that run their own helper (Copilot SDK): refused below 2 GB, also with Small server mode on. The
- * ~400 MB npm install and the helper process run inside the app service's 700 MB memory cap next to the app itself,
- * so on 1 GB they fail or get the app stopped; Small server mode does not cover this (055).
- */
-export function heavyCheck(what) {
-  const s = serverSize();
-  if (s.effectiveMb < HEAVY_MIN_TOTAL_MB) return { ok: false, code: 'too_small', reason: `${what} needs a server with at least ${HEAVY_MIN_TOTAL_MB / 1024} GB of memory; this one has ${s.effectiveMb} MB. Small server mode does not cover this: its ~400 MB download and helper process do not fit next to the app on this server. Use another provider (an API key or OpenRouter works on any server).` };
   return { ok: true };
 }
 /** How many local tool services (stdio processes) may run at once. */
