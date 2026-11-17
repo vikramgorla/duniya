@@ -71,7 +71,11 @@ export function systemRoutes(route, { channel } = {}) {
 
   // ---------- channels (075): which channels exist, on/off (off = connections closed, adapter dropped) ----------
   route('GET', '/api/channels', async () => channel.channels());
-  route('PUT', '/api/channels/:id', async (req, res, body, q, p, user) => channel.setEnabled(p.id, !!body.enabled, user.username), { role: 'owner' });
+  // admins may switch a channel on (the first-run Link WhatsApp); only the owner switches one off
+  route('PUT', '/api/channels/:id', async (req, res, body, q, p, user) => {
+    if (!body.enabled && user.role !== 'owner') return [403, { error: 'Only the owner can switch a channel off' }];
+    return channel.setEnabled(p.id, !!body.enabled, user.username);
+  }, { role: 'admin' });
   // ---------- WhatsApp ----------
   route('POST', '/api/whatsapp/pair', async (req, res, body) => ({ code: await channel.pair(body.phone, body.number) }));
   route('POST', '/api/whatsapp/logout', async (req, res, body) => { await channel.logout(body.number); return { ok: true }; });

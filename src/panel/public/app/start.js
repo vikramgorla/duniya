@@ -42,6 +42,13 @@ export function linkNumberBox(n) {
       h('button', { class: 'btn', onclick: () => tryApi(async () => { const r = await api('POST', '/api/whatsapp/pair', { number: n.id, phone: phone.value }); S.overviewBusy = false; toast(`Pairing code: ${r.code}`); refreshStatus(); }) }, 'Get code')),
     n.pairingCode ? h('p', {}, 'In WhatsApp → Linked devices → Link with phone number instead, enter ', h('span', { class: 'code' }, n.pairingCode)) : null);
 }
+/** 075: on a fresh install nothing of WhatsApp is loaded until the owner asks for the QR code (one tap). */
+function linkWhatsAppButton() {
+  const wa = S.status?.channel?.channels?.find((c) => c.id === 'whatsapp');
+  if (!wa || wa.state === 'on' || !can('admin')) return null;
+  return h('button', { class: 'btn primary', onclick: () => tryApi(async () => { await api('PUT', '/api/channels/whatsapp', { enabled: true }); await refreshStatus(); }, 'Getting a QR code…') },
+    wa.state === 'off' ? 'Switch WhatsApp on' : 'Show the QR code');
+}
 /** 062: one box for any key: OpenRouter, Anthropic, OpenAI, a GitHub token for Copilot or a Claude Code token (074), recognised by how it starts. */
 const KEY_KINDS = [
   [/^sk-or-/, PROVIDER_NAMES.openrouter, (key) => api('POST', '/api/providers/openrouter', { key, freeOnly: true })],
@@ -110,7 +117,7 @@ function quickTestBox(agent) {
 async function stepBody(s, c) {
   const n = (S.status?.channel?.numbers || []).find((x) => x.status !== 'open');
   switch (s.id) {
-    case 'whatsapp': return n ? linkNumberBox(n) : null;
+    case 'whatsapp': return n ? linkNumberBox(n) : linkWhatsAppButton();
     case 'provider': return quickProviderBox();
     case 'agent': return quickAgentBox();
     case 'chat': return c.agent ? quickChatBox(c.agent) : null;
