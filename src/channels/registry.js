@@ -125,6 +125,8 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
       for (const [id, ch] of sessions) out.push({ number: id, ...(ch.refreshNames ? await ch.refreshNames().catch(() => ({ ok: false })) : { ok: false, reason: 'unsupported' }) });
       return out;
     },
+    /** 069: graceful shutdown: every number's socket closes (still linked). */
+    async stop() { for (const ch of sessions.values()) await ch.stop?.().catch(() => {}); },
     pair: (phone, number) => byNumber(number).pair(phone),
     logout: (number) => byNumber(number).logout(),
     restart: (number) => byNumber(number).restart(),

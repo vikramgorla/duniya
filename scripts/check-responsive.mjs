@@ -159,6 +159,10 @@ const STATES = [
       return r; }; S.models = null;`, js: "await T.click('Sign in with ChatGPT', 'button', 1200); T.openAll();" },
   { name: 'usage', hash: 'usage' },
   { name: 'server', hash: 'server', wait: 2000, js: 'T.openAll();' },
+  // 069: Health with an almost-full disk (writes paused) and a queue at its limit
+  { name: 'server-health-disk-full', hash: 'server', wait: 2000, before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
+      if (String(u) === '/api/server/health') { const j = await r.clone().json(); return new Response(JSON.stringify({ ...j, disk: { ...j.disk, level: 'full', free: 52428800, writesPaused: true } })); }
+      return r; };`, js: "T.openAll(); document.getElementById('health')?.scrollIntoView(); await T.wait(300);" },
   // #96: OS updates grouped (will install / rolling out gradually / held back), the restart banner and last-run summary
   { name: 'server-os-updates', hash: 'server', wait: 2000, js: "T.openAll(); document.getElementById('restart-needed')?.scrollIntoView(); await T.wait(300);" },
   // #96, 056: a root helper too old to update itself: no gradual button, a note to run sudo duniya update once or reinstall
@@ -201,7 +205,8 @@ const PRELUDE = `const T = {
   async until(sel, ms = 15000) { for (let t = 0; t < ms && !document.querySelector(sel); t += 100) await T.wait(100); },
   openAll: () => document.querySelectorAll('details').forEach((d) => { d.open = true; }),
   async click(text, sel = 'button,a,summary', ms = 900) {
-    const el = [...document.querySelectorAll(sel)].find((e) => e.textContent.trim().includes(text) && e.offsetParent);
+    let el = null; // 069: wait up to 5 s for it (a screen still drawing made models-setup flaky)
+    for (let t = 0; t < 5000 && !(el = [...document.querySelectorAll(sel)].find((e) => e.textContent.trim().includes(text) && e.offsetParent)); t += 100) await T.wait(100);
     if (!el) throw new Error('nothing to click: ' + text);
     el.click(); await T.wait(ms);
   },

@@ -394,6 +394,8 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     }
   }
   store.updateSettings({ modelPrices: { 'anthropic:claude-haiku-5-5': { in: 1, out: 5 }, 'anthropic:claude-sonnet-5-5': { in: 3, out: 15 } } });
+  // 069: one clean-up as the upkeep tick does it, so Server → Health shows its last run
+  (await imp('src/core/retention.js')).retentionTick();
   // spending caps (040), owner alerts and weekly counters (041); 059: the alert number and character are the owner assistant's
   const budget = await imp('src/core/budget.js'); const stats = await imp('src/core/stats.js');
   budget.setCap('agent', 'carpool', { cost: 2 });

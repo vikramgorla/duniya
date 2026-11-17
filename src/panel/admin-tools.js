@@ -240,8 +240,8 @@ export const TOOLS = [
     input: {},
     run: async (a, x) => (await x.call('GET', '/api/owner-assistant/weekly-preview')).text },
   { name: 'list_contacts', readOnly: true, calls: [['GET', '/api/contacts']], description: 'Contacts (WhatsApp names synced from the phone + own entries). Each has bookName (the phone\'s address book), businessName, profileName (chosen by the person) and ownName; name is the one shown (own > address book > business > profile > number). Shared ones can be looked up by participants through agents.',
-    input: { query: str('Name, note or number to filter by (optional)'), shared_only: { type: 'boolean' } },
-    run: (a, x) => x.call('GET', `/api/contacts?q=${enc(a.query || '')}${a.shared_only ? '&shared=1' : ''}`) },
+    input: { query: str('Name, note or number to filter by (optional)'), shared_only: { type: 'boolean' }, offset: { type: 'number', description: 'Skip this many (paging; 500 per call)' } },
+    run: (a, x) => x.call('GET', `/api/contacts?q=${enc(a.query || '')}${a.shared_only ? '&shared=1' : ''}${a.offset ? `&offset=${Number(a.offset) || 0}` : ''}`) },
   { name: 'contact_names_status', readOnly: true, calls: [['GET', '/api/contacts/summary']], description: 'How many contact names of each kind are known (address book, business, profile, own), how many people WhatsApp shows only by a hidden number, and when names were last refreshed. Names refresh by themselves after WhatsApp connects and daily.',
     input: {}, run: (a, x) => x.call('GET', '/api/contacts/summary') },
   { name: 'set_contact_names_for_agents', risky: true, calls: [['GET', '/api/contacts/summary'], ['PUT', '/api/contacts/agent-names']],
@@ -480,6 +480,18 @@ export const TOOLS = [
   // ---------- server ----------
   { name: 'get_server_metrics', readOnly: true, calls: [['GET', '/api/system']], description: 'Server CPU, memory, disk, load and uptime right now, and where it is hosted (hosting.provider: oci, gcp, docker, server or unknown) so you can point to the matching hosting guide in docs/deploy/.', input: {},
     run: (a, x) => x.call('GET', '/api/system') },
+  { name: 'get_server_health', readOnly: true, calls: [['GET', '/api/server/health']], description: 'Server → Health: database size (bytes, reusable bytes), rows and the oldest kept date of stored messages, activity and usage detail, how long each is kept (retention), the last automatic clean-up (rows removed), free disk (level ok | low | full; at full, stored messages and backups pause), the photos & voice queue and whether the server clock looks steady. Old data is pruned automatically every hour.', input: {},
+    run: (a, x) => x.call('GET', '/api/server/health') },
+  { name: 'set_retention', risky: true, calls: [['GET', '/api/server/health'], ['PUT', '/api/server/retention']],
+    description: 'Owner only: how long data is kept. messages_days (7–3650) and messages_per_chat (200–50000) for stored chat messages, usage_days (30–3650) for model-call detail. Shorter values delete older data on the next clean-up (within the hour); summaries, notes and contacts are never pruned. Activity retention is set with set_logging_settings. Needs confirm_action.',
+    input: { messages_days: { type: 'number' }, messages_per_chat: { type: 'number' }, usage_days: { type: 'number' } },
+    preview: async (a, x) => {
+      const r = (await x.call('GET', '/api/server/health')).retention;
+      const parts = [['messages_days', 'messagesDays', 'stored messages kept', 'days'], ['messages_per_chat', 'messagesPerChat', 'stored messages per chat', ''], ['usage_days', 'usageDays', 'usage detail kept', 'days']]
+        .filter(([k]) => a[k] !== undefined).map(([k, f, what, unit]) => `${what}: ${r[f]} → ${a[k]}${unit ? ` ${unit}` : ''}${Number(a[k]) < r[f] ? ' (older data is deleted on the next clean-up)' : ''}`);
+      return parts.length ? `Change ${parts.join('; ')}.` : 'Nothing to change.';
+    },
+    run: (a, x) => x.call('PUT', '/api/server/retention', { messagesDays: a.messages_days, messagesPerChat: a.messages_per_chat, usageDays: a.usage_days }) },
   { name: 'list_os_updates', readOnly: true, calls: [['GET', '/api/system/os-updates']], description: 'Operating-system package updates, grouped: install (will install now; count = how many), phased (Ubuntu is rolling them out gradually: they install automatically within days, or now with run_maintenance os-update-all) and held (kept back, with the reason in why).',
     input: { refresh: bool('Check again now (slower)') },
     run: (a, x) => x.call('GET', `/api/system/os-updates${a.refresh ? '?refresh=1' : ''}`) },

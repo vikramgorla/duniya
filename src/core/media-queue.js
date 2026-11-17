@@ -8,13 +8,15 @@
 //  - a job that hasn't started after ~10 s gets a ⏳ reaction on the person's message (removed when done); after
 //    ~60 s one short "I'm on it" line, once per message;
 //  - a job older than the max age (15 min) is answered with a short apology instead of a stale reply;
-//  - only when the queue is really full does enqueue() refuse ({ code: 'overloaded' }) — the caller says so once.
+//  - only when the queue is really full does enqueue() refuse ({ code: 'overloaded' }) — the caller says so once, and
+//    (069) the owner hears about it at most once an hour: the newest work is refused, waiting work is never dropped.
 // Text-only replies never come here.
-import { db } from './db.js';
+import { db, kvGet, kvSet } from './db.js';
 import { activity } from './events.js';
 import { isChatEnabled } from './chat-prefs.js';
 import { serverSize } from './resources.js';
 import { silenceReason } from './silences.js';
+import { sendOwnerAlert } from './owner-alerts.js';
 
 const TENANT = 'default';
 db.exec(`
@@ -42,10 +44,18 @@ export function registerJobHandler(kind, h) { handlers.set(kind, h); }
 export function setQueueChannel(ch) { channel = ch; }
 
 const count = () => db.prepare('SELECT COUNT(*) AS n FROM media_jobs WHERE tenant_id = ?').get(TENANT).n;
+/** 069: the queue refused work: record it and tell the owner, at most once an hour. */
+function queueFull(now = Date.now()) {
+  if (now - (Number(kvGet('health:queueFullAt')) || 0) < 3600000) return;
+  kvSet('health:queueFullAt', now);
+  const text = `Photos & voice: ${queueLimits().max} requests are waiting, so new ones are refused for now and people are asked to send them again in a few minutes. The queue empties by itself; on a busy server consider a bigger one.`;
+  activity('error', { summary: text });
+  sendOwnerAlert(`Duniya: ${text}`, { kind: 'queue' }).catch(() => {});
+}
 /** Queue a job. Throws { code: 'overloaded' } when the queue is full. Returns the job id. */
 export function enqueue({ kind, chat, msgId = '', senderJid = '', agent = '', payload = {} }) {
   if (!handlers.has(kind)) throw new Error(`No handler for media job "${kind}"`);
-  if (count() >= queueLimits().max) throw Object.assign(new Error('The media queue is full'), { code: 'overloaded' });
+  if (count() >= queueLimits().max) { queueFull(); throw Object.assign(new Error('The media queue is full'), { code: 'overloaded' }); }
   const r = db.prepare('INSERT INTO media_jobs (tenant_id, chat, msg_id, sender_jid, kind, agent, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
     .run(TENANT, chat, msgId || '', senderJid || '', kind, agent || '', JSON.stringify(payload), Date.now());
   setImmediate(pump);

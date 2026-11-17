@@ -1,6 +1,6 @@
 // @ts-check
 // Daily counters for the weekly summary (041, issue #38): messages handled and replies per agent, messages ignored per
-// chat, replies held back by a spending cap. Counts only — never message text. Kept 60 days.
+// chat, replies held back by a spending cap. Counts only — never message text. Kept 60 days (retention.js).
 import { db } from './db.js';
 
 db.exec(`
@@ -17,7 +17,6 @@ const up = db.prepare(`INSERT INTO daily_stats (day, kind, agent, chat, n) VALUE
 export function countStat(kind, { agent = '', chat = '' } = {}, ts = Date.now()) {
   try {
     up.run(dayOf(ts), kind, agent || '', kind === 'ignored' || kind === 'budget' ? chat || '' : '');
-    if (Math.random() < 0.002) db.prepare('DELETE FROM daily_stats WHERE day < ?').run(dayOf(ts) - 60);
   } catch { /* ignore */ }
 }
 

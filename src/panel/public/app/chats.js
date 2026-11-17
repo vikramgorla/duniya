@@ -17,7 +17,7 @@ function addDirectChatCard(agents, { pre = null, onDone } = {}) {
   let timer;
   search.oninput = () => { clearTimeout(timer); timer = setTimeout(async () => {
     const q = search.value.trim(); if (!q) { hits.replaceChildren(); return; }
-    const list = await api('GET', `/api/contacts?q=${encodeURIComponent(q)}`).catch(() => []);
+    const list = await api('GET', `/api/contacts?q=${encodeURIComponent(q)}&limit=6`).catch(() => []);
     hits.replaceChildren(...list.slice(0, 6).map((c) => h('button', { type: 'button', class: 'btn small', onclick: () => { phone.value = `+${c.phone}`; who.textContent = `Contact: ${c.name}`; hits.replaceChildren(); search.value = ''; check(); } }, `${c.name} · +${c.phone}`)),
       list.length ? null : h('span', { class: 'small muted' }, 'No contact matches.'));
   }, 250); };

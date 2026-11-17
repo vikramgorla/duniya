@@ -116,6 +116,35 @@ returns the JSON answer, `[status, answer]`, or throws `fail(message, status)` /
 - SQLite rows are untyped (`db.prepare()` hands out plain rows, `src/core/db.js`); settings have a `Settings` typedef
   (`src/core/store.js`); route modules type their registrar with `Route` / `RouteContext` (`src/panel/http.js`).
 
+## Scale measurements
+
+`npm run measure:scale` (dev only, `scripts/measure-scale.mjs`) runs the real core and panel through the test fakes
+against a seeded data directory: **300 chats (20 on) over 3 numbers, 30 agents, 200 000 stored messages over 80 days,
+50 000 activity entries, 20 000 usage rows, 5 000 contacts**. It prints startup in a fresh process pinned to one CPU
+(`taskset -c 0`, `--max-old-space-size=700`), panel API latencies (median / p95 of 15), live-stream fan-out to 20
+panels, router throughput, a retention pass, one backup, the database size and the query plans of the hot queries.
+`--small` runs a tenth of the fixture. Run it before and after a change that touches the database, the router or the
+panel API, and put both tables in the PR.
+
+Before and after 069 (#143), same machine:
+
+| | v2.29.1 | v2.30.0 |
+|---|---|---|
+| Startup to panel ready (1 CPU) / RSS | 416 ms / 158 MB | 276 ms / 164 MB |
+| Router: stored, not addressed | 257 msg/s | 970 msg/s (3.8×) |
+| Router: chat off | 1 923 msg/s | 11 250 msg/s (5.9×) |
+| Router: answered by the fake model | 64 msg/s | 240 msg/s (3.8×) |
+| Panel API (status, chats, agents, activity pages, contacts) | 1–7 ms median | 1–7 ms median (Health 1 ms) |
+| Usage by day, all time | 21 ms | 21 ms |
+| Activity for one chat / age prunes | `SCAN activity` / `SCAN messages` | index searches |
+| Retention (messages kept 30 days) | pruned on the write path | 125 000 rows in 63 upkeep ticks, ≤ 102 ms each |
+| One backup | – | 1 s, 6.7 MB, +167 MB RSS while it runs |
+
+What made the difference: WAL with `synchronous = NORMAL` (no fsync per write), no pruning on the write path (one
+bounded pass on the upkeep tick, `src/core/retention.js`), indexes for the chat filter and the age prunes, one date
+formatter per time zone, and counting before loading rows to summarize. Still open: a backup holds the whole
+database in memory several times (base64 + gzip) — about 170 MB extra for a 36 MB database.
+
 ## Commits and pull requests
 
 No attribution trailers or footers in commits and PRs (no Co-Authored-By, session links or 'Generated with' lines).

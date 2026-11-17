@@ -80,9 +80,6 @@ const s3Http = http.createServer(async (req, res) => {
 }).listen(0);
 
 let t; let owner;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-/** Backup names carry the time to the second: wait just until the next second starts (not a whole second). */
-const nextSecond = () => sleep(1005 - (Date.now() % 1000));
 before(async () => {
   t = await setup({
     beforeImport: () => {
@@ -106,7 +103,7 @@ test('US1: owner only; passphrase required; encrypted file; local retention', as
   assert.equal((await t.api(owner, 'PUT', '/api/backups/passphrase', { passphrase: 'correct horse battery staple' })).status, 200);
   assert.equal((await t.api(owner, 'PUT', '/api/backups/settings', { enabled: true, keep: 2, schedule: 'daily', at: '03:30' })).status, 200);
 
-  for (let i = 0; i < 3; i++) { assert.equal((await t.api(owner, 'POST', '/api/backups/run')).status, 200); await nextSecond(); }
+  for (let i = 0; i < 3; i++) { assert.equal((await t.api(owner, 'POST', '/api/backups/run')).status, 200); }
   const local = (await t.api(owner, 'GET', '/api/backups/list?source=local')).body;
   assert.equal(local.length, 2, 'keeps 2');
   const buf = readFileSync(join(t.tmp, 'data', 'backups', local[0].file));
@@ -125,7 +122,7 @@ test('US2: GitHub device login, private repo creation, commits with pruning', as
   const repo = (await t.api(owner, 'POST', '/api/backups/github/create-repo', {})).body.repo;
   assert.equal(repo, 'vikramgorla/duniya-backups');
   assert.equal(gh.created[0].private, true);
-  for (let i = 0; i < 3; i++) { const r = (await t.api(owner, 'POST', '/api/backups/run')).body; assert.match(r.results.github, /^ok/); await nextSecond(); }
+  for (let i = 0; i < 3; i++) { const r = (await t.api(owner, 'POST', '/api/backups/run')).body; assert.match(r.results.github, /^ok/); }
   const files = (await t.api(owner, 'GET', '/api/backups/list?source=github')).body;
   assert.equal(files.length, 2);
   const head = gh.commits.get(gh.repos.get(repo).head);
@@ -140,7 +137,7 @@ test('US3: S3-compatible with SigV4, retention, failure isolated', async () => {
   await t.api(owner, 'PUT', '/api/backups/s3/keys', { accessKeyId: 'AKTEST', secretAccessKey: 'secret-key' });
   await t.api(owner, 'PUT', '/api/backups/settings', { s3: { enabled: true, endpoint: `http://127.0.0.1:${s3Http.address().port}`, region: 'auto', bucket: 'bk', prefix: 'duniya/' } });
   assert.deepEqual((await t.api(owner, 'POST', '/api/backups/test/s3')).body, { ok: true });
-  for (let i = 0; i < 3; i++) { const r = (await t.api(owner, 'POST', '/api/backups/run')).body; assert.equal(r.results.s3, 'ok'); await nextSecond(); }
+  for (let i = 0; i < 3; i++) { const r = (await t.api(owner, 'POST', '/api/backups/run')).body; assert.equal(r.results.s3, 'ok'); }
   assert.equal([...s3.objects.keys()].filter((k) => k.startsWith('duniya/')).length, 2);
   assert.equal(s3.rejected, 0);
   await t.api(owner, 'PUT', '/api/backups/s3/keys', { accessKeyId: 'AKTEST', secretAccessKey: 'wrong' });

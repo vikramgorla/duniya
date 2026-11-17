@@ -219,6 +219,8 @@ cat > /etc/systemd/system/whatsapp-agent-duniya.service <<EOF
 Description=whatsapp-agent-duniya (WhatsApp agents + admin panel)
 After=network-online.target
 Wants=network-online.target
+# 069: keep restarting after crashes, however often (Restart=always below)
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -228,6 +230,8 @@ EnvironmentFile=$CONF_DIR/app.env
 ExecStart=/usr/bin/node --max-old-space-size=384 --disable-warning=ExperimentalWarning src/index.js
 Restart=always
 RestartSec=5
+# 069: a graceful stop (running replies finish, the database closes) takes up to 10 s
+TimeoutStopSec=20
 SyslogIdentifier=whatsapp-agent-duniya
 MemoryMax=700M
 NoNewPrivileges=true

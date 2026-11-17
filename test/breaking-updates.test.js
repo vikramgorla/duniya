@@ -111,7 +111,7 @@ test('045: auto mode installs the safe release (backup first), announces the bre
   assert.equal(appVersion(app), '1.1.0');
   assert.equal(t.restarts, restarts + 1);
   assert.equal(backup.listPreUpdate().length, 1, 'backup made before the update');
-  assert.match(u.updateStatus().lastResult.backup, /^duniya-\d{8}-\d{6}\.dbk$/);
+  assert.match(u.updateStatus().lastResult.backup, /^duniya-\d{8}-\d{6}-\d{3}\.dbk$/);
 
   // notified once: alert number + the linked owner (with a code), never the admin
   const toOwner = sentTo(ownerDm);

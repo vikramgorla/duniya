@@ -1,6 +1,6 @@
 # Plan 067
 
-> Removed in #146 (v2.29.3): see the note at the top of `spec.md`.
+> Removed in #146 (v2.30.1): see the note at the top of `spec.md`.
 
 - **Server:**
   - `providers/plan-usage.js` (new): parsers (Anthropic and OpenAI rate-limit headers,
