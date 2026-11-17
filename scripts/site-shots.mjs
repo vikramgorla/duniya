@@ -45,7 +45,7 @@ const ASK = `S.ask = { draft: '', busy: false, turns: [{ q: 'What did the famili
   confirms: [{ code: 'H4M9', preview: 'Turn off the agent “Office colleagues” (1 chat). It stops answering until you switch it on again.' }],
   steps: [{ step: 'tool', tool: 'list_visible_chats', ok: true }, { step: 'tool', tool: 'chat_recap', ok: true }, { step: 'tool', tool: 'search_messages', ok: true }, { step: 'held', tool: 'set_agent_enabled', ok: true }] }] };`;
 const START = 'await T.wait(1500);'; // 062: Getting started, one step open (data installed with page.call, see open())
-const AI_DIFF = "const ta = document.querySelector('#main textarea'); ta.value = 'Shorter replies, make Lea an organizer, weather before rides'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); document.querySelector('.dskip')?.click(); await T.wait(400);";
+const AI_DIFF = "await T.click('Change with AI', 'button', 600); const ta = document.querySelector('dialog textarea'); ta.value = 'Shorter replies, make Lea an organizer, weather before rides'; await T.click('Draft', 'button', 100); await T.until('.dreview, .note.bad'); document.querySelector('.dskip')?.click(); await T.wait(400);";
 const TEST_AS = "const sel = document.querySelector('select[aria-label=\"Test as role\"]'); sel.value = 'organizer'; sel.dispatchEvent(new Event('change')); await T.wait(1200); const i = document.querySelector('#test-console input[placeholder^=\"Ask the\"]'); if (i) { i.value = 'Who drives to Geneva on Friday?'; await T.click('Send', 'button', 1800); }";
 // 065: an update from v2.22.0 to the demo's version: the dialog lists every release in between
 const UPDATE_NOTES = `const f0 = window.fetch; window.fetch = async (u, o) => { const r = await f0(u, o);
@@ -68,6 +68,7 @@ const PAGES = [
   ['settings', 'settings', '', true],
   ['activity', 'activity', '', false],
   ['agent-editor', 'agents/carpool', '', false],
+  ['agent-section', 'agents/carpool/where', '', false], // 068: a section page
 ];
 // [name, hash, js that prepares it, selector or T.box heading, viewport width]
 const CARDS = [
@@ -78,29 +79,30 @@ const CARDS = [
   ['card-start-model', 'overview', START, '#ov-checklist', 1100, fakeChecklist('provider')],
   ['card-start-agent', 'overview', START, '#ov-checklist', 1100, fakeChecklist('agent')],
   ['card-find', 'chats', "await openFind(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'ge'; i.dispatchEvent(new Event('input')); await T.wait(200);", '#palette', 1100],
-  ['card-ai-diff', 'agents/carpool', AI_DIFF, '.dreview', 1100],
+  ['card-ai-diff', 'agents/carpool', AI_DIFF, 'dialog.ask', 1100],
   ['card-test-as', 'agents/carpool/test', TEST_AS, '#test-console', 1100],
   ['card-caps', 'usage', '', 'box:Monthly spending caps', 1100],
   ['card-photos-voice', 'models/abilities', '', 'box:Photos & voice', 1100],
   ['card-plan-usage', 'models/chatgpt', '', '.plan-usage', 900], // 067
   ['card-fallback', 'models/fallback', 'T.openAll(document.querySelector("#fallback"));', '#fallback', 1100],
-  ['card-chat-fallback', 'chats', "[...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);", '#chat-fallback', 600],
+  ['card-chat-fallback', 'chats/120363041122330003%40g.us', "document.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);", '#chat-fallback', 600],
   ['card-owner-assistant', 'settings/owner-assistant', 'T.openAll(T.box("Owner assistant"));', 'box:Owner assistant', 900],
-  ['card-owner-agent', 'agents/owner-assistant', '', 'box:Character', 900], // 059: the owner assistant's own editor
+  ['card-owner-agent', 'agents/owner-assistant', '', '.ap-card', 900], // 059: the owner assistant's own editor
   ['card-privacy', 'settings/privacy-notice', '', 'box:Privacy notice', 900],
   ['card-web-access', 'settings/web-access', '', 'box:Web address & access', 900],
   ['card-small-server', 'server', '', 'box:This server', 1100],
   ['card-small-mode', 'settings/small-mode', '', '#small-mode', 900],
   ['card-assistants', 'settings/assistants', '', 'box:Connected AI assistants', 900],
   ['card-logging', 'settings/logging', '', 'box:Activity log', 600],
-  ['card-mcp', 'agents/carpool', 'T.openAll(T.box("Tool services"));', 'box:Tool services', 600],
-  ['card-registry', 'agents/carpool', "await T.click('Browse tool services', 'button', 1500);", 'dialog.dlg', 900],
-  ['card-wa-actions', 'agents/carpool', 'T.openAll(T.box("WhatsApp actions"));', 'box:WhatsApp actions', 600],
-  ['card-people', 'agents/carpool', '', 'box:People & roles', 600],
-  ['card-quick', 'agents/carpool', '', '#quick-answers', 600],
+  ['card-mcp', 'agents/carpool/tools', '', '.ap-sec', 600],
+  ['card-registry', 'agents/carpool/tools', "await T.click('Browse tool services', 'button', 1500);", 'dialog.dlg', 900],
+  ['card-wa-actions', 'agents/carpool/tools', 'T.openAll();', '.ap-sec', 600],
+  ['card-people', 'agents/carpool/people', '', '.ap-sec', 600],
+  ['card-quick', 'agents/carpool/quick', '', '.ap-sec', 600],
   ['card-quick-test', 'agents/carpool/test', "const i = document.querySelector('#test-console input[placeholder^=\"Ask the\"]'); i.value = '!rides'; await T.click('Send', 'button', 900); i.value = 'where is the pick-up point in Geneva?'; await T.click('Send', 'button', 900);", '#test-console', 1100],
-  ['card-wa-group', 'chats', "[...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button')?.click(); await T.until('.wa-card input'); await T.wait(600);", '.wa-card', 900],
-  ['card-memory', 'chats', "[...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Geneva rides'))?.querySelector('button')?.click(); await T.wait(1800);", 'box:Memory', 900],
+  ['card-wa-group', 'chats/120363041122330003%40g.us', "document.querySelector('.chat-page details.menu summary')?.click(); await T.click('Messages & memory', 'button', 100); await T.until('.wa-card input'); await T.wait(600);", '.wa-card', 900],
+  ['card-memory', 'chats/120363041122330003%40g.us', "document.querySelector('.chat-page details.menu summary')?.click(); await T.click('Messages & memory', 'button', 1800);", 'box:Memory', 900],
+  ['card-chat-page', 'chats/120363041122330003%40g.us', '', '.chat-page', 900], // 068: a chat's page
 ];
 
 const { base } = await startDemo({ small: true });
@@ -160,14 +162,13 @@ for (const width of [...new Set(CARDS.map((c) => c[4]))]) {
 // videos: frames at ~8 fps while a script runs in the page, joined by ffmpeg with their real timing
 const VIDEOS = [
   ['tour', 'overview', `for (const t of ['overview', 'chats', 'agents', 'models', 'models/chatgpt', 'settings', 'activity']) { location.hash = t; await T.wait(2100); }`, 15500],
-  ['chat-on', 'chats', `const row = () => [...document.querySelectorAll('.chat-row')].find((r) => r.textContent.includes('Book club'));
-    row().scrollIntoView({ block: 'center' }); await T.wait(1200);
-    const sel = row()?.querySelector('.chat-agent select'); if (sel) { sel.focus(); await T.wait(600); sel.value = [...sel.options].find((o) => /family/i.test(o.textContent))?.value || sel.value; sel.dispatchEvent(new Event('change', { bubbles: true })); }`, 6500],
-  ['ai-create', 'agents', `const ta = document.querySelector('#main textarea'); await T.wait(500);
+  ['chat-on', 'chats/120363041122330006%40g.us', `await T.wait(1200);
+    const sel = document.querySelector('.chat-page select'); if (sel) { sel.focus(); await T.wait(600); sel.value = [...sel.options].find((o) => /family/i.test(o.textContent))?.value || sel.value; sel.dispatchEvent(new Event('change', { bubbles: true })); }`, 6500],
+  ['ai-create', 'agents/new', `await T.wait(1500); const ta = document.querySelector('#main textarea'); await T.wait(500);
     await T.type(ta, 'A helper for our running club that posts Sunday’s run every Saturday evening');
     await T.click('Draft', 'button', 200); await T.until('.dreview, .note.bad'); await T.wait(900);
     for (let y = 0; y < 900; y += 30) { scrollBy(0, 30); await T.wait(60); }`, 12000],
-  ['test-console', 'agents/school', `const i = document.querySelector('input[placeholder^="Ask the"]'); i.scrollIntoView({ block: 'center' }); await T.wait(600);
+  ['test-console', 'agents/school/test', `await T.wait(1200); const i = document.querySelector('input[placeholder^="Ask the"]'); i.scrollIntoView({ block: 'center' }); await T.wait(600);
     await T.type(i, 'When are the museum trip forms due?'); await T.click('Send', 'button', 100);`, 7000],
 ];
 if (!opt['no-video']) {

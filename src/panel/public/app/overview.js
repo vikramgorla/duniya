@@ -2,7 +2,7 @@
 // ---------- overview ----------
 import { feedList, loadChatNames } from './activity.js';
 import { askCard } from './ask.js';
-import { $, S, ago, api, ask, avatar, can, emptyState, h, logo, menu, optimistic, pulse, refreshStatus, show, time, toggle, tryApi } from './core.js';
+import { $, S, ago, api, ask, avatar, can, emptyState, field, h, logo, menu, optimistic, pulse, refreshStatus, show, time, toggle, tryApi } from './core.js';
 import { plural } from './shared.js';
 import { refreshSilences, silencesCard } from './quiet.js';
 import { checklistActive, checklistBox, checklistNext, goTo, linkNumberBox, refreshChecklist } from './start.js';
@@ -34,22 +34,21 @@ export async function renderOverview(soft) {
         h('button', { class: 'btn small', onclick: () => tryApi(() => api('POST', '/api/whatsapp/restart', body), 'Reconnecting…') }, linked ? 'Reconnect' : 'New QR code'),
         linked ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Unlink ${n.label}?`, text: 'Agents stop answering on this number until you scan a new QR code with its phone.', ok: 'Unlink number', danger: true })) && tryApi(() => api('POST', '/api/whatsapp/logout', body), 'Unlinked') }, 'Unlink') : null,
         n.id !== 'main' && can('owner') ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Remove the number “${n.label}”?`, text: 'Its chats keep their memory, but agents bound to them stop answering there.', ok: 'Remove number', danger: true })) && tryApi(async () => { await api('DELETE', `/api/whatsapp/numbers/${n.id}`); refreshStatus(); }, 'Removed') }, 'Remove') : null) : null)),
-      linked ? h('div', { class: 'small muted' }, `Connected since ${time(n.since)}`) : null,
+
       !linked && can('admin') ? (checklistNext() === 'whatsapp' ? h('p', { class: 'small muted' }, 'Waiting for the scan: the QR code is in ', h('a', { href: '#overview/start', onclick: goTo('#overview/start') }, 'Getting started'), ' above.') : linkNumberBox(n)) : null,
       n.lastError && !linked ? h('p', { class: 'small', style: 'color:var(--bad)' }, n.lastError) : null,
-      linked ? [h('label', {}, 'Direct messages to this number go to'), dmSel] : null);
+      linked ? h('details', { class: 'num-dm' }, h('summary', { class: 'small muted' }, `Direct messages: ${st.agents.find((b) => b.id === n.dmAgent)?.name || 'default agent'} · connected since ${time(n.since)}`), field('Direct messages to this number go to', dmSel)) : null);
   };
   const newLabel = h('input', { placeholder: 'Name, e.g. Shop', onfocus: () => (S.overviewBusy = true), onblur: () => (S.overviewBusy = false) });
   const wa = h('div', { class: 'card', id: 'ov-whatsapp', 'data-jump': 'whatsapp' },
     h('div', { class: 'row spread' }, h('h2', {}, 'WhatsApp numbers'), h('span', { class: 'pill' }, `${numbers.filter((n) => n.status === 'open').length}/${numbers.length} connected`)),
     numbers.map(numberBlock),
     can('owner') ? h('details', { class: 'mut' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, '+ Add another number'),
-      h('p', { class: 'small muted' }, 'Each number is linked as its own device. Use a dedicated number for agents.'),
       h('div', { class: 'row' }, newLabel, h('button', { class: 'btn primary', onclick: () => tryApi(async () => { await api('POST', '/api/whatsapp/numbers', { label: newLabel.value }); S.overviewBusy = false; await refreshStatus(); renderOverview(); }, 'Added — scan its QR') }, 'Add number'))) : null);
   // 064: avatars, a live pulse per agent (reading… / answered, from the activity stream) and named switches
   const pause = (v) => optimistic(() => { st.settings.paused = v; }, () => api('POST', '/api/settings', { paused: v }), v ? 'All agents paused' : 'Agents resumed', () => pause(!v));
   const control = h('div', { class: 'card' }, h('h2', {}, 'Control'),
-    h('div', { class: 'row spread nowrap' }, h('div', {}, h('b', {}, 'Pause all agents'), h('div', { class: 'small muted' }, 'Stops all replies and scheduled posts')),
+    h('div', { class: 'row spread nowrap' }, h('b', {}, 'Pause all agents'),
       toggle(st.settings.paused, pause, false, 'Pause all agents')),
     st.agents.length ? h('ul', { class: 'ctl-list' }, st.agents.map((b) => h('li', {},
       avatar(b.name, b.id, b.enabled && !st.settings.paused ? '' : 'off'),
@@ -59,12 +58,12 @@ export async function renderOverview(soft) {
     st.pending ? h('p', {}, h('a', { class: 'pill warn', href: '#pending' }, `${plural(st.pending, 'change')} waiting for a confirm`)) : null);
   const reusedUpdates = soft && $('#updates-box')?.childElementCount ? $('#updates-box') : null;
   const updateBanner = (reusedUpdates && $('#ov-update-banner')) || h('div', { id: 'ov-update-banner' });
-  const server = h('div', { class: 'card' }, h('h2', {}, 'Server'),
-    h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {}, [['Version', st.version], ['Uptime', ago(Date.now() - st.uptimeSec * 1000), 'ov-uptime'], ['Memory', `${st.memoryMb} MB`, 'ov-memory'], ['Node', st.node]]
-      .map(([k, v, id]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', id ? { id } : {}, v)))))),
+  // 068: one calm line instead of a table; details are on the Server screen
+  const server = h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'Server'), h('a', { class: 'small', href: '#server' }, 'Details ›')),
+    h('p', { class: 'small muted num', style: 'margin:6px 0 0' }, `${st.version} · up `, h('span', { id: 'ov-uptime' }, ago(Date.now() - st.uptimeSec * 1000)), ' · ', h('span', { id: 'ov-memory' }, `${st.memoryMb} MB`)),
     reusedUpdates || h('div', { id: 'updates-box' }));
   const recent = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('div', { class: 'row spread' }, h('h2', {}, 'Recent activity'), h('button', { class: 'btn small', onclick: () => show('activity') }, 'All activity')),
-    feedList('recent', S.feed.slice(0, 8)),
+    feedList('recent', S.feed.slice(0, 5)),
     S.feed.length ? null : emptyState('activity', 'Quiet so far', 'What your agents read, answer and change shows up here live.'));
   const hr = new Date().getHours();
   const hello = hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
@@ -79,7 +78,7 @@ export async function renderOverview(soft) {
   const hero = h('div', { class: 'card console' },
     h('div', {}, h('div', { class: 'eyebrow' }, `${hello} · ${S.user.username}`),
       h('h2', {}, headline)),
-    h('div', { class: 'leds' },
+    allGood && !st.pending ? h('p', { class: 'small muted calm-line' }, [numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : 'WhatsApp connected', `${plural(live, 'agent')} live`, `${plural(st.enabledChats, 'chat')} on`].join(' · ')) : h('div', { class: 'leds' },
       // 066: plain sentence-case chips ("2 agents live"), not mono caps
       led(open === numbers.length ? true : open ? null : false, numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : open ? 'WhatsApp connected' : 'WhatsApp not linked'),
       led(st.settings.paused ? false : live ? true : null, st.settings.paused ? 'Agents paused' : live ? `${plural(live, 'agent')} live` : 'No agent live'),
@@ -93,7 +92,7 @@ export async function renderOverview(soft) {
   refreshSilences();
   // the feed and the chat names it shows (064) load after the first paint
   Promise.all([S.feed.length ? S.feed : api('GET', '/api/activity?limit=50'), soft ? null : loadChatNames()])
-    .then(([rows]) => { S.feed = rows; if (rows.length) { $('#recent')?.replaceWith(feedList('recent', rows.slice(0, 8))); $('#recent + .empty')?.remove(); } }).catch(() => {});
+    .then(([rows]) => { S.feed = rows; if (rows.length) { $('#recent')?.replaceWith(feedList('recent', rows.slice(0, 5))); $('#recent + .empty')?.remove(); } }).catch(() => {});
   if (can('owner') && !reusedUpdates) renderUpdates($('#updates-box'));
 }
 // 065: release notes load on demand (./releases.js).
@@ -127,7 +126,6 @@ function drawInstallHint(box = $('#ov-install')) {
   box.replaceChildren(h('div', { class: 'card install-hint' },
     h('div', { class: 'row nowrap' }, logo(), h('div', { style: 'flex:1;min-width:0' }, h('div', { class: 'eyebrow' }, 'Install on your phone'), h('h2', { style: 'margin:2px 0 0' }, 'Duniya on your home screen')),
       h('button', { class: 'btn small', title: 'Hide this hint on this device', onclick: hide }, 'Hide')),
-    h('p', { class: 'small muted' }, 'Opens full screen like an app, with live status, Ask and confirmations. Nothing to download from a store.'),
     S.installPrompt ? h('button', { class: 'btn primary', onclick: install }, 'Install')
       : ios ? h('p', { class: 'small', style: 'margin-bottom:0' }, 'Tap ', h('b', {}, 'Share'), ' (the square with the arrow), then ', h('b', {}, 'Add to Home Screen'), '.')
         : h('p', { class: 'small', style: 'margin-bottom:0' }, 'Open the browser menu (⋮) and choose ', h('b', {}, 'Install app'), ' or ', h('b', {}, 'Add to Home screen'), '.')));

@@ -17,6 +17,9 @@ export function modelSelect(models, value, { withInherit = false, autoLabel = 'A
 }
 export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 export const trunc = (s, n) => { const t = String(s || '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
+/** The guides on GitHub, and a small "?" that opens one (068: details live there, not in long help paragraphs). */
+export const DOCS = 'https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/';
+export const helpLink = (path, label = 'Help: open the guide') => h('a', { class: 'help', href: DOCS + path, target: '_blank', rel: 'noopener', 'aria-label': label, title: label }, '?');
 // ---------- models ----------
 export const LINKS = {
   anthropicKeys: 'https://platform.claude.com/settings/keys',
@@ -33,7 +36,7 @@ export const saveSecretKey = (name) => async (value) => { await api('PUT', '/api
 export const SETTINGS_SECTIONS = [
   ['tool-services', 'Tool services for all agents', 'mcp tools weather calendar registry browse'],
   ['owner-assistant', 'Owner assistant', 'my own chat alerts weekly summary character'],
-  ['direct-messages', 'Direct messages', 'dm default agent private'],
+  ['direct-messages', 'Chats & direct messages', 'dm default agent history load earlier messages phone'],
   ['privacy-notice', 'Privacy notice', 'notice group members opt-out'],
   ['photos-voice', 'Photos & voice', 'images voice notes transcription speech pictures'],
   ['secrets', 'Secrets', 'keys tokens api key password'],

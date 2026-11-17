@@ -1,6 +1,6 @@
 // Server screen: metrics, OS updates, maintenance helper, logs, hosting. Module of the panel (063).
 import { $, S, ago, api, ask, can, h, serverBadge, time, tryApi } from './core.js';
-import { SIZE_LABEL, bytes, meter, pct, plural } from './shared.js';
+import { DOCS, SIZE_LABEL, bytes, meter, pct, plural } from './shared.js';
 function spark(values, max) {
   const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('viewBox', '0 0 100 30'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('class', 'spark');
@@ -25,7 +25,6 @@ function serverSizeNote(s, q) {
     waiting);
 }
 // Hosting help (#56): open the step-by-step guide for where this server runs (update, recreate, remove, console help).
-const DOCS = 'https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/';
 const HOST_GUIDES = {
   oci: ['Oracle Cloud', 'deploy/oci-free-tier.md', 'Update the stack (new zip → Plan → Apply), recreate, remove (Destroy, then Delete), find the IP and console history, out-of-capacity and LimitExceeded.'],
   gcp: ['Google Cloud', 'deploy/google-cloud.md', 'Recreate or remove the VM, firewall rule and IPs, serial console, SSH, resize, what keeps the IP.'],
@@ -39,9 +38,9 @@ function hostingCard(hosting) {
       h('a', { class: `btn small${primary ? ' primary' : ''}`, href: DOCS + path, target: '_blank', rel: 'noopener' }, 'Open guide')); };
   const known = HOST_GUIDES[p];
   return h('div', { class: 'card', id: 'hosting-help' }, h('h2', {}, 'Hosting help'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, known ? `This server runs on ${known[0]}. Step-by-step guide with the exact console menus:` : 'Step-by-step guides with the exact console menus. Pick where this server runs:'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, known ? `Runs on ${known[0]}.` : 'Pick where this server runs.'),
     known ? link(p, true) : [link('oci'), link('gcp'), link('server'), link('docker')],
-    h('p', { class: 'small muted' }, 'App updates never need the cloud console: use Updates on the Overview page. Back up before you recreate or remove a server.'),
+    h('p', { class: 'small muted' }, 'Updates are on Overview. Back up before you recreate or remove a server.'),
     known ? h('details', {}, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Other hosts'), Object.keys(HOST_GUIDES).filter((k) => k !== p).map((k) => link(k))) : null);
 }
 export async function renderServer() {

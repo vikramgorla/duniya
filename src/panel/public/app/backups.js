@@ -25,7 +25,7 @@ export async function renderBackups() {
   const runDl = busyBtn('Back up now & download', '', async (r) => { if (r.results.local === 'ok') downloadFile(`/api/backups/download/${r.file}`, r.file); });
 
   const scheduleCard = h('div', { class: 'card' }, h('h2', {}, 'Schedule'),
-    h('p', { class: 'small muted' }, 'Backups include agents, users, settings, secrets, chat memory and (optionally) the WhatsApp link. They are encrypted with your passphrase before leaving the server — without it they cannot be restored, so write it down somewhere safe (not on this server).'),
+    h('p', { class: 'small muted' }, 'Encrypted with your passphrase: keep it safe, off this server. Without it a backup cannot be restored.'),
     field('Passphrase', h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', '/api/backups/passphrase', { passphrase: pass.value }), 'Passphrase saved')) renderBackups(); } }, pass, h('button', { class: 'btn' }, 'Save'))),
     h('div', { class: 'row', style: 'margin-top:10px' }, h('label', { class: 'inline' }, en, 'Scheduled backups'), h('label', { class: 'inline' }, wa, 'Include WhatsApp link')),
     h('div', { class: 'row' }, sched, at, wd, h('span', { class: 'small muted' }, 'keep'), keep),
@@ -125,7 +125,7 @@ function githubCard(b, s, saveSettings) {
         h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: 'Disconnect GitHub?', text: 'Backups stop going there; the backups already there stay.', ok: 'Disconnect GitHub', danger: true })) && tryApi(async () => { await api('DELETE', '/api/backups/github'); renderBackups(); }) }, 'Disconnect'))];
   } else {
     const org = h('input', { placeholder: 'organization name' });
-    body = [h('p', { class: 'small muted', style: 'margin-top:0' }, 'Keep encrypted copies in a private GitHub repository. One click creates a small GitHub app owned by you that can only write to the repository you choose — no keys to copy.'),
+    body = [h('p', { class: 'small muted', style: 'margin-top:0' }, 'A private GitHub repository, written by a small app you own. No keys to copy.'),
       h('a', { class: 'btn primary', href: '/backups/github-app/new' }, 'Create GitHub app'),
       h('p', { class: 'small muted' }, 'No GitHub account? ', h('a', { href: G.signupUrl, target: '_blank', rel: 'noopener' }, 'Create one'), ' (free), then come back.'),
       h('details', {}, h('summary', { class: 'small muted' }, 'Create it for an organization instead'),
