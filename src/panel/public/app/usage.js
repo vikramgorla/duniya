@@ -11,7 +11,7 @@ export async function usageSummary() {
 let usagePeriod = '30d';
 // ---------- spending caps (040, #35) ----------
 const CAP_STATE = { ok: ['ok', 'Within cap'], warning: ['warn', '80%+ used'], quiet: ['bad', 'Cap reached — quiet'], fallback: ['warn', 'Cap reached — cheaper model'] };
-export const capAmount = (c) => [c.cost ? `${fmtCost(c.spent.cost)} of ${fmtCost(c.cost)}` : '', c.tokens ? `${fmtTok(c.spent.tokens)} of ${fmtTok(c.tokens)} tokens` : ''].filter(Boolean).join(' · ');
+const capAmount = (c) => [c.cost ? `${fmtCost(c.spent.cost)} of ${fmtCost(c.cost)}` : '', c.tokens ? `${fmtTok(c.spent.tokens)} of ${fmtTok(c.tokens)} tokens` : ''].filter(Boolean).join(' · ');
 const capResets = (c) => new Date(c.resetsAt).toLocaleDateString([], { month: 'short', day: 'numeric' });
 /** One cap as a progress bar with one state line. */
 function capBar(c, { name = true } = {}) {

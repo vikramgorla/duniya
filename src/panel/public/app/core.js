@@ -327,7 +327,7 @@ const MOVED = { secrets: 'settings/secrets' };
 let statusTimer = null; // slow fallback poll, only while the live stream is down
 /** The four everyday screens in the phone tab bar (064); every other screen is under More. */
 export const PRIMARY = ['overview', 'chats', 'agents', 'activity'];
-export const signOut = async () => { await api('POST', '/api/logout').catch(() => {}); S.user = null; renderLogin(); };
+const signOut = async () => { await api('POST', '/api/logout').catch(() => {}); S.user = null; renderLogin(); };
 /** 068: signing out asks first (it sat next to Refresh and was easy to tap by mistake). */
 export const askSignOut = async () => { if (await ask({ title: 'Sign out?', text: `You are signed in as ${S.user?.username} (${S.user?.role}). To come back you sign in again.`, ok: 'Sign out' })) signOut(); };
 /** The signed-in shell. `status`: the status that came with the session (login.js), if any. */
