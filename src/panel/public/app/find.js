@@ -2,13 +2,33 @@
 // ---------- Find anything (062): / or ⌘K (Ctrl+K), or the search button: jump to a screen, agent, chat, setting or action ----------
 import { $, PRIMARY, S, TABS, api, askSignOut, avatar, badgeFor, can, go, h, icon, optimistic, recover, serverBadge, show, time, tryApi } from './core.js';
 import { PROVIDER_NAMES } from './names.js';
-import { SETTINGS_SECTIONS, highlight, searchWords } from './shared.js';
+import { SETTINGS_SECTIONS } from './shared.js';
 /** 068: the sections of an agent's page that Find anything lists ([id, title, words, only for normal agents]). */
 const AGENT_SECTIONS = [['character', 'Character', 'instructions prompt description name'], ['where', 'Where it answers', 'triggers mention direct dm chats', true],
   ['people', 'People', 'organizers participants roles', true], ['quick', 'Quick replies & FAQ', 'commands help faq', true], ['welcome', 'Welcome', 'new members greet rules', true],
   ['schedules', 'Schedules', 'scheduled posts weekly summary'], ['model', 'Model', 'fallback provider'], ['tools', 'Tools', 'mcp tool services whatsapp actions confirm'],
   ['memory', 'Memory', 'notes shared'], ['media', 'Photos & voice', 'images pictures voice notes'], ['cap', 'Spending cap', 'budget limit cost'],
   ['advanced', 'Advanced', 'timezone history tokens'], ['review', 'Review', 'answers rate thumbs teach feedback quality', true], ['test', 'Test', 'try console']];
+/** 070: the words of a search, as the server matches them (word beginnings, any order). */
+export const searchWords = (q) => (String(q || '').toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).slice(0, 8);
+/**
+ * Text with the searched words marked (<mark>, built from text nodes: message text is never HTML). `around`: show
+ * about that many characters around the first hit, with … at cut ends.
+ */
+export function highlight(text, words, around = 0) {
+  let t = String(text || '').replace(/\s+/g, ' ').trim();
+  // the words are letters and digits only (searchWords), so they need no escaping
+  const re = words.length ? new RegExp(`(?<![\\p{L}\\p{N}])(${words.join('|')})[\\p{L}\\p{N}]*`, 'giu') : null;
+  if (around && t.length > around) {
+    const at = re ? Math.max(0, t.search(re) - Math.round(around / 3)) : 0;
+    t = `${at ? '…' : ''}${t.slice(at, at + around)}${at + around < t.length ? '…' : ''}`;
+  }
+  if (!re) return [t];
+  const out = []; let last = 0;
+  for (const m of t.matchAll(re)) { out.push(t.slice(last, m.index), h('mark', {}, m[0])); last = m.index + m[0].length; }
+  out.push(t.slice(last));
+  return out;
+}
 /** Everything the Find box can open. Agents and chats come from the status and the cached chat list. */
 async function paletteItems() {
   const items = TABS().map(([id, label]) => ({ kind: 'Screen', label, go: `#${id}`, icon: id }));

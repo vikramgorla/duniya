@@ -16,26 +16,6 @@ export function modelSelect(models, value, { withInherit = false, autoLabel = 'A
     value && !known.has(value) ? h('option', { value, selected: true }, `${value} (not available)`) : null);
 }
 export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-/** 070: the words of a search, as the server matches them (word beginnings, any order). */
-export const searchWords = (q) => (String(q || '').toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).slice(0, 8);
-/**
- * Text with the searched words marked (<mark>, built from text nodes: message text is never HTML). `around`: show
- * about that many characters around the first hit, with … at cut ends.
- */
-export function highlight(text, words, around = 0) {
-  let t = String(text || '').replace(/\s+/g, ' ').trim();
-  // the words are letters and digits only (searchWords), so they need no escaping
-  const re = words.length ? new RegExp(`(?<![\\p{L}\\p{N}])(${words.join('|')})[\\p{L}\\p{N}]*`, 'giu') : null;
-  if (around && t.length > around) {
-    const at = re ? Math.max(0, t.search(re) - Math.round(around / 3)) : 0;
-    t = `${at ? '…' : ''}${t.slice(at, at + around)}${at + around < t.length ? '…' : ''}`;
-  }
-  if (!re) return [t];
-  const out = []; let last = 0;
-  for (const m of t.matchAll(re)) { out.push(t.slice(last, m.index), h('mark', {}, m[0])); last = m.index + m[0].length; }
-  out.push(t.slice(last));
-  return out;
-}
 export const trunc = (s, n) => { const t = String(s || '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
 /** The guides on GitHub, and a small "?" that opens one (068: details live there, not in long help paragraphs). */
 export const DOCS = 'https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/';

@@ -29,6 +29,8 @@ export function reviewCounts(agent, now = Date.now()) {
 /**
  * The agent's answers, newest first (`before`: a row id for the next page, `only`: 'down' | 'unrated').
  * Each: { id, chat, ts, text, rating, ratedBy, question: { name, sender, senderJid, text, ts } | null }.
+ * @param {string} agent
+ * @param {{ before?: number | string | null, limit?: number, only?: string }} [o]
  */
 export function listAnswers(agent, { before = 0, limit = 20, only = '' } = {}) {
   const hidden = privateChats();

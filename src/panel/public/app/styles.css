@@ -344,7 +344,7 @@ pre { background: #0d0f13; color: #d6dae3; border: 0; border-radius: var(--radiu
 .steps > li.now::before { background: var(--accent); color: var(--accent-ink); }
 .steps > li:not(:last-child)::after { content: ""; position: absolute; left: 13.5px; top: 32px; bottom: 4px; width: 1px; background: var(--line); }
 .steps b.t { display: block; font-family: var(--font-display); font-size: var(--fs); margin-bottom: 2px; }
-.steps code, .ptags code { font: 12.5px var(--mono); background: var(--bg-2); padding: 1px 5px; border-radius: var(--radius-xs); }
+.steps code { font: 12.5px var(--mono); background: var(--bg-2); padding: 1px 5px; border-radius: var(--radius-xs); }
 .choices { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-top: var(--s3); }
 .choice { text-align: left; font: inherit; color: var(--ink); background: color-mix(in srgb, var(--bg) 50%, var(--card)); border: 1px solid var(--line); border-radius: 14px; padding: var(--s3) 14px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; min-height: 44px; transition: border-color var(--fast), transform .08s; }
 .choice:hover { border-color: var(--ink); } .choice:active { transform: scale(.98); }
@@ -515,7 +515,6 @@ details.add-acct > summary::-webkit-details-marker { display: none; }
 .pmark { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; font: 700 17px var(--font-display); color: #fff; flex: none; }
 .m-or { background: #5160cf; } .m-an { background: #a9532c; } .m-oa { background: #0b7f62; } .m-cg { background: #1a7560; } .m-gh { background: #24292f; }
 @media (prefers-color-scheme: dark) { .m-gh { background: #6e7681; } }
-.ptags { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
 .pkgs summary { cursor: pointer; } .pkgs .pkg { padding: 3px 0; overflow-wrap: anywhere; } .pkgs .why { color: var(--muted); }
 /* "where to click" cues drawn in the page */
 .cue { margin-top: var(--s2); border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow: hidden; font-size: var(--fs-xs); max-width: 360px; }
@@ -564,10 +563,8 @@ dialog.palette input { width: 100%; font-size: 16px; }
 .pal-list li svg { width: 16px; height: 16px; flex: none; opacity: .7; }
 .pal-list .pal-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pal-list .pal-label small { font-size: var(--fs-s); }
-.pal-list li.pal-msg { align-items: flex-start; }
-.pal-list li.pal-msg svg { margin-top: 3px; }
-.pal-list li.pal-msg .pal-label { white-space: normal; }
-.pal-snip { display: block; font-size: var(--fs-s); color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.pal-msg .pal-label { white-space: normal; }
+.pal-snip { display: block; font-size: var(--fs-s); color: var(--muted); overflow-wrap: anywhere; }
 mark { background: var(--signal); color: var(--signal-ink); border-radius: 3px; padding: 0 1px; }
 .pal-help { margin-top: var(--s2); text-align: right; }
 /* Pull to refresh (066) and "Couldn't load" (066) */
@@ -653,7 +650,7 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
   input[type=checkbox], input[type=radio] { min-height: 0; width: 18px; height: 18px; }
   /* 16 px form fields: iOS zooms into anything smaller when it gets focus (061) */
   input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 16px; }
-  .pill, .eyebrow, legend, th, .led, .feed .fmeta, .feed .fitem > time, .pulse, pre, .steps code, .ptags code, .copyrow code, .toast, .brand small, .toolset code, .dgl,
+  .pill, .eyebrow, legend, th, .led, .feed .fmeta, .feed .fitem > time, .pulse, pre, .steps code, .copyrow code, .toast, .brand small, .toolset code, .dgl,
   table.stack td[data-label]:not([data-label=""])::before { font-size: 13px; }
   .pill { white-space: normal; overflow-wrap: anywhere; }
   td { overflow-wrap: anywhere; }
@@ -710,12 +707,10 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
 .contact-list li { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 0; }
 .contact-list li + li { border-top: 1px solid var(--line); }
 
-/* Review & teach (070): an answer per block, hairlines between them, the question as a quote */
-.rv { padding: var(--s3) 0; border-top: 1px solid var(--line); }
-.rv:first-child { border-top: 0; }
-.rv-q { margin: 4px 0; padding-left: 10px; border-left: 2px solid var(--line-2); color: var(--muted); font-size: var(--fs-s); overflow-wrap: anywhere; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.rv-a { overflow-wrap: anywhere; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+/* Review & teach (070) */
+.rv { padding: var(--s3) 0; overflow-wrap: anywhere; }
+.rv + .rv { border-top: 1px solid var(--line); }
+.rv-q { margin: 4px 0; padding-left: 10px; border-left: 2px solid var(--line-2); color: var(--muted); font-size: var(--fs-s); }
+.rv-a { white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
 .rv-a.open { display: block; }
-.rv-act { display: flex; gap: var(--s2); align-items: center; margin-top: var(--s2); }
-.rv-act .rv-t { min-width: 40px; font-size: 16px; filter: grayscale(1); opacity: .7; }
-.rv-act .rv-t.on { filter: none; opacity: 1; border-color: var(--ink); }
+.rv-t:not(.on) { filter: grayscale(1); opacity: .7; }

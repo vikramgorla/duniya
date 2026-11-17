@@ -77,7 +77,7 @@ export async function writeBackup(file, passphrase, { includeWhatsApp = true, ap
     out.write(`${MAGIC}${JSON.stringify({ ...KDF, salt: salt.toString('base64'), iv: iv.toString('base64') })}\n`);
     const meta = { format: FORMAT, version: 3, createdAt: new Date().toISOString(), app: { version: appVersion } };
     await pipeline(Readable.from(plaintext(meta, files)), createGzip(), cipher, out, { end: false });
-    await new Promise((ok, ko) => out.end(cipher.getAuthTag(), (/** @type {any} */ e) => (e ? ko(e) : ok(null))));
+    await new Promise((ok, ko) => { out.on('error', ko); out.end(cipher.getAuthTag(), () => ok(null)); });
     renameSync(part, file);
     return { size: statSync(file).size, files: files.length };
   } finally {
@@ -149,9 +149,10 @@ async function readBackup(src, passphrase, stage = '') {
   const { h, tag, stream } = openSource(src);
   const d = createDecipheriv('aes-256-gcm', keyFromPassphrase(passphrase, Buffer.from(h.salt, 'base64')), Buffer.from(h.iv, 'base64'));
   d.setAuthTag(tag);
-  const names = []; let meta = null; const sinks = [];
+  /** @type {string[]} */
+  const names = []; const meta = { createdAt: '' }; const sinks = [];
   const reader = recordReader((m) => {
-    meta = m;
+    meta.createdAt = m.createdAt;
     if (m.format !== FORMAT) throw fail('Unsupported backup format');
   }, (rel) => {
     if (rel.startsWith('/') || rel.split('/').includes('..')) return null;
@@ -160,7 +161,7 @@ async function readBackup(src, passphrase, stage = '') {
     const dst = resolve(stage, rel);
     mkdirSync(dirname(dst), { recursive: true });
     const ws = createWriteStream(dst, { mode: 0o600 });
-    sinks.push(new Promise((ok, ko) => { ws.on('finish', ok); ws.on('error', ko); }));
+    sinks.push(new Promise((ok, ko) => { ws.on('finish', () => ok(null)); ws.on('error', ko); }));
     return ws;
   });
   try {
@@ -171,7 +172,7 @@ async function readBackup(src, passphrase, stage = '') {
     throw fail('Wrong passphrase (or the file is damaged)');
   }
   if (!names.includes('duniya.sqlite')) throw fail('Backup has no database');
-  return { createdAt: meta?.createdAt, files: names };
+  return { createdAt: meta.createdAt, files: names };
 }
 
 /** Check that a backup opens with the passphrase (restore preview). */

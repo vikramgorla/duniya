@@ -93,6 +93,7 @@ function ftsQuery(q) {
 }
 const likeArg = (q) => `%${String(q).replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
 /**
+ * @param {{ chats: string[], query?: string, person?: string, since?: number, before?: number | string | null, limit?: number }} o
  * Stored messages of `chats` matching `query` (words, any order, word prefixes) and/or `person` (sender name or
  * number), newest first. `before`: a row id for the next page. Returns rows like listMessages's source rows.
  */

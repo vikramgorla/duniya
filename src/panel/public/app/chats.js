@@ -3,7 +3,8 @@ import { $, S, ago, api, ask, avatar, can, copyRow, emptyState, field, h, menu, 
 import { chatFallbackEditor, chatFallbackLine } from './fallback.js';
 import { silenceFix } from './quiet.js';
 import { listDetail } from './listdetail.js';
-import { helpLink, highlight, loadModels, modelSelect, plural, quietLine, searchWords, usageLine } from './shared.js';
+import { highlight, searchWords } from './find.js';
+import { helpLink, loadModels, modelSelect, plural, quietLine, usageLine } from './shared.js';
 import { capEditor, usageSummary } from './usage.js';
 let chatsFilter = 'all';
 let chatsQuery = ''; // 062: Find a chat

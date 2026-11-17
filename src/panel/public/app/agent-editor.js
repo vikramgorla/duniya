@@ -178,7 +178,7 @@ function buildReview(x, { teach }) {
   const more = h('button', { class: 'btn small', type: 'button', hidden: true }, 'Show older answers');
   const admin = can('admin');
   let only = ''; let last = 0;
-  const thumb = (a, v, label, rowEl) => h('button', { class: `btn small icon rv-t${a.rating === v ? ' on' : ''}`, type: 'button', 'aria-label': label, 'aria-pressed': String(a.rating === v), disabled: !admin,
+  const thumb = (a, v, label, rowEl) => h('button', { class: `btn small rv-t${a.rating === v ? ' on' : ''}`, type: 'button', 'aria-label': label, 'aria-pressed': String(a.rating === v), disabled: !admin,
     onclick: () => tryApi(async () => { const r = await api('PUT', `/api/agents/${x.enc}/review/${a.id}`, { rating: a.rating === v ? 0 : v }); a.rating = r.rating; x.review = r.counts; rowEl.replaceWith(item(a)); }) }, v > 0 ? '👍' : '👎');
   function item(a) {
     const el = h('div', { class: 'rv' });
@@ -187,7 +187,7 @@ function buildReview(x, { teach }) {
       h('div', { class: 'small muted' }, [a.question?.name, a.chatName, time(a.ts)].filter(Boolean).join(' · ')),
       a.question ? h('div', { class: 'rv-q' }, a.question.text) : null,
       h('div', { class: 'rv-a', title: 'Tap to show all', onclick: (e) => e.currentTarget.classList.toggle('open') }, a.text),
-      h('div', { class: 'rv-act' }, thumb(a, 1, 'Good answer', el), thumb(a, -1, 'Wrong or unhelpful answer', el),
+      h('div', { class: 'row' }, thumb(a, 1, 'Good answer', el), thumb(a, -1, 'Wrong or unhelpful answer', el),
         admin && a.rating < 0 ? h('button', { class: 'btn small', type: 'button', onclick: () => teach(prompt) }, h('span', { class: 'ai-chip' }, 'AI'), ' Teach…') : null));
     return el;
   }

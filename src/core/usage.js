@@ -89,7 +89,7 @@ export function usageReport({ from = 0, to = Date.now(), groupBy = 'agent', agen
   const cols = `COUNT(*) AS calls, SUM(input) AS input, SUM(output) AS output, SUM(cost) AS cost,
     SUM(CASE WHEN priced IS NULL THEN 1 ELSE 0 END) AS unpriced, SUM(CASE WHEN priced = 'plan' THEN 1 ELSE 0 END) AS plan`;
   const total = db.prepare(`SELECT MIN(ts) AS lo, ${cols} FROM usage WHERE ${where.join(' AND ')}`).get(...args);
-  const key = groupBy === 'day' ? localDayKey(Math.trunc(total.lo ?? args[1]), Math.trunc(args[1])) : GROUPS[groupBy];
+  const key = groupBy === 'day' ? localDayKey(Math.trunc(Number(total.lo ?? args[1])), Math.trunc(Number(args[1]))) : GROUPS[groupBy];
   const rows = db.prepare(`SELECT ${key} AS key, ${cols} FROM usage WHERE ${where.join(' AND ')} GROUP BY 1 ORDER BY ${groupBy === 'day' ? '1' : 'input + output DESC'} LIMIT 500`).all(...args);
   const clean = ({ lo: _lo, ...r }) => ({ ...r, ...(groupBy === 'day' && 'key' in r ? { key: new Date(r.key * DAY).toISOString().slice(0, 10) } : {}),
     input: r.input || 0, output: r.output || 0, cost: r.cost == null ? null : Math.round(r.cost * 1e6) / 1e6 });

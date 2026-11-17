@@ -106,7 +106,7 @@ function settingsMap() {
  * @returns {Settings}
  */
 export function getSettings() {
-  return structuredClone(settingsMap());
+  return /** @type {Settings} */ (structuredClone(settingsMap()));
 }
 export function updateSettings(patch) {
   const stmt = db.prepare('INSERT OR REPLACE INTO settings (tenant_id, key, value) VALUES (?, ?, ?)');
