@@ -728,3 +728,4 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
 .rv-a { white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
 .rv-a.open { display: block; }
 .rv-t:not(.on) { filter: grayscale(1); opacity: .7; }
+.devcode { font-size: 22px; font-weight: 700; letter-spacing: .08em; padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--card); }

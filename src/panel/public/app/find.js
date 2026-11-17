@@ -48,7 +48,7 @@ async function paletteItems() {
     }
   }
   for (const [id, title, words] of SETTINGS_SECTIONS) items.push({ kind: 'Setting', label: title, words, go: `#settings/${id}`, icon: 'settings' });
-  for (const p of ['openrouter', 'anthropic', 'openai', 'chatgpt', 'copilot'].map((id) => [id, PROVIDER_NAMES[id]])) items.push({ kind: 'Model', label: p[1], words: 'provider key connect', go: `#models/${p[0]}`, icon: 'models' });
+  for (const p of ['openrouter', 'anthropic', 'openai', 'chatgpt', 'copilot', 'claudecode', 'codex'].map((id) => [id, PROVIDER_NAMES[id]])) items.push({ kind: 'Model', label: p[1], words: 'provider key connect', go: `#models/${p[0]}`, icon: 'models' });
   const admin = can('admin');
   const act = (label, words, run) => items.push({ kind: 'Action', label, words, run });
   if (admin) {

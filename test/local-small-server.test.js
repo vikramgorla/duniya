@@ -123,7 +123,7 @@ test('small server mode: owner-only switch, off by default, shown in status', as
   assert.equal((await t.api(owner, 'PUT', '/api/server/small-mode', { enabled: 'yes' })).status, 400);
   const on = await t.api(owner, 'PUT', '/api/server/small-mode', { enabled: true });
   assert.equal(on.body.enabled, true);
-  assert.match(on.body.notCovered.join(' '), /Copilot/);
+  assert.match(on.body.covers.join(' '), /Agent apps: Claude Code, Codex, GitHub Copilot/);
   assert.equal((await t.api(owner, 'GET', '/api/status')).body.server.smallMode, true);
 });
 
