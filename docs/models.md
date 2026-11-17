@@ -14,10 +14,8 @@ list ("Connected · add another account").
 - Photos & voice depend on the provider: [see the table](#photos--voice).
 - **Models** is a list: each provider with a health dot and a short status ("ok · 8 models", "Paused until 14:20"),
   then *Default models*, *When a model fails*, *Photos & voice* and *Other endpoints*. Tap a row for its page: keys or
-  sign-in, accounts, test, and **Plan usage** when the provider reports limits ([see below](#plan-usage)).
-  Each page has its own address (`#models/chatgpt`).
-- See how much of each plan is left: Copilot's premium requests, OpenRouter's free requests and credit, an API key's
-  rate-limit headroom. A list row says "62% of premium requests".
+  sign-in, accounts and test. Each page has its own address (`#models/chatgpt`).
+- An account that hits its plan's limit pauses until the reset and the next model answers ([usage limits](#usage-limits)).
 
 | Provider | How |
 |---|---|
@@ -83,46 +81,22 @@ Admin MCP: `list_model_accounts`, `get_model_fallback`, `set_model_fallback`, `s
 `retry_model_account`; per chat `set_chat_settings` (`fallback_mode`, `fallback_chain`; giving only one keeps the
 other, like the panel editor).
 
-## Plan usage
+## Usage limits
 
-**See how much of each plan, credit and rate limit is left, before an agent runs into it.**
+**When a plan or key hits its limit, the next model answers until the limit resets.**
 
-**Do it:** panel → **Models** → a provider → **Plan usage**. Also on **Usage** (*Plans and credit*) and on Overview
-when a plan is 80 % used or more.
+**Do it:** nothing. Models shows the paused account and why ("Paused until 14:20 — usage limit reached").
 
 **In 30 seconds**
-- Only what the provider reports, never an estimate. A provider that reports nothing shows nothing.
-- No buttons: it updates with every answer, and when you open Models (for providers that need a request).
-- At 90 % and when a limit is used up you get one WhatsApp alert per window (owner assistant → *Alerts*).
-
-| Provider | What you see | Where it comes from |
-|---|---|---|
-| GitHub Copilot | premium requests (and chat messages on the free plan): left of the allowance, reset date | GitHub's `copilot_internal/user` (what the editors show); else the Copilot runtime's quota |
-| OpenRouter | free requests today, the key's credit limit, prepaid credit | `GET /api/v1/key` and `/credits` (when the key may read it) |
-| ChatGPT | your own usage through Duniya over the last 30 days (on its page and on **Usage**); no plan limits | ChatGPT doesn't share its plan limits with *Sign in with ChatGPT* |
-| Claude, OpenAI, Custom | rate-limit headroom per minute (requests, tokens), and what Duniya spent through the key this month | headers of every answer (`anthropic-ratelimit-*`, `x-ratelimit-*`); the [usage table](spending.md) |
-
-1. Open **Models** and tap a provider. The row already shows its tightest limit ("62% of premium requests").
-2. **Plan usage** has a meter per limit with what is left and when it resets, and "Updated 3m ago".
-3. Several accounts of one provider each show their own.
-
-> [!NOTE]
-> Copilot and OpenRouter need a request to tell: it is made when you open Models (at most every 10 minutes) and on
-> the server's regular upkeep (one account at a time, each every 30 minutes, skipped while memory is tight). Copilot's
-> runtime is never started just for this.
->
-> ChatGPT doesn't share its plan limits with this sign-in, so Duniya shows its own 30-day usage instead and nothing is
-> guessed. When ChatGPT says a limit was reached, the account is paused until the reset ChatGPT names and the next
-> model in the chain answers. Your plan's limits are on [chatgpt.com → Settings → Usage](https://chatgpt.com/settings/usage).
+- When a provider says a usage or rate limit was reached, that account pauses until the reset the provider names
+  (Retry-After or its own reset time) and the next model in the chain answers. Activity says who answered and why.
+- Duniya does not show how much of a plan is left: ChatGPT doesn't share it with this sign-in, and the other providers
+  report it differently. Check it with the provider (for ChatGPT: [chatgpt.com → Settings → Usage](https://chatgpt.com/settings/usage)).
+- What Duniya itself used through each account is on its page (*last 30 days*) and on **Usage**; [spending caps](spending.md)
+  limit it per agent or chat.
 
 > [!TIP]
-> When a limit runs out, Duniya switches to the next model in the chain and waits for the window's reset before it
-> tries that account again. Rate-limit headroom never alerts: it refills within a minute.
-
-![Models → OpenRouter: Plan usage with today's free requests used up and when they reset](site/img/card-plan-usage.webp)
-
-Admin MCP: `list_model_accounts` returns each account's `usage` (label, % used, what is left, reset time, when it was
-updated) and `spend_this_month`; the owner assistant uses it for "how much Copilot quota is left?".
+> Fixed the cause early (a new key, more credit)? **Try again now** on the account's page clears the pause.
 
 ## Photos & voice
 
@@ -144,7 +118,7 @@ voice notes. Photos and voice notes are sent to that provider.
 | Creates pictures | — | ✓ `gpt-image-*` listed for the key | — ¹ | — | ✓ image models (paid) | — | — |
 | Speaks | — | ✓ `gpt-4o-mini-tts` (Ogg/Opus) | — | — | ✓ (paid, needs ffmpeg) | — | Piper voice (optional) |
 
-¹ OpenAI's Sign in with ChatGPT preview lists image generation and transcription as unsupported for plan usage on
+¹ OpenAI's Sign in with ChatGPT preview lists image generation and transcription as unsupported with a ChatGPT plan on
 `api.openai.com` and says not to use ChatGPT's `backend-api` endpoints, so Duniya doesn't. Free-only OpenRouter makes
 no paid media calls.
 

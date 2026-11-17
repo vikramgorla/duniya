@@ -270,7 +270,7 @@ async function chatFor(secret, { model, system, messages, tools, onText = null, 
   if (!completed) throw new Error('ChatGPT stream ended before completion');
   const content = fromOutputItems(completed.output?.length ? completed.output : items);
   const stop = content.some((b) => b.type === 'tool_use') ? 'tool_use' : completed.incomplete ? 'max_tokens' : 'end_turn';
-  return { content, stop_reason: stop, usage: { input_tokens: completed.usage?.input_tokens || 0, output_tokens: completed.usage?.output_tokens || 0 }, headers: res.headers };
+  return { content, stop_reason: stop, usage: { input_tokens: completed.usage?.input_tokens || 0, output_tokens: completed.usage?.output_tokens || 0 } };
 }
 
 /** Adapter for one ChatGPT account (042). */

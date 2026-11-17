@@ -34,3 +34,10 @@
 - [x] T144-2 Tests: ChatGPT shows no usage and pauses until the reported reset; alert/pause/Overview/admin via OpenRouter
 - [x] T144-3 Demo without ChatGPT meters; `card-plan-usage` shot from OpenRouter; Models shots retaken
 - [x] T144-4 Docs (`models.md`, `admin-mcp.md`, `owner-assistant.md`, `spending.md`), README, website; version 2.29.2 + `releases.json`
+
+## Removal #146 (v2.30.1): plan usage removed for every provider
+
+- [x] T146-1 Delete `plan-usage.js`, `plans.js`; header plumbing (Anthropic, Chat Completions, ChatGPT), Copilot `copilot_internal/user` and runtime quota, OpenRouter `/key` and `/credits`, the upkeep tick and the Models-open refresh, the `limit` text in pauses and fallbacks, per-account spend
+- [x] T146-2 Panel: Models row meters and *Plan usage*, Usage *Plans and credit*, Overview hint, styles; budgets lowered
+- [x] T146-3 Admin MCP `list_model_accounts` back to health only; tests: the ChatGPT usage-limit pause kept (`test/usage-limit.test.js`)
+- [x] T146-4 Demo, shots (`card-plan-usage` gone; Models, Usage, Overview retaken), docs, README, website, DESIGN.md; version 2.30.1 + `releases.json`

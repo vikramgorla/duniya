@@ -5,17 +5,15 @@
 //   - address-book names: the channel refreshes a number's contact names when due (after connect, then daily)
 //   - group member lists of chats that are on: up to 2 groups whose refresh is due (on start, after a member change,
 //     then every 12 h) — learns LID↔phone pairs (the member list carries no tags, #117)
-//   - plan usage (067): the usage endpoint of at most one model account (Copilot, OpenRouter), each every 30 minutes
 //   - retention and health (069): free disk space every tick; old data pruned in bounded batches at most hourly
 //     (retention.js) — also while memory is tight (pruning makes things smaller); a WhatsApp number that keeps
 //     reconnecting for 15 minutes is reported to the owner once
-// Names, group and plan-usage refreshes are skipped while memory is tight (optional work, resources.js).
+// Names and group refreshes are skipped while memory is tight (optional work, resources.js).
 import { optionalPaused } from './resources.js';
 import { enabledChats } from './chat-prefs.js';
 import { historyRetryTick } from './history-load.js';
 import { activity } from './events.js';
 import { isGroup } from './config.js';
-import { planUsageTick } from './providers/index.js';
 import { retentionTick } from './retention.js';
 import { sendOwnerAlert } from './owner-alerts.js';
 
@@ -48,13 +46,12 @@ let running = false;
 export async function upkeepTick(channel, now = Date.now()) {
   if (running) return { skipped: 'running' };
   running = true;
-  const done = { retries: 0, names: false, groups: 0, plan: null, prune: null };
+  const done = { retries: 0, names: false, groups: 0, prune: null };
   try {
     try { done.prune = retentionTick(now); } catch (e) { activity('error', { summary: `Pruning old data failed: ${e.message}` }); }
     await channelHealth(channel, now);
     try { done.retries = await historyRetryTick(now); } catch (e) { activity('error', { summary: `History retry failed: ${e.message}` }); }
     if (optionalPaused()) return { ...done, skipped: 'memory' };
-    try { done.plan = await planUsageTick(now); } catch { /* the provider did not say; next round */ }
     try { done.names = !!(await channel?.upkeep?.())?.ok; } catch { /* the channel reports its own failures */ }
     if (typeof channel?.refreshGroup !== 'function') return done;
     const on = new Set(enabledChats().filter(isGroup));
