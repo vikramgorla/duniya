@@ -19,8 +19,8 @@ import { FIRST_SCREEN, staticClosure } from '../src/panel/module-graph.js';
 // own confirmation dialog, and accessibility (switch roles, labelled fields, focus handling); then 53 KB for the ⋯ row
 // menu and the display names shared with the server (names.js). The total rose to 152 KB for the list → page layout
 // (Models, Settings, Backups) and the plan-usage meters.
-const FIRST_BUDGET = 59_000; // 066: +6 KB (with the 065 change logs merged) for the Ask conversation (thinking, live tool chips, streaming markdown, Stop), plain-word activity rows, and recovery after the phone suspends the app (deadlines, Retry, pull to refresh)
-const TOTAL_BUDGET = 158_000; // 066: same reason
+const FIRST_BUDGET = 59_600; // #136: +0.6 KB for the quiet copy icon (copy/done icons) and plain tool phrases in old activity entries. Before: 59_000; // 066: +6 KB (with the 065 change logs merged) for the Ask conversation (thinking, live tool chips, streaming markdown, Stop), plain-word activity rows, and recovery after the phone suspends the app (deadlines, Retry, pull to refresh)
+const TOTAL_BUDGET = 158_800; // #136: same reason. Before: 158_000; // 066: same reason
 
 const PUBLIC = resolve(import.meta.dirname, '../src/panel/public');
 const APP = resolve(PUBLIC, 'app');

@@ -1,6 +1,17 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.27.1": {
+      "breaking": false,
+      "title": "Small fixes from the phone: Ask empties its box, a quiet Copy icon, the refresh spinner goes away, plain words in Activity",
+      "changes": [
+        { "type": "fixed", "text": "Ask kept your question in the box after it was answered; the box now empties when you send, ready for a follow-up." },
+        { "type": "fixed", "text": "After pull to refresh, the round refresh icon stayed under the header; it now disappears when the refresh is done." },
+        { "type": "fixed", "text": "Activity showed tool names for AI assistants and older entries (\"check_for_updates\", \"Chat_recap\"); they read in plain words too (\"Checked for updates\", \"Chat recap\")." },
+        { "type": "improved", "text": "Copy under an answer is a small copy icon instead of a big button; it turns into a tick when copied." },
+        { "type": "improved", "text": "Owner assistant entries in Activity use the agent icon instead of a house." }
+      ]
+    },
     "2.27.0": {
       "breaking": false,
       "title": "Ask is a live conversation; Activity, Overview and the phone app are easier to read and never get stuck",

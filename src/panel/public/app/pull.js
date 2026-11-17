@@ -4,14 +4,15 @@
 import { $, S, h, recover } from './core.js';
 const PULL = 64; // px of (damped) pull that arms the refresh
 let y0 = null; let armed = false; let mark = null;
-const reset = () => { y0 = null; armed = false; if (mark) mark.style.transform = ''; mark?.classList.remove('armed'); };
+// the spinner exists only while pulling or refreshing (#136: at rest it peeked out under the header)
+const reset = () => { y0 = null; armed = false; mark?.remove(); mark = null; };
 const blocked = (t) => window.scrollY > 0 || $('dialog[open]') || [...document.querySelectorAll('.thread, .ld-list, .tscroll, pre, textarea')].some((b) => b.contains(t) && b.scrollTop > 0);
 if (matchMedia('(pointer: coarse)').matches) {
   document.addEventListener('touchstart', (e) => { y0 = S.user && e.touches.length === 1 && !blocked(e.target) ? e.touches[0].clientY : null; }, { passive: true });
   document.addEventListener('touchmove', (e) => {
     if (y0 == null) return;
     const d = Math.min((e.touches[0].clientY - y0) * 0.5, PULL + 16);
-    if (d <= 4 || window.scrollY > 0) { if (mark) mark.style.transform = ''; armed = false; return; }
+    if (d <= 4 || window.scrollY > 0) { mark?.remove(); mark = null; armed = false; return; }
     mark ||= document.body.appendChild(h('div', { class: 'ptr', 'aria-hidden': 'true' }, h('span', { class: 'spinner' })));
     armed = d >= PULL;
     mark.classList.toggle('armed', armed);
@@ -21,7 +22,7 @@ if (matchMedia('(pointer: coarse)').matches) {
     if (!armed) return reset();
     mark.classList.add('busy'); mark.style.transform = `translate(-50%, ${PULL}px)`;
     recover(true);
-    setTimeout(() => { mark?.classList.remove('busy'); reset(); }, 700);
+    setTimeout(reset, 700);
   }, { passive: true });
   document.addEventListener('touchcancel', reset, { passive: true });
 }
