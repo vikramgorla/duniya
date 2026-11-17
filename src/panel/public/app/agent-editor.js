@@ -169,7 +169,7 @@ export function agentPage(id, { onChange } = {}) {
 // ---------- sections ----------
 function buildCharacter(x) {
   const F = { name: h('input', { value: x.c.name || '' }), description: h('input', { value: x.c.description || '' }),
-    prompt: h('textarea', { class: 'prose', value: x.c.prompt || '', placeholder: x.bi ? 'e.g. Answer in English, short; call me Vik.' : '' }) };
+    prompt: h('textarea', { class: 'prose', style: 'min-height:min(52vh,420px)', value: x.c.prompt || '', placeholder: x.bi ? 'e.g. Answer in English, short; call me Vik.' : '' }) };
   return { F, el: h('div', {}, field('Name', F.name), x.bi ? null : field('Description', F.description, 'One line, shown in lists.'), field(x.bi ? 'Character' : 'Instructions', F.prompt)),
     value: () => ({ name: F.name.value, ...(x.bi ? {} : { description: F.description.value }), prompt: F.prompt.value }) };
 }
