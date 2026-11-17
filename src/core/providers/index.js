@@ -10,7 +10,9 @@ import * as anthropic from './anthropic.js';
 import { recordUsage } from '../usage.js';
 import * as chatgpt from './chatgpt.js';
 import * as copilot from './copilot.js';
-import { chatCompletionsProvider } from './openai-chat.js';
+import { chatCompletionsProvider, openRouterLimits } from './openai-chat.js';
+import * as planUsage from './plan-usage.js';
+import { spendOf } from '../budget.js';
 import { classify, REASON_TEXT } from './errors.js';
 import * as breaker from './breaker.js';
 import { REF_RE, cleanChain } from './fallback-config.js';
@@ -128,7 +130,7 @@ const providerById = (id) => providers().find((p) => p.id === id);
 export const accountById = providerById;
 
 // Credentials changed: forget that account's pause / "needs reconnect" state.
-onSecretChange((name) => { for (const p of providers()) if (p.secret === name) breaker.reset(p.id); });
+onSecretChange((name) => { for (const p of providers()) if (p.secret === name) { breaker.reset(p.id); planUsage.forget(p.id); } });
 
 // ---------- accounts (042) ----------
 const cleanLabel = (v) => String(v || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 40);
@@ -183,7 +185,7 @@ export async function removeAccount(id) {
     else setSecret(secret, '');
     updateSettings({ accounts: accountEntries().filter((a) => a.id !== id) });
   }
-  modelCache.delete(id); extrasCache.delete(id); breaker.reset(id); lastUsed.delete(id);
+  modelCache.delete(id); extrasCache.delete(id); breaker.reset(id); lastUsed.delete(id); planUsage.forget(id);
   return { ok: true };
 }
 
@@ -215,7 +217,7 @@ export function addCompatible({ id, name, baseUrl, key, preset, label }) {
 export function removeCompatible(id) {
   updateSettings({ providers: compatibleList().filter((p) => p.id !== id) });
   setSecret(keySecretFor(id), '');
-  modelCache.delete(id); breaker.reset(id);
+  modelCache.delete(id); breaker.reset(id); planUsage.forget(id);
 }
 
 // ---------- models ----------
@@ -242,6 +244,10 @@ export async function status({ refresh = false } = {}) {
       const m = await providerModels(p, { refresh });
       row.connected = !m.error; row.models = m.models.length; if (m.error) row.error = m.error;
       if (row.connected && p.type === 'copilot') Object.assign(row, await copilotExtras(p, { refresh }));
+      if (row.connected) await refreshPlanUsage(p, { force: refresh });
+      const usage = planUsage.view(p.id); // 067: { at, limits } — only what the provider reports
+      if (usage) row.usage = usage;
+      if (PRICED.has(p.type) && !p.freeOnly) row.spend = spendOf('account', p.id); // this month, by Duniya
       row.health = breaker.accountState(p.id); // 042: { state: ok | paused | probing | reconnect, text }
       row.accounts = groups.get(p.group) || 1;
       row.strategy = strat[p.group] || 'order';
@@ -256,10 +262,35 @@ const extrasCache = new Map(); // account id -> { at, value }
 async function copilotExtras(p, { refresh }) {
   const hit = extrasCache.get(p.id);
   if (!refresh && hit && Date.now() - hit.at < 5 * 60000) return hit.value;
-  const [account, quota] = await Promise.all([copilot.account(p.secret), copilot.quota(p.secret).catch(() => null)]);
-  const value = { ...(account ? { account } : {}), ...(quota ? { quota } : {}) };
+  const account = await copilot.account(p.secret);
+  const value = account ? { account } : {};
   extrasCache.set(p.id, { at: Date.now(), value });
   return value;
+}
+
+// ---------- plan usage (067) ----------
+const PRICED = new Set(['anthropic', 'openai', 'openrouter', 'compatible']); // accounts that cost per use
+const ENDPOINT_TYPES = new Set(['copilot', 'openrouter']); // usage needs a request (other accounts report it with every answer)
+const USAGE_TTL_MS = 10 * 60000; // when Models opens
+const USAGE_TICK_MS = 30 * 60000; // on the scheduler tick
+/** Read an account's usage endpoint when it is older than the TTL (or `force`). Never throws. */
+async function refreshPlanUsage(p, { force = false, ttl = USAGE_TTL_MS, allowStart = true } = {}) {
+  if (!ENDPOINT_TYPES.has(p.type) || (!force && Date.now() - planUsage.endpointAt(p.id) < ttl)) return;
+  try {
+    const limits = p.type === 'copilot' ? await copilot.planLimits(p.secret, { allowStart }) : await openRouterLimits(p.baseUrl, getSecret(p.secret));
+    if (limits) planUsage.noteEndpoint(p.id, limits, { name: p.name });
+  } catch { /* the provider did not say: nothing is shown */ }
+}
+/**
+ * Scheduler tick (upkeep.js, skipped while memory is tight): refresh the usage endpoint of at most one account, each at
+ * most every 30 minutes, never while the account is paused, and never starting the Copilot runtime just for this.
+ */
+export async function planUsageTick(now = Date.now()) {
+  const due = providers().filter((p) => p.configured && ENDPOINT_TYPES.has(p.type) && !breaker.isPaused(p.id) && now - planUsage.endpointAt(p.id) >= USAGE_TICK_MS)
+    .sort((a, b) => planUsage.endpointAt(a.id) - planUsage.endpointAt(b.id))[0];
+  if (!due) return null;
+  await refreshPlanUsage(due, { force: true, allowStart: false });
+  return due.id;
 }
 export function clearCopilotExtras(id) { if (id) extrasCache.delete(id); else extrasCache.clear(); }
 
@@ -401,7 +432,7 @@ export function planCandidates({ model = 'auto', purpose = 'agent', fallback = f
   return out;
 }
 
-const describeFailures = (failures) => failures.map((f) => `${f.name} (${f.paused ? 'paused: ' : ''}${REASON_TEXT[f.reason] || f.reason})`).join(', ');
+const describeFailures = (failures) => failures.map((f) => `${f.name} (${f.paused ? 'paused: ' : ''}${f.limit || REASON_TEXT[f.reason] || f.reason})`).join(', ');
 
 /**
  * Unified chat call with automatic fallback (042). Input/output use Anthropic-style blocks.
@@ -435,7 +466,8 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
     if (paused.some((x) => x.id === p.id)) return;
     paused.push(p);
     if (failures.some((f) => f.account === p.id)) return; // it already failed in this call
-    failures.push({ ref: `${p.id}:auto`, account: p.id, name: p.name, reason: breaker.accountState(p.id).reason || 'server', paused: true });
+    const st = breaker.accountState(p.id);
+    failures.push({ ref: `${p.id}:auto`, account: p.id, name: p.name, reason: st.reason || 'server', paused: true, ...(st.limit ? { limit: st.limit } : {}) });
   };
   // Second pass (last resort): when every candidate was paused and nothing was tried, accounts paused for a
   // transient error (outage, network, timeout) are tried once anyway — there is no one else to ask. Accounts paused
@@ -487,15 +519,21 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
         }
       } catch (e) {
         if (signal?.aborted) { breaker.release(p.id); throw Object.assign(new Error('Stopped'), { code: 'aborted' }); } // 066: the asker pressed Stop; not the provider's fault
-        const cls = classify(e);
-        if (cls.breaker) breaker.recordFailure(p.id, cls, { name: p.name, message: e.message });
+        if (e?.headers) planUsage.noteHeaders(p.id, e.headers, { name: p.name }); // 067: a 429 says which window is full
+        let cls = classify(e);
+        // 067: a limit error names the plan window that is used up ("5-hour limit used up, resets 14:20") and waits for its reset
+        const lim = ['quota', 'rate_limit'].includes(cls.reason) ? planUsage.exhausted(p.id) : null;
+        if (lim && !cls.retryAfterMs && lim.resetAt > Date.now()) cls = { ...cls, retryAfterMs: lim.resetAt - Date.now() };
+        if (cls.breaker) breaker.recordFailure(p.id, cls, { name: p.name, message: e.message, limit: lim?.text });
         else breaker.release(p.id);
         lastErr = e;
-        failures.push({ ref, account: p.id, name: p.name, reason: cls.reason, message: String(e.message || '').slice(0, 200) });
+        failures.push({ ref, account: p.id, name: p.name, reason: cls.reason, message: String(e.message || '').slice(0, 200), ...(lim ? { limit: lim.text } : {}) });
         if (!cls.next || direct) { e.failures = failures; e.fallbackReason = cls.reason; throw e; }
         continue;
       }
       breaker.recordSuccess(p.id, { name: p.name });
+      const { headers: rh, planEvent, ...answer } = res; res = answer; // 067: plan usage from the answer's headers / stream event
+      try { if (rh) planUsage.noteHeaders(p.id, rh, { name: p.name }); if (planEvent) planUsage.noteEvent(p.id, planEvent, { name: p.name }); } catch { /* bookkeeping */ }
       const failed = failures.filter((f) => f.reason !== 'unavailable' && !(f.paused && f.account === p.id));
       const fbText = failed.length ? `after ${describeFailures(failed)}` : '';
       try { // usage & cost (023): the account and model that actually answered, and why it switched (042)
@@ -504,7 +542,7 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
           input: res.usage?.input_tokens || 0, output: res.usage?.output_tokens || 0, published, fallback: fbText });
       } catch { /* never fail a reply because of bookkeeping */ }
       const firstFail = failed.find((f) => f.account !== p.id);
-    if (firstFail) breaker.noteSwitch({ from: firstFail.name, to: p.name, reason: firstFail.reason, agent: usage.agent, chat: usage.chat });
+      if (firstFail) breaker.noteSwitch({ from: firstFail.name, to: p.name, reason: firstFail.reason, limit: firstFail.limit, agent: usage.agent, chat: usage.chat });
       if (turn) turn.ref = ref;
       return { ...res, model: ref, account: p.id, answeredBy: p.name, failures: failed };
     }

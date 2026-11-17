@@ -31,14 +31,15 @@ export function anthropicAdapter(secret = SECRET) {
     /** onText (047, #83): stream the answer's text; deltas go to onText, the final message (content, usage) is returned. */
     async chat({ model, system, messages, tools, maxTokens, onText = null, signal = undefined }) {
       const params = { model, max_tokens: maxTokens, system, tools, messages };
+      // 067: the response headers carry the rate-limit headroom (anthropic-ratelimit-*, plan-usage.js)
       if (!onText) {
-        const res = await sdk().messages.create(params);
-        return { content: res.content, stop_reason: res.stop_reason, usage: res.usage || {} };
+        const { data: res, response } = await sdk().messages.create(params).withResponse();
+        return { content: res.content, stop_reason: res.stop_reason, usage: res.usage || {}, headers: response.headers };
       }
       const stream = sdk().messages.stream(params, { signal }); // 066: Stop in the Ask box ends the call
       stream.on('text', (delta) => { if (delta) onText(delta); });
-      const res = await stream.finalMessage();
-      return { content: res.content, stop_reason: res.stop_reason, usage: res.usage || {} };
+      const [{ response }, res] = await Promise.all([stream.withResponse(), stream.finalMessage()]);
+      return { content: res.content, stop_reason: res.stop_reason, usage: res.usage || {}, headers: response.headers };
     },
   };
 }
