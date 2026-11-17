@@ -1,3 +1,4 @@
+// @ts-check
 // Per-chat preferences (013/011): model choice and activity logging level for a single chat (group or person).
 // The agent a chat talks to stays in the agent's `chats` list (one source of truth for bindings).
 import { db } from './db.js';

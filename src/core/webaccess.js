@@ -454,6 +454,7 @@ export function cancelSwitch({ user } = {}) {
  * Change who may open the panel. Anything stricter than now is a trial: it reverts by itself unless confirmed through
  * the new rule within TRIAL_MS. Rules that would shut out the current request need `confirmLockout`.
  */
+/** @param {object} body  @param {{ user?: object, ip?: string, req?: object }} [o] */
 export async function setAccess(body, { user, ip = '', req } = {}) {
   ensureFree();
   const s = webSettings();

@@ -1,3 +1,4 @@
+// @ts-check
 // Local tool services (010): MCP servers installed from npm or GitHub and run on this server over stdio.
 // They are third-party code running with the app's own permissions, so: only owners add or change them (panel),
 // the installed version is recorded, npm install scripts are off unless allowed, and the process gets a scrubbed
@@ -65,7 +66,7 @@ export function installedInfo(spec, allowScripts = false) {
 function run(cmd, args, opts) {
   return new Promise((res, rej) => {
     execFile(cmd, args, { maxBuffer: 8 * 1024 * 1024, ...opts }, (err, stdout, stderr) => {
-      if (err) rej(Object.assign(new Error((stderr || err.message).trim().split('\n').slice(-6).join('\n')), { status: 400 }));
+      if (err) rej(Object.assign(new Error(String(stderr || err.message).trim().split('\n').slice(-6).join('\n')), { status: 400 }));
       else res(stdout);
     });
   });

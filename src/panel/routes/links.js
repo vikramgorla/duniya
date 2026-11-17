@@ -1,3 +1,4 @@
+// @ts-check
 // One-time links (060, #121): a signed-in owner or admin enters a secret in the panel instead of a chat, and a new
 // user sets their own password. Values are saved through the existing routes (`invoke`, as the signed-in user), so
 // validation, role gates and activity logging stay in one place. Values are never returned or logged.

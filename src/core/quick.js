@@ -1,3 +1,4 @@
+// @ts-check
 // Built-in answers (054, issue #102): quick replies, the optional "!help" list and FAQ auto-answers. No AI, no tokens:
 // the owner writes the answers, the router sends them before (or instead of) a model call. Pure functions; the
 // router and the panel's test console share them, so both take the same path.

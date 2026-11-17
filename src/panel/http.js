@@ -1,3 +1,4 @@
+// @ts-check
 // Small HTTP helpers shared by the panel router and feature routes (sign-in pages, uploads).
 import { createWriteStream, mkdirSync, rmSync, renameSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -135,14 +136,14 @@ export async function receiveUpload(req, { magic = '', max = UPLOAD_MAX } = {}) 
         head = Buffer.concat([head, chunk]).subarray(0, magic.length);
         if (head.length === magic.length && head.toString() !== magic) throw Object.assign(new Error('This is not a Duniya backup file (.dbk)'), { status: 400 });
       }
-      if (!out.write(chunk)) await new Promise((r) => out.once('drain', r));
+      if (!out.write(chunk)) await new Promise((r) => out.once('drain', () => r(null)));
     }
     if (size < magic.length || (magic && head.toString() !== magic)) throw Object.assign(new Error('This is not a Duniya backup file (.dbk)'), { status: 400 });
     await new Promise((r, j) => out.end((e) => (e ? j(e) : r())));
     renameSync(part, resolve(UPLOAD_DIR, `${id}.dbk`));
     return { upload: id, size };
   } catch (e) {
-    await new Promise((r) => { if (out.closed) r(); else { out.once('close', r); out.destroy(); } });
+    await new Promise((r) => { if (out.closed) r(null); else { out.once('close', () => r(null)); out.destroy(); } });
     rmSync(part, { force: true }); // after close: the file may only be created once the stream opened it
     req.resume(); // drain whatever the client still sends
     throw e;

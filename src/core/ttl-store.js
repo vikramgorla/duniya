@@ -1,3 +1,4 @@
+// @ts-check
 // Short-lived state that must survive a restart (#64): owner-assistant and admin-MCP confirm codes, provider
 // circuit-breaker pauses. One SQLite row per (kind, key) with an expiry; values are JSON, encrypted with the master key
 // (confirm codes hold tool arguments). Expired rows are never returned and are swept on writes.

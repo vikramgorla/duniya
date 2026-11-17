@@ -1,3 +1,4 @@
+// @ts-check
 // Daily counters for the weekly summary (041, issue #38): messages handled and replies per agent, messages ignored per
 // chat, replies held back by a spending cap. Counts only — never message text. Kept 60 days.
 import { db } from './db.js';

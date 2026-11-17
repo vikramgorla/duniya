@@ -1,3 +1,4 @@
+// @ts-check
 // The panel's static files (058, 063): the HTML shell, its native ES modules and stylesheet (public/app/), the web app
 // manifest and icons. Read once at start, compressed once, served from memory with an ETag (staticFile).
 //

@@ -1,3 +1,4 @@
+// @ts-check
 // Panel routes that explain the app to its owner: why agents stayed silent (#34), the first-run checklist (#36) and
 // the tools a role gets in the test console (#37).
 import { db } from '../../core/db.js';

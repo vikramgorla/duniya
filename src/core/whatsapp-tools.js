@@ -1,3 +1,4 @@
+// @ts-check
 // Built-in WhatsApp tools (026), exposed to the model as whatsapp__<name>. Same shape as the memory tools.
 // Role rules are code (constitution III): participants get the send/react/poll-type tools by default, organizers all;
 // powerful actions (people, group settings, block, delete) are organizer-only whatever the rules say, and are applied

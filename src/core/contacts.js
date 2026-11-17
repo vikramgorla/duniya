@@ -1,3 +1,4 @@
+// @ts-check
 // Contacts (issue #11, #110): names synced from the linked WhatsApp phone(s) plus the owner's own entries.
 // Agents look contacts up with contacts__find_contact. Participants only ever see contacts marked shared;
 // organizers see all and manage them (owner decision on #11). Synced contacts are never shared by default.
@@ -70,7 +71,7 @@ export function mapLid(lid, phone) {
   const changed = setLidPhone.run(TENANT, l, p, Date.now()).changes > 0;
   const r = getLid.get(TENANT, l);
   let moved = 0;
-  for (const [k, col] of Object.entries(NAME_COLS)) if (r?.[col]) moved += upPhone[k].run(TENANT, p, r[col], Date.now()).changes;
+  for (const [k, col] of Object.entries(NAME_COLS)) if (r?.[col]) moved += Number(upPhone[k].run(TENANT, p, r[col], Date.now()).changes);
   return changed || moved > 0;
 }
 /** Phone digits of a LID when the mapping is known, else ''. */
@@ -93,8 +94,8 @@ export function syncWhatsAppContacts(list = []) {
       const names = { book: clean(c?.name), biz: clean(c?.verifiedName), push: clean(c?.notify) };
       for (const [k, v] of Object.entries(names)) {
         if (!v || /^\+?\d[\d\s]{5,}$/.test(v)) continue; // a "name" that is only a number adds nothing
-        if (phone.length >= 6) n += upPhone[k].run(TENANT, phone, v, Date.now()).changes;
-        else if (lid) n += upLid[k].run(TENANT, lid, v, Date.now()).changes;
+        if (phone.length >= 6) n += Number(upPhone[k].run(TENANT, phone, v, Date.now()).changes);
+        else if (lid) n += Number(upLid[k].run(TENANT, lid, v, Date.now()).changes);
       }
     }
     db.exec('COMMIT');

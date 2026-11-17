@@ -1,3 +1,4 @@
+// @ts-check
 import { interpolate } from './store.js';
 import { mcpConnection } from './mcp.js';
 import { localServiceCheck } from './mcp-local.js';

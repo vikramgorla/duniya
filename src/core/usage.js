@@ -1,3 +1,4 @@
+// @ts-check
 // Usage and cost (023). Every model call is recorded with tokens, agent, chat, provider, model and kind
 // (reply | summary | ai-helper | test). Costs come only from prices the owner set or the provider publishes
 // (e.g. OpenRouter); plan-based providers (ChatGPT plan, GitHub Copilot) are "included", free models cost 0, and
@@ -65,7 +66,9 @@ const GROUPS = { agent: 'agent', chat: 'chat', provider: 'provider', account: "C
 export function usageReport({ from = 0, to = Date.now(), groupBy = 'agent', agent = '', chat = '' } = {}) {
   const key = GROUPS[groupBy];
   if (!key) throw Object.assign(new Error('groupBy must be one of agent, chat, provider, account, model, kind, fallback, day'), { status: 400 });
-  const where = ['ts >= ?', 'ts <= ?']; const args = [Number(from) || 0, Number(to) || Date.now()];
+  const where = ['ts >= ?', 'ts <= ?'];
+  /** @type {(string|number)[]} */
+  const args = [Number(from) || 0, Number(to) || Date.now()];
   if (agent) { where.push('agent = ?'); args.push(agent); }
   if (chat) { where.push('chat = ?'); args.push(chat); }
   const cols = `COUNT(*) AS calls, SUM(input) AS input, SUM(output) AS output, SUM(cost) AS cost,

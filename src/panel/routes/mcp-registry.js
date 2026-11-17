@@ -1,3 +1,4 @@
+// @ts-check
 // Browse tool services (052, issue #99): search the MCP Registry and add an entry as a tool service of one agent or of
 // all agents (035) in one step. Same rules as adding by hand: local packages are owner-only (they run code on this
 // server) and refused on small servers unless Small server mode is on (055); secret values are stored as secrets and never returned; tools are listed

@@ -12,6 +12,7 @@
 //  6. Lean code (fails, 058): knip finds no unused files, exports or dependencies (knip.json); jscpd finds no
 //     duplication above its threshold (.jscpd.json); the panel's modules link and stay within their first-screen and
 //     total budgets (scripts/check-panel.mjs, 063).
+//  7. Types (fails, 063): `tsc` checks every file that starts with // @ts-check (tsconfig.json, npm run typecheck).
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -94,5 +95,14 @@ if (base) {
   try {
     console.log(execFileSync(process.execPath, ['--experimental-vm-modules', '--disable-warning=ExperimentalWarning', join(root, 'scripts', 'check-panel.mjs')], { cwd: root, encoding: 'utf8' }).trim());
   } catch (e) { failed = true; console.log(String(e.stdout || e.message)); }
+}
+// 7. types: files that opted in with // @ts-check
+try {
+  execFileSync(join(root, 'node_modules', '.bin', 'tsc'), ['-p', 'tsconfig.json'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  console.log('typecheck: ok');
+} catch (e) {
+  failed = true;
+  console.log('::error::Type errors in files with // @ts-check. Fix them (or add a JSDoc type where the code is right). Run `npm run typecheck` for details.');
+  console.log(String(e.stdout || '') + String(e.stderr || e.message));
 }
 process.exit(failed ? 1 : 0);

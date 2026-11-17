@@ -1,3 +1,4 @@
+// @ts-check
 // Circuit breaker per provider account (042, issue #43). A retryable failure pauses the account: 1 minute, doubling up
 // to 30 minutes, or until the provider's Retry-After / reset time for quota and rate limits. While paused the account
 // is skipped; after the pause one call probes it (others keep skipping) and success closes the breaker. An expired or
@@ -70,6 +71,7 @@ export function canTry(id, { name = id } = {}) {
 }
 
 /** Paused (cooling down, or another call is probing it)? Also sends the "failing > 15 min" alert when due. */
+/** @param {string} id  @param {{ name?: string }} [o] */
 export function isPaused(id, { name } = {}) {
   const s = states.get(id);
   if (!s) return false;

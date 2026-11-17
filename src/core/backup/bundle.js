@@ -1,3 +1,4 @@
+// @ts-check
 // Backup bundle: consistent snapshot → gzip JSON → passphrase encryption (scrypt + AES-256-GCM).
 import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, relative } from 'node:path';

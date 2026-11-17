@@ -1,3 +1,4 @@
+// @ts-check
 import { isChatEnabled, ignoredCounts, noteLatestKeys } from './chat-prefs.js';
 import { storeLoadedBatch, setHistoryChannel, historyChatActive } from './history-load.js';
 import { personInfo, agentName } from './contacts.js';

@@ -1,7 +1,14 @@
+// @ts-check
 import { DatabaseSync } from 'node:sqlite';
 import { resolve } from 'node:path';
 import { DATA_DIR, env } from './config.js';
 
+/**
+ * Rows are plain objects whose columns the SQL decides, so statements hand them out untyped (063, type checking).
+ * @typedef {{ run: (...params: any[]) => import('node:sqlite').StatementResultingChanges, get: (...params: any[]) => any,
+ *   all: (...params: any[]) => any[], iterate: (...params: any[]) => IterableIterator<any> }} Statement
+ * @type {Omit<DatabaseSync, 'prepare'> & { prepare: (sql: string) => Statement }}
+ */
 export const db = new DatabaseSync(resolve(DATA_DIR, 'duniya.sqlite'));
 db.exec(`
   PRAGMA journal_mode = WAL;
@@ -161,7 +168,9 @@ export function pruneActivity({ days = 30, max = 5000 } = {}) {
 }
 export function listActivity({ limit = 200, agent = '', chat = '', before = 0 } = {}) {
   const lim = Math.min(Number(limit) || 200, 1000);
-  const where = ['(? = 0 OR id < ?)']; const args = [before, before];
+  const where = ['(? = 0 OR id < ?)'];
+  /** @type {(string|number)[]} */
+  const args = [before, before];
   if (agent) { where.push('agent = ?'); args.push(agent); }
   if (chat) { where.push('chat = ?'); args.push(chat); }
   const rows = db.prepare(`SELECT * FROM activity WHERE ${where.join(' AND ')} ORDER BY id DESC LIMIT ?`).all(...args, lim);

@@ -1,3 +1,4 @@
+// @ts-check
 // Panel routes for photos & voice (043, #48): capabilities per provider, server settings, on-server speech engines,
 // and the small-server state (size, memory, media queue).
 import { capabilities, mediaSettings, setMediaSettings, VOICES } from '../../core/media-ai.js';

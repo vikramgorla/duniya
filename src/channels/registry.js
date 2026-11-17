@@ -1,3 +1,4 @@
+// @ts-check
 // Several WhatsApp numbers (012). Each number is its own linked-device session. The registry looks like one channel
 // to the rest of the app: chats on the first number keep their plain WhatsApp id (no migration), chats on other
 // numbers are prefixed "<number>#<jid>", and send/typing/isMember route to the right session from the chat id.
@@ -82,6 +83,7 @@ export function createChannelRegistry({ factory = createWhatsAppChannel } = {}) 
       const g = await byNumber(number).groupCreate(subject, people);
       return { ...g, id: chatKey(number || MAIN, g.id) };
     },
+    /** @param {Function} onMessage  @param {{ onHistory?: Function, onJoin?: Function, onMemberTag?: Function, onPhoneActive?: Function, onGroupChange?: Function }} [handlers] */
     async start(onMessage, { onHistory, onJoin, onMemberTag, onPhoneActive, onGroupChange } = {}) {
       handler = onMessage; historyHandler = onHistory || null; joinHandler = onJoin || null; tagHandler = onMemberTag || null; activeHandler = onPhoneActive || null;
       groupHandler = onGroupChange || null;

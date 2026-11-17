@@ -1,3 +1,4 @@
+// @ts-check
 // Provider error classification (042, issue #43): decides whether a failed model call may move on to the next
 // account/model in the fallback chain, whether it trips that account's circuit breaker, and for how long.
 //

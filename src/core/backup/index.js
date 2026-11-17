@@ -1,3 +1,4 @@
+// @ts-check
 // Backups (007): settings, run, retention per destination, schedule, list, restore staging.
 import { readFileSync, writeFileSync, readdirSync, rmSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';

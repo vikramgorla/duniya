@@ -1,3 +1,4 @@
+// @ts-check
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { applyPendingRestore } from './restore-apply.js';

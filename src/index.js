@@ -1,3 +1,4 @@
+// @ts-check
 import { loadAgents, listAgents } from './core/agents.js';
 import { createChannelRegistry } from './channels/registry.js';
 import { createRouter, createHistoryHandler, createJoinHandler } from './core/router.js';
@@ -37,5 +38,5 @@ startWebAccess();
 // #10 silent by default: chats are off until switched on; tell the owner once after the update.
 activity('system', { summary: 'Started' });
 
-process.on('unhandledRejection', (e) => activity('error', { summary: `Unhandled: ${e?.message || e}` }));
+process.on('unhandledRejection', (e) => activity('error', { summary: `Unhandled: ${e instanceof Error ? e.message : e}` }));
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));

@@ -1,3 +1,4 @@
+// @ts-check
 // Small-server guardrails (043, issue #48). A 1 GB / 1 vCPU VM (OCI E2.1.Micro, Google e2-micro) must never fall over
 // because of optional features. This module knows how big the server is, how much memory is free and how much the app
 // itself uses, and gives the rest of the app three tools:

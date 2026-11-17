@@ -9,6 +9,7 @@
     "start": "node --disable-warning=ExperimentalWarning src/index.js",
     "test": "node --test --test-concurrency=4 --disable-warning=ExperimentalWarning test/*.test.js",
     "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json",
     "check:panel": "node --experimental-vm-modules --disable-warning=ExperimentalWarning scripts/check-panel.mjs",
     "check:responsive": "node --disable-warning=ExperimentalWarning scripts/check-responsive.mjs",
     "site:shots": "node --disable-warning=ExperimentalWarning scripts/site-shots.mjs",
@@ -29,9 +30,11 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
     "eslint": "^10.15.0",
     "globals": "^17.14.0",
     "jscpd": "^5.4.3",
-    "knip": "^6.45.1"
+    "knip": "^6.45.1",
+    "typescript": "^5.9.3"
   }
 }

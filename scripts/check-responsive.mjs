@@ -41,11 +41,11 @@ const REGISTRY_ADDED = `const f1 = window.fetch; window.fetch = async (u, o) => 
 // js runs in the page after the screen loaded; T.* helpers are defined in PRELUDE.
 const STATES = [
   { name: 'login', hash: '', js: "await fetch('/api/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); await (await import('/app/login.js')).renderLogin();", relogin: true },
-  { name: 'setup', hash: '', js: "S.es?.close(); S.tab = ''; (await import('/app/login.js')).renderSetup(document.querySelector('#app'), () => []);" },
-  { name: 'setup-restore', hash: '', js: "S.es?.close(); S.tab = ''; (await import('/app/login.js')).renderSetup(document.querySelector('#app'), () => []); await T.click('Restore a backup');" },
+  { name: 'setup', hash: '', js: "S.es?.close(); S.tab = ''; const f0 = window.fetch; window.fetch = (u, o) => (String(u) === '/api/session' ? Promise.resolve(new Response(JSON.stringify({ needsSetup: true }))) : f0(u, o)); await (await import('/app/login.js')).renderLogin();" },
+  { name: 'setup-restore', hash: '', js: "S.es?.close(); S.tab = ''; const f0 = window.fetch; window.fetch = (u, o) => (String(u) === '/api/session' ? Promise.resolve(new Response(JSON.stringify({ needsSetup: true }))) : f0(u, o)); await (await import('/app/login.js')).renderLogin(); await T.click('Restore a backup');" },
   { name: 'overview', hash: 'overview' },
   // 061: the install hint without the browser's install prompt (iPhone, Firefox): the manual steps instead of a button
-  { name: 'overview-install-steps', hash: 'overview', js: "S.installPrompt = null; localStorage.removeItem('duniya.installHint'); (await import('/app/overview.js')).drawInstallHint();" },
+  { name: 'overview-install-steps', hash: 'overview', js: "S.installPrompt = null; localStorage.removeItem('duniya.installHint'); show(S.tab); await T.wait(300);" },
   // 062: Getting started, each step open in place (as on a fresh install), and the closing card
   ...['provider', 'agent', 'chat', 'reply'].map((step) => ({ name: `overview-start-${step}`, hash: 'overview', checklist: fakeChecklist(step), wait: 2000 })),
   { name: 'overview-start-done', hash: 'overview', checklist: fakeChecklist('', { done: true }), wait: 2000 },
@@ -107,7 +107,7 @@ const STATES = [
   { name: 'settings-secrets', hash: 'secrets' }, // 062: #secrets opens Settings → Secrets
   // 060: one-time links — enter a secret (signed in), a new user's sign-up page (before sign-in), the link in Users.
   { name: 'secret-link', hash: 'secrets', js: "const r = await (await fetch('/api/secret-links', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'OPENAI_API_KEY' }) })).json(); await (await import('/app/login.js')).renderSecretLink(r.link.split('=')[1]);" },
-  { name: 'signup-link', hash: '', js: "const r = await (await fetch('/api/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: `lea${Date.now() % 1e6}`, role: 'admin' }) })).json(); S.tab = ''; S.es?.close(); const app = document.querySelector('#app'); app.replaceChildren(); await (await import('/app/login.js')).renderSignup(app, () => [], r.signup.link.split('=')[1]);" },
+  { name: 'signup-link', hash: '', js: "const r = await (await fetch('/api/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: `lea${Date.now() % 1e6}`, role: 'admin' }) })).json(); S.tab = ''; S.es?.close(); history.replaceState(null, '', `#signup=${r.signup.link.split('=')[1]}`); await (await import('/app/login.js')).renderLogin();" },
   { name: 'settings-signup-link', hash: 'settings', wait: 2000, js: "S.signupLink = { username: 'lea', link: `${location.origin}/#signup=${'a1'.repeat(32)}` }; await (await import('/app/settings.js')).renderSettings(); document.querySelector('.note code')?.scrollIntoView(); await T.wait(300);" },
   { name: 'settings', hash: 'settings', wait: 2000, js: 'T.openAll();' },
   // 055: Settings → Server, Small server mode (one switch for heavier features on a small server)

@@ -1,3 +1,4 @@
+// @ts-check
 // Admin MCP tools (017). Each tool runs the same panel route handler in-process (not over HTTP), as the signed-in
 // panel user, so role gates, validation and activity logging are exactly the panel's. `calls` names the routes a
 // tool uses: the minimum role to see and run the tool is the highest role those routes require.

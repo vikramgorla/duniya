@@ -1,3 +1,4 @@
+// @ts-check
 // Agent registry (005): agents are database records; templates are JSON files.
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -69,6 +70,7 @@ function releaseChats(chats, exceptId, by) {
   }
 }
 
+/** @param {{ id?: string, config: object, by?: string }} o  id: from the name when left out */
 export async function createAgent({ id, config, by = '' }) {
   const { config: clean, warnings } = agentConfig(config);
   guardLocalSmall({}, clean.mcpServers); // 055: no new local tool services on small servers (every path ends here)

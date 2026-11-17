@@ -1,3 +1,4 @@
+// @ts-check
 // Panel routes for Web address & access (031, 036). Owner only.
 import {
   webState, checkDomain, preview, addDomain, confirmSwitch, finishSwitch, cancelSwitch, setAccess, confirmAccess, revertAccess, refreshRanges,

@@ -1,3 +1,4 @@
+// @ts-check
 // One-time links (060, #121): enter a secret in the panel (15 minutes) or set your own password as a new user
 // (48 hours), so keys and passwords never pass through WhatsApp, the owner assistant or an AI assistant.
 // The token is 256 bits of randomness; only its SHA-256 is stored (ttl_state, data encrypted, with an expiry), so a

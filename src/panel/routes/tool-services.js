@@ -1,3 +1,4 @@
+// @ts-check
 // Global tool services (035): Settings → Tool services. Defined once, available to every agent (agents opt out per
 // service). Same shape as an agent's tool-service routes (/api/agents/:id/…) so the panel reuses one editor.
 // Local services run third-party code on this server: only the owner may add, change, remove or install them.

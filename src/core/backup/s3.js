@@ -1,3 +1,4 @@
+// @ts-check
 // Minimal S3-compatible client with AWS Signature Version 4 (path-style). Works with R2, OCI, AWS, MinIO.
 import { createHash, createHmac } from 'node:crypto';
 

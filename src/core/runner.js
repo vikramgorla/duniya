@@ -1,3 +1,4 @@
+// @ts-check
 import { randomInt } from 'node:crypto';
 import { env } from './config.js';
 import { addPending, takePending, peekPending, dropPending } from './db.js';

@@ -1,3 +1,4 @@
+// @ts-check
 import { randomBytes, createCipheriv, createDecipheriv, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';

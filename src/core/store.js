@@ -1,3 +1,4 @@
+// @ts-check
 // Persistent app data (005): tenants, users, sessions, agents, secrets (encrypted), settings.
 import { db } from './db.js';
 import { encrypt, decrypt, hashPassword, verifyPassword, sha256, newToken } from './crypto.js';
@@ -77,6 +78,13 @@ export function interpolate(value) {
 
 // ---------- settings ----------
 const SETTINGS_DEFAULTS = { paused: false, defaultDmAgent: '', historyLoadCount: 50 }; // #91: earlier messages loaded when a chat goes on
+/**
+ * Panel settings: the defaults above plus what owners changed. Features keep their own block (providers, backup,
+ * webAccess, media, updates, …) and read it through their own module.
+ * @typedef {{ paused: boolean, defaultDmAgent: string, historyLoadCount: number, smallServerMode?: boolean,
+ *   whatsappNumbers?: { id: string, label: string, dmAgent?: string }[], [key: string]: any }} Settings
+ * @returns {Settings}
+ */
 export function getSettings() {
   const out = { ...SETTINGS_DEFAULTS };
   for (const r of db.prepare('SELECT key, value FROM settings WHERE tenant_id = ?').all(TENANT)) {
@@ -204,6 +212,7 @@ export function acceptInvite(email, sub) {
   } catch (e) { db.exec('ROLLBACK'); throw e; }
 }
 
+/** @param {number|string} id  @param {{ role?: string, password?: string, disabled?: boolean, email?: string }} change */
 export function updateUser(id, { role, password, disabled, email }) {
   const u = db.prepare('SELECT * FROM users WHERE id = ? AND tenant_id = ?').get(Number(id), TENANT);
   if (!u) throw Object.assign(new Error('User not found'), { status: 404 });

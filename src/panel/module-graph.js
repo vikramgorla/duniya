@@ -1,3 +1,4 @@
+// @ts-check
 // The panel's module graph (063), shared by the server (assets.js: import map, modulepreload) and the checks
 // (scripts/check-panel.mjs: budgets). Pure: reads sources it is given, no I/O.
 

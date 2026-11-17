@@ -1,3 +1,4 @@
+// @ts-check
 // Server metrics and maintenance (011). Read-only metrics come from /proc and standard tools (no root needed).
 // Maintenance (OS updates, reboot, restarting services) is done by a root-owned helper installed by install.sh:
 // the app writes one action word to a request file; a systemd path unit runs the helper, which accepts only a
@@ -142,6 +143,7 @@ export const metricsHistory = () => history;
 // A simulation as the app user may ignore phasing (apt treats it like a chroot), so phasing also comes from
 // `apt-cache policy` ("(phased 20%)" next to the candidate). Security updates are never phased.
 // The parsers are pure and tested on captured outputs (test/fixtures/apt/), including apt 3's new layout.
+/** @type {[RegExp, string][]} */
 const LIST_HEADERS = [
   [/^The following upgrades have been deferred due to phasing:$/, 'phased'], [/^Not upgrading yet due to phasing:$/, 'phased'],
   [/^The following packages have been kept back:$/, 'keptBack'], [/^Not upgrading:$/, 'keptBack'],

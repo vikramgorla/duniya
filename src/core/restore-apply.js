@@ -1,3 +1,4 @@
+// @ts-check
 // Applies a staged restore (007) before the database is opened. No imports from the app on purpose.
 import { existsSync, readFileSync, mkdirSync, renameSync, rmSync, readdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';

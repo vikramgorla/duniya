@@ -1,3 +1,4 @@
+// @ts-check
 // Runtime heartbeat (029): the running service writes DATA_DIR/runtime.json every 30 s (pid, start time, version,
 // WhatsApp numbers) so the `duniya status` command can show live state without talking to the process.
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';

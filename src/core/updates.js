@@ -1,3 +1,4 @@
+// @ts-check
 // Updates (008, 045): check the git remote for new releases (tags) or main, apply via deploy/update.sh, optional auto
 // mode. 045: releases.json (read from the target with git) marks breaking releases; the status says what lies between
 // the installed and the available version and which release can be reached safely. Before every update a local backup
@@ -120,6 +121,7 @@ export const updateRunning = () => (inflight ? { target: inflight.target, starte
  * Backup (when configured and `backup` is not false) → deploy/update.sh <target>. Returns { code, log, backup }.
  * A second call while one runs gets the same result. A failed backup stops the update (code 2).
  */
+/** @param {{ root?: string, target?: string, backup?: boolean, by?: string }} [o] */
 export function applyUpdate({ root = appRoot, target, backup = true, by = '' } = {}) {
   const own = root === appRoot;
   if (inflight && own) return inflight.promise;

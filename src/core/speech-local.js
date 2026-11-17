@@ -1,3 +1,4 @@
+// @ts-check
 // On-server speech engines (043): listening (Whisper "tiny", int8) and speaking (a Piper voice), both run by the
 // open-source sherpa-onnx runtime. Nothing is part of the app: the owner switches an engine on in Settings and it is
 // downloaded into DATA_DIR on demand (like the Copilot helper) — the npm package `sherpa-onnx-node` with prebuilt
