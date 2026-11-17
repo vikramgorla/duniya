@@ -118,7 +118,7 @@ test('US2: an agent on a Chat Completions model uses tools and the confirm gate'
   await t.route(t.msg({ phone: '41790000001', text: `confirm ${code}` }));
   assert.equal(t.mcpCalls.filter((c) => c.name === 'confirm').length, 1);
   const acts = (await t.api(owner, 'GET', '/api/activity?limit=200')).body;
-  assert.ok(acts.some((a) => a.type === 'model.usage' && /ollama:gpt-x: 22 in \/ 8 out/.test(a.summary)));
+  assert.ok(acts.some((a) => a.type === 'model.usage' && /GPT-X: 22 in \/ 8 out/.test(a.summary)));
 });
 
 test('US2: auto resolution, defaults and background model', async () => {

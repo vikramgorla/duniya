@@ -100,8 +100,10 @@ const CARDS = [
   ['card-people', 'agents/carpool/people', '', '.ap-sec', 600],
   ['card-quick', 'agents/carpool/quick', '', '.ap-sec', 600],
   ['card-quick-test', 'agents/carpool/test', "const i = document.querySelector('#test-console input[placeholder^=\"Ask the\"]'); i.value = '!rides'; await T.click('Send', 'button', 900); i.value = 'where is the pick-up point in Geneva?'; await T.click('Send', 'button', 900);", '#test-console', 1100],
-  ['card-wa-group', 'chats/120363041122330003%40g.us', "document.querySelector('.chat-page details.menu summary')?.click(); await T.click('Messages & memory', 'button', 100); await T.until('.wa-card input'); await T.wait(600);", '.wa-card', 900],
-  ['card-memory', 'chats/120363041122330003%40g.us', "document.querySelector('.chat-page details.menu summary')?.click(); await T.click('Messages & memory', 'button', 1800);", 'box:Memory', 900],
+  // 072: a chat's sections, each its own page
+  ['card-wa-group', 'chats/120363041122330003%40g.us/group', "await T.until('.wa-card input'); await T.wait(600);", '.ap-sec', 900],
+  ['card-memory', 'chats/120363041122330003%40g.us/memory', '', '.ap-sec', 900],
+  ['card-messages', 'chats/120363041122330003%40g.us/messages', "await T.until('.msg-ans .rv-acts'); await T.wait(300);", '.ap-sec', 900],
   ['card-chat-page', 'chats/120363041122330003%40g.us', '', '.chat-page', 900], // 068: a chat's page
 ];
 
@@ -161,9 +163,9 @@ for (const width of [...new Set(CARDS.map((c) => c[4]))]) {
 
 // videos: frames at ~8 fps while a script runs in the page, joined by ffmpeg with their real timing
 const VIDEOS = [
-  // 071: the website's hero: Overview with Ask, a chat's page, an agent and its Review, Models, Server Health, then a message search
+  // 071, 072: the website's hero: Overview with Ask, a chat's page and its Messages, an agent and its Review, Models, Server Health, then a message search
   ['tour', 'overview', `${ASK} show('overview'); await T.wait(3200);
-    for (const t of ['chats', 'chats/120363041122330003%40g.us', 'agents/carpool', 'agents/carpool/review', 'models', 'server']) { location.hash = t; await T.wait(2300); }
+    for (const t of ['chats', 'chats/120363041122330003%40g.us', 'chats/120363041122330003%40g.us/messages', 'agents/carpool', 'agents/carpool/review', 'models', 'server']) { location.hash = t; await T.wait(2300); }
     document.querySelector('#health')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); await T.wait(1800);
     await openFind(); await T.wait(500); const i = document.querySelector('#palette input'); await T.type(i, 'cornavin'); await T.wait(300); [...document.querySelectorAll('#palette li')].at(-1).click(); await T.wait(2600);`, 25000],
   ['chat-on', 'chats/120363041122330006%40g.us', `await T.wait(1200);

@@ -1,6 +1,7 @@
 // Usage screen and spending caps (040). Module of the panel (063).
 import { $, api, can, field, h, tryApi } from './core.js';
-import { fmtCost, fmtTok, meter } from './shared.js';
+import { fmtCost, fmtTok, meter, plural } from './shared.js';
+import { modelName } from './names.js';
 let usageCache = null;
 /** Last-30-days usage per agent, chat, provider and model (cached 60 s) for inline badges. */
 export async function usageSummary() {
@@ -20,7 +21,7 @@ function capBar(c, { name = true } = {}) {
     h('div', { class: 'row spread', style: 'gap:6px' }, name ? h('b', {}, c.name || c.id) : h('span', { class: 'small' }, 'This month'), h('span', { class: `pill ${cls}` }, `${Math.round(c.used * 100)}% · ${label}`)),
     meter(Math.round(c.used * 100)),
     h('div', { class: 'small muted num' }, `${capAmount(c)} · resets ${capResets(c)}`),
-    c.costUntracked ? h('div', { class: 'small', style: 'color:var(--warn)' }, `${c.spent.unpriced} call(s) have no price, so the cost cap can’t count them. Set the price under Usage → By model, or add a token cap.`) : null);
+    c.costUntracked ? h('div', { class: 'small', style: 'color:var(--warn)' }, `${plural(c.spent.unpriced, 'call')} ${c.spent.unpriced === 1 ? 'has' : 'have'} no price, so the cost cap can’t count them. Set the price under Usage → By model, or add a token cap.`) : null);
 }
 /** Editor for the monthly cap of an agent or a chat; saves on its own. */
 export async function capEditor(scope, id, models) {
@@ -82,7 +83,7 @@ export async function renderUsage() {
     h('div', { class: 'tiles' },
       tile('Tokens in', fmtTok(t.input), 'what agents read: instructions, chat context, tool results'),
       tile('Tokens out', fmtTok(t.output), 'what agents wrote'),
-      tile('Estimated cost', fmtCost(t.cost), t.unpriced ? `${t.unpriced} call(s) without a price — set prices under “By model”` : t.plan ? `${t.plan} call(s) included in your plans` : 'from the prices below'),
+      tile('Estimated cost', fmtCost(t.cost), t.unpriced ? `${plural(t.unpriced, 'call')} without a price — set prices under “By model”` : t.plan ? `${plural(t.plan, 'call')} included in your plans` : 'from the prices below'),
       tile('Model calls', String(t.calls || 0), `${(byKind.rows.find((r) => r.key === 'reply')?.calls) || 0} replies`)),
     caps ? h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Monthly spending caps'),
       caps.caps.length ? h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px' }, caps.caps.map((c) => capBar(c)))
@@ -90,13 +91,14 @@ export async function renderUsage() {
       caps.caps.length && !caps.alertsTo ? h('div', { class: 'note warn', style: 'margin-top:10px' }, 'Cap alerts can’t reach you on WhatsApp yet: add your number under Agents → Owner assistant → Alerts.') : null) : null,
     h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Per day'), days.length ? chart : h('p', { class: 'small muted' }, 'Nothing in this period.')),
     h('div', { class: 'grid', style: 'margin-top:16px;align-items:start' },
-      table('By agent', byAgent, (k) => agentName[k] || k || '(no agent)'),
-      table('By chat', byChat, (k) => chatName[k] || (k ? k.replace(/@.*/, '') : '(no chat)')),
+      // 072: names link to the agent's or chat's page; models as people know them
+      table('By agent', byAgent, (k) => (k ? h('a', { href: `#agents/${encodeURIComponent(k)}` }, agentName[k] || k) : '(no agent)')),
+      table('By chat', byChat, (k) => (k ? h('a', { href: `#chats/${encodeURIComponent(k)}` }, chatName[k] || k.replace(/@.*/, '')) : '(no chat)')),
       table('By provider', byProv, (k) => k),
       byAcct.rows.length > 1 || byProv.rows.some((r) => !byAcct.rows.some((a) => a.key === r.key)) ? table('By account', byAcct, (k) => acctName[k] || k) : null,
       byFb.rows.some((r) => r.key === 'fallback') ? table('First choice or fallback', byFb, (k) => (k === 'fallback' ? 'Answered by a fallback model' : 'Answered by the chosen model')) : null,
       table('By kind', byKind, (k) => KIND[k] || k)),
-    h('div', { style: 'margin-top:16px' }, table('By model', byModel, (k) => k, priceEditor)),
+    h('div', { style: 'margin-top:16px' }, table('By model', byModel, (k) => [modelName(k.replace(/^[\w-]+:(?=.)/, '')), h('span', { class: 'small muted', style: 'display:block' }, k)], priceEditor)),
     h('p', { class: 'small muted' }, 'Costs are estimates from the prices you set (or the provider publishes, e.g. OpenRouter). ChatGPT plan and Copilot calls are included in those plans. Your provider’s bill is the source of truth.'));
 }
 

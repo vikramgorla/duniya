@@ -53,6 +53,13 @@ export function listAnswers(agent, { before = 0, limit = 20, only = '' } = {}) {
   });
 }
 
+/** 072: ratings of some answers by row id (Messages, Activity), so a rating looks the same wherever the answer is shown. */
+export function ratingsOf(ids) {
+  const list = [...new Set(ids.map((i) => Math.trunc(Number(i))).filter(Boolean))].slice(0, 500);
+  if (!list.length) return new Map();
+  return new Map(db.prepare(`SELECT msg, rating FROM reply_ratings WHERE msg IN (${list.map(() => '?').join(',')})`).all(...list).map((r) => [r.msg, r.rating]));
+}
+
 /** Rate one answer of the agent: 1, -1, or 0 to clear. */
 export function rateAnswer(agent, msg, rating, by = '') {
   const m = db.prepare('SELECT id, chat FROM messages WHERE id = ? AND agent = ? AND from_agent = 1').get(Math.trunc(Number(msg)), agent);

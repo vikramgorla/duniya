@@ -369,8 +369,8 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
       const notice = !msg.isGroup ? dmNoticeOnce(msg.phone || msg.chat) : null; // 044: once per person
       if (notice) await channel.send(msg.chat, `_${notice}_`).catch(() => {});
       countStat('reply', { agent: agent.id });
-      logMessage({ channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
-      activity('message.out', { agent: agent.id, chat: msg.chat, summary: `🔊 ${text}`, detail: { voice: v.by } });
+      const id = logMessage({ channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
+      activity('message.out', { agent: agent.id, chat: msg.chat, summary: `🔊 ${text}`, detail: { voice: v.by, ...(id ? { msg: id } : {}) } });
       return;
     }
   } else if (!voiceNow && wantsVoice(agent, { voiceIn, text })) {
@@ -383,11 +383,12 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
   if (!msg.isGroup) { const notice = dmNoticeOnce(msg.phone || msg.chat); if (notice) text = `${text}\n\n_${notice}_`; } // 044: once per person
   const sent = await channel.send(msg.chat, text, quoteOf(msg));
   countStat('reply', { agent: agent.id });
-  logMessage({
+  const id = logMessage({
     channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent',
     name: 'Assistant', text, fromAgent: true,
   });
-  activity('message.out', { agent: agent.id, chat: msg.chat, summary: text });
+  // 072: the stored answer's id, so Activity can show and change its rating and open it in the chat
+  activity('message.out', { agent: agent.id, chat: msg.chat, summary: text, ...(id ? { detail: { msg: id } } : {}) });
 }
 
 /** One agent turn for a routed message (inline for text; from the media queue for photos and voice notes). */

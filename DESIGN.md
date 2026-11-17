@@ -208,7 +208,7 @@ for "…"*; choosing it turns the list into results (a spinner row while it sear
 bold · the sender and time muted, then a snippet of about 140 characters around the first hit. Searched words are
 marked with `<mark>` built from text nodes (`highlight()` in `find.js`, never HTML): lime with the on-accent ink and a
 1 px ink outline, so a mark also shows inside a lime bubble. *Show older matches* is the last row. A result opens the
-chat's page at *Messages & memory*, filtered by the same words and scrolled to the messages. An empty result says
+chat's *Messages* (`#chats/<id>/messages`), filtered by the same words. An empty result says
 where it looked ("No stored message in the 6 chats that are on matches …").
 
 ## Review (070)
@@ -219,6 +219,30 @@ the actions on one row: 👍 and 👎 as small toggle buttons (`aria-pressed`; g
 one primary next step **Teach…** with the `AI` chip. Teach opens the AI helper pre-filled with the cursor at *Better
 answer:*; the result is the usual visual diff with *Apply & save* and Undo. Filters are a `seg` above the list (*All ·
 👎 · Not rated*); *Show older answers* is centred below it.
+
+## One object, one look (072)
+
+The same thing looks and behaves the same wherever it appears, and every place links to the others.
+
+- **One component per object.** An agent's answer has one rating row, `answerActions()` in `answers.js`: 👍 / 👎
+  (`aria-pressed`) and, on a 👎, **Teach…**. It is used in the agent's *Review*, a chat's *Messages* and an open Activity
+  reply. A rating is stored once; a change repaints every copy on screen (`[data-answer]`). An agent is its
+  `avatar()` and name everywhere (lists, Overview, Activity, Messages, Pending); a chat is its name, never its id;
+  models are `modelName()`, tools are `toolPhrase()`, server summaries included.
+- **Where things live.** A chat's history and memory are sections of the chat's page, not hidden behind ⋯:
+  *Messages* (`#chats/<id>/messages`, `…/messages/<msg>` opens it at one answer, marked), *Memory*
+  (`#chats/<id>/memory`), *WhatsApp group* (`#chats/<id>/group`) and *Activity* (`#activity/chat=<id>`). An agent's
+  answers are its *Review*; its *Memory* section links to each chat's memory. ⋯ holds only rare actions (Send intro…,
+  Duplicate, Export, Delete).
+- **Messages.** People on the left (grey bubble, name · time · tag); an answer on the right in its agent's colour
+  (tinted bubble, the agent's avatar and a link to the agent), with the rating row under it. Newest at the bottom; the
+  list scrolls, not the page.
+- **Cross-links.** Each place offers the next one in a tap: chat ↔ agent (*Open <agent>*, the agent's chats), Review
+  answer → *In chat ›*, Activity entry → *See in messages*, *Open <chat>*, *Open <agent>*; Pending → the chat's
+  messages; Usage names → their pages. Each target has a deep link and, for new places, a Find anything entry
+  (*Messages · <chat>*, *Memory · <chat>*).
+- **States.** Every section page has a back link to its item, a loading line, an empty state that says what fills it
+  ("No stored messages for this chat yet."), and errors through `tryApi()`.
 
 ## Standalone pages (064, 070)
 
@@ -324,6 +348,8 @@ the reason and **Retry**. Every animation stops with *reduce motion*.
   rows; at most one short line of help (details behind **?**); one save model.
 - [ ] Simple items are rows, not cards; secondary actions sit behind ⋯ or on the item's page; lists with pages use
   `listDetail()` and deep links.
+- [ ] *One object, one look*: the object uses its one component (answers: `answerActions()`), links to the related
+  places, and every new place has a deep link and a Find anything entry.
 - [ ] Provider, account and model names come from `names.js`; tool names are shown with `toolPhrase()`.
 - [ ] Nothing on lime uses `--ink`; labels are sentence case, not mono caps; icons in buttons are sized.
 - [ ] Text from WhatsApp, tools or models is built from text nodes (marks with `highlight()`), never HTML.

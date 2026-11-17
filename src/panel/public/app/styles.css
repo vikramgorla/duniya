@@ -317,13 +317,24 @@ details.rel > .note, .rel-sum, .rel-group, .rel-more { margin: 0 0 var(--s3) 18p
 .feed .fmeta > span + span::before { content: "·"; margin-right: var(--s2); }
 .feed .ftype { color: var(--tone); font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
 .feed .ftype::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
-.feed .fitem > pre { grid-column: 1 / -1; margin: 6px 0 0; }
+.feed .fopen { grid-column: 1 / -1; margin: 6px 0 0; display: grid; gap: var(--s2); cursor: auto; } .feed .fopen pre { margin: 6px 0 0; } .feed .fopen summary { cursor: pointer; }
+.fchat { gap: var(--s2); margin-top: var(--s2); }
 select.compact { width: auto; max-width: 180px; min-height: 32px; padding: 4px 8px; font-size: var(--fs-s); flex: none; }
 pre { background: #0d0f13; color: #d6dae3; border: 0; border-radius: var(--radius-s); padding: 12px 14px; overflow: auto; font: 12px/1.55 var(--mono); white-space: pre-wrap; word-break: break-word; max-height: 380px; }
 .chatlog { display: flex; flex-direction: column; gap: var(--s2); max-height: 380px; overflow: auto; margin: 10px 0; }
 .bubble { padding: 9px 12px; border-radius: 16px; max-width: 85%; white-space: pre-wrap; word-break: break-word; }
 .bubble.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; }
 .bubble.agent { align-self: flex-start; background: var(--bg-2); border-bottom-left-radius: 4px; }
+/* 072: a chat's Messages — people on the left; each answer on the right in its agent's colour, with the Review row */
+.chatlog.msgs { max-height: min(68vh, 640px); position: relative; }
+.msg-who { color: var(--muted); margin-bottom: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.msg-quote { opacity: .75; border-left: 2px solid currentColor; padding-left: 6px; margin: 2px 0 4px; }
+.msg-ans { align-self: flex-end; max-width: 85%; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; --c: var(--p4); }
+.msg-ans.c1 { --c: var(--p1); } .msg-ans.c2 { --c: var(--p2); } .msg-ans.c3 { --c: var(--p3); } .msg-ans.c5 { --c: var(--p5); }
+.msg-ans .bubble.ans { max-width: 100%; background: color-mix(in srgb, var(--c) 13%, var(--card)); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); border-bottom-right-radius: 4px; }
+.msg-ans .rv-acts { gap: 6px; }
+.chatlog .hit { outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 16px; }
+.msg-find input { min-width: 0; }
 .qr { background: #fff; padding: 10px; border-radius: var(--radius-s); width: 220px; max-width: 100%; }
 .code { font: 600 22px var(--mono); letter-spacing: 3px; }
 .readonly .mut { display: none !important; }
@@ -707,6 +718,10 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
 .contact-list li + li { border-top: 1px solid var(--line); }
 
 /* Review & teach (070) */
+.pend { list-style: none; margin: 0; padding: 0; }
+.pend li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--s1) var(--s3); align-items: start; padding: var(--s3) 0; overflow-wrap: anywhere; }
+.pend li + li { border-top: 1px solid var(--line); }
+@media (max-width: 640px) { .pend-act { grid-column: 2 / -1; } }
 .rv { padding: var(--s3) 0; overflow-wrap: anywhere; }
 .rv + .rv { border-top: 1px solid var(--line); }
 .rv-q { margin: 4px 0; padding-left: 10px; border-left: 2px solid var(--line-2); color: var(--muted); font-size: var(--fs-s); }

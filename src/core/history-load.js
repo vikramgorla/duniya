@@ -126,7 +126,7 @@ function finish(chat, l, state, error = '') {
   l.state = state; l.doneAt = Date.now(); if (error) l.error = error;
   const agent = agentForChat(chat);
   activity('memory.history', { agent: agent?.id || '', chat,
-    summary: state === 'loaded' ? `Loaded ${l.loaded} earlier message(s) from the phone` : state === 'no_response' ? 'The phone did not send earlier messages (it may be offline); retrying automatically' : `Loading earlier messages failed: ${error}; retrying automatically` });
+    summary: state === 'loaded' ? `Loaded ${l.loaded} earlier message${l.loaded === 1 ? '' : 's'} from the phone` : state === 'no_response' ? 'The phone did not send earlier messages (it may be offline); retrying automatically' : `Loading earlier messages failed: ${error}; retrying automatically` });
   if (l.ids.length) summarizeAfterLoad(chat, agent, l.ids).catch(() => {});
   if (state === 'loaded') dropRetry(chat);
   else if (state === 'no_response' || state === 'failed') planRetry(chat, l, l.attempt || 0);
@@ -168,7 +168,7 @@ export async function loadChatHistory(chat, { count, by = 'panel', reason = 'but
     dropRetry(chat);
     return historyStatus(chat);
   }
-  activity('memory.history', { agent: agentForChat(chat)?.id || '', chat, summary: `Asked the phone for up to ${n} earlier message(s) (${reason === 'switch_on' ? 'chat switched on' : reason === 'retry' ? `automatic retry ${attempt}` : 'Load recent messages'}, ${by})` });
+  activity('memory.history', { agent: agentForChat(chat)?.id || '', chat, summary: `Asked the phone for up to ${n} earlier messages (${reason === 'switch_on' ? 'chat switched on' : reason === 'retry' ? `automatic retry ${attempt}` : 'Load recent messages'}, ${by})` });
   await requestPage(chat, l, anchor);
   return historyStatus(chat);
 }
@@ -185,7 +185,7 @@ export function storeLoadedBatch(chat, rows) {
   if (stored.length) dropRetry(chat);
   if (!ours) {
     if (stored.length) {
-      activity('memory.history', { agent: agentForChat(chat)?.id || '', chat, summary: `Stored ${stored.length} earlier message(s) the phone sent` });
+      activity('memory.history', { agent: agentForChat(chat)?.id || '', chat, summary: `Stored ${stored.length} earlier message${stored.length === 1 ? '' : 's'} the phone sent` });
       summarizeAfterLoad(chat, agentForChat(chat), stored.map((r) => r.id)).catch(() => {});
     }
     return stored.length;

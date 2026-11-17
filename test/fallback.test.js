@@ -76,7 +76,7 @@ test('chain order: a rate-limited model is paused and the next connected provide
   const sw = acts('model.fallback');
   assert.equal(sw.length, 1);
   assert.match(sw[0].summary, /Answered by alpha after Claude failed \(rate limit\)/);
-  assert.ok(acts('model.usage').some((x) => /alpha:fake-large: .* \(after Claude: rate limit\)/.test(x.summary)));
+  assert.ok(acts('model.usage').some((x) => /Fake Large: .* \(after Claude: rate limit\)/.test(x.summary)));
   const fbRows = usage.usageReport({ groupBy: 'fallback' }).rows;
   assert.ok(fbRows.some((r) => r.key === 'fallback' && r.calls >= 1));
   assert.ok(usage.usageReport({ groupBy: 'account' }).rows.some((r) => r.key === 'alpha'));

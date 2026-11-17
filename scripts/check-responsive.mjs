@@ -99,7 +99,7 @@ const STATES = [
   { name: 'overview-whats-new', hash: 'overview', wait: 1500, js: WHATS_NEW },
   { name: 'whats-new-dialog', hash: 'overview', wait: 1500, js: `${WHATS_NEW} await T.click("See what's new", 'button', 1200);` },
   { name: 'settings-release-notes', hash: 'settings/release-notes', wait: 2000 },
-  { name: 'activity', hash: 'activity', js: "document.querySelector('#feed li')?.click();" },
+  { name: 'activity', hash: 'activity', js: "document.querySelector('#feed .fitem')?.click(); await T.wait(300);" },
   { name: 'agents', hash: 'agents' },
   // 066: fast tab switching (bottom tab bar, More sheet, top tabs), on a slow network, from deep down a long screen, must
   // always start the new screen at the top (iPhone painted the area above blank otherwise) and end on the chosen screen
@@ -144,7 +144,13 @@ const STATES = [
   { name: 'chats-fallback', hash: 'chats/120363041122330003%40g.us', wait: 2000, js: "document.querySelector('button[aria-label^=\"Model fallback\"]')?.click(); await T.until('#chat-fallback select'); await T.wait(400);" },
   { name: 'chats-add-dm', hash: 'chats/add', wait: 2000, js: "const i = document.querySelector('input[inputmode=tel]'); if (i) { i.value = '+41 79 000 00 30'; i.dispatchEvent(new Event('change')); } await T.wait(600);" },
   { name: 'chats-intro', hash: 'chats/41790000009%40s.whatsapp.net', wait: 2000, js: "document.querySelector('.chat-page details.menu summary')?.click(); await T.click('Send intro', 'button', 100); await T.until('textarea[aria-label=\"Intro text\"]'); await T.wait(400);" },
-  { name: 'chats-memory', hash: 'chats/120363041122330003%40g.us', wait: 2000, js: "document.querySelector('.chat-page details.menu summary')?.click(); await T.click('Messages & memory', 'button', 1800); T.openAll();" },
+  // 072: a chat's sections, each its own page: Messages (answers in the agent's colour with 👍 / 👎), opened at one
+  // answer (Review → In chat), Memory, the WhatsApp group; Activity of one chat with an open reply
+  { name: 'chats-messages', hash: 'chats/120363041122330003%40g.us/messages', wait: 2500, js: "await T.until('.msg-ans .rv-acts'); if (!document.querySelector('.msg-ans .av')) throw new Error('answer without its agent');" },
+  { name: 'chats-messages-at', hash: 'chats/120363041122330003%40g.us', wait: 2500, js: "const r = await (await fetch('/api/agents/carpool/review')).json(); location.hash = 'chats/120363041122330003%40g.us/messages/' + r.answers[0].id; await T.until('.chatlog .hit'); await T.wait(300);" },
+  { name: 'chats-memory', hash: 'chats/120363041122330003%40g.us/memory', wait: 2500 },
+  { name: 'chats-group', hash: 'chats/120363041122330003%40g.us/group', wait: 2500, js: "await T.until('.wa-settings'); T.openAll();" },
+  { name: 'activity-chat', hash: 'activity/chat=120363041122330003%40g.us', wait: 2000, js: "[...document.querySelectorAll('#feed .fitem')].find((li) => li.textContent.includes('Reply'))?.click(); await T.until('.fopen .rv-acts, .fopen .fx'); await T.wait(300);" },
   { name: 'more-sheet', hash: 'overview', js: "(await import('/app/find.js')).openMore(); await T.wait(400);" },
   { name: 'more-sheet-account', hash: 'overview', js: "const { askSignOut } = await import('/app/core.js'); askSignOut(); await T.wait(400);" },
   { name: 'contacts', hash: 'contacts' },

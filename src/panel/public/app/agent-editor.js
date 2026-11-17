@@ -1,7 +1,8 @@
 // Agents → one agent's page (068): a compact header (avatar, name, state, switch, ⋯) and a short list of sections, each
 // a row with its current value that opens the section's own page (#agents/<id>/<section>). Every section saves on its
 // own: one Save, disabled until something changed, then "Saved" and Undo in the toast. Module of the panel (063).
-import { aiHelper } from './ai-helper.js';
+import { changeWithAi as changeWithAiDialog } from './ai-helper.js';
+import { answerActions } from './answers.js';
 import { askCard } from './ask.js';
 import { S, api, ask, avatar, can, field, fieldError, h, icon, lines, menu, splitLines, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
 import { fallbackLine, fallbackPicker } from './fallback.js';
@@ -158,13 +159,8 @@ export function agentPage(id, { onChange } = {}) {
     if (push) { if (matchMedia('(max-width: 640px)').matches) window.scrollTo({ top: 0 }); root.querySelector('.sec-head h2')?.focus({ preventScroll: true }); }
     if (focus && built.F?.[focus]) { built.F[focus].scrollIntoView({ block: 'center' }); built.F[focus].focus({ preventScroll: true }); }
   }
-  /** "Change with AI": describe a change, review the visual diff, apply (the shared dialog; a sheet on phones). */
-  async function changeWithAi(x, initial = '') {
-    const helper = await aiHelper({ agentId: id, bare: true, applyLabel: 'Apply & save', initial,
-      placeholder: 'What should change? e.g. “Shorter, friendlier replies”, “Make Anu and Ravi organizers”, “Post a menu reminder every Saturday at 9”.',
-      onApply: async (r) => { if (await save(x, Object.fromEntries(r.changes.map((ch) => [ch.field, ch.after])))) { helper.closest('dialog')?.close(); redraw(x); } } });
-    ask({ title: 'Change with AI', body: helper, ok: null, cancel: 'Close', wide: true });
-  }
+  /** "Change with AI" (the shared dialog): applied changes save like a section, then the page redraws. */
+  const changeWithAi = (x, initial = '') => changeWithAiDialog(id, initial, async (patch) => { if (!await save(x, patch)) return false; redraw(x); return true; });
   return root;
 }
 
@@ -174,23 +170,15 @@ const reviewLine = (r) => (!r ? 'Rate its answers' : r.up || r.down ? `👍 ${r.
 /** 070: Review & teach — its answers with the question, 👍 / 👎, and Teach (the AI helper, pre-filled). */
 function buildReview(x, { teach }) {
   if (!can('admin')) return { el: h('p', { class: 'small muted' }, 'Admins and the owner can read and rate its answers.') };
-  const list = h('div', { class: 'rv-list' }, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading answers…'));
+  const list = h('div', { class: 'rv-list', onrated: (e) => { x.review = e.detail.counts; } }, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading answers…'));
   const more = h('button', { class: 'btn small hide', type: 'button' }, 'Show older answers');
-  const admin = can('admin');
   let only = ''; let last = 0;
-  const thumb = (a, v, label, rowEl) => h('button', { class: `btn small rv-t${a.rating === v ? ' on' : ''}`, type: 'button', 'aria-label': label, 'aria-pressed': String(a.rating === v), disabled: !admin,
-    onclick: () => tryApi(async () => { const r = await api('PUT', `/api/agents/${x.enc}/review/${a.id}`, { rating: a.rating === v ? 0 : v }); a.rating = r.rating; x.review = r.counts; rowEl.replaceWith(item(a)); }) }, v > 0 ? '👍' : '👎');
-  function item(a) {
-    const el = h('div', { class: 'rv' });
-    const prompt = `Someone asked: “${trunc(a.question?.text || '(no question found)', 300)}”\nIt answered: “${trunc(a.text, 400)}”\nBetter answer: `;
-    el.append(
-      h('div', { class: 'small muted' }, [a.question?.name, a.chatName, time(a.ts)].filter(Boolean).join(' · ')),
-      a.question ? h('div', { class: 'rv-q' }, a.question.text) : null,
-      h('div', { class: 'rv-a', title: 'Tap to show all', onclick: (e) => e.currentTarget.classList.toggle('open') }, a.text),
-      h('div', { class: 'row' }, thumb(a, 1, 'Good answer', el), thumb(a, -1, 'Wrong or unhelpful answer', el),
-        admin && a.rating < 0 ? h('button', { class: 'btn small', type: 'button', onclick: () => teach(prompt) }, h('span', { class: 'ai-chip' }, 'AI'), ' Teach…') : null));
-    return el;
-  }
+  // 072: the same answer row as a chat's Messages and Activity; "In chat ›" opens the conversation at this answer
+  const item = (a) => h('div', { class: 'rv' },
+    h('div', { class: 'small muted' }, [a.question?.name, a.chatName, time(a.ts)].filter(Boolean).join(' · ')),
+    a.question ? h('div', { class: 'rv-q' }, a.question.text) : null,
+    h('div', { class: 'rv-a', title: 'Tap to show all', onclick: (e) => e.currentTarget.classList.toggle('open') }, a.text),
+    answerActions({ ...a, agent: x.id }, { teach, extra: h('a', { class: 'btn small ghost rv-in', href: `#chats/${encodeURIComponent(a.chat)}/messages/${a.id}` }, 'In chat ›') }));
   async function load(older) {
     const r = await tryApi(() => api('GET', `/api/agents/${x.enc}/review?only=${only}${older && last ? `&before=${last}` : ''}`));
     if (!r) return;
@@ -282,7 +270,10 @@ function buildMemory(x) {
       : h('p', { class: 'small muted' }, 'None yet. Organizers add them in WhatsApp: “remember for all groups: …”.')));
   };
   if (!x.bi) loadNotes();
-  return { F, el: h('div', {}, tick(F.memory, x.bi ? 'Keep notes when asked' : 'Remember each chat (summary and notes)'), notesBox), value: () => ({ memory: { enabled: F.memory.checked } }) };
+  // 072: each chat's own memory lives on the chat's page; one tap from here
+  const chats = x.bi || !x.chats.length ? null : block('Memory of each chat', h('ul', { class: 'notes' }, x.chats.map((ch) => h('li', {},
+    h('a', { href: `#chats/${encodeURIComponent(ch.id)}/memory` }, `${ch.name || ch.id} ›`)))));
+  return { F, el: h('div', {}, tick(F.memory, x.bi ? 'Keep notes when asked' : 'Remember each chat (summary and notes)'), chats, notesBox), value: () => ({ memory: { enabled: F.memory.checked } }) };
 }
 function buildMedia(x) {
   const md = { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', ...structuredClone(x.c.media || {}) };

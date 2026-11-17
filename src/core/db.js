@@ -279,15 +279,26 @@ export function namesInChat(chat) {
 
 /** Stored messages of a chat, newest first (for admins in the panel). */
 /** @param {string} chat  @param {{ before?: number|string, limit?: number|string, q?: string }} [o]  numbers as sent */
-export function listMessages(chat, { before = 0, limit = 50, q = '' } = {}) {
+/**
+ * Stored messages of a chat, newest first. `before`: the next page; `q`: a search; `around` (072): the message with that
+ * id and up to half a page on each side, for opening a chat at one answer (Review, Activity).
+ * @param {string} chat
+ * @param {{ before?: number | string | null, limit?: number | string | null, q?: string, around?: number | string | null }} [o]
+ */
+export function listMessages(chat, { before = 0, limit = 50, q = '', around = 0 } = {}) {
   const lim = Math.min(Math.max(Number(limit) || 50, 1), 200);
   /** @type {(string|number)[]} */
   const args = [chat];
   let where = 'chat = ?';
   if (Number(before)) { where += ' AND id < ?'; args.push(Number(before)); }
+  const at = Math.trunc(Number(around) || 0);
+  const half = Math.ceil(lim / 2);
   const rows = q ? searchStored({ chats: [chat], query: String(q).slice(0, 100), before, limit: lim })
-    : db.prepare(`SELECT * FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim);
-  return rows.map((m) => ({ id: m.id, sender: m.sender, senderJid: m.sender_jid, name: m.name, text: m.text, quoted: m.quoted, fromAgent: !!m.from_agent, addressed: !!m.addressed, ts: m.ts }));
+    : at ? [...db.prepare('SELECT * FROM messages WHERE chat = ? AND id > ? ORDER BY id LIMIT ?').all(chat, at, half).reverse(),
+      ...db.prepare('SELECT * FROM messages WHERE chat = ? AND id <= ? ORDER BY id DESC LIMIT ?').all(chat, at, half)]
+      : db.prepare(`SELECT * FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim);
+  return rows.map((m) => ({ id: m.id, sender: m.sender, senderJid: m.sender_jid, name: m.name, text: m.text, quoted: m.quoted, fromAgent: !!m.from_agent,
+    agent: m.agent || '', addressed: !!m.addressed, ts: m.ts }));
 }
 
 // ---- WhatsApp reactions and polls (026) ----

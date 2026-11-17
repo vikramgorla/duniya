@@ -4,6 +4,7 @@ import { env } from './config.js';
 import { addPending, takePending, peekPending, dropPending } from './db.js';
 import { chat as modelChat, effectiveFallback } from './providers/index.js';
 import { REASON_TEXT } from './providers/errors.js';
+import { modelName } from '../panel/public/app/names.js';
 import { getChatPrefs } from './chat-prefs.js';
 
 /** The model for a chat: the chat's own choice (auto, provider:auto or provider:model) or the agent's. */
@@ -204,7 +205,8 @@ export async function runAgent(ctx) {
   }
   ctx.usage = usage;
   const via = failed.length ? ` (after ${failed.map((f) => `${f.name}: ${REASON_TEXT[f.reason] || f.reason}`).join(', ')})` : '';
-  activity('model.usage', { agent: agent.id, chat, summary: `${ctx.model || agent.model}: ${usage.input} in / ${usage.output} out${via}`, detail: failed.length ? { fallback: failed } : undefined });
+  // 072: the model as people know it ("Claude Haiku 5.5"), not its id
+  activity('model.usage', { agent: agent.id, chat, summary: `${modelName(String(ctx.model || agent.model).replace(/^[\w-]+:(?=.)/, ''))}: ${usage.input} in / ${usage.output} out${via}`, detail: failed.length ? { fallback: failed } : undefined });
   return reply.trim() || null;
 }
 
