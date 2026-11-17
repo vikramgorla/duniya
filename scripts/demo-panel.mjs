@@ -155,7 +155,8 @@ export function fakeChecklist(next, { done = false } = {}) {
   const n = done ? ids.length : ids.indexOf(next);
   const c = { done: n, total: ids.length, complete: done, dismissed: false, agent: { id: 'carpool', name: 'Car pooling', trigger: '!ride' },
     steps: ids.map((id, i) => ({ id, title: titles[id], hint: hints[id], href: `#${id}`, done: i < n, skipped: false })) };
-  return `const fc = ${JSON.stringify(c)}; const fcf = window.fetch; window.fetch = (u, o) => (String(u) === '/api/checklist' && (!o || !o.method || o.method === 'GET') ? Promise.resolve(new Response(JSON.stringify(fc))) : fcf(u, o));
+  // base64 keeps the data inert inside the evaluated code (no quoting or escaping questions)
+  return `const fc = JSON.parse(atob('${Buffer.from(JSON.stringify(c)).toString('base64')}')); const fcf = window.fetch; window.fetch = (u, o) => (String(u) === '/api/checklist' && (!o || !o.method || o.method === 'GET') ? Promise.resolve(new Response(JSON.stringify(fc))) : fcf(u, o));
     S.checklist = null; S.checklistDone = ${done ? `{ last: h('div', { class: 'chat-mini' }, h('div', { class: 'bubble me' }, 'Any seat to Geneva on Friday?'), h('div', { class: 'bubble agent' }, 'Friday 21 Nov: Marc drives from Morges station at 07:40, 2 seats left. Want me to save one for you?')) }` : 'null'};`;
 }
 
