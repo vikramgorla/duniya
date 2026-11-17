@@ -1,6 +1,19 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.35.0": {
+      "breaking": false,
+      "title": "Settings → Channels: WhatsApp has its own page, and loads only when you use it",
+      "summary": "Chat apps now plug in as channels; WhatsApp is the first. Nothing changes for your numbers, chats or agents. A new server loads no WhatsApp code until you link a number, which makes it lighter and gets Duniya ready for more channels.",
+      "changes": [
+        { "type": "new", "text": "Settings → Channels → WhatsApp: your numbers (link, add, unlink, direct-message agent), the memory WhatsApp uses on your server, and a switch to turn WhatsApp off without unlinking." },
+        { "type": "improved", "text": "Overview shows a short WhatsApp card; it and the WhatsApp chip open the WhatsApp page." },
+        { "type": "improved", "text": "A new server uses less memory: WhatsApp loads only when you tap Show the QR code in Getting started." },
+        { "type": "improved", "text": "Server → Health shows how much memory each channel uses." },
+        { "type": "new", "text": "ChatGPT or Claude can list your channels and switch one on or off (switching off asks you first)." }
+      ],
+      "data": "unchanged"
+    },
     "2.34.1": {
       "breaking": false,
       "title": "A renamed WhatsApp group shows its new name right away",

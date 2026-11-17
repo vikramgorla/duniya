@@ -1,5 +1,6 @@
 flowchart TD
-  WA["WhatsApp<br/>linked devices"] --> AL{"Allow-list:<br/>chat on?"}
+  WA["WhatsApp adapter<br/>linked devices"] --> HUB["Channel hub<br/>loads a channel only<br/>when set up and on"]
+  HUB --> AL{"Allow-list:<br/>chat on?"}
   AL -- "off" --> X["dropped"]
   AL -- "on" --> R["Router<br/>triggers, roles, rate limits"]
   R -- "owner DM" --> OA["Owner assistant"]
@@ -7,10 +8,11 @@ flowchart TD
   R --> AG["Agent<br/>stored in the app"]
   AG --> M["Model provider<br/>+ fallback"]
   AG --> T["MCP tools<br/>per-role allow lists"]
-  AG --> W["WhatsApp<br/>actions"]
+  AG --> W["Chat actions<br/>by channel capability"]
   T -- "preview tools" --> CG["Confirm gate:<br/>organizer replies<br/>confirm CODE"]
   M ~~~ MEM
   M ~~~ W
+  W -. "send, react, polls" .-> HUB
   AG --> MEM["Memory<br/>messages, notes"]
   AG --> DB[("SQLite<br/>encrypted secrets")]
   P["Panel and<br/>admin MCP"] --> DB

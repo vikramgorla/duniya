@@ -447,6 +447,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   await imp('src/core/owner-assistant.js');
   db.db.prepare("INSERT OR REPLACE INTO owner_links (tenant_id, user_id, phone, status, code_hash, expires_at, linked_at) SELECT 'default', id, ?, 'linked', NULL, 0, ? FROM users WHERE username = 'admin'").run(P(1), now - 2 * D);
   await wa.start({ onMessage: createRouter(wa), onHistory: createHistoryHandler() });
+  await wa.upkeep(Date.now() + 61000); // 075: the memory WhatsApp uses is measured a minute after start; the demo has no scheduler
   // #91: Chats shows "Loaded 12 earlier messages" (rides) and "Loading recent messages from your phone…" (Family)
   prefs.noteLatestKeys([2, 5, 6, 7].map((n) => ({ chat: G(n), isGroup: true, msgId: `last-${n}`, participant: `${P(n)}@s.whatsapp.net`, ts: now - n * H })));
   const phoneHistory = await imp('src/core/history-load.js');

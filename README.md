@@ -49,7 +49,7 @@ then takes about five taps: link WhatsApp, connect a model, pick a template, swi
 <tr>
 <td valign="top"><a href="docs/privacy.md"><img src="docs/img/thumb-privacy.webp" alt="Privacy notice settings" width="100%"></a><br><b>Silent by default</b><br>Off chats are never stored or sent to a model; groups are told once. Tools are allowed per role, in code.</td>
 <td valign="top"><a href="docs/everyday.md#on-your-phone"><img src="docs/img/thumb-phone.webp" alt="The panel on a phone" width="100%"></a><br><b>On your phone</b><br>Installs on your home screen: tab bar at your thumb, compact screens, live, light and dark. Nothing from a store.</td>
-<td valign="top"><a href="docs/small-servers.md"><img src="docs/img/thumb-small-server.webp" alt="Server card for a small server" width="100%"></a><br><b>Made for a 1 GB VM</b><br>~180 MB of RAM. Old data pruned by itself; reconnects, crashes and a full disk handled without you.</td>
+<td valign="top"><a href="docs/small-servers.md"><img src="docs/img/thumb-small-server.webp" alt="Server card for a small server" width="100%"></a><br><b>Made for a 1 GB VM</b><br>~180 MB of RAM. Channels load only when used (WhatsApp today, more to come). Old data pruned by itself; reconnects, crashes and a full disk handled without you.</td>
 <td valign="top"><a href="docs/backups-and-updates.md"><img src="docs/img/thumb-backups.webp" alt="Backups page" width="100%"></a><br><b>Backups &amp; updates</b><br>Encrypted to GitHub or S3. One-click updates that show what's new; breaking ones wait for you. No SSH.</td>
 </tr>
 </table>

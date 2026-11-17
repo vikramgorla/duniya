@@ -146,6 +146,9 @@ Calm and compact: say more with less chrome.
   - A row may carry one switch next to its chevron (`end`, outside the link: Agents, Chats); everything else about the
     item is on its page.
   - Used by Agents, Chats, Models, Settings and Backups.
+  - Settings opens with **Channels** (075): one row per channel the server really has (today WhatsApp), with its
+    state as the row's line (*2 of 2 numbers connected*, *Switched off*, *Not set up yet*). Never a "coming soon" row.
+    A channel's page: its status card (on/off switch for the owner, the memory it uses), then its accounts.
 - **Touch:** every target is at least 44 px on phones (40 px is the hard floor that `check:responsive` enforces).
 
 ## Screen anatomy (068)

@@ -6,7 +6,7 @@ import { plural } from './shared.js';
 import { checklistNext, goTo, linkNumberBox } from './start.js';
 
 /** A channel's state in a few words, for its row and its page. */
-export function channelLine(c) {
+function channelLine(c) {
   if (c.state === 'not_set_up') return 'Not set up yet';
   if (c.state === 'off') return 'Switched off';
   if (c.state === 'error') return 'Did not start';
@@ -14,7 +14,7 @@ export function channelLine(c) {
 }
 const tone = (c) => (c.state === 'on' && c.connected === c.accounts && c.accounts ? 'ok' : c.state === 'on' ? 'warn' : c.state === 'off' ? '' : 'bad');
 const memoryLine = (c) => (c.state !== 'on' ? 'Uses no memory while it is off: nothing is loaded and no connection is open.'
-  : c.measuring ? 'Memory used: measured a minute after it starts.' : `Uses about ${c.memoryMb} MB of this server's memory.`);
+  : c.measuring ? 'Memory used: measured a minute after it starts.' : `Uses ${c.memoryMb ? `about ${c.memoryMb} MB` : 'less than 1 MB'} of this server's memory.`);
 
 /** Settings list rows: real channels only (no "coming soon" entries). */
 export const channelItems = (st) => (st?.channel?.channels || []).map((c) => ({ id: c.id, name: c.label, sub: channelLine(c),

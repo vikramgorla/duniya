@@ -76,7 +76,7 @@ The panel is one dependency-free app in native ES modules: no framework, no bund
 | `app/core.js` | `h()` (untrusted text only through `textContent`), `api()` and its cache, the shared state `S`, the shared components (`ask()` confirmation, `toast()`, `field()`, `toggle()`, `avatar()`, `emptyState()`, `skeleton()`), the shell: top tabs and the phone tab bar, router (`show()`), live stream |
 | `app/login.js` | sign-in, first-run setup, one-time sign-up and secret links |
 | `app/shared.js` | small helpers several screens use (formatting, model picker, usage line, server size, links) |
-| `app/<screen>.js` | one module per screen: `overview`, `chats`, `agents` + `agent-editor`, `activity`, `usage`, `models`, `contacts`, `pending`, `server`, `backups`, `settings`; parts: `start` (Getting started), `ask` (the Ask card), `quiet`, `updates`, `find` (Find anything and the phone's More sheet), `fallback`, `tool-editor`, `registry`, `ai-helper`, `diff` |
+| `app/<screen>.js` | one module per screen: `overview`, `chats`, `agents` + `agent-editor`, `activity`, `usage`, `models`, `contacts`, `pending`, `server`, `backups`, `settings`; parts: `start` (Getting started), `ask` (the Ask card), `quiet`, `updates`, `find` (Find anything and the phone's More sheet), `fallback`, `tool-editor`, `registry`, `ai-helper`, `diff`, `channels` (Settings → Channels and a channel's page) |
 | `app/styles.css` | all styles, one set of tokens ([DESIGN.md](../DESIGN.md#tokens-064)) |
 | `page.css`, `page.js` | the standalone server pages (sign-in results, Google address help, GitHub app hand-off): files, so their CSP needs no `'unsafe-inline'` |
 
@@ -104,6 +104,35 @@ feature), each exporting `<area>Routes(route, { channel })`. `src/panel/server.j
 only the router (role gates, the JSON-only CSRF guard), the admin MCP's in-process calls and the static files. A handler
 returns the JSON answer, `[status, answer]`, or throws `fail(message, status)` / `bad(message, field)`
 (`src/core/config.js`); the router turns the error into `{ error, field, code }` with that status.
+
+## Adding a channel
+
+Chat channels plug into the hub (`src/channels/hub.js`); WhatsApp (`src/channels/whatsapp/`) is the reference. The rest of
+the app never asks which channel a chat is on: it calls `channel.send(chat, …)`, `isGroup(chat)`, `phoneOf(chat)` and so
+on, and the hub and the catalogue answer from the chat id.
+
+1. **Catalogue entry** in `src/channels/index.js`: `id`, `label`, `prefix` (chat ids become
+   `<prefix>:<account>#<native id>`, e.g. `tg:bot1#-1001234567`; only WhatsApp is unprefixed), `setup` (`qr`, `token`, …),
+   `caps` (what it can do — tools, prompt hints and panel controls follow them) and `ids` (`isChat`, `isGroup`,
+   `isDirect`, `phoneOf`, `personOf`, and `phoneChat` only for phone-based channels). Metadata only: no imports of the
+   adapter.
+2. **Adapter module** `src/channels/<id>/index.js` exporting a factory. It implements `start(handlers)`, `stop()`,
+   `status()`, `listChats()`, `send(chat, text, opts)` and the chat actions its `caps` promise (`react`, `sendPoll`,
+   `sendMedia`, `groupInfo`, …), all with the app chat id first; `upkeep()` for bounded background work. Inbound
+   messages go to `handlers.onMessage` in the one shape described at the top of `hub.js` (`chat`, `isGroup`,
+   `phone` only when the channel vouches for it, `senderJid` = the sender's id on the channel, `mentioned`,
+   `replyToAgent`, …). Telegram: pass a phone only after `contact.user_id === from.id` (request_contact), so people
+   join across channels safely (`src/core/people.js`).
+3. **Hub wiring** in `hub.js`: a loader (`import('./<id>/index.js')`), how to tell it is set up (a setting or a file,
+   without loading it) and, if needed, its first account when it is switched on.
+4. **No timers, no idle sockets:** reconnect with backoff inside the adapter on events; periodic work goes through
+   `upkeep()` (the hub calls one channel per 30-second tick). Nothing opens while the channel is not set up or off.
+5. **Dependencies:** prefer none (`fetch`, Node's `WebSocket`). A dependency must be pure JS, imported only inside the
+   adapter (it then loads only with it), and the plan states its install size and measured memory.
+6. **Panel:** the channel appears under **Settings → Channels** by itself (from the catalogue); its page goes into
+   `app/channels.js`. Only real channels are listed — no "coming soon" rows.
+7. **Tests** with a fake adapter: `createHub({ loaders: { <id>: async () => fake } })` (see `test/channel-hub.test.js`);
+   the lazy-loading test checks that a fresh install never imports the channel's library.
 
 ## Type checking
 

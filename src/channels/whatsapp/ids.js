@@ -10,9 +10,9 @@ export const chatKey = (number, jid) => (number === MAIN ? jid : `${number}#${ji
 export const splitChat = (chat) => { const s = String(chat); const i = s.indexOf('#'); return i > 0 ? { number: s.slice(0, i), jid: s.slice(i + 1) } : { number: MAIN, jid: s }; };
 const jidOf = (chat) => splitChat(chat).jid;
 
-export const isGroupJid = (jid) => String(jid || '').endsWith('@g.us');
+const isGroupJid = (jid) => String(jid || '').endsWith('@g.us');
 export const isLidJid = (jid) => /@(lid|hosted\.lid)$/.test(String(jid || ''));
-export const isPnJid = (jid) => /@(s\.whatsapp\.net|c\.us|hosted)$/.test(String(jid || ''));
+const isPnJid = (jid) => /@(s\.whatsapp\.net|c\.us|hosted)$/.test(String(jid || ''));
 /** user part of a jid without device: "123:4@lid" → "123@lid". */
 export const bareJid = (j) => { const s = String(j || ''); const at = s.indexOf('@'); return at < 0 ? '' : `${s.slice(0, at).split(':')[0]}${s.slice(at)}`; };
 /** Phone digits of a phone-form jid ("41791234567:3@s.whatsapp.net" → "41791234567"), '' for a LID or a group. */
