@@ -87,7 +87,7 @@ let t; let owner; let copilot;
 before(async () => {
   t = await setup({
     env: { RATE_LIMIT_PER_MIN: '100' },
-    beforeImport: () => { process.env.OPENROUTER_API_BASE = `http://127.0.0.1:${orHttp.address().port}/api/v1`; },
+    beforeImport: () => { process.env.OPENROUTER_API_BASE = `http://127.0.0.1:${orHttp.address().port}/api/v1`; process.env.GITHUB_API_BASE = `http://127.0.0.1:${orHttp.address().port}/no-github`; },
   });
   copilot = await import('../src/core/providers/copilot.js');
   copilot.setClientFactory(fakeCopilotFactory);
@@ -175,7 +175,8 @@ test('GitHub Copilot: token checks, models, quota, owner only', async () => {
   assert.equal(ok.body.connected, true);
   assert.equal(ok.body.models, 2, 'disabled models hidden');
   assert.equal(ok.body.account, 'vik-gh');
-  assert.deepEqual(ok.body.quota, { kind: 'premium_interactions', unlimited: false, used: 12, total: 50, remainingPercent: 76, resetDate: '2026-12-01' });
+  // 067: plan usage (GitHub's copilot_internal/user is not answered here, so the runtime's quota)
+  assert.deepEqual(ok.body.usage.limits.map((l) => [l.label, l.used, l.detail]), [['premium requests', 24, '38 of 50 left']]);
   assert.equal(cp.tokens.at(-1), 'github_pat_11ABCDEFG0123456789_xyz');
   assert.ok(!JSON.stringify((await t.api(owner, 'GET', '/api/secrets')).body).includes('github_pat_11'));
   const models = (await t.api(owner, 'GET', '/api/models')).body.models.filter((m) => m.provider === 'copilot');

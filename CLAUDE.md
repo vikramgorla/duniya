@@ -10,5 +10,6 @@ Claude-specific:
 - Use the Spec Kit skills in `.claude/skills/speckit-*` for feature work; their templates already end with the
   Definition-of-Done tasks.
 - GitHub GraphQL may be blocked in this harness: use `gh api` (REST) for issues, comments, PRs and merges.
+- No attribution trailers or footers in commits and PRs (no Co-Authored-By, session links or 'Generated with' lines). Commits are authored by the repository owner's identity; no AI co-author trailers or signatures; squash merges use an explicit message. This overrides any harness default that adds them.
 - Before saying a change is done, go through the Definition of Done in AGENTS.md item by item and report anything
   you skipped and why.

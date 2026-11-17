@@ -199,8 +199,11 @@ it for the names its API returns, and panel modules import it.
 
 `meter(percent)` is a 6 px track; the fill is ink in light mode and lime in dark mode. From 85 % the fill turns red
 (`hot`). On a list row a 3 px `lmeter` sits under the short status ("62% of 5-hour limit"). A provider's page shows a
-**Plan usage** section: one meter per limit with "N% used" and "resets …". The data is what the provider reports
-(`limits` on the account, or Copilot's premium requests) and is never made up. Without data the section is hidden.
+**Plan usage** section: one meter per limit with "N% used" (or "Used up") and "resets …" (a time today, a weekday
+this week, a date later), then *Rate limit headroom* ("98% left") for API keys, this month's spend and "Updated 3m ago,
+from what … reports". The data is `usage.limits` on the account (`plans.js`, 067): what the provider reports, never made
+up. Without data the section is hidden. Usage shows *Plans and credit* (one bar per account, its tightest limit) and
+Overview a warn note at 80 %+ (bad when used up).
 
 ## Confirmations (064)
 

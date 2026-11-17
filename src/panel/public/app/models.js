@@ -3,8 +3,9 @@ import { $, S, api, ask, can, field, h, toast, toggle, tryApi } from './core.js'
 import { chainEditor } from './fallback.js';
 import { listDetail, mark } from './listdetail.js';
 import { PROVIDER_NAMES } from './names.js';
-import { LINKS, loadModels, meter, modelLabel, modelSelect, plural, saveSecretKey, usageLine } from './shared.js';
+import { LINKS, loadModels, modelLabel, modelSelect, plural, saveSecretKey, usageLine } from './shared.js';
 import { usageSummary } from './usage.js';
+import { planSection, rowStatus } from './plans.js';
 /** 066: the Add a provider list, in this order: [provider type (names.js) = page id, one short line]. */
 const ADD_PROVIDERS = [['openrouter', 'Many models, some free'], ['anthropic', 'Anthropic API key, pay per use'], ['openai', 'API key, pay per use'],
   ['copilot', 'Your Copilot plan, also works with the free plan'], ['chatgpt', 'Sign in with your ChatGPT plan'], ['compatible', 'Ollama, LM Studio, Groq, Mistral…']];
@@ -48,24 +49,12 @@ function providerCard({ id, mark, title, cost, tag, p, steps, form, connected, e
     tag ? h('div', { class: 'ptags' }, tag) : null,
     p?.error ? h('div', { class: 'note bad' }, p.error) : null,
     healthNote(p),
-    isOn ? planUsage(p) : null,
+    isOn ? planSection(p) : null, // 067
     isOn ? h('div', {}, connected, h('div', { class: 'row', style: 'margin-top:10px' }, t.btn, extra), t.out, accounts || null)
       : ownerOnly && !can('owner') ? h('p', { class: 'small muted' }, 'Ask an owner to connect this account.')
         : h('div', {}, h('div', { class: 'eyebrow', style: 'margin-top:14px' }, 'How to connect'), stepList(steps), form));
 }
 
-/** 064: plan usage of an account as limits [{ label, used (0–100 %), resetAt?, detail? }]: what the provider reports
- * (`p.limits`; Copilot's premium requests from its quota). Nothing is shown when the provider reports nothing. */
-const limitsOf = (p) => p?.limits || (p?.quota && !p.quota.unlimited && p.quota.remainingPercent != null
-  ? [{ label: 'premium requests', used: 100 - p.quota.remainingPercent, resetAt: p.quota.resetDate, detail: p.quota.total != null && p.quota.used != null ? `${Math.max(0, p.quota.total - p.quota.used)} of ${p.quota.total} left` : '' }] : []);
-const resetText = (t) => (t ? `resets ${new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '');
-/** The "Plan usage" section of a provider's page: a meter per limit with its reset time. */
-function planUsage(p) {
-  const ls = limitsOf(p);
-  return ls.length ? h('div', { class: 'plan-usage' }, h('h3', {}, 'Plan usage'), ls.map((l) => h('div', { class: 'limit' },
-    h('div', { class: 'row spread small' }, h('span', {}, l.label[0].toUpperCase() + l.label.slice(1)), h('b', { class: 'num' }, `${Math.round(l.used)}% used`)),
-    meter(l.used), h('div', { class: 'small muted' }, [l.detail, resetText(l.resetAt)].filter(Boolean).join(' · '))))) : null;
-}
 /** 042: "Paused until 14:20 — usage limit reached" with a "Try again now" button; nothing when the account is fine. */
 function healthNote(p) {
   const st = p?.health;
@@ -134,6 +123,7 @@ function accountsBox({ first, provs, addForm, ownerOnly }) {
       u ? h('div', { class: 'small num' }, 'Last 30 days: ', usageLine(u)) : null,
       p.error ? h('div', { class: 'note bad' }, p.error) : null,
       healthNote(p),
+      p.connected ? planSection(p) : null,
       p.health?.state === 'reconnect' && p.type === 'chatgpt' && can('owner') ? (() => { const f = chatgptFlow({ account: p.id }); return h('div', {}, f.start, f.form); })() : null,
       h('div', { class: 'row', style: 'margin-top:8px' }, t?.btn,
         can('admin') ? h('details', { class: 'small mut' }, h('summary', {}, 'Rename'), h('form', { class: 'row nowrap', style: 'margin-top:6px', onsubmit: async (e) => { e.preventDefault(); if (await tryApi(() => api('PUT', `/api/accounts/${encodeURIComponent(p.id)}`, { label: name.value.trim() }), 'Renamed')) { S.models = null; renderModels(); } } }, name, h('button', { class: 'btn small' }, 'Save'))) : null,
@@ -307,9 +297,8 @@ export async function renderModels() {
   const names = Object.fromEntries(Object.entries(pages).map(([id, card]) => [id, card.querySelector('h2')?.textContent || id]));
   const state = (p) => (!p?.connected ? (p?.error ? ['bad', 'needs attention'] : ['', 'not connected']) : p.health?.state && p.health.state !== 'ok' ? [p.health.state === 'reconnect' ? 'bad' : 'warn', p.health.text] : ['ok', `ok · ${plural(p.models, 'model')}`]);
   const row = (id, p, name) => {
-    const [st, text] = state(p); const l = st === 'ok' ? limitsOf(p)[0] : null; // the tightest limit, when the provider reports one
-    return { id, name, mark: mark(...(MARKS[id] || [name[0], 'c0'])), status: h('span', { class: `dot ${st}`, 'aria-hidden': 'true' }),
-      sub: l ? [`${Math.round(l.used)}% of ${l.label}`, h('span', { class: `lmeter${l.used >= 85 ? ' hot' : ''}`, 'aria-hidden': 'true' }, h('i', { style: `width:${Math.min(100, Math.round(l.used))}%` }))] : text };
+    const [st, text] = state(p); const plan = st === 'ok' ? rowStatus(p) : null; // 067: the tightest plan limit, when the provider reports one
+    return { id, name, mark: mark(...(MARKS[id] || [name[0], 'c0'])), status: h('span', { class: `dot ${st}`, 'aria-hidden': 'true' }), sub: plan || text };
   };
   const on = Object.keys(pages).filter((id) => by[id]?.connected || by[id]?.error);
   const off = Object.keys(pages).filter((id) => !on.includes(id));

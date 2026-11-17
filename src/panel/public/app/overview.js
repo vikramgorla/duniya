@@ -84,6 +84,8 @@ export async function renderOverview(soft) {
       led(st.settings.paused ? false : live ? true : null, st.settings.paused ? 'Agents paused' : live ? `${plural(live, 'agent')} live` : 'No agent live'),
       led(st.enabledChats ? true : null, st.enabledChats ? `${plural(st.enabledChats, 'chat')} on` : 'No chat on'),
       led(st.pending ? null : true, st.pending ? `${st.pending} waiting for a confirm` : 'Nothing waiting')),
+    // 067: a plan or credit at 80 %+ (the tightest), as the provider reports it
+    st.plans?.length ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: `note ${st.plans[0].used >= 100 ? 'bad' : 'warn'}`, style: 'margin:0' }, `${st.plans[0].name}: ${st.plans[0].text}${st.plans.length > 1 ? ` (+${st.plans.length - 1} more)` : ''}. `, h('a', { href: '#models' }, 'See Models'))) : null,
     st.enabledChats === 0 && open && st.agents.length && !checklistActive() ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
   const silencesSlot = h('div', { id: 'ov-silences-slot', 'data-jump': 'quiet', style: `grid-column:1/-1${S.silences?.length ? '' : ';display:none'}` }, S.silences?.length ? silencesCard(S.silences, refreshSilences) : null);
   $('#main').replaceChildren(hero, whatsNewBox(), updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), wa, control, server, silencesSlot, recent));

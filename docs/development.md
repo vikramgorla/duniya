@@ -116,6 +116,13 @@ returns the JSON answer, `[status, answer]`, or throws `fail(message, status)` /
 - SQLite rows are untyped (`db.prepare()` hands out plain rows, `src/core/db.js`); settings have a `Settings` typedef
   (`src/core/store.js`); route modules type their registrar with `Route` / `RouteContext` (`src/panel/http.js`).
 
+## Commits and pull requests
+
+No attribution trailers or footers in commits and PRs (no Co-Authored-By, session links or 'Generated with' lines).
+Commits are authored by the repository owner's identity; no AI co-author trailers or signatures; squash merges use an
+explicit message. Squash-merge with `gh api -X PUT repos/vikramgorla/whatsapp-agent-duniya/pulls/N/merge -f merge_method=squash -f
+commit_title="<PR title> (#N)" -f commit_message="<short summary>"`, so GitHub does not append trailers from the branch commits.
+
 ## Releases
 
 1. Bump the version in `package.json`, `package-lock.json` and `infra/oci/schema.yaml` (CI checks they match) and add
