@@ -37,6 +37,8 @@ jobs:
         run: npm run check:panel
       - name: Version consistency, releases.json, docs and lean code (knip, jscpd, panel size)
         run: node scripts/ci-checks.mjs
+      - name: Panel never sticks on navigation (headless Chrome, fast tab switching on a slow network, hung request → Retry)
+        run: npm run check:responsive -- --only nav-stress,load-failed,load-retry --widths 393,1440 --schemes light
       - name: Dependency audit (production, high+)
         run: npm audit --omit=dev --audit-level=high
 

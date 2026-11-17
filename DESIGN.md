@@ -80,6 +80,9 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
   for notes.
 - **Type:** Segoe UI Variable / SF Pro / Inter for text and headings (tight tracking); SF Mono / Cascadia /
   JetBrains Mono for labels and numbers.
+- **Navigation never sticks (066):** an older screen that finishes after you moved on is drawn over by the current one
+  again; placeholders never replace a screen that has started drawing; live updates never redraw another screen.
+  `nav-stress` in `check:responsive` (run in CI) switches tabs fast on a slow network and fails on leftovers.
 - **Loading never hangs (066):** every request has a deadline (`S.loadTimeout`, 15 s), and a screen that fails or
   stalls shows *Couldn't load this screen* with the reason and **Retry**, never skeletons forever (a module that never
   arrived reloads the app). Back from the background after more than 30 s, `recover()` drops waiting requests,

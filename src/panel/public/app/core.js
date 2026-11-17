@@ -374,7 +374,7 @@ function applyStatus(next) {
   const dot = $('#wa-dot'); if (dot) { dot.className = `dot ${st === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(st) ? 'warn' : 'bad'}`; dot.setAttribute('aria-label', `WhatsApp: ${st === 'open' ? 'connected' : st.replace('_', ' ')}`); }
   const sub = $('#brand-sub'); if (sub) sub.textContent = S.status.settings.paused ? 'paused' : `${S.status.agents.filter((b) => b.enabled).length} agents live`;
   serverBadge(S.status.osUpdates);
-  if (S.tab === 'overview') import('./overview.js').then((m) => m.renderOverview(true));
+  if (S.tab === 'overview') import('./overview.js').then((m) => { if (S.tab === 'overview' && S.renderDone === S.renderSeq) m.renderOverview(true); }); // 066: never over another screen, never mid-navigation
 }
 // #96: the Server tab counts only OS updates that will install now (not gradual roll-outs or held packages); "!" when
 // a restart is needed to finish updates.
@@ -422,18 +422,28 @@ export function show(tab) {
   const seq = (S.renderSeq = (S.renderSeq || 0) + 1);
   const main = $('#main');
   const moved = from !== tab; // another screen: placeholder cards while it loads; the same one: dim it
-  const slow = setTimeout(() => { if (S.renderSeq !== seq || !main) return; if (moved) main.replaceChildren(skeleton()); else main.classList.add('loading'); main.setAttribute('aria-busy', 'true'); }, 120);
+  // 066: placeholders only while nothing new is drawn. A screen that draws and then waits for more (Activity draws its
+  // card, then loads the list) used to have its card replaced by the placeholders for good.
+  const shown = main?.firstElementChild;
+  const slow = setTimeout(() => { if (S.renderSeq !== seq || !main || main.firstElementChild !== shown) return; if (moved) main.replaceChildren(skeleton()); else main.classList.add('loading'); main.setAttribute('aria-busy', 'true'); }, 120);
   const r = Object.hasOwn(SCREENS, tab) ? SCREENS[tab] : null;
   // 066: a screen that fails or stalls (a module or request hung after the phone suspended the app) shows why and Retry,
   // instead of placeholder cards forever.
   Promise.resolve(r && deadline(r(), S.loadTimeout + 5000, 'screen')).catch((e) => {
-    if (S.renderSeq !== seq || !main) return;
-    if (e?.message === 'Please sign in') return;
+    console.error(`Duniya: ${tab} did not load`, e);
+    if (S.renderSeq !== seq || !main || e?.message === 'Please sign in') return;
+    // A screen module that is missing (the app was updated while this page was open: new file names) → load the new app
+    // once; a second failure within a minute shows Retry instead of looping.
+    const missing = /dynamically imported module|importing a module script failed|module script/i.test(e?.message || '');
+    if (missing && Date.now() - Number(sessionStorage.getItem('duniya.reloadedAt') || 0) > 60000) { sessionStorage.setItem('duniya.reloadedAt', String(Date.now())); location.reload(); return; }
     main.replaceChildren(loadFailed(e, () => show(S.tab)));
   }).finally(() => {
     clearTimeout(slow);
     if (S.renderSeq === seq) {
       main?.classList.remove('loading'); main?.removeAttribute('aria-busy'); S.renderDone = seq;
+      if (main) main.dataset.screen = tab;
+      if (S.overdrawn === seq) { S.overdrawn = 0; show(S.tab); return; } // an older screen finished meanwhile and may have drawn over this one
+      if (main?.querySelector(':scope > .skel')) { console.error(`Duniya: ${tab} finished without drawing`); main.replaceChildren(loadFailed(new Error('This screen did not finish drawing.'), () => show(S.tab))); }
       if (moved && from && main) {
         main.classList.remove('enter'); void main.offsetWidth; main.classList.add('enter');
         // Keyboard and screen-reader users land on the new screen, not on the tab they left (064).
@@ -442,8 +452,10 @@ export function show(tab) {
       }
       jumpToSub(); return;
     }
-    // A slower, older tab finished after a newer one and drew over it: draw the current tab again.
-    if ((S.renderDone || 0) > seq && S.tab) show(S.tab);
+    // A slower, older screen finished after a newer one started: it may have drawn over it. If the newer one is done,
+    // draw it again now; otherwise when it is done (066: before, only the first case was handled, and an older screen
+    // that drew while the newer one was still loading stayed under the newer tab).
+    if (S.renderDone === S.renderSeq) { if (S.tab) show(S.tab); } else S.overdrawn = S.renderSeq;
   });
 }
 /** 066: "Couldn't load" with the reason and Retry. A screen module that never arrived cannot be asked for again in

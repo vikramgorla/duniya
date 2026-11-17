@@ -1,4 +1,5 @@
-// Responsive check of the admin panel (issue #1). Not part of CI: it needs a local Chrome or Chromium.
+// Responsive check of the admin panel (issue #1). Needs Chrome or Chromium. CI runs the navigation states only (066):
+// nav-stress, load-failed, load-retry (see .github/workflows/ci.yml).
 //
 //   npm run check:responsive                      all screens at 375 / 393 / 1440 px, light and dark
 //   npm run check:responsive -- --shots /tmp/rs   … and save a full-page screenshot of every screen and state
@@ -28,6 +29,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // ---------- screens and states ----------
 // 066: a request that never answers (a phone that suspended the app): the screen ends in Couldn't load + Retry, not
 // endless placeholder cards; with the server back, Retry draws the screen.
+const NAV_STRESS = `window.__realFetch ||= window.fetch; const { dropCache } = await import('/app/core.js');
+  // slow lists, and a screen whose second request is slower than the first (it draws, then waits: the 064 skeleton timer
+  // used to replace what was drawn)
+  window.fetch = async (u, o) => { await T.wait(String(u).startsWith('/api/activity') ? 300 + Math.random() * 300 : Math.random() < 0.5 ? 0 : Math.random() * 400); return window.__realFetch(u, o); };
+  const phone = innerWidth < 641; const tabs = ['activity', 'chats', 'agents', 'overview', 'usage', 'models', 'server', 'activity', 'contacts', 'settings', 'activity'];
+  const go = async (id) => {
+    const bar = document.querySelector(phone ? 'nav.tabbar' : 'nav.tabs');
+    const b = bar.querySelector('button[data-tab="' + id + '"]');
+    if (b) return b.click();
+    bar.querySelector('button[data-tab="more"]').click(); await T.until('dialog.more', 3000);
+    [...document.querySelectorAll('dialog.more .more-list button')].find((x) => x.textContent.toLowerCase().startsWith(id))?.click();
+  };
+  for (let round = 0; round < 3; round++) for (const id of tabs) { dropCache(); await go(id); await T.wait([0, 30, 130, 260, 600][Math.floor(Math.random() * 5)]); }
+  await T.wait(3500); window.fetch = window.__realFetch;
+  const main = document.getElementById('main');
+  if (main.querySelector('.skel') || main.classList.contains('loading')) throw new Error('stuck on placeholders on ' + S.tab);
+  if (main.dataset.screen !== S.tab) throw new Error('screen ' + main.dataset.screen + ' drawn under tab ' + S.tab);
+  if (S.tab === 'activity' && !document.getElementById('feed')?.isConnected) throw new Error('activity list not on screen; shown: ' + main.textContent.trim().slice(0, 60));`;
 const HANG_AGENTS = `const { dropCache } = await import('/app/core.js'); dropCache(); S.loadTimeout = 800; window.__realFetch ||= window.fetch;
   window.fetch = (u, o) => (String(u).startsWith('/api/agents') ? new Promise((_, no) => o?.signal?.addEventListener('abort', () => no(new DOMException('aborted', 'AbortError')))) : window.__realFetch(u, o));`;
 // 045: pretend v3.0.0 (breaking) is available, with v2.10.0 still safe to install.
@@ -65,6 +84,9 @@ const STATES = [
   { name: 'update-decision-dialog', hash: 'overview', before: UPDATE_DECISION, wait: 1500, js: "await T.click('Review update', 'button', 600);" },
   { name: 'activity', hash: 'activity', js: "document.querySelector('#feed li')?.click();" },
   { name: 'agents', hash: 'agents' },
+  // 066: fast tab switching (bottom tab bar, More sheet, top tabs), on a slow network, must always end on the chosen
+  // screen fully drawn: no placeholder cards left, no screen drawn under another tab. Throws (fails the state) otherwise.
+  { name: 'nav-stress', hash: 'overview', wait: 2000, js: NAV_STRESS },
   { name: 'load-failed', hash: 'agents', before: HANG_AGENTS, wait: 2500, js: "if (!document.querySelector('.load-failed')) throw new Error('no Retry card after a hung request'); window.fetch = window.__realFetch; S.loadTimeout = 15000;" },
   { name: 'load-retry', hash: 'agents', before: HANG_AGENTS, wait: 2500, js: "window.fetch = window.__realFetch; S.loadTimeout = 15000; await T.click('Retry', 'button', 1500); if (document.querySelector('.load-failed, .skel') || !document.querySelector('.agent-card')) throw new Error('Retry did not recover the screen');" },
   { name: 'pull-refresh', hash: 'overview', js: "const m = document.createElement('div'); m.className = 'ptr armed busy'; m.setAttribute('aria-hidden', 'true'); m.append(Object.assign(document.createElement('span'), { className: 'spinner' })); m.style.transform = 'translate(-50%, 64px)'; document.body.append(m); await T.wait(200);" },
