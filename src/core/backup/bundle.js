@@ -61,10 +61,11 @@ async function* plaintext(meta, files) {
 }
 
 /**
- * Write an encrypted backup to `file` (via a .part file). Returns { size, files }.
- * Memory stays flat: the database snapshot is a temporary file that is streamed, never loaded.
+ * Write an encrypted backup to `file` (via a .part file). Returns { size, files, bytes? }.
+ * Memory stays flat: the database snapshot is a temporary file that is streamed, never loaded. `keep`: also return
+ * the encrypted file's bytes (compressed size) for the GitHub / S3 copies.
  */
-export async function writeBackup(file, passphrase, { includeWhatsApp = true, appVersion = '' } = {}) {
+export async function writeBackup(file, passphrase, { includeWhatsApp = true, appVersion = '', keep = false } = {}) {
   const snap = resolve(tmpdir(), `duniya-snap-${process.pid}-${Date.now()}.sqlite`);
   const part = `${file}.part`;
   try {
@@ -74,12 +75,17 @@ export async function writeBackup(file, passphrase, { includeWhatsApp = true, ap
     const cipher = createCipheriv('aes-256-gcm', keyFromPassphrase(passphrase, salt), iv);
     mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
     const out = createWriteStream(part, { mode: 0o600 });
-    out.write(`${MAGIC}${JSON.stringify({ ...KDF, salt: salt.toString('base64'), iv: iv.toString('base64') })}\n`);
+    const head = Buffer.from(`${MAGIC}${JSON.stringify({ ...KDF, salt: salt.toString('base64'), iv: iv.toString('base64') })}\n`);
+    /** @type {Buffer[]} */
+    const kept = keep ? [head] : [];
+    if (keep) cipher.on('data', (c) => kept.push(c));
+    out.write(head);
     const meta = { format: FORMAT, version: 3, createdAt: new Date().toISOString(), app: { version: appVersion } };
     await pipeline(Readable.from(plaintext(meta, files)), createGzip(), cipher, out, { end: false });
     await new Promise((ok, ko) => { out.on('error', ko); out.end(cipher.getAuthTag(), () => ok(null)); });
     renameSync(part, file);
-    return { size: statSync(file).size, files: files.length };
+    if (keep) kept.push(cipher.getAuthTag());
+    return { size: statSync(file).size, files: files.length, ...(keep ? { bytes: Buffer.concat(kept) } : {}) };
   } finally {
     rmSync(snap, { force: true }); rmSync(part, { force: true });
   }

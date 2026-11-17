@@ -1,6 +1,6 @@
 // @ts-check
 // Backups (007): settings, run, retention per destination, schedule, list, restore staging.
-import { readFileSync, readdirSync, rmSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, rmSync, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DATA_DIR, env, fail } from '../config.js';
 import { getSecret, setSecret, getSetting, updateSettings } from '../store.js';
@@ -113,9 +113,9 @@ export function runBackup({ reason = 'manual', appVersion = '', preUpdate = fals
       // the same millisecond (a clock that went back): wait for the next stamp
       while (existsSync(resolve(LOCAL_DIR, file))) { await new Promise((r) => setTimeout(r, 5)); file = stampName(); }
       const results = {};
-      // 070: streamed from disk into the file; remote copies read the finished (compressed, encrypted) file
-      const { size } = await writeBackup(resolve(LOCAL_DIR, file), pass, { includeWhatsApp: s.includeWhatsApp, appVersion });
-      const remote = (s.github.enabled || s.s3.enabled) && !preUpdate ? readFileSync(resolve(LOCAL_DIR, file)) : null;
+      // 070: streamed from disk into the file; GitHub / S3 get the same encrypted bytes (compressed size)
+      const keep = (s.github.enabled || s.s3.enabled) && !preUpdate;
+      const { size, bytes: remote } = await writeBackup(resolve(LOCAL_DIR, file), pass, { includeWhatsApp: s.includeWhatsApp, appVersion, keep });
       let pre = preUpdateFiles();
       if (preUpdate) {
         pre = [...pre, file];
