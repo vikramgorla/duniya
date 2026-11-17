@@ -80,6 +80,8 @@ const CARDS = [
   ['card-start-model', 'overview', START, '#ov-checklist', 1100, fakeChecklist('provider')],
   ['card-start-agent', 'overview', START, '#ov-checklist', 1100, fakeChecklist('agent')],
   ['card-find', 'chats', "await openFind(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'ge'; i.dispatchEvent(new Event('input')); await T.wait(200);", '#palette', 1100],
+  ['card-search', 'chats', "await openFind(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'cornavin'; i.dispatchEvent(new Event('input')); await T.wait(200); [...document.querySelectorAll('#palette li')].at(-1).click(); await T.until('.pal-msg'); await T.wait(300);", '#palette', 1100], // 070: Search messages
+  ['card-review', 'agents/carpool/review', '', '.ap-sec', 600], // 070: Review & teach
   ['card-ai-diff', 'agents/carpool', AI_DIFF, 'dialog.ask', 1100],
   ['card-test-as', 'agents/carpool/test', TEST_AS, '#test-console', 1100],
   ['card-caps', 'usage', '', 'box:Monthly spending caps', 1100],

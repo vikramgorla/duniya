@@ -19,7 +19,8 @@
 - **An agent's page:** a short header (avatar, name, state, switch, **⋯** with *Test*, *Change with AI*, *Duplicate*,
   *Export*, *Delete*), then its sections, each with its current value: **Character**, **Where it answers** (its chats,
   triggers, @mentions, direct messages), **People**, **Quick replies & FAQ**, **Welcome**, **Schedules**, **Model**,
-  **Tools**, **Memory**, **Photos & voice**, **Spending cap**, **Advanced** and **Test**. Tap one to open it.
+  **Tools**, **Memory**, **Photos & voice**, **Spending cap**, **Advanced**, **Review** and **Test**. Tap one to open
+  it.
 - **Saving:** each section saves on its own. It says *All changes saved* until you change something; then **Save**
   stays at the bottom of the screen. After saving, the toast offers **Undo**. Leaving with unsaved changes asks first.
   The on/off switch saves at once.
@@ -38,6 +39,12 @@
   lists its chats and links back), why it stayed quiet with a one-tap fix, recent messages from your phone, model and
   fallback, activity log, welcome override, *Private to members*, the privacy notice, the spending cap, and behind
   **⋯**: *Messages & memory* and, for a person, *Send intro…*.
+- **Search messages (owner):** type two or more characters in Find anything (`/`) and pick *Search messages for
+  "…"*. It searches the stored messages of every chat that is on and not *Private to members*: all words must appear,
+  in any order; word beginnings match ("ride" finds "rides"); case and accents don't matter. Results show the chat,
+  who wrote, when and the words marked, newest first (*Show older matches* for more). Tap one to open the chat's
+  *Messages & memory* with the search filled in. Each search is recorded in Activity (the words and how many were
+  found, never message text).
 
 ![A chat's page: its agent, why it stayed quiet, recent messages and settings](site/img/card-chat-page.webp)
 
@@ -52,6 +59,22 @@
 > **The Owner assistant is an agent too** (built in, always there): your own agent in your own WhatsApp chat. Its
 > page has the sections that apply to it — character, model, tools, photos & voice, memory, alerts and scheduled
 > messages to you (the weekly summary is one). See [Owner assistant](owner-assistant.md).
+
+## Review and teach
+
+**See what an agent really answered, and fix a wrong answer in two taps.** On an agent's page, **Review** (its row
+shows *👍 3 · 👎 1 this week*) lists its recent answers, newest first, each with the message that asked for it, who
+asked, the chat and the time.
+
+1. Rate an answer **👍** (good) or **👎** (wrong or unhelpful). Tap again to clear. *All · 👎 · Not rated* filters.
+2. On a 👎 answer, tap **Teach…**: the AI helper opens with the question, the answer and *Better answer:* — write what
+   it should have said and tap **Draft**.
+3. The helper proposes a FAQ entry (for fixed facts: times, places, links) or one short rule in the instructions,
+   shown as the usual visual diff. **Apply & save**; the toast offers **Undo**.
+
+> [!NOTE]
+> Admins and the owner can review; viewers can't read answers. Answers in chats that are *Private to members* are
+> left out. A rating keeps only who rated and when, and disappears with the answer (retention, *Erase memory*).
 
 ## Create and change agents
 

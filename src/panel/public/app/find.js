@@ -107,7 +107,7 @@ export async function openPalette() {
       : h('li', { class: 'muted small' }, found.error || (found.chats ? `No stored message in the ${found.chats} chats that are on matches “${found.q}”.` : 'No chat is on yet, so no messages are stored.')))
       : h('li', { class: 'muted small' }, 'Nothing found. Try a group, an agent or a word like “backup”.');
     list.replaceChildren(...hits.map((it, i) => h('li', { role: 'option', 'aria-selected': String(i === sel), class: `${i === sel ? 'on' : ''}${it.node ? ' pal-msg' : ''}`, onclick: () => open(it), onmousemove: () => { if (sel !== i) { sel = i; draw(); } } },
-      icon(it.icon || 'search'), h('span', { class: 'pal-label' }, it.node || [it.label, it.hint ? h('small', { class: 'muted' }, ` · ${it.hint}`) : null]), it.node ? null : h('span', { class: 'pill' }, it.kind))),
+      icon(it.icon || 'search'), h('span', { class: 'pal-label', style: it.node ? 'white-space:normal' : null }, it.node || [it.label, it.hint ? h('small', { class: 'muted' }, ` · ${it.hint}`) : null]), it.node ? null : h('span', { class: 'pill' }, it.kind))),
     hits.length ? null : empty);
   };
   input.oninput = () => { sel = 0; found = null; draw(); };

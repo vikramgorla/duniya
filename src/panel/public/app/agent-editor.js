@@ -175,7 +175,7 @@ const reviewLine = (r) => (!r ? 'Rate its answers' : r.up || r.down ? `👍 ${r.
 function buildReview(x, { teach }) {
   if (!can('admin')) return { el: h('p', { class: 'small muted' }, 'Admins and the owner can read and rate its answers.') };
   const list = h('div', { class: 'rv-list' }, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading answers…'));
-  const more = h('button', { class: 'btn small', type: 'button', hidden: true }, 'Show older answers');
+  const more = h('button', { class: 'btn small hide', type: 'button' }, 'Show older answers');
   const admin = can('admin');
   let only = ''; let last = 0;
   const thumb = (a, v, label, rowEl) => h('button', { class: `btn small rv-t${a.rating === v ? ' on' : ''}`, type: 'button', 'aria-label': label, 'aria-pressed': String(a.rating === v), disabled: !admin,
@@ -198,7 +198,7 @@ function buildReview(x, { teach }) {
     const items = r.answers.map(item);
     if (older) list.append(...items);
     else list.replaceChildren(...(items.length ? items : [h('p', { class: 'small muted' }, only === 'down' ? 'No answer is rated 👎.' : only ? 'Every answer is rated.' : 'No answers yet. They appear here after the agent answers in a chat.')]));
-    last = r.answers.at(-1)?.id || last; more.hidden = !r.more;
+    last = r.answers.at(-1)?.id || last; more.classList.toggle('hide', !r.more);
   }
   more.onclick = () => load(true);
   const filter = seg('Show', [['', 'All'], ['down', '👎'], ['unrated', 'Not rated']], only, (v) => { only = v; last = 0; load(false); });

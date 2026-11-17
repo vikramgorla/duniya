@@ -88,6 +88,7 @@ const STATES = [
   { name: 'overview-start-done', hash: 'overview', checklist: fakeChecklist('', { done: true }), wait: 2000 },
   // 062: Find anything (/ or ⌘K), empty and with a query
   { name: 'find', hash: 'overview', js: 'await openFind(); await T.wait(600);' },
+  { name: 'find-search-messages', hash: 'chats', js: "await openFind(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'cornavin'; i.dispatchEvent(new Event('input')); await T.wait(200); [...document.querySelectorAll('#palette li')].at(-1).click(); await T.until('.pal-msg'); await T.wait(300);" }, // 070
   { name: 'find-query', hash: 'chats', js: "await openFind(); await T.wait(600); const i = document.querySelector('#palette input'); i.value = 'gen'; i.dispatchEvent(new Event('input')); await T.wait(200);" },
   { name: 'chats-find', hash: 'chats', js: "const i = document.querySelector('.ld-tools input'); i.value = 'car'; i.dispatchEvent(new Event('input')); await T.wait(200);" },
   // 045: a breaking release waits for the owner (banner on Overview, the dialog with release notes)
@@ -115,7 +116,7 @@ const STATES = [
   // 068: the agent page (header + section rows) and each section page; the owner assistant uses the same page
   { name: 'agent-editor', hash: 'agents/carpool', wait: 2500 },
   { name: 'agent-editor-owner', hash: 'agents/owner-assistant', wait: 2500 }, // 059: the built-in owner assistant
-  ...['character', 'where', 'people', 'quick', 'welcome', 'schedules', 'model', 'memory', 'media', 'cap', 'advanced'].map((sec) => ({ name: `agent-sec-${sec}`, hash: `agents/carpool/${sec}`, wait: 2500, js: 'T.openAll();' })),
+  ...['character', 'where', 'people', 'quick', 'welcome', 'schedules', 'model', 'memory', 'media', 'cap', 'advanced', 'review'].map((sec) => ({ name: `agent-sec-${sec}`, hash: `agents/carpool/${sec}`, wait: 2500, js: 'T.openAll();' })),
   { name: 'agent-sec-alerts', hash: 'agents/owner-assistant/alerts', wait: 2500 },
   { name: 'agent-sec-dirty', hash: 'agents/carpool/character', wait: 2500, js: "const i = document.querySelector('.sbody input'); i.value += ' 2'; i.dispatchEvent(new Event('input', { bubbles: true })); await T.wait(200); if (!document.querySelector('.sec-save.dirty')) throw new Error('no Save bar after a change');" },
   { name: 'agent-editor-tools', hash: 'agents/carpool/tools', wait: 2500, js: "await T.click('Choose tools', 'button', 1500); T.openAll();" },

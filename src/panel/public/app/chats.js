@@ -283,6 +283,7 @@ function messagesCard(c, q0 = '') {
     log.replaceChildren(...(rows.length ? rows.map(bubble) : [h('p', { class: 'small muted' }, q.value.trim() ? 'No stored message matches.' : 'No stored messages for this chat.')]));
     more.classList.toggle('hide', page.length < 50);
     if (!older) log.scrollTop = log.scrollHeight;
+    if (q0 && !older) { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); q0 = ''; } // 070: from Search messages
   }
   const card = h('div', { class: 'card', style: 'margin-top:16px' },
     h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, `Messages · ${c.name}`), h('form', { class: 'row nowrap', style: 'flex:0 1 420px', onsubmit: (e) => { e.preventDefault(); load(false); } }, q, h('button', { class: 'btn small' }, 'Search'))),
