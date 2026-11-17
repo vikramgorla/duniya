@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+// Fake npm for tests (074): `npm install … <spec>` puts the fake agent app where the real package would put the app.
+import fs from 'node:fs';
+import path from 'node:path';
+const spec = process.argv.at(-1);
+const src = path.join(import.meta.dirname, 'fake-app');
+const place = (rel, as) => {
+  const f = path.join(process.cwd(), 'node_modules', rel);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, `#!/bin/sh\nexec "${process.execPath}" "${src}" ${as} "$@"\n`, { mode: 0o755 });
+};
+if (spec.startsWith('@anthropic-ai/claude-code@')) place('@anthropic-ai/claude-code/bin/claude.exe', '--as-claude');
+else if (spec.startsWith('@openai/codex@')) place('@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex', '--as-codex');
+else { process.stderr.write(`npm ERR! unknown package ${spec}\n`); process.exit(1); }

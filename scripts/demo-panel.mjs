@@ -8,7 +8,7 @@
 import http from 'node:http';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -280,6 +280,10 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   store.updateSettings({ mcpRegistry: { enabled: true, baseUrl: registryUrl } }); // 052: Browse tool services, offline
   store.setSecret('CHATGPT_CREDENTIALS', JSON.stringify({ access_token: 'demo', refresh_token: 'demo', expires_at: now + 365 * D, email: 'owner@example.org', client_id: 'demo', scopes: [] }));
   providers.addOpenRouter({ key: 'sk-or-demo-not-a-real-key', freeOnly: true });
+  // 074: Claude Code connected (a stand-in file where the downloaded app would be; the demo never runs it)
+  const ccBin = join(data, 'apps', 'claudecode', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+  mkdirSync(dirname(ccBin), { recursive: true }); writeFileSync(ccBin, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+  store.setSecret('CLAUDE_CODE_OAUTH_TOKEN', 'sk-ant-oat01-demo-not-a-real-token');
   // 042: a second ChatGPT account, and OpenRouter paused by its daily free limit
   store.updateSettings({ accounts: [{ id: 'chatgpt-sam', type: 'chatgpt', label: 'Sam' }] });
   store.setSecret('PROVIDER_CHATGPT_SAM_CREDENTIALS', JSON.stringify({ access_token: 'demo', refresh_token: 'demo', expires_at: now + 365 * D, email: 'sam@example.org', client_id: 'demo', scopes: [] }));

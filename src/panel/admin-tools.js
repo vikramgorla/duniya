@@ -316,8 +316,8 @@ export const TOOLS = [
     input: { refresh: bool('Ask the providers again (slower)') },
     run: (a, x) => x.call('GET', `/api/models${a.refresh ? '?refresh=1' : ''}`) },
   { name: 'list_model_accounts', readOnly: true, calls: [['GET', '/api/providers']],
-    description: 'Connected model provider accounts (several per provider are possible, e.g. openai and openai-work) with their health: ok, paused (until when and why: usage limit, rate limit, outage…), or reconnect (sign-in expired), and how accounts of one provider are used (order or spread). Plan quotas are not read: a used-up limit shows as health paused until the reset the provider reported. Never shows keys.',
-    input: {}, run: async (a, x) => (await x.call('GET', '/api/providers')).filter((p) => p.connected || p.error).map((p) => ({ id: p.id, name: p.name, type: p.type, provider: p.group, connected: p.connected, models: p.models, health: p.health, strategy: p.strategy, error: p.error })) },
+    description: 'Connected model provider accounts (several per provider are possible, e.g. openai and openai-work) with their health: ok, paused (until when and why: usage limit, rate limit, outage…), or reconnect (sign-in expired), and how accounts of one provider are used (order or spread). Agent apps (Claude Code, Codex, GitHub Copilot) also show app: whether the app is downloaded and what it measured on this server (peakMb while answering, startMs, turns); connecting one is done by the owner in the panel (Models). Plan quotas are not read: a used-up limit shows as health paused until the reset the provider reported. Never shows keys.',
+    input: {}, run: async (a, x) => (await x.call('GET', '/api/providers')).filter((p) => p.connected || p.error).map((p) => ({ id: p.id, name: p.name, type: p.type, provider: p.group, connected: p.connected, models: p.models, health: p.health, strategy: p.strategy, error: p.error, ...(p.app ? { app: p.app } : {}) })) },
   { name: 'get_model_fallback', readOnly: true, calls: [['GET', '/api/fallback']],
     description: 'Automatic model fallback: whether it is on, the chain of models tried when the chosen one fails with a retryable error (empty = any other connected provider\'s Auto), the strategy per provider for several accounts, and paused accounts. Agents and chats can override it (agent field "fallback": { mode, chain }; set_chat_settings).',
     input: {}, run: (a, x) => x.call('GET', '/api/fallback') },
@@ -447,12 +447,12 @@ export const TOOLS = [
     input: { paused: bool('true = pause all agents') }, required: ['paused'],
     run: async (a, x) => ({ paused: !!(await x.call('POST', '/api/settings', { paused: !!a.paused })).paused }) },
   { name: 'set_small_server_mode', risky: true, calls: [['GET', '/api/server/small-mode'], ['PUT', '/api/server/small-mode']],
-    description: 'Small server mode (owner only): on a small server (under 2 GB or 1 CPU) allow heavier features anyway: on-server speech and local tool services, each one at a time / at most 2, started only when memory allows and stopped when it is tight. Slower and may be refused at busy moments. Does not cover GitHub Copilot sign-in (needs 2 GB). Needs confirm_action.',
+    description: 'Small server mode (owner only): on a small server (under 2 GB or 1 CPU) allow heavier features anyway: on-server speech, local tool services and agent apps (Claude Code, Codex, GitHub Copilot) — one voice note / at most 2 services / one agent app at a time, started only when memory allows and stopped when it is tight. Slower and may be refused at busy moments. Needs confirm_action.',
     input: { enabled: bool('true = allow heavier features on this small server') }, required: ['enabled'],
     preview: async (a, x) => {
       const cur = await x.call('GET', '/api/server/small-mode');
       const size = `${cur.server.size} server, ${cur.server.effectiveMb} MB, ${cur.server.cpus} CPU`;
-      return a.enabled ? `Switch Small server mode on (${size}; now ${cur.enabled ? 'on' : 'off'}). Allows: ${cur.covers.join('; ')}. Slower; heavier work waits or is refused when memory is tight. Not covered: ${cur.notCovered.join('; ')}.`
+      return a.enabled ? `Switch Small server mode on (${size}; now ${cur.enabled ? 'on' : 'off'}). Allows: ${cur.covers.join('; ')}. Slower; heavier work waits or is refused when memory is tight.`
         : `Switch Small server mode off (${size}; now ${cur.enabled ? 'on' : 'off'}). On a small server, on-server speech stops being used and local tool services stop starting (they stay saved).`;
     },
     run: (a, x) => x.call('PUT', '/api/server/small-mode', { enabled: !!a.enabled }) },

@@ -1,6 +1,19 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.34.0": {
+      "breaking": false,
+      "title": "Use your Claude, ChatGPT and Copilot plans through their official apps, also on a 1 GB server",
+      "summary": "Models has two new providers: Claude Code (your Claude Pro or Max plan) and Codex (your ChatGPT plan). Duniya runs each vendor's own app on your server for each answer, downloaded only when you connect it. Your agents keep their tools and rules. On a 1 GB server, switch on Small server mode: one app answers at a time.",
+      "changes": [
+        { "type": "new", "text": "Claude Code: use your Claude Pro or Max plan. Run claude setup-token on your computer and paste the token under Models." },
+        { "type": "new", "text": "Codex: use your ChatGPT plan through OpenAI's Codex app. Sign in from Models with a link and a one-time code; the page updates by itself." },
+        { "type": "improved", "text": "GitHub Copilot now works on 1 GB servers with Small server mode. Its helper downloads faster (about 220 MB) and stops after 2 idle minutes on small servers." },
+        { "type": "improved", "text": "Agent apps start only for an answer and only with enough free memory. One answers at a time on small servers; a waiting message gets ⏳. If an app can't start or hits its plan limit, the next model answers." },
+        { "type": "improved", "text": "Each agent app's page shows how much memory it used on your server and how fast it started." }
+      ],
+      "data": "unchanged"
+    },
     "2.33.0": {
       "breaking": false,
       "title": "Chats by their name everywhere, calmer Overview, shorter screens on your phone",

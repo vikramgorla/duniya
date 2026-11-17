@@ -25,7 +25,7 @@ Examples: OCI `VM.Standard.E2.1.Micro`, Google `e2-micro`. Size also in `/api/st
 | Media jobs at once | 1 | 2 | 3 |
 | Local tool services | *Small server mode* only, 2 at once | 6 at once | 12 at once |
 | On-server speech | below 2 GB: *Small server mode* only | yes | yes |
-| Copilot helper | below 2 GB: no (not even with *Small server mode*) | yes | yes |
+| [Agent apps](models.md#agent-apps) (Claude Code, Codex, GitHub Copilot) | *Small server mode* only, 1 at a time | 2 at a time | 3 at a time |
 
 ## Small server mode
 
@@ -48,8 +48,9 @@ also `set_small_server_mode` for [AI assistants](admin-mcp.md), with a confirmat
 > for text. The installer's 2 GB swap is the safety net. Hosted tool services and providers are faster and safer here.
 
 > [!NOTE]
-> **Not covered:** GitHub Copilot sign-in. Its ~400 MB download and helper process run inside the app's 700 MB memory
-> cap next to the app itself, so on 1 GB they fail or get the app stopped. It stays refused below 2 GB.
+> **Agent apps** (074) are covered too: measured 140–200 MB while one answers and nothing between answers (Copilot's
+> runtime about 60 MB, stopped after 2 minutes idle), so one app next to the app (about 200 MB) fits the service's
+> 700 MB memory cap.
 
 ## The media queue
 
@@ -81,7 +82,11 @@ Max age: `MEDIA_JOB_MAX_AGE_MIN` (15). [Settings](settings.md)
   +150 MB in small server mode); otherwise the provider is used or the agent asks for text.
 - **Memory pressure** (> 70 %): summaries, on-server speech and picture creation pause (one activity entry), then
   resume.
-- **Copilot** helper (~400 MB download): refused below 2 GB, with or without Small server mode.
+- **Agent apps** ([Claude Code, Codex, GitHub Copilot](models.md#agent-apps)): only with Small server mode on a small
+  server. Downloaded when connected (needs ~380 MB free memory and 1.2 GB disk: the npm download peaks at 280–355 MB,
+  so keep the installer's 2 GB swap), started per answer after a free-memory check (the app's need + 80 MB), one at a
+  time: the next turn waits up to 2 minutes (⏳ on the message), then the next model answers. Turns nobody finished
+  and idle runtimes are stopped by the upkeep tick, and at once when memory gets tight.
 - **Local tool services** (each one an extra Node.js process): on a small server, adding or changing one is refused
   on every path (agent page → Tools, Settings → Tool services, Browse tool services, import, duplicate, AI assistants)
   with the same message, unless [Small server mode](#small-server-mode) is on. Hosted services work as usual. Over the

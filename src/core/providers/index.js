@@ -10,6 +10,9 @@ import * as anthropic from './anthropic.js';
 import { recordUsage } from '../usage.js';
 import * as chatgpt from './chatgpt.js';
 import * as copilot from './copilot.js';
+import * as claudeCode from './claude-code.js';
+import * as codex from './codex.js';
+import { appStats, isInstalling } from './apps.js';
 import { chatCompletionsProvider } from './openai-chat.js';
 import { classify, REASON_TEXT } from './errors.js';
 import * as breaker from './breaker.js';
@@ -19,7 +22,7 @@ import { accountName, modelName } from '../../panel/public/app/names.js';
 
 export { REF_RE, FALLBACK_MODES, cleanChain, cleanOverride } from './fallback-config.js';
 
-const RESERVED = new Set(['anthropic', 'openai', 'chatgpt', 'copilot', 'auto', 'local', 'memory']);
+const RESERVED = new Set(['anthropic', 'openai', 'chatgpt', 'copilot', 'claudecode', 'codex', 'auto', 'local', 'memory']);
 export const COMPAT_ID_RE = /^[a-z][a-z0-9-]{1,30}$/;
 const keySecretFor = (id) => `PROVIDER_${id.toUpperCase().replace(/-/g, '_')}_KEY`;
 const OPENAI_BASE = () => (process.env.OPENAI_API_BASE || 'https://api.openai.com/v1');
@@ -32,9 +35,14 @@ export const TYPES = Object.freeze({
   openai: { secret: 'OPENAI_API_KEY' },
   chatgpt: { secret: chatgpt.SECRET },
   copilot: { secret: copilot.SECRET },
+  claudecode: { secret: claudeCode.SECRET },
+  codex: {},
   openrouter: {},
 });
-const BUILTIN = ['anthropic', 'openai', 'chatgpt', 'copilot'];
+const BUILTIN = ['anthropic', 'openai', 'chatgpt', 'copilot', 'claudecode', 'codex'];
+/** 074: agent apps — official subscription apps run on the server; one account each. */
+export const APP_TYPES = ['claudecode', 'codex', 'copilot'];
+const appInstalled = { claudecode: claudeCode.installed, codex: codex.installed, copilot: copilot.sdkInstalled };
 export const STRATEGIES = ['order', 'spread'];
 
 /** Extra accounts of built-in types and labels of first accounts: [{ id, type, label }]. */
@@ -88,9 +96,11 @@ function builtinAdapter(type, secret) {
   if (type === 'anthropic') return anthropic.anthropicAdapter(secret);
   if (type === 'openai') return chatCompletionsProvider({ baseUrl: OPENAI_BASE(), key: () => getSecret(secret), official: true });
   if (type === 'chatgpt') return chatgpt.chatgptAdapter(secret);
+  if (type === 'claudecode') return claudeCode.claudeCodeAdapter(secret);
+  if (type === 'codex') return codex.codexAdapter();
   return copilot.copilotAdapter(secret);
 }
-const configuredFor = (type, secret) => (type === 'chatgpt' ? chatgpt.configured(secret) : !!getSecret(secret));
+const configuredFor = (type, secret) => (type === 'chatgpt' ? chatgpt.configured(secret) : type === 'codex' ? codex.configured() : !!getSecret(secret));
 
 /**
  * All accounts with their adapter and whether they're configured, in the order Auto tries them: built-in types
@@ -107,6 +117,7 @@ export function providers() {
       const row = { id: a.id, type, group: type, primary: a.id === type, label: a.label || '', name: accountName(type, a.label), secret,
         configured: configuredFor(type, secret), adapter: builtinAdapter(type, secret) };
       if (type === 'chatgpt') row.account = chatgpt.credentials(secret)?.email || '';
+      if (type === 'codex') row.account = codex.account();
       if (a.id !== type && !row.configured) continue; // an extra account without credentials is not listed
       list.push(row);
     }
@@ -145,7 +156,7 @@ export function newAccountId(type, label) {
 
 /** Register another account of a built-in type (anthropic, openai, copilot; chatgpt after its sign-in). */
 export function addAccount({ type, label, key, id: givenId }) {
-  if (!BUILTIN.includes(type)) throw bad('Type must be anthropic, openai, chatgpt or copilot', 'type');
+  if (!BUILTIN.includes(type) || type === 'claudecode' || type === 'codex') throw bad('Type must be anthropic, openai, chatgpt or copilot', 'type');
   const lab = cleanLabel(label);
   if (!lab) throw bad('Give the account a label, e.g. “work” or your name', 'label');
   if (accountEntries().some((a) => a.type === type && a.id !== type && a.label.toLowerCase() === lab.toLowerCase())) throw bad(`There is already a ${accountName(type)} account called “${lab}”`, 'label');
@@ -247,6 +258,7 @@ export async function status({ refresh = false } = {}) {
       row.strategy = strat[p.group] || 'order';
       if (lastUsed.has(p.id)) row.lastUsed = lastUsed.get(p.id);
     }
+    if (APP_TYPES.includes(p.type) && p.primary) row.app = { installed: !!appInstalled[p.type](), installing: isInstalling(p.type), ...appStats(p.type) }; // 074
     out.push(row);
   }
   return out;
@@ -420,7 +432,7 @@ const describeFailures = (failures) => failures.map((f) => `${f.name} (${f.pause
  * streaming, then the chain continues without streaming. Usage is recorded once, from the answer that is returned.
  * signal (066): an AbortSignal (Stop in the Ask box); it ends a streaming call, nothing falls back, the account is not blamed.
  */
-export async function chat({ model = 'auto', purpose = 'agent', system, messages, tools = [], maxTokens = 1024, usage = {}, fallback, turn = null, direct = false, accept = null, lastResort = [], onText = null, onRestart = null, signal = undefined }) {
+export async function chat({ model = 'auto', purpose = 'agent', system, messages, tools = [], maxTokens = 1024, usage = {}, fallback, turn = null, direct = false, accept = null, lastResort = [], onText = null, onRestart = null, signal = undefined, onWait = undefined }) {
   let streamOn = typeof onText === 'function';
   if (!direct && (!parseRef(model) || parseRef(model).model === 'auto')) await warmModels();
   const fb = direct ? { enabled: false, chain: [] } : (fallback || fallbackSettings());
@@ -473,7 +485,7 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
       tried.add(ref);
       lastUsed.set(p.id, Date.now()); useOrder.set(p.id, ++useSeq);
       let res;
-      const args = { model: modelId, system, messages, tools, maxTokens };
+      const args = { model: modelId, system, messages, tools, maxTokens, ...(onWait ? { onWait } : {}) }; // 074: onWait — an agent app waits for its turn
       let started = false; // 047: this account already sent text to onText
       const streamed = streamOn && p.adapter.streams ? { ...args, signal, onText: (d) => { started = true; try { onText(d); } catch { /* a closed stream must not break the call */ } } } : null;
       try {

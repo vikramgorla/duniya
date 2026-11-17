@@ -1,5 +1,5 @@
 // Models screen: providers, accounts, defaults, fallback, photos & voice capabilities. Module of the panel (063).
-import { $, S, api, ask, can, field, h, icon, menu, toast, toggle, tryApi } from './core.js';
+import { $, S, api, ask, can, copyBtn, field, h, icon, menu, toast, toggle, tryApi } from './core.js';
 import { chainEditor } from './fallback.js';
 import { listDetail, mark } from './listdetail.js';
 import { PROVIDER_NAMES } from './names.js';
@@ -7,7 +7,8 @@ import { LINKS, helpLink, loadModels, modelLabel, modelSelect, plural, saveSecre
 import { usageSummary } from './usage.js';
 /** 066: the Add a provider list, in this order: [provider type (names.js) = page id, one short line]. */
 const ADD_PROVIDERS = [['openrouter', 'Many models, some free'], ['anthropic', 'Anthropic API key, pay per use'], ['openai', 'API key, pay per use'],
-  ['copilot', 'Your Copilot plan, also works with the free plan'], ['chatgpt', 'Sign in with your ChatGPT plan'], ['compatible', 'Ollama, LM Studio, Groq, Mistral…']];
+  ['copilot', 'Your Copilot plan, also works with the free plan'], ['chatgpt', 'Sign in with your ChatGPT plan'],
+  ['claudecode', 'Your Claude Pro or Max plan, through the Claude Code app'], ['codex', 'Your ChatGPT plan, through the Codex app'], ['compatible', 'Ollama, LM Studio, Groq, Mistral…']];
 const ext = (href, text) => h('a', { href, target: '_blank', rel: 'noopener' }, text, ' ↗');
 // Small drawings of what to look for on the other site (no images from the web).
 const cue = {
@@ -78,6 +79,35 @@ function healthNote(p) {
 }
 const healthPill = (p) => (!p.connected ? h('span', { class: 'pill bad' }, 'Needs attention') : p.health?.state === 'reconnect' ? h('span', { class: 'pill bad' }, 'Reconnect')
   : p.health?.state && p.health.state !== 'ok' ? h('span', { class: 'pill warn' }, 'Paused') : h('span', { class: 'pill ok' }, `✓ ${p.models} model${p.models === 1 ? '' : 's'}`));
+/** 074: what an agent app costs on this server, as measured here ("about 200 MB while answering · starts in 0.6 s"). */
+const appLine = (p) => (p?.app ? h('div', { class: 'small muted num' }, 'Runs on this server for each answer',
+  p.app.peakMb ? ` · about ${p.app.peakMb} MB while answering` : '', p.app.startMs ? ` · starts in ${secs(p.app.startMs)}` : '') : null);
+const planNote = () => h('p', { class: 'small muted', style: 'margin:6px 0 0' }, 'For your own, personal use with your own account; it counts against your plan’s limits. ', helpLink('models.md#agent-apps', 'What the terms say'));
+
+/** 074: Codex's own device sign-in: a link and a one-time code; the page updates when the owner is done (activity stream). */
+function codexFlow() {
+  const out = h('div', {});
+  const start = h('button', { type: 'button', class: 'btn primary', onclick: async () => {
+    start.disabled = true; out.replaceChildren(h('div', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Preparing… the first time this downloads Codex (about 400 MB, a minute or two)'));
+    const r = await tryApi(() => api('POST', '/api/providers/codex/start', {}));
+    start.disabled = false;
+    if (!r) return out.replaceChildren();
+    start.classList.add('hide');
+    out.replaceChildren(h('div', { class: 'note info' }, h('div', {}, 'Open the link, sign in with your ChatGPT account and enter this code:'),
+      h('div', { class: 'row', style: 'margin:8px 0' }, h('code', { class: 'devcode' }, r.code), copyBtn(r.code, 'Copy code')),
+      h('a', { class: 'btn primary', href: r.url, target: '_blank', rel: 'noopener' }, 'Open the sign-in ↗'),
+      h('div', { class: 'small muted', style: 'margin-top:8px' }, h('span', { class: 'spinner' }), ' Waiting for you to finish. This page updates by itself; the code is valid for 15 minutes.')));
+    const done = (e) => {
+      const a = JSON.parse(e.data);
+      if (a.detail?.signin !== 'codex') return;
+      S.es?.removeEventListener('message', done);
+      if (a.detail.ok) { toast('Codex connected'); S.models = null; renderModels(); } else { start.classList.remove('hide'); out.replaceChildren(h('div', { class: 'note bad' }, a.summary)); }
+    };
+    S.es?.addEventListener('message', done);
+  } }, 'Sign in with ChatGPT');
+  return h('div', {}, start, out);
+}
+
 const TERMS_NOTE = 'Use your own accounts. Some subscription plans’ terms forbid sharing an account or using several accounts to get around their limits, so check the provider’s terms first.';
 
 /** A label + key form for another account. submit(label, key). */
@@ -204,7 +234,7 @@ export async function renderModels() {
       [h('span', {}, 'Copy the key (starts with ', h('code', {}, 'sk-ant-'), '). It is shown only once.'), cue.win('platform.claude.com', cue.hl(cue.field('sk-ant-api03-Xk…')))],
     ],
     form: keyForm({ placeholder: 'sk-ant-…', submit: saveSecretKey('ANTHROPIC_API_KEY') }),
-    connected: h('p', { class: 'small muted', style: 'margin:0' }, 'Claude Pro/Max subscriptions can’t be used here; this uses your API key.'),
+    connected: h('p', { class: 'small muted', style: 'margin:0' }, 'This uses your API key. For your Claude Pro or Max plan, connect ', h('a', { href: '#models/claudecode' }, 'Claude Code'), '.'),
     accounts: accountsBox({ first: by.anthropic, provs, addForm: () => accountKeyForm({ placeholder: 'sk-ant-…', submit: (label, key) => api('POST', '/api/accounts', { type: 'anthropic', label, key }) }) }),
     extra: [replaceKey(keyForm({ placeholder: 'sk-ant-…', button: 'Save', submit: saveSecretKey('ANTHROPIC_API_KEY') })),
       h('button', { class: 'btn small danger mut', onclick: async () => (await ask({ title: 'Remove the Anthropic key?', text: 'Agents using Claude stop answering until another model is chosen.', ok: 'Remove key', danger: true })) && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'ANTHROPIC_API_KEY', value: '' }); S.models = null; renderModels(); }, 'Removed') }, 'Remove')],
@@ -256,12 +286,38 @@ export async function renderModels() {
         cue.win('github.com/settings/personal-access-tokens/new', h('div', { class: 'cue-perm' }, h('span', {}, 'Copilot requests'), cue.hl(h('span', { class: 'cue-select' }, 'Read and write ▾'))), cue.btn('Generate token', true))],
       [h('span', {}, 'Copy the token (starts with ', h('code', {}, 'github_pat_'), '). It is shown only once. Classic tokens (', h('code', {}, 'ghp_'), ') don’t work.'), cue.win('github.com', cue.hl(cue.field('github_pat_11AB…')))],
     ],
-    form: h('div', {}, keyForm({ placeholder: 'github_pat_…', busy: 'Connecting… the first time this downloads Copilot support (about 400 MB, a few minutes)', submit: (token) => api('POST', '/api/providers/copilot', { token }) }),
-      h('p', { class: 'small muted' }, 'Refused? Switch “Copilot requests” to the other access level on GitHub and try again. The first connection downloads GitHub’s Copilot helper (about 400 MB).')),
+    form: h('div', {}, keyForm({ placeholder: 'github_pat_…', busy: 'Connecting… the first time this downloads Copilot support (about 220 MB, a minute)', submit: (token) => api('POST', '/api/providers/copilot', { token }) }),
+      h('p', { class: 'small muted' }, 'Refused? Switch “Copilot requests” to the other access level on GitHub and try again. The first connection downloads GitHub’s Copilot helper (about 220 MB).')),
+    connected: appLine(co),
     account: co?.account,
     accounts: accountsBox({ first: co, provs, ownerOnly: true, addForm: () => accountKeyForm({ placeholder: 'github_pat_…', keyLabel: 'Paste its GitHub token (fine-grained, with Copilot requests)', submit: (label, token) => api('POST', '/api/providers/copilot', { label, token }) }) }),
     extra: can('owner') ? [replaceKey(keyForm({ placeholder: 'github_pat_…', button: 'Save', submit: (token) => api('POST', '/api/providers/copilot', { token }) })),
       disconnect('GitHub Copilot', '/api/providers/copilot', 'Agents using Copilot models stop answering until another model is chosen.')] : null,
+  });
+
+  // 074: agent apps — the official apps run on this server with your own plan
+  const cc = by.claudecode;
+  const ccCard = providerCard({
+    id: 'claudecode', mark: 'm-an', title: cc?.name || 'Claude Code', p: cc, ownerOnly: true,
+    cost: 'Included in your Claude Pro or Max plan; its limits apply. Runs Anthropic’s Claude Code app on this server.',
+    steps: [
+      [h('span', {}, 'You need a Claude Pro or Max plan. On your computer, install Claude Code (', ext(LINKS.claudeCodeSetup, 'how'), ') and run ', h('code', {}, 'claude setup-token'), ' in a terminal. Sign in when your browser opens.')],
+      [h('span', {}, 'Copy the token it prints. It starts with ', h('code', {}, 'sk-ant-oat01-'), ' and is valid for a year.'), cue.win('Terminal', cue.hl(cue.field('sk-ant-oat01-Xk…')))],
+    ],
+    form: h('div', {}, keyForm({ placeholder: 'sk-ant-oat01-…', busy: 'Connecting… the first time this downloads Claude Code (about 360 MB, a minute)', submit: (token) => api('POST', '/api/providers/claudecode', { token }) }), planNote()),
+    connected: h('div', {}, appLine(cc), planNote()),
+    extra: can('owner') ? [replaceKey(keyForm({ placeholder: 'sk-ant-oat01-…', button: 'Save', submit: (token) => api('POST', '/api/providers/claudecode', { token }) })),
+      disconnect('Claude Code', '/api/providers/claudecode', 'Its token and the downloaded app are removed. Agents using it switch to the next model.')] : null,
+  });
+  const cx = by.codex;
+  const cxCard = providerCard({
+    id: 'codex', mark: 'm-cg', title: cx?.name || 'Codex', p: cx, ownerOnly: true, account: cx?.account,
+    cost: 'Included in your ChatGPT plan; its Codex limits apply. Runs OpenAI’s Codex app on this server.',
+    steps: [[h('span', {}, 'Click the button. You get a link and a one-time code.'), codexFlow()],
+      [h('span', {}, 'Open the link on any device, sign in with your ChatGPT account and enter the code. This page updates by itself.')]],
+    form: planNote(),
+    connected: h('div', {}, appLine(cx), planNote()),
+    extra: can('owner') ? disconnect('Codex', '/api/providers/codex', 'Its sign-in and the downloaded app are removed. Agents using it switch to the next model.') : null,
   });
 
   // Other OpenAI-compatible endpoints (advanced)
@@ -303,8 +359,8 @@ export async function renderModels() {
     can('admin') ? h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn primary mut', onclick: () => tryApi(async () => { await api('PUT', '/api/fallback', { enabled: fbOn.checked, chain: fbChain.value() }); S.models = null; renderModels(); }, 'Saved') }, 'Save')) : null);
 
   // 064: a list of providers (mark, name, health, short status) → the chosen provider's page; #models/<id>
-  const MARKS = { openrouter: ['O', 'c4'], anthropic: ['A', 'c1'], openai: ['O', 'c3'], chatgpt: ['C', 'c5'], copilot: ['G', 'c0'] };
-  const pages = { openrouter: orCard, anthropic: anCard, openai: oaCard, chatgpt: cgCard, copilot: coCard };
+  const MARKS = { openrouter: ['O', 'c4'], anthropic: ['A', 'c1'], openai: ['O', 'c3'], chatgpt: ['C', 'c5'], copilot: ['G', 'c0'], claudecode: ['C', 'c1'], codex: ['C', 'c5'] };
+  const pages = { openrouter: orCard, anthropic: anCard, openai: oaCard, chatgpt: cgCard, copilot: coCard, claudecode: ccCard, codex: cxCard };
   const names = Object.fromEntries(Object.entries(pages).map(([id, card]) => [id, card.querySelector('h2')?.textContent || id]));
   const state = (p) => (!p?.connected ? (p?.error ? ['bad', 'needs attention'] : ['', 'not connected']) : p.health?.state && p.health.state !== 'ok' ? [p.health.state === 'reconnect' ? 'bad' : 'warn', p.health.text] : ['ok', `Connected · ${plural(p.models, 'model')}`]);
   const row = (id, p, name) => {
@@ -320,7 +376,7 @@ export async function renderModels() {
     h('ul', { class: 'add-list' }, ADD_PROVIDERS.map(([id, line]) => {
       const isOn = by[id]?.connected; const [letter, c] = MARKS[id] || ['E', 'c0'];
       return h('li', {}, h('a', { class: 'lrow', href: `#models/${id === 'compatible' ? 'endpoints' : id}` }, mark(letter, c),
-        h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, PROVIDER_NAMES[id]), h('span', { class: 'lrow-sub' }, isOn ? 'Connected · add another account' : line)),
+        h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, PROVIDER_NAMES[id]), h('span', { class: 'lrow-sub' }, isOn ? (id === 'claudecode' || id === 'codex' ? 'Connected' : 'Connected · add another account') : line)),
         isOn ? h('span', { class: 'dot ok', 'aria-hidden': 'true' }) : null, h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
     })));
   pages.endpoints = otherCard; pages.fallback = fallbackCard; pages.defaults = defaults;

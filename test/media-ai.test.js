@@ -396,7 +396,7 @@ test('queue: jobs survive a restart, run in order per chat, ⏳ when waiting, ap
 });
 
 // ---------- small-server guardrails ----------
-test('small servers: size in status, on-server engines and Copilot refused, low memory falls back, pressure pauses optional work', async () => {
+test('small servers: size in status, on-server engines and agent apps refused, low memory falls back, pressure pauses optional work', async () => {
   res.setResourceProbe({ totalMb: 958, availableMb: 250, cpus: 1, rssMb: 180 });
   const st = (await t.api(owner, 'GET', '/api/status')).body;
   assert.equal(st.server.size, 'small'); assert.equal(st.server.effectiveMb, 958);
@@ -405,7 +405,7 @@ test('small servers: size in status, on-server engines and Copilot refused, low 
   const inst = await t.api(owner, 'POST', '/api/media/local/stt/install');
   assert.equal(inst.status, 400);
   const co = await t.api(owner, 'POST', '/api/providers/copilot', { token: 'github_pat_abcdefghijklmnop' });
-  assert.equal(co.status, 400); assert.match(co.body.error, /2 GB/);
+  assert.equal(co.status, 400); assert.match(co.body.error, /agent apps .*Small server mode/); // 074: allowed with the switch
   assert.equal(res.maxLocalServices(), 2);
   // a container limit counts as the server's size
   res.setResourceProbe({ totalMb: 16000, cgroupLimitMb: 900, availableMb: 500, cpus: 4, rssMb: 100 });

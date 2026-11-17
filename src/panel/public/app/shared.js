@@ -23,6 +23,7 @@ export const helpLink = (path, label = 'Help: open the guide') => h('a', { class
 // ---------- models ----------
 export const LINKS = {
   anthropicKeys: 'https://platform.claude.com/settings/keys',
+  claudeCodeSetup: 'https://code.claude.com/docs/en/setup',
   openaiKeys: 'https://platform.openai.com/api-keys',
   openrouterKeys: 'https://openrouter.ai/settings/keys',
   openrouterFree: 'https://openrouter.ai/models?max_price=0',

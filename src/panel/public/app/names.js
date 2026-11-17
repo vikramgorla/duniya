@@ -7,7 +7,7 @@
 
 /** Provider names by type. */
 export const PROVIDER_NAMES = Object.freeze({
-  anthropic: 'Claude', openai: 'OpenAI', chatgpt: 'ChatGPT', copilot: 'GitHub Copilot', openrouter: 'OpenRouter', compatible: 'Custom (OpenAI-compatible)',
+  anthropic: 'Claude', openai: 'OpenAI', chatgpt: 'ChatGPT', copilot: 'GitHub Copilot', claudecode: 'Claude Code', codex: 'Codex', openrouter: 'OpenRouter', compatible: 'Custom (OpenAI-compatible)',
 });
 
 /** "ChatGPT", or "ChatGPT · work" for a labelled account. */

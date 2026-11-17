@@ -188,7 +188,8 @@ Names are short and familiar, and the same everywhere: the panel, the admin MCP 
 The one source is `src/panel/public/app/names.js` (`PROVIDER_NAMES`, `accountName()`, `modelName()`). The server uses
 it for the names its API returns, and panel modules import it.
 
-- Providers: **ChatGPT**, **Claude**, **OpenAI**, **GitHub Copilot**, **OpenRouter**, and **Custom (OpenAI-compatible)**
+- Providers: **ChatGPT**, **Claude**, **OpenAI**, **GitHub Copilot**, **Claude Code**, **Codex** (agent apps, 074: the
+  app's own name, never "Claude (subscription)"), **OpenRouter**, and **Custom (OpenAI-compatible)**
   only where a generic endpoint must be named. No explanations in brackets: how you connect (sign in or key) belongs
   on the provider's page.
 - Accounts: the provider's name, with the label only when there are several accounts: "ChatGPT · work".

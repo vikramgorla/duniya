@@ -1,0 +1,91 @@
+#!/usr/bin/env node
+// Fake agent app for tests (074): one script plays Claude Code (--as-claude, started from …/claude-code/bin/claude.exe)
+// and Codex (--as-codex, from …/bin/codex). No network: it calls Duniya's tool bridge on 127.0.0.1 like the real apps do (MCP over HTTP) and
+// writes what it was started with to $HOME/fake-calls.jsonl (argument names and env names only, no values).
+import fs from 'node:fs';
+import path from 'node:path';
+const codex = process.argv[2] === '--as-codex';
+const args = process.argv.slice(3);
+const home = process.env.HOME;
+const out = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
+const log = (o) => fs.appendFileSync(path.join(home, 'fake-calls.jsonl'), `${JSON.stringify(o)}\n`);
+const readStdin = () => new Promise((r) => { let s = ''; process.stdin.on('data', (d) => { s += d; }); process.stdin.on('end', () => r(s)); });
+const jwt = (o) => ['e30', Buffer.from(JSON.stringify(o)).toString('base64url'), 'sig'].join('.');
+
+async function mcp(url, token, method, params) {
+  const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ jsonrpc: '2.0', id: Math.random(), method, params }) });
+  return (await res.json()).result;
+}
+
+async function turn({ url, token, prompt: full, model, sys, emit }) {
+  const prompt = full.trim().split('\n').at(-1); // the new message (earlier lines are the chat's memory)
+  log({ app: codex ? 'codex' : 'claude', model, args: args.filter((a) => a.startsWith('-')), env: Object.keys(process.env).filter((k) => /TOKEN|KEY|CODEX|CLAUDE|ANTHROPIC|OPENAI/.test(k)).sort(), sysFile: !!sys && fs.existsSync(sys), sys: sys && fs.existsSync(sys) ? fs.readFileSync(sys, 'utf8').slice(0, 40) : '' });
+  if (/LIMIT/.test(prompt)) return emit.limit();
+  if (/CRASH/.test(prompt)) { process.stderr.write('boom: fake crash\n'); process.exit(3); }
+  await mcp(url, token, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'fake', version: '1' } });
+  const tools = (await mcp(url, token, 'tools/list', {})).tools || [];
+  const want = prompt.match(/use tool (\w+)/)?.[1];
+  const tool = want && tools.find((t) => t.name.endsWith(want));
+  if (tool) {
+    emit.call(tool.name);
+    const r = await mcp(url, token, 'tools/call', { name: tool.name, arguments: {} });
+    emit.text(`${codex ? 'Codex' : 'Claude Code'} says: ${r.content[0].text}`);
+  } else emit.text(`Hi from fake ${codex ? 'Codex' : 'Claude Code'} (${model}, ${tools.length} tools)`);
+  emit.done();
+}
+
+(async () => {
+  const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : ''; };
+  if (!codex) {
+    if (args[0] === 'auth') { out({ loggedIn: !!process.env.CLAUDE_CODE_OAUTH_TOKEN, authMethod: 'oauth_token', apiProvider: 'firstParty' }); return; }
+    const prompt = await readStdin();
+    const cfg = JSON.parse(opt('--mcp-config')).mcpServers.duniya;
+    out({ type: 'system', subtype: 'init', model: opt('--model'), tools: [] });
+    if (/bad/.test(process.env.CLAUDE_CODE_OAUTH_TOKEN || '')) {
+      out({ type: 'result', subtype: 'success', is_error: true, result: 'Failed to authenticate. API Error: 401 Invalid bearer token' });
+      process.exit(1);
+    }
+    await turn({ url: cfg.url, token: cfg.headers.Authorization.slice(7), prompt, model: opt('--model'), sys: opt('--system-prompt-file'), emit: {
+      call: (name) => out({ type: 'assistant', message: { model: 'claude', content: [{ type: 'tool_use', id: 'toolu_1', name: `mcp__duniya__${name}`, input: {} }] }, parent_tool_use_id: null }),
+      text: (text) => out({ type: 'assistant', message: { model: 'claude', content: [{ type: 'text', text }] }, parent_tool_use_id: null }),
+      done: () => out({ type: 'result', subtype: 'success', is_error: false, result: 'ok', usage: { input_tokens: 11, output_tokens: 4, cache_read_input_tokens: 1 } }),
+      limit: () => {
+        out({ type: 'rate_limit_event', rate_limit_info: { status: 'rejected', resetsAt: Math.floor(Date.now() / 1000) + 3600 } });
+        out({ type: 'result', subtype: 'success', is_error: true, result: 'You\'ve hit your session limit · resets 5pm (UTC)' });
+        process.exit(1);
+      },
+    } });
+    return;
+  }
+  const chome = process.env.CODEX_HOME;
+  if (args[0] === 'login') {
+    process.stdout.write('\n\u001b[90mWelcome to Codex\u001b[0m\n\n1. Open this link in your browser and sign in to your account\n   \u001b[94mhttps://auth.openai.com/codex/device\u001b[0m\n\n2. Enter this one-time code \u001b[90m(expires in 15 minutes)\u001b[0m\n   \u001b[94mABCD-EF12\u001b[0m\n\n');
+    await new Promise((r) => setTimeout(r, 150));
+    if (fs.existsSync(path.join(home, 'fail-login'))) { process.stderr.write('Error: device code expired\n'); process.exit(1); }
+    fs.writeFileSync(path.join(chome, 'auth.json'), JSON.stringify({ tokens: { id_token: jwt({ email: 'owner@example.com', 'https://api.openai.com/auth': { chatgpt_plan_type: 'plus' } }), access_token: 'a', refresh_token: 'r' } }));
+    process.stdout.write('Successfully logged in\n');
+    return;
+  }
+  if (args[0] === 'logout') { fs.rmSync(path.join(chome, 'auth.json'), { force: true }); return; }
+  if (args[0] === 'debug' && args[1] === 'models') {
+    out({ models: [{ slug: 'gpt-5.6-luna', display_name: 'GPT-5.6-Luna', visibility: 'list', priority: 9, apply_patch_tool_type: 'freeform', supports_search_tool: true },
+      { slug: 'gpt-6.1-sol', display_name: 'GPT-6.1-Sol', visibility: 'list', priority: 1 }, { slug: 'codex-auto-review', visibility: 'hide', priority: 43 }] });
+    return;
+  }
+  if (args[0] === 'exec') {
+    const prompt = await readStdin();
+    const cs = args.filter((a, i) => args[i - 1] === '-c');
+    const server = cs.find((c) => c.startsWith('mcp_servers.duniya='));
+    const url = server.match(/url="([^"]+)"/)[1];
+    const sys = JSON.parse(cs.find((c) => c.startsWith('model_instructions_file=')).split('=').slice(1).join('='));
+    const catalog = JSON.parse(cs.find((c) => c.startsWith('model_catalog_json=')).split('=').slice(1).join('='));
+    log({ catalog: JSON.parse(fs.readFileSync(catalog, 'utf8')).models[0], disabled: args.filter((a, i) => args[i - 1] === '--disable'), sandbox: opt('-s') });
+    out({ type: 'thread.started', thread_id: 't1' }); out({ type: 'turn.started' });
+    await turn({ url, token: process.env.DUNIYA_TOOLS_TOKEN, prompt, model: opt('-m'), sys, emit: {
+      call: (name) => out({ type: 'item.started', item: { id: 'i0', type: 'mcp_tool_call', server: 'duniya', tool: name, arguments: {}, status: 'in_progress' } }),
+      text: (text) => out({ type: 'item.completed', item: { id: 'i1', type: 'agent_message', text } }),
+      done: () => out({ type: 'turn.completed', usage: { input_tokens: 9, cached_input_tokens: 0, output_tokens: 3 } }),
+      limit: () => { out({ type: 'turn.failed', error: { message: 'You\'ve hit your usage limit. Upgrade to Pro, or try again in 2 hours.' } }); process.exit(1); },
+    } });
+  }
+})();

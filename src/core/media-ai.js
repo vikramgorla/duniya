@@ -100,7 +100,7 @@ export async function modelSeesImages(ref) {
   const p = r && accountById(r.provider);
   if (!p) return false;
   if (p.type === 'anthropic' || p.type === 'chatgpt') return true;
-  if (p.type === 'copilot') return false; // the Copilot SDK bridge sends text only
+  if (['copilot', 'claudecode', 'codex'].includes(p.type)) return false; // agent apps (074) get the conversation as text only
   if (p.type === 'openai') return !OPENAI_NO_VISION.test(r.model);
   const m = (await listed(p).catch(() => [])).find((x) => x.id === r.model);
   if (Array.isArray(m?.inputs)) return m.inputs.includes('image');
@@ -115,9 +115,9 @@ async function accountCaps(p) {
   else if (p.type === 'chatgpt') {
     Object.assign(row, { sees: 'yes', hears: false, creates: false, speaks: false });
     how.hears = how.creates = 'OpenAI does not offer this for ChatGPT plan sign-in yet. Add an OpenAI API key or OpenRouter for it.';
-  } else if (p.type === 'copilot') {
+  } else if (['copilot', 'claudecode', 'codex'].includes(p.type)) {
     Object.assign(row, { sees: 'no', hears: false, creates: false, speaks: false });
-    how.sees = 'Not through the Copilot helper. Choose a vision fallback model under Settings → Photos & voice.';
+    how.sees = 'Not through the agent app (it gets text only). Choose a vision fallback model under Settings → Photos & voice.';
   } else if (p.type === 'openai') {
     const img = p.configured ? await imageModelsOf(p).catch(() => []) : [];
     Object.assign(row, { sees: 'yes', hears: true, creates: img.length > 0, speaks: true, imageModel: img[0] || '' });
