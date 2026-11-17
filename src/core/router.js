@@ -425,6 +425,10 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
         chatName: msg.isGroup ? await channel.chatName?.(msg.chat) : '',
         attachments: media?.blocks || [], mediaNote: media?.note || '',
       };
+      // 074: an agent app waiting for its turn on a small server: ⏳ on the message, taken back when the answer is out
+      const mref = msg.msgId ? { msgId: msg.msgId, fromMe: false, participant: msg.senderJid || undefined } : null;
+      let waited = false;
+      if (mref) ctx.onWait = () => { waited = true; channel.react?.(msg.chat, mref, '⏳')?.catch?.(() => {}); };
       try {
         out = await runAgent(ctx);
       } catch (e) {
@@ -432,6 +436,7 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
         quiet('model_error', agent.id);
         out = 'Sorry, I hit an error. Please try again in a minute.';
       }
+      if (waited) channel.react?.(msg.chat, mref, '')?.catch?.(() => {});
       if (ctx.modelError) quiet('model_error', agent.id);
       else if (!out) quiet('no_reply', agent.id);
     }

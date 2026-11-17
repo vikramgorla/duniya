@@ -19,8 +19,8 @@ function serverSizeNote(s, q) {
   return h('div', { class: `note ${s.pressure ? 'warn' : s.size === 'small' ? 'info' : ''}`, style: 'margin-top:10px' },
     h('b', {}, `${SIZE_LABEL[s.size]}: `), `${ram} memory${s.cgroupLimitMb ? ' (container limit)' : ''}, ${s.cpus} CPU${s.cpus > 1 ? 's' : ''}, ${s.availableMb} MB free. `,
     s.pressure ? `The app uses ${s.rssMb} MB — above ${s.softLimitMb} MB, so summaries, on-server speech and picture creation are paused until memory frees up. Replies continue.`
-      : s.size === 'small' ? (s.smallMode ? 'Small server mode is on: on-server speech and up to 2 local tool services may run, one job at a time and only when memory allows. Photos and voice notes are handled one at a time; the Copilot helper is not available.'
-        : 'Photos and voice notes are handled one at a time; on-server speech, local tool services and the Copilot helper are not available (Small server mode in Settings → Server allows the first two). Providers (OpenAI, OpenRouter) handle photos and voice fine.')
+      : s.size === 'small' ? (s.smallMode ? 'Small server mode is on: on-server speech and up to 2 local tool services may run, one job at a time and only when memory allows. Photos and voice notes are handled one at a time; agent apps (Claude Code, Codex, GitHub Copilot) answer one at a time.'
+        : 'Photos and voice notes are handled one at a time; on-server speech, local tool services and agent apps (Claude Code, Codex, GitHub Copilot) are not available (Small server mode in Settings → Server allows them). Providers (OpenAI, OpenRouter) handle photos and voice fine.')
         : 'Everything is available.',
     waiting);
 }

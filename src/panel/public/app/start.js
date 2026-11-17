@@ -42,9 +42,10 @@ export function linkNumberBox(n) {
       h('button', { class: 'btn', onclick: () => tryApi(async () => { const r = await api('POST', '/api/whatsapp/pair', { number: n.id, phone: phone.value }); S.overviewBusy = false; toast(`Pairing code: ${r.code}`); refreshStatus(); }) }, 'Get code')),
     n.pairingCode ? h('p', {}, 'In WhatsApp → Linked devices → Link with phone number instead, enter ', h('span', { class: 'code' }, n.pairingCode)) : null);
 }
-/** 062: one box for any key: OpenRouter, Anthropic, OpenAI or a GitHub token for Copilot, recognised by how it starts. */
+/** 062: one box for any key: OpenRouter, Anthropic, OpenAI, a GitHub token for Copilot or a Claude Code token (074), recognised by how it starts. */
 const KEY_KINDS = [
   [/^sk-or-/, PROVIDER_NAMES.openrouter, (key) => api('POST', '/api/providers/openrouter', { key, freeOnly: true })],
+  [/^sk-ant-oat01-/, PROVIDER_NAMES.claudecode, (token) => api('POST', '/api/providers/claudecode', { token })], // 074: a Claude plan token
   [/^sk-ant-/, PROVIDER_NAMES.anthropic, (key) => saveSecretKey('ANTHROPIC_API_KEY')(key)],
   [/^github_pat_/, PROVIDER_NAMES.copilot, (token) => api('POST', '/api/providers/copilot', { token })],
   [/^sk-/, PROVIDER_NAMES.openai, (key) => saveSecretKey('OPENAI_API_KEY')(key)],

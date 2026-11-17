@@ -15,7 +15,7 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS usage_ts ON usage(ts);
 `);
-export const PLAN_PROVIDERS = { chatgpt: 'ChatGPT plan', copilot: 'Copilot allowance' };
+export const PLAN_PROVIDERS = { chatgpt: 'ChatGPT plan', copilot: 'Copilot allowance', claudecode: 'Claude subscription', codex: 'ChatGPT plan' };
 const priceSetting = () => getSetting('modelPrices', {}) || {};
 
 /** Owner-set prices in USD per 1M tokens: { "provider:model": { in, out } }. Empty values remove the price. */

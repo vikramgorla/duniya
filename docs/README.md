@@ -19,7 +19,7 @@
 | <img src="img/thumb-overview.webp" alt="" width="120"> | **1** | **[Install](install.md)** | you want Duniya on a server: one click on Oracle or Google Cloud, or one command |
 | <img src="img/thumb-checklist.webp" alt="" width="120"> | **2** | **[Getting started](getting-started.md)** | the panel is open: five taps to a first answer, and *Where is my panel?* |
 | <img src="img/thumb-whatsapp.webp" alt="" width="120"> | **3** | **[Connect WhatsApp](whatsapp.md)** | you link the agents' number (QR or pairing code), or add another one |
-| <img src="img/thumb-fallback.webp" alt="" width="120"> | **4** | **[Add a model](models.md)** | you connect OpenRouter, ChatGPT, Claude, OpenAI, Copilot or Ollama, with a backup model |
+| <img src="img/thumb-fallback.webp" alt="" width="120"> | **4** | **[Add a model](models.md)** | you connect OpenRouter, ChatGPT, Claude, OpenAI, Copilot, Claude Code, Codex or Ollama, with a backup model |
 | <img src="img/thumb-agents.webp" alt="" width="120"> | **5** | **[Agents](agents.md)** | you create your first agent, test it, review its answers, give it tools and quick replies |
 | <img src="img/thumb-chats.webp" alt="" width="120"> | **6** | **[Chats](chats.md)** | you switch groups on, set up a person's chat, search messages, sort out names |
 | <img src="img/thumb-ask.webp" alt="" width="120"> | **7** | **[Owner assistant](owner-assistant.md)** | you want your own agent in your WhatsApp and the Ask box: recaps, sends, alerts, weekly summary |

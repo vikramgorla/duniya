@@ -120,7 +120,7 @@ function smallModeCard(sv) {
   return h('div', { class: 'card', id: 'small-mode' }, h('h2', {}, 'Server size'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, `${SIZE_LABEL[sv.size]}: ${ram} memory, ${sv.cpus} CPU${sv.cpus > 1 ? 's' : ''}.`),
     h('label', { class: 'inline' }, toggle(on, flip, !can('owner')), h('b', {}, 'Small server mode: allow heavier features on this server')),
-    h('div', { class: 'small', style: 'margin-top:6px' }, 'On a small server (under 2 GB or 1 CPU), allows on-server speech and local tool services anyway. Caveats: slower; one job at a time and at most 2 local tool services; they start only when enough memory is free and are stopped when memory gets tight (the agent then answers without them). GitHub Copilot sign-in is not covered: it needs 2 GB.'),
+    h('div', { class: 'small', style: 'margin-top:6px' }, 'On a small server (under 2 GB or 1 CPU), allows on-server speech, local tool services and agent apps (Claude Code, Codex, GitHub Copilot) anyway. Caveats: slower; one job at a time, at most 2 local tool services and one agent app at a time; they start only when enough memory is free and are stopped when memory gets tight (the agent then answers without them, or with the next model).'),
     !small ? h('div', { class: 'small muted', style: 'margin-top:6px' }, 'This server is not small: everything is available, the switch changes nothing here.') : null,
     !can('owner') ? h('div', { class: 'small muted', style: 'margin-top:6px' }, 'Only the owner can change this.') : null);
 }

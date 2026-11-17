@@ -33,7 +33,8 @@ through five steps; the one you are on opens in place:
 1. **Link your WhatsApp number**: scan the QR code with the phone of the agents' number (*WhatsApp → Settings →
    Linked devices → Link a device*), or get a pairing code. Use a number just for the agents. [Connect WhatsApp](whatsapp.md)
 2. **Connect an AI model**: paste any key into the one box: Duniya recognises OpenRouter (`sk-or-`, free models
-   only), Anthropic (`sk-ant-`), OpenAI (`sk-`) and GitHub Copilot (`github_pat_`). No key yet? **Free key from
+   only), Anthropic (`sk-ant-`), a Claude Code token from `claude setup-token` (`sk-ant-oat01-`), OpenAI (`sk-`) and GitHub Copilot
+   (`github_pat_`). No key yet? **Free key from
    OpenRouter ↗**, or **Use my ChatGPT plan**. Everything else: [Models](models.md).
 3. **Create your first agent**: tap a template (Car pooling, Family, Event planning…) or describe it in your own words
    and let the AI helper draft it. You can change everything later. [Agents](agents.md)

@@ -1,10 +1,12 @@
 // Panel routes for model providers (006).
-import { heavyCheck } from '../../core/resources.js';
 import { status, allModels, addCompatible, removeCompatible, clearModelCache, resolveModel, addOpenRouter, setFreeOnly, testProvider, clearCopilotExtras, providerModels, providers, OPENROUTER_ID,
   addAccount, renameAccount, removeAccount, newAccountId, secretFor, accountById, fallbackSettings, setFallbackSettings, strategies, setStrategy } from '../../core/providers/index.js';
 import * as breaker from '../../core/providers/breaker.js';
 import * as chatgpt from '../../core/providers/chatgpt.js';
 import * as copilot from '../../core/providers/copilot.js';
+import * as claudeCode from '../../core/providers/claude-code.js';
+import * as codex from '../../core/providers/codex.js';
+import { appsCheck } from '../../core/providers/apps.js';
 import { setSecret, getSecret, getSettings, updateSettings } from '../../core/store.js';
 import { REF_RE } from '../../core/providers/fallback-config.js';
 import { activity } from '../../core/events.js';
@@ -41,8 +43,9 @@ export function providerRoutes(route) {
   // body.label (042): connect another Copilot account with its own token; body.account: replace that account's token.
   route('POST', '/api/providers/copilot', async (req, res, body, q, p, user) => {
     const token = copilot.checkToken(body.token);
-    // Small servers (043): the Copilot helper is a ~400 MB download running its own process; refuse it below 2 GB.
-    if (!copilot.sdkInstalled()) { const heavy = heavyCheck('GitHub Copilot'); if (!heavy.ok) return [400, { error: heavy.reason, field: 'token' }]; }
+    // 074: an agent app — on small servers only with Small server mode; downloaded now when it is not there yet.
+    const gate = appsCheck(); if (!gate.ok) return [400, { error: gate.reason, field: 'token' }];
+    await copilot.installSdk();
     const existing = body.account ? accountById(String(body.account)) : null;
     if (body.account && existing?.type !== 'copilot') return [404, { error: 'No such Copilot account' }];
     const label = String(body.label || '').trim();
@@ -68,6 +71,45 @@ export function providerRoutes(route) {
     copilot.disconnect();
     clearModelCache('copilot'); clearCopilotExtras('copilot');
     activity('system', { summary: `GitHub Copilot disconnected by ${user.username}` });
+    return { ok: true };
+  }, { role: 'owner' });
+
+  // ---------- agent apps (074): Claude Code and Codex, downloaded on connect ----------
+  // Claude Code: the owner pastes the token from `claude setup-token`; checked with one tiny turn before it is kept.
+  route('POST', '/api/providers/claudecode', async (req, res, body, q, p, user) => {
+    const token = claudeCode.checkToken(body.token);
+    const gate = appsCheck(); if (!gate.ok) return [400, { error: gate.reason, field: 'token' }];
+    await claudeCode.install();
+    const previous = getSecret(claudeCode.SECRET);
+    setSecret(claudeCode.SECRET, token);
+    clearModelCache('claudecode');
+    const check = await testProvider('claudecode', 'haiku');
+    if (!check.ok) { setSecret(claudeCode.SECRET, previous || ''); return [400, { error: check.error, field: 'token' }]; }
+    activity('system', { summary: `Claude Code connected by ${user.username} (answered in ${check.ms} ms)` });
+    const [row] = (await status({ refresh: true })).filter((x) => x.id === 'claudecode');
+    return row;
+  }, { role: 'owner' });
+  route('DELETE', '/api/providers/claudecode', async (req, res, body, q, p, user) => {
+    claudeCode.disconnect();
+    clearModelCache('claudecode');
+    activity('system', { summary: `Claude Code disconnected by ${user.username}` });
+    return { ok: true };
+  }, { role: 'owner' });
+  // Codex: its own device sign-in. Start shows the link and code; the end arrives as an activity entry
+  // (detail.signin = 'codex'), which the open Models page listens for — no polling.
+  route('POST', '/api/providers/codex/start', async (req, res, body, q, p, user) => {
+    const gate = appsCheck(); if (!gate.ok) return [400, { error: gate.reason }];
+    await codex.install();
+    return codex.startLogin((ok, why) => {
+      clearModelCache('codex'); breaker.reset('codex');
+      if (ok) activity('system', { summary: `Codex connected by ${user.username}`, detail: { signin: 'codex', ok: true } });
+      else activity('error', { summary: `Codex sign-in did not finish${why ? `: ${why}` : ''}`, detail: { signin: 'codex', ok: false } });
+    });
+  }, { role: 'owner' });
+  route('DELETE', '/api/providers/codex', async (req, res, body, q, p, user) => {
+    await codex.disconnect();
+    clearModelCache('codex');
+    activity('system', { summary: `Codex disconnected by ${user.username}` });
     return { ok: true };
   }, { role: 'owner' });
 
