@@ -1,5 +1,6 @@
 // App updates: the Overview box, banner and the breaking-release dialog (045). Module of the panel (063).
 import { $, S, ago, api, ask, h, time, toast, tryApi } from './core.js';
+import { plural } from './shared.js';
 function watchUpdate(from, onTick) {
   if (S.updateWatch) return;
   const started = Date.now(); let wentDown = false; let bootUptime = null;
@@ -27,32 +28,31 @@ function watchUpdate(from, onTick) {
     onTick?.();
   }, 3000);
 }
-// Breaking releases (045): the owner decides. Banner on Overview, a line on the Updates card, and a dialog with the
-// release notes, "Make a backup first" and "Update to X".
-const RELEASE_DOCS = 'https://github.com/vikramgorla/whatsapp-agent-duniya/blob/';
-function updateDialog(u, after) {
-  const d = u.decision; if (!d) return;
+// 065: one dialog for every update: every release between the running version and the target (newest first, breaking
+// ones marked with what to do), a backup choice and the action on the button. Breaking releases (045) need this OK.
+/** Notes for the range up to `target`; breaking steps without an entry (an unlisted new major) are added. */
+function rangeNotes(st, d, target, notAfter) {
+  const notes = (st.notes || []).filter((n) => notAfter(n.version, target));
+  const missing = (d?.steps || []).filter((x) => notAfter(x.version, target) && !notes.some((n) => n.version === x.version)).map((x) => ({ ...x, breaking: true, changes: [] }));
+  return [...notes, ...missing].sort((a, b) => (notAfter(a.version, b.version) ? 1 : -1));
+}
+async function confirmUpdate(u, { target, breaking = false }) {
+  const { notAfter, rangeLine, releaseList } = await import('./releases.js'); // loads when an update is reviewed
+  const st = u.status || {};
+  const d = breaking ? u.decision : null;
+  const notes = rangeNotes(st, d, target, notAfter);
+  const steps = notes.filter((n) => n.breaking).length;
+  const docker = u.install === 'docker';
   const backup = h('input', { type: 'checkbox', checked: u.backup, disabled: !u.backup });
-  const go = h('button', { class: 'btn primary', onclick: async () => {
-    go.disabled = true; go.textContent = backup.checked ? 'Making a backup…' : 'Starting…';
-    const r = await tryApi(() => api('POST', '/api/updates/apply', { breaking: true, backup: backup.checked }));
-    dlg.close();
-    if (r) { S.updateFrom = d.current; after?.(); }
-  } }, `Update to ${d.target}`);
-  const dlg = h('dialog', { class: 'dlg', 'aria-label': `Update to ${d.target}` },
-    h('h2', {}, `Update to ${d.target}`),
-    h('p', { class: 'small muted' }, `You are running ${d.current}. ${d.steps.length > 1 ? `${d.steps.length} breaking releases lie in between` : 'This is a breaking release'}: read what changes and what you need to do.`),
-    d.steps.map((st) => h('div', { class: 'note warn' }, h('b', {}, `v${st.version}: ${st.title}`),
-      st.summary ? h('div', { style: 'margin-top:4px' }, st.summary) : null,
-      st.actions.length ? h('div', { style: 'margin-top:6px' }, h('b', {}, 'What you need to do'), h('ul', {}, st.actions.map((a) => h('li', {}, a)))) : null,
-      st.data === 'not-migrated' ? h('div', { class: 'small', style: 'margin-top:6px' }, 'Older data or settings named above are not carried over.') : null,
-      st.docs ? h('div', { style: 'margin-top:6px' }, h('a', { href: `${RELEASE_DOCS}v${st.version}/${st.docs}`, target: '_blank', rel: 'noopener' }, 'Read more')) : null)),
-    d.docker ? h('div', { class: 'note' }, 'Docker install: update the image on the host with  docker compose pull && docker compose up -d') : [
-      h('label', { class: 'check' }, backup, u.backup ? 'Make a backup first (on this server; the update waits for it)' : 'Make a backup first: set a backup passphrase under Backups to use this'),
-      d.safeTarget ? h('p', { class: 'small muted' }, `Not ready yet? ${d.safeTarget} can be installed without this decision.`) : null],
-    h('div', { class: 'row', style: 'margin-top:10px' }, d.docker ? null : go, h('button', { class: 'btn', onclick: () => dlg.close() }, 'Not now')));
-  dlg.addEventListener('close', () => dlg.remove());
-  document.body.append(dlg); dlg.showModal();
+  const ok = await ask({ title: `Update to ${target}?`, wide: true,
+    text: `You are running ${st.current}. ${notes.length ? `${rangeLine(notes)} come with it` : 'No release notes for this update'}${steps ? `, ${steps > 1 ? `${steps} of them need` : 'one needs'} your OK: read what to do` : ''}.${docker ? '' : ' The agents pause for about a minute; this page reloads by itself.'}`,
+    ok: docker ? null : `Update to ${target}`, cancel: docker ? 'Close' : 'Not now',
+    body: [releaseList(notes, { open: notes.length > 4 ? 2 : 3 }),
+      docker ? h('div', { class: 'note' }, 'Docker install: update the image on the host with  docker compose pull && docker compose up -d')
+        : h('label', { class: 'check rel-backup' }, backup, u.backup ? 'Make a backup first (on this server; the update waits for it)' : 'Make a backup first: set a backup passphrase under Backups to use this'),
+      d?.safeTarget && !docker ? h('p', { class: 'small muted' }, `Not ready yet? ${d.safeTarget} can be installed without this decision.`) : null] });
+  if (!ok) return false;
+  return !!await tryApi(() => api('POST', '/api/updates/apply', breaking ? { breaking: true, backup: backup.checked } : { backup: backup.checked }));
 }
 function drawUpdateBanner(u, after) {
   const slot = $('#ov-update-banner'); if (!slot) return;
@@ -60,7 +60,7 @@ function drawUpdateBanner(u, after) {
   if (!d || !d.show || u.running) return slot.replaceChildren();
   slot.replaceChildren(h('div', { class: 'card', style: 'margin-bottom:16px' },
     h('div', { class: 'note warn', style: 'margin-top:0' }, h('b', {}, `Version ${d.version} needs your decision`), ` · running ${d.current}. It is a breaking release, so automatic updates stop before it.`),
-    h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: () => updateDialog(u, after) }, 'Review update'),
+    h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: async () => { if (await confirmUpdate(u, { target: d.target, breaking: true })) { S.updateFrom = d.current; after?.(); } } }, 'Review update'),
       h('button', { class: 'btn', onclick: () => tryApi(async () => { await api('POST', '/api/updates/decision', { action: 'snooze' }); after?.(); }, 'We will remind you in 7 days') }, 'Remind me in 7 days'),
       h('button', { class: 'btn mut', onclick: () => tryApi(async () => { await api('POST', '/api/updates/decision', { action: 'dismiss' }); after?.(); }, 'Dismissed') }, 'Dismiss'))));
 }
@@ -85,18 +85,18 @@ export async function renderUpdates(box, note = '') {
         h('div', { class: 'small', style: 'margin-top:4px' }, d.steps.map((x) => `v${x.version}: ${x.title}`).join(' · ')),
         d.snoozedUntil ? h('div', { class: 'small muted' }, `Reminder snoozed until ${time(d.snoozedUntil)}`) : d.dismissed ? h('div', { class: 'small muted' }, 'Dismissed: no more reminders for this release') : null)
       : st.available
-        ? h('div', { class: 'note warn' }, h('b', {}, `Update available: ${st.latest}`), ` · running ${st.current}`)
-        : h('div', { class: 'note ok' }, h('b', {}, `✓ Up to date: ${st.current}`), h('span', { class: 'muted' }, ` · checked ${ago(st.checkedAt)} ago`));
+        ? h('div', { class: 'note warn' }, h('b', {}, `Update available: ${st.latest}`), ` · running ${st.current}`,
+          st.notes?.length ? h('div', { class: 'small', style: 'margin-top:4px' }, `${plural(st.notes.length, 'release')} · newest: ${st.notes[0].title}`) : null)
+        : h('div', { class: 'note ok' }, h('b', {}, `✓ Up to date: ${st.current}`), h('span', { class: 'muted' }, ` · checked ${ago(st.checkedAt)} ago · `),
+          h('a', { href: '#settings/release-notes' }, 'Release notes'));
   const last = lr ? h('p', { class: 'small muted' }, lr.ok ? `Last update: ${lr.from ? `${lr.from} → ` : ''}${lr.target} on ${time(lr.at)}${lr.backup ? ` · backup ${lr.backup}` : ''}` : `Last update failed on ${time(lr.at)}; the previous version kept running.`) : null;
   const plain = st.breaking ? st.safeTarget : st.available ? st.latest : null;
   const updateBtn = plain && !u.running && u.install !== 'docker' ? h('button', { class: `btn${d ? '' : ' primary'}`, onclick: async (e) => {
-    if (!await ask({ title: `Update to ${plain}?`, text: `The service installs ${plain} and restarts. The agents pause for about a minute.`, ok: `Update to ${plain}`,
-      body: h('ul', { class: 'small' }, h('li', {}, `Running ${st.current} now`), h('li', {}, u.backup ? 'A backup is made first' : 'No backup first: set a backup passphrase under Backups to get one'), h('li', {}, 'This page reloads by itself when it is done')) })) return;
-    e.target.disabled = true;
-    const r = await tryApi(() => api('POST', '/api/updates/apply'));
-    if (r) { S.updateFrom = st.current; renderUpdates(box); }
+    const b = e.currentTarget;
+    if (!await confirmUpdate(u, { target: plain })) return;
+    b.disabled = true; S.updateFrom = st.current; renderUpdates(box);
   } }, `Update to ${plain}`) : null;
-  const reviewBtn = d && !u.running ? h('button', { class: 'btn primary', onclick: () => updateDialog(u, redraw) }, `Review ${d.version}`) : null;
+  const reviewBtn = d && !u.running ? h('button', { class: 'btn primary', onclick: async () => { if (await confirmUpdate(u, { target: d.target, breaking: true })) { S.updateFrom = d.current; redraw(); } } }, `Review ${d.version}`) : null;
   // While an update runs (state kept on the server, so a reload or redraw can't lose it): show progress and poll.
   const running = u.running ? h('div', { class: 'note' }, h('span', { class: 'spinner' }), h('b', {}, u.running.phase === 'backup' ? ' Making a backup before the update…' : ` Installing ${u.running.target || 'the update'}…`),
     ` started ${ago(u.running.startedAt)} ago. The service restarts when it is done; this page reloads by itself.`) : null;

@@ -9,6 +9,7 @@ import { queueStats } from '../../core/media-queue.js';
 import { serverSize, setSmallServerMode, smallServerMode } from '../../core/resources.js';
 import { getSettings, updateSettings } from '../../core/store.js';
 import { osUpdatesCached, rebootStatus } from '../../core/system.js';
+import { whatsNew } from '../../core/updates.js';
 import { ROOT } from '../../core/config.js';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -38,6 +39,7 @@ export const statusFor = async (user, channel) => ({
   node: process.version,
   agents: listAgents().filter((b) => !isBuiltin(b)).map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })), // 059: chat agents
   pending: listPending().length,
+  whatsNew: whatsNew(user), // 065: { from, to } once after an update, until this user opened or hid it
   // #96: Server tab badge — only updates that will install now (from the last check; never runs apt here)
   osUpdates: ['admin', 'owner'].includes(user?.role) ? { ...(osUpdatesCached() || { count: 0, security: 0, at: null }), restart: rebootStatus().required } : null,
 });
