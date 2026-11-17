@@ -709,3 +709,13 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
 .contact-list { list-style: none; margin: var(--s2) 0 0; padding: 0; }
 .contact-list li { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 0; }
 .contact-list li + li { border-top: 1px solid var(--line); }
+
+/* Review & teach (070): an answer per block, hairlines between them, the question as a quote */
+.rv { padding: var(--s3) 0; border-top: 1px solid var(--line); }
+.rv:first-child { border-top: 0; }
+.rv-q { margin: 4px 0; padding-left: 10px; border-left: 2px solid var(--line-2); color: var(--muted); font-size: var(--fs-s); overflow-wrap: anywhere; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.rv-a { overflow-wrap: anywhere; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.rv-a.open { display: block; }
+.rv-act { display: flex; gap: var(--s2); align-items: center; margin-top: var(--s2); }
+.rv-act .rv-t { min-width: 40px; font-size: 16px; filter: grayscale(1); opacity: .7; }
+.rv-act .rv-t.on { filter: none; opacity: 1; border-color: var(--ink); }

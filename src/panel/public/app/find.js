@@ -8,7 +8,7 @@ const AGENT_SECTIONS = [['character', 'Character', 'instructions prompt descript
   ['people', 'People', 'organizers participants roles', true], ['quick', 'Quick replies & FAQ', 'commands help faq', true], ['welcome', 'Welcome', 'new members greet rules', true],
   ['schedules', 'Schedules', 'scheduled posts weekly summary'], ['model', 'Model', 'fallback provider'], ['tools', 'Tools', 'mcp tool services whatsapp actions confirm'],
   ['memory', 'Memory', 'notes shared'], ['media', 'Photos & voice', 'images pictures voice notes'], ['cap', 'Spending cap', 'budget limit cost'],
-  ['advanced', 'Advanced', 'timezone history tokens'], ['test', 'Test', 'try console']];
+  ['advanced', 'Advanced', 'timezone history tokens'], ['review', 'Review', 'answers rate thumbs teach feedback quality', true], ['test', 'Test', 'try console']];
 /** Everything the Find box can open. Agents and chats come from the status and the cached chat list. */
 async function paletteItems() {
   const items = TABS().map(([id, label]) => ({ kind: 'Screen', label, go: `#${id}`, icon: id }));
