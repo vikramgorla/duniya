@@ -53,7 +53,7 @@ Names are the same everywhere (panel, admin MCP tools, activity): *ChatGPT*, *Cl
 
 - **Models → When a model fails** sets the chain. Default: any other connected provider's *Auto*. Per agent and per
   chat: inherit / switch / don't switch, or an own chain.
-- **Per chat:** Chats → the chat's **Fallback…** button (under its model) opens the same editor as the agent editor:
+- **Per chat:** Chats → the chat's page → **Fallback…** (under its model) opens the same editor as the agent's **Model** section:
   *As the agent*, *Switch to another model* or *Don't switch*, and optionally an own ordered list of models
   (↑ to reorder, ✕ to remove, at most 10). The line under the model shows what is set, e.g.
   "If unavailable: switch model: OpenAI · Auto → Anthropic · Auto".

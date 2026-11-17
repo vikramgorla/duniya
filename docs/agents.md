@@ -2,7 +2,7 @@
 
 **An agent is data, not code: instructions, triggers, organizers, tools, a model, memory, a cap and scheduled posts.**
 
-**Do it:** panel → **Agents → New agent** → pick a template, or **Create an agent with AI**.
+**Do it:** panel → **Agents → New agent** → describe it (AI), pick a template, or import a file.
 
 **In 30 seconds**
 - Template or plain words; every change comes back as a visual diff.
@@ -10,6 +10,32 @@
 - Memory per chat and shared across chats; export/import agents as JSON.
 
 ![Agents page](site/img/agents-desktop.webp)
+
+## The Agents screen and an agent's page
+
+- **The list:** one row per agent: its avatar, name, one line (*On · 1 chat · Auto model*) and its on/off switch. The
+  built-in owner assistant has its own small section; **New agent** is the last row. On a computer the list stays on
+  the left and the agent's page opens on the right; on a phone the page opens over the list (back arrow).
+- **An agent's page:** a short header (avatar, name, state, switch, **⋯** with *Test*, *Change with AI*, *Duplicate*,
+  *Export*, *Delete*), then its sections, each with its current value: **Character**, **Where it answers** (its chats,
+  triggers, @mentions, direct messages), **People**, **Quick replies & FAQ**, **Welcome**, **Schedules**, **Model**,
+  **Tools**, **Memory**, **Photos & voice**, **Spending cap**, **Advanced** and **Test**. Tap one to open it.
+- **Saving:** each section saves on its own. It says *All changes saved* until you change something; then **Save**
+  stays at the bottom of the screen. After saving, the toast offers **Undo**. Leaving with unsaved changes asks first.
+  The on/off switch saves at once.
+- **Links:** `#agents/<id>` opens an agent, `#agents/<id>/<section>` a section (e.g. `#agents/carpool/tools`); Find
+  anything (`/`) lists every section ("Tools · Car pooling").
+- **Change with AI** opens the AI helper in a sheet: describe the change, review the visual diff, apply.
+
+## The Chats screen and a chat's page
+
+- **The list:** one row per chat, under *On* and *Off*: avatar, name, one line (*Car pooling · 14 members* when on,
+  *Off · 12 members* when off) with a short why-quiet hint when an agent stayed quiet there, and the on/off switch.
+  *All / Groups / People* and search sit on one line above it. **Add a direct chat** is the last row.
+- **A chat's page:** its agent (with **Open <agent>** to jump to the agent's page; the agent's *Where it answers*
+  lists its chats and links back), why it stayed quiet with a one-tap fix, recent messages from your phone, model and
+  fallback, activity log, welcome override, *Private to members*, the privacy notice, the spending cap, and behind
+  **⋯**: *Messages & memory* and, for a person, *Send intro…*.
 
 
 > [!TIP]
@@ -20,7 +46,7 @@
 
 > [!NOTE]
 > **The Owner assistant is an agent too** (built in, always there): your own agent in your own WhatsApp chat. Its
-> editor has the parts that apply to it — character, model, tools, photos & voice, memory, alerts and scheduled
+> page has the sections that apply to it — character, model, tools, photos & voice, memory, alerts and scheduled
 > messages to you (the weekly summary is one). See [Owner assistant](owner-assistant.md).
 
 ## Create and change agents
@@ -39,10 +65,10 @@ word (*Changes only*, *Side by side*, *Whole new text*). Skip any part; nothing 
 
 ## Quick replies, welcome & FAQ
 
-Built-in answers for the things people ask again and again: **no AI, no tokens**, instant. Agent editor →
-**Quick replies, welcome & FAQ** (rows to add, edit and remove, with a live preview).
+Built-in answers for the things people ask again and again: **no AI, no tokens**, instant. Agent page →
+**Quick replies & FAQ** and **Welcome** (rows to add, edit and remove, with a live preview).
 
-![Quick replies, welcome and FAQ in the agent editor](site/img/card-quick.webp)
+![Quick replies and FAQ on the agent page](site/img/card-quick.webp)
 
 | Feature | What happens |
 |---|---|
@@ -54,7 +80,7 @@ Built-in answers for the things people ask again and again: **no AI, no tokens**
 > [!NOTE]
 > Built-in answers count in **Usage** as `quick reply`, `faq` and `welcome` with cost 0 and no tokens, and in the
 > weekly summary as replies. "Once per person" is stored as a hash of the group and the person's id: no names or
-> numbers. The **test console** shows which path answered (*Quick reply !rides · no AI*, *FAQ answer · no AI* or the
+> numbers. The agent's **Test** section shows which path answered (*Quick reply !rides · no AI*, *FAQ answer · no AI* or the
 > model). The car pooling, family, school, office, event and neighbours templates come with `!rules` (car pooling also
 > `!rides`), `!help` and a short welcome switched on; their FAQ starts empty.
 
@@ -86,7 +112,7 @@ Admin MCP and owner assistant: `set_agent_quick_answers` (only the parts given c
 
 </details>
 
-1. Agent page → tool services → enter the URL → **Check**.
+1. Agent page → **Tools** → **+ Add by address** → enter the URL → **Check**.
 2. **Connect** to sign in (OAuth, your own OAuth app), or use a token or custom headers.
 3. **Discover tools** → tick what participants and organizers may use → save.
 
@@ -96,7 +122,7 @@ Or skip the URL hunting: **Browse tool services** (below).
 
 **Find a service in the official [MCP Registry](https://registry.modelcontextprotocol.io) and add it in one step.**
 
-1. Agent page → Tool services → **Browse tool services** (or **Settings → Tool services** for all agents).
+1. Agent page → **Tools** → **Browse tool services** (or **Settings → Tool services** for all agents).
 2. Search by name. Each card shows the publisher, **Hosted** or **Local (npm)**, the keys it needs, a trust hint and a
    link to its source code.
 3. **Add** → fill in what it asks for (keys are stored as secrets and never shown again) → the tools are listed with
@@ -152,7 +178,7 @@ action is logged (`whatsapp.action`). Admins get the same group tools on **Chats
 | | What | Who writes |
 |---|---|---|
 | **Chat memory** | recent messages, a running summary and notes per chat; limits `MEMORY_RETENTION_DAYS`, `MEMORY_MAX_MESSAGES` | the agent |
-| **Shared memory** | notes across all of an agent's chats (agent page → *Shared memory*) | organizers only, so one group can't plant facts for another |
+| **Shared memory** | notes across all of an agent's chats (agent page → **Memory**) | organizers only, so one group can't plant facts for another |
 
 Admins can read, search (each look logged), rebuild or erase it. Tools:
 `memory__remember`, `list_notes`, `find_notes`, `update_note`, `forget` (last two organizers only), `search_history`.
@@ -163,7 +189,7 @@ Admins can read, search (each look logged), rebuild or erase it. Tools:
 
 Chats start **off**, so the history WhatsApp sends when you link a number is not stored (only the id and time of each
 chat's newest message are kept). When you switch a chat **on**, the server asks your phone for its recent messages
-(default 50; *When a chat is switched on, load its last …* on **Chats**, 0–200) and builds the running summary from
+(default 50; **Settings → Chats & direct messages** → *When a chat is switched on, load its last*, 0–200) and builds the running summary from
 them. The chat row shows *Loading recent messages from your phone…*, then *Loaded N earlier messages*.
 
 - The phone must be **online** (WhatsApp answers from the phone, not from the server). No answer within a minute →
@@ -234,13 +260,13 @@ is speaking: *New message from Priya (tag: Driver)*, and in the recent messages.
 ## Several WhatsApp numbers and direct messages
 
 - Link more numbers on **Overview** (QR or pairing code). Replies leave from the number the chat belongs to.
-- Each number chooses which agent takes direct messages (or the default under **Settings → Direct messages**); a
+- Each number chooses which agent takes direct messages (or the default under **Settings → Chats & direct messages**); a
   person can be assigned an agent on **Chats**.
 - Chats on the first number keep their WhatsApp id; others are `<number>#<jid>`.
 
 ### Set up a direct chat before the person writes
 
-1. **Chats → + Add a direct chat** (or **Contacts → Set up chat** on a person's row).
+1. **Chats → Add a direct chat** (the last row of the list; or **Contacts → ⋯ → Set up chat**).
 2. Enter the number with country code (`+41 79 123 45 67`) or pick a contact; pick the WhatsApp number if you have
    several.
 3. Choose the agent, **On** and, if you like, **Private to members**, then **Set up chat**. Model, logging, fallback and

@@ -50,7 +50,7 @@ leaves a step for later (**Skipped · undo** brings it back); **Hide** hides the
 Getting started**). Afterwards: **Backups** (passphrase, GitHub or S3, schedule), see [Backups](backups-and-updates.md).
 
 > [!TIP]
-> For one person instead of a group, **Chats → + Add a direct chat** works before they have written
+> For one person instead of a group, **Chats → Add a direct chat** works before they have written
 > ([Agents](agents.md#set-up-a-direct-chat-before-the-person-writes)). Tools every agent should have (a calendar, a
 > shared planner) go under **Settings → Tool services** once, instead of per agent.
 
@@ -69,7 +69,7 @@ Getting started**). Afterwards: **Backups** (passphrase, GitHub or S3, schedule)
 ## Find anything
 
 Press **/** or **⌘K** (Ctrl+K), or tap the search button in the header, and type: a group, a person, an agent
-(*Test Car pooling* opens its test console), a setting (*secrets*, *privacy*, *backup*) or an action (*pause*, *new
+(*Test · Car pooling* opens its test), a setting (*secrets*, *privacy*, *backup*) or an action (*pause*, *new
 agent*, *add a direct chat*). ↑ ↓ and Enter, or tap. Links like `#settings/secrets`, `#models/chatgpt` or
 `#chats/<chat id>` open the screen at that spot.
 
@@ -77,7 +77,7 @@ agent*, *add a direct chat*). ↑ ↓ and Enter, or tap. Links like `#settings/s
 
 ## Trying an agent: test console and *Test as*
 
-Every agent page has a **test console**: real tools and saved settings, nothing posted to WhatsApp. **Test as** picks
+Every agent page has a **Test** section: real tools and saved settings, nothing posted to WhatsApp. **Test as** picks
 the role (participant or organizer) and the chat (one of the agent's chats or a new direct chat), and shows the tools
 that role really gets.
 

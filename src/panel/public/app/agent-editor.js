@@ -49,7 +49,7 @@ const SECTIONS = [
     sub: (x) => (x.c.memory?.enabled === false ? 'Off' : 'On'), build: buildMemory },
   { group: 'How it works', id: 'media', icon: 'image', c: 'c1', title: () => 'Photos & voice', help: 'settings.md', line: () => 'What it does with photos and voice notes, and whether it speaks.',
     sub: (x) => { const m = { photos: true, voiceNotes: true, voiceReply: 'never', ...(x.c.media || {}) }; return [m.photos ? 'Photos' : '', m.voiceNotes ? 'voice notes' : '', m.voiceReply !== 'never' ? 'speaks' : ''].filter(Boolean).join(', ') || 'Off'; }, build: buildMedia },
-  { group: 'How it works', id: 'cap', icon: 'pending', c: 'c0', title: () => 'Spending cap', help: 'usage.md', line: () => 'A monthly limit; at 80 % you get an alert.',
+  { group: 'How it works', id: 'cap', icon: 'pending', c: 'c0', title: () => 'Spending cap', help: 'spending.md', line: () => 'A monthly limit; at 80 % you get an alert.',
     sub: (x) => (x.cap ? `${Math.round(x.cap.used * 100)}% of this month's cap` : 'No cap'), build: buildCap },
   { group: 'How it works', id: 'alerts', only: 'bi', icon: 'shield', c: 'c1', title: () => 'Alerts', help: 'owner-assistant.md', line: () => 'Spending, provider and update alerts go to this WhatsApp number.',
     sub: (x) => (x.c.alerts?.to ? `+${x.c.alerts.to}` : 'Only in Activity'), build: buildAlerts },

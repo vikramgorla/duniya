@@ -7,7 +7,7 @@
 **In 30 seconds**
 - It is the same panel, so every screen and every setting is there, live (no reload needed), in light and dark mode.
 - On a phone it has a **tab bar at the bottom**: Overview, Chats, Agents, Activity, and **More** for every other
-  screen, *Find anything* and *Sign out*. Questions ("Unlink this number?") open as a sheet from the bottom.
+  screen as compact rows, *Find anything*, a small Refresh icon and your account row (it asks before signing out). Questions ("Unlink this number?") open as a sheet from the bottom.
 - Nothing to download from a store and nothing to keep up to date: the server updates it with every release.
 - It signs in with your panel account. Nothing is stored on the phone except the sign-in cookie.
 
@@ -41,7 +41,7 @@
 | **Refresh** | pull down at the top of a screen (or **More** → **Refresh**) to load it again. Back after a while in the background, the app drops anything still waiting, reconnects and redraws a screen that was not finished; a screen that cannot load says why with **Retry**, never endless grey cards |
 | **Switching screens** | a new screen always opens at its top with the header in view |
 | **Undo** | switching a chat off or pausing all agents shows **Undo** for a few seconds |
-| **Sign out** | **More** → **Sign out** (on a computer: in the header) |
+| **Sign out** | **More** → your account row → **Sign out** (on a computer: in the header); it always asks first |
 
 ---
 **Next:** [Owner assistant](owner-assistant.md) · [Docs index](README.md)
