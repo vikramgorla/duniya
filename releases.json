@@ -1,6 +1,15 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.31.1": {
+      "breaking": false,
+      "title": "Clearer guides and a new website",
+      "changes": [
+        { "type": "improved", "text": "The guides follow the path you take: install, connect WhatsApp, add a model, first agent, chats, owner assistant, everyday use, then server and reference. Shorter pages with current screenshots." },
+        { "type": "improved", "text": "A new website: what Duniya is in one line, a short tour, how it works in three steps, the features that matter, one-click install and straight answers." },
+        { "type": "removed", "text": "The one-time backup in the new format at startup (it ran once after updating to 2.31.0). Backups made by 2.30 or earlier still can't be restored: make a new one under Backups if you haven't since updating." }
+      ]
+    },
     "2.31.0": {
       "breaking": false,
       "title": "Search what was said in every chat, and teach agents from their real answers",
@@ -12,7 +21,7 @@
         { "type": "improved", "text": "Backups are compressed and encrypted while they are written, using a few MB of memory instead of several times the database size; a damaged backup is refused before anything is replaced." },
         { "type": "improved", "text": "The Chats list, Usage by day and every message are handled faster, also with hundreds of chats." },
         { "type": "improved", "text": "The sign-in and consent page for AI assistants looks like the rest of Duniya and runs no inline code." },
-        { "type": "removed", "text": "Restoring backups made by Duniya 2.30 or earlier. Right after this update Duniya makes a fresh backup in the new format by itself, so you always have one you can restore." }
+        { "type": "removed", "text": "Restoring backups made by Duniya 2.30 or earlier. Make a new backup after updating (Backups → Back up now, or wait for the next scheduled one) so you always have one you can restore." }
       ]
     },
     "2.30.1": {
@@ -384,7 +393,7 @@
       "title": "Names instead of numbers, group member tags, and automatic retries",
       "summary": "The panel shows people by the name you gave them, then your phone contact name, business name or profile name, instead of numbers; a profile-name change no longer replaces your contact name, and people WhatsApp shows only by a hidden id get their name once the number is known. Contact names refresh by themselves (one full refresh after this update, then daily). Group member tags (\"Driver\") show next to names and agents see them, for chats that are on. Loading recent messages retries by itself when your phone was offline. Existing synced names start as profile names until the first refresh brings back your contact names.",
       "data": "migrated",
-      "docs": "docs/agents.md#which-name-is-shown",
+      "docs": "docs/chats.md#which-name-is-shown",
       "changes": [
         {
           "type": "improved",
@@ -520,7 +529,7 @@
       "summary": "Chats → Add a direct chat (or Contacts → Set up chat) assigns an agent, on/off, private, model and caps to a phone number before any message; their first message goes to that agent, whichever form WhatsApp uses. The owner assistant does it in one go (\"assign Mochi to Vedika\"). The agent can send an intro, only after you confirm.",
       "actions": [],
       "data": "unchanged",
-      "docs": "docs/agents.md#set-up-a-direct-chat-before-the-person-writes",
+      "docs": "docs/chats.md#set-up-a-direct-chat-before-the-person-writes",
       "changes": [
         {
           "type": "new",

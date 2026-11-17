@@ -2,20 +2,16 @@
 
 **Use any model you already pay for (or a free one), with an automatic backup when it fails.**
 
-**Do it:** panel → **Models** → **Add a provider** → pick one by name (OpenRouter is one tap). Each row says in one line
-how you connect: *OpenRouter — many models, some free*, *Claude — Anthropic API key, pay per use*, *OpenAI — API key,
-pay per use*, *GitHub Copilot — your Copilot plan, also works with the free plan*, *ChatGPT — sign in with your ChatGPT
-plan*, *Custom (OpenAI-compatible) — Ollama, LM Studio, Groq, Mistral…*. A provider already connected stays in the
-list ("Connected · add another account").
+**Do it:** panel → **Models** → **Add a provider** → pick one (OpenRouter is one tap), or paste any key into
+**Getting started** on Overview: Duniya recognises it.
 
 **In 30 seconds**
+- No key yet? **OpenRouter** with free models only, or **Sign in with ChatGPT** with your Plus/Pro plan.
 - Pick a model per agent and per chat, or *Auto*.
-- A failing model hands over to the next in the chain; tools that already ran never run twice.
+- A failing model hands over to the next one; tools that already ran never run twice.
 - Photos & voice depend on the provider: [see the table](#photos--voice).
-- **Models** is a list: each provider with a health dot and a short status ("ok · 8 models", "Paused until 14:20"),
-  then *Default models*, *When a model fails*, *Photos & voice* and *Other endpoints*. Tap a row for its page: keys or
-  sign-in, accounts and test. Each page has its own address (`#models/chatgpt`).
-- An account that hits its plan's limit pauses until the reset and the next model answers ([usage limits](#usage-limits)).
+
+![Models: each provider with its status, then default models, fallback and photos & voice](site/img/models-desktop.webp)
 
 | Provider | How |
 |---|---|

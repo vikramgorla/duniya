@@ -26,8 +26,8 @@ for a large database. A restore checks the whole file before anything is replace
 file changes nothing.
 
 > [!IMPORTANT]
-> Since 2.31 backups use a new file format. Backups made by **2.30 or earlier can't be restored** by 2.31 or later:
-> after updating, make a new backup (**Backups → Back up now**; scheduled backups do it by themselves).
+> Backups made by Duniya **2.30 or earlier can't be restored** (older file format). If your newest backup is from
+> before 2.31, make a new one: **Backups → Back up now**.
 
 > [!NOTE]
 > **Pre-update backups** stay on this server only, are listed with the local backups and kept apart from the normal
@@ -150,4 +150,4 @@ Back up (**Backups → Back up now & download**), set up the new server, then **
 [own server](install.md#recreate-from-scratch-new-server-or-fresh-os) · [Docker](deploy/docker.md#recreate-from-scratch).
 
 ---
-**Next:** [Upgrading](upgrading.md) · [Managing your server](README.md#run-it) · [Docs index](README.md)
+**Next:** [Upgrading](upgrading.md) · [Managing your server](README.md#run-your-server) · [Docs index](README.md)

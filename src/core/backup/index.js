@@ -1,6 +1,6 @@
 // @ts-check
 // Backups (007): settings, run, retention per destination, schedule, list, restore staging.
-import { readdirSync, rmSync, existsSync, statSync, openSync, readSync, closeSync } from 'node:fs';
+import { readdirSync, rmSync, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DATA_DIR, env, fail } from '../config.js';
 import { getSecret, setSecret, getSetting, updateSettings } from '../store.js';
@@ -213,18 +213,7 @@ export function slotFor(s, date = new Date(), tz = env.timezone) {
   return null;
 }
 
-// 2.31.0 only (remove in the next release): backups from 2.30 and earlier (DUNIYA1) cannot be restored any more, so
-// when the newest local backup is in the old format and a passphrase is set, make a fresh one once at startup.
-const newestIsOldFormat = () => {
-  const [f] = listLocal(); if (!f) return false;
-  const fd = openSync(resolve(LOCAL_DIR, f.file), 'r'); const b = Buffer.alloc(8);
-  try { readSync(fd, b, 0, 8, 0); } finally { closeSync(fd); }
-  return b.toString() === 'DUNIYA1\n';
-};
 export function startBackupScheduler({ appVersion = '' } = {}) {
-  setTimeout(() => {
-    try { if (getSecret('BACKUP_PASSPHRASE') && newestIsOldFormat()) Promise.resolve().then(() => runBackup({ reason: 'new backup format', appVersion })).catch((e) => activity('error', { summary: `Backup in the new format failed: ${e.message}` })); } catch { /* best effort */ }
-  }, 30 * 1000).unref();
   const tick = async () => {
     const s = getBackupSettings();
     if (!s.enabled) return;

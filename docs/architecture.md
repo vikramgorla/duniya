@@ -10,7 +10,7 @@ top.**
   content hash (a new release re-downloads only what changed); Overview comes first and other screens load on their
   first visit. Status and activity arrive live over server-sent events, so nothing polls.
 
-<p align="center"><img src="diagrams/architecture.svg" alt="Architecture: WhatsApp linked devices feed the allow-list (off chats are dropped), then the router (owner DMs go to the owner assistant; quick-reply commands and FAQ matches are answered without AI), then the agent, which uses a model provider with fallback, MCP tools behind the confirm gate, WhatsApp actions and memory; the agent and the panel, app and admin MCP use SQLite with encrypted secrets" width="720"></p>
+<p align="center"><img src="diagrams/architecture.svg" alt="Architecture: WhatsApp linked devices feed the allow-list (off chats are dropped), then the router (owner DMs go to the owner assistant; quick-reply commands and FAQ matches are answered without AI), then the agent, which uses a model provider with fallback, MCP tools behind the confirm gate, WhatsApp actions and memory; the agent, the panel and the admin MCP use SQLite with encrypted secrets" width="720"></p>
 
 <details><summary>Diagram as text</summary>
 

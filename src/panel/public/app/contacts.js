@@ -40,7 +40,7 @@ export async function renderContacts() {
   }) }, 'Show more');
   $('#main').replaceChildren(
     h('div', { class: 'card' },
-      h('div', { class: 'sec-head' }, h('h2', {}, `Contacts (${(contactsQuery || !sum ? list.length : sum.total).toLocaleString()}${contactsQuery && list.length === PAGE ? '+' : ''})`), edit ? h('button', { class: 'btn small primary', type: 'button', onclick: addContact }, '+ Add') : null, helpLink('agents.md#contacts')),
+      h('div', { class: 'sec-head' }, h('h2', {}, `Contacts (${(contactsQuery || !sum ? list.length : sum.total).toLocaleString()}${contactsQuery && list.length === PAGE ? '+' : ''})`), edit ? h('button', { class: 'btn small primary', type: 'button', onclick: addContact }, '+ Add') : null, helpLink('chats.md#contacts')),
       h('div', { class: 'ld-tools', style: 'margin-top:8px' }, search),
       sum ? h('p', { class: 'small muted', role: 'status' }, `${sum.book} from your phone · ${sum.profile} profile name${sum.profile === 1 ? '' : 's'}${sum.hiddenNumbers ? ` · ${sum.hiddenNumbers} hidden numbers` : ''}${sum.refreshedAt ? ` · refreshed ${ago(sum.refreshedAt)} ago` : ''}. Participants only see Shared ones.`,
         edit ? [' ', h('button', { class: 'btn small ghost', title: 'Optional: the server also does this by itself', onclick: () => tryApi(async () => { await api('POST', '/api/contacts/refresh'); setTimeout(renderContacts, 4000); }, 'Asked WhatsApp for names') }, 'Refresh')] : null) : null,
