@@ -8,6 +8,7 @@ import './usage.js'; // creates the usage table this module indexes
 import { env, bad } from './config.js';
 import { activity } from './events.js';
 import { sendOwnerAlert } from './owner-alerts.js';
+import { chatLabel } from './chat-names.js';
 
 const TENANT = 'default';
 db.exec(`
@@ -129,7 +130,7 @@ export async function checkBudget(agent, chat, { names = {} } = {}) {
   let worst = { action: 'ok' };
   for (const cap of caps) {
     const st = capStatus(cap, month);
-    const label = cap.scope === 'agent' ? `agent "${names.agent || agent.name || agent.id}"` : `chat "${names.chat || chat}"`;
+    const label = cap.scope === 'agent' ? `agent "${names.agent || agent.name || agent.id}"` : `chat "${names.chat || chatLabel(chat)}"`;
     try {
       if (st.used >= 1) await alertOnce(st, 100, label);
       else if (st.used >= ALERT_AT) await alertOnce(st, 80, label);

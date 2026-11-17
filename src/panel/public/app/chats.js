@@ -81,7 +81,7 @@ async function introCard(c, { onClose, onSent } = {}) {
 }
 /** The one muted line of a chat's row (068): "Captain Raju · 7 members", "Off · 12 members". */
 const chatLine = (c, agentName) => [c.waiting ? 'Waiting for the first message' : c.enabled ? agentName || 'No agent' : 'Off',
-  c.isGroup ? plural(c.size || 0, 'member') : c.phone ? `+${c.phone}` : ''].filter(Boolean).join(' · ');
+  c.offline ? 'not a member, or WhatsApp is offline' : c.isGroup ? plural(c.size || 0, 'member') : c.phone ? `+${c.phone}` : ''].filter(Boolean).join(' · ');
 export async function renderChats() {
   const [list, agents, models, us, quiet] = await Promise.all([api('GET', '/api/chats'), api('GET', '/api/agents'), loadModels().catch(() => ({ models: [] })), usageSummary(), api('GET', '/api/silences?days=7').catch(() => ({ silences: [] }))]);
   // 070: the list leaves out settings at their default

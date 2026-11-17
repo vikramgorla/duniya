@@ -58,7 +58,7 @@ export const TOOLS = [
       if (a.agent_id) q.set('agent', a.agent_id);
       if (a.chat) q.set('chat', a.chat);
       if (a.before_id) q.set('before', String(a.before_id));
-      return (await x.call('GET', `/api/activity?${q}`)).map((r) => ({ id: r.id, time: iso(r.ts), type: r.type, agent: r.agent || undefined, chat: r.chat || undefined, summary: r.summary, ...(a.include_details && r.detail ? { detail: r.detail } : {}) }));
+      return (await x.call('GET', `/api/activity?${q}`)).map((r) => ({ id: r.id, time: iso(r.ts), type: r.type, agent: r.agent || undefined, chat: r.chat || undefined, chatName: r.chatName || undefined, summary: r.summary, ...(a.include_details && r.detail ? { detail: r.detail } : {}) }));
     } },
 
   // ---------- agents ----------
@@ -136,7 +136,7 @@ export const TOOLS = [
       if (a.chat) q.set('chat', a.chat);
       if (a.agent_id) q.set('agent', a.agent_id);
       if (a.reason) q.set('reason', a.reason);
-      return (await x.call('GET', `/api/silences?${q}`)).silences.map((r) => ({ chat: r.chat, agent: r.agent || undefined, reason: r.reason, label: r.label, explain: r.explain, count: r.count, last: iso(r.lastTs), sampleSender: r.sampleSender || undefined }));
+      return (await x.call('GET', `/api/silences?${q}`)).silences.map((r) => ({ chat: r.chat, chatName: r.chatName, agent: r.agent || undefined, reason: r.reason, label: r.label, explain: r.explain, count: r.count, last: iso(r.lastTs), sampleSender: r.sampleSender || undefined }));
     } },
   { name: 'list_chats', readOnly: true, calls: [['GET', '/api/chats']], description: 'WhatsApp groups and 1:1 chats the numbers know, with their agent, model and logging settings. Settings at their default (off, model/logging/welcome "inherit", not private) are left out.', input: {},
     run: (a, x) => x.call('GET', '/api/chats') },

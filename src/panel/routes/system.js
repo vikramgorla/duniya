@@ -5,6 +5,7 @@ import { restartSoon } from '../../core/config.js';
 import { healthView, setRetention } from '../../core/retention.js';
 import { dropPending, listPending, takePending } from '../../core/db.js';
 import { activity } from '../../core/events.js';
+import { withChatNames } from '../../core/chat-names.js';
 import { globalServers } from '../../core/global-mcp.js';
 import { applyPending } from '../../core/runner.js';
 import { referencedSecrets } from '../../core/schema.js';
@@ -15,7 +16,7 @@ import { PLAN_PROVIDERS, listPrices, setPrice, usageReport } from '../../core/us
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
 export function systemRoutes(route, { channel } = {}) {
   // ---------- pending ----------
-  route('GET', '/api/pending', async () => listPending());
+  route('GET', '/api/pending', async () => withChatNames(listPending(), channel)); // 073: chat names, never ids
   route('DELETE', '/api/pending/:code', async (req, res, body, q, p, user) => {
     dropPending(p.code); activity('confirm.cancelled', { summary: `${p.code} (panel, ${user.username})` }); return { ok: true };
   });
@@ -43,7 +44,11 @@ export function systemRoutes(route, { channel } = {}) {
 
   // ---------- usage & cost (023) ----------
   const periodFrom = (pr) => ({ '1d': Date.now() - 86400000, '7d': Date.now() - 7 * 86400000, '30d': Date.now() - 30 * 86400000, '90d': Date.now() - 90 * 86400000, all: 0 }[pr || '30d'] ?? Date.now() - 30 * 86400000);
-  route('GET', '/api/usage', async (req, res, body, q) => usageReport({ from: periodFrom(q.get('period')), groupBy: q.get('groupBy') || 'agent', agent: q.get('agent') || '', chat: q.get('chat') || '' }));
+  route('GET', '/api/usage', async (req, res, body, q) => {
+    const groupBy = q.get('groupBy') || 'agent';
+    const r = usageReport({ from: periodFrom(q.get('period')), groupBy, agent: q.get('agent') || '', chat: q.get('chat') || '' });
+    return groupBy === 'chat' ? { ...r, rows: await withChatNames(r.rows, channel, 'key') } : r; // 073: chat names, never ids
+  });
   route('GET', '/api/usage/summary', async (req, res, body, q) => {
     const from = periodFrom(q.get('period'));
     const by = (g) => Object.fromEntries(usageReport({ from, groupBy: g }).rows.map((r) => [r.key, r]));

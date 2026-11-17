@@ -15,11 +15,12 @@ import { db, peekPending, getChatMemory, logMessage, kvGet, kvSet, searchStored 
 import { buildContext } from './memory.js';
 import { weeklyText } from './weekly.js';
 import { sendOwnerAlert } from './owner-alerts.js';
-import { chatTitle, personInfo } from './contacts.js';
+import { personInfo } from './contacts.js';
+import { chatLabels } from './chat-names.js';
 import { env, digits, clip, iso, isGroup, fail } from './config.js';
 import { getUser, onUserDeleted, TENANT } from './store.js';
 import { listAgents, agentForChat, getAgent, OWNER_AGENT_ID } from './agents.js';
-import { getChatPrefs, enabledChats, privateChats, seenChats } from './chat-prefs.js';
+import { getChatPrefs, enabledChats, privateChats } from './chat-prefs.js';
 import { activity } from './events.js';
 import { toolPhrase } from '../panel/public/app/names.js';
 import { chat as modelChat, effectiveFallback } from './providers/index.js';
@@ -157,11 +158,8 @@ export function hideChats(v, hidden) {
   return v;
 }
 
-async function chatNames() {
-  const names = new Map(seenChats().map((c) => [c.id, chatTitle(c)])); // 057: one resolver for people
-  try { for (const g of await whatsappChannel()?.listChats?.() || []) names.set(g.id, g.name); } catch { /* offline */ }
-  return names;
-}
+/** 073: the one chat-name resolver (group subjects, people's names), never an id. */
+const chatNames = (ids) => chatLabels(ids, whatsappChannel());
 function parseSince(v, fallbackMs = 7 * 86400000) {
   const s = String(v ?? '').trim();
   if (!s) return Date.now() - fallbackMs;
@@ -171,7 +169,7 @@ function parseSince(v, fallbackMs = 7 * 86400000) {
   if (Number.isNaN(t)) throw fail('since: use a date (2026-11-01) or a period like 24h, 3d, 2w');
   return t;
 }
-const msgLine = (m, names) => ({ chat: m.chat, chatName: names.get(m.chat) || m.chat, time: iso(m.ts), from: m.from_agent ? 'Assistant' : personInfo({ phone: m.sender, jid: m.sender_jid, fallbackName: m.name }).label, text: clip(m.text, 400) });
+const msgLine = (m, names) => ({ chat: m.chat, chatName: names.get(m.chat), time: iso(m.ts), from: m.from_agent ? 'Assistant' : personInfo({ phone: m.sender, jid: m.sender_jid, fallbackName: m.name }).label, text: clip(m.text, 400) });
 
 /** Cross-chat read tools (core). role = minimum panel role. */
 const CORE_TOOLS = [
@@ -180,11 +178,11 @@ const CORE_TOOLS = [
     input: { days: { type: 'integer', description: 'Look back this many days (default 7)', minimum: 1, maximum: 365 } },
     run: async (a) => {
       const since = Date.now() - (Number(a.days) || 7) * 86400000;
-      const names = await chatNames();
+      const names = await chatNames(visibleChats());
       return visibleChats().map((chat) => {
         const r = db.prepare('SELECT COUNT(*) AS n, MAX(ts) AS last FROM messages WHERE chat = ? AND ts >= ?').get(chat, since);
         const last = r.last || db.prepare('SELECT MAX(ts) AS last FROM messages WHERE chat = ?').get(chat).last;
-        return { chat, name: names.get(chat) || chat, group: chat.endsWith('@g.us'), agent: agentForChat(chat)?.id || '', messages: r.n, lastMessage: iso(last),
+        return { chat, name: names.get(chat), group: chat.endsWith('@g.us'), agent: agentForChat(chat)?.id || '', messages: r.n, lastMessage: iso(last),
           quietDays: last ? Math.floor((Date.now() - last) / 86400000) : null };
       }).sort((x, y) => y.messages - x.messages);
     } },
@@ -199,7 +197,7 @@ const CORE_TOOLS = [
       if (!chats.length) return [];
       // 070: the same full-text search as the panel's Search messages
       const rows = searchStored({ chats, query: a.query, person: a.person, since: parseSince(a.since, 30 * 86400000), limit: Math.min(Number(a.limit) || 25, 50) }).reverse();
-      const names = await chatNames();
+      const names = await chatNames(rows.map((m) => m.chat));
       return rows.map((m) => msgLine(m, names));
     } },
   { name: 'chat_recap', role: 'admin', readOnly: true,
@@ -210,8 +208,8 @@ const CORE_TOOLS = [
       if (!isVisible(a.chat)) throw fail('That chat is not visible to the assistant (off or private to members)', 403);
       const since = parseSince(a.since, 86400000);
       const rows = db.prepare('SELECT * FROM (SELECT * FROM messages WHERE chat = ? AND ts >= ? ORDER BY id DESC LIMIT 300) ORDER BY id').all(a.chat, since);
-      const names = await chatNames();
-      return { chat: a.chat, name: names.get(a.chat) || a.chat, since: iso(since), runningSummary: getChatMemory(a.chat)?.summary || '', messages: rows.map((m) => { const l = msgLine(m, names); delete l.chat; delete l.chatName; return l; }) };
+      const names = await chatNames([a.chat]);
+      return { chat: a.chat, name: names.get(a.chat), since: iso(since), runningSummary: getChatMemory(a.chat)?.summary || '', messages: rows.map((m) => { const l = msgLine(m, names); delete l.chat; delete l.chatName; return l; }) };
     } },
   // 059: a plain text into another chat (pictures, GIFs, polls … use the whatsapp__ tools with `chat`). Always confirmed.
   { name: 'send_message', role: 'admin',
@@ -265,12 +263,12 @@ async function resolveChat(want, ownChat, user) {
   if (agentRole(user) !== 'organizer') throw fail('Your account is read-only: I can act only in our own chat.', 403);
   const chats = visibleChats();
   if (chats.includes(w)) return w;
-  const names = await chatNames();
+  const names = await chatNames(chats);
   const lw = w.toLowerCase();
   const exact = chats.filter((c) => (names.get(c) || '').toLowerCase() === lw);
   const hits = exact.length ? exact : chats.filter((c) => (names.get(c) || '').toLowerCase().includes(lw));
   if (hits.length === 1) return hits[0];
-  if (hits.length > 1) throw fail(`Several chats match "${clip(w, 60)}": ${hits.map((c) => names.get(c) || c).join(', ')}. Say which one.`);
+  if (hits.length > 1) throw fail(`Several chats match "${clip(w, 60)}": ${hits.map((c) => names.get(c)).join(', ')}. Say which one.`);
   throw fail(`No chat that is on matches "${clip(w, 60)}". Chats that are off or private to members can't be used.`, 403);
 }
 const whoInDm = (chat) => { const jid = String(chat).split('#').pop(); return jid.endsWith('@s.whatsapp.net') ? jid.split('@')[0] : chat; };
@@ -281,7 +279,7 @@ async function privacyLineAfterSend(chat) {
   if (line) await whatsappChannel()?.send(chat, `_${line}_`).catch(() => {});
 }
 async function sendPreview(chat, what) {
-  const name = (await chatNames()).get(chat) || chat;
+  const name = (await chatNames([chat])).get(chat);
   return `${what} in "${name}"${!isGroup(chat) && dmNoticePending(whoInDm(chat)) ? ' (with the privacy line, first time)' : ''}`;
 }
 
