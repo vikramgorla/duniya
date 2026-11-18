@@ -1,6 +1,6 @@
 # Modules
 
-**Switch on built-in features that hang off People: Events, and Orders and payments. Off keeps their data.**
+**Switch on built-in features that hang off People: Events, Orders and payments, and Lists and sending. Off keeps their data.**
 
 **Do it:** panel → **Settings → Modules** → switch **Events** (and **Orders and payments**) on.
 
@@ -12,7 +12,7 @@
 - **Off** removes its agent tools and pages; its data stays, and comes back when you switch it on again.
 - Merge, undo, export and erase in People cover module rows too (also while a module is off).
 
-![Settings → Modules: Events and Orders and payments, each with a switch, and the ways to pay](site/img/card-modules.webp)
+![Settings → Modules: Events, Orders and payments, and Lists and sending, each with a switch, and the ways to pay](site/img/card-modules.webp)
 
 ## The modules
 
@@ -20,6 +20,7 @@
 |---|---|---|
 | **Events** | events with places, a deadline, a price list; registrations per household or person (adults and kids), a waiting list, organizer confirmation, duties, attendance, CSV | [Events](events.md) |
 | **Orders and payments** | what people owe and paid: orders (from a registration by itself, or by hand), part payments, refunds, your own ways to pay, a daily list of orders due | [Orders and payments](orders.md) |
+| **Lists and sending** | a message to a list, a tag, a household, an event's families or people who owe: consent checked per message, each person's own wording, the WhatsApp pace, stop signals, payment reminders | [Lists and sending](sending.md) |
 
 ## Agent tools
 
@@ -42,7 +43,8 @@ When a module is on, every agent gets its tools, shown on the agent's page under
 
 ## AI assistants and the owner assistant
 
-Admin MCP: `list_modules`, `set_module_enabled`* (* needs `confirm_action`); each module's tools are on its page.
+Admin MCP: `list_modules`, `set_module_enabled`* (* needs `confirm_action`; module `events`, `orders` or `sending`); each
+module's tools are on its page.
 
 ---
-**Next:** [Events](events.md) · [Orders and payments](orders.md) · [People](people.md) · [Docs index](README.md)
+**Next:** [Events](events.md) · [Orders and payments](orders.md) · [Lists and sending](sending.md) · [People](people.md) · [Docs index](README.md)

@@ -12,8 +12,9 @@
   cancellation cancels it (if something was paid, the timeline says so and you refund).
 - Record **payments** (part or full) and **refunds** with a method from **your own list** (Cash, Bank transfer,
   Instant online payment by default). Status: **Open**, **Part paid**, **Paid**, **Refunded**, **Cancelled**.
-- Once a day you get one message with the open orders due within three days or overdue (owner alerts). Reminders to
-  people come with list sending.
+- Once a day you get one message with the open orders due within three days or overdue (owner alerts). With
+  [Lists and sending](sending.md) on, **Send reminders** messages the people themselves, and an event can send them
+  automatically a few days before the due date.
 
 ![Orders: not paid, totals per event, and each order with what is left and when it is due](site/img/card-orders.webp)
 
@@ -48,4 +49,4 @@ Admin MCP: `list_orders` (open, overdue, paid, refunded, cancelled or all; per e
 `record_payment`* (payment or refund), `set_payment_methods` (* needs `confirm_action`).
 
 ---
-**Next:** [Events](events.md) · [Modules](modules.md) · [People](people.md) · [Docs index](README.md)
+**Next:** [Lists and sending](sending.md) · [Events](events.md) · [Modules](modules.md) · [People](people.md) · [Docs index](README.md)

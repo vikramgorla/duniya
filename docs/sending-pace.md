@@ -10,8 +10,8 @@ the reply, and a daily limit on new chats.**
   8 seconds, at most 40 new chats a day between 09:00 and 20:00.
 - **Chats that are off are never touched**: no blue ticks, nothing stored ([Chats](chats.md)).
 - Every wait is random within its range (bell-shaped, never a fixed interval), so nothing looks like a machine.
-- The same pace will drive sending to lists (People step 4): gaps between messages, longer pauses, the daily cap and
-  sending hours are already here.
+- The same pace drives [sending to lists](sending.md): the gap between messages, the longer pause, the daily cap and
+  the sending hours.
 
 ![Settings → Sending pace: read receipts switch, the presets and the custom ranges](site/img/card-pace.webp)
 
