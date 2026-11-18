@@ -52,6 +52,12 @@ export const fail = (message, status = 400, extra = {}) => Object.assign(new Err
 /** A 400-style error the panel shows next to `field`. */
 export const bad = (message, field, status = 400) => fail(message, status, field ? { field } : {});
 export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+/** Date, time and weekday of a moment in a time zone: { date: 'YYYY-MM-DD', hhmm: 'HH:MM', day: 'mon' }. */
+export function localParts(tz, at = Date.now()) {
+  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short' });
+  const p = Object.fromEntries(fmt.formatToParts(new Date(at)).map((x) => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, hhmm: `${p.hour === '24' ? '00' : p.hour}:${p.minute}`, day: p.weekday.slice(0, 3).toLowerCase() };
+}
 export const iso = (ts) => (ts ? new Date(ts).toISOString() : null);
 /** 069: restart the app after `ms` through the graceful shutdown (src/index.js); systemd or Docker starts it again. */
 export const restartSoon = (ms = 500) => setTimeout(() => process.kill(process.pid, 'SIGTERM'), ms);

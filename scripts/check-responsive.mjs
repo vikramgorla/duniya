@@ -201,6 +201,8 @@ const STATES = [
   { name: 'settings-telegram', hash: 'settings/telegram', wait: 2000, js: 'T.openAll();' }, // 077: Settings → Channels → Telegram (fake bot)
   { name: 'chats-telegram-group', hash: `chats/${encodeURIComponent('tg:7000000001#-100170000001')}`, wait: 2000 }, // 077: a Telegram group's page
   { name: 'settings-users', hash: 'settings/users', wait: 2000, js: 'T.openAll();' },
+  { name: 'settings-pace', hash: 'settings/sending-pace', wait: 2000 }, // 080: Settings → Sending pace (preset)
+  { name: 'settings-pace-custom', hash: 'settings/sending-pace', wait: 2000, js: "await T.click('Custom', 'button', 300);" }, // 080: custom ranges
   { name: 'models-setup', hash: 'models/chatgpt', before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u).startsWith('/api/providers') && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); if (Array.isArray(j)) return new Response(JSON.stringify(j.filter((x) => x.id !== 'openrouter').map((x) => ({ ...x, connected: false, models: 0 })))); }
       return r; }; S.models = null;`, js: "await T.click('Sign in with ChatGPT', 'button', 1200); T.openAll();" },

@@ -209,6 +209,21 @@ export const TOOLS = [
     description: 'Change the privacy notice: enabled (post in groups when switched on), text (group notice), dm_first_reply (show dm_text once per person in direct messages), dm_text. Give only what changes; empty text restores the default.',
     input: { enabled: bool('Post the notice in groups (optional)'), text: str('Group notice text (optional)'), dm_first_reply: bool('Show the DM notice once (optional)'), dm_text: str('Direct-message notice text (optional)') },
     run: (a, x) => x.call('PUT', '/api/privacy-notice', { enabled: a.enabled, text: a.text, dmFirstReply: a.dm_first_reply, dmText: a.dm_text }) },
+  // ---------- sending pace (080) ----------
+  { name: 'get_sending_pace', readOnly: true, calls: [['GET', '/api/pace']],
+    description: 'Sending pace: the preset (careful, normal, faster or custom), whether read receipts are on, the ranges (gaps between messages in seconds, typing speed in characters per second with jitter %, read-receipt delay in seconds, new 1:1 chats a day, sending hours in the owner time zone, a longer pause every N messages), today\'s new chats on the first number and how long a list of 100 would take.',
+    input: {}, run: (a, x) => x.call('GET', '/api/pace') },
+  { name: 'set_sending_pace', calls: [['PUT', '/api/pace']],
+    description: 'Change the sending pace. Give a preset (careful, normal, faster), or custom ranges (switches to custom): gap_min/gap_max (s, 5–3600), cps (2–20), jitter (0–60 %), read_min/read_max (s, 0–600), daily_new (1–500), hours_from/hours_to ("09:00"), pause_every (0 = off, up to 200 messages), pause_minutes (1–120). read_receipts switches read receipts on or off. Give only what changes.',
+    input: { preset: str('careful, normal, faster or custom (optional)', { enum: ['careful', 'normal', 'faster', 'custom'] }), read_receipts: bool('Mark messages in chats that are on as read (optional)'),
+      gap_min: int('Shortest gap between messages, seconds'), gap_max: int('Longest gap, seconds'), cps: { type: 'number', description: 'Typing speed, characters per second' }, jitter: int('Typing jitter, %'),
+      read_min: int('Shortest read delay, seconds'), read_max: int('Longest read delay, seconds'), daily_new: int('New 1:1 chats a day'), hours_from: str('Sending hours start, HH:MM'), hours_to: str('Sending hours end, HH:MM'),
+      pause_every: int('A longer pause every N messages (0 = never)'), pause_minutes: int('Length of the longer pause, minutes') },
+    run: (a, x) => {
+      const keys = { gap_min: 'gapMin', gap_max: 'gapMax', cps: 'cps', jitter: 'jitter', read_min: 'readMin', read_max: 'readMax', daily_new: 'dailyNew', hours_from: 'hoursFrom', hours_to: 'hoursTo', pause_every: 'pauseEvery', pause_minutes: 'pauseMinutes' };
+      const custom = Object.fromEntries(Object.entries(keys).filter(([k]) => a[k] !== undefined).map(([k, v]) => [v, a[k]]));
+      return x.call('PUT', '/api/pace', { preset: a.preset, readReceipts: a.read_receipts, ...(Object.keys(custom).length ? { custom } : {}) });
+    } },
   { name: 'set_chat_privacy_notice', calls: [['PUT', '/api/chats/x/prefs']],
     description: 'Opt a group out of the privacy notice (off = true) or back in (off = false). The change is recorded in the activity log.',
     input: { chat: str('Chat id'), off: bool('true = never post the notice in this chat') }, required: ['chat', 'off'],

@@ -14,6 +14,7 @@ import { savePoll, getPoll, kvGet, kvSet } from '../../core/db.js';
 import { syncWhatsAppContacts, mapLid, unmappedLids } from '../../core/contacts.js';
 import { rememberGroupNames } from '../../core/chat-names.js';
 import { chatKey } from './ids.js';
+import { noteLinked } from '../../core/pace.js';
 
 const logger = pino({ level: process.env.BAILEYS_LOG || 'warn' });
 // 057: address-book names live in the app-state collection "critical_unblock_low" (contactAction / lidContactAction).
@@ -97,6 +98,7 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
       if (qr) setState({ status: 'qr', qr });
       if (connection === 'open') {
         retries = 0;
+        if (state.status === 'qr' || state.pairingCode) safe(() => noteLinked(number)); // 080: a newly linked number warms up for a week
         setState({ status: 'open', qr: null, pairingCode: null, me: sock.user?.id || null, lastError: null });
         namesDueAt = Date.now() + NAMES_FIRST_MS; // after the initial sync settles
         try { onPhoneActive({ reason: 'connected' }); } catch { /* best effort */ }
