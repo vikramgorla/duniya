@@ -1,6 +1,16 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.41.0": {
+      "breaking": false,
+      "title": "Delete stored messages; calmer history loading",
+      "changes": [
+        { "type": "fixed", "text": "When contacts from your phone are added to People in the background, an open People list now shows them right away instead of waiting for a refresh." },
+        { "type": "new", "text": "Delete a stored message: tap it in a chat's Messages, then Delete. The agent forgets it (the chat summary is rebuilt without it)." },
+        { "type": "improved", "text": "A message deleted for everyone in WhatsApp is now removed from the stored messages too." },
+        { "type": "fixed", "text": "Loading earlier messages from your phone no longer retries for days: it tries 3 more times, each from another message, then stops." }
+      ]
+    },
     "2.40.0": {
       "breaking": false,
       "title": "People and agents: agents know who is writing, everyone is in People",

@@ -22,6 +22,8 @@ import { sendOwnerAlert } from './owner-alerts.js';
 import { appsTick } from './providers/apps.js';
 import { pruneMerges } from './people-ops.js';
 import { noteMembers, syncPhonePeople } from './people-access.js';
+import { rebuildStaleSummary } from './memory.js';
+import { agentForChat } from './agents.js';
 import { channelOf } from '../channels/index.js';
 
 const GROUP_EVERY_MS = 12 * 3600000;
@@ -62,6 +64,7 @@ export async function upkeepTick(channel, now = Date.now()) {
     try { done.retries = await historyRetryTick(now); } catch (e) { activity('error', { summary: `History retry failed: ${e.message}` }); }
     if (optionalPaused()) return { ...done, skipped: 'memory' };
     try { done.names = !!(await channel?.upkeep?.())?.ok; } catch { /* the channel reports its own failures */ }
+    try { await rebuildStaleSummary(agentForChat); } catch { /* #180: retried next tick */ }
     try { done.phonePeople = syncPhonePeople(); } catch (e) { activity('error', { summary: `Phone contacts to People failed: ${e.message}` }); }
     if (typeof channel?.groupMembers !== 'function') return done;
     const on = new Set(enabledChats().filter(isGroup));

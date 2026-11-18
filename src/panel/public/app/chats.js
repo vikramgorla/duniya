@@ -302,18 +302,24 @@ function messagesView(c, agents, q0 = '', at = 0) {
   const more = h('button', { class: 'btn small', type: 'button', onclick: () => load('older') }, 'Load older');
   const latest = h('button', { class: 'btn small hide', type: 'button', onclick: () => { at = 0; load(); } }, 'Show the latest');
   const agentOf = (id) => agents.find((b) => b.id === id)?.name || (id === 'owner-assistant' ? 'Owner assistant' : 'Agent');
+  // #180: delete a stored message (tap a message to show it); the chat's summary is rebuilt without it
+  const del = (m) => admin ? h('button', { class: 'btn small msg-del', type: 'button', onclick: async (e) => {
+    e.stopPropagation();
+    if (!await ask({ title: 'Delete this message?', text: 'It is removed from the stored messages and the agent forgets it (the chat summary is rebuilt). Nothing changes in WhatsApp.', ok: 'Delete', danger: true })) return;
+    if (await tryApi(() => api('DELETE', `/api/chats/${enc}/messages/${m.id}`))) { rows = rows.filter((r) => r.id !== m.id); log.querySelector(`[data-msg="${m.id}"]`)?.remove(); }
+  } }, 'Delete') : null;
   function bubble(m, i) {
     const text = highlight(m.text, searchWords(shown));
     if (!m.fromAgent) {
-      return h('div', { class: `bubble agent${m.id === at ? ' hit' : ''}`, 'data-msg': m.id },
+      return h('div', { class: `bubble agent${m.id === at ? ' hit' : ''}`, 'data-msg': m.id, tabindex: admin ? '0' : null },
         h('div', { class: 'small msg-who' }, m.sender && can('admin') ? h('a', { href: `#people/${encodeURIComponent(m.sender)}` }, m.name || `+${m.sender}`) : m.name || (m.sender ? `+${m.sender}` : 'someone'), m.tag ? ` (${m.tag})` : '', ` · ${time(m.ts)}`, m.addressed ? ' · to the agent' : ''),
-        m.quoted ? h('div', { class: 'small msg-quote' }, m.quoted) : null, h('span', {}, text));
+        m.quoted ? h('div', { class: 'small msg-quote' }, m.quoted) : null, h('span', {}, text), del(m));
     }
     const name = agentOf(m.agent); const av = avatar(name, m.agent || 'agent', 's');
-    return h('div', { class: `msg-ans ${[...av.classList].find((k) => /^c\d$/.test(k)) || ''}${m.id === at ? ' hit' : ''}`, 'data-msg': m.id },
+    return h('div', { class: `msg-ans ${[...av.classList].find((k) => /^c\d$/.test(k)) || ''}${m.id === at ? ' hit' : ''}`, 'data-msg': m.id, tabindex: admin ? '0' : null },
       h('div', { class: 'small msg-who' }, av, m.agent && !m.agent.startsWith('owner') ? h('a', { href: `#agents/${encodeURIComponent(m.agent)}` }, name) : name, ` · ${time(m.ts)}`),
       h('div', { class: 'bubble ans' }, text),
-      admin && m.rateable ? answerActions({ id: m.id, agent: m.agent, rating: m.rating, text: m.text, question: questionOf(rows, i) }) : null);
+      admin && m.rateable ? answerActions({ id: m.id, agent: m.agent, rating: m.rating, text: m.text, question: questionOf(rows, i) }) : null, del(m));
   }
   async function load(older) {
     const term = q.value.trim();

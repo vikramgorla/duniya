@@ -425,7 +425,7 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
     const chat = msg.key.remoteJid;
     if (!chat || chat === 'status@broadcast' || chat.endsWith('@newsletter')) return null;
     const c = normalizeMessageContent(msg.message);
-    if (!c || c.protocolMessage) return null;
+    if (!c) return null;
     const isGroup = !!isJidGroup(chat);
     const fromMe = !!msg.key.fromMe;
     const senderJid = fromMe ? sock.user?.id : isGroup ? msg.key.participant : chat;
@@ -433,6 +433,11 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
     const ts = Number(msg.messageTimestamp || 0) * 1000 || Date.now();
     const base = { channel: 'whatsapp', raw: msg, chat, isGroup, phone, senderJid, fromMe, msgId: msg.key.id || null, ts,
       senderName: fromMe ? 'Assistant' : msg.pushName || phone || 'someone' };
+    // "Delete for everyone": the stored copy goes too (#180). Other protocol messages carry nothing to store.
+    if (c.protocolMessage) {
+      const pm = c.protocolMessage;
+      return pm.type === proto.Message.ProtocolMessage.Type.REVOKE && pm.key?.id ? { ...base, kind: 'deleted', text: '', target: pm.key.id } : null;
+    }
     // Reactions and poll votes are events about another message: stored, never answered.
     if (c.reactionMessage) {
       if (includeOwn) return null;
