@@ -51,7 +51,7 @@ async function renderOne(kind, id) {
     if (!await ask({ title: `Add to ${g.name}`, ok: 'Add', body: [pk.el, house ? field('As', role) : null] })) return;
     redraw(() => (pk.value() ? api('PUT', `${k.api}/${enc(id)}/members/${pk.value()}`, { role: role.value }) : Promise.reject(new Error('Choose a person from the matches'))), 'Added');
   };
-  const out = (m) => h('button', { class: 'btn small ghost icon', type: 'button', 'aria-label': `Take ${m.name} out`, title: `Take ${m.name} out`,
+  const out = (m) => h('button', { class: 'btn small ghost icon rm', type: 'button', 'aria-label': `Take ${m.name} out`, title: `Take ${m.name} out`,
     onclick: () => redraw(() => api('DELETE', `${k.api}/${enc(id)}/members/${m.id || m.person}`), 'Taken out') }, '×');
   const members = house ? g.members : g.members.map((m) => ({ ...m, person: m.id }));
   const sub = (m) => (house ? [m.role === 'kid' ? 'Kid' : 'Adult', m.reachable ? '' : 'no app: reached through the adults'].filter(Boolean).join(' · ') : undefined);

@@ -33,7 +33,7 @@ const NAV_STRESS = `window.__realFetch ||= window.fetch; const { dropCache } = a
   // slow lists, and a screen whose second request is slower than the first (it draws, then waits: the 064 skeleton timer
   // used to replace what was drawn)
   window.fetch = async (u, o) => { await T.wait(String(u).startsWith('/api/activity') ? 300 + Math.random() * 300 : Math.random() < 0.5 ? 0 : Math.random() * 400); return window.__realFetch(u, o); };
-  const phone = innerWidth < 641; const tabs = ['activity', 'chats', 'agents', 'overview', 'usage', 'models', 'server', 'activity', 'contacts', 'settings', 'activity'];
+  const phone = innerWidth < 641; const tabs = ['activity', 'chats', 'agents', 'overview', 'usage', 'models', 'server', 'activity', 'people', 'settings', 'activity'];
   const go = async (id) => {
     const bar = document.querySelector(phone ? 'nav.tabbar' : 'nav.tabs');
     const b = bar.querySelector('button[data-tab="' + id + '"]');
@@ -171,10 +171,19 @@ const STATES = [
   { name: 'activity-chat', hash: 'activity/chat=120363041122330003%40g.us', wait: 2000, js: "[...document.querySelectorAll('#feed .fitem')].find((li) => li.textContent.includes('Reply'))?.click(); await T.until('.fopen .rv-acts, .fopen .fx'); await T.wait(300);" },
   { name: 'more-sheet', hash: 'overview', js: "(await import('/app/find.js')).openMore(); await T.wait(400);" },
   { name: 'more-sheet-account', hash: 'overview', js: "const { askSignOut } = await import('/app/core.js'); askSignOut(); await T.wait(400);" },
-  { name: 'contacts', hash: 'contacts' },
-  // 073: a person's page (their direct chat and groups), also for someone who is not a saved contact
-  { name: 'contact-person', hash: 'contacts/41790000004', wait: 1500 },
-  { name: 'contact-person-unsaved', hash: 'contacts/41790000999', wait: 1500 },
+  // 078: People — the list (search, filter), a person's page (ties, household, notes, tags, lists), a kid without an
+  // app, a number not in People, Households and Lists (list → page), the add-tie and erase dialogs
+  { name: 'people', hash: 'people' },
+  { name: 'people-filter', hash: 'people', js: "const s = document.querySelector('#main select'); s.value = 'tag:badminton'; s.dispatchEvent(new Event('change')); await T.wait(800);" },
+  { name: 'person', hash: 'people/41790000001', wait: 1500 },
+  { name: 'person-kid', hash: 'people', js: "const r = await (await fetch('/api/people?q=vedika')).json(); location.hash = 'people/' + r[0].id; await T.until('.person-page .timeline'); await T.wait(300);" },
+  { name: 'person-not-in-people', hash: 'people/41790000999', wait: 1500 },
+  { name: 'person-add-tie', hash: 'people/41790000001', wait: 1500, js: "await T.click('Add a tie', 'button', 600);" },
+  { name: 'person-erase', hash: 'people/41790000001', wait: 1500, js: "document.querySelector('.person-page details.menu summary').click(); await T.click('Erase', 'button', 600);" },
+  { name: 'people-households', hash: 'people/households', wait: 1200 },
+  { name: 'people-household', hash: 'people', js: "const r = await (await fetch('/api/households')).json(); location.hash = 'people/households/' + r[0].id; await T.until('.person-page .lgroup'); await T.wait(300);" },
+  { name: 'people-lists', hash: 'people/lists', wait: 1200 },
+  { name: 'people-list', hash: 'people', js: "const r = await (await fetch('/api/lists')).json(); location.hash = 'people/lists/' + r[0].id; await T.until('.person-page .lgroup'); await T.wait(300);" },
   { name: 'models', hash: 'models', js: 'T.openAll();' },
   // 064: list → page: a provider's page, the Add page, Backups → Restore, Settings sections
   { name: 'models-provider', hash: 'models/chatgpt', js: 'T.openAll();' },

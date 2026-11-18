@@ -2,6 +2,7 @@
 // load from people-groups.js. Module of the panel (063). Text from WhatsApp or people is built from text nodes.
 import { $, S, ago, api, ask, avatar, can, emptyState, field, h, icon, menu, tryApi } from './core.js';
 import { helpLink, plural } from './shared.js';
+import { tagInput } from './tags.js';
 let query = ''; let filter = '';
 const PAGE = 100;
 const APPS = { whatsapp: 'WhatsApp', telegram: 'Telegram' };
@@ -9,11 +10,11 @@ const enc = encodeURIComponent;
 export const personHref = (id) => `#people/${enc(id)}`;
 const appsLine = (p) => [p.apps.map((a) => APPS[a] || a).join(' · ') || 'No app', p.lastContact ? `${ago(p.lastContact)} ago` : ''].filter(Boolean).join(' · ');
 /** One person row: avatar · name · apps and last contact · chevron (calm rows, 073). `end`: a control next to the row. */
-export const personRow = (p, sub = appsLine(p), end = null) => h('li', { class: end ? 'has-end' : null }, h('a', { class: 'lrow', href: personHref(p.id || p.person) }, avatar(p.name, p.id || p.person, 's'),
+export const personRow = (p, sub = appsLine(p), end = null) => h('li', { class: end ? 'has-end' : null }, h('a', { class: 'lrow', href: personHref(p.id || p.person) }, avatar(p.who || p.name, p.id || p.person, 's'),
   h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, p.name), sub ? h('span', { class: 'lrow-sub' }, sub) : null), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')), end);
 /** People · Households · Lists (one switch on each of the three lists). */
-export const peopleNav = (on) => h('nav', { class: 'seg', 'aria-label': 'People, households and lists', style: 'margin-bottom:10px' },
-  [['people', 'People'], ['people/households', 'Households'], ['people/lists', 'Lists']].map(([href, l]) => h('a', { href: `#${href}`, class: `btn small ghost${href === on ? ' on' : ''}`, 'aria-current': href === on ? 'page' : null }, l)));
+export const peopleNav = (on) => h('nav', { class: 'seg pnav', 'aria-label': 'People, households and lists', style: 'margin-bottom:10px' },
+  [['people', 'People'], ['people/households', 'Households'], ['people/lists', 'Lists']].map(([href, l]) => h('a', { href: `#${href}`, class: href === on ? 'on' : null, 'aria-current': href === on ? 'page' : null }, l)));
 
 /** Pick a person by typing a name: a search field with up to six matches. Returns { el, value() }. */
 export function pickPerson(label, exclude = '') {
@@ -74,7 +75,7 @@ const act = (ref, fn, ok) => tryApi(fn, ok).then((r) => { if (r !== false) rende
 const block = (title, help, ...kids) => h('div', { class: 'lgroup' }, h('div', { class: 'eyebrow' }, title, help ? [' ', helpLink(help)] : null), kids);
 const rowBtn = (label, sub, onclick) => h('li', {}, h('button', { class: 'lrow', type: 'button', onclick }, h('span', { class: 'lmark c3', 'aria-hidden': 'true' }, '+'),
   h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, label), sub ? h('span', { class: 'lrow-sub' }, sub) : null), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
-const x = (label, onclick) => h('button', { class: 'btn small ghost icon', type: 'button', 'aria-label': label, title: label, onclick }, '×');
+const x = (label, onclick) => h('button', { class: 'btn small ghost icon rm', type: 'button', 'aria-label': label, title: label, onclick }, '×');
 const TIES = [['parent', 'Parent of', false], ['parent', 'Child of', true], ['partner', 'Partner of', false], ['sibling', 'Sibling of', false], ['works_with', 'Works with', false], ['custom', 'Something else…', false]];
 
 /** A person's page: name and apps, then Family and ties, Notes and timeline, Tags and lists, their chats; ⋯ Edit, Merge, Export, Erase. */
@@ -88,8 +89,9 @@ async function renderPerson(ref) {
     h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, c.name), h('span', { class: 'lrow-sub' }, [c.enabled ? c.agentName || 'No agent' : 'Off', sub].filter(Boolean).join(' · '))),
     h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
   const setUp = () => { S.dmPrefill = { phone: p.phone, name: p.name }; location.hash = 'chats/add'; };
-  const chats = [block('Direct chat', '', h('ul', {}, p.direct.length ? p.direct.map((c) => chatRow(c, ''))
-    : p.phone ? rowBtn('Set up a direct chat', 'Give them an agent, before they write', setUp) : h('li', { class: 'small muted lempty' }, p.reachVia?.length ? `Reached through ${p.reachVia.map((r) => r.name).join(', ')}` : 'No app: agents never message them directly.'))),
+  const noApp = !p.notInPeople && !p.apps.length && !p.phone;
+  const chats = noApp ? null : [block('Direct chat', '', h('ul', {}, p.direct.length ? p.direct.map((c) => chatRow(c, ''))
+    : p.phone ? rowBtn('Set up a direct chat', 'Give them an agent, before they write', setUp) : null)),
   block('Groups they wrote in', '', p.groups.length ? h('ul', {}, p.groups.map((c) => chatRow(c, `wrote ${ago(c.lastAt)} ago`))) : h('p', { class: 'small muted lempty' }, 'No stored message from them in a group that is on.'))];
   if (p.notInPeople) {
     const addThem = () => act(ref, () => api('POST', '/api/people', { name: p.name.startsWith('+') ? '' : p.name, phone: p.phone }), 'Added to People');
@@ -150,13 +152,14 @@ async function renderPerson(ref) {
     if (!await ask({ title: `Add ${p.name} to a list`, ok: 'Add', body: [field('List', sel), nameF] })) return;
     act(p.id, async () => { const id = sel.value || (await api('POST', '/api/lists', { name: name.value })).id; return api('PUT', `/api/lists/${id}/members/${p.id}`); }, 'Added');
   };
-  const setTags = (tags) => act(p.id, () => api('PUT', `/api/people/${p.id}/tags`, { tags }), 'Tags saved');
-  const tagIn = h('input', { placeholder: 'Add a tag', 'aria-label': 'Add a tag', autocomplete: 'off', style: 'max-width:180px', onkeydown: (e) => { if (e.key === 'Enter' && tagIn.value.trim()) { e.preventDefault(); setTags([...p.tags, tagIn.value]); } } });
+  const tagIn = tagInput(p.tags, { placeholder: 'Add a tag', label: `Tags of ${p.name}` });
+  let saved = p.tags.join();
+  tagIn.box.addEventListener('input', () => { const v = tagIn.values(); if (v.join() !== saved) { saved = v.join(); tryApi(() => api('PUT', `/api/people/${p.id}/tags`, { tags: v }), 'Tags saved'); } });
   const note = h('textarea', { rows: 2, placeholder: `A note about ${p.name}`, 'aria-label': 'New note', maxlength: 1000 });
   const entry = (n) => h('li', { class: `tl ${n.kind}` }, h('div', {}, n.kind === 'event' ? h('span', { class: 'muted' }, n.text) : n.text),
     h('div', { class: 'small muted' }, [n.kind === 'event' ? '' : n.by === 'agent' ? 'Agent' : n.author || 'Owner', `${ago(n.at)} ago`].filter(Boolean).join(' · '),
       n.kind === 'note' ? [' ', x('Delete note', () => act(p.id, () => api('DELETE', `/api/people/${p.id}/notes/${n.id}`), 'Note deleted'))] : null));
-  const facts = [p.phone ? `+${p.phone}` : '', p.apps.map((a) => APPS[a] || a).join(' · ') || 'No app', p.nickname ? `“${p.nickname}”` : ''].filter(Boolean).join(' · ');
+  const facts = [p.phone ? `+${p.phone}` : '', p.apps.map((a) => APPS[a] || a).join(' · ') || (p.reachVia.length ? `No app · reached through ${p.reachVia.map((r) => r.name).join(', ')}` : 'No app: agents never message them'), p.nickname ? `“${p.nickname}”` : ''].filter(Boolean).join(' · ');
   $('#main').replaceChildren(h('div', { class: 'card person-page' }, back,
     h('div', { class: 'ap-head' }, avatar(p.name, p.id, 'l'),
       h('div', { class: 'ap-title' }, h('h2', { tabindex: '-1' }, p.name), h('div', { class: 'small muted num' }, facts)),
@@ -168,7 +171,7 @@ async function renderPerson(ref) {
       p.lastContact ? `last contact ${ago(p.lastContact)} ago` : ''].filter(Boolean).join(' · ')),
     owner && p.suggestions.map((s) => h('p', { class: 'note' }, `${s.reason} as ${s.name}. `, h('button', { class: 'qfix', type: 'button', onclick: () => merge(s.id, s.name) }, `Merge ${s.name} into ${p.name}`))),
     owner && p.merges.map((m) => h('p', { class: 'small muted' }, `Merged with ${m.name} ${ago(m.at)} ago. `, h('button', { class: 'qfix', type: 'button', onclick: () => act(p.id, () => api('POST', `/api/people/merges/${m.id}/undo`), 'Merge undone') }, 'Undo merge'))),
-    block('Family and ties', 'people.md#family-and-ties', h('ul', {}, p.ties.map((t) => personRow({ id: t.other.id, name: t.other.name }, t.label, x(`Remove ${t.label} ${t.other.name}`, () => act(p.id, () => api('DELETE', `/api/people/${p.id}/ties/${t.id}`), 'Tie removed')))),
+    block('Family and ties', 'people.md#family-and-ties', h('ul', {}, p.ties.map((t) => personRow({ id: t.other.id, who: t.other.name, name: `${t.label} ${t.other.name}` }, '', x(`Remove ${t.label} ${t.other.name}`, () => act(p.id, () => api('DELETE', `/api/people/${p.id}/ties/${t.id}`), 'Tie removed')))),
       p.households.map((x2) => h('li', { class: 'has-end' }, h('a', { class: 'lrow', href: `#people/households/${enc(x2.id)}` }, h('span', { class: 'lmark c2', 'aria-hidden': 'true' }, x2.name[0] || 'H'),
         h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, x2.name), h('span', { class: 'lrow-sub' }, `Household · ${x2.role === 'kid' ? 'kid' : 'adult'}`)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))),
       rowBtn('Add a tie', 'Parent, partner, sibling, works with…', addTie), rowBtn('Add to a household', 'Adults and kids', addToHousehold))),
@@ -176,7 +179,7 @@ async function renderPerson(ref) {
       h('form', { class: 'note-add', onsubmit: (e) => { e.preventDefault(); if (note.value.trim()) act(p.id, () => api('POST', `/api/people/${p.id}/notes`, { text: note.value }), 'Note added'); } }, note, h('button', { class: 'btn small' }, 'Add note')),
       p.timeline.length ? h('ul', { class: 'timeline' }, p.timeline.map(entry)) : null),
     block('Tags and lists', 'people.md#tags-and-lists',
-      h('div', { class: 'row tags', style: 'gap:6px;padding:0 10px' }, p.tags.map((t) => h('span', { class: 'pill raw' }, `#${t}`, x(`Remove tag ${t}`, () => setTags(p.tags.filter((y) => y !== t))))), tagIn),
+      h('div', { style: 'padding:0 10px 6px' }, tagIn.box),
       h('ul', {}, p.lists.map((l) => h('li', { class: 'has-end' }, h('a', { class: 'lrow', href: `#people/lists/${enc(l.id)}` }, h('span', { class: 'lmark c4', 'aria-hidden': 'true' }, '≡'),
         h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, l.name), h('span', { class: 'lrow-sub' }, 'List')), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')),
       x(`Take off ${l.name}`, () => act(p.id, () => api('DELETE', `/api/lists/${l.id}/members/${p.id}`), 'Taken off the list')))), rowBtn('Add to a list', '', addToList))),
