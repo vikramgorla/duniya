@@ -71,7 +71,7 @@ export function queueStats() {
 /** What a queued turn needs to run later, even after a restart (no media bytes, no raw message object). */
 export const packMsg = (m) => ({ channel: m.channel, chat: m.chat, number: m.number, isGroup: m.isGroup, phone: m.phone, senderJid: m.senderJid, senderName: m.senderName,
   msgId: m.msgId, ts: m.ts, text: m.text, caption: m.caption || '', quoted: m.quoted || '', mentioned: !!m.mentioned, replyToAgent: !!m.replyToAgent,
-  mediaInfo: m.mediaInfo || null, mediaRef: m.mediaRef || '' });
+  mediaInfo: m.mediaInfo || null, mediaRef: m.mediaRef || '', personId: m.personId || '' });
 export function unpackMsg(ch, p) {
   return { ...p, raw: null, fetchMedia: () => ch.downloadMedia(p.chat, p.mediaRef, p.mediaInfo?.size || 0) };
 }

@@ -6,7 +6,8 @@ import { activity } from './events.js';
 import { isConnected, runtimeProvider, GLOBAL_SCOPE } from './mcp-oauth.js';
 import { globalServers } from './global-mcp.js';
 import { memoryTools, memoryEnabled, MEMORY_DEFAULT_ALLOW } from './memory.js';
-import { contactsTools, CONTACTS_DEFAULT_ALLOW } from './people.js';
+import { peopleTools, peopleRules } from './people-tools.js';
+import { peopleScope } from './people-access.js';
 import { chatToolsFor, chatToolRules, chatChannel } from './chat-tools.js';
 import { capsOf } from '../channels/index.js';
 import { mediaTools, imageToolAllowed } from './media-ai.js';
@@ -92,9 +93,9 @@ export const organizerConnection = (agent, serverKey) => connectionFor(agent, se
 
 /**
  * Build the tool list for an agent + role, in a chat (075: chat tools only as far as the chat's channel can do them;
- * no chat = the test console). Returns { defs: [Anthropic tool defs], run: (name, input, ctx) => {isError, text}, meta: Map }
+ * no chat = the test console). `owner` (079): the sender is the owner (People tools with owner-level access). Returns { defs: [Anthropic tool defs], run: (name, input, ctx) => {isError, text}, meta: Map }
  */
-export async function toolsFor(agent, role, { chat = '' } = {}) {
+export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
   const allow = agent.tools[role] || [];
   const deny = [...(agent.tools.deny || [])];
   if (agent.confirm?.tool) deny.push(agent.confirm.tool); // confirming is never the model's job
@@ -139,9 +140,8 @@ export async function toolsFor(agent, role, { chat = '' } = {}) {
 
   if (memoryEnabled(agent)) addLocal('memory', memoryTools, [...allow, ...(MEMORY_DEFAULT_ALLOW[role] || [])]);
 
-  // Contacts (#11): every agent can look people up; the role's explicit contacts: rules win over the defaults.
-  const contactRules = allow.filter((r) => r.startsWith('contacts:'));
-  addLocal('contacts', contactsTools, contactRules.length ? contactRules : CONTACTS_DEFAULT_ALLOW[role] || []);
+  // People (079): the role's people: rules (or the defaults) when the agent's People access is on, or the sender is the owner.
+  if (peopleScope(agent, { owner })) addLocal('people', peopleTools, peopleRules(agent, role));
 
   // Chat actions (026, 075 by capability): role defaults unless the role has explicit whatsapp: rules; organizer-only
   // tools never reach participants (t.roles), and the deny list always wins.

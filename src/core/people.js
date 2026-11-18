@@ -21,7 +21,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS people (
     tenant_id TEXT NOT NULL, id TEXT NOT NULL, phone TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL,
     name TEXT NOT NULL DEFAULT '', nickname TEXT NOT NULL DEFAULT '', birthday TEXT NOT NULL DEFAULT '', shared INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (tenant_id, id)
+    source TEXT NOT NULL DEFAULT 'chat', hidden INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (tenant_id, id)
   );
   CREATE UNIQUE INDEX IF NOT EXISTS people_phone ON people (tenant_id, phone) WHERE phone <> '';
   CREATE TABLE IF NOT EXISTS identities (
@@ -30,13 +30,18 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS identities_person ON identities (tenant_id, person);
 `);
-// 078, one release only (remove in the next): databases from before 2.39 get the new columns.
-for (const [table, cols] of [['people', ['name', 'nickname', 'birthday', 'shared']], ['identities', ['name']]]) {
-  const have = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name));
-  for (const c of cols) if (!have.has(c)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${c} ${c === 'shared' ? 'INTEGER NOT NULL DEFAULT 0' : "TEXT NOT NULL DEFAULT ''"}`);
+// 079, one release only (remove in the next): databases from before 2.40 get where a person came from and Hide.
+{
+  const have = new Set(db.prepare('PRAGMA table_info(people)').all().map((c) => c.name));
+  if (!have.has('source')) {
+    db.exec("ALTER TABLE people ADD COLUMN source TEXT NOT NULL DEFAULT 'chat'; ALTER TABLE people ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0");
+    db.exec("UPDATE people SET source = 'owner' WHERE NOT EXISTS (SELECT 1 FROM identities i WHERE i.tenant_id = people.tenant_id AND i.person = people.id)");
+  }
 }
 db.exec(`
   CREATE INDEX IF NOT EXISTS identities_phone ON identities (tenant_id, phone) WHERE phone <> '';
+  CREATE INDEX IF NOT EXISTS people_source ON people (tenant_id, source);
+  CREATE INDEX IF NOT EXISTS people_hidden ON people (tenant_id, id) WHERE hidden = 1;
   CREATE TABLE IF NOT EXISTS person_ties (
     tenant_id TEXT NOT NULL, id TEXT NOT NULL, a TEXT NOT NULL, b TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL DEFAULT '',
     inverse TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, PRIMARY KEY (tenant_id, id)
@@ -62,6 +67,17 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS person_lists (tenant_id TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (tenant_id, id));
   CREATE TABLE IF NOT EXISTS person_list_members (tenant_id TEXT NOT NULL, list TEXT NOT NULL, person TEXT NOT NULL, PRIMARY KEY (tenant_id, list, person));
   CREATE INDEX IF NOT EXISTS person_list_members_person ON person_list_members (tenant_id, person);
+  -- 079: the chats a person is in (wrote in, or a member of, while the chat was on): which agents may see them
+  CREATE TABLE IF NOT EXISTS person_chats (
+    tenant_id TEXT NOT NULL, person TEXT NOT NULL, chat TEXT NOT NULL, wrote INTEGER NOT NULL DEFAULT 0, member INTEGER NOT NULL DEFAULT 0,
+    last_at INTEGER NOT NULL, PRIMARY KEY (tenant_id, person, chat)
+  );
+  CREATE INDEX IF NOT EXISTS person_chats_chat ON person_chats (tenant_id, chat, person);
+  -- 079: consent per person and purpose (privacy notice seen, updates, marketing); no row = unknown = no
+  CREATE TABLE IF NOT EXISTS person_consents (
+    tenant_id TEXT NOT NULL, person TEXT NOT NULL, purpose TEXT NOT NULL, value TEXT NOT NULL, source TEXT NOT NULL DEFAULT '', at INTEGER NOT NULL,
+    PRIMARY KEY (tenant_id, person, purpose)
+  );
 `);
 
 const q = {
@@ -131,17 +147,18 @@ const LABEL = `COALESCE(NULLIF(p.name, ''), NULLIF(c.book_name, ''), NULLIF(c.bi
   (SELECT i.name FROM identities i WHERE i.tenant_id = p.tenant_id AND i.person = p.id AND i.name <> '' ORDER BY i.last_seen DESC LIMIT 1),
   CASE WHEN p.phone <> '' THEN '+' || p.phone END, 'Unknown')`;
 const FROM = "FROM people p LEFT JOIN contacts c ON c.tenant_id = p.tenant_id AND c.phone = p.phone AND p.phone <> ''";
-const ROW = `p.id, p.phone, p.name AS ownName, p.nickname, p.birthday, p.shared, p.created_at AS createdAt, ${LABEL} AS label,
+const ROW = `p.id, p.phone, p.name AS ownName, p.nickname, p.birthday, p.shared, p.source, p.hidden, p.created_at AS createdAt, ${LABEL} AS label,
   (SELECT group_concat(DISTINCT i.channel) FROM identities i INDEXED BY identities_person WHERE i.tenant_id = p.tenant_id AND i.person = p.id) AS apps,
   (SELECT MAX(i.last_seen) FROM identities i WHERE i.tenant_id = p.tenant_id AND i.person = p.id) AS lastContact`;
 const view = (r) => r && ({
   id: r.id, name: r.label, ownName: r.ownName, nickname: r.nickname, phone: r.phone, birthday: r.birthday, shared: !!r.shared,
+  source: r.source, ...(r.hidden ? { hidden: true } : {}),
   apps: r.apps ? String(r.apps).split(',').sort() : [], lastContact: r.lastContact || null, createdAt: r.createdAt,
 });
 /** The own name the owner gave the person with this phone ('' when none): the contacts resolver's first choice. */
 export const ownNameOf = (phone) => (digits(phone) ? st("SELECT name FROM people WHERE tenant_id = ? AND phone = ? AND phone <> ''").get(TENANT, digits(phone))?.name || '' : '');
 
-/** A person's row as lists show it ({ id, name, nickname, phone, birthday, shared, apps, lastContact, createdAt }), or null. */
+/** A person's row as lists show it ({ id, name, nickname, phone, birthday, shared, source, hidden?, apps, lastContact, createdAt }), or null. */
 export const personRow = (id) => view(st(`SELECT ${ROW} ${FROM} WHERE p.tenant_id = ? AND p.id = ?`).get(TENANT, String(id || ''))) || null;
 const nameOf = (id) => personRow(id)?.name || 'Someone';
 
@@ -197,7 +214,7 @@ export function createPerson({ name, nickname = '', birthday = '', phone = '', s
   if (!n && !p) throw fail('A name is required', 400, { field: 'name' }); // with a number, the name may come from their apps
   if (p && personByPhone(p)) throw fail('This number is already in People', 409, { field: 'phone', person: personByPhone(p)?.id });
   const id = rid('p');
-  db.prepare('INSERT INTO people (tenant_id, id, phone, created_at, name, nickname, birthday, shared) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+  db.prepare("INSERT INTO people (tenant_id, id, phone, created_at, name, nickname, birthday, shared, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'owner')")
     .run(TENANT, id, p, Date.now(), n, clean(nickname, 60), normBirthday(birthday), shared ? 1 : 0);
   addEvent(id, `Added to People by ${by}`);
   return personRow(id);
@@ -224,12 +241,28 @@ export function updatePerson(id, { name, nickname, birthday, phone, shared }) {
   return personRow(cur.id);
 }
 
+/**
+ * 079: Hide a person (or show them again). Hidden people leave People lists, search, agent tools and sender cards; their
+ * data stays, and the phone's contact sync never brings them back as someone new (the person still holds the number).
+ */
+export function setHidden(id, on, by = 'panel') {
+  const cur = q.person.get(TENANT, exists(id));
+  if (!!cur.hidden === !!on) return personRow(cur.id);
+  db.prepare('UPDATE people SET hidden = ? WHERE tenant_id = ? AND id = ?').run(on ? 1 : 0, TENANT, cur.id);
+  addEvent(cur.id, on ? `Hidden (${by})` : `Shown again (${by})`);
+  return personRow(cur.id);
+}
+
 // ---------- list and search ----------
 /**
  * People by name. q matches names (own, phone contact, business, profile, app), nickname, number, tags and notes;
- * filters: tag, list, household, app (a channel id, or 'none' for people without any app). `limit` + `offset` page.
+ * filters: tag, list, household, app (a channel id, or 'none' for people without any app), source (chat | phone |
+ * owner), hidden (079: only the hidden ones; otherwise hidden people never appear). `scope` (079, people-access.js):
+ * only the people an agent may see. `limit` + `offset` page.
+ * @param {{ q?: string, tag?: string, list?: string, household?: string, app?: string, source?: string, hidden?: boolean,
+ *   limit?: number, offset?: number, shared?: boolean, scope?: { all?: boolean, chats?: string[], lists?: string[] } | null }} [o]
  */
-export function listPeople({ q: text = '', tag = '', list = '', household = '', app = '', limit = 100, offset = 0, shared = false } = {}) {
+export function listPeople({ q: text = '', tag = '', list = '', household = '', app = '', source = '', hidden = false, limit = 100, offset = 0, shared = false, scope = null } = {}) {
   const where = ['p.tenant_id = ?']; const args = [TENANT];
   const s = String(text).trim().toLowerCase();
   if (s) {
@@ -245,10 +278,22 @@ export function listPeople({ q: text = '', tag = '', list = '', household = '', 
   if (household) { where.push('p.id IN (SELECT m.person FROM household_members m WHERE m.tenant_id = ? AND m.household = ?)'); args.push(TENANT, String(household)); }
   if (app === 'none') where.push('NOT EXISTS (SELECT 1 FROM identities i WHERE i.tenant_id = p.tenant_id AND i.person = p.id)');
   else if (app) { where.push('p.id IN (SELECT i.person FROM identities i WHERE i.tenant_id = ? AND i.channel = ?)'); args.push(TENANT, String(app)); }
+  if (source) { where.push('p.id IN (SELECT s.id FROM people s WHERE s.tenant_id = ? AND s.source = ?)'); args.push(TENANT, String(source)); }
+  if (hidden) { where.push('p.id IN (SELECT x.id FROM people x WHERE x.tenant_id = ? AND x.hidden = 1)'); args.push(TENANT); } else where.push('p.hidden = 0');
   if (shared) where.push('p.shared = 1');
+  const scoped = scope && !scope.all;
+  if (scoped) {
+    const chats = scope.chats || []; const lists = scope.lists || [];
+    const parts = [chats.length ? `p.id IN (SELECT c.person FROM person_chats c WHERE c.tenant_id = ? AND c.chat IN (${chats.map(() => '?').join(',')}))` : '',
+      lists.length ? `p.id IN (SELECT l2.person FROM person_list_members l2 WHERE l2.tenant_id = ? AND l2.list IN (${lists.map(() => '?').join(',')}))` : ''].filter(Boolean);
+    if (!parts.length) return [];
+    where.push(`(${parts.join(' OR ')})`);
+    if (chats.length) args.push(TENANT, ...chats);
+    if (lists.length) args.push(TENANT, ...lists);
+  }
   // Without such a filter every person's display name is needed to sort (and to search) by it: the one full read of
   // `people`, marked for scripts/check-perf.mjs and kept within its time budget.
-  const all = !(tag || list || household || (app && app !== 'none')) ? '/* people: every name sorts */ ' : '';
+  const all = !(tag || list || household || source || hidden || scoped || (app && app !== 'none')) ? '/* people: every name sorts */ ' : '';
   // the page is chosen by name first; apps and last contact are looked up for that page only
   const sql = `SELECT ${ROW} ${FROM} WHERE p.tenant_id = ? AND p.id IN (SELECT ${all}p.id ${FROM} WHERE ${where.join(' AND ')} ORDER BY lower(${LABEL}) LIMIT ? OFFSET ?) ORDER BY lower(label)`;
   return db.prepare(sql).all(TENANT, ...args, Math.min(Number(limit) || 100, 500), Math.max(0, Number(offset) || 0)).map(view);
@@ -257,7 +302,7 @@ export function listPeople({ q: text = '', tag = '', list = '', household = '', 
 export function peopleCounts() {
   const n = (sql) => db.prepare(sql).get(TENANT).n;
   return {
-    people: n('SELECT COUNT(*) n FROM people WHERE tenant_id = ?'), households: n('SELECT COUNT(*) n FROM households WHERE tenant_id = ?'),
+    people: n('SELECT COUNT(*) n FROM people WHERE tenant_id = ? AND hidden = 0'), hidden: n('SELECT COUNT(*) n FROM people INDEXED BY people_hidden WHERE tenant_id = ? AND hidden = 1'), households: n('SELECT COUNT(*) n FROM households WHERE tenant_id = ?'),
     lists: n('SELECT COUNT(*) n FROM person_lists WHERE tenant_id = ?'),
     tags: db.prepare('SELECT tag, COUNT(*) AS count FROM person_tags WHERE tenant_id = ? GROUP BY tag ORDER BY count DESC, tag LIMIT 100').all(TENANT),
   };
@@ -420,53 +465,3 @@ export function setListMember(list, person, on = true) {
 }
 export const listsOf = (person) => db.prepare(`SELECT l.id, l.name FROM person_list_members m JOIN person_lists l ON l.tenant_id = m.tenant_id AND l.id = m.list
   WHERE m.tenant_id = ? AND m.person = ? ORDER BY lower(l.name)`).all(TENANT, person);
-
-// ---------- agent tools (exposed as contacts__<name>; step 2 of People replaces them with people tools) ----------
-export const CONTACTS_DEFAULT_ALLOW = { organizer: ['contacts:*'], participant: ['contacts:find_contact'] };
-const out = (c, full) => ({ name: c.name, phone: c.phone ? `+${c.phone}` : '', ...(c.note ? { note: c.note } : {}), ...(full ? { shared: c.shared } : {}) });
-const withNote = (c) => ({ ...c, note: db.prepare("SELECT text FROM person_notes WHERE tenant_id = ? AND person = ? AND kind = 'note' ORDER BY at DESC LIMIT 1").get(TENANT, c.id)?.text || '' });
-const byNumber = (phone) => { const d = normPhone(phone); if (!d) throw fail('A phone number with country code is needed'); return d; };
-
-export const contactsTools = [
-  {
-    name: 'find_contact',
-    description: 'Look up a person\'s phone number (and latest note) in People by name, part of a name or number. Participants only see people the owner shared.',
-    input_schema: { type: 'object', properties: { query: { type: 'string', minLength: 2, maxLength: 60 } }, required: ['query'] },
-    roles: ['organizer', 'participant'],
-    async run({ query }, ctx) {
-      if (String(query || '').trim().length < 2) throw new Error('query too short');
-      const org = ctx.role === 'organizer';
-      const found = listPeople({ q: query, shared: !org, limit: 10 }).filter((c) => c.phone).map((c) => out(withNote(c), org));
-      return found.length ? found : 'No matching person' + (org ? '' : ' that is shared with this chat');
-    },
-  },
-  {
-    name: 'save_contact',
-    description: 'Add or change a person in People (organizers only): name, phone with country code, optional short note, and whether participants may look them up (shared).',
-    input_schema: {
-      type: 'object',
-      properties: { phone: { type: 'string' }, name: { type: 'string', maxLength: 100 }, note: { type: 'string', maxLength: 300 }, shared: { type: 'boolean' } },
-      required: ['phone'],
-    },
-    roles: ['organizer'],
-    async run({ phone, name, note, shared }, ctx) {
-      const d = byNumber(phone);
-      const by = `${ctx.senderName} via ${ctx.agent.id}`;
-      const cur = personByPhone(d);
-      const p = cur ? updatePerson(cur.id, { name, shared }) : createPerson({ name, phone: d, shared: !!shared }, by);
-      if (note) addNote(p.id, { text: note, by: 'agent', author: by });
-      return out(withNote(personRow(p.id)), true);
-    },
-  },
-  {
-    name: 'remove_contact',
-    description: 'Clear the saved name of a person and stop sharing them (organizers only). The person stays in People.',
-    input_schema: { type: 'object', properties: { phone: { type: 'string' } }, required: ['phone'] },
-    roles: ['organizer'],
-    async run({ phone }) {
-      const cur = personByPhone(byNumber(phone));
-      if (cur) updatePerson(cur.id, { name: '', shared: false });
-      return { removed: !!cur };
-    },
-  },
-];

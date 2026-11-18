@@ -1,28 +1,11 @@
 // 078: People (PRM core) — people from chats that are on, ties with a named inverse, households with a kid without an
-// app, notes and timeline, tags and lists, merge + undo, export, erase, the one-time move of saved contacts, the panel
-// API and its roles, the owner assistant's read tools and the admin MCP tools.
+// app, notes and timeline, tags and lists, merge + undo, export, erase, the panel API and its roles, the owner
+// assistant's read tools and the admin MCP tools. Agents and people (079): people-agents.test.js.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import { setup } from './harness.js';
 
-// A database from before 2.39: Contacts with own names, notes and Shared, and the 075 people table without names.
-const t = await setup({ beforeImport: (x) => {
-  mkdirSync(join(x.tmp, 'data'), { recursive: true });
-  const old = new DatabaseSync(join(x.tmp, 'data', 'duniya.sqlite'));
-  old.exec(`CREATE TABLE contacts (tenant_id TEXT NOT NULL, phone TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', book_name TEXT NOT NULL DEFAULT '',
-    biz_name TEXT NOT NULL DEFAULT '', push_name TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', shared INTEGER NOT NULL DEFAULT 0,
-    own INTEGER NOT NULL DEFAULT 0, updated_at INTEGER, PRIMARY KEY (tenant_id, phone));
-    CREATE TABLE people (tenant_id TEXT NOT NULL, id TEXT NOT NULL, phone TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, PRIMARY KEY (tenant_id, id));
-    INSERT INTO people VALUES ('default', 'p_0000000000aa', '41790000301', 1);
-    INSERT INTO contacts (tenant_id, phone, name, book_name, note, shared, own) VALUES
-      ('default', '41790000301', 'Dr. Meier', 'Meier Praxis', 'Mon–Fri 8–12', 1, 1),
-      ('default', '41790000302', 'Taxi Morges', '', '', 0, 1),
-      ('default', '41790000303', '', 'Only Phonebook', '', 0, 0);`);
-  old.close();
-} });
+const t = await setup();
 const owner = await t.login();
 t.store.createUser({ username: 'ada', role: 'admin', password: 'admin password 123' });
 t.store.createUser({ username: 'vic', role: 'viewer', password: 'viewer password 123' });
@@ -31,23 +14,10 @@ const viewer = await t.login('vic', 'viewer password 123');
 after(() => t.close());
 const people = await import('../src/core/people.js');
 const ops = await import('../src/core/people-ops.js');
-const contacts = await import('../src/core/contacts.js');
 const { TOOLS } = await import('../src/panel/admin-tools.js');
 const api = async (m, p, b, who = owner) => { const r = await t.api(who, m, p, b); if (r.status >= 400) throw Object.assign(new Error(r.body.error), { status: r.status }); return r.body; };
 const x = { call: (m, p, b) => api(m, p, b) };
 const tool = (name, a = {}) => TOOLS.find((y) => y.name === name).run(a, x);
-
-test('saved contacts move into People once: own name, Shared and the note; phone-book names create nobody', async () => {
-  assert.equal(ops.migrateContacts(), 2);
-  assert.equal(ops.migrateContacts(), 0, 'once only');
-  const meier = people.personByPhone('41790000301');
-  assert.equal(meier.id, 'p_0000000000aa', 'the existing person keeps their id');
-  assert.deepEqual([meier.name, meier.ownName, meier.shared], ['Dr. Meier', 'Dr. Meier', true]);
-  assert.deepEqual(people.timeline(meier.id).filter((n) => n.kind === 'note').map((n) => [n.text, n.author]), [['Mon–Fri 8–12', 'Contacts']]);
-  assert.equal(people.personByPhone('41790000302').name, 'Taxi Morges');
-  assert.equal(people.personByPhone('41790000303'), null, 'a phone-book name alone is no person');
-  assert.equal(contacts.personInfo({ phone: '41790000301' }).source, 'own', 'the own name still wins everywhere');
-});
 
 test('people are created only from chats that are on; the name the app showed is kept', async () => {
   t.chatPrefs.setChatPrefs('g7@g.us', { enabled: false });
@@ -93,7 +63,7 @@ test('ties read from both sides with the named inverse; custom ties; households 
   const h3 = await api('POST', '/api/households', { name: 'Grandparents' });
   await api('PUT', `/api/households/${h3.id}/members/${mia.id}`, { role: 'kid' });
   assert.equal((await api('GET', `/api/people?household=${hh.id}`)).length, 3);
-  assert.deepEqual((await api('GET', '/api/people?app=none')).map((p) => p.name).sort(), ['Anu', 'Dr. Meier', 'Mia', 'Taxi Morges']);
+  assert.deepEqual((await api('GET', '/api/people?app=none')).map((p) => p.name).sort(), ['Anu', 'Mia']);
 });
 
 test('notes: owner and agent notes; agent notes never quote stored messages; tags and lists filter the list', async () => {
@@ -180,18 +150,12 @@ test('export has everything about one person; erase removes their messages, note
   assert.ok(log && !/Ravi/.test(log.summary), 'the log keeps counts, not the name');
 });
 
-test('panel API roles; a number without a person still has a page; agent contact tools read People', async () => {
+test('panel API roles; a number without a person still has a page', async () => {
   assert.equal((await t.api(viewer, 'GET', '/api/people')).status, 403);
   assert.equal((await t.api(viewer, 'GET', '/api/households')).status, 403);
   assert.equal((await t.api(admin, 'PUT', '/api/people/agent-names', { enabled: false })).status, 403);
   const page = await api('GET', '/api/people/41790000999', undefined, admin);
   assert.deepEqual([page.notInPeople, page.name], [true, '+41790000999']);
-  const tool = (await import('../src/core/people.js')).contactsTools;
-  const find = tool.find((y) => y.name === 'find_contact');
-  assert.match(await find.run({ query: 'taxi' }, { role: 'participant' }), /No matching person/, 'participants see shared people only');
-  assert.deepEqual(await find.run({ query: 'meier' }, { role: 'participant' }), [{ name: 'Dr. Meier', phone: '+41790000301', note: 'Mon–Fri 8–12' }]);
-  await tool.find((y) => y.name === 'save_contact').run({ phone: '+41 79 000 03 20', name: 'Lea', shared: true }, { role: 'organizer', senderName: 'Org', agent: { id: 'panduga' } });
-  assert.equal(people.personByPhone('41790000320').shared, true);
 });
 
 test('admin MCP and the owner assistant answer people questions; risky people tools need a confirm code', async () => {

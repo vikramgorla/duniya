@@ -15,7 +15,7 @@ import { maybeSummarize } from './memory.js';
 import { setChatChannel } from './chat-tools.js';
 import { countStat } from './stats.js';
 import { silenceReason } from './silences.js';
-import { handleOwnerMessage } from './owner-assistant.js';
+import { handleOwnerMessage, userForPhone } from './owner-assistant.js';
 import { dmNoticeOnce } from './privacy-notice.js';
 import { resolveDirectChat } from './direct-chats.js';
 import { inboundKind, prepareInbound, wantsVoice, speak, createImage } from './media-ai.js';
@@ -25,6 +25,7 @@ import { builtinAnswer, todayText, fillPlaceholders } from './quick.js';
 import { recordUsage } from './usage.js';
 import { noteJoin } from './welcome.js';
 import { notePerson } from './people.js';
+import { inRole, notePersonChat } from './people-access.js';
 
 // 059: the built-in owner assistant is reached through the owner hand-off only, never by routing.
 const listAgents = () => allAgents().filter((b) => !isBuiltin(b));
@@ -40,7 +41,7 @@ function rateLimited(key) {
   return list.length > env.rateLimitPerMin;
 }
 
-const isAnyOrganizer = (phone) => !!phone && listAgents().some((b) => b.organizers.includes(phone));
+const isAnyOrganizer = (phone) => !!phone && listAgents().some((b) => inRole(b.organizers, { phone }));
 /** Index of a trigger in the text as a whole word (anywhere: "can mochi help?" works), or -1. */
 function triggerAt(trigger, lower) {
   const word = /[\p{L}\p{N}_]/u;
@@ -78,7 +79,7 @@ export function stripTriggers(agent, text) {
  * groups are its organizers (015: "group admins as the default").
  */
 export async function resolveRole(agent, msg, channel) {
-  const saved = roleIn(agent, msg.phone);
+  const saved = roleIn(agent, msg.phone, msg.personId || '');
   if (saved === 'organizer' || agent.organizers.length || !msg.phone) return saved;
   const groups = msg.isGroup ? [msg.chat] : agent.chats.filter((c) => isGroup(c));
   for (const g of groups) {
@@ -114,7 +115,7 @@ async function agentForDm(msg, channel, { openOnly = false } = {}) {
     const role = await resolveRole(agent, msg, channel);
     if (agent.dm === 'anyone' || role === 'organizer') return agent;
     if (agent.dm === 'organizers') continue;
-    if (agent.participants.includes(msg.phone)) return agent;
+    if (inRole(agent.participants, { phone: msg.phone, person: msg.personId || '' })) return agent;
     for (const chat of agent.chats) {
       if (await channel.isMember(chat, msg.phone, msg.senderJid)) return agent;
     }
@@ -270,6 +271,7 @@ export function createRouter(channel) {
 
     // 075: who wrote, across channels (ids and phone only; chats that are on or answered only)
     msg.personId = notePerson(msg);
+    if (!openAgent) notePersonChat(msg.personId, msg.chat, 'wrote'); // 079: which agents may see them
     // Groups: remember everything said (bound or not, paused or not) so agents have context.
     let rowId = 0;
     if (msg.isGroup) {
@@ -447,6 +449,8 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
       const ctx = {
         // #113: the name the owner knows them by (phone contact name unless switched off on the Contacts page)
         agent, role, chat: msg.chat, senderName: agentName({ phone: msg.phone, jid: msg.senderJid, fallbackName: msg.senderName }) || msg.senderName, requester: msg.phone,
+        // 079: who wrote (People), and whether it is the owner (verified identity on any app: owner-level People access)
+        personId: msg.personId || '', ownerTurn: userForPhone(msg.phone)?.role === 'owner',
         // 057: the sender's group member tag (chats that are on only)
         senderTag: msg.isGroup ? memberTag(msg.chat, { phone: msg.phone, jid: msg.senderJid }) : '',
         text, isGroup: msg.isGroup, source: msg.channel, msgRowId: rowId, msgId: msg.msgId, senderJid: msg.senderJid,

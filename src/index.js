@@ -1,5 +1,5 @@
 // @ts-check
-import { loadAgents, listAgents } from './core/agents.js';
+import { loadAgents, listAgents, migrateRolesToPeople } from './core/agents.js';
 import { createHub } from './channels/hub.js';
 import { createRouter, createHistoryHandler, createJoinHandler, createChatMoveHandler, closeRouter } from './core/router.js';
 import { startScheduler } from './core/scheduler.js';
@@ -19,12 +19,13 @@ import { historyPhoneOnline, resumeHistoryRetries } from './core/history-load.js
 import { markGroupDue } from './core/upkeep.js';
 import { stopQueue } from './core/media-queue.js';
 import { db } from './core/db.js';
-import { migrateContacts } from './core/people-ops.js';
+import { migratePeopleChats } from './core/people-access.js';
 
+migratePeopleChats(); // 079, one release only: the chats people wrote in, and the notices they saw
+migrateRolesToPeople(); // 079, one release only: saved organizer numbers become the person
 await loadAgents();
 { const s = serverSize(); console.log(`Server: ${s.size} (${s.effectiveMb} MB RAM${s.cgroupLimitMb ? ' container limit' : ''}, ${s.cpus} CPU)`); }
 startResourceWatch();
-migrateContacts(); // 078, one release only: saved contacts move into People
 console.log(`Agents: ${listAgents().map((b) => `${b.id}${b.enabled ? '' : ' (disabled)'}`).join(', ') || 'none'}`);
 
 // 075: the channel hub loads a channel (WhatsApp: Baileys; 077: Telegram) only when it is set up and on

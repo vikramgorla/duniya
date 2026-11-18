@@ -1,14 +1,17 @@
 // @ts-check
 // People operations (078, PRM core): merge two people (owner only, undoable for 30 days), export one person, erase one
-// person, and the one-time move of saved contacts into People. Merges are suggested only on evidence: an identity
+// person (079: admin MCP only, behind a confirm; the panel hides people instead). Merges are suggested only on evidence: an identity
 // whose verified phone is another person's number. Undo records are pruned on the upkeep tick (no timers).
 import { randomBytes } from 'node:crypto';
-import { db, kvGet, kvSet } from './db.js';
+import { db } from './db.js';
 import { fail, plural } from './config.js';
 import { activity } from './events.js';
 import { eraseChatMemory } from './memory.js';
 import { TENANT } from './store.js';
-import { addEvent, addNote, forgetPeopleCache, householdsOf, listsOf, personById, personByPhone, personRow, tagsOf, tiesOf, timeline } from './people.js';
+import { addEvent, forgetPeopleCache, householdsOf, listsOf, personById, personRow, tagsOf, tiesOf, timeline } from './people.js';
+import { consentsOf, chatsOfPerson } from './people-access.js';
+import { listAgentRows, saveAgentRow } from './store.js';
+import { loadAgents } from './agents.js';
 
 const UNDO_MS = 30 * 86400000;
 db.exec(`CREATE TABLE IF NOT EXISTS person_merges (
@@ -39,6 +42,7 @@ export function mergePeople(keep, other, by = 'panel') {
       memberships: all('SELECT household, role FROM household_members WHERE tenant_id = ? AND person = ?', o.id),
       tags: all('SELECT tag FROM person_tags WHERE tenant_id = ? AND person = ?', o.id).map((r) => r.tag),
       lists: all('SELECT list FROM person_list_members WHERE tenant_id = ? AND person = ?', o.id).map((r) => r.list),
+      chats: all('SELECT chat, wrote, member, last_at FROM person_chats WHERE tenant_id = ? AND person = ?', o.id), // 079
     };
     // what `keep` gains (so undo takes exactly that back)
     snap.added = {
@@ -54,13 +58,24 @@ export function mergePeople(keep, other, by = 'panel') {
     for (const m of snap.memberships) if (snap.added.memberships.includes(m.household)) run('INSERT INTO household_members (tenant_id, household, person, role) VALUES (?, ?, ?, ?)', m.household, k.id, m.role);
     for (const t of snap.added.tags) run('INSERT INTO person_tags (tenant_id, person, tag) VALUES (?, ?, ?)', k.id, t);
     for (const l of snap.added.lists) run('INSERT INTO person_list_members (tenant_id, list, person) VALUES (?, ?, ?)', l, k.id);
+    // 079: the chats they are in and their consents move too (the kept person's own answers win)
+    for (const t of ['person_chats', 'person_consents']) {
+      db.prepare(`UPDATE OR IGNORE ${t} SET person = ? WHERE tenant_id = ? AND person = ?`).run(k.id, TENANT, o.id);
+      run(`DELETE FROM ${t} WHERE tenant_id = ? AND person = ?`, o.id);
+    }
     for (const t of ['household_members', 'person_tags', 'person_list_members']) run(`DELETE FROM ${t} WHERE tenant_id = ? AND person = ?`, o.id);
+    // 079: agent roles that name the merged person name the kept one
+    for (const row of listAgentRows()) {
+      const swap = (l = []) => [...new Set(l.map((e) => (e === o.id ? k.id : e)))];
+      if ([...(row.config.organizers || []), ...(row.config.participants || [])].includes(o.id)) saveAgentRow(row.id, { ...row.config, organizers: swap(row.config.organizers), participants: swap(row.config.participants) }, by);
+    }
     run('DELETE FROM people WHERE tenant_id = ? AND id = ?', o.id);
     db.prepare('UPDATE people SET name = ?, nickname = ?, birthday = ?, phone = ?, shared = ? WHERE tenant_id = ? AND id = ?')
       .run(k.name || o.name, k.nickname || o.nickname, k.birthday || o.birthday, k.phone || o.phone, k.shared || o.shared ? 1 : 0, TENANT, k.id);
     run('INSERT INTO person_merges (tenant_id, id, kept, merged, snapshot, at) VALUES (?, ?, ?, ?, ?, ?)', id, k.id, o.id, JSON.stringify(snap), Date.now());
   });
   forgetPeopleCache();
+  void loadAgents(); // 079: roles that named the merged person (runs at once: no await inside)
   addEvent(k.id, `Merged with ${otherName} (${by}); undo possible for 30 days`);
   activity('config', { summary: `Merged two people in People (${by})` });
   return { merge: id, undoUntil: Date.now() + UNDO_MS, person: personRow(k.id) };
@@ -89,6 +104,7 @@ export function undoMerge(mergeId, by = 'panel') {
     for (const t of s.added.tags) run('DELETE FROM person_tags WHERE tenant_id = ? AND person = ? AND tag = ?', m.kept, t);
     for (const t of s.tags) run('INSERT OR IGNORE INTO person_tags (tenant_id, person, tag) VALUES (?, ?, ?)', o.id, t);
     for (const l of s.added.lists) run('DELETE FROM person_list_members WHERE tenant_id = ? AND list = ? AND person = ?', l, m.kept);
+    for (const c of s.chats || []) run('INSERT OR IGNORE INTO person_chats (tenant_id, person, chat, wrote, member, last_at) VALUES (?, ?, ?, ?, ?, ?)', o.id, c.chat, c.wrote, c.member, c.last_at);
     for (const l of s.lists) run('INSERT OR IGNORE INTO person_list_members (tenant_id, list, person) SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM person_lists WHERE tenant_id = ? AND id = ?)', l, o.id, TENANT, l);
     run('DELETE FROM person_merges WHERE tenant_id = ? AND id = ?', m.id);
   });
@@ -130,6 +146,7 @@ export function exportPerson(id) {
   const messages = who.length ? db.prepare(`SELECT chat, ts, name, text FROM messages WHERE ${whoSql(who.length)} ORDER BY id DESC LIMIT 5000`).all(...who, ...who) : [];
   return {
     exportedAt: new Date().toISOString(), person: p, names, ties: tiesOf(p.id), households: householdsOf(p.id), tags: tagsOf(p.id), lists: listsOf(p.id),
+    chats: chatsOfPerson(p.id), consents: consentsOf(p.id),
     notes: timeline(p.id, 500), messages: messages.reverse().map((m) => ({ ...m, at: new Date(m.ts).toISOString() })),
   };
 }
@@ -156,7 +173,7 @@ export function erasePerson(id, by = 'panel') {
     const notes = Number(run('DELETE FROM person_notes WHERE tenant_id = ? AND person = ?', p.id).changes);
     const ties = Number(run('DELETE FROM person_ties WHERE tenant_id = ? AND (a = ? OR b = ?)', p.id, p.id).changes);
     const households = Number(run('DELETE FROM household_members WHERE tenant_id = ? AND person = ?', p.id).changes);
-    for (const t of ['person_tags', 'person_list_members', 'identities']) run(`DELETE FROM ${t} WHERE tenant_id = ? AND person = ?`, p.id);
+    for (const t of ['person_tags', 'person_list_members', 'person_chats', 'person_consents', 'identities']) run(`DELETE FROM ${t} WHERE tenant_id = ? AND person = ?`, p.id);
     run('DELETE FROM person_merges WHERE tenant_id = ? AND (kept = ? OR merged = ?)', p.id, p.id);
     run('DELETE FROM people WHERE tenant_id = ? AND id = ?', p.id);
     return { messages, directChats: chats.length, notes, ties, households };
@@ -170,34 +187,4 @@ export function erasePerson(id, by = 'panel') {
 /** Undo records older than 30 days go (upkeep tick; bounded). */
 export function pruneMerges(now = Date.now()) {
   return Number(db.prepare('DELETE FROM person_merges WHERE rowid IN (SELECT rowid FROM person_merges WHERE tenant_id = ? AND at < ? LIMIT 200)').run(TENANT, now - UNDO_MS).changes);
-}
-
-/**
- * 078, one release only (remove in the next): saved contacts move into People once — own name and Shared onto the
- * person with that number (created when missing, as the owner saved them), the note as an owner note.
- */
-export function migrateContacts() {
-  if (kvGet('people.contactsMoved')) return 0;
-  const cols = new Set(db.prepare('PRAGMA table_info(contacts)').all().map((c) => c.name));
-  let n = 0;
-  if (cols.has('own')) {
-    const rows = db.prepare("SELECT phone, name, note, shared FROM contacts WHERE tenant_id = ? AND (own = 1 OR note <> '' OR shared = 1)").all(TENANT);
-    for (const r of rows) {
-      try {
-        let p = personByPhone(r.phone);
-        if (!p) {
-          const id = `p_${randomBytes(6).toString('hex')}`;
-          db.prepare('INSERT INTO people (tenant_id, id, phone, created_at) VALUES (?, ?, ?, ?)').run(TENANT, id, r.phone, Date.now());
-          p = personById(id);
-        }
-        if (!p) continue;
-        db.prepare("UPDATE people SET name = CASE WHEN name = '' THEN ? ELSE name END, shared = MAX(shared, ?) WHERE tenant_id = ? AND id = ?").run(r.name || '', r.shared ? 1 : 0, TENANT, p.id);
-        if (r.note) addNote(p.id, { text: r.note, author: 'Contacts' });
-        n++;
-      } catch (e) { console.error('contact move failed', e.message); }
-    }
-    if (n) activity('config', { summary: `Moved ${plural(n, 'saved contact')} into People` });
-  }
-  kvSet('people.contactsMoved', String(Date.now()));
-  return n;
 }
