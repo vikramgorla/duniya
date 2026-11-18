@@ -20,7 +20,7 @@
 
 ## The People screen
 
-- **People · Households · Lists** sit at the top; each is a list, and a row opens its page (`#people/<id>`,
+- **People · Households · Lists** (and **Events · Orders** when those [modules](modules.md) are on) sit at the top; each is a list, and a row opens its page (`#people/<id>`,
   `#people/households/<id>`, `#people/lists/<id>`).
 - **People (N)** counts everyone (hidden people aside); with a search or a filter it says how many match, e.g.
   *People (12 of 640)*.
@@ -135,22 +135,21 @@ a tie from both.
 ## Hide, merge, export
 
 - **Merge…** (owner): choose the other entry of the same human; their apps, notes, ties, households, tags and lists
-  move here. The page then offers **Undo merge** for 30 days. When there is evidence (a verified phone number of one
+  move here, and so do their event registrations, duties and orders. The page then offers **Undo merge** for 30 days. When there is evidence (a verified phone number of one
   person belongs to the other), the page suggests the merge: one tap.
 - **Export** (owner) downloads everything stored about the person as JSON: their page, names, notes, ties, households,
-  tags, lists and their stored messages.
+  tags, lists, registrations, duties, orders and payments, and their stored messages.
 - **Hide…**: they leave People lists and search, and agents no longer see them (tools and the sender card). Their
   notes, ties and chats stay, and your phone's contacts never bring them back as someone new. **Show → Hidden** lists
   them; **Show again** undoes it.
 - **Erase** (a true delete, for privacy requests) is not in the panel: ask an AI assistant with the admin tools
   (`erase_person`, owner only, with a confirmation). See [Privacy](privacy.md#delete-a-person).
 
-## After updating to 2.40
+## Events, orders and payments
 
-Nothing to do. On the first start the app notes, from what is stored, which chats each person wrote in and the privacy
-notices they saw, and saved organizer or participant numbers that belong to someone in People become that person (so
-the role follows them to Telegram). Old agent tool rules for `contacts:` keep working as the matching `people:` rules
-for this release. Your phone's contacts become people over the next minutes.
+With the [modules](modules.md) switched on, People also holds [Events](events.md) (registrations, waiting list, duties)
+and [Orders and payments](orders.md): **People · Households · Lists · Events · Orders**. A person's and a household's
+page then show their registrations, duties and orders, and their timeline says when they registered or paid.
 
 ## AI assistants and the owner assistant
 
@@ -164,4 +163,4 @@ The [owner assistant](owner-assistant.md) uses the same tools: it reads People d
 your confirmation.
 
 ---
-**Next:** [Chats](chats.md) · [Privacy](privacy.md) · [Docs index](README.md)
+**Next:** [Events](events.md) · [Orders and payments](orders.md) · [Chats](chats.md) · [Privacy](privacy.md) · [Docs index](README.md)

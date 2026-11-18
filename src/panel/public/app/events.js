@@ -83,12 +83,12 @@ async function eventPage(id) {
   };
   const regRow = (r) => row(r.who, [`${plural(r.adults, 'adult')}${r.kids ? `, ${plural(r.kids, 'kid')}` : ''}`, r.notes, r.attended ? 'came' : ''].filter(Boolean).join(' · '), {
     href: r.person ? `#people/${enc(r.person)}` : r.household ? `#people/households/${enc(r.household)}` : null,
-    end: h('span', { class: 'row-end' }, pill(r.status), can('admin') ? menu(`More for ${r.who}`,
+    end: can('admin') ? menu(`More for ${r.who}`, // the group title says the status
       r.status !== 'registered' ? h('button', { class: 'btn small', type: 'button', onclick: () => set(r, { status: 'registered' }, r.status === 'pending' ? 'Confirmed' : 'Registered') }, r.status === 'pending' ? 'Confirm' : 'Register') : null,
       r.status !== 'waiting' && r.status !== 'cancelled' ? h('button', { class: 'btn small', type: 'button', onclick: () => set(r, { status: 'waiting' }, 'On the waiting list') }, 'Waiting list') : null,
       h('button', { class: 'btn small', type: 'button', onclick: () => numbers(r) }, 'Change numbers…'),
       r.status === 'registered' ? h('button', { class: 'btn small', type: 'button', onclick: () => set(r, { attended: !r.attended }, 'Saved') }, r.attended ? 'Did not come' : 'Came') : null,
-      r.status !== 'cancelled' ? h('button', { class: 'btn small danger', type: 'button', onclick: () => set(r, { status: 'cancelled' }, 'Cancelled') }, 'Cancel registration') : null) : null) });
+      r.status !== 'cancelled' ? h('button', { class: 'btn small danger', type: 'button', onclick: () => set(r, { status: 'cancelled' }, 'Cancelled') }, 'Cancel registration') : null) : null });
   const by = (s) => g.registrations.filter((r) => r.status === s);
   const addDuty = async () => {
     const task = h('input', { placeholder: 'e.g. Set up chairs', autocomplete: 'off' }); const at = h('input', { placeholder: 'e.g. 09:00', autocomplete: 'off' }); const needed = h('input', { type: 'number', min: 1, value: 2 });

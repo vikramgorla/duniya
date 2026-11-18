@@ -1,6 +1,19 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.43.0": {
+      "breaking": false,
+      "title": "Events, orders and payments",
+      "summary": "Two new modules under Settings → Modules. Events: registrations with adults and kids from the household, a waiting list that moves up by itself, organizer confirmation, duties. Orders and payments: price lists turn registrations into orders, part payments and refunds with your own ways to pay. Agents register people and answer \"what do I owe?\"; organizers' changes wait for confirm. Both are off until you switch them on.",
+      "changes": [
+        { "type": "new", "text": "Settings → Modules: switch Events and Orders and payments on or off. Off keeps their data." },
+        { "type": "new", "text": "Events: places, deadline, one currency, registration per household or per person, automatic or organizer confirmation, a waiting list that fills by itself, duties, attendance and CSV." },
+        { "type": "new", "text": "People can register themselves or their family through an agent, take a duty and ask what they owe; organizers register others, confirm, mark paid and refund with a confirm code." },
+        { "type": "new", "text": "Orders and payments: an event's price list (adult, kid, kids under an age free) makes the order; record part payments and refunds with your own ways to pay; totals per event; a daily message about orders due." },
+        { "type": "improved", "text": "A person's and a household's page show their registrations, duties and orders; merge, export and erase include them." },
+        { "type": "removed", "text": "The one-time moves of 2.40 (chats people wrote in, organizer numbers to people, old contact tool rules) ran on your server already and are gone." }
+      ]
+    },
     "2.42.0": {
       "breaking": false,
       "title": "Reads and types at a person's pace",
