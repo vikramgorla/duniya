@@ -34,9 +34,9 @@ export async function seedScale(t, N = FULL) {
     await t.agents.createAgent({ id: `agent-${a}`, config: { name: `Agent ${a}`, prompt: 'You help.', model: 'anthropic:claude-sonnet-5-5', triggers: [`!a${a}`], chats: own } });
   }
   for (const c of chats.slice(0, N.on)) t.chatPrefs.setChatPrefs(c, { enabled: true });
-  // 081: Events and Orders on (their tables), seeded below
+  // 081: Events and Orders on (their tables), seeded below; 082: Lists and sending too
   const mods = await import('../src/modules/index.js');
-  for (const id of ['events', 'orders']) await mods.setModuleOn(id, true, 'fixture');
+  for (const id of ['events', 'orders', 'sending']) await mods.setModuleOn(id, true, 'fixture');
   db.exec('BEGIN');
   try {
     const seen = db.prepare('INSERT OR REPLACE INTO chats_seen (tenant_id, chat, number, is_group, name, phone, last_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
@@ -124,6 +124,20 @@ export async function seedScale(t, N = FULL) {
     const du = db.prepare("INSERT INTO ev_duties (tenant_id, id, event, task, at, needed, created_at) VALUES ('default', ?, ?, ?, '09:00', 3, ?)");
     const dp = db.prepare("INSERT OR IGNORE INTO ev_duty_people (tenant_id, duty, person, at) VALUES ('default', ?, ?, ?)");
     for (let d = 0; d < 200; d++) { du.run(`d_${String(d).padStart(12, '0')}`, evId(d % 20), `Task ${d}`, now); for (let m = 0; m < 2; m++) dp.run(`d_${String(d).padStart(12, '0')}`, personId((d * 7 + m) % N.people), now); }
+    // 082: half the people said yes to updates; 30 finished runs of 2,000 recipients each (60k rows), the last one running
+    const up = db.prepare("INSERT OR REPLACE INTO person_consents (tenant_id, person, purpose, value, source, at) VALUES (?, ?, 'updates', ?, 'fixture', ?)");
+    for (let i = 0; i < N.people; i++) up.run('default', personId(i), i % 2 ? 'no' : 'yes', now);
+    const sr = db.prepare("INSERT INTO snd_runs (tenant_id, id, title, purpose, agent, template, audience, status, created_at, started_at, since) VALUES ('default', ?, ?, 'updates', 'agent-0', 'Hi {first_name}', ?, ?, ?, ?, ?)");
+    const rr = db.prepare("INSERT INTO snd_recipients (tenant_id, run, n, person, name, chat, channel, known, status, reason, text, at, replied_at) VALUES ('default', ?, ?, ?, ?, ?, 'whatsapp', 1, ?, ?, ?, ?, ?)");
+    const RS = ['sent', 'sent', 'replied', 'skipped', 'sent', 'stop', 'failed', 'sent'];
+    for (let r = 0; r < 30; r++) {
+      const id = `run_${String(r).padStart(12, '0')}`; const last = r === 29;
+      sr.run(id, `Run ${r}`, JSON.stringify({ kind: 'list', list: 'l_000000000003' }), last ? 'running' : 'done', now - (30 - r) * DAY, now - (30 - r) * DAY, now - (30 - r) * DAY);
+      for (let i = 0; i < 2000; i++) {
+        const st = last && i >= 1000 ? 'waiting' : RS[i % RS.length]; const at = st === 'waiting' || st === 'skipped' ? null : now - (30 - r) * DAY + i * 60000;
+        rr.run(id, i, personId((i * 3 + r) % N.people), `Contact ${i}`, `${phoneOf((i * 3 + r) % N.people)}@s.whatsapp.net`, st, st === 'skipped' ? 'Not asked about updates' : '', at ? 'Hi there' : '', at, st === 'replied' ? at + 600000 : null);
+      }
+    }
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
   db.exec('PRAGMA wal_checkpoint(TRUNCATE)');

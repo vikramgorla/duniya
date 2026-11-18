@@ -32,6 +32,9 @@ const BUDGETS = {
   'registration list (agent tool)': 15, // 081: events__registration_list for one event
   'orders list': 20, // 081: GET /api/orders (not fully paid, up to 200 rows with names, totals per event)
   "who hasn't paid (agent tool)": 15, // 081: orders__who_has_not_paid for one event, with totals
+  'sending run page': 12, // 082: GET /api/sending/runs/:id (counts, 500 of 2,000 recipients)
+  'sending history': 15, // 082: GET /api/sending (the newest 50 runs with counts, saved audiences)
+  'sending recipients of an event': 20, // 082: the recipients query of a preview (registered households → one adult who agreed, consent, app, chat) for one event
 };
 const RUNS = 9;
 
@@ -108,6 +111,11 @@ measured['event page'] = await time(() => get('/api/module/events/ev_00000000000
 measured['registration list (agent tool)'] = await time(() => mTool(eventTools, 'registration_list').run({ event: 'ev_000000000003' }, orgCtx));
 measured['orders list'] = await time(() => get('/api/orders'));
 measured["who hasn't paid (agent tool)"] = await time(() => mTool(orderTools, 'who_has_not_paid').run({ event: 'Event 3' }, orgCtx));
+// 082: Lists and sending (the fixture switched it on: 30 runs of 2,000 recipients)
+const { resolve: recipientsOf } = await import('../src/modules/sending/audience.js');
+measured['sending run page'] = await time(() => get('/api/sending/runs/run_000000000012'));
+measured['sending history'] = await time(() => get('/api/sending'));
+measured['sending recipients of an event'] = await time(() => recipientsOf({ kind: 'event', event: 'ev_000000000003' }, 'updates', new Set(['whatsapp', 'telegram'])));
 
 // Everything else on a hot path, for the query-plan check (not timed).
 const activityMid = db.prepare('SELECT id FROM activity WHERE id > ? ORDER BY id LIMIT 1').get(FULL.activity / 2)?.id || 1;
@@ -123,7 +131,14 @@ for (const path of ['/api/status', '/api/checklist', '/api/chats', '/api/agents'
   // 081: modules, Events, Orders
   '/api/modules', '/api/modules/tools', '/api/module/events', '/api/module/events?past=1', '/api/module/events/ev_000000000003/csv', '/api/orders?status=overdue', '/api/orders?status=paid',
   '/api/orders?status=all', '/api/orders?status=all&event=ev_000000000004', '/api/orders?status=open&event=ev_000000000004', '/api/orders/o_000000000001', '/api/orders/csv?status=open',
+  // 082: Lists and sending
+  '/api/sending/runs/run_000000000029?status=waiting', '/api/order-reminders?event=ev_000000000004',
 ]) await get(path);
+// 082: previews of every kind of audience (the recipients queries), one send on the tick, a reply and a stop word
+for (const audience of [{ kind: 'list', list: 'l_000000000003' }, { kind: 'tag', tag: 'badminton' }, { kind: 'household', household: 'h_000000000004' }, { kind: 'orders', event: 'ev_000000000004' }, { kind: 'orders' }, { kind: 'people', people: [personId(2), personId(4)] }]) {
+  const r = await t.api(cookie, 'POST', '/api/sending/preview', { audience, purpose: 'updates', agent: agent.id, template: 'Hi {first_name}' }); if (r.status >= 400) throw new Error(`preview ${audience.kind}: ${JSON.stringify(r.body)}`);
+}
+await (await import('../src/core/upkeep.js')).upkeepTick(t.channel, Date.now());
 for (const [list, n, args] of [[eventTools, 'list_events', {}], [eventTools, 'show_event', { event: 'Event 3' }], [orderTools, 'what_do_i_owe', {}], [orderTools, 'who_has_not_paid', {}]]) await mTool(list, n).run(args, orgCtx);
 for (const [m, path, body] of [['POST', '/api/module/events/ev_000000000005/registrations', { person: personId(4001) }], ['POST', '/api/module/events/ev_000000000005/registrations', { household: 'h_000000000777' }],
   ['PUT', '/api/module/registrations/r_000000000009', { status: 'cancelled' }], ['POST', '/api/orders/o_000000000003/payments', { amount: 10, method: 'Cash' }], ['POST', '/api/module/events/ev_000000000005/duties', { task: 'Chairs', needed: 2 }]]) {
@@ -133,6 +148,7 @@ for (const [m, path, body] of [['POST', '/api/module/events/ev_000000000005/regi
 const off = chats[FULL.chats - 1];
 await t.route(t.msg({ chat: off, isGroup: off.endsWith('@g.us'), text: 'off chat', msgId: `perf-off-${seq++}` }));
 await t.route(t.msg({ chat: direct, isGroup: false, phone: phoneOf(3), senderJid: `${phoneOf(3)}@s.whatsapp.net`, text: 'hello there', msgId: `perf-dm-${seq++}` }));
+await t.route(t.msg({ chat: direct, isGroup: false, phone: phoneOf(3), senderJid: `${phoneOf(3)}@s.whatsapp.net`, text: 'STOP', msgId: `perf-dm-${seq++}` })); // 082: a stop word
 t.script.push([{ type: 'tool_use', id: 'tu1', name: 'memory__search_history', input: { query: 'station' } }], [{ type: 'text', text: 'Nine at the station.' }]);
 await t.route(t.msg({ chat: onGroup, phone: phoneOf(5), senderJid: `${phoneOf(5)}@s.whatsapp.net`, text: `${agent.triggers[0]} when do we meet?`, msgId: `perf-ask-${seq++}` }));
 await t.onJoin({ chat: onGroup, participants: [{ jid: `${phoneOf(4999)}@s.whatsapp.net`, phone: phoneOf(4999) }] });

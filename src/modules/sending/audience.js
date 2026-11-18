@@ -56,7 +56,7 @@ const firstName = (n) => (String(n || '').startsWith('+') ? '' : String(n || '')
 async function units(a) {
   const P = (ids) => ids.map((person) => ({ person, facts: {} }));
   if (a.kind === 'list') return P(db.prepare('SELECT person FROM person_list_members WHERE tenant_id = ? AND list = ? LIMIT ?').all(TENANT, a.list, MAX).map((r) => r.person));
-  if (a.kind === 'tag') return P(db.prepare('SELECT person FROM person_tags WHERE tenant_id = ? AND tag = ? LIMIT ?').all(TENANT, a.tag, MAX).map((r) => r.person));
+  if (a.kind === 'tag') return P(db.prepare('SELECT person FROM person_tags INDEXED BY person_tags_tag WHERE tenant_id = ? AND tag = ? LIMIT ?').all(TENANT, a.tag, MAX).map((r) => r.person));
   if (a.kind === 'household') return [{ household: a.household, facts: {} }];
   if (a.kind === 'people') return P(a.people);
   const ev = a.event ? (await need('events')).getEvent(a.event) : null;
@@ -68,7 +68,7 @@ async function units(a) {
   const om = await need('orders');
   const rows = a.event
     ? db.prepare("SELECT person, household, currency, SUM(total - paid) AS left, MIN(due) AS due FROM ord_orders WHERE tenant_id = ? AND event = ? AND status IN ('open', 'part') GROUP BY person, household, currency LIMIT ?").all(TENANT, a.event, MAX)
-    : db.prepare("SELECT person, household, currency, SUM(total - paid) AS left, MIN(due) AS due FROM ord_orders WHERE tenant_id = ? AND status IN ('open', 'part') GROUP BY person, household, currency LIMIT ?").all(TENANT, MAX);
+    : db.prepare("SELECT person, household, currency, SUM(total - paid) AS left, MIN(due) AS due FROM ord_orders INDEXED BY ord_orders_status WHERE tenant_id = ? AND status IN ('open', 'part') GROUP BY person, household, currency LIMIT ?").all(TENANT, MAX);
   const ways = om.paymentMethods().join(', ');
   return rows.filter((r) => r.left > 0).map((r) => ({ person: r.household ? '' : r.person, household: r.household,
     facts: { ...evFacts, amount: om.money(r.left, r.currency), due: day(r.due), ways_to_pay: ways } }));
