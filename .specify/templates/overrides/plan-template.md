@@ -58,7 +58,7 @@ Always include, for this repository:
 | Checks | `npm test`, `npm run lint`, `npm run typecheck`, `npm run check:panel`; `npm run check:responsive` if UI |
 | Security | [secrets, TLS, shell input, untrusted text, permissions in code, CodeQL] |
 | Privacy | [allow-list, logging of contents, privacy notice] |
-| Small servers | [memory / CPU / downloads on a 1 GB VM; queue, timeouts, refusal below 2 GB] |
+| Small servers | [memory / CPU / downloads on a 1 GB VM; queue, timeouts, refusal below 2 GB; new queries pass `npm run check:perf` (indexes, sizes)] |
 | Lean code | [what this replaces and deletes; helpers/resolvers reused; knip + jscpd + panel budgets (first screen, total); no new polling] |
 | Admin MCP | [new or changed tools in `src/panel/admin-tools.js`, or n/a] |
 | Docs | [`docs/*.md` pages, `docs/README.md`, `README.md` highlights, `DESIGN.md`, diagrams in `docs/diagrams/` (`npm run docs:diagrams`)] |

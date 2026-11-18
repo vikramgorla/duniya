@@ -16,7 +16,8 @@ npm install && ADMIN_PASSWORD=dev-password-123 npm start     # panel on http://1
 | `npm run lint` | ESLint (server code with Node globals, the panel's modules with browser globals) |
 | `npm run typecheck` | `tsc` over every file that starts with `// @ts-check` ([Type checking](#type-checking)) |
 | `npm run check:panel` | the panel's modules link (every import names a real export) and stay within their budgets ([Panel modules](#panel-modules)) |
-| `node scripts/ci-checks.mjs` | versions match, breaking-release entries, **doc links** (`scripts/check-doc-links.mjs`), diagrams, **lean code** (knip, jscpd, panel budgets), types |
+| `node scripts/ci-checks.mjs` | versions match, breaking-release entries, **doc links** (`scripts/check-doc-links.mjs`), diagrams, **lean code** (knip, jscpd, panel budgets), types, **performance budgets** (`check-perf`) |
+| `npm run check:perf` | no full scans of large tables on hot paths, and every time budget met, against the scale fixture ([Performance budgets](#performance-budgets), ~30 s) |
 | `npm run knip` / `npm run jscpd` | unused files, exports and dependencies / duplicated code ([Lean code](#lean-code)) |
 | `node scripts/demo-panel.mjs` | seeded demo panel on :8099 (admin / demo-password-123), no network |
 | `DEMO_EMPTY=1 node scripts/demo-panel.mjs` | a fresh install (no provider, no agent, WhatsApp waiting for a scan; *Get code* links it): check the first run |
@@ -58,9 +59,11 @@ The owner runs the latest version on one server, so the code carries nothing for
    exports and dependencies, `jscpd` (`.jscpd.json`, 8 lines) on duplication (both cover the panel's modules too), and
    the panel has two budgets in `scripts/check-panel.mjs`: the first screen and all of its code (raising one needs a
    reason in the PR).
-5. **Test behaviour, not internals:** tests go through the panel API, the router and the fakes in `test/harness.js`;
+5. **Queries use an index:** `npm run check:perf` (also in `ci-checks.mjs`) fails on a full scan of a large table
+   and on a missed time budget ([Performance budgets](#performance-budgets)).
+6. **Test behaviour, not internals:** tests go through the panel API, the router and the fakes in `test/harness.js`;
    export something only when the app uses it.
-6. **Keep the panel snappy:** no new polling. The status and activity arrive over `/api/events` (server-sent events);
+7. **Keep the panel snappy:** no new polling. The status and activity arrive over `/api/events` (server-sent events);
    screens load through `api()`, whose screen-data cache is dropped by any change or live event. Simple switches update
    the screen at once and put the old state back when the server refuses. The shell and its modules are served from
    memory, compressed, with ETag/304; screens load on their first visit ([Panel modules](#panel-modules)).
@@ -150,13 +153,42 @@ on, and the hub and the catalogue answer from the chat id.
 - SQLite rows are untyped (`db.prepare()` hands out plain rows, `src/core/db.js`); settings have a `Settings` typedef
   (`src/core/store.js`); route modules type their registrar with `Route` / `RouteContext` (`src/panel/http.js`).
 
+## Performance budgets
+
+`npm run check:perf` (`scripts/check-perf.mjs`, run by `node scripts/ci-checks.mjs` in the quality job) seeds the scale
+fixture (`scripts/scale-fixture.mjs`, below) into a temp data directory with the real schema, then runs the hot paths
+through the real core and panel with the test fakes: the router per message, an agent turn with a tool, the panel's
+lists and pages, search, People (list, filters, a person's page, export), the owner assistant's and admin MCP's reads,
+and the retention pass of the upkeep tick.
+
+1. **Query plans.** Every statement the app prepares meanwhile goes through `EXPLAIN QUERY PLAN` against the seeded
+   database. A full scan of a large table (≥ 1 000 rows in the fixture) fails: `SCAN <table>` with or without an index,
+   and a `SEARCH` on the tenant alone (`(tenant_id=?)` reads every row). So a new query without an index fails CI.
+2. **Time budgets.** The median of 9 runs of each key path (person page, people list and search, a chat's messages,
+   search messages, one chat's activity, the router per message, an agent's context) stays within `BUDGETS`.
+
+When it fails:
+- **Add the index** (in the `CREATE TABLE` block of its module) or **write the query so it can use one**: put the
+  constant in the query (`AND phone <> ''` for a partial index), drive a filter from the small side (`p.id IN (SELECT
+  person FROM person_tags WHERE tag = ?)`), seek instead of offset (`id < ?` for the next page), `INDEXED BY` where
+  SQLite picks the wrong one. Mind the size on a 1 GB server and say it in the PR.
+- **A scan that is right** (counts on Server → Health, a list that must sort every name, a newest-first walk that stops
+  at `LIMIT`) goes on `ALLOW_SCANS` in `scripts/check-perf.mjs` with its reason; a marker comment in the SQL
+  (`/* people: every name sorts */`) keeps the entry to that one statement.
+- **Raise a budget only with a reason**, like the panel budgets: keep the old value in the comment and say why in the
+  PR. Budgets are about twice what a CI runner measured. `--verbose` prints every checked plan.
+
+A path the workload does not reach is not checked: when you add a hot path (a new screen, router step or agent tool),
+add it to the workload in `check-perf.mjs`.
+
 ## Scale measurements
 
 `npm run measure:scale` (dev only, `scripts/measure-scale.mjs`) runs the real core and panel through the test fakes
 against a seeded data directory: **300 chats (20 on) over 3 numbers, 30 agents, 200 000 stored messages over 80 days,
-50 000 activity entries, 20 000 usage rows, 5 000 people with phone contact names**. It prints startup in a fresh process pinned to one CPU
+50 000 activity entries, 20 000 usage rows, 5 000 people with 20 000 identities, notes, tags, households and lists**
+(`scripts/scale-fixture.mjs`, shared with [`check-perf`](#performance-budgets)). It prints startup in a fresh process pinned to one CPU
 (`taskset -c 0`, `--max-old-space-size=700`), panel API latencies (median / p95 of 15), live-stream fan-out to 20
-panels, router throughput, a retention pass, one backup, the database size and the query plans of the hot queries.
+panels, router throughput, a retention pass, one backup and the database size.
 `--small` runs a tenth of the fixture. Run it before and after a change that touches the database, the router or the
 panel API, and put both tables in the PR.
 
@@ -191,6 +223,17 @@ Before and after 070 (#148), same fixture:
 | Database after retention (79k messages) | 36.3 MB | 48.4 MB (+12 MB full-text index) |
 
 A database from before 2.31 builds its full-text index once at start (about 0.2 s per 80 000 messages on one CPU).
+
+Before and after #174 (performance budgets), same fixture (900 people writing the 200 000 messages):
+
+| | v2.39.0 | v2.39.1 |
+|---|---|---|
+| Person page | 202 ms (`SCAN messages` for the groups they wrote in) | **7 ms** |
+| People list (first page) | 430–520 ms (each row's apps read all 20 000 identities) | **5 ms** |
+| People search | 416 ms | **20 ms** |
+| Activity, an older page | walks every newer row | index seek from `before` |
+| Retention pass | `SELECT DISTINCT chat` over every message; activity cap by `OFFSET` | one lookup per chat; cap by row id |
+| Indexes added | – | `messages(sender)` 4.1 MB, `messages(sender_jid)` 7.1 MB per 200 000 messages |
 
 ## Commits and pull requests
 

@@ -106,8 +106,8 @@ export const mergesInto = (person) => all('SELECT id, snapshot, at FROM person_m
 export function mergeSuggestions(person) {
   const p = raw(person); if (!p) return [];
   const ids = new Set();
-  if (p.phone) for (const r of all("SELECT DISTINCT person FROM identities WHERE tenant_id = ? AND phone = ? AND person <> ?", p.phone, p.id)) ids.add(r.person);
-  for (const r of all("SELECT DISTINCT o.id FROM identities i JOIN people o ON o.tenant_id = i.tenant_id AND o.phone = i.phone WHERE i.tenant_id = ? AND i.person = ? AND i.phone <> '' AND o.id <> i.person", p.id)) ids.add(r.id);
+  if (p.phone) for (const r of all("SELECT DISTINCT person FROM identities WHERE tenant_id = ? AND phone = ? AND phone <> '' AND person <> ?", p.phone, p.id)) ids.add(r.person);
+  for (const r of all("SELECT DISTINCT o.id FROM identities i JOIN people o ON o.tenant_id = i.tenant_id AND o.phone = i.phone AND o.phone <> '' WHERE i.tenant_id = ? AND i.person = ? AND i.phone <> '' AND o.id <> i.person", p.id)) ids.add(r.id);
   return [...ids].map((id) => personRow(id)).filter(Boolean).map((r) => ({ id: r.id, name: r.name, reason: 'Same verified phone number' }));
 }
 

@@ -4,19 +4,18 @@
 //   npm run measure:scale                  → seed, then measure; prints one table per part
 //   node scripts/measure-scale.mjs --small → a smaller fixture (CI smoke run, ~10 s)
 //
-// Fixture: 300 chats (20 on) over 3 numbers, 30 agents, 200k stored messages (80 days), 50k activity rows, 20k usage
-// rows, 5k people (with phone contact names). Parts: startup in a fresh process on 1 CPU (taskset) with a 700 MB heap cap, RSS, panel API
-// latencies (median / p95 of 15), live stream fan-out to 20 panels, router throughput, database size, query plans.
+// Fixture: scripts/scale-fixture.mjs (300 chats, 200k messages, 5k people …). Parts: startup in a fresh process on 1 CPU
+// (taskset) with a 700 MB heap cap, RSS, panel API latencies (median / p95 of 15), live stream fan-out to 20 panels,
+// router throughput, retention, database size. Query plans and time budgets that CI enforces: scripts/check-perf.mjs.
 import { spawn } from 'node:child_process';
 import { statSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { setup } from '../test/harness.js';
+import { FULL, SMALL as SMALL_FIXTURE, seedScale, personId, phoneOf } from './scale-fixture.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SMALL = process.argv.includes('--small');
-const N = SMALL ? { chats: 60, on: 10, agents: 8, messages: 20000, activity: 5000, usage: 2000, contacts: 500 }
-  : { chats: 300, on: 20, agents: 30, messages: 200000, activity: 50000, usage: 20000, contacts: 5000 };
-const DAY = 86400000;
+const N = SMALL ? SMALL_FIXTURE : FULL;
 const mb = (b) => Math.round(b / 1048576);
 const median = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
 const p95 = (a) => [...a].sort((x, y) => x - y)[Math.min(a.length - 1, Math.floor(a.length * 0.95))];
@@ -39,50 +38,10 @@ if (process.argv[2] === '--startup') {
 
 const t = await setup({ env: { MEMORY_RETENTION_DAYS: '90' } });
 const { db } = t.db;
-const now = Date.now();
-const numbers = ['main', 'n2', 'n3'];
-const chatId = (i) => { const n = numbers[i % 3]; const base = i % 4 === 3 ? `4179${String(1000000 + i).slice(1)}@s.whatsapp.net` : `scale${i}@g.us`; return n === 'main' ? base : `${n}#${base}`; };
-const chats = Array.from({ length: N.chats }, (_, i) => chatId(i));
-const groups = chats.filter((c) => c.endsWith('@g.us'));
-
-// ---------- seed ----------
+// ---------- seed (scripts/scale-fixture.mjs, shared with scripts/check-perf.mjs) ----------
 const seed0 = performance.now();
-t.store.updateSettings({ logging: { level: 'normal', retentionDays: 365, maxEntries: 100000 } });
-t.events.resetLoggingCache();
-t.channel.listChats = async () => groups.map((id, i) => ({ id, name: `Group ${i}`, size: 5 + (i % 40), number: id.includes('#') ? id.split('#')[0] : 'main' }));
-t.channel.status = async () => ({ status: 'open', me: '41790000099:1@s.whatsapp.net', since: now, numbers: numbers.map((id, i) => ({ id, label: `Number ${i + 1}`, status: 'open', me: `4179000009${i}` })) });
-for (let a = 0; a < N.agents; a++) {
-  const own = chats.filter((_, i) => i % N.agents === a && i < N.on * 3).slice(0, 2);
-  await t.agents.createAgent({ id: `agent-${a}`, config: { name: `Agent ${a}`, prompt: 'You help.', model: 'anthropic:claude-sonnet-5-5', triggers: [`!a${a}`], chats: own } });
-}
-for (const c of chats.slice(0, N.on)) t.chatPrefs.setChatPrefs(c, { enabled: true });
-const tx = (fn) => { db.exec('BEGIN'); try { fn(); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } };
-tx(() => {
-  const seen = db.prepare('INSERT OR REPLACE INTO chats_seen (tenant_id, chat, number, is_group, name, phone, last_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-  for (const c of chats.filter((x) => !x.endsWith('@g.us'))) seen.run('default', c, c.includes('#') ? c.split('#')[0] : 'main', 0, `Person ${c.slice(-18, -15)}`, c.replace(/^.*#/, '').split('@')[0], now - 3600000);
-  const msg = db.prepare('INSERT INTO messages (channel, chat, agent, msg_id, sender, name, text, quoted, addressed, from_agent, ts, sender_jid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-  for (let i = 0; i < N.messages; i++) {
-    const c = chats[i % chats.length];
-    msg.run('whatsapp', c, '', `m${i}`, `4179000${String(i % 900).padStart(4, '0')}`, `Person ${i % 900}`, `Message ${i}: shall we meet at the station at nine or later?`, '', i % 20 === 0 ? 1 : 0, i % 25 === 0 ? 1 : 0, now - Math.round((N.messages - i) / N.messages * 80 * DAY), '');
-  }
-  const act = db.prepare('INSERT INTO activity (ts, type, agent, chat, summary, detail) VALUES (?, ?, ?, ?, ?, ?)');
-  const types = ['message.in', 'message.out', 'tool.call', 'model.usage', 'silence', 'config'];
-  for (let i = 0; i < N.activity; i++) act.run(now - Math.round((N.activity - i) / N.activity * 60 * DAY), types[i % types.length], `agent-${i % N.agents}`, chats[i % N.on], `Entry ${i}`, i % 3 ? '' : JSON.stringify({ text: 'x'.repeat(200) }));
-  const use = db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kind, input, output, cost, priced, account, fallback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-  for (let i = 0; i < N.usage; i++) use.run(now - Math.round((N.usage - i) / N.usage * 300 * DAY), `agent-${i % N.agents}`, chats[i % N.on], 'anthropic', 'claude-sonnet-5-5', 'reply', 1200, 300, 0.0081, 'set', 'anthropic', '');
-  // 078: People — phone contact names, one person per number with a WhatsApp identity, every tenth with an own name
-  const con = db.prepare('INSERT OR REPLACE INTO contacts (tenant_id, phone, book_name, push_name, updated_at) VALUES (?, ?, ?, ?, ?)');
-  const per = db.prepare('INSERT OR REPLACE INTO people (tenant_id, id, phone, created_at, name, shared) VALUES (?, ?, ?, ?, ?, ?)');
-  const ide = db.prepare('INSERT OR REPLACE INTO identities (tenant_id, channel, external_id, person, phone, first_seen, last_seen, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-  for (let i = 0; i < N.contacts; i++) {
-    const phone = `4179${String(5000000 + i)}`;
-    con.run('default', phone, `Contact ${i}`, `push${i}`, now);
-    per.run('default', `p_${String(i).padStart(12, '0')}`, phone, now, i % 10 ? '' : `Own ${i}`, i % 7 ? 0 : 1);
-    ide.run('default', 'whatsapp', `${phone}@s.whatsapp.net`, `p_${String(i).padStart(12, '0')}`, phone, now - i * 1000, now - i * 1000, `push${i}`);
-  }
-});
+const { chats } = await seedScale(t, N);
 const seedMs = performance.now() - seed0;
-db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
 
 // ---------- panel API latencies ----------
 const cookie = await t.login();
@@ -93,7 +52,7 @@ const paths = [
   ['activity (first page)', '/api/activity?limit=200'], ['activity (older page)', `/api/activity?limit=200&before=${midAct}`],
   ['activity (one agent)', '/api/activity?limit=200&agent=agent-7'], ['activity (one chat)', `/api/activity?limit=200&chat=${encodeURIComponent(chats[3])}`],
   ['usage (30 days by agent)', '/api/usage?period=30d&groupBy=agent'], ['usage (all, by day)', '/api/usage?period=all&groupBy=day'], ['usage summary', '/api/usage/summary'],
-  ['people (first page)', '/api/people'], ['people (search)', '/api/people?q=contact%2012'], ['people summary', '/api/people/summary'], ['person page', '/api/people/p_000000000012'],
+  ['people (first page)', '/api/people'], ['people (search)', '/api/people?q=contact%2012'], ['people summary', '/api/people/summary'], ['person page', `/api/people/${personId(12)}`],
   ['chat messages', `/api/chats/${encodeURIComponent(someChat)}/messages?limit=50`], ['silences (7 days)', '/api/silences?days=7'],
   ['server health', '/api/server/health'],
   ['search messages (one hit)', '/api/search/messages?q=123456'], ['search messages (every message matches)', '/api/search/messages?q=station'],
@@ -142,7 +101,7 @@ const R = 3000;
 let s0 = performance.now();
 for (let i = 0; i < R; i++) {
   const c = on[i % on.length];
-  await t.route(t.msg({ chat: c, isGroup: c.endsWith('@g.us'), phone: `4179000${String(i % 300).padStart(4, '0')}`, text: `just chatting ${i}`, msgId: `load-${i}` }));
+  await t.route(t.msg({ chat: c, isGroup: c.endsWith('@g.us'), phone: phoneOf(i % 300), text: `just chatting ${i}`, msgId: `load-${i}` }));
 }
 const quietRate = R / ((performance.now() - s0) / 1000);
 const offChat = chats[N.chats - 1];
@@ -154,7 +113,7 @@ const g = on.find((c) => c.endsWith('@g.us') && t.agents.listAgents().some((b) =
 const trig = t.agents.listAgents().find((b) => b.chats.includes(g)).triggers[0];
 t.script.length = 0; for (let i = 0; i < A; i++) t.script.push([{ type: 'text', text: `Answer ${i}` }]);
 s0 = performance.now();
-for (let i = 0; i < A; i++) await t.route(t.msg({ chat: g, phone: `4179000${String(100 + (i % 50)).padStart(4, '0')}`, text: `${trig} question ${i}`, msgId: `ask-${i}` }));
+for (let i = 0; i < A; i++) await t.route(t.msg({ chat: g, phone: phoneOf(100 + (i % 50)), text: `${trig} question ${i}`, msgId: `ask-${i}` }));
 const askRate = A / ((performance.now() - s0) / 1000);
 const router = { 'stored, not addressed (msg/s)': Math.round(quietRate), 'chat off (msg/s)': Math.round(offRate), 'answered by fake model (msg/s)': Math.round(askRate), replies: t.sent.length };
 
@@ -185,14 +144,6 @@ const pg = db.prepare('PRAGMA page_count').get().page_count * db.prepare('PRAGMA
 const free = db.prepare('PRAGMA freelist_count').get().freelist_count * db.prepare('PRAGMA page_size').get().page_size;
 const counts = Object.fromEntries(['messages', 'activity', 'usage', 'contacts', 'people', 'chats_seen'].map((x) => [x, db.prepare(`SELECT COUNT(*) AS n FROM ${x}`).get().n]));
 const dbInfo = { 'file MB': +(size(file) / 1048576).toFixed(1), 'wal MB': +(size(`${file}-wal`) / 1048576).toFixed(1), 'pages MB': +(pg / 1048576).toFixed(1), 'free MB': +(free / 1048576).toFixed(1), ...counts };
-const plans = Object.fromEntries([
-  ['activity, one chat', `SELECT * FROM activity WHERE chat = 'x' ORDER BY id DESC LIMIT 200`],
-  ['activity, older than', 'SELECT id FROM activity WHERE ts < 1'],
-  ['messages, older than', 'SELECT id FROM messages WHERE ts < 1'],
-  ['usage, period', 'SELECT COUNT(*) FROM usage WHERE ts >= 1 AND ts <= 2'],
-  ['silences', 'SELECT * FROM silences WHERE last_ts >= 1'],
-].map(([k, sql]) => [k, db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all().map((r) => r.detail).join(' · ')]));
-
 // ---------- startup in a fresh process: 1 CPU, 700 MB heap cap ----------
 const startup = await new Promise((done) => {
   const node = [`--max-old-space-size=700`, '--disable-warning=ExperimentalWarning', join(ROOT, 'scripts/measure-scale.mjs'), '--startup'];
@@ -209,6 +160,5 @@ console.log('Live stream fan-out:'); console.table([fan]);
 console.log('Router throughput (fakes):'); console.table([router]);
 console.log('Retention (messages 30 days) and one backup:'); console.table([maint]);
 console.log('Database (after retention):'); console.table([dbInfo]);
-console.log('Query plans:'); console.table(plans);
 console.log(`RSS of the measuring process at the end: ${mb(process.memoryUsage().rss)} MB (heap ${mb(process.memoryUsage().heapUsed)} MB)`);
 t.close();

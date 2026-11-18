@@ -42,6 +42,9 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
       goes through the media queue / `runJob` with timeouts, large downloads are refused on small servers.
 - [ ] Background work rides on the existing scheduler tick (`src/core/upkeep.js`) or on events, bounded per tick and
       skipped while memory is tight; no new timers or intervals per feature, chat or number.
+- [ ] New queries pass `npm run check:perf` (also in `ci-checks.mjs`): no full scans of large tables on hot paths, time
+      budgets in `scripts/check-perf.mjs` met; a new hot path is added to its workload; a budget is raised (or a scan
+      allowed) only with a reason; index sizes stated in the PR.
 
 **No chores for the owner**
 - [ ] Anything the server can do or retry itself happens automatically (refresh, reload, sync, retry, re-check);
@@ -148,7 +151,7 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 | `install.sh`, `deploy/`, `infra/oci/`, `infra/gcp/`, `Dockerfile` | Installer, root maintenance helper (`deploy/ops/`), OCI stack, GCP script, Docker |
 | `templates/` | Agent templates (JSON) |
 | `test/` | `node:test` e2e tests with fakes (`harness.js`) |
-| `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `measure-load.mjs` (`npm run measure:load`), `check-panel.mjs` (modules link, budgets), `ci-checks.mjs` (versions, releases, docs, knip, jscpd, panel budgets, types), `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails), `render-diagrams.mjs` (`npm run docs:diagrams`: docs/diagrams/*.mmd → SVG) |
+| `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `measure-load.mjs` (`npm run measure:load`), `check-panel.mjs` (modules link, budgets), `check-perf.mjs` + `scale-fixture.mjs` (query plans and time budgets on 200k messages / 5k people), `ci-checks.mjs` (versions, releases, docs, knip, jscpd, panel budgets, types, check-perf), `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails), `render-diagrams.mjs` (`npm run docs:diagrams`: docs/diagrams/*.mmd → SVG) |
 | `docs/` | Reference docs (`docs/README.md` index), deploy guides, diagrams (`docs/diagrams/`), the website `docs/site/` |
 | `specs/`, `.specify/` | Spec Kit: one folder per feature; constitution and templates |
 
