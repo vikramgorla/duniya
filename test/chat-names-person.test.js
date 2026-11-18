@@ -1,4 +1,4 @@
-// 073: one chat-name resolver (never a raw id), a person's page for contacts, plain tool words.
+// 073: one chat-name resolver (never a raw id), a person's page (People), plain tool words.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setup } from './harness.js';
@@ -12,7 +12,6 @@ const names = await import('../src/core/chat-names.js');
 const { silenceReason } = await import('../src/core/silences.js');
 const { recordUsage } = await import('../src/core/usage.js');
 const { TOOLS } = await import('../src/panel/admin-tools.js');
-const contacts = await import('../src/core/contacts.js');
 const x = { call: async (m, p, b) => { const r = await t.api(owner, m, p, b); if (r.status >= 400) throw new Error(r.body.error); return r.body; } };
 const tool = (name, a = {}) => TOOLS.find((y) => y.name === name).run(a, x);
 
@@ -61,21 +60,22 @@ test('073: activity (API and live stream), pending changes and usage by chat car
   assert.match(text, /"summary":"live one"[^\n]*"chatName":"Morges rides"|"chatName":"Morges rides"[^\n]*"summary":"live one"/);
 });
 
-test('073: a person\'s page — their direct chat, the groups they wrote in, also when not saved; admins only', async () => {
-  contacts.saveContact({ phone: '41790000002', name: 'Priya', note: 'treasurer' });
+test('073: a person\'s page — their direct chat, the groups they wrote in, also when not in People; admins only', async () => {
+  const pr = (await t.api(owner, 'POST', '/api/people', { phone: '41790000002', name: 'Priya' })).body;
+  await t.api(owner, 'POST', `/api/people/${pr.id}/notes`, { text: 'treasurer' });
   await t.agents.bindChat('41790000002@s.whatsapp.net', 'panduga');
   t.chatPrefs.noteChat({ chat: '41790000002@s.whatsapp.net', isGroup: false, name: 'Priya', phone: '41790000002' });
   t.db.logMessage({ channel: 'whatsapp', chat: 'g1@g.us', msgId: 'p1', sender: '41790000002', name: 'Priya', text: 'hello', ts: Date.now() });
-  const p = (await t.api(owner, 'GET', '/api/contacts/41790000002/person')).body;
+  const p = (await t.api(owner, 'GET', '/api/people/41790000002')).body;
   assert.equal(p.name, 'Priya');
-  assert.equal(p.note, 'treasurer');
+  assert.equal(p.timeline.find((n) => n.kind === 'note').text, 'treasurer');
   assert.deepEqual(p.direct.map((c) => [c.id, c.name, c.agentName]), [['41790000002@s.whatsapp.net', 'Priya', 'Panduga']]);
   assert.deepEqual(p.groups.map((c) => [c.id, c.name]), [['g1@g.us', 'Panduga families']]);
   assert.ok(p.groups[0].lastAt);
-  // someone who wrote but is not a saved contact still has a page
-  const q = (await t.api(owner, 'GET', '/api/contacts/41790000888/person')).body;
-  assert.equal(q.notSaved, true);
+  // a number that is not in People still has a page
+  const q = (await t.api(owner, 'GET', '/api/people/41790000888')).body;
+  assert.equal(q.notInPeople, true);
   assert.equal(q.name, '+41790000888');
-  assert.equal((await t.api(viewer, 'GET', '/api/contacts/41790000002/person')).status, 403);
-  assert.equal((await tool('get_contact', { phone: '+41 79 000 00 02' })).name, 'Priya');
+  assert.equal((await t.api(viewer, 'GET', '/api/people/41790000002')).status, 403);
+  assert.equal((await tool('get_person', { person: '+41 79 000 00 02' })).name, 'Priya');
 });

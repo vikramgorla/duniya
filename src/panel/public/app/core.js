@@ -30,7 +30,7 @@ const ICONS = {
   chats: 'M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9zM9 9.5h6M9 12.5h4',
   models: 'M12 3.5l1.8 4.7 4.7 1.8-4.7 1.8L12 16.5l-1.8-4.7L5.5 10l4.7-1.8zM18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z',
   usage: 'M5 19V10M10 19V5M15 19v-7M20 19v-4M3 19.5h18',
-  contacts: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3.5 19a5.5 5.5 0 0 1 11 0M16 7.5h5M16 11h5M17.5 14.5H21',
+  people: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3.5 19a5.5 5.5 0 0 1 11 0M16 7.5h5M16 11h5M17.5 14.5H21',
   server: 'M5 5h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM5 13h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zM8 8h.01M8 16h.01',
   backups: 'M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9a4.5 4.5 0 0 1 .5 9zM12 11v5M9.5 13.5 12 11l2.5 2.5',
   back: 'M15 5l-7 7 7 7',
@@ -153,7 +153,7 @@ const skeleton = (cards = 2) => h('div', { class: 'skel', 'aria-hidden': 'true' 
 // Screen data cache (058): switching screens reuses what was just loaded. Any change made here and anything the live
 // stream reports (activity, a changed status) drops it; entries also expire after 60 s. Only lists that screens load
 // on open are cached, never live views (status, system, activity, updates).
-const CACHED = /^\/api\/(agents|templates|chats|providers|budget|media|backups|pending|secrets|logging|assistants|owner-assistant|privacy-notice|contacts|usage|silences|session)(\/|\?|$)/;
+const CACHED = /^\/api\/(agents|templates|chats|providers|budget|media|backups|pending|secrets|logging|assistants|owner-assistant|privacy-notice|people|households|lists|usage|silences|session)(\/|\?|$)/;
 const apiCache = new Map(); // path -> { at, p }
 export const dropCache = () => apiCache.clear();
 export async function api(method, path, body) {
@@ -321,15 +321,15 @@ export const meterEl = () => { const i = h('i', { style: 'width:0%' }); const m 
 
 // ---------- state ----------
 // Shared screen state. models: the /api/models answer (null = load again); overviewBusy: someone types on Overview, so a
-// status push does not redraw it; dmPrefill (049): Contacts → "Set up chat" opens Chats → "Add a direct chat" with it.
+// status push does not redraw it; dmPrefill (049): a person's page → "Set up a direct chat" opens Chats → "Add a direct chat" with it.
 export const S = { loadTimeout: 15000, tab: 'overview', user: null, status: null, feed: [], feedAgent: '', feedChat: '', es: null, editing: null, models: null, overviewBusy: false, dmPrefill: null };
 const RANK = { viewer: 1, admin: 2, owner: 3 };
 export const can = (role) => S.user && RANK[S.user.role] >= RANK[role];
 // 062: everyday screens first; Pending only while something waits; Secrets live in Settings.
-export const TABS = () => [['overview', 'Overview'], ['chats', 'Chats'], ['agents', 'Agents'], ['activity', 'Activity'], ['usage', 'Usage'], ['models', 'Models'], ['contacts', 'Contacts'],
+export const TABS = () => [['overview', 'Overview'], ['chats', 'Chats'], ['agents', 'Agents'], ['activity', 'Activity'], ['usage', 'Usage'], ['models', 'Models'], can('admin') && ['people', 'People'],
   S.status?.pending ? ['pending', 'Pending'] : null, ['server', 'Server'], can('owner') && ['backups', 'Backups'], ['settings', 'Settings']].filter(Boolean);
 /** Old addresses that moved (062): #secrets is a section of Settings now. */
-const MOVED = { secrets: 'settings/secrets' };
+const MOVED = { secrets: 'settings/secrets', contacts: 'people' }; // 078: Contacts moved into People
 
 // ---------- shell ----------
 let statusTimer = null; // slow fallback poll, only while the live stream is down
@@ -417,7 +417,7 @@ const SCREENS = {
   activity: () => import('./activity.js').then((m) => m.renderActivity()),
   usage: () => import('./usage.js').then((m) => m.renderUsage()),
   models: () => import('./models.js').then((m) => m.renderModels()),
-  contacts: () => import('./contacts.js').then((m) => m.renderContacts()),
+  people: () => import('./people.js').then((m) => m.renderPeople()),
   pending: () => import('./pending.js').then((m) => m.renderPending()),
   server: () => import('./server.js').then((m) => m.renderServer()),
   backups: () => import('./backups.js').then((m) => m.renderBackups()),
@@ -431,7 +431,7 @@ const sheet = (open) => deadline(import('./find.js'), S.loadTimeout, 'screen').t
   toast('Part of the app did not arrive. Reloading…', { bad: true }); setTimeout(() => location.reload(), 1200);
 });
 export function show(tab) {
-  if (Object.hasOwn(MOVED, tab)) { history.replaceState(null, '', `#${MOVED[tab]}`); tab = MOVED[tab].split('/')[0]; }
+  if (Object.hasOwn(MOVED, tab)) { const rest = location.hash.split('/').slice(1).join('/'); history.replaceState(null, '', `#${MOVED[tab]}${rest && !MOVED[tab].includes('/') ? `/${rest}` : ''}`); tab = MOVED[tab].split('/')[0]; }
   if (!TABS().some(([id]) => id === tab) && !(tab === 'pending' && can('viewer'))) tab = 'overview';
   const from = S.tab; S.tab = tab;
   document.title = `${LABEL[tab] || 'Duniya'}${LABEL[tab] ? ' · Duniya' : ''}`;

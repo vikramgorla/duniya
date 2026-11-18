@@ -6,7 +6,7 @@ import { activity } from './events.js';
 import { isConnected, runtimeProvider, GLOBAL_SCOPE } from './mcp-oauth.js';
 import { globalServers } from './global-mcp.js';
 import { memoryTools, memoryEnabled, MEMORY_DEFAULT_ALLOW } from './memory.js';
-import { contactsTools, CONTACTS_DEFAULT_ALLOW } from './contacts.js';
+import { contactsTools, CONTACTS_DEFAULT_ALLOW } from './people.js';
 import { chatToolsFor, chatToolRules, chatChannel } from './chat-tools.js';
 import { capsOf } from '../channels/index.js';
 import { mediaTools, imageToolAllowed } from './media-ai.js';

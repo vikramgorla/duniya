@@ -82,7 +82,7 @@ const SETTINGS_GROUPS = [['Agents & chats', ['tool-services', 'owner-assistant',
   ['People & sign-in', ['users', 'sign-in', 'google', 'assistants', 'password', 'my-google']], ['Server', ['updates', 'web-access', 'secrets', 'logging', 'small-mode']],
   ['Help', ['getting-started', 'whatsapp-helpers', 'release-notes']]];
 const SECTION_ICON = { 'tool-services': ['models', 'c4'], 'owner-assistant': ['agents', 'c5'], 'direct-messages': ['chats', 'c3'], 'privacy-notice': ['shield', 'c3'], 'photos-voice': ['image', 'c2'],
-  users: ['contacts', 'c4'], 'sign-in': ['lock', 'c0'], google: ['globe', 'c4'], assistants: ['agents', 'c1'], password: ['secrets', 'c0'], 'my-google': ['contacts', 'c0'],
+  users: ['people', 'c4'], 'sign-in': ['lock', 'c0'], google: ['globe', 'c4'], assistants: ['agents', 'c1'], password: ['secrets', 'c0'], 'my-google': ['people', 'c0'],
   'web-access': ['globe', 'c3'], secrets: ['secrets', 'c1'], logging: ['activity', 'c0'], 'small-mode': ['server', 'c0'], updates: ['refresh', 'c5'], 'getting-started': ['overview', 'c5'], 'whatsapp-helpers': ['chats', 'c0'], 'release-notes': ['notes', 'c2'] };
 const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assistant': 'Your own chat, alerts, weekly summary', 'direct-messages': 'Direct messages, earlier messages',
   'privacy-notice': 'What groups are told', 'photos-voice': 'Pictures, voice notes, speech', users: 'Who can use this panel', 'sign-in': 'Passwords or Google only',
