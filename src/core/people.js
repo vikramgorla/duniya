@@ -161,6 +161,8 @@ export const ownNameOf = (phone) => (digits(phone) ? st("SELECT name FROM people
 /** A person's row as lists show it ({ id, name, nickname, phone, birthday, shared, source, hidden?, apps, lastContact, createdAt }), or null. */
 export const personRow = (id) => view(st(`SELECT ${ROW} ${FROM} WHERE p.tenant_id = ? AND p.id = ?`).get(TENANT, String(id || ''))) || null;
 const nameOf = (id) => personRow(id)?.name || 'Someone';
+/** 079: the name an app last showed for a person ('' when none), for names agents may see. */
+export const seenNameOf = (id) => st("SELECT name FROM identities WHERE tenant_id = ? AND person = ? AND name <> '' ORDER BY last_seen DESC LIMIT 1").get(TENANT, String(id))?.name || '';
 
 /** A person with their identities, or null. */
 export function personById(id) {

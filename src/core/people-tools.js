@@ -6,12 +6,12 @@
 // anyone other than the sender is held for an organizer's "confirm XXXX" (the runner's confirm gate). Merge, hide and
 // erase are never agent tools.
 import { fail, clip, digits } from './config.js';
-import { addNote, householdsOf, listLists, listPeople, listsOf, personById, personByRef, setListMember, setTags, tagsOf, tiesOf, timeline } from './people.js';
+import { addNote, householdsOf, listLists, listPeople, listsOf, personById, personByRef, seenNameOf, setListMember, setTags, tagsOf, tiesOf, timeline } from './people.js';
 import { canSee, peopleScope } from './people-access.js';
 import { agentName } from './contacts.js';
 
 /** The name an agent sees (#113: phone contact names only while the owner allows them). */
-const nameFor = (p) => (p.phone ? agentName({ phone: p.phone }) || `+${p.phone}` : p.ownName || p.name);
+const nameFor = (p) => (p.phone ? agentName({ phone: p.phone, fallbackName: seenNameOf(p.id) }) || `+${p.phone}` : p.ownName || seenNameOf(p.id) || 'Someone');
 
 export const PEOPLE_DEFAULT_ALLOW = { organizer: ['people:*'], participant: ['people:find_person', 'people:get_person'] };
 // 079, one release only (remove in the next): saved `contacts:` rules of 078 keep working as the matching people rules.
@@ -24,6 +24,8 @@ export function peopleRules(agent, role) {
 }
 
 const scopeOf = (ctx) => peopleScope(ctx.agent, { owner: !!ctx.ownerTurn });
+/** Organizers (and the owner, on any turn) see everyone in scope; participants only the people the owner shared. */
+const full = (ctx) => ctx.role === 'organizer' || !!ctx.ownerTurn;
 /** The person a tool names (id, phone or a name that matches exactly one visible person), if the agent may see them. */
 function visible(ref, ctx) {
   const scope = scopeOf(ctx);
@@ -31,11 +33,11 @@ function visible(ref, ctx) {
   if (!r) throw fail('Name the person (id, number or name)');
   let p = personByRef(r);
   if (!p && !/^p_/.test(r) && digits(r).length < 6) {
-    const hits = listPeople({ q: r, scope, limit: 3, shared: ctx.role !== 'organizer' });
+    const hits = listPeople({ q: r, scope, limit: 3, shared: !full(ctx) });
     if (hits.length > 1) throw fail(`More than one person matches "${clip(r, 40)}": ${hits.map((h) => `${h.name} (${h.id})`).join(', ')}. Use the id.`);
     p = hits[0] ? personById(hits[0].id) : null;
   }
-  if (!p || !canSee(scope, p.id) || (ctx.role !== 'organizer' && !p.shared)) throw fail('No such person that this agent may see');
+  if (!p || !canSee(scope, p.id) || (!full(ctx) && !p.shared)) throw fail('No such person that this agent may see');
   return p;
 }
 const short = (p, org) => ({ id: p.id, name: nameFor(p), ...(p.nickname ? { nickname: p.nickname } : {}), ...(p.phone ? { phone: `+${p.phone}` } : {}), ...(org ? { tags: tagsOf(p.id) } : {}) });
@@ -68,7 +70,7 @@ export const peopleTools = [
     roles: ['organizer', 'participant'],
     async run({ query }, ctx) {
       if (String(query || '').trim().length < 2) throw fail('query too short');
-      const org = ctx.role === 'organizer';
+      const org = full(ctx);
       const found = listPeople({ q: query, scope: scopeOf(ctx), shared: !org, limit: 10 }).map((p) => short(p, org));
       return found.length ? found : 'Nobody matching that this agent may see';
     },
@@ -81,7 +83,7 @@ export const peopleTools = [
     async run({ person }, ctx) {
       const p = visible(person, ctx);
       const scope = scopeOf(ctx);
-      const org = ctx.role === 'organizer';
+      const org = full(ctx);
       return {
         ...short(p, org), ...(p.birthday ? { birthday: p.birthday.replace(/^--/, '') } : {}),
         households: householdsOf(p.id).map((h) => `${h.name} (${h.role})`),
