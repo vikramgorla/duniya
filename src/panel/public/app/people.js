@@ -7,7 +7,7 @@ let query = ''; let filter = '';
 const PAGE = 100;
 const APPS = { whatsapp: 'WhatsApp', telegram: 'Telegram' };
 const enc = encodeURIComponent;
-export const personHref = (id) => `#people/${enc(id)}`;
+const personHref = (id) => `#people/${enc(id)}`;
 const appsLine = (p) => [p.apps.map((a) => APPS[a] || a).join(' · ') || 'No app', p.lastContact ? `${ago(p.lastContact)} ago` : ''].filter(Boolean).join(' · ');
 /** One person row: avatar · name · apps and last contact · chevron (calm rows, 073). `end`: a control next to the row. */
 export const personRow = (p, sub = appsLine(p), end = null) => h('li', { class: end ? 'has-end' : null }, h('a', { class: 'lrow', href: personHref(p.id || p.person) }, avatar(p.who || p.name, p.id || p.person, 's'),

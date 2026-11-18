@@ -95,7 +95,9 @@ const CARDS = [
   ['card-small-server', 'server', '', 'box:This server', 1100],
   ['card-small-mode', 'settings/small-mode', '', '#small-mode', 900],
   ['card-health', 'server', 'T.openAll(document.querySelector("#health"));', '#health', 1100], // 069: Server → Health (073: its details open)
-  ['card-person', 'contacts/41790000004', '', '.person-page', 600], // 073: a person's page
+  ['card-person', 'people/41790000001', '', '.person-page', 600], // 073, 078: a person's page in People (ties, household, notes, tags, lists)
+  ['card-people-list', 'people', '', '#main .card', 600], // 078: People — search, filters, rows with apps and last contact
+  ['card-household', 'people', "const r = await (await fetch('/api/households')).json(); location.hash = 'people/households/' + r[0].id; await T.until('.person-page .lgroup'); await T.wait(300);", '.person-page', 600], // 078: a household with kids without an app
   ['card-usage-breakdown', 'usage', '', 'box:Breakdown', 900], // 073: Usage breakdown rows
   ['card-updates', 'settings/updates', '', 'box:Updates', 900], // 073: Settings → Updates
   ['card-assistants', 'settings/assistants', '', 'box:Connected AI assistants', 900],

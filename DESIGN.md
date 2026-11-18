@@ -197,7 +197,7 @@ it for the names its API returns, and panel modules import it.
   on the provider's page.
 - Accounts: the provider's name, with the label only when there are several accounts: "ChatGPT · work".
 - Chats: their name, never an id — a group's WhatsApp subject (remembered; *Unnamed group* until known), a person's
-  name from the contacts resolver (else *+number* or *Unknown (hidden number)*). One server resolver,
+  name from the one names resolver: own name in People, phone contact, business, profile (else *+number* or *Unknown (hidden number)*). One server resolver,
   `src/core/chat-names.js` (`chatLabel`, `chatLabels`, `withChatNames`); every API that lists chats returns `chatName`
   (silences, activity and the live stream, pending, usage, caps, Review, search, admin MCP, owner assistant) (073).
 - Models: as people know them ("GPT-5.5", "Claude Sonnet 4.5"). The provider's own display name wins; a raw id is
@@ -265,9 +265,15 @@ The same thing looks and behaves the same wherever it appears, and every place l
 - **Breakdowns** (Usage) are one card with a `seg` over rows: name (its page) · calls and tokens muted · cost right ·
   ⋯ for the row's rare action. Details tables become muted summary lines with a *Details* disclosure (Server → Health,
   This server); Logs start as one row and load when opened.
-- **A person's page** (`#contacts/<phone>`): header (avatar, name, *+number · where the name comes from*, ⋯ Edit /
-  Remove), note, Shared, then rows: their direct chat (or *Set up a direct chat*) and the groups they wrote in. A
-  direct chat's page links back (*Contact page ›*).
+- **A person's page** (`#people/<id or number>`, 078): header (avatar, name, *+number · apps · nickname*, one muted
+  line with birthday, since and last contact, ⋯ Edit / Merge / Export / Erase), then hairline groups: *Family and
+  ties* (a tie is one row that reads as a sentence from this page, "Parent of Vedika", with the other person's avatar
+  and a × to remove; households as rows; *Add a tie* and *Add to a household* as the last rows), *Notes and timeline*
+  (a note box, then notes and muted events, newest first; agent notes say *Agent*), *Tags and lists* (the shared
+  `tagInput()` from `tags.js`, saves at once; lists as rows), their chats, their apps. Merge suggestions and *Undo
+  merge* are one line with a `.qfix` link. A person without an app says who reaches them instead of offering a chat.
+- **People · Households · Lists** (078): one small switch (`.seg.pnav`, links) at the top of the three lists; each
+  row opens a page with a back link; a household lists adults, then kids.
 
 ## Standalone pages (064, 070)
 

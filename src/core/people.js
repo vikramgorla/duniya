@@ -245,8 +245,9 @@ export function listPeople({ q: text = '', tag = '', list = '', household = '', 
   if (app === 'none') where.push('NOT EXISTS (SELECT 1 FROM identities i WHERE i.tenant_id = p.tenant_id AND i.person = p.id)');
   else if (app) { where.push('EXISTS (SELECT 1 FROM identities i WHERE i.tenant_id = p.tenant_id AND i.person = p.id AND i.channel = ?)'); args.push(String(app)); }
   if (shared) where.push('p.shared = 1');
-  const sql = `SELECT ${ROW} ${FROM} WHERE ${where.join(' AND ')} ORDER BY lower(label) LIMIT ? OFFSET ?`;
-  return db.prepare(sql).all(...args, Math.min(Number(limit) || 100, 500), Math.max(0, Number(offset) || 0)).map(view);
+  // the page is chosen by name first; apps and last contact are looked up for that page only
+  const sql = `SELECT ${ROW} ${FROM} WHERE p.tenant_id = ? AND p.id IN (SELECT p.id ${FROM} WHERE ${where.join(' AND ')} ORDER BY lower(${LABEL}) LIMIT ? OFFSET ?) ORDER BY lower(label)`;
+  return db.prepare(sql).all(TENANT, ...args, Math.min(Number(limit) || 100, 500), Math.max(0, Number(offset) || 0)).map(view);
 }
 /** How many people, households and lists there are, and the tags in use (with counts) for the filters. */
 export function peopleCounts() {

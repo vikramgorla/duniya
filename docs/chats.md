@@ -1,4 +1,4 @@
-# Chats, contacts and direct messages
+# Chats and direct messages
 
 **Choose where agents may speak: every group and person starts off, one switch turns a chat on.**
 
@@ -7,7 +7,7 @@
 **In 30 seconds**
 - Chats that are **off** are dropped before storage and before any model ([Privacy](privacy.md)).
 - Switching a chat on picks its agent, posts the privacy notice once and loads recent messages from your phone.
-- **Add a direct chat** sets up a person before they write. Names come from your phone's contacts.
+- **Add a direct chat** sets up a person before they write. Names come from your phone's contacts and [People](people.md).
 - The owner can search what was said in every chat that is on: press **/** and type.
 - [Telegram](telegram.md) groups and people are listed the same way, with *Telegram* in their line.
 
@@ -84,8 +84,8 @@ chat's newest message). When you switch a chat **on**, the server asks your phon
 
 ## Set up a direct chat before the person writes
 
-1. **Chats → Add a direct chat** (or **Contacts → the person → Set up a direct chat**).
-2. Enter the number with country code (`+41 79 123 45 67`) or pick a contact; pick the WhatsApp number if you have
+1. **Chats → Add a direct chat** (or **People → the person → Set up a direct chat**).
+2. Enter the number with country code (`+41 79 123 45 67`) or pick someone in People; pick the WhatsApp number if you have
    several.
 3. Choose the agent, **On** and, if you like, **Private to members** → **Set up chat**.
 
@@ -101,23 +101,11 @@ settings stay together.
 People who write to an agent number privately get the agent chosen for that number
 ([Connect WhatsApp](whatsapp.md#settings--channels--whatsapp)); a person can be given another agent on their chat's page.
 
-## Contacts
+## Names and people
 
-**Contacts** lists the names synced from the linked phone(s) plus your own entries with notes. Agents look people up
-(`contacts__find_contact`): participants only see contacts marked **Shared**; organizers see all and can save or
-remove entries.
-
-- Phone contact names **refresh by themselves** (after a number connects, then daily). **Refresh now** is optional.
-- **Agents may use the names from your phone contacts** (owner, on by default): switch it off if your address book
-  holds private labels ("Raj plumber, don't answer"); agents then see business or profile names.
-- Each person has a **page** (tap the row, or `#contacts/<number>`): name, number and where the name comes from, the
-  note, **Shared**, their **direct chat** with its agent (or **Set up a direct chat**) and the **groups they wrote
-  in**, each opening the chat. A direct chat's page links back with **Contact page ›**. People who wrote but are not
-  saved have a page too (**⋯ → Save as contact…**). **⋯** holds **Edit…** and **Remove…**.
-- Admin MCP: `list_contacts`, `get_contact` (a person's page), `save_contact`, `remove_contact`, `contact_names_status`,
-  `refresh_contact_names`, `set_contact_names_for_agents`.
-
-![A person's page: name and number, Shared, their direct chat with its agent and the groups they wrote in](site/img/card-person.webp)
+Everyone who writes in a chat that is on is in [People](people.md): their page, family and ties, households, notes,
+tags and lists. A direct chat's page links there with **Person page ›**, and names in a chat's *Messages* and in group
+member lists open the person too.
 
 ### Which name is shown
 
@@ -131,7 +119,7 @@ picks a person's name:
 
 1. If WhatsApp shows the person only by a hidden id (LID), look up the number WhatsApp shared for it (the pair can
    arrive later; names are matched up then).
-2. Use the first name known: the name you set in Duniya, then the phone contact name (your address book), then a
+2. Use the first name known: the name you set in People, then the phone contact name (your address book), then a
    WhatsApp Business name, then the profile name the person chose.
 3. Otherwise show `+number`, or *Unknown (hidden number)* when WhatsApp hides it.
 4. Member tags are kept per group (chats that are on only), from each message the person sends, tag changes and

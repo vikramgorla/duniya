@@ -32,6 +32,7 @@
 
 | | Guide | Use this when… |
 |---|---|---|
+| <img src="img/thumb-people.webp" alt="" width="120"> | **[People](people.md)** | you want one place for who is who: families and kids, notes, tags, lists, merge, export and erase |
 | <img src="img/thumb-telegram.webp" alt="" width="120"> | **[Connect Telegram](telegram.md)** | your groups are on Telegram too: add a bot, same agents, one person on both apps |
 | <img src="img/thumb-photos-voice.webp" alt="" width="120"> | **[Photos & voice](models.md#photos--voice)** | agents should see photos, hear voice notes or reply with voice |
 | <img src="img/thumb-usage.webp" alt="" width="120"> | **[Usage & spending caps](spending.md)** | you want to see or limit what it costs |

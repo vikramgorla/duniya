@@ -124,7 +124,7 @@ channel uses. Nothing to click:
 - **Every hour** old data goes, in small batches so replies never wait: stored messages older than **90 days** or
   beyond **5 000 per chat**, activity as set in **Settings → Activity log** (30 days / 5 000 entries), usage detail
   older than **400 days**, why-quiet rows after 90 days, daily counters after 60 days. Chat summaries, notes,
-  contacts and settings are never pruned, so agents keep what older talk decided. The owner changes the numbers under
+  People and settings are never pruned, so agents keep what older talk decided. The owner changes the numbers under
   **Change how long data is kept** (or with the admin MCP tool `set_retention`). Backups stay small with it.
 - The database is kept compact (freed space is reused and handed back in small steps).
 - **Disk:** below 500 MB free (or 5 %) the owner is told once a day. Below 100 MB, stored messages and optional
