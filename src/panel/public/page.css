@@ -38,3 +38,8 @@ input[type=text], input[type=password] { font: inherit; font-size: 16px; color: 
 .pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: var(--ok-soft); color: var(--ok); }
 form .btn:not(.primary) { background: var(--card); color: var(--ink); border-color: var(--line); }
 .btn.danger, form .btn.danger { color: var(--bad); border-color: var(--bad); }
+/* Survey links (083): a plain form, one question after the other */
+fieldset { border: 0; padding: 0; margin: 16px 0 0; } legend { font-size: 14px; font-weight: 600; color: var(--ink); padding: 0; margin-bottom: 4px; }
+form > label { font-size: 14px; color: var(--ink); margin-top: 16px; }
+label.opt { display: flex; gap: 10px; align-items: center; font-size: 15px; font-weight: 400; color: var(--ink); margin: 0; min-height: 40px; }
+label.opt input { width: 20px; height: 20px; margin: 0; accent-color: var(--btn); }

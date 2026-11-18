@@ -20,7 +20,8 @@ const KINDS = { list: 'A list', tag: 'A tag', household: 'A household', event: '
 export const PURPOSES = { updates: 'Updates', marketing: 'Marketing' };
 const MAX = 5000;
 /** The placeholders a message may use, and the audience kinds that have them. */
-const FIELDS = { first_name: null, name: null, household: null, event: ['event', 'orders'], date: ['event', 'orders'], place: ['event', 'orders'], people: ['event'], amount: ['orders'], due: ['orders'], ways_to_pay: ['orders'] };
+const FIELDS = { first_name: null, name: null, household: null, event: ['event', 'orders'], date: ['event', 'orders'], place: ['event', 'orders'], people: ['event'], amount: ['orders'], due: ['orders'], ways_to_pay: ['orders'],
+  survey: ['survey'], survey_link: ['survey'] }; // 083: a send that carries a survey
 
 /** A validated audience (400 with field "audience" when it names nothing). */
 export function cleanAudience(a = {}) {
@@ -134,8 +135,8 @@ export async function resolve(audience, purpose, on) {
 }
 
 /** The placeholders a template uses that this audience cannot fill. */
-export const missingFields = (template, kind) => [...String(template).matchAll(/\{([a-z_]+)\}/g)].map((m) => m[1])
-  .filter((f) => !Object.hasOwn(FIELDS, f) || (FIELDS[f] && !FIELDS[f].includes(kind)));
+export const missingFields = (template, kind, survey = false) => [...String(template).matchAll(/\{([a-z_]+)\}/g)].map((m) => m[1])
+  .filter((f) => !Object.hasOwn(FIELDS, f) || (FIELDS[f] && !FIELDS[f].includes(kind) && !(survey && FIELDS[f].includes('survey'))));
 /** The template with a recipient's facts. */
 export const fill = (template, facts) => String(template).replace(/\{([a-z_]+)\}/g, (_, k) => String(facts[k] ?? '')).replace(/[ \t]+([,.!?])/g, '$1').replace(/[ \t]{2,}/g, ' ').trim();
 /** The facts a template uses (what a rewrite must keep word for word). */

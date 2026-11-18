@@ -537,6 +537,26 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   };
   await seedRun({ title: 'Badminton moves to the new hall', audience: { kind: 'list', list: bad.id }, template: 'Hi {first_name}, from next Tuesday badminton is in the new hall (Rue du Lac 4), same time. See you there!' }, ['replied', 'sent', 'replied'], true);
   await seedRun({ title: `Payment reminder: Sankranti ${yr}`, audience: { kind: 'orders', event: sank.id }, template: om.reminderTemplate(sank.id), noReplyLimit: 0 }, ['replied', 'sent', 'stop'], false);
+  // 083: Surveys and a campaign: a picnic survey several people answered (in chat and by link), and a campaign for
+  // Sankranti (a message, a wait, a follow-up only to people who have not paid) on its second step. Fake people only.
+  await mods.setModuleOn('surveys', true, 'admin');
+  const sv = await imp('src/modules/surveys/index.js');
+  const pic2 = sv.saveSurvey({ title: 'Summer picnic', intro: 'Three quick questions so we plan food and games.', questions: [
+    { text: 'Which Sunday suits you?', kind: 'single', options: ['14 June', '21 June', 'Either'] }, { text: 'What will you bring?', kind: 'multi', options: ['Salad', 'Dessert', 'Drinks', 'Games'] },
+    { text: 'How many in your group?', kind: 'number' }, { text: 'Anything we should know?', kind: 'text', required: false }] }, 'admin');
+  for (const [i, a, via] of [[0, { q1: '21 June', q2: ['Salad', 'Games'], q3: 4, q4: 'Kabir is allergic to nuts' }, 'link'], [3, { q1: 'Either', q2: ['Drinks'], q3: 2 }, 'chat'],
+    [5, { q1: '21 June', q2: ['Dessert'], q3: 3, q4: '' }, 'chat'], [6, { q1: '14 June', q2: ['Salad', 'Dessert'], q3: 5, q4: 'We can bring a grill' }, 'link'], [9, { q1: '21 June' }, 'chat']]) {
+    sv.invite(pic2.id, pid[i]); sv.answer(pic2.id, pid[i], a, via);
+  }
+  for (const i of [1, 4, 7]) sv.invite(pic2.id, pid[i]);
+  const cmp = await imp('src/modules/sending/campaigns.js');
+  const cp = await cmp.campaignPreview({ title: `Sankranti ${yr}: register and pay`, audience: { kind: 'orders', event: sank.id }, purpose: 'updates', agent: 'school', event: sank.id, stops: { replied: false, paid: true },
+    steps: [{ kind: 'message', template: om.reminderTemplate(sank.id) }, { kind: 'wait', days: 5 }, { kind: 'message', template: 'Hi {first_name}, last reminder: {amount} for {event} by {due}. Thank you!' }] }, 'admin');
+  cmp.startCampaign(cp.campaign.id, 'admin');
+  const firstRun = db.db.prepare("SELECT id FROM snd_runs WHERE title LIKE 'Payment reminder:%' ORDER BY created_at DESC LIMIT 1").get();
+  db.db.prepare("UPDATE snd_runs SET status = 'done', finished_at = ? WHERE id = ?").run(now - 3 * D, firstRun.id);
+  db.db.prepare('INSERT INTO snd_campaign_runs (tenant_id, campaign, step, run) VALUES (?, ?, 0, ?)').run('default', cp.campaign.id, firstRun.id);
+  db.db.prepare('UPDATE snd_campaigns SET step = 1, step_at = ? WHERE id = ?').run(now - 3 * D, cp.campaign.id);
   // #91: Chats shows "Loaded 12 earlier messages" (rides) and "Loading recent messages from your phone…" (Family)
   prefs.noteLatestKeys([2, 5, 6, 7].map((n) => ({ chat: G(n), isGroup: true, msgId: `last-${n}`, participant: `${P(n)}@s.whatsapp.net`, ts: now - n * H })));
   const phoneHistory = await imp('src/core/history-load.js');

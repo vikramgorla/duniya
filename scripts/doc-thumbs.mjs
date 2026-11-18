@@ -11,7 +11,7 @@ const THUMBS = {
   'photos-voice': 'card-photos-voice', usage: 'usage-desktop', quiet: 'card-quiet', mcp: 'card-mcp',
   'wa-group': 'card-wa-group', 'web-access': 'card-web-access', backups: 'backups-desktop',
   'small-server': 'card-small-server', assistants: 'card-assistants', checklist: 'card-checklist',
-  overview: 'overview-desktop', phone: 'overview-mobile', whatsapp: 'card-wa-numbers', chats: 'card-chat-page', telegram: 'card-telegram', people: 'card-person', pace: 'card-pace', events: 'card-event', sending: 'card-sending',
+  overview: 'overview-desktop', phone: 'overview-mobile', whatsapp: 'card-wa-numbers', chats: 'card-chat-page', telegram: 'card-telegram', people: 'card-person', pace: 'card-pace', events: 'card-event', sending: 'card-sending', surveys: 'card-survey',
 };
 const BG = '0xf1f2eb';
 

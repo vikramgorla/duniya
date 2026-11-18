@@ -42,7 +42,7 @@ let sankranti;
 
 test('modules are off by default: no pages, no agent tools; viewers cannot switch them; on keeps going after off', async () => {
   const m = await api('GET', '/api/modules');
-  assert.deepEqual(m.modules.map((r) => [r.id, r.on]), [['events', false], ['orders', false], ['sending', false]]);
+  assert.deepEqual(m.modules.map((r) => [r.id, r.on]), [['events', false], ['orders', false], ['sending', false], ['surveys', false]]);
   assert.equal((await t.api(owner, 'GET', '/api/module/events')).status, 409);
   assert.match((await t.api(owner, 'GET', '/api/orders')).body.error, /switched off/);
   t.script.push([{ type: 'text', text: 'hi' }]);

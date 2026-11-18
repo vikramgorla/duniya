@@ -30,9 +30,10 @@ import { dmNoticeOnce } from '../../core/privacy-notice.js';
 import { listEstimate, listGapMs, sendingHoursNow, takeListSend, typeBefore } from '../../core/pace.js';
 import { chat as modelChat } from '../../core/providers/index.js';
 import { isGroup, phoneOf, splitChatId } from '../../channels/index.js';
-import { changeOrHold } from '../index.js';
+import { changeOrHold, moduleApi } from '../index.js';
 import { PURPOSES, cleanAudience, describe, fill, missingFields, resolve, usedFacts } from './audience.js';
 import { sendingTools } from './tools.js';
+import { campaignsTick } from './campaigns.js';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS snd_runs (
@@ -52,6 +53,16 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS snd_recipients_run ON snd_recipients (tenant_id, run, status, n);
   CREATE INDEX IF NOT EXISTS snd_recipients_person ON snd_recipients (tenant_id, person, at);
   CREATE INDEX IF NOT EXISTS snd_recipients_chat ON snd_recipients (tenant_id, chat, at);
+  -- 083: the survey a run carries (each recipient gets their own link), campaigns and the runs of their steps
+  CREATE TABLE IF NOT EXISTS snd_run_surveys (tenant_id TEXT NOT NULL, run TEXT NOT NULL, survey TEXT NOT NULL, PRIMARY KEY (tenant_id, run));
+  CREATE TABLE IF NOT EXISTS snd_campaigns (
+    tenant_id TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL, audience TEXT NOT NULL, purpose TEXT NOT NULL, agent TEXT NOT NULL, event TEXT NOT NULL DEFAULT '',
+    steps TEXT NOT NULL, stops TEXT NOT NULL DEFAULT '{}', end_day TEXT NOT NULL DEFAULT '', no_reply_limit INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'draft',
+    reason TEXT NOT NULL DEFAULT '', step INTEGER NOT NULL DEFAULT 0, step_at INTEGER NOT NULL DEFAULT 0, by TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL,
+    finished_at INTEGER, PRIMARY KEY (tenant_id, id)
+  );
+  CREATE INDEX IF NOT EXISTS snd_campaigns_status ON snd_campaigns (tenant_id, status, created_at);
+  CREATE TABLE IF NOT EXISTS snd_campaign_runs (tenant_id TEXT NOT NULL, campaign TEXT NOT NULL, step INTEGER NOT NULL, run TEXT NOT NULL, PRIMARY KEY (tenant_id, campaign, step));
   CREATE TABLE IF NOT EXISTS snd_filters (tenant_id TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, audience TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (tenant_id, id));
 `);
 
@@ -74,6 +85,8 @@ const counts = (id) => {
 const runView = (r) => ({ id: r.id, title: r.title, purpose: r.purpose, mode: r.mode, group: r.grp, agent: r.agent, agentName: getAgent(r.agent)?.name || '',
   template: r.template, audience: JSON.parse(r.audience || '{}'), audienceText: describe(JSON.parse(r.audience || '{}')), source: r.source, by: r.by, status: r.status,
   reason: r.reason, wait: r.wait, noReplyLimit: r.no_reply_limit, nextAt: r.next_at || null, createdAt: r.created_at, startedAt: r.started_at, finishedAt: r.finished_at, counts: counts(r.id) });
+/** The Surveys module's api; 409 with the reason when it is off (083). */
+const surveysApi = () => moduleApi('surveys') || (() => { throw fail('Surveys is switched off (Settings → Modules)', 409, { field: 'survey' }); })();
 const on = async () => new Set((await chatChannel()?.channels?.().catch(() => []) || []).filter((c) => c.state === 'on').map((c) => c.id));
 
 /** The agent a run speaks as: the one given, else the first agent that is on (never the owner assistant). */
@@ -100,9 +113,10 @@ async function personalise(template, facts, agent) {
 // ---------- drafts and the preview ----------
 /**
  * A draft run with its recipients and the preview: { run, recipients: [...skipped first 200, then waiting], samples,
- * estimate, chatsToSwitchOn }. `visible` (agent tools): people the agent may not see are skipped. body: { title, audience, purpose, mode: direct | group, group, agent, template, noReplyLimit }.
+ * estimate, chatsToSwitchOn }. `visible` (agent tools): people the agent may not see are skipped; `drop` (campaigns, 083):
+ * people and households the campaign's stop rules took out. body: { title, audience, purpose, mode: direct | group, group, agent, template, noReplyLimit }.
  */
-export async function preview(body = {}, by = 'panel', source = 'panel', { visible = null } = {}) {
+export async function preview(body = {}, by = 'panel', source = 'panel', { visible = null, drop = null } = {}) {
   const title = clip(body.title, 80) || 'Message';
   const purpose = String(body.purpose || 'updates');
   if (!PURPOSES[purpose]) throw fail('Purpose: updates or marketing', 400, { field: 'purpose' });
@@ -110,7 +124,11 @@ export async function preview(body = {}, by = 'panel', source = 'panel', { visib
   if (!template) throw fail('Write the message', 400, { field: 'template' });
   const mode = body.mode === 'group' ? 'group' : 'direct';
   const audience = mode === 'group' ? {} : cleanAudience(body.audience);
-  const missing = mode === 'group' ? missingFields(template, '').filter((f) => !['event', 'date', 'place'].includes(f)) : missingFields(template, audience.kind);
+  const sv = body.survey ? surveysApi().getSurvey(body.survey) : null; // 083
+  if (sv && mode === 'group') throw fail('A survey goes to people one by one, not to a group', 400, { field: 'survey' });
+  if (sv && sv.status !== 'open') throw fail(`The survey "${sv.title}" is closed`, 409, { field: 'survey' });
+  if (sv && template.includes('{survey_link}') && !surveysApi().linkBase()) throw fail('Links need the server\'s address: add a domain (Settings → Domains), or remove {survey_link} and let people answer in chat', 400, { field: 'template' });
+  const missing = mode === 'group' ? missingFields(template, '') : missingFields(template, audience.kind, !!sv);
   if (missing.length) throw fail(`This audience has no {${missing.join('}, {')}}: remove it from the message`, 400, { field: 'template' });
   const agent = agentOf(body.agent || (mode === 'group' ? agentForChat(body.group)?.id : ''));
   const limit = Math.max(0, Math.min(500, Math.round(Number(body.noReplyLimit ?? 20)) || 0));
@@ -118,7 +136,11 @@ export async function preview(body = {}, by = 'panel', source = 'panel', { visib
   if (mode === 'group') {
     if (!isGroup(body.group) || !isChatEnabled(body.group)) throw fail('Choose a group that is on', 400, { field: 'group' });
     rows = [{ person: '', household: '', name: 'The group', chat: body.group, channel: splitChatId(body.group).channel, known: true, status: 'waiting', reason: '', facts: {} }];
-  } else rows = (await resolve(audience, purpose, await on())).map((r) => (visible && r.status === 'waiting' && !visible(r.person) ? { ...r, status: 'skipped', reason: 'Not one of this agent\'s people', chat: '', channel: '' } : r));
+  } else {
+    rows = (await resolve(audience, purpose, await on())).map((r) => (r.status !== 'waiting' ? r
+      : visible && !visible(r.person) ? { ...r, status: 'skipped', reason: 'Not one of this agent\'s people', chat: '', channel: '' }
+        : drop && (drop.has(r.person) || drop.has(r.household)) ? { ...r, status: 'skipped', reason: 'Taken out by the campaign\'s rules', chat: '', channel: '' } : r));
+  }
   const id = rid('run'); const now = Date.now();
   db.exec('BEGIN');
   try {
@@ -126,11 +148,13 @@ export async function preview(body = {}, by = 'panel', source = 'panel', { visib
       .run(TENANT, id, title, purpose, mode, mode === 'group' ? body.group : '', agent.id, template, JSON.stringify(audience), source, clip(by, 60), limit, now);
     const ins = db.prepare('INSERT INTO snd_recipients (tenant_id, run, n, person, household, name, chat, channel, known, status, reason, facts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
     rows.forEach((r, i) => ins.run(TENANT, id, i, r.person, r.household, r.name, r.chat, r.channel, r.known ? 1 : 0, r.status, r.reason, JSON.stringify(r.facts)));
+    if (sv) db.prepare('INSERT INTO snd_run_surveys (tenant_id, run, survey) VALUES (?, ?, ?)').run(TENANT, id, sv.id);
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
   const going = rows.filter((r) => r.status === 'waiting');
   const samples = [];
-  for (const r of going.slice(0, 3)) samples.push({ to: r.name, channel: r.channel, text: await personalise(template, r.facts, agent.id) });
+  const svFacts = sv ? { survey: sv.title, survey_link: `${surveysApi().linkBase()}/s/…` } : {};
+  for (const r of going.slice(0, 3)) samples.push({ to: r.name, channel: r.channel, text: await personalise(template, { ...r.facts, ...svFacts }, agent.id) });
   const wa = going.filter((r) => r.channel === 'whatsapp');
   const est = listEstimate(wa.length + wa.filter((r) => !r.known).length); // people who never wrote wait twice as long
   const out = { run: runView(runRow(id)), samples,
@@ -185,6 +209,8 @@ export function runPage(id, status = '') {
   return { run: runView(r), recipients: rows.map((x) => ({ person: x.person, household: x.household, name: x.name, channel: x.channel, known: !!x.known, status: x.status,
     reason: x.reason, text: x.text, at: x.at, repliedAt: x.replied_at })) };
 }
+/** A run's state and counts (campaign steps). */
+export const runSummary = (id) => { const r = runRow(id); return r ? { id: r.id, status: r.status, reason: r.reason, wait: r.wait, counts: counts(r.id) } : null; };
 /** History: the newest 50 runs (drafts left out). */
 export const listRuns = () => db.prepare("SELECT * FROM snd_runs WHERE tenant_id = ? AND status <> 'draft' ORDER BY created_at DESC LIMIT 50").all(TENANT).map(runView);
 
@@ -281,7 +307,9 @@ async function step(now) {
   db.prepare("UPDATE snd_recipients SET status = 'sending', at = ? WHERE tenant_id = ? AND run = ? AND person = ?").run(now, TENANT, r.id, x.person);
   try {
     if (r.mode === 'direct') await openChat(x.chat, r.agent, r.by || 'sending');
-    let text = await personalise(r.template, JSON.parse(x.facts || '{}'), r.agent);
+    const sv = db.prepare('SELECT survey FROM snd_run_surveys WHERE tenant_id = ? AND run = ?').get(TENANT, r.id)?.survey;
+    const facts = { ...JSON.parse(x.facts || '{}'), ...(sv && r.mode === 'direct' ? surveysApi().invite(sv, x.person) : {}) }; // 083: their own survey link
+    let text = await personalise(r.template, facts, r.agent);
     const notice = r.mode === 'direct' ? dmNoticeOnce(phoneOf(x.chat) || x.chat) : ''; // the privacy line, once per person
     if (notice) text = `${text}\n\n_${notice}_`;
     await typeBefore(ch, x.chat, text);
@@ -308,7 +336,7 @@ async function upkeep(now = Date.now()) {
   db.prepare("UPDATE snd_recipients SET status = 'failed', reason = 'Interrupted by a restart; not sent again to be safe' WHERE tenant_id = ? AND run IN (SELECT id FROM snd_runs WHERE tenant_id = ? AND status IN ('running', 'paused')) AND status = 'sending' AND at < ?").run(TENANT, TENANT, now - 10 * MIN);
   if (busy) return;
   busy = true;
-  step(now).catch((e) => activity('error', { summary: `Sending: ${e.message}` })).finally(() => { busy = false; });
+  campaignsTick(now).then(() => step(now)).catch((e) => activity('error', { summary: `Sending: ${e.message}` })).finally(() => { busy = false; });
 }
 
 // ---------- replies, stop and start ----------

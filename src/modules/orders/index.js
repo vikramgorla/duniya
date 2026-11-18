@@ -185,7 +185,7 @@ export function listOrders({ status = 'open', event = '' } = {}) {
   const args = status === 'overdue' ? [t] : [];
   const order = status === 'all' ? 'created_at DESC' : 'due, created_at DESC'; // all: newest first, walking ord_orders_created
   const rows = event
-    ? db.prepare(`SELECT * FROM ord_orders WHERE tenant_id = ? AND event = ? AND ${where} ORDER BY ${order} LIMIT 200`).all(TENANT, event, ...args)
+    ? db.prepare(`SELECT * FROM ord_orders INDEXED BY ord_orders_event WHERE tenant_id = ? AND event = ? AND ${where} ORDER BY ${order} LIMIT 200`).all(TENANT, event, ...args) // one event: its own index, whatever the statistics say
     : db.prepare(`SELECT * FROM ord_orders WHERE tenant_id = ? AND ${where} ORDER BY ${order} LIMIT 200`).all(TENANT, ...args);
   return rows.map((o) => view(o));
 }

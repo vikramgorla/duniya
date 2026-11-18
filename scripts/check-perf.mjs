@@ -35,6 +35,9 @@ const BUDGETS = {
   'sending run page': 12, // 082: GET /api/sending/runs/:id (counts, 500 of 2,000 recipients)
   'sending history': 15, // 082: GET /api/sending (the newest 50 runs with counts, saved audiences)
   'sending recipients of an event': 20, // 082: the recipients query of a preview (registered households → one adult who agreed, consent, app, chat) for one event
+  'survey results': 90, // 083: GET /api/surveys/:id (totals of 4 questions over 3,000 answers each, 500 people with their answers)
+  'campaign page': 15, // 083: GET /api/sending/campaigns/:id (steps with their runs' counts)
+  'survey link page': 10, // 083: GET /s/<token> (the public page: token → survey, the person's answers)
 };
 const RUNS = 9;
 
@@ -116,6 +119,12 @@ const { resolve: recipientsOf } = await import('../src/modules/sending/audience.
 measured['sending run page'] = await time(() => get('/api/sending/runs/run_000000000012'));
 measured['sending history'] = await time(() => get('/api/sending'));
 measured['sending recipients of an event'] = await time(() => recipientsOf({ kind: 'event', event: 'ev_000000000003' }, 'updates', new Set(['whatsapp', 'telegram'])));
+// 083: Surveys and campaigns (5 surveys, 3,000 people answered the first; 5 campaigns). A real link: invite person 4100.
+measured['survey results'] = await time(() => get('/api/surveys/sv_000000000000'));
+measured['campaign page'] = await time(() => get('/api/sending/campaigns/cmp_000000000000'));
+const surveyLink = (await import('../src/modules/surveys/index.js')).invite('sv_000000000000', personId(4100)).survey_link || '';
+const linkPath = `/s/${surveyLink.split('/s/')[1]}`;
+measured['survey link page'] = await time(() => fetch(t.base + linkPath).then((r) => r.arrayBuffer()));
 
 // Everything else on a hot path, for the query-plan check (not timed).
 const activityMid = db.prepare('SELECT id FROM activity WHERE id > ? ORDER BY id LIMIT 1').get(FULL.activity / 2)?.id || 1;
@@ -133,11 +142,16 @@ for (const path of ['/api/status', '/api/checklist', '/api/chats', '/api/agents'
   '/api/orders?status=all', '/api/orders?status=all&event=ev_000000000004', '/api/orders?status=open&event=ev_000000000004', '/api/orders/o_000000000001', '/api/orders/csv?status=open',
   // 082: Lists and sending
   '/api/sending/runs/run_000000000029?status=waiting', '/api/order-reminders?event=ev_000000000004',
+  // 083: surveys and campaigns
+  '/api/surveys', '/api/surveys/sv_000000000000/csv', `/api/people/${personId(10)}`,
 ]) await get(path);
 // 082: previews of every kind of audience (the recipients queries), one send on the tick, a reply and a stop word
 for (const audience of [{ kind: 'list', list: 'l_000000000003' }, { kind: 'tag', tag: 'badminton' }, { kind: 'household', household: 'h_000000000004' }, { kind: 'orders', event: 'ev_000000000004' }, { kind: 'orders' }, { kind: 'people', people: [personId(2), personId(4)] }]) {
   const r = await t.api(cookie, 'POST', '/api/sending/preview', { audience, purpose: 'updates', agent: agent.id, template: 'Hi {first_name}' }); if (r.status >= 400) throw new Error(`preview ${audience.kind}: ${JSON.stringify(r.body)}`);
 }
+await t.api(cookie, 'POST', '/api/sending/campaigns/preview', { audience: { kind: 'list', list: 'l_000000000003' }, purpose: 'updates', agent: agent.id, steps: [{ kind: 'message', template: 'Hi {first_name}' }], stops: { replied: true, answered: true } });
+await fetch(t.base + linkPath, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', origin: t.base }, body: 'q1=Sat&q2=Salad&q3=2' });
+for (const [n, input] of [['my_surveys', {}], ['answer_survey', { question: 'q1', answer: 'Sun' }], ['survey_results', { survey: 'Survey 0' }]]) await (await import('../src/modules/surveys/tools.js')).surveyTools.find((y) => y.name === n).run(input, { ...orgCtx, personId: personId(4100) }).catch(() => null);
 await (await import('../src/core/upkeep.js')).upkeepTick(t.channel, Date.now());
 for (const [list, n, args] of [[eventTools, 'list_events', {}], [eventTools, 'show_event', { event: 'Event 3' }], [orderTools, 'what_do_i_owe', {}], [orderTools, 'who_has_not_paid', {}]]) await mTool(list, n).run(args, orgCtx);
 for (const [m, path, body] of [['POST', '/api/module/events/ev_000000000005/registrations', { person: personId(4001) }], ['POST', '/api/module/events/ev_000000000005/registrations', { household: 'h_000000000777' }],
