@@ -52,20 +52,19 @@ async function channel(log = []) {
   return { ch, sock: fakeSocket.last, got, log };
 }
 
-test('a profile-name update never replaces the address-book name; precedence own > book > business > profile > number', () => {
+test('a profile-name update never replaces the address-book name; precedence own > book > business > profile > number', async () => {
   c.syncWhatsAppContacts([{ id: '41790000101@s.whatsapp.net', name: 'Priya Sharma' }]);
   c.syncWhatsAppContacts([{ id: '41790000101@s.whatsapp.net', notify: 'priya 🌸' }]); // contacts.update from a message
-  const p = c.getContact('41790000101');
-  assert.deepEqual([p.name, p.bookName, p.profileName, p.source], ['Priya Sharma', 'Priya Sharma', 'priya 🌸', 'whatsapp']);
+  const p = c.personInfo({ phone: '41790000101' });
+  assert.deepEqual([p.name, p.source], ['Priya Sharma', 'book']);
   c.syncWhatsAppContacts([{ id: '41790000102@s.whatsapp.net', notify: 'Ravi', verifiedName: 'Ravi Tours' }]);
   assert.equal(c.personInfo({ phone: '41790000102' }).name, 'Ravi Tours');
   assert.equal(c.personInfo({ phone: '41790000102' }).source, 'business');
-  c.saveContact({ phone: '41790000101', name: 'Priya (treasurer)' });
+  (await import('../src/core/people.js')).createPerson({ phone: '41790000101', name: 'Priya (treasurer)' }); // 078: own names live in People
   assert.deepEqual(c.personInfo({ phone: '41790000101' }), { phone: '41790000101', name: 'Priya (treasurer)', label: 'Priya (treasurer)', source: 'own', hidden: false });
   assert.equal(c.personInfo({ phone: '41790000999' }).label, '+41790000999');
   assert.equal(c.personInfo({ phone: '41790000999', fallbackName: '+41790000999' }).name, '', 'a fallback that is only the number is no name');
   assert.equal(c.personInfo({ phone: '41790000999', fallbackName: 'Seen Name' }).source, 'seen');
-  assert.ok(c.listContacts({ q: 'sharma' }).some((x) => x.phone === '41790000101'), 'search finds address-book names');
 });
 
 test('LID-only address-book entries wait for the mapping; raw LIDs are never shown as numbers', async () => {
@@ -78,7 +77,7 @@ test('LID-only address-book entries wait for the mapping; raw LIDs are never sho
   assert.ok(c.mapLid('777@lid', '41790000105@s.whatsapp.net'), 'mapping arrives later');
   p = c.personInfo({ jid: '777@lid' });
   assert.deepEqual([p.name, p.phone, p.hidden], ['Kiran Book', '41790000105', false]);
-  assert.equal(c.getContact('41790000105').bookName, 'Kiran Book', 'the name moved to the phone row');
+  assert.equal(c.personInfo({ phone: '41790000105' }).name, 'Kiran Book', 'the name moved to the phone row');
   // contact with both lid and phone: mapping stored right away
   c.syncWhatsAppContacts([{ id: '41790000106@s.whatsapp.net', name: 'Asha', lid: '606@lid' }]);
   assert.equal(c.lidPhone('606@lid'), '41790000106');
@@ -93,14 +92,14 @@ test('names refresh automatically on the shared tick: one snapshot of the contac
   assert.deepEqual(sets[0].v, { 'app-state-sync-version': { critical_unblock_low: null } });
   assert.deepEqual(log.find((x) => x.fn === 'resyncAppState').names, ['critical_unblock_low']);
   await wait();
-  assert.equal(c.getContact('41790000204').bookName, 'Meera (phone)');
+  assert.equal(c.personInfo({ phone: '41790000204' }).name, 'Meera (phone)');
   assert.equal(c.lidPhone('204@lid'), '41790000204');
   await upkeepTick(ch);
   assert.equal(log.filter((x) => x.fn === 'resyncAppState').length, 1, 'not due again until tomorrow');
   // the optional button (and admin MCP) can ask now; no second snapshot
-  const r = await t.api(owner, 'GET', '/api/contacts/summary');
+  const r = await t.api(owner, 'GET', '/api/people/summary');
   assert.equal(r.status, 200);
-  assert.ok(r.body.book >= 1 && r.body.automatic);
+  assert.ok(r.body.names.book >= 1);
   await ch.refreshNames();
   assert.equal(log.filter((x) => x.fn === 'keys.set').length, 1);
   assert.equal(log.filter((x) => x.fn === 'resyncAppState').length, 2);
@@ -110,7 +109,7 @@ test('names refresh automatically on the shared tick: one snapshot of the contac
   assert.equal(c.personInfo({ phone: '41790000207' }).name, 'Dev Book');
   sock.ev.emit('contacts.upsert', [{ id: '888@lid', name: 'Lata Book' }]);
   await t.waitFor(() => c.lidPhone('888@lid') === '41790000208');
-  assert.equal(c.getContact('41790000208').bookName, 'Lata Book');
+  assert.equal(c.personInfo({ phone: '41790000208' }).name, 'Lata Book');
   // a profile name pushed for a LID sender (contacts.update) does not replace the book name
   sock.ev.emit('contacts.update', [{ id: '888@lid', notify: 'lata_x' }]);
   assert.equal(c.personInfo({ jid: '888@lid' }).name, 'Lata Book');
@@ -186,17 +185,17 @@ test('the panel and the agent use the resolver and tags', async () => {
   let turn = t.userTurn(t.claudeReqs.length - 1);
   assert.match(turn, /New message from Anu Private Book Name \(tag: Driver\) \(participant\)/);
   assert.match(turn, /Chitra Book: hello all/, 'history lines use the same names');
-  // switched off on the Contacts page (owner only): agents get profile names, never the phone contact names
-  assert.equal((await t.api(owner, 'PUT', '/api/contacts/agent-names', { enabled: 'yes' })).status, 400);
-  assert.equal((await t.api(owner, 'PUT', '/api/contacts/agent-names', { enabled: false })).body.namesForAgents, false);
-  assert.equal((await t.api(owner, 'GET', '/api/contacts/summary')).body.namesForAgents, false);
+  // switched off on the People screen (owner only): agents get profile names, never the phone contact names
+  assert.equal((await t.api(owner, 'PUT', '/api/people/agent-names', { enabled: 'yes' })).status, 400);
+  assert.equal((await t.api(owner, 'PUT', '/api/people/agent-names', { enabled: false })).body.namesForAgents, false);
+  assert.equal((await t.api(owner, 'GET', '/api/people/summary')).body.namesForAgents, false);
   t.script.push([{ type: 'text', text: 'ok' }]);
   await t.route(t.msg({ chat: 'g1@g.us', text: '!panduga who drives?' }));
   turn = t.userTurn(t.claudeReqs.length - 1);
   assert.match(turn, /New message from Anu \(tag: Driver\) \(participant\)/);
   assert.match(turn, /chitra_p: hello all/);
   assert.ok(!/Anu Private Book Name|Chitra Book/.test(turn), 'switched off: phone contact names never reach a model');
-  await t.api(owner, 'PUT', '/api/contacts/agent-names', { enabled: true });
+  await t.api(owner, 'PUT', '/api/people/agent-names', { enabled: true });
   // Activity names the sender as the panel knows them
   assert.ok(t.db.listActivity({ limit: 20 }).some((a) => /^Anu Private Book Name \(participant\)/.test(a.summary)));
   // a chat switched off: tags not used
@@ -210,10 +209,10 @@ test('the panel and the agent use the resolver and tags', async () => {
 
 test('admin MCP covers the names status and the optional refresh', async () => {
   const { TOOLS } = await import('../src/panel/admin-tools.js');
-  assert.ok(TOOLS.find((x) => x.name === 'contact_names_status')?.readOnly);
+  assert.ok(TOOLS.find((x) => x.name === 'people_names_status')?.readOnly);
   assert.ok(TOOLS.some((x) => x.name === 'refresh_contact_names'));
   t.channel.refreshNames = async () => [{ number: 'main', ok: true }];
-  const r = await t.api(owner, 'POST', '/api/contacts/refresh');
+  const r = await t.api(owner, 'POST', '/api/people/refresh-names');
   assert.equal(r.status, 200);
   assert.equal(r.body.numbers[0].ok, true);
 });

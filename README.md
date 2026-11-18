@@ -55,7 +55,7 @@ then takes about five taps: link WhatsApp, connect a model, pick a template, swi
 </tr>
 </table>
 
-More: [Telegram](docs/telegram.md) · [MCP tool services](docs/agents.md#tool-services-mcp) · [manage it from ChatGPT or Claude](docs/admin-mcp.md) ·
+More: [People](docs/people.md) (families, kids, notes, tags and lists) · [Telegram](docs/telegram.md) · [MCP tool services](docs/agents.md#tool-services-mcp) · [manage it from ChatGPT or Claude](docs/admin-mcp.md) ·
 [your own domain](docs/domains-and-access.md) · [how it works](docs/architecture.md).
 
 > [!WARNING]

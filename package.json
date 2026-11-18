@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-agent-duniya",
-  "version": "2.38.0",
+  "version": "2.39.0",
   "private": true,
   "description": "Self-hosted WhatsApp agent platform: AI agents for your groups and chats, any model, MCP tools, admin panel.",
   "type": "module",

@@ -17,7 +17,7 @@ import { linkRoutes } from './routes/links.js';
 import { statusRoutes } from './routes/status.js';
 import { agentRoutes } from './routes/agents.js';
 import { chatRoutes } from './routes/chats.js';
-import { contactRoutes } from './routes/contacts.js';
+import { peopleRoutes } from './routes/people.js';
 import { systemRoutes } from './routes/system.js';
 import { toolServiceRoutes } from './routes/tool-services.js';
 import { insightRoutes } from './routes/insights.js';
@@ -56,7 +56,7 @@ export function startPanel({ channel, extend = [] }) {
   statusRoutes(route, { channel }); // status, live stream, settings, activity and logging
   agentRoutes(route, { channel });
   chatRoutes(route, { channel });
-  contactRoutes(route, { channel });
+  peopleRoutes(route, { channel }); // People (078): people, households, lists
   systemRoutes(route, { channel }); // pending, secrets, usage, server metrics & maintenance, WhatsApp numbers, restart
 
   // ---------- global tool services (035): Settings → Tool services ----------

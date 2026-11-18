@@ -1,6 +1,20 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.39.0": {
+      "breaking": false,
+      "title": "People: who is who, families and kids, in one place",
+      "summary": "Contacts become People (More → People). Your saved names, notes and Shared move over by themselves on the first start; nothing to do.",
+      "changes": [
+        { "type": "new", "text": "People: everyone who writes in a chat that is on, one person across WhatsApp and Telegram, with their apps and last contact. Search by name, number, tag or note, and filter by app, tag, list or household." },
+        { "type": "new", "text": "A person's page with Family and ties (“parent of” shows as “child of” on the other page), notes and a timeline, tags and lists, and their chats." },
+        { "type": "new", "text": "Households with adults and kids. Kids without a phone can be added too; agents never message them, they are reached through the adults." },
+        { "type": "new", "text": "Merge two entries of the same person in one tap, with 30 days to undo. Export everything about a person, or erase them, including their stored messages." },
+        { "type": "new", "text": "Ask your owner assistant “who is Ravi's kid?” or “which household is Mia in?”; changes it suggests wait for your confirmation." },
+        { "type": "improved", "text": "Names in a chat's messages, group member lists and direct chats open the person's page; Find anything finds people, households and lists." },
+        { "type": "removed", "text": "The Contacts screen: saved names, notes and Shared moved into People." }
+      ]
+    },
     "2.38.0": {
       "breaking": false,
       "title": "Telegram: your agents in Telegram groups too",

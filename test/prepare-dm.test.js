@@ -167,7 +167,7 @@ test('049: the intro needs the preview\'s confirm token, the chat on and an agen
 
 test('049: owner assistant — "assign Mochi to Vedika" in one go, held for confirm; intro only with confirm', async () => {
   await t.agents.createAgent({ id: 'mochi', config: { name: 'Mochi', prompt: 'You are Mochi.', model: 'anthropic:claude-sonnet-5-5', description: 'Helps with homework' } });
-  await t.api(owner, 'PUT', '/api/contacts/41790000709', { name: 'Vedika' });
+  await t.api(owner, 'POST', '/api/people', { phone: '41790000709', name: 'Vedika' });
   t.script.push([{ type: 'text', text: 'ok' }]);
   await t.api(owner, 'POST', '/api/owner/ask', { question: 'hi' });
   assert.match(t.claudeReqs.at(-1).system, /prepare_direct_chat/, 'the assistant knows to prepare instead of asking them to write first');

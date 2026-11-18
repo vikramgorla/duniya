@@ -47,8 +47,13 @@ async function paletteItems() {
       if (sid === 'memory' || can('admin')) items.push({ kind, label: `${title} · ${label}`, words, go: `#chats/${encodeURIComponent(c.id)}/${sid}`, icon: 'chats' });
     }
   }
-  // 073: people open their page (the first 200 by name; the Contacts screen searches all of them)
-  if (can('admin')) for (const c of await api('GET', '/api/contacts?limit=200').catch(() => [])) items.push({ kind: 'Contact', label: c.name, hint: `+${c.phone}`, words: c.note || '', go: `#contacts/${encodeURIComponent(c.phone)}`, icon: 'contacts' });
+  // 078: people open their page (the first 500 by name; the People screen searches all of them), then households and lists
+  if (can('admin')) {
+    const [people, sum] = await Promise.all([api('GET', '/api/people?limit=500').catch(() => []), api('GET', '/api/people/summary').catch(() => null)]);
+    for (const p of people) items.push({ kind: 'People', label: p.name, hint: p.phone ? `+${p.phone}` : p.apps.length ? '' : 'no app', words: p.nickname || '', go: `#people/${encodeURIComponent(p.id)}`, icon: 'people' });
+    for (const x of sum?.households || []) items.push({ kind: 'Household', label: x.name, words: 'family home', go: `#people/households/${encodeURIComponent(x.id)}`, icon: 'people' });
+    for (const x of sum?.lists || []) items.push({ kind: 'List', label: x.name, words: 'group people', go: `#people/lists/${encodeURIComponent(x.id)}`, icon: 'people' });
+  }
   for (const [id, title, words] of SETTINGS_SECTIONS) items.push({ kind: 'Setting', label: title, words, go: `#settings/${id}`, icon: 'settings' });
   for (const p of ['openrouter', 'anthropic', 'openai', 'chatgpt', 'copilot', 'claudecode', 'codex'].map((id) => [id, PROVIDER_NAMES[id]])) items.push({ kind: 'Model', label: p[1], words: 'provider key connect', go: `#models/${p[0]}`, icon: 'models' });
   const admin = can('admin');

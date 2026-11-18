@@ -4,6 +4,7 @@
 import { changeWithAi as changeWithAiDialog } from './ai-helper.js';
 import { answerActions } from './answers.js';
 import { askCard } from './ask.js';
+import { tagInput } from './tags.js';
 import { S, api, ask, avatar, can, field, fieldError, h, icon, lines, menu, splitLines, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
 import { fallbackLine, fallbackPicker } from './fallback.js';
 import { browseButton } from './registry.js';
@@ -36,11 +37,11 @@ const SECTIONS = [
     sub: (x) => trunc(x.c.description || x.c.prompt || 'Not written yet', 60), build: buildCharacter },
   { group: 'What it does', id: 'where', agent: true, icon: 'chats', c: 'c3', title: () => 'Where it answers', help: 'agents.md#create-and-change-agents', line: () => 'The chats it serves, the words that wake it and who may write to it directly.',
     sub: (x) => [plural(x.chats.length, 'chat'), x.c.triggers?.length ? x.c.triggers.join(', ') : 'no wake word', `direct: ${DM_LABEL[x.c.dm]?.toLowerCase() || x.c.dm}`].join(' · '), build: buildWhere },
-  { group: 'What it does', id: 'people', agent: true, icon: 'contacts', c: 'c4', title: () => 'People', help: 'agents.md#roles', line: () => 'Organizers use organizer tools and confirm changes; everyone else is a participant.',
+  { group: 'What it does', id: 'people', agent: true, icon: 'people', c: 'c4', title: () => 'People', help: 'agents.md#roles', line: () => 'Organizers use organizer tools and confirm changes; everyone else is a participant.',
     sub: (x) => (x.c.organizers?.length ? plural(x.c.organizers.length, 'organizer') : 'Group admins are organizers'), build: buildPeople },
   { group: 'What it does', id: 'quick', agent: true, icon: 'send', c: 'c2', title: () => 'Quick replies & FAQ', help: 'agents.md#quick-replies-welcome--faq', line: () => 'Instant answers from your text: no AI, no tokens.',
     sub: (x) => { const n = (x.c.quickReplies || []).length; const f = (x.c.faq?.items || []).length; return n || f ? [n ? plural(n, 'quick reply', 'quick replies') : '', f ? plural(f, 'question') : ''].filter(Boolean).join(' · ') : 'None'; }, build: buildQuick },
-  { group: 'What it does', id: 'welcome', agent: true, icon: 'contacts', c: 'c3', title: () => 'Welcome', help: 'agents.md#quick-replies-welcome--faq', line: () => 'Greets people who join a group, once per person.',
+  { group: 'What it does', id: 'welcome', agent: true, icon: 'people', c: 'c3', title: () => 'Welcome', help: 'agents.md#quick-replies-welcome--faq', line: () => 'Greets people who join a group, once per person.',
     sub: (x) => (x.c.welcome?.enabled ? 'On' : 'Off'), build: buildWelcome },
   { group: 'What it does', id: 'schedules', icon: 'pending', c: 'c1', title: (x) => (x.bi ? 'Scheduled messages' : 'Schedules'), help: 'agents.md', line: (x) => (x.bi ? 'Sent to you in your own chat, even while agents are paused.' : 'Posts it writes by itself at set times.'),
     sub: (x) => { const s = x.c.schedules || []; return s.length ? `${plural(s.length, 'schedule')} · ${s.map((y) => y.at).join(', ')}` : 'None'; }, build: buildSchedules },
@@ -235,7 +236,7 @@ function buildPeople(x) {
     box.replaceChildren(
       pp.suggested && pp.groups.some((g) => g.members.some((m) => m.suggested)) ? h('p', { class: 'small muted' }, 'No roles saved yet: the group admins are its organizers.') : null,
       pp.groups.length ? pp.groups.map((g) => block(`${g.name} · ${plural(g.members.length, 'member')}`, g.error ? h('div', { class: 'small', style: 'color:var(--bad)' }, g.error) : null,
-        h('ul', { class: 'people' }, g.members.map((m) => h('li', {}, h('span', { class: 'who' }, h('b', {}, whoLabel(m)), tagPill(m.tag), m.admin ? h('span', { class: 'small muted' }, ' · admin') : null), role(m))))))
+        h('ul', { class: 'people' }, g.members.map((m) => h('li', {}, h('span', { class: 'who' }, h('b', {}, m.phone ? h('a', { href: `#people/${encodeURIComponent(m.phone)}` }, whoLabel(m)) : whoLabel(m)), tagPill(m.tag), m.admin ? h('span', { class: 'small muted' }, ' · admin') : null), role(m))))))
         : h('p', { class: 'small muted' }, 'Choose this agent for a group on Chats to pick people from its members.'));
   }).catch((e) => box.replaceChildren(h('p', { class: 'small muted' }, `Could not load members: ${e.message}`)));
   return { F, ready, el: h('div', {}, box,
@@ -451,7 +452,7 @@ function buildTest(x) {
   let thread = []; // #163: sent with each message
   const fresh = () => { thread = []; log.replaceChildren(); };
   const role = h('select', { 'aria-label': 'Test as role', onchange: () => { fresh(); loadTools(); } }, h('option', { value: 'participant' }, 'a participant'), h('option', { value: 'organizer' }, 'an organizer'));
-  const where = h('select', { 'aria-label': 'Test in chat', onchange: () => fresh() || hintBox.replaceChildren(x.chats.find((ch) => ch.id === where.value && !ch.enabled) ? h('div', { class: 'small', style: 'color:var(--warn)' }, 'This chat is Off: in WhatsApp the agent stays silent there.') : null) },
+  const where = h('select', { 'aria-label': 'Test in chat', onchange: () => { fresh(); hintBox.replaceChildren(x.chats.find((ch) => ch.id === where.value && !ch.enabled) ? h('div', { class: 'small', style: 'color:var(--warn)' }, 'This chat is Off: in WhatsApp the agent stays silent there.') : null); } },
     h('option', { value: 'new' }, 'a new direct chat'), x.chats.map((ch) => h('option', { value: ch.id }, `${ch.isGroup ? 'group' : 'chat'}: ${ch.name || ch.id}`)));
   const hintBox = h('div', {});
   const toolsBox = h('details', { class: 'small' }, h('summary', {}, 'Tools for this role…'));
@@ -490,29 +491,3 @@ function buildTest(x) {
   return { el: h('div', { id: 'test-console' }, h('div', { class: 'row test-as' }, h('span', { class: 'small' }, 'As'), role, h('span', { class: 'small' }, 'in'), where, restart), hintBox, toolsBox, log, form) };
 }
 
-/** 076: words as tags — Enter, comma or leaving the box adds one, × or Backspace in an empty box removes one.
- *  Returns the input (for field errors) with .values() for saving. */
-function tagInput(list, { placeholder = '', label = '' } = {}) {
-  let tags = [...list];
-  const box = h('div', { class: 'tags' });
-  const input = h('input', { placeholder, 'aria-label': label, enterkeyhint: 'enter' });
-  const changed = () => box.dispatchEvent(new Event('input', { bubbles: true })); // the section's unsaved-changes bar
-  const add = () => {
-    const words = input.value.split(',').map((w) => w.trim().toLowerCase()).filter(Boolean);
-    input.value = '';
-    if (!words.length) return false;
-    tags = [...new Set([...tags, ...words])]; draw(); return true;
-  };
-  const draw = () => box.replaceChildren(...tags.map((w) => h('span', { class: 'tag' }, w,
-    h('button', { type: 'button', class: 'tag-x', 'aria-label': `Remove ${w}`, onclick: () => { tags = tags.filter((y) => y !== w); draw(); input.focus(); changed(); } }, '×'))), input);
-  input.addEventListener('keydown', (e) => {
-    if ((e.key === 'Enter' || e.key === ',') && !e.isComposing) { e.preventDefault(); if (add()) changed(); }
-    else if (e.key === 'Backspace' && !input.value && tags.length) { tags = tags.slice(0, -1); draw(); input.focus(); changed(); }
-  });
-  input.addEventListener('blur', () => { if (add()) changed(); });
-  box.onclick = (e) => { if (e.target === box) input.focus(); };
-  draw();
-  input.values = () => [...new Set([...tags, ...input.value.split(',').map((w) => w.trim().toLowerCase()).filter(Boolean)])];
-  input.box = box;
-  return input;
-}

@@ -8,6 +8,7 @@
 //   - retention and health (069): free disk space every tick; old data pruned in bounded batches at most hourly
 //     (retention.js) — also while memory is tight (pruning makes things smaller); a WhatsApp number that keeps
 //     reconnecting for 15 minutes is reported to the owner once
+//   - People (078): merge undo records older than 30 days (at most 200 per tick)
 //   - agent apps (074): turns whose tool calls nobody answered are ended; idle app runtimes (Copilot) are stopped
 // Names and group refreshes are skipped while memory is tight (optional work, resources.js).
 import { optionalPaused } from './resources.js';
@@ -18,6 +19,7 @@ import { isGroup } from '../channels/index.js';
 import { retentionTick } from './retention.js';
 import { sendOwnerAlert } from './owner-alerts.js';
 import { appsTick } from './providers/apps.js';
+import { pruneMerges } from './people-ops.js';
 
 const GROUP_EVERY_MS = 12 * 3600000;
 const DOWN_ALERT_MS = 15 * 60000;
@@ -51,6 +53,7 @@ export async function upkeepTick(channel, now = Date.now()) {
   const done = { retries: 0, names: false, groups: 0, prune: null };
   try {
     try { done.prune = retentionTick(now); } catch (e) { activity('error', { summary: `Pruning old data failed: ${e.message}` }); }
+    try { pruneMerges(now); } catch { /* 078: retried next tick */ }
     try { appsTick(now); } catch { /* 074: agent apps — abandoned turns, idle runtimes; never blocks upkeep */ }
     await channelHealth(channel, now);
     try { done.retries = await historyRetryTick(now); } catch (e) { activity('error', { summary: `History retry failed: ${e.message}` }); }

@@ -741,13 +741,22 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
 .qfix { display: inline-flex; align-items: center; min-height: 40px; padding: 0 2px; border: 0; background: none; font: inherit; font-size: var(--fs-s); font-weight: 600;
   color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 @media (prefers-color-scheme: light) { .qfix { color: var(--info); } }
-.contact-list { list-style: none; margin: var(--s2) 0 0; padding: 0; }
-.contact-list { margin-left: calc(-1 * var(--s2)); margin-right: calc(-1 * var(--s2)); }
-/* 073: a person's page — header, Shared, their direct chat and groups as rows */
+.people-list { list-style: none; margin: var(--s2) calc(-1 * var(--s2)) 0; padding: 0; }
+.people-list li + li { border-top: 1px solid var(--line); }
+/* 073, 078: a person's page (People) — header, then Family and ties, Notes and timeline, Tags and lists, chats as rows */
 .person-page .lgroup { margin: var(--s3) calc(-1 * var(--s2)) 0; }
 .person-page .lgroup li + li { border-top: 1px solid var(--line); }
+.person-page .lempty { padding: 4px 10px; }
+.person-page .lgroup li.has-end { display: flex; align-items: center; } .person-page .lgroup li.has-end > .lrow { flex: 1; min-width: 0; }
+.person-page .lgroup .eyebrow .help { margin-left: 4px; }
+.pnav a { padding: 5px 12px; border-radius: 8px; color: var(--muted); font-size: var(--fs-s); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
+.pnav a.on { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(16,18,22,.12); }
+.btn.rm { min-width: 40px; min-height: 40px; }
+#main .ld-tools input[type=search] { flex: 1 1 60%; min-width: 0; } #main .ld-tools select { flex: 0 1 260px; min-width: 0; }
+.lmark.l { width: 48px; height: 48px; font-size: 20px; }
+.note-add { display: flex; gap: 8px; align-items: flex-end; padding: 0 10px 8px; } .note-add textarea { flex: 1; min-height: 44px; font: inherit; }
+.timeline { list-style: none; margin: 0; padding: 0; } .timeline li { padding: 8px 10px; overflow-wrap: anywhere; } .timeline li.event { font-size: var(--fs-s); }
 button.lrow { width: 100%; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
-.contact-list li + li { border-top: 1px solid var(--line); }
 
 /* Review & teach (070) */
 .pend { list-style: none; margin: 0; padding: 0; }

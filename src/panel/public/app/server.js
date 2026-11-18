@@ -71,7 +71,7 @@ function healthCard(x, redraw) {
     h('h2', {}, 'Health'),
     state ? h('div', { class: `note ${state[0]}`, role: 'status' }, state[1]) : h('p', { class: 'small muted', style: 'margin:0' }, h('span', { class: 'dot ok', 'aria-hidden': 'true' }), ` ${summary}`),
     h('details', {}, h('summary', { class: 'small' }, 'Details'),
-      h('p', { class: 'small muted' }, 'Old data is pruned by itself every hour. Summaries, notes, contacts and settings are never pruned.'),
+      h('p', { class: 'small muted' }, 'Old data is pruned by itself every hour. Summaries, notes, People and settings are never pruned.'),
       h('div', { class: 'tscroll' }, h('table', {}, h('tbody', {}, rows.map(([k, v]) => h('tr', {}, h('td', { class: 'muted small' }, k), h('td', {}, v))))))),
     owner ? h('details', {}, h('summary', { class: 'small' }, 'Change how long data is kept'),
       field('Stored messages: days', F.messagesDays, 'Agents remember older talk through the chat summary.'), field('Stored messages: at most per chat', F.messagesPerChat),

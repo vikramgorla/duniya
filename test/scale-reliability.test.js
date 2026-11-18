@@ -94,10 +94,10 @@ test('two backups in the same second get different names', async () => {
   assert.ok(list.includes(a.file) && list.includes(b.file));
 });
 
-test('contacts page through the server: limit and offset', async () => {
-  for (let i = 0; i < 25; i++) t.db.db.prepare("INSERT OR REPLACE INTO contacts (tenant_id, phone, name, own, updated_at) VALUES ('default', ?, ?, 1, 0)").run(`4179555${String(i).padStart(4, '0')}`, `Page ${String(i).padStart(2, '0')}`);
-  const p1 = (await t.api(owner, 'GET', '/api/contacts?q=page&limit=10&offset=0')).body;
-  const p3 = (await t.api(owner, 'GET', '/api/contacts?q=page&limit=10&offset=20')).body;
+test('People page through the server: limit and offset', async () => {
+  for (let i = 0; i < 25; i++) await t.api(owner, 'POST', '/api/people', { phone: `4179555${String(i).padStart(4, '0')}`, name: `Page ${String(i).padStart(2, '0')}` });
+  const p1 = (await t.api(owner, 'GET', '/api/people?q=page&limit=10&offset=0')).body;
+  const p3 = (await t.api(owner, 'GET', '/api/people?q=page&limit=10&offset=20')).body;
   assert.deepEqual([p1.length, p3.length], [10, 5]);
   assert.equal(p1[0].name, 'Page 00'); assert.equal(p3[4].name, 'Page 24');
 });

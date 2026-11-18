@@ -32,7 +32,7 @@ tools out, a panel on top.**
 |---|---|
 | **Sign-in** | [Google](google-sign-in.md) (owners invite by email; *Only allow Sign in with Google* turns passwords off) or a password |
 | **Channels** | `src/channels/`: the catalogue (`index.js`: ids and capabilities), the hub (`hub.js`), one folder per adapter (`whatsapp/`, `telegram/`); [adding a channel](development.md#adding-a-channel) |
-| **People** | one person id per human with their identities per channel; the same phone number joins them; on Telegram, a person's number counts only when they share their own contact (`src/core/people.js`) |
+| **People** (PRM core) | one person per human with their identities per channel (the same verified phone number joins them; on Telegram, a person's number counts only when they share their own contact), plus what the owner knows: name, nickname, birthday, ties with a named inverse, households (adults and kids, kids may have no identity), notes and timeline, tags and lists; merge with 30-day undo, export, erase (`src/core/people.js`, `people-ops.js`, [People](people.md)) |
 | **Data** | SQLite in `DATA_DIR`, WhatsApp sessions, local backups; secrets encrypted, files mode 0600 |
 | **Code map** | [AGENTS.md → Architecture map](../AGENTS.md#architecture-map) |
 | **Specs / design** | [`specs/`](../specs) · [DESIGN.md](../DESIGN.md) |

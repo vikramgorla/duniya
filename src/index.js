@@ -19,10 +19,12 @@ import { historyPhoneOnline, resumeHistoryRetries } from './core/history-load.js
 import { markGroupDue } from './core/upkeep.js';
 import { stopQueue } from './core/media-queue.js';
 import { db } from './core/db.js';
+import { migrateContacts } from './core/people-ops.js';
 
 await loadAgents();
 { const s = serverSize(); console.log(`Server: ${s.size} (${s.effectiveMb} MB RAM${s.cgroupLimitMb ? ' container limit' : ''}, ${s.cpus} CPU)`); }
 startResourceWatch();
+migrateContacts(); // 078, one release only: saved contacts move into People
 console.log(`Agents: ${listAgents().map((b) => `${b.id}${b.enabled ? '' : ' (disabled)'}`).join(', ') || 'none'}`);
 
 // 075: the channel hub loads a channel (WhatsApp: Baileys; 077: Telegram) only when it is set up and on

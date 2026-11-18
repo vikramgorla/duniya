@@ -5,7 +5,7 @@
 //   node scripts/measure-scale.mjs --small → a smaller fixture (CI smoke run, ~10 s)
 //
 // Fixture: 300 chats (20 on) over 3 numbers, 30 agents, 200k stored messages (80 days), 50k activity rows, 20k usage
-// rows, 5k contacts. Parts: startup in a fresh process on 1 CPU (taskset) with a 700 MB heap cap, RSS, panel API
+// rows, 5k people (with phone contact names). Parts: startup in a fresh process on 1 CPU (taskset) with a 700 MB heap cap, RSS, panel API
 // latencies (median / p95 of 15), live stream fan-out to 20 panels, router throughput, database size, query plans.
 import { spawn } from 'node:child_process';
 import { statSync, existsSync } from 'node:fs';
@@ -70,8 +70,16 @@ tx(() => {
   for (let i = 0; i < N.activity; i++) act.run(now - Math.round((N.activity - i) / N.activity * 60 * DAY), types[i % types.length], `agent-${i % N.agents}`, chats[i % N.on], `Entry ${i}`, i % 3 ? '' : JSON.stringify({ text: 'x'.repeat(200) }));
   const use = db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kind, input, output, cost, priced, account, fallback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
   for (let i = 0; i < N.usage; i++) use.run(now - Math.round((N.usage - i) / N.usage * 300 * DAY), `agent-${i % N.agents}`, chats[i % N.on], 'anthropic', 'claude-sonnet-5-5', 'reply', 1200, 300, 0.0081, 'set', 'anthropic', '');
-  const con = db.prepare('INSERT OR REPLACE INTO contacts (tenant_id, phone, name, book_name, push_name, note, shared, own, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
-  for (let i = 0; i < N.contacts; i++) con.run('default', `4179${String(5000000 + i)}`, i % 10 ? '' : `Own ${i}`, `Contact ${i}`, `push${i}`, '', i % 7 ? 0 : 1, i % 10 ? 0 : 1, now);
+  // 078: People — phone contact names, one person per number with a WhatsApp identity, every tenth with an own name
+  const con = db.prepare('INSERT OR REPLACE INTO contacts (tenant_id, phone, book_name, push_name, updated_at) VALUES (?, ?, ?, ?, ?)');
+  const per = db.prepare('INSERT OR REPLACE INTO people (tenant_id, id, phone, created_at, name, shared) VALUES (?, ?, ?, ?, ?, ?)');
+  const ide = db.prepare('INSERT OR REPLACE INTO identities (tenant_id, channel, external_id, person, phone, first_seen, last_seen, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  for (let i = 0; i < N.contacts; i++) {
+    const phone = `4179${String(5000000 + i)}`;
+    con.run('default', phone, `Contact ${i}`, `push${i}`, now);
+    per.run('default', `p_${String(i).padStart(12, '0')}`, phone, now, i % 10 ? '' : `Own ${i}`, i % 7 ? 0 : 1);
+    ide.run('default', 'whatsapp', `${phone}@s.whatsapp.net`, `p_${String(i).padStart(12, '0')}`, phone, now - i * 1000, now - i * 1000, `push${i}`);
+  }
 });
 const seedMs = performance.now() - seed0;
 db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
@@ -85,7 +93,7 @@ const paths = [
   ['activity (first page)', '/api/activity?limit=200'], ['activity (older page)', `/api/activity?limit=200&before=${midAct}`],
   ['activity (one agent)', '/api/activity?limit=200&agent=agent-7'], ['activity (one chat)', `/api/activity?limit=200&chat=${encodeURIComponent(chats[3])}`],
   ['usage (30 days by agent)', '/api/usage?period=30d&groupBy=agent'], ['usage (all, by day)', '/api/usage?period=all&groupBy=day'], ['usage summary', '/api/usage/summary'],
-  ['contacts (first page)', '/api/contacts'], ['contacts (search)', '/api/contacts?q=contact%2012'], ['contacts summary', '/api/contacts/summary'],
+  ['people (first page)', '/api/people'], ['people (search)', '/api/people?q=contact%2012'], ['people summary', '/api/people/summary'], ['person page', '/api/people/p_000000000012'],
   ['chat messages', `/api/chats/${encodeURIComponent(someChat)}/messages?limit=50`], ['silences (7 days)', '/api/silences?days=7'],
   ['server health', '/api/server/health'],
   ['search messages (one hit)', '/api/search/messages?q=123456'], ['search messages (every message matches)', '/api/search/messages?q=station'],
@@ -175,7 +183,7 @@ const file = join(process.env.DATA_DIR, 'duniya.sqlite');
 const size = (f) => (existsSync(f) ? statSync(f).size : 0);
 const pg = db.prepare('PRAGMA page_count').get().page_count * db.prepare('PRAGMA page_size').get().page_size;
 const free = db.prepare('PRAGMA freelist_count').get().freelist_count * db.prepare('PRAGMA page_size').get().page_size;
-const counts = Object.fromEntries(['messages', 'activity', 'usage', 'contacts', 'chats_seen'].map((x) => [x, db.prepare(`SELECT COUNT(*) AS n FROM ${x}`).get().n]));
+const counts = Object.fromEntries(['messages', 'activity', 'usage', 'contacts', 'people', 'chats_seen'].map((x) => [x, db.prepare(`SELECT COUNT(*) AS n FROM ${x}`).get().n]));
 const dbInfo = { 'file MB': +(size(file) / 1048576).toFixed(1), 'wal MB': +(size(`${file}-wal`) / 1048576).toFixed(1), 'pages MB': +(pg / 1048576).toFixed(1), 'free MB': +(free / 1048576).toFixed(1), ...counts };
 const plans = Object.fromEntries([
   ['activity, one chat', `SELECT * FROM activity WHERE chat = 'x' ORDER BY id DESC LIMIT 200`],

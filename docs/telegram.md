@@ -50,7 +50,7 @@ Members can see in the member list whether a bot reads all messages.
 
 ## Share my number: one person on both apps
 
-Telegram never tells bots phone numbers. So that roles (organizers, participants), contact names and your
+Telegram never tells bots phone numbers. So that roles (organizers, participants), names in People and your
 [owner assistant](owner-assistant.md) work on Telegram:
 
 1. The person opens a direct chat with the bot (**Open a direct chat** on the Telegram page, or `t.me/your_bot`) and

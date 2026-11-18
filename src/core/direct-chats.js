@@ -10,7 +10,7 @@ import { TENANT, getSetting } from './store.js';
 import { getAgent, bindChat, agentForChat } from './agents.js';
 import { getChatPrefs, setChatPrefs, seenChats } from './chat-prefs.js';
 import { setCap } from './budget.js';
-import { getContact } from './contacts.js';
+import { personInfo } from './contacts.js';
 import { activity } from './events.js';
 import { dmNoticeOnce, dmNoticePending } from './privacy-notice.js';
 import { putTtl, takeTtl } from './ttl-store.js';
@@ -108,10 +108,9 @@ export function resolveDirectChat(msg) {
 
 // ---------------------------------------------------------------- views
 function view(row, prefs = getChatPrefs(row.chat)) {
-  const contact = getContact(row.phone);
-  const n = numbersList().find((x) => x.id === row.number);
+    const n = numbersList().find((x) => x.id === row.number);
   return {
-    chat: row.chat, phone: row.phone, name: contact?.name || `+${row.phone}`, number: row.number, numberLabel: n?.label || row.number,
+    chat: row.chat, phone: row.phone, name: personInfo({ phone: row.phone }).label, number: row.number, numberLabel: n?.label || row.number,
     agent: agentForChat(row.chat)?.id || '', enabled: prefs.enabled, private: prefs.private, model: prefs.model, logging: prefs.logging,
     onWhatsApp: row.on_whatsapp == null ? null : !!row.on_whatsapp, waiting: !row.first_at, firstAt: row.first_at || null,
     introAt: row.intro_at || null, createdAt: row.created_at, createdBy: row.created_by,
@@ -127,7 +126,7 @@ export async function checkDirectNumber({ phone, number } = {}, { channel } = {}
   const n = resolveNumber(number);
   const look = await lookup(channel, n.id, d);
   const chat = targetChat(n.id, d);
-  return { phone: d, number: n.id, chat, name: getContact(d)?.name || '', onWhatsApp: look.onWhatsApp, existing: getDirectChat(chat), warning: lookWarning(look) };
+  return { phone: d, number: n.id, chat, name: personInfo({ phone: d }).name, onWhatsApp: look.onWhatsApp, existing: getDirectChat(chat), warning: lookWarning(look) };
 }
 
 async function lookup(channel, number, phone) {
@@ -220,7 +219,7 @@ const defaultIntro = (agent, name) => {
 /** What "Send intro now" would send: { chat, to, agent, text, notice, token } — the token confirms exactly this text. */
 export function introPreview(chat, { text } = {}) {
   const { agent, phone } = introTarget(chat);
-  const name = phone ? getContact(phone)?.name || `+${phone}` : chat;
+  const name = phone ? personInfo({ phone }).label : chat;
   const body = String(text ?? '').trim() || defaultIntro(agent, name);
   if (body.length > 1000) throw bad('Keep the intro under 1000 characters', 'text');
   const notice = dmNoticePending(phone || chat);

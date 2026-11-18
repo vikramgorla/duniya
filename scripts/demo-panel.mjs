@@ -215,6 +215,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   await system.osUpdates(); // #96: the Server tab badge counts from the last check
   const backup = await imp('src/core/backup/index.js');
   const contacts = await imp('src/core/contacts.js');
+  const pp = await imp('src/core/people.js');
   const globalMcp = await imp('src/core/global-mcp.js');
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
   const { createHub } = await imp('src/channels/hub.js');
@@ -365,9 +366,33 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const tags = await imp('src/core/member-tags.js');
   for (const [i, label] of [[0, 'Class rep'], [2, 'Treasurer'], [4, 'Snacks']]) tags.saveMemberTag({ chat: G(1), participant: `${P(i + 1)}@s.whatsapp.net`, phone: P(i + 1), label });
   for (const [i, label] of [[1, 'Driver'], [7, 'Driver']]) tags.saveMemberTag({ chat: G(3), participant: `${P(i + 1)}@s.whatsapp.net`, phone: P(i + 1), label });
-  contacts.saveContact({ phone: `+${P(20)}`, name: 'Dr. Meier (paediatrician)', note: 'Mon–Fri 8–12, Rue de Lausanne 14, 1110 Morges — call before 11', shared: true }, 'admin');
-  contacts.saveContact({ phone: `+${P(21)}`, name: 'Taxi Morges', note: 'Night line', shared: true }, 'admin');
-  contacts.saveContact({ phone: `+${P(3)}`, name: 'Lea Fontaine-Bernasconi', note: 'Car-pool organizer, prefers voice notes' }, 'admin');
+  // 078: People — everyone who wrote (WhatsApp; Jonas also on Telegram), saved people, two households with kids
+  // without an app, ties, notes, tags and lists. Fake numbers only.
+  const pid = people.map((name, i) => pp.personFor({ channel: 'whatsapp', externalId: `${P(i + 1)}@s.whatsapp.net`, phone: P(i + 1), name }));
+  pp.personFor({ channel: 'telegram', externalId: '700100', phone: P(6), name: 'Jonas' });
+  const meier = pp.createPerson({ phone: P(20), name: 'Dr. Meier (paediatrician)', shared: true }, 'admin');
+  pp.addNote(meier.id, { text: 'Mon–Fri 8–12, Rue de Lausanne 14, 1110 Morges — call before 11', author: 'admin' });
+  const taxi = pp.createPerson({ phone: P(21), name: 'Taxi Morges', shared: true }, 'admin');
+  pp.addNote(taxi.id, { text: 'Night line', author: 'admin' });
+  pp.updatePerson(pid[2], { name: 'Lea Fontaine-Bernasconi', nickname: 'Lea', birthday: '--06-14' });
+  pp.addNote(pid[2], { text: 'Car-pool organizer, prefers voice notes', author: 'admin' });
+  pp.addNote(pid[2], { text: 'Asked for Friday morning rides until December', by: 'agent', author: 'Carpool' });
+  const kids = [['Vedika', '2016-04-23'], ['Kabir', '2019-09-02'], ['Noé', '2017-01-30']].map(([name, birthday]) => pp.createPerson({ name, birthday }, 'admin'));
+  const chary = pp.saveHousehold({ name: 'Chary family', address: 'Chemin des Vignes 3, 1110 Morges' });
+  for (const [id, role] of [[pid[0], 'adult'], [pid[3], 'adult'], [kids[0].id, 'kid'], [kids[1].id, 'kid']]) pp.setHouseholdMember(chary.id, id, role);
+  const font = pp.saveHousehold({ name: 'Fontaine family' });
+  for (const [id, role] of [[pid[2], 'adult'], [pid[1], 'adult'], [kids[2].id, 'kid']]) pp.setHouseholdMember(font.id, id, role);
+  pp.addTie(pid[0], pid[3], { kind: 'partner' });
+  for (const k of [kids[0], kids[1]]) { pp.addTie(pid[0], k.id, { kind: 'parent' }); pp.addTie(pid[3], k.id, { kind: 'parent' }); }
+  pp.addTie(kids[0].id, kids[1].id, { kind: 'sibling' });
+  pp.addTie(pid[2], kids[2].id, { kind: 'parent' }); pp.addTie(pid[1], pid[2], { kind: 'partner' });
+  pp.addTie(pid[6], kids[0].id, { kind: 'custom', label: 'Godmother of', inverse: 'Goddaughter of' });
+  pp.addTie(pid[3], pid[7], { kind: 'works_with' });
+  for (const [i, tags] of [[0, ['parents-council']], [3, ['badminton', 'driver']], [5, ['badminton']], [7, ['driver']], [1, ['driver']], [9, ['badminton', 'neighbour']]]) pp.setTags(pid[i], tags);
+  const bad = pp.saveList({ name: 'Badminton Tuesdays' });
+  for (const i of [3, 5, 9, 11]) pp.setListMember(bad.id, pid[i]);
+  const xmas = pp.saveList({ name: 'Christmas cards' });
+  for (const id of [pid[0], pid[2], pid[6], meier.id]) pp.setListMember(xmas.id, id);
   db.addPending({ code: 'K7Q2', agent: 'carpool', server: 'calendar', confirmTool: 'confirm', confirmId: 'cf_demo_1', tool: 'events_create', chat: G(3), requester: P(2), summary: 'Add “Friday ride: Marc 07:40 Morges → Geneva” to the shared calendar', expires: now + 50 * MIN });
 
   // activity

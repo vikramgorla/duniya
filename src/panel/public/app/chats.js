@@ -9,19 +9,19 @@ import { helpLink, loadModels, modelSelect, plural, quietLine, usageLine } from 
 import { capEditor, usageSummary } from './usage.js';
 let chatsFilter = 'all';
 let chatsQuery = ''; // 062: Find a chat
-/** 049 (#92): set up a direct chat by phone number (or a contact) before the person writes. */
+/** 049 (#92): set up a direct chat by phone number (or someone in People) before the person writes. */
 function addDirectChatCard(agents, { pre = null, onDone } = {}) {
   const numbers = (S.status?.channel?.numbers || []).length ? S.status.channel.numbers : [{ id: 'main', label: 'Main' }];
   const phone = h('input', { placeholder: '+41 79 123 45 67', inputmode: 'tel', autocomplete: 'off', value: pre?.phone ? `+${pre.phone}` : '', 'aria-label': 'Phone number with country code' });
-  const who = h('div', { class: 'small muted', style: 'margin-top:4px;min-height:1.2em' }, pre?.name ? `Contact: ${pre.name}` : '');
-  const search = h('input', { type: 'search', placeholder: 'Or search your contacts', 'aria-label': 'Search contacts' });
+  const who = h('div', { class: 'small muted', style: 'margin-top:4px;min-height:1.2em' }, pre?.name ? `Person: ${pre.name}` : '');
+  const search = h('input', { type: 'search', placeholder: 'Or search People', 'aria-label': 'Search People' });
   const hits = h('div', { class: 'row', style: 'gap:6px;margin-top:6px' });
   let timer;
   search.oninput = () => { clearTimeout(timer); timer = setTimeout(async () => {
     const q = search.value.trim(); if (!q) { hits.replaceChildren(); return; }
-    const list = await api('GET', `/api/contacts?q=${encodeURIComponent(q)}&limit=6`).catch(() => []);
-    hits.replaceChildren(...list.slice(0, 6).map((c) => h('button', { type: 'button', class: 'btn small', onclick: () => { phone.value = `+${c.phone}`; who.textContent = `Contact: ${c.name}`; hits.replaceChildren(); search.value = ''; check(); } }, `${c.name} · +${c.phone}`)),
-      list.length ? null : h('span', { class: 'small muted' }, 'No contact matches.'));
+    const list = await api('GET', `/api/people?q=${encodeURIComponent(q)}&limit=12`).catch(() => []);
+    hits.replaceChildren(...list.filter((c) => c.phone).slice(0, 6).map((c) => h('button', { type: 'button', class: 'btn small', onclick: () => { phone.value = `+${c.phone}`; who.textContent = `Person: ${c.name}`; hits.replaceChildren(); search.value = ''; check(); } }, `${c.name} · +${c.phone}`)),
+      list.length ? null : h('span', { class: 'small muted' }, 'Nobody in People matches.'));
   }, 250); };
   const number = h('select', { 'aria-label': 'WhatsApp number' }, numbers.map((n) => h('option', { value: n.id }, n.label || n.id)));
   const agent = h('select', { 'aria-label': 'Agent' }, h('option', { value: '' }, '— no agent yet —'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id }, b.name + (b.enabled ? '' : ' (off)'))));
@@ -49,7 +49,7 @@ function addDirectChatCard(agents, { pre = null, onDone } = {}) {
   h('p', { class: 'small muted sec-line' }, 'Their first message goes straight to the agent. Nothing is sent to them.'),
   h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px' },
     h('div', {}, h('label', {}, 'Phone number'), phone, who, status),
-    h('div', {}, h('label', {}, 'From contacts'), search, hits),
+    h('div', {}, h('label', {}, 'From People'), search, hits),
     numbers.length > 1 ? field('WhatsApp number', number, 'The number this person will write to.') : null,
     field('Agent', agent)),
   h('div', { class: 'row spread', style: 'margin-top:10px' },
@@ -130,7 +130,7 @@ const emptyChats = () => (!(S.status?.channel?.channels || []).some((c) => c.con
 const CHAT_SECTIONS = [
   { id: 'messages', icon: 'chats', c: 'c3', title: 'Messages', admin: true, help: 'chats.md#messages-and-memory', line: 'Who said what, with the 👍 / 👎 of each answer. Each look is recorded in Activity.' },
   { id: 'memory', icon: 'notes', c: 'c2', title: 'Memory', help: 'chats.md#messages-and-memory', line: 'What the agent remembers here: a running summary and notes.' },
-  { id: 'group', icon: 'contacts', c: 'c4', title: 'WhatsApp group', admin: true, group: true, help: 'chats.md#whatsapp-group-tools', line: 'Changes happen in WhatsApp at once. Most need the agents’ number to be a group admin.' },
+  { id: 'group', icon: 'people', c: 'c4', title: 'WhatsApp group', admin: true, group: true, help: 'chats.md#whatsapp-group-tools', line: 'Changes happen in WhatsApp at once. Most need the agents’ number to be a group admin.' },
 ];
 /** 077: the chat's app ("Telegram", "WhatsApp"), for the group section's title and wording. */
 const appOf = (c) => (c?.channel === 'telegram' ? 'Telegram' : 'WhatsApp');
@@ -158,9 +158,9 @@ function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
   function home() {
     const savePrefs = (patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${enc}/prefs`, patch)); refresh(c); return true; }, 'Saved');
     const agentLink = h('span', {});
-    // 073: chat ↔ person — a direct chat links to the person's contact page
+    // 073, 078: chat ↔ person — a direct chat links to the person's page in People
     const drawLink = () => agentLink.replaceChildren(c.agent ? h('a', { href: `#agents/${encodeURIComponent(c.agent)}` }, `Open ${agents.find((x) => x.id === c.agent)?.name || 'agent'} ›`) : null,
-      !c.isGroup && c.phone && can('admin') ? [c.agent ? ' · ' : '', h('a', { href: `#contacts/${encodeURIComponent(c.phone)}` }, 'Contact page ›')] : null);
+      !c.isGroup && c.phone && can('admin') ? [c.agent ? ' · ' : '', h('a', { href: `#people/${encodeURIComponent(c.phone)}` }, 'Person page ›')] : null);
     drawLink();
     const agentSel = h('select', { disabled: !admin, onchange: (e) => tryApi(async () => {
       // 062: choosing an agent for a chat that is Off switches it on too (one step instead of two)
@@ -276,7 +276,7 @@ function groupView(c) {
       linkBox, h('button', { class: 'btn small', onclick: (e) => { e.currentTarget.remove(); showLink(); } }, 'Show invite link'),
       h('details', { style: 'margin-top:14px' }, h('summary', { class: 'small', style: 'cursor:pointer' }, `Members (${g.participants.length})`),
         h('ul', { class: 'wa-members' }, g.participants.map((p) => h('li', {},
-          h('span', {}, h('b', {}, whoLabel(p)), tagPill(p.tag), p.name && p.phone ? h('span', { class: 'small muted num' }, ` +${p.phone}`) : null),
+          h('span', {}, h('b', {}, p.phone ? h('a', { href: `#people/${encodeURIComponent(p.phone)}` }, whoLabel(p)) : whoLabel(p)), tagPill(p.tag), p.name && p.phone ? h('span', { class: 'small muted num' }, ` +${p.phone}`) : null),
           p.admin ? h('span', { class: 'pill ok' }, p.admin === 'superadmin' ? 'owner' : 'admin') : null)))));
   }
   load();
@@ -306,7 +306,7 @@ function messagesView(c, agents, q0 = '', at = 0) {
     const text = highlight(m.text, searchWords(shown));
     if (!m.fromAgent) {
       return h('div', { class: `bubble agent${m.id === at ? ' hit' : ''}`, 'data-msg': m.id },
-        h('div', { class: 'small msg-who' }, m.name || (m.sender ? `+${m.sender}` : 'someone'), m.tag ? ` (${m.tag})` : '', ` · ${time(m.ts)}`, m.addressed ? ' · to the agent' : ''),
+        h('div', { class: 'small msg-who' }, m.sender && can('admin') ? h('a', { href: `#people/${encodeURIComponent(m.sender)}` }, m.name || `+${m.sender}`) : m.name || (m.sender ? `+${m.sender}` : 'someone'), m.tag ? ` (${m.tag})` : '', ` · ${time(m.ts)}`, m.addressed ? ' · to the agent' : ''),
         m.quoted ? h('div', { class: 'small msg-quote' }, m.quoted) : null, h('span', {}, text));
     }
     const name = agentOf(m.agent); const av = avatar(name, m.agent || 'agent', 's');

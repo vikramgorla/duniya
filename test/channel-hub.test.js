@@ -189,8 +189,8 @@ test('075: the router notes who wrote, only for chats that are on', async () => 
   await t.route(t.msg({ chat: 'g7@g.us', phone: '41790000803', senderJid: '41790000803@s.whatsapp.net', text: 'hello' }));
   assert.equal(people.personByPhone('41790000803'), null, 'a chat that is off stores nothing, not even who wrote');
   const owner = await t.login();
-  const r = await t.api(owner, 'GET', '/api/contacts/41790000802/person');
-  assert.deepEqual(r.body.channels, ['whatsapp']);
+  const r = await t.api(owner, 'GET', '/api/people/41790000802');
+  assert.deepEqual(r.body.apps, ['whatsapp']);
 });
 
 test('075: a fresh install never loads Baileys; switching WhatsApp on does', () => {
