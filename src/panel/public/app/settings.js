@@ -48,6 +48,7 @@ export async function renderSettings() {
     'privacy-notice': notice ? privacyNoticeCard(notice) : null,
     'photos-voice': await photosVoiceCard().catch(loadErr('Photos & voice')),
     'sending-pace': await api('GET', '/api/pace').then(paceCard, loadErr('Sending pace')),
+    modules: await api('GET', '/api/modules').then(modulesCard, loadErr('Modules')),
     secrets: can('admin') ? await secretsCard().catch(loadErr('Secrets')) : null,
     users: owner ? usersCard(users, inv, signin) : null,
     'sign-in': owner && signin ? signinCard(signin) : null,
@@ -79,14 +80,14 @@ export async function renderSettings() {
   $('#main').replaceChildren(listDetail({ screen: 'settings', title: 'Settings', page: (id) => by[id],
     groups: [{ title: 'Channels', items: channels }, ...SETTINGS_GROUPS.map(([g, ids]) => ({ title: g, items: ids.filter((id) => by[id]).map((id) => ({ id, name: title[id], sub: SECTION_SUB[id], mark: h('span', { class: `lmark ${SECTION_ICON[id][1]}`, 'aria-hidden': 'true' }, icon(SECTION_ICON[id][0])) })) }))] }));
 }
-const SETTINGS_GROUPS = [['Agents & chats', ['tool-services', 'owner-assistant', 'direct-messages', 'privacy-notice', 'photos-voice', 'sending-pace']],
+const SETTINGS_GROUPS = [['Agents & chats', ['tool-services', 'owner-assistant', 'direct-messages', 'privacy-notice', 'photos-voice', 'sending-pace', 'modules']],
   ['People & sign-in', ['users', 'sign-in', 'google', 'assistants', 'password', 'my-google']], ['Server', ['updates', 'web-access', 'secrets', 'logging', 'small-mode']],
   ['Help', ['getting-started', 'whatsapp-helpers', 'release-notes']]];
-const SECTION_ICON = { 'tool-services': ['models', 'c4'], 'owner-assistant': ['agents', 'c5'], 'direct-messages': ['chats', 'c3'], 'privacy-notice': ['shield', 'c3'], 'photos-voice': ['image', 'c2'], 'sending-pace': ['pending', 'c1'],
+const SECTION_ICON = { 'tool-services': ['models', 'c4'], 'owner-assistant': ['agents', 'c5'], 'direct-messages': ['chats', 'c3'], 'privacy-notice': ['shield', 'c3'], 'photos-voice': ['image', 'c2'], 'sending-pace': ['pending', 'c1'], modules: ['people', 'c2'],
   users: ['people', 'c4'], 'sign-in': ['lock', 'c0'], google: ['globe', 'c4'], assistants: ['agents', 'c1'], password: ['secrets', 'c0'], 'my-google': ['people', 'c0'],
   'web-access': ['globe', 'c3'], secrets: ['secrets', 'c1'], logging: ['activity', 'c0'], 'small-mode': ['server', 'c0'], updates: ['refresh', 'c5'], 'getting-started': ['overview', 'c5'], 'whatsapp-helpers': ['chats', 'c0'], 'release-notes': ['notes', 'c2'] };
 const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assistant': 'Your own chat, alerts, weekly summary', 'direct-messages': 'Direct messages, earlier messages',
-  'privacy-notice': 'What groups are told', 'photos-voice': 'Pictures, voice notes, speech', 'sending-pace': 'Read receipts, typing, new chats a day', users: 'Who can use this panel', 'sign-in': 'Passwords or Google only',
+  'privacy-notice': 'What groups are told', 'photos-voice': 'Pictures, voice notes, speech', 'sending-pace': 'Read receipts, typing, new chats a day', modules: 'Events, orders and payments', users: 'Who can use this panel', 'sign-in': 'Passwords or Google only',
   google: 'Google sign-in client', assistants: 'ChatGPT, Claude and other MCP clients', password: 'Change your password', 'my-google': 'Link your Google account',
   'web-access': 'Domain, HTTPS, who may open the panel', secrets: 'Keys and tokens', logging: 'What is recorded, for how long', 'small-mode': 'Heavier features on a small server', updates: 'Version, automatic updates, last update',
   'getting-started': 'The first-run guide', 'whatsapp-helpers': 'Commands in WhatsApp', 'release-notes': "What's new in each version" };
@@ -660,6 +661,21 @@ function paceCard(st) {
     seg, line, custom,
     can('admin') ? h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: save }, 'Save') : null,
     h('p', { class: 'small muted', style: 'margin-bottom:0' }, `Today: ${t.used} of ${t.cap} new chats${t.warmup ? ' (a newly linked number starts lower and grows over a week)' : ''}. Replies type for at most 8 seconds. Sending to ${st.example.count} people would take about ${st.example.days > 1 ? `${st.example.days} days` : `${Math.round(st.example.minutes / 6) / 10} hours`} at this pace; hours are in ${st.timezone}.`));
+  return card;
+}
+
+// ---------- Settings → Modules (081): built-in features on People, each on or off; Orders' payment methods ----------
+function modulesCard(st) {
+  const flip = (m, on) => tryApi(async () => { const r = await api('PUT', `/api/modules/${m.id}`, { on }); S.status = await api('GET', '/api/status'); card.replaceWith(modulesCard({ ...st, modules: r.modules, methods: on && m.id === 'orders' ? (await api('GET', '/api/modules')).methods : st.methods })); },
+    on ? `${m.label} on` : `${m.label} off · data kept`);
+  const methods = h('textarea', { rows: 3, value: (st.methods || []).join('\n'), 'aria-label': 'Ways to pay, one per line', disabled: !can('admin') });
+  const card = h('div', { class: 'card' }, h('h2', {}, 'Modules'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Built-in features on top of People. Switch one on and agents get its tools; switch it off and its tools and pages go, its data stays.'),
+    h('ul', { class: 'people-list' }, st.modules.map((m) => h('li', { class: 'has-end' }, h(m.on ? 'a' : 'div', { class: 'lrow', href: m.on ? `#people/${m.id}` : null },
+      h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, m.label), h('span', { class: 'lrow-sub' }, `${m.line}${m.on && m.memoryMb !== null ? ` · about ${m.memoryMb} MB` : ''}`))),
+    h('span', { class: 'row-end' }, toggle(m.on, (v) => flip(m, v), !can('admin'), m.label))))),
+    st.methods ? h('div', { class: 'sblock' }, h('h3', {}, 'Ways to pay'), field('One per line', methods, 'Payments are recorded with one of these. Duniya never takes money.'),
+      can('admin') ? h('button', { class: 'btn', style: 'margin-top:8px', onclick: () => tryApi(() => api('PUT', '/api/orders/methods', { methods: methods.value.split('\n') }), 'Saved') }, 'Save') : null) : null);
   return card;
 }
 

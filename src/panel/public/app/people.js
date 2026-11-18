@@ -12,9 +12,10 @@ const appsLine = (p) => [p.apps.map((a) => APPS[a] || a).join(' · ') || 'No app
 /** One person row: avatar · name · apps and last contact · chevron (calm rows, 073). `end`: a control next to the row. */
 export const personRow = (p, sub = appsLine(p), end = null) => h('li', { class: end ? 'has-end' : null }, h('a', { class: 'lrow', href: personHref(p.id || p.person) }, avatar(p.who || p.name, p.id || p.person, 's'),
   h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, p.name), sub ? h('span', { class: 'lrow-sub' }, sub) : null), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')), end);
-/** People · Households · Lists (one switch on each of the three lists). */
-export const peopleNav = (on) => h('nav', { class: 'seg pnav', 'aria-label': 'People, households and lists', style: 'margin-bottom:10px' },
-  [['people', 'People'], ['people/households', 'Households'], ['people/lists', 'Lists']].map(([href, l]) => h('a', { href: `#${href}`, class: href === on ? 'on' : null, 'aria-current': href === on ? 'page' : null }, l)));
+/** People · Households · Lists, and Events · Orders when their module is on (081; one switch on each list). */
+const modsOn = () => S.status?.settings?.modulesOn || [];
+export const peopleNav = (on) => h('nav', { class: 'seg pnav', 'aria-label': 'People, households, lists and modules', style: 'margin-bottom:10px' },
+  [['people', 'People'], ['people/households', 'Households'], ['people/lists', 'Lists'], modsOn().includes('events') && ['people/events', 'Events'], modsOn().includes('orders') && ['people/orders', 'Orders']].filter(Boolean).map(([href, l]) => h('a', { href: `#${href}`, class: href === on ? 'on' : null, 'aria-current': href === on ? 'page' : null }, l)));
 
 /** Pick a person by typing a name: a search field with up to six matches. Returns { el, value() }. */
 export function pickPerson(label, exclude = '') {
@@ -34,6 +35,7 @@ export function pickPerson(label, exclude = '') {
 export async function renderPeople() {
   const [, a, b] = location.hash.slice(1).split('/').map(decodeURIComponent);
   if (a === 'households' || a === 'lists') return import('./people-groups.js').then((m) => m.renderGroup(a, b || ''));
+  if (a === 'events' || a?.startsWith('orders')) return import('./events.js').then((m) => m.renderModule(a, b || '')); // 081
   if (a) return renderPerson(a);
   const [k, v] = filter.split(':');
   const page = (offset) => api('GET', `/api/people?q=${enc(query)}&${k ? `${k}=${enc(v)}&` : ''}limit=${PAGE}&offset=${offset}`);
@@ -73,6 +75,9 @@ export async function renderPeople() {
       ' Agents may use the names from your phone contacts') : null));
 }
 
+/** 081: what the modules that are on add to a person's, household's or event's page: titled groups of link rows. */
+export const moduleBlocks = (sections = []) => sections.map((s) => h('div', { class: 'lgroup' }, h('div', { class: 'eyebrow' }, s.title), h('ul', {}, s.rows.map((r) => h('li', {},
+  h('a', { class: 'lrow', href: r.href || null }, h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, r.name), r.sub ? h('span', { class: 'lrow-sub' }, r.sub) : null), r.href ? h('span', { class: 'chev', 'aria-hidden': 'true' }, '›') : null))))));
 /** Save something on a person and draw the page again. */
 const act = (ref, fn, ok) => tryApi(fn, ok).then((r) => { if (r !== false) renderPerson(ref); return r; });
 const block = (title, help, ...kids) => h('div', { class: 'lgroup' }, h('div', { class: 'eyebrow' }, title, help ? [' ', helpLink(help)] : null), kids);
@@ -195,6 +200,7 @@ async function renderPerson(ref) {
         h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, l.name), h('span', { class: 'lrow-sub' }, 'List')), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')),
       x(`Take off ${l.name}`, () => act(p.id, () => api('DELETE', `/api/lists/${l.id}/members/${p.id}`), 'Taken off the list')))), rowBtn('Add to a list', '', addToList))),
     chats,
+    moduleBlocks(p.modules),
     block('Consent', 'people.md#consent', h('ul', {}, p.consents.map(consentRow))),
     block('Agents that can see them', 'people.md#what-agents-see', p.agents.length ? h('ul', { class: 'mini-list' }, p.agents.map((a) => h('li', {}, h('a', { class: 'lrow', href: `#agents/${enc(a.id)}/people` },
       h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, a.name), h('span', { class: 'lrow-sub' }, a.why)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))))

@@ -5,7 +5,8 @@
 // Full size: 300 chats (20 on) over 3 numbers, 30 agents, 200k stored messages (80 days) written by 900 active people,
 // 50k activity rows, 20k usage rows, 5k people with 20k identities (WhatsApp number + LID, Telegram, a second Telegram
 // account), phone contact names, 20k person notes and events, 10k tags, 1k households with 3k members, 20 lists with 4k
-// members, 2k ties, 5k chat notes, 5k reactions, 3k group member tags.
+// members, 2k ties, 5k chat notes, 5k reactions, 3k group member tags; 081: 20 events, 4k registrations, ~2.7k orders
+// with lines and payments, 200 duties.
 export const FULL = { chats: 300, on: 20, agents: 30, messages: 200000, activity: 50000, usage: 20000, people: 5000, active: 900 };
 export const SMALL = { chats: 60, on: 10, agents: 8, messages: 20000, activity: 5000, usage: 2000, people: 500, active: 200 };
 const DAY = 86400000;
@@ -33,6 +34,9 @@ export async function seedScale(t, N = FULL) {
     await t.agents.createAgent({ id: `agent-${a}`, config: { name: `Agent ${a}`, prompt: 'You help.', model: 'anthropic:claude-sonnet-5-5', triggers: [`!a${a}`], chats: own } });
   }
   for (const c of chats.slice(0, N.on)) t.chatPrefs.setChatPrefs(c, { enabled: true });
+  // 081: Events and Orders on (their tables), seeded below
+  const mods = await import('../src/modules/index.js');
+  for (const id of ['events', 'orders']) await mods.setModuleOn(id, true, 'fixture');
   db.exec('BEGIN');
   try {
     const seen = db.prepare('INSERT OR REPLACE INTO chats_seen (tenant_id, chat, number, is_group, name, phone, last_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
@@ -97,6 +101,29 @@ export async function seedScale(t, N = FULL) {
     db.prepare('UPDATE people SET hidden = 1 WHERE CAST(substr(id, 3) AS INTEGER) % 97 = 0').run();
     const cs = db.prepare("INSERT OR IGNORE INTO person_consents (tenant_id, person, purpose, value, source, at) VALUES (?, ?, 'privacy_notice', 'yes', 'Group notice', ?)");
     for (let i = 0; i < N.people; i++) cs.run('default', personId(i), now);
+    // 081: 20 events; registrations by households and people (registered, a few waiting, pending, cancelled); an order
+    // with two lines for each registration, a payment for two thirds of them; duties with people
+    const ev = db.prepare("INSERT INTO ev_events (tenant_id, id, name, starts, place, capacity, deadline, currency, per, confirm, prices, created_at) VALUES ('default', ?, ?, ?, 'Hall', 0, '', 'CHF', 'household', 'auto', ?, ?)");
+    const evId = (e) => `ev_${String(e).padStart(12, '0')}`;
+    for (let e = 0; e < 20; e++) ev.run(evId(e), `Event ${e}`, new Date(now + (e - 5) * 20 * DAY).toISOString().slice(0, 10), JSON.stringify({ adult: 2500, kid: 1000, freeUnder: 5 }), now);
+    const rg = db.prepare("INSERT INTO ev_registrations (tenant_id, id, event, person, household, adults, kids, notes, status, by, created_at, updated_at) VALUES ('default', ?, ?, ?, ?, ?, ?, '', ?, 'fixture', ?, ?)");
+    const od = db.prepare("INSERT INTO ord_orders (tenant_id, id, person, household, event, registration, currency, total, paid, due, status, created_at, updated_at) VALUES ('default', ?, ?, ?, ?, ?, 'CHF', ?, ?, ?, ?, ?, ?)");
+    const ol = db.prepare("INSERT INTO ord_lines (tenant_id, ord, n, item, qty, price) VALUES ('default', ?, ?, ?, ?, ?)");
+    const op = db.prepare("INSERT INTO ord_payments (tenant_id, id, ord, amount, at, method, by, created_at) VALUES ('default', ?, ?, ?, ?, 'Cash', 'fixture', ?)");
+    const STAT = ['registered', 'registered', 'registered', 'registered', 'registered', 'registered', 'waiting', 'pending', 'cancelled'];
+    for (let i = 0; i < N.people * 0.8; i++) {
+      const rid = `r_${String(i).padStart(12, '0')}`; const hh = i % 2 ? '' : `h_${String((i / 2) % (N.people / 5)).padStart(12, '0')}`; const pers = hh ? '' : personId(i % N.people);
+      const status = STAT[i % STAT.length]; const event = evId(i % 20);
+      rg.run(rid, event, pers, hh, 2, 1, status, now - i * 60000, now - i * 60000);
+      if (status !== 'registered') continue;
+      const oid = `o_${String(i).padStart(12, '0')}`; const paid = i % 3 === 0 ? 0 : i % 3 === 1 ? 2000 : 6000;
+      od.run(oid, pers, hh, event, rid, 6000, paid, new Date(now + ((i % 40) - 10) * DAY).toISOString().slice(0, 10), paid >= 6000 ? 'paid' : paid ? 'part' : 'open', now - i * 60000, now);
+      ol.run(oid, 0, 'Adult', 2, 2500); ol.run(oid, 1, 'Kid', 1, 1000);
+      if (paid) op.run(`pay_${String(i).padStart(12, '0')}`, oid, paid, new Date(now).toISOString().slice(0, 10), now);
+    }
+    const du = db.prepare("INSERT INTO ev_duties (tenant_id, id, event, task, at, needed, created_at) VALUES ('default', ?, ?, ?, '09:00', 3, ?)");
+    const dp = db.prepare("INSERT OR IGNORE INTO ev_duty_people (tenant_id, duty, person, at) VALUES ('default', ?, ?, ?)");
+    for (let d = 0; d < 200; d++) { du.run(`d_${String(d).padStart(12, '0')}`, evId(d % 20), `Task ${d}`, now); for (let m = 0; m < 2; m++) dp.run(`d_${String(d).padStart(12, '0')}`, personId((d * 7 + m) % N.people), now); }
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
   db.exec('PRAGMA wal_checkpoint(TRUNCATE)');

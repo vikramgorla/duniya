@@ -26,6 +26,7 @@ import { ownerAlertRoutes } from './routes/owner-alerts.js';
 import { directChatRoutes } from './routes/direct-chats.js';
 import { mediaRoutes } from './routes/media.js';
 import { paceRoutes } from './routes/pace.js';
+import { moduleRoutes } from './routes/modules.js';
 
 const ROLE_RANK = { viewer: 1, admin: 2, owner: 3 };
 
@@ -70,6 +71,7 @@ export function startPanel({ channel, extend = [] }) {
   directChatRoutes(route, { channel }); // prepared direct chats + intro (049)
   mediaRoutes(route); // photos & voice (043)
   paceRoutes(route); // sending pace (080)
+  moduleRoutes(route); // modules, events, orders (081)
 
   // Other features (providers, backups, updates) add their routes with the same role gates.
   for (const fn of [].concat(extend)) fn(route, { channel });

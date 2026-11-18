@@ -17,6 +17,7 @@ import {
   peopleCounts, personByRef, reachVia, removeHouseholdMember, removeNote, removeTie, saveHousehold, saveList, setHidden, setHouseholdMember, setListMember,
   setTags, tagsOf, tiesOf, timeline, updatePerson, TIE_KINDS,
 } from '../../core/people.js';
+import { moduleSections } from '../../modules/index.js';
 import { erasePerson, exportPerson, mergePeople, mergeSuggestions, mergesInto, undoMerge } from '../../core/people-ops.js';
 
 /**
@@ -77,7 +78,7 @@ export function peopleRoutes(route, { channel } = {}) {
     }
     return { ...x, ...(await personChats(x, channel)), ties: tiesOf(x.id), households: householdsOf(x.id), reachVia: reachVia(x.id), timeline: timeline(x.id),
       tags: tagsOf(x.id), lists: listsOf(x.id), merges: mergesInto(x.id), suggestions: mergeSuggestions(x.id),
-      consents: consentsOf(x.id), agents: agentsSeeing(x.id, listAgents().filter((a) => !isBuiltin(a))) };
+      consents: consentsOf(x.id), agents: agentsSeeing(x.id, listAgents().filter((a) => !isBuiltin(a))), modules: moduleSections('person', x.id) };
   }, admin);
   route('PUT', '/api/people/:ref', async (req, res, body, q, p) => updatePerson(found(p.ref).id, body || {}), admin);
   // 079: the panel hides people; a true delete (privacy requests) is the admin MCP's erase_person, behind a confirm
@@ -106,7 +107,7 @@ export function peopleRoutes(route, { channel } = {}) {
   // ---------- households ----------
   route('GET', '/api/households', async () => listHouseholds(), admin);
   route('POST', '/api/households', async (req, res, body) => saveHousehold({ name: body.name, address: body.address }), admin);
-  route('GET', '/api/households/:id', async (req, res, body, q, p) => getHousehold(p.id), admin);
+  route('GET', '/api/households/:id', async (req, res, body, q, p) => ({ ...getHousehold(p.id), modules: moduleSections('household', p.id) }), admin);
   route('PUT', '/api/households/:id', async (req, res, body, q, p) => saveHousehold({ id: p.id, name: body.name, address: body.address }), admin);
   route('DELETE', '/api/households/:id', async (req, res, body, q, p) => ({ ok: deleteHousehold(p.id) }), admin);
   route('PUT', '/api/households/:id/members/:person', async (req, res, body, q, p) => setHouseholdMember(p.id, found(p.person).id, body.role || 'adult'), admin);

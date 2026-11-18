@@ -41,6 +41,7 @@ export const SETTINGS_SECTIONS = [
   ['direct-messages', 'Chats & direct messages', 'dm default agent history load earlier messages phone'],
   ['privacy-notice', 'Privacy notice', 'notice group members opt-out'],
   ['photos-voice', 'Photos & voice', 'images voice notes transcription speech pictures'],
+  ['modules', 'Modules', 'events registrations orders payments price list waiting list duties'],
   ['sending-pace', 'Sending pace', 'read receipts blue ticks typing speed gaps daily cap new chats quiet hours warm-up'],
   ['secrets', 'Secrets', 'keys tokens api key password'],
   ['users', 'Users', 'people admin viewer invite sign-up link'],

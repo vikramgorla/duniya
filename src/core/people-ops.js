@@ -12,6 +12,7 @@ import { addEvent, forgetPeopleCache, householdsOf, listsOf, personById, personR
 import { consentsOf, chatsOfPerson } from './people-access.js';
 import { listAgentRows, saveAgentRow } from './store.js';
 import { loadAgents } from './agents.js';
+import { eraseModuleRows, exportModuleRows, moveModuleRows, restoreModuleRows } from '../modules/index.js';
 
 const UNDO_MS = 30 * 86400000;
 db.exec(`CREATE TABLE IF NOT EXISTS person_merges (
@@ -64,6 +65,7 @@ export function mergePeople(keep, other, by = 'panel') {
       run(`DELETE FROM ${t} WHERE tenant_id = ? AND person = ?`, o.id);
     }
     for (const t of ['household_members', 'person_tags', 'person_list_members']) run(`DELETE FROM ${t} WHERE tenant_id = ? AND person = ?`, o.id);
+    snap.modules = moveModuleRows(o.id, k.id); // 081: registrations, duties, orders … (every module, on or off)
     // 079: agent roles that name the merged person name the kept one
     for (const row of listAgentRows()) {
       const swap = (l = []) => [...new Set(l.map((e) => (e === o.id ? k.id : e)))];
@@ -105,6 +107,7 @@ export function undoMerge(mergeId, by = 'panel') {
     for (const t of s.tags) run('INSERT OR IGNORE INTO person_tags (tenant_id, person, tag) VALUES (?, ?, ?)', o.id, t);
     for (const l of s.added.lists) run('DELETE FROM person_list_members WHERE tenant_id = ? AND list = ? AND person = ?', l, m.kept);
     for (const c of s.chats || []) run('INSERT OR IGNORE INTO person_chats (tenant_id, person, chat, wrote, member, last_at) VALUES (?, ?, ?, ?, ?, ?)', o.id, c.chat, c.wrote, c.member, c.last_at);
+    restoreModuleRows(s.modules, m.kept, o.id); // 081
     for (const l of s.lists) run('INSERT OR IGNORE INTO person_list_members (tenant_id, list, person) SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM person_lists WHERE tenant_id = ? AND id = ?)', l, o.id, TENANT, l);
     run('DELETE FROM person_merges WHERE tenant_id = ? AND id = ?', m.id);
   });
@@ -147,6 +150,7 @@ export function exportPerson(id) {
   return {
     exportedAt: new Date().toISOString(), person: p, names, ties: tiesOf(p.id), households: householdsOf(p.id), tags: tagsOf(p.id), lists: listsOf(p.id),
     chats: chatsOfPerson(p.id), consents: consentsOf(p.id),
+    modules: exportModuleRows(p.id), // 081: registrations, duties, orders and payments
     notes: timeline(p.id, 500), messages: messages.reverse().map((m) => ({ ...m, at: new Date(m.ts).toISOString() })),
   };
 }
@@ -174,9 +178,10 @@ export function erasePerson(id, by = 'panel') {
     const ties = Number(run('DELETE FROM person_ties WHERE tenant_id = ? AND (a = ? OR b = ?)', p.id, p.id).changes);
     const households = Number(run('DELETE FROM household_members WHERE tenant_id = ? AND person = ?', p.id).changes);
     for (const t of ['person_tags', 'person_list_members', 'person_chats', 'person_consents', 'identities']) run(`DELETE FROM ${t} WHERE tenant_id = ? AND person = ?`, p.id);
+    const moduleRows = eraseModuleRows('person', p.id); // 081: their registrations, duties, orders and payments
     run('DELETE FROM person_merges WHERE tenant_id = ? AND (kept = ? OR merged = ?)', p.id, p.id);
     run('DELETE FROM people WHERE tenant_id = ? AND id = ?', p.id);
-    return { messages, directChats: chats.length, notes, ties, households };
+    return { messages, directChats: chats.length, notes, ties, households, moduleRows };
   });
   forgetPeopleCache();
   // no name in the log: the person is gone

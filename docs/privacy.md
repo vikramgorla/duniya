@@ -65,8 +65,8 @@ context…" (edit under **Settings → Privacy notice**).
 For a privacy request ("delete everything about me"), the panel's **Hide** is not enough: it keeps their data. Ask an
 AI assistant connected with the [admin tools](admin-mcp.md) (or your owner assistant) to **erase** them
 (`erase_person`, owner only): it shows what goes and waits for your confirmation, then deletes their stored messages in
-every chat, their direct chat's memory, notes, ties, household memberships, tags, list entries, consents and app
-accounts. The activity log keeps only counts. If they write again in a chat that is on, or WhatsApp syncs their number
+every chat, their direct chat's memory, notes, ties, household memberships, tags, list entries, consents, app
+accounts, and their event registrations, duties, orders and payments ([modules](modules.md)). The activity log keeps only counts. If they write again in a chat that is on, or WhatsApp syncs their number
 from your phone again, they come back as a new person; **Hide** them then.
 
 > [!WARNING]

@@ -367,24 +367,27 @@ function buildTools(x, { save }) {
         custom ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { for (const role of ['organizer', 'participant']) rulesBox[role].value = splitLines(rulesBox[role].value).filter((r) => !r.startsWith(`${g.name}:`)).join('\n'); drawGlobals(); } }, 'Use the defaults') : null) : null, grid);
     })));
   }
-  const waOn = (role, t) => { const mine = splitLines(rulesBox[role].value).filter((r) => r.startsWith('whatsapp:')); return !mine.length ? role === 'organizer' || t.participantDefault : mine.some((r) => globRe(r).test(`whatsapp:${t.name}`)); };
-  const setWa = (role, name, on) => { // name '*': all or none (#165)
-    const may = waTools.filter((t) => role === 'organizer' || !t.organizerOnly);
-    const next = may.filter((t) => (name === '*' || t.name === name ? on : waOn(role, t))).map((t) => t.name);
-    const rest = splitLines(rulesBox[role].value).filter((r) => !r.startsWith('whatsapp:'));
-    rulesBox[role].value = [...rest, ...(!next.length ? ['whatsapp:-'] : role === 'organizer' && next.length === may.length ? ['whatsapp:*'] : next.map((n) => `whatsapp:${n}`))].join('\n');
+  // Built-in tools by role (WhatsApp actions; 081: module tools): "<key>:" rules, all / none per role (#165)
+  const bOn = (key, role, t) => { const mine = splitLines(rulesBox[role].value).filter((r) => r.startsWith(`${key}:`)); return !mine.length ? role === 'organizer' || t.participantDefault : mine.some((r) => globRe(r).test(`${key}:${t.name}`)); };
+  const setB = (key, tools, role, name, on) => {
+    const may = tools.filter((t) => role === 'organizer' || !t.organizerOnly);
+    const next = may.filter((t) => (name === '*' || t.name === name ? on : bOn(key, role, t))).map((t) => t.name);
+    const rest = splitLines(rulesBox[role].value).filter((r) => !r.startsWith(`${key}:`));
+    rulesBox[role].value = [...rest, ...(!next.length ? [`${key}:-`] : role === 'organizer' && next.length === may.length ? [`${key}:*`] : next.map((n) => `${key}:${n}`))].join('\n');
   };
-  const drawWa = () => waBox.replaceChildren(waTools.length ? h('details', {}, h('summary', {}, `Choose per role (${waTools.length})`),
-    can('admin') ? h('div', { class: 'row', style: 'gap:6px' }, ['participant', 'organizer'].map((role) => { const may = waTools.filter((t) => role === 'organizer' || !t.organizerOnly), n = may.filter((t) => waOn(role, t)).length;
-      return h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: n === may.length, indeterminate: n > 0 && n < may.length, onchange: (e) => { setWa(role, '*', e.target.checked); drawWa(); } }), ` All: ${ROLE_LABEL[role]}`); })) : null,
-    h('ul', { class: 'wa-tools' }, waTools.map((t) => h('li', {},
+  const drawB = (box, key, tools) => box.replaceChildren(tools.length ? h('details', {}, h('summary', {}, `Choose per role (${tools.length})`),
+    can('admin') ? h('div', { class: 'row', style: 'gap:6px' }, ['participant', 'organizer'].map((role) => { const may = tools.filter((t) => role === 'organizer' || !t.organizerOnly), n = may.filter((t) => bOn(key, role, t)).length;
+      return h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: n === may.length, indeterminate: n > 0 && n < may.length, onchange: (e) => { setB(key, tools, role, '*', e.target.checked); drawB(box, key, tools); } }), ` All: ${ROLE_LABEL[role]}`); })) : null,
+    h('ul', { class: 'wa-tools' }, tools.map((t) => h('li', {},
     h('div', {}, h('b', {}, t.name.replace(/_/g, ' ')), t.organizerOnly ? h('span', { class: 'small muted' }, ' · organizers only') : null), h('div', { class: 'small muted' }, t.description),
-    h('div', { class: 'row', style: 'gap:4px;margin-top:4px' }, ['participant', 'organizer'].map((role) => h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: (role === 'organizer' || !t.organizerOnly) && waOn(role, t), disabled: !can('admin') || (role === 'participant' && t.organizerOnly),
-      onchange: (e) => { setWa(role, t.name, e.target.checked); drawWa(); } }), ` ${ROLE_LABEL[role]}`))))))) : h('p', { class: 'small muted' }, 'None.'));
+    h('div', { class: 'row', style: 'gap:4px;margin-top:4px' }, ['participant', 'organizer'].map((role) => h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: (role === 'organizer' || !t.organizerOnly) && bOn(key, role, t), disabled: !can('admin') || (role === 'participant' && t.organizerOnly),
+      onchange: (e) => { setB(key, tools, role, t.name, e.target.checked); drawB(box, key, tools); } }), ` ${ROLE_LABEL[role]}`))))))) : h('p', { class: 'small muted' }, 'None.'));
+  const modBox = h('div', {});
   const ready = Promise.all([api('GET', `/api/agents/${x.enc}/connections`).catch(() => []), api('GET', `/api/agents/${x.enc}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => []),
-    can('admin') ? api('GET', '/api/tool-services/registry/settings').catch(() => null) : null]).then(([cn, lo, wa, reg]) => {
+    can('admin') ? api('GET', '/api/tool-services/registry/settings').catch(() => null) : null, bi ? [] : api('GET', '/api/modules/tools').catch(() => [])]).then(([cn, lo, wa, reg, mods]) => {
     conns = cn; locals = lo; waTools = bi ? wa.filter((t) => t.owner) : wa; registry = reg;
-    drawServers(); drawGlobals(); drawWa();
+    drawServers(); drawGlobals(); drawB(waBox, 'whatsapp', waTools);
+    modBox.replaceChildren(...mods.map((m) => { const box = h('div', {}); drawB(box, m.id, m.tools); return block(m.label, h('p', { class: 'small muted' }, 'A module (Settings → Modules). Changes about someone other than the sender wait for an organizer\'s confirm code.'), box); }));
     addRow.replaceChildren(browseButton({ target: x.id, targetName: c.name || x.id, onAdded: () => location.reload() }, registry),
       can('admin') ? h('button', { class: 'btn small', type: 'button', onclick: () => { servers.push(serverState('', {})); drawServers(); } }, '+ Add by address') : null);
   });
@@ -401,6 +404,7 @@ function buildTools(x, { save }) {
     block('Its own tool services', srvList, addRow),
     block('Tool services for all agents', globalBox),
     block('WhatsApp actions', h('p', { class: 'small muted' }, bi ? 'In your own chat it acts at once; anything sent elsewhere waits for your confirm.' : 'Organizer-only actions happen at once when an organizer asks. Every action is in Activity.'), waBox),
+    modBox,
     confirmBox,
     h('details', { class: 'sblock' }, h('summary', {}, 'Tool rules (advanced)'), field('Participant rules', rulesBox.participant), field('Organizer rules', rulesBox.organizer), field('Never allowed', rulesBox.deny))) };
 }

@@ -202,6 +202,14 @@ const STATES = [
   { name: 'chats-telegram-group', hash: `chats/${encodeURIComponent('tg:7000000001#-100170000001')}`, wait: 2000 }, // 077: a Telegram group's page
   { name: 'settings-users', hash: 'settings/users', wait: 2000, js: 'T.openAll();' },
   { name: 'settings-pace', hash: 'settings/sending-pace', wait: 2000 }, // 080: Settings → Sending pace (preset)
+  { name: 'settings-modules', hash: 'settings/modules', wait: 2000 }, // 081: Settings → Modules (on/off, ways to pay)
+  { name: 'events', hash: 'people/events', wait: 2000 }, // 081: People → Events
+  { name: 'event-page', hash: 'people/events', wait: 2000, js: "document.querySelector('.people-list a').click(); await T.until('.person-page'); await T.wait(300);" }, // 081: an event's page
+  { name: 'event-edit', hash: 'people/events', wait: 2000, js: "document.querySelector('.people-list a').click(); await T.until('.person-page'); await T.wait(300); document.querySelector('.ap-head details.menu summary').click(); await T.click('Edit…', 'button', 600);" }, // 081: the event dialog
+  { name: 'event-pending', hash: 'people/events', wait: 2000, js: "[...document.querySelectorAll('.people-list a')].find((a) => a.textContent.includes('picnic')).click(); await T.until('.person-page'); await T.wait(300);" }, // 081: to confirm and waiting list
+  { name: 'orders', hash: 'people/orders', wait: 2000 }, // 081: People → Orders (not paid, totals per event)
+  { name: 'order-page', hash: 'people/orders', wait: 2000, js: "document.querySelector('.people-list a').click(); await T.until('.person-page'); await T.wait(300);" }, // 081: an order's lines and payments
+  { name: 'person-modules', hash: 'people', wait: 2000, js: "[...document.querySelectorAll('.people-list a')].find((a) => a.textContent.includes('Anu')).click(); await T.until('.person-page'); await T.wait(300); [...document.querySelectorAll('.eyebrow')].find((e) => e.textContent === 'Events')?.scrollIntoView();" }, // 081: Events and Orders on a person's page
   { name: 'settings-pace-custom', hash: 'settings/sending-pace', wait: 2000, js: "await T.click('Custom', 'button', 300);" }, // 080: custom ranges
   { name: 'models-setup', hash: 'models/chatgpt', before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u).startsWith('/api/providers') && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); if (Array.isArray(j)) return new Response(JSON.stringify(j.filter((x) => x.id !== 'openrouter').map((x) => ({ ...x, connected: false, models: 0 })))); }

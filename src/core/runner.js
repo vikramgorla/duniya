@@ -21,6 +21,7 @@ import { planAttachments, visionCallOptions, noVisionNote } from './media-ai.js'
 import { faqContext } from './quick.js';
 import { peopleScope, senderCard } from './people-access.js';
 import { applyPeopleAction } from './people-tools.js';
+import { applyModuleAction } from '../modules/index.js';
 
 const MAX_TOOL_ROUNDS = 8;
 
@@ -252,9 +253,10 @@ export async function handleConfirmCommand({ agent, text, role, chat }) {
 }
 
 export async function applyPending(agent, row) {
-  if (row.server === 'local:people') { // 079: a held People change
+  if (row.server.startsWith('local:')) { // 079: a held People change; 081: a held module change (events, orders)
+    const kind = row.server.slice(6);
     let text; let failed = false;
-    try { text = applyPeopleAction(JSON.parse(row.confirm_id), agent); } catch (e) { text = e.message; failed = true; }
+    try { text = kind === 'people' ? applyPeopleAction(JSON.parse(row.confirm_id), agent) : applyModuleAction(kind, JSON.parse(row.confirm_id), agent); } catch (e) { text = e.message; failed = true; }
     activity(failed ? 'tool.error' : 'confirm.applied', { agent: agent.id, chat: row.chat, summary: `${row.code}: ${row.tool}${failed ? ' failed' : ''}` });
     return failed ? `Could not apply ${row.code}: ${text}` : `Done (${row.code}). ${text}`;
   }

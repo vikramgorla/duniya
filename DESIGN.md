@@ -161,6 +161,8 @@ screens (list → page) or a section behind a row.
    needs attention.
 2. **A list of rows** (`listDetail()`): avatar or mark · name · **one** muted line · optional switch · chevron. Filters
    and search sit on one line above the list. Adding is the last row ("New agent", "Add a direct chat").
+   A row whose state is a word (*Registered*, *Waiting list*, *Part paid*) ends in one status `pill` before its ⋯
+   menu (`.row-end`; 081: registrations, orders); the row itself still opens the person or the order.
 3. **An item's page**: a compact header (avatar, name, one muted state line, its switch, a ⋯ menu for Test, Duplicate,
    Export, Delete…), then **grouped section rows** (icon · title · current value · chevron). A section with more than a
    few fields is its own page (`#screen/<id>/<section>`, with a back link to the item); a few simple settings sit on the

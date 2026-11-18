@@ -28,6 +28,10 @@ const BUDGETS = {
   'agent context build': 3, // memory.buildContext for a busy group (recent messages, summary, notes); CI 0.6
   'sender card': 3, // 079: the People card of the sender each agent turn gets
   'people tool: find (own chats)': 15, // 079: people__find_person for an agent that sees its own chats only
+  'event page': 15, // 081: GET /api/module/events/:id (counts, ~200 registrations with names, duties, payments section)
+  'registration list (agent tool)': 15, // 081: events__registration_list for one event
+  'orders list': 20, // 081: GET /api/orders (not fully paid, up to 200 rows with names, totals per event)
+  "who hasn't paid (agent tool)": 15, // 081: orders__who_has_not_paid for one event, with totals
 };
 const RUNS = 9;
 
@@ -49,8 +53,8 @@ const ALLOW_SCANS = [
   { table: 'households', sql: 'SELECT COUNT(*) n FROM households WHERE tenant_id = ?', why: 'People summary count' },
   { table: 'person_tags', sql: 'SELECT tag, COUNT(*) AS count FROM person_tags WHERE tenant_id = ? GROUP BY tag', why: 'People summary: tags in use' },
   { table: 'contacts', sql: "SUM(book_name <> '') book", why: 'People summary: names from the phone' },
-  // 079, one time (remove with the migration): the chats people wrote in, from every stored message
-  { table: 'identities', sql: 'SELECT i.tenant_id, i.person, m.chat, 1, 0, MAX(m.ts) FROM messages m JOIN identities i', why: 'one-time migration 2.40' },
+  // 081: Orders → All walks the orders newest first and stops at LIMIT (like Activity)
+  { table: 'ord_orders', sql: 'SELECT * FROM ord_orders WHERE tenant_id = ? AND 1 = 1 ORDER BY created_at DESC LIMIT 200', why: 'newest first, stops at LIMIT' },
   // Households: the whole list by name (an owner has dozens; 1k in the fixture)
   { table: 'households', sql: "SUM(m.role = 'adult') AS adults", why: 'all households, by name' },
 ];
@@ -95,6 +99,15 @@ const { peopleTools } = await import('../src/core/people-tools.js');
 measured['sender card'] = await time(() => access.senderCard(personId(5), access.peopleScope(agent), 'Contact 5'));
 const findTool = peopleTools.find((x) => x.name === 'find_person');
 measured['people tool: find (own chats)'] = await time(() => findTool.run({ query: 'contact 1' }, { agent, role: 'organizer' }));
+// 081: Events and Orders (the fixture switched both on)
+const { eventTools } = await import('../src/modules/events/tools.js');
+const { orderTools } = await import('../src/modules/orders/tools.js');
+const mTool = (list, n) => list.find((x) => x.name === n);
+const orgCtx = { agent, role: 'organizer', personId: personId(10) };
+measured['event page'] = await time(() => get('/api/module/events/ev_000000000003'));
+measured['registration list (agent tool)'] = await time(() => mTool(eventTools, 'registration_list').run({ event: 'ev_000000000003' }, orgCtx));
+measured['orders list'] = await time(() => get('/api/orders'));
+measured["who hasn't paid (agent tool)"] = await time(() => mTool(orderTools, 'who_has_not_paid').run({ event: 'Event 3' }, orgCtx));
 
 // Everything else on a hot path, for the query-plan check (not timed).
 const activityMid = db.prepare('SELECT id FROM activity WHERE id > ? ORDER BY id LIMIT 1').get(FULL.activity / 2)?.id || 1;
@@ -107,7 +120,15 @@ for (const path of ['/api/status', '/api/checklist', '/api/chats', '/api/agents'
   '/api/people/summary', '/api/people?tag=badminton', `/api/people?list=${enc('l_000000000003')}`, `/api/people?household=${enc('h_000000000004')}`, '/api/people?app=telegram',
   `/api/people?q=${enc(phoneOf(42).slice(-6))}`, '/api/people?offset=4000', `/api/people/${phoneOf(77)}`, `/api/people/${personId(4321)}`, `/api/people/${personId(12)}/export`,
   '/api/households', '/api/households/h_000000000004', '/api/lists', '/api/lists/l_000000000003', '/api/budget', '/api/owner-assistant', '/api/owner-assistant/weekly-preview', '/api/models',
+  // 081: modules, Events, Orders
+  '/api/modules', '/api/modules/tools', '/api/module/events', '/api/module/events?past=1', '/api/module/events/ev_000000000003/csv', '/api/orders?status=overdue', '/api/orders?status=paid',
+  '/api/orders?status=all', '/api/orders?status=all&event=ev_000000000004', '/api/orders?status=open&event=ev_000000000004', '/api/orders/o_000000000001', '/api/orders/csv?status=open',
 ]) await get(path);
+for (const [list, n, args] of [[eventTools, 'list_events', {}], [eventTools, 'show_event', { event: 'Event 3' }], [orderTools, 'what_do_i_owe', {}], [orderTools, 'who_has_not_paid', {}]]) await mTool(list, n).run(args, orgCtx);
+for (const [m, path, body] of [['POST', '/api/module/events/ev_000000000005/registrations', { person: personId(4001) }], ['POST', '/api/module/events/ev_000000000005/registrations', { household: 'h_000000000777' }],
+  ['PUT', '/api/module/registrations/r_000000000009', { status: 'cancelled' }], ['POST', '/api/orders/o_000000000003/payments', { amount: 10, method: 'Cash' }], ['POST', '/api/module/events/ev_000000000005/duties', { task: 'Chairs', needed: 2 }]]) {
+  const r = await t.api(cookie, m, path, body); if (r.status >= 400) throw new Error(`${m} ${path}: ${r.status} ${JSON.stringify(r.body)}`);
+}
 // router: a direct message, a chat that is off, an answered turn (fake model) with a tool round; a member joining
 const off = chats[FULL.chats - 1];
 await t.route(t.msg({ chat: off, isGroup: off.endsWith('@g.us'), text: 'off chat', msgId: `perf-off-${seq++}` }));
@@ -132,9 +153,6 @@ const { upkeepTick } = await import('../src/core/upkeep.js');
 recording = false; db.prepare('UPDATE contacts SET updated_at = updated_at + 1 WHERE rowid % 10 = 0').run(); recording = true; // contacts that changed
 const members = (chat) => Array.from({ length: 150 }, (_, i) => ({ phone: phoneOf((chats.indexOf(chat) * 7 + i) % FULL.people), jid: `${phoneOf((chats.indexOf(chat) * 7 + i) % FULL.people)}@s.whatsapp.net` }));
 await upkeepTick({ groupMembers: async (chat) => members(chat), status: async () => ({ numbers: [] }) });
-// one-time migrations of this release (checked so their plans are seen; allowed below as one-time)
-access.migratePeopleChats();
-await t.agents.migrateRolesToPeople();
 
 // ---------- 1. query plans ----------
 recording = false; // the checks below prepare their own statements

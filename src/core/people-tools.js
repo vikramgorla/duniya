@@ -14,12 +14,10 @@ import { agentName } from './contacts.js';
 const nameFor = (p) => (p.phone ? agentName({ phone: p.phone, fallbackName: seenNameOf(p.id) }) || `+${p.phone}` : p.ownName || seenNameOf(p.id) || 'Someone');
 
 const PEOPLE_DEFAULT_ALLOW = { organizer: ['people:*'], participant: ['people:find_person', 'people:get_person'] };
-// 079, one release only (remove in the next): saved `contacts:` rules of 078 keep working as the matching people rules.
-const LEGACY = { 'contacts:*': ['people:*'], 'contacts:find_contact': ['people:find_person', 'people:get_person'], 'contacts:save_contact': ['people:add_note', 'people:tag_person'] };
-/** The people rules of a role: its explicit people: (or old contacts:) rules, else the defaults. */
+/** The people rules of a role: its explicit people: rules, else the defaults. */
 export function peopleRules(agent, role) {
   const allow = agent.tools?.[role] || [];
-  const rules = [...allow.filter((r) => r.startsWith('people:')), ...allow.flatMap((r) => LEGACY[r] || [])];
+  const rules = allow.filter((r) => r.startsWith('people:'));
   return rules.length ? rules : PEOPLE_DEFAULT_ALLOW[role] || [];
 }
 
