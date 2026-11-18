@@ -16,6 +16,7 @@ import { db } from './db.js';
 import { digits, fail } from './config.js';
 import { loggingSettings } from './events.js';
 import { TENANT } from './store.js';
+import { eraseModuleRows } from '../modules/index.js';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS people (
@@ -30,14 +31,6 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS identities_person ON identities (tenant_id, person);
 `);
-// 079, one release only (remove in the next): databases from before 2.40 get where a person came from and Hide.
-{
-  const have = new Set(db.prepare('PRAGMA table_info(people)').all().map((c) => c.name));
-  if (!have.has('source')) {
-    db.exec("ALTER TABLE people ADD COLUMN source TEXT NOT NULL DEFAULT 'chat'; ALTER TABLE people ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0");
-    db.exec("UPDATE people SET source = 'owner' WHERE NOT EXISTS (SELECT 1 FROM identities i WHERE i.tenant_id = people.tenant_id AND i.person = people.id)");
-  }
-}
 db.exec(`
   CREATE INDEX IF NOT EXISTS identities_phone ON identities (tenant_id, phone) WHERE phone <> '';
   CREATE INDEX IF NOT EXISTS people_source ON people (tenant_id, source);
@@ -395,6 +388,7 @@ export function saveHousehold({ id = '', name, address }) {
 }
 export function deleteHousehold(id) {
   const r = hh(id);
+  eraseModuleRows('household', r.id); // 081: its registrations and orders go with it
   db.prepare('DELETE FROM household_members WHERE tenant_id = ? AND household = ?').run(TENANT, r.id);
   db.prepare('DELETE FROM households WHERE tenant_id = ? AND id = ?').run(TENANT, r.id);
   return true;

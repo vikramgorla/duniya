@@ -3,9 +3,7 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TEMPLATES_DIR, fail } from './config.js';
-import { kvGet, kvSet } from './db.js';
 import { inRole } from './people-access.js';
-import { personByPhone } from './people.js';
 import { validateAgentConfig, referencedSecrets, slugify, AGENT_ID_RE, ValidationError } from './schema.js';
 import {
   listAgentRows, getAgentRow, saveAgentRow, deleteAgentRow, getSecret,
@@ -61,24 +59,6 @@ export const getAgent = (id) => agents.get(id);
 export const agentForChat = (chat) => listAgents().find((b) => b.chats.includes(chat));
 /** Organizer or participant: saved organizers are numbers, people and lists (079: a role follows the person on any app). */
 export const roleIn = (agent, phone, person = '') => (inRole(agent.organizers, { phone, person }) ? 'organizer' : 'participant');
-
-/**
- * 079, one release only (remove in the next): saved organizer and participant numbers that belong to someone in People
- * become that person, so the role follows them to every app. Numbers of nobody in People stay numbers (they still work).
- */
-export function migrateRolesToPeople() {
-  if (kvGet('people.rolesMoved')) return 0;
-  let n = 0;
-  for (const row of listAgentRows()) {
-    if (isBuiltin(row.id)) continue;
-    const move = (l = []) => [...new Set(l.map((e) => { const p = /^\d+$/.test(e) ? personByPhone(e) : null; if (p) n++; return p ? p.id : e; }))];
-    const next = { ...row.config, organizers: move(row.config.organizers), participants: move(row.config.participants) };
-    if (JSON.stringify(next) !== JSON.stringify(row.config)) saveAgentRow(row.id, next, 'system');
-  }
-  kvSet('people.rolesMoved', String(Date.now()));
-  if (n) activity('config', { summary: `${n} saved organizer or participant ${n === 1 ? 'number now points' : 'numbers now point'} to the person in People` });
-  return n;
-}
 
 function releaseChats(chats, exceptId, by) {
   for (const other of listAgents()) {

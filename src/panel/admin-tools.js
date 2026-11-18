@@ -31,6 +31,14 @@ async function chatName(x, chat) {
   const c = (await x.call('GET', '/api/chats')).find((r) => r.id === chat);
   return c ? `"${c.name}"` : `"${chat}"`;
 }
+/** 081: an event id from an id or (part of) a name, upcoming first. */
+async function eventIdOf(x, ref) {
+  const r = String(ref || '').trim().toLowerCase();
+  const all = [...await x.call('GET', '/api/module/events'), ...await x.call('GET', '/api/module/events?past=1')];
+  const e = all.find((v) => v.id === ref) || all.find((v) => v.name.toLowerCase() === r) || all.find((v) => v.name.toLowerCase().includes(r));
+  if (!e) throw fail(`No event matches "${ref}"`, 404);
+  return e.id;
+}
 async function numbers(x) {
   const ch = (await x.call('GET', '/api/status')).channel;
   return ch?.numbers || (ch ? [{ id: 'main', label: 'Main', ...ch }] : []);
@@ -320,7 +328,7 @@ export const TOOLS = [
     input: { person: str('Person id or phone'), purpose: { type: 'string', enum: ['privacy_notice', 'updates', 'marketing'] }, answer: { type: 'string', enum: ['yes', 'no'] } }, required: ['person', 'purpose', 'answer'],
     run: (a, x) => x.call('PUT', `/api/people/${enc(a.person)}/consents`, { purpose: a.purpose, value: a.answer }) },
   { name: 'erase_person', risky: true, calls: [['GET', '/api/people/x'], ['DELETE', '/api/people/x']],
-    description: 'Owner only, for privacy requests (the panel only hides people): erase one person — their stored messages in every chat, their direct chat\'s memory, notes, ties, household memberships, tags, list entries, consents and apps. Cannot be undone. Needs confirm_action.',
+    description: 'Owner only, for privacy requests (the panel only hides people): erase one person — their stored messages in every chat, their direct chat\'s memory, notes, ties, household memberships, tags, list entries, consents, apps, and their event registrations, duties, orders and payments. Cannot be undone. Needs confirm_action.',
     input: { person: str('Person id or phone') }, required: ['person'],
     preview: async (a, x) => {
       const p = await x.call('GET', `/api/people/${enc(a.person)}`);
@@ -328,6 +336,63 @@ export const TOOLS = [
       return `Erase "${p.name}" from Duniya: their stored messages in every chat, their direct chat's memory (${p.direct.length}), ${p.timeline.length} notes and events, ${p.ties.length} ties, ${p.households.length} household memberships, tags and lists. This cannot be undone. If they write again in a chat that is on (or WhatsApp syncs their number from your phone again), they come back as a new person. To keep them out without deleting, use set_person_hidden.`;
     },
     run: (a, x) => x.call('DELETE', `/api/people/${enc(a.person)}`) },
+  // ---------- modules (081): Events, Orders and payments ----------
+  { name: 'list_modules', readOnly: true, calls: [['GET', '/api/modules']],
+    description: 'Modules (Settings → Modules): Events and Orders and payments, each on or off with its memory use, and the owner\'s payment methods when Orders is on.',
+    input: {}, run: (a, x) => x.call('GET', '/api/modules') },
+  { name: 'set_module_enabled', risky: true, calls: [['PUT', '/api/modules/x']],
+    description: 'Switch a module on or off (module: events or orders). Off removes its agent tools and pages and keeps its data. Needs confirm_action.',
+    input: { module: str('events or orders', { enum: ['events', 'orders'] }), on: bool('true = on') }, required: ['module', 'on'],
+    preview: async (a) => `Switch ${a.module === 'orders' ? 'Orders and payments' : 'Events'} ${a.on ? 'on: agents get its tools' : 'off: its agent tools and pages go; its data is kept'}.`,
+    run: (a, x) => x.call('PUT', `/api/modules/${enc(a.module)}`, { on: !!a.on }) },
+  { name: 'list_events', readOnly: true, calls: [['GET', '/api/module/events']],
+    description: 'Events (Events module): upcoming ones (or past: true), each with dates, place, capacity, deadline, currency, prices, how registration works and counts: registrations, adults, kids, people, waiting list, pending, places left.',
+    input: { past: bool('Past events instead of upcoming ones') }, run: (a, x) => x.call('GET', `/api/module/events${a.past ? '?past=1' : ''}`) },
+  { name: 'get_event', readOnly: true, calls: [['GET', '/api/module/events'], ['GET', '/api/module/events/x']],
+    description: 'One event by name or id: the event, counts (registrations, adults, kids, people, waiting list, pending, places left), every registration (who, adults, kids, notes, status, attended), duties with who took them, and payments when Orders is on. Answers "how many kids registered?".',
+    input: { event: str('Event name (or part of it) or id') }, required: ['event'],
+    run: async (a, x) => x.call('GET', `/api/module/events/${enc(await eventIdOf(x, a.event))}`) },
+  { name: 'save_event', calls: [['POST', '/api/module/events'], ['PUT', '/api/module/events/x']],
+    description: 'Create an event (no id) or change one (id; give only what changes): name, starts / ends (2027-01-14 or 2027-01-14T18:00), place, capacity (people, 0 = no limit), deadline, currency (one per event, default CHF), per (household or person), confirm (auto or organizer), prices { adult, kid, freeUnder (age) } in the event currency, payBy.',
+    input: { id: str('Event id to change (optional)'), name: str('Name'), starts: str('Start date'), ends: str('End date'), place: str('Place'), capacity: int('People, 0 = no limit'), deadline: str('Registration deadline'),
+      currency: str('Three letters, e.g. CHF'), per: str('household or person', { enum: ['household', 'person'] }), confirm: str('auto or organizer', { enum: ['auto', 'organizer'] }), prices: obj('{ adult, kid, freeUnder }'), payBy: str('Pay by (date)') },
+    run: (a, x) => { const { id, ...body } = a; return id ? x.call('PUT', `/api/module/events/${enc(id)}`, body) : x.call('POST', '/api/module/events', body); } },
+  { name: 'delete_event', risky: true, calls: [['GET', '/api/module/events/x'], ['DELETE', '/api/module/events/x']],
+    description: 'Delete an event with its registrations and duties (their orders are cancelled when nothing was paid). Needs confirm_action.',
+    input: { event: str('Event id') }, required: ['event'],
+    preview: async (a, x) => { const e = await x.call('GET', `/api/module/events/${enc(a.event)}`); return `Delete the event "${e.event.name}" (${e.event.starts}) with ${e.counts.registrations + e.counts.waiting + e.counts.pending} registrations and ${e.duties.length} duties. This cannot be undone.`; },
+    run: (a, x) => x.call('DELETE', `/api/module/events/${enc(a.event)}`) },
+  { name: 'register_for_event', calls: [['GET', '/api/module/events'], ['POST', '/api/module/events/x/registrations']],
+    description: 'Register a person or a household for an event (as an organizer: deadline and organizer confirmation do not apply). Household: adults and kids default to its members. Full → waiting list.',
+    input: { event: str('Event name or id'), person: str('Person id (or give household)'), household: str('Household id'), adults: int('Adults'), kids: int('Kids'), notes: str('e.g. vegetarian') }, required: ['event'],
+    run: async (a, x) => x.call('POST', `/api/module/events/${enc(await eventIdOf(x, a.event))}/registrations`, { person: a.person, household: a.household, adults: a.adults, kids: a.kids, notes: a.notes }) },
+  { name: 'update_registration', calls: [['PUT', '/api/module/registrations/x']],
+    description: 'Change a registration (id from get_event): status registered (confirms a pending one; full → waiting list), waiting or cancelled (a place opens for the waiting list), attended, adults, kids, notes.',
+    input: { registration: str('Registration id'), status: str('registered, waiting or cancelled', { enum: ['registered', 'waiting', 'cancelled'] }), attended: bool('Came to the event'), adults: int('Adults'), kids: int('Kids'), notes: str('Notes') }, required: ['registration'],
+    run: (a, x) => { const { registration, ...body } = a; return x.call('PUT', `/api/module/registrations/${enc(registration)}`, body); } },
+  { name: 'save_event_duty', calls: [['GET', '/api/module/events'], ['POST', '/api/module/events/x/duties'], ['PUT', '/api/module/duties/x/people/x']],
+    description: 'Add a duty to an event (task, at, needed = how many people), or give an existing duty (duty id from get_event) to a person (person id).',
+    input: { event: str('Event name or id'), task: str('Task, e.g. Set up chairs'), at: str('When, e.g. 09:00'), needed: int('How many people'), duty: str('Duty id (to give it to a person)'), person: str('Person id') }, required: ['event'],
+    run: async (a, x) => (a.duty && a.person ? x.call('PUT', `/api/module/duties/${enc(a.duty)}/people/${enc(a.person)}`, { on: true })
+      : x.call('POST', `/api/module/events/${enc(await eventIdOf(x, a.event))}/duties`, { task: a.task, at: a.at, needed: a.needed })) },
+  { name: 'list_orders', readOnly: true, calls: [['GET', '/api/module/events'], ['GET', '/api/orders']],
+    description: 'Orders (Orders module) by status: open (not fully paid — "who hasn\'t paid?"), overdue, paid, refunded, cancelled or all; optionally of one event (name or id). Each with who, what for, total, paid, left, due; plus totals per event (total, collected, open) and the payment methods. Amounts are in cents.',
+    input: { status: str('open, overdue, paid, refunded, cancelled or all', { enum: ['open', 'overdue', 'paid', 'refunded', 'cancelled', 'all'] }), event: str('Event name or id (optional)') },
+    run: async (a, x) => x.call('GET', `/api/orders?status=${enc(a.status || 'open')}${a.event ? `&event=${enc(await eventIdOf(x, a.event))}` : ''}`) },
+  { name: 'get_order', readOnly: true, calls: [['GET', '/api/orders/x']], description: 'One order: lines, payments (method, date), total, paid, left, status. Amounts in cents.',
+    input: { order: str('Order id') }, required: ['order'], run: (a, x) => x.call('GET', `/api/orders/${enc(a.order)}`) },
+  { name: 'create_order', calls: [['POST', '/api/orders']],
+    description: 'An order by hand for a person or a household (optionally for an event, then in its currency): lines [{ item, qty, price (e.g. 12.50) }], due date, note.',
+    input: { person: str('Person id'), household: str('Household id'), event: str('Event id (optional)'), title: str('What for'), lines: { type: 'array', items: { type: 'object', additionalProperties: true } }, due: str('Due date'), note: str('Note') }, required: ['lines'],
+    run: (a, x) => x.call('POST', '/api/orders', a) },
+  { name: 'record_payment', risky: true, calls: [['GET', '/api/orders/x'], ['POST', '/api/orders/x/payments']],
+    description: 'Record a payment for an order (amount, default: what is left; method from the owner\'s payment methods; date), or a refund (refund: true; default: all that was paid). Duniya records payments; it never takes money. Needs confirm_action.',
+    input: { order: str('Order id'), amount: { type: 'number', description: 'Amount, e.g. 25 or 12.50' }, method: str('Payment method'), at: str('Date (default today)'), refund: bool('Money given back') }, required: ['order'],
+    preview: async (a, x) => { const o = await x.call('GET', `/api/orders/${enc(a.order)}`); return `Record a ${a.refund ? 'refund' : 'payment'} of ${a.amount ?? ((a.refund ? o.paid : o.left) / 100).toFixed(2)} ${o.currency} for ${o.who} (${o.title})${a.method ? `, ${a.method}` : ''}.`; },
+    run: (a, x) => x.call('POST', `/api/orders/${enc(a.order)}/payments`, { amount: a.amount, method: a.method, at: a.at, refund: !!a.refund }) },
+  { name: 'set_payment_methods', calls: [['PUT', '/api/orders/methods']],
+    description: 'Replace the owner\'s list of payment methods (e.g. ["Cash", "Bank transfer", "TWINT"]). Payments use one of these.',
+    input: { methods: { type: 'array', items: { type: 'string' } } }, required: ['methods'], run: (a, x) => x.call('PUT', '/api/orders/methods', { methods: a.methods }) },
   { name: 'list_households', readOnly: true, calls: [['GET', '/api/households']], description: 'Households (e.g. "Chary family") with address and how many adults and kids.', input: {},
     run: (a, x) => x.call('GET', '/api/households') },
   { name: 'get_household', readOnly: true, calls: [['GET', '/api/households/x']], description: 'One household with its members (person id, name, role adult or kid, reachable = has an app).',

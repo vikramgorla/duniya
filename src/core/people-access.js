@@ -212,19 +212,3 @@ export function syncPhonePeople(limit = PHONE_BATCH) {
   if (added) { forgetPeopleCache(); activity('config', { summary: `${added} ${added === 1 ? 'contact' : 'contacts'} from your phone added to People` }); }
   return added;
 }
-
-/**
- * 079, one release only (remove in the next): the chats people wrote in, from the stored messages, and the privacy
- * notices they saw (group notices posted there, the direct-message line), once.
- */
-export function migratePeopleChats() {
-  if (kvGet('people.chatsNoted')) return;
-  db.prepare(`INSERT OR IGNORE INTO person_chats (tenant_id, person, chat, wrote, member, last_at)
-    SELECT i.tenant_id, i.person, m.chat, 1, 0, MAX(m.ts) FROM messages m JOIN identities i ON i.tenant_id = ? AND i.channel = m.channel AND i.external_id = m.sender_jid
-    WHERE m.from_agent = 0 AND m.sender_jid <> '' GROUP BY i.person, m.chat`).run(TENANT);
-  db.exec(`INSERT OR IGNORE INTO person_consents (tenant_id, person, purpose, value, source, at)
-    SELECT c.tenant_id, c.person, 'privacy_notice', 'yes', 'Group notice', n.posted_at FROM person_chats c JOIN privacy_notices n ON n.tenant_id = c.tenant_id AND n.chat = c.chat`);
-  db.exec(`INSERT OR IGNORE INTO person_consents (tenant_id, person, purpose, value, source, at)
-    SELECT p.tenant_id, p.id, 'privacy_notice', 'yes', 'Direct message notice', s.ts FROM privacy_dm_seen s JOIN people p ON p.tenant_id = s.tenant_id AND p.phone = s.who AND p.phone <> ''`);
-  kvSet('people.chatsNoted', String(Date.now()));
-}

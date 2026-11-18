@@ -11,6 +11,7 @@
 //   - People (078): merge undo records older than 30 days (at most 200 per tick); 079: the members of those groups
 //     become people (identities only), and up to 300 changed phone contacts per tick become people
 //   - read receipts (080): the ones that are due (pace.js; also drained on every incoming message)
+//   - modules that are on (081): their own bounded work (Orders: the owner's daily list of orders due soon)
 //   - agent apps (074): turns whose tool calls nobody answered are ended; idle app runtimes (Copilot) are stopped
 // Names and group refreshes are skipped while memory is tight (optional work, resources.js).
 import { optionalPaused } from './resources.js';
@@ -27,6 +28,7 @@ import { rebuildStaleSummary } from './memory.js';
 import { agentForChat } from './agents.js';
 import { channelOf } from '../channels/index.js';
 import { drainReads } from './pace.js';
+import { modulesUpkeep } from '../modules/index.js';
 
 const GROUP_EVERY_MS = 12 * 3600000;
 const DOWN_ALERT_MS = 15 * 60000;
@@ -68,6 +70,7 @@ export async function upkeepTick(channel, now = Date.now()) {
     if (optionalPaused()) return { ...done, skipped: 'memory' };
     try { done.names = !!(await channel?.upkeep?.())?.ok; } catch { /* the channel reports its own failures */ }
     try { await rebuildStaleSummary(agentForChat); } catch { /* #178: retried next tick */ }
+    try { await modulesUpkeep(now); } catch { /* 081: each module reports its own failures */ }
     try { done.phonePeople = syncPhonePeople(); } catch (e) { activity('error', { summary: `Phone contacts to People failed: ${e.message}` }); }
     if (typeof channel?.groupMembers !== 'function') return done;
     const on = new Set(enabledChats().filter(isGroup));

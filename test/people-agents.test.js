@@ -31,7 +31,7 @@ await say('g1@g.us', '41790000401', 'hello from Gita', { name: 'Gita' });
 await say('g2@g.us', '41790000402', 'hello from Hari', { name: 'Hari' });
 const gita = people.personByPhone('41790000401'); const hari = people.personByPhone('41790000402');
 
-test('agents get the people tools (never merge, hide or erase); old contacts: rules keep working for one release', async () => {
+test('agents get the people tools (never merge, hide or erase); old contacts: rules are gone', async () => {
   const r = await toolTurn('g1@g.us', ORG, '!panduga', 'people__find_person', { query: 'gita' });
   assert.deepEqual(r.tools.filter((n) => n.startsWith('people__')).sort(), ['people__add_note', 'people__add_to_list', 'people__find_person', 'people__get_person', 'people__tag_person']);
   assert.ok(!r.tools.some((n) => /contacts__|merge|erase|hide/.test(n)));
@@ -39,11 +39,6 @@ test('agents get the people tools (never merge, hide or erase); old contacts: ru
   t.script.push([{ type: 'text', text: 'ok' }]);
   await say('g1@g.us', '41790000401', '!panduga hi');
   assert.deepEqual(t.toolNames(t.claudeReqs.length - 1).filter((n) => n.startsWith('people__')), ['people__find_person', 'people__get_person'], 'participants: find and get');
-  // a saved 078 rule "contacts:find_contact" is the people find/get pair
-  await t.agents.updateAgent('helper', { tools: { organizer: ['contacts:find_contact'], participant: [], deny: [] } });
-  t.script.push([{ type: 'text', text: 'ok' }]);
-  await say('g2@g.us', ORG, '!help hi');
-  assert.deepEqual(t.toolNames(t.claudeReqs.length - 1).filter((n) => n.startsWith('people__')), ['people__find_person', 'people__get_person']);
   await t.agents.updateAgent('helper', { tools: { organizer: [], participant: [], deny: [] } });
 });
 
@@ -160,13 +155,7 @@ test('roles are people and lists: an organizer follows the person to Telegram; s
   t.script.push([{ type: 'text', text: 'ok' }]);
   await say('g2@g.us', '41790000402', '!help hi');
   assert.match(t.userTurn(t.claudeReqs.length - 1), /\(organizer\)/);
-  // the one-time move: saved numbers of people in People become the person; unknown numbers stay
-  t.db.db.prepare("DELETE FROM kv WHERE k = 'people.rolesMoved'").run();
-  await t.agents.updateAgent('helper', { organizers: ['41790000402', '41790009999'] });
-  assert.ok(t.agents.migrateRolesToPeople() >= 1);
-  await t.agents.loadAgents();
-  assert.deepEqual(t.agents.getAgent('helper').organizers, [hari2.id, '41790009999']);
-  assert.equal(t.agents.migrateRolesToPeople(), 0, 'once');
+  await t.agents.updateAgent('helper', { organizers: [hari2.id, '41790009999'] });
   const pp = await api('GET', '/api/agents/helper/people');
   assert.deepEqual(pp.entries.map((e) => [e.kind, e.label.startsWith('+')]), [['person', false], ['phone', true]], 'a person by name, an unknown number as a number');
   await t.agents.updateAgent('helper', { chats: ['g2@g.us'], organizers: [ORG] });
@@ -231,12 +220,3 @@ test('phone contacts become people by themselves: idempotent, hidden people stay
   assert.equal(people.personByPhone('41790000602').source, 'chat');
 });
 
-test('one-time: the chats people wrote in and the notices they saw come from what is stored', async () => {
-  t.db.db.prepare('DELETE FROM person_chats').run();
-  t.db.db.prepare("DELETE FROM kv WHERE k = 'people.chatsNoted'").run();
-  access.migratePeopleChats();
-  assert.ok(access.chatsOfPerson(hari.id).some((c) => c.chat === 'g2@g.us' && c.wrote));
-  const page = await api('GET', `/api/people/${hari.id}`);
-  assert.ok(page.groups.some((g) => g.id === 'g2@g.us'));
-  assert.deepEqual(page.agents.map((a) => a.id), ['helper'], 'the agents that can see them');
-});

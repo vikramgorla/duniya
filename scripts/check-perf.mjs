@@ -49,8 +49,6 @@ const ALLOW_SCANS = [
   { table: 'households', sql: 'SELECT COUNT(*) n FROM households WHERE tenant_id = ?', why: 'People summary count' },
   { table: 'person_tags', sql: 'SELECT tag, COUNT(*) AS count FROM person_tags WHERE tenant_id = ? GROUP BY tag', why: 'People summary: tags in use' },
   { table: 'contacts', sql: "SUM(book_name <> '') book", why: 'People summary: names from the phone' },
-  // 079, one time (remove with the migration): the chats people wrote in, from every stored message
-  { table: 'identities', sql: 'SELECT i.tenant_id, i.person, m.chat, 1, 0, MAX(m.ts) FROM messages m JOIN identities i', why: 'one-time migration 2.40' },
   // Households: the whole list by name (an owner has dozens; 1k in the fixture)
   { table: 'households', sql: "SUM(m.role = 'adult') AS adults", why: 'all households, by name' },
 ];
@@ -132,9 +130,6 @@ const { upkeepTick } = await import('../src/core/upkeep.js');
 recording = false; db.prepare('UPDATE contacts SET updated_at = updated_at + 1 WHERE rowid % 10 = 0').run(); recording = true; // contacts that changed
 const members = (chat) => Array.from({ length: 150 }, (_, i) => ({ phone: phoneOf((chats.indexOf(chat) * 7 + i) % FULL.people), jid: `${phoneOf((chats.indexOf(chat) * 7 + i) % FULL.people)}@s.whatsapp.net` }));
 await upkeepTick({ groupMembers: async (chat) => members(chat), status: async () => ({ numbers: [] }) });
-// one-time migrations of this release (checked so their plans are seen; allowed below as one-time)
-access.migratePeopleChats();
-await t.agents.migrateRolesToPeople();
 
 // ---------- 1. query plans ----------
 recording = false; // the checks below prepare their own statements
