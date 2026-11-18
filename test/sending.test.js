@@ -250,3 +250,19 @@ test('erasing a person removes their rows in runs', async () => {
   await api('DELETE', `/api/people/${gita.id}`);
   assert.equal((await run(first)).recipients.length, before - 1);
 });
+
+test('a chat the owner switched off is skipped; "post once in a group" sends one message to a group that is on', async () => {
+  const off = await person('Off Chat', '41790000081'); await consent(off);
+  t.chatPrefs.setChatPrefs(jid('41790000081'), { enabled: false });
+  const p = await api('POST', '/api/sending/preview', { title: 'X', audience: { kind: 'people', people: [off.id] }, purpose: 'updates', agent: 'panduga', template: 'Hi {first_name}' });
+  assert.deepEqual(p.skipped, [{ name: 'Off Chat', reason: 'Their chat is switched off' }]);
+  assert.equal((await t.api(owner, 'POST', `/api/sending/runs/${p.run.id}/start`)).status, 409, 'nobody to send to');
+  assert.equal((await t.api(owner, 'POST', '/api/sending/preview', { mode: 'group', group: 'g9@g.us.off', template: 'Hello all' })).body.field, 'group');
+  const g = await api('POST', '/api/sending/preview', { title: 'News', mode: 'group', group: 'g1@g.us', purpose: 'updates', template: 'Hello all, the hall is booked.' });
+  assert.equal(g.to.total, 1);
+  await api('POST', `/api/sending/runs/${g.run.id}/start`);
+  const out = sent('g1@g.us').length;
+  await tick(at('15:00', 5));
+  assert.equal(sent('g1@g.us').length, out + 1);
+  assert.equal((await run(g.run.id)).run.status, 'done');
+});

@@ -40,6 +40,7 @@ export function cleanAudience(a = {}) {
 export function describe(a) {
   const nameIn = (t, id) => db.prepare(`SELECT name FROM ${t} WHERE tenant_id = ? AND id = ?`).get(TENANT, id)?.name || id;
   const has = (t) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(t);
+  if (!a.kind) return 'One post in a group';
   if (a.kind === 'list') return `List: ${nameIn('person_lists', a.list)}`;
   if (a.kind === 'tag') return `Tag: ${a.tag}`;
   if (a.kind === 'household') return `Household: ${nameIn('households', a.household)}`;

@@ -90,7 +90,7 @@ async function personalise(template, facts, agent) {
   const base = fill(template, facts);
   const keep = usedFacts(template, facts);
   try {
-    const res = await modelChat({ model: 'auto', purpose: 'background', usage: { agent: agent || '', kind: 'sending' }, maxTokens: 700, system: WRITE_SYSTEM,
+    const res = await modelChat({ model: 'auto', purpose: 'background', usage: { agent: agent || '', kind: 'sending' }, fallback: undefined, maxTokens: 700, system: WRITE_SYSTEM,
       messages: [{ role: 'user', content: `<message>\n${base}\n</message>\n<keep>${keep.join(' | ')}</keep>` }] });
     const out = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
     return out && out.length <= base.length * 2 + 200 && keep.every((k) => out.includes(k)) ? out : base;

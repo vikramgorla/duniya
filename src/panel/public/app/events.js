@@ -1,7 +1,7 @@
 // Events and Orders (081): People → Events (list → event page with registrations, waiting list, duties, payments)
 // and People → Orders (list with filters and totals per event → order page with lines and payments). Loaded from
 // people.js on first visit, only when the module is on. Names and notes are built from text nodes.
-import { $, api, ask, can, emptyState, field, h, icon, menu, tryApi } from './core.js';
+import { $, S, api, ask, can, emptyState, field, h, icon, menu, tryApi } from './core.js';
 import { helpLink, plural } from './shared.js';
 import { moduleBlocks, peopleNav, pickPerson } from './people.js';
 const enc = encodeURIComponent;
@@ -10,13 +10,14 @@ const STATUS = { registered: ['Registered', 'ok'], waiting: ['Waiting list', 'wa
 const pill = (s) => h('span', { class: `pill ${STATUS[s]?.[1] || ''}` }, STATUS[s]?.[0] || s);
 const money = (c, cur) => `${cur} ${(Number(c || 0) / 100).toFixed(2)}`;
 const day = (d) => (d ? new Date(`${d.slice(0, 10)}T12:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '');
-const row = (name, sub, { href = null, mark = null, end = null, onclick = null } = {}) => h('li', { class: end ? 'has-end' : null },
+export const row = (name, sub, { href = null, mark = null, end = null, onclick = null } = {}) => h('li', { class: end ? 'has-end' : null },
   h(href ? 'a' : 'button', { class: 'lrow', href, type: href ? null : 'button', onclick }, mark,
     h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, name), sub ? h('span', { class: 'lrow-sub' }, sub) : null), href || onclick ? h('span', { class: 'chev', 'aria-hidden': 'true' }, '›') : null), end);
 const addRow = (label, sub, onclick) => row(label, sub, { onclick, mark: h('span', { class: 'lmark c3', 'aria-hidden': 'true' }, '+') });
-const group = (title, ...kids) => h('div', { class: 'lgroup' }, h('div', { class: 'eyebrow' }, title), kids);
+export const group = (title, ...kids) => h('div', { class: 'lgroup' }, h('div', { class: 'eyebrow' }, title), kids);
 const dateMark = (d) => h('span', { class: 'lmark c2', 'aria-hidden': 'true' }, d ? String(Number(d.slice(8, 10))) : '?');
-const back = (href, label) => h('a', { class: 'sub-back', href }, icon('back'), label);
+export const back = (href, label) => h('a', { class: 'sub-back', href }, icon('back'), label);
+const sendingOn = () => (S.status?.settings?.modulesOn || []).includes('sending'); // 082: Lists and sending
 const done = (redraw) => (r) => { if (r !== undefined) redraw(); return r; };
 
 /** #people/events[/id], #people/orders[?event=…][/id] */
@@ -107,6 +108,8 @@ async function eventPage(id) {
     h('div', { class: 'ap-head' }, dateMark(e.starts),
       h('div', { class: 'ap-title' }, h('h2', { tabindex: '-1' }, e.name), h('div', { class: 'small muted' }, [`${day(e.starts)}${e.ends && e.ends !== e.starts ? ` – ${day(e.ends)}` : ''}`, e.place].filter(Boolean).join(' · '))),
       can('admin') ? menu(`More for ${e.name}`, h('button', { class: 'btn small', type: 'button', onclick: () => editEvent(e).then(done(redraw)) }, 'Edit…'),
+        sendingOn() ? h('a', { class: 'btn small', href: `#people/sending/new?kind=event&event=${enc(e.id)}&title=${enc(e.name)}` }, 'Message registered people') : null,
+        sendingOn() && (S.status?.settings?.modulesOn || []).includes('orders') ? h('button', { class: 'btn small', type: 'button', onclick: () => autoReminders(e) }, 'Automatic payment reminders…') : null,
         h('a', { class: 'btn small', href: `/api/module/events/${e.id}/csv`, download: '' }, 'Download CSV'), h('button', { class: 'btn small danger', type: 'button', onclick: remove }, 'Delete…')) : null),
     h('p', { class: 'small', style: 'margin:8px 0 0' }, countsLine(c)),
     h('p', { class: 'small muted', style: 'margin:4px 0 0' }, [e.per === 'household' ? 'Per household' : 'Per person', e.confirm === 'organizer' ? 'an organizer confirms' : 'confirmed automatically',
@@ -118,6 +121,21 @@ async function eventPage(id) {
     moduleBlocks(g.modules),
     cancelled.length ? h('details', { class: 'sblock' }, h('summary', {}, `Cancelled (${cancelled.length})`), h('ul', { class: 'mini-list' }, cancelled.map(regRow))) : null));
   $('#main h2')?.focus({ preventScroll: true });
+}
+
+/** 082: payment reminders sent by themselves a few days before the due date (Orders with Lists and sending). */
+async function autoReminders(e) {
+  const [cur, agents] = await Promise.all([api('GET', `/api/order-reminders?event=${enc(e.id)}`), api('GET', '/api/agents')]);
+  const mine = cur.auto[e.id];
+  const days = h('input', { type: 'number', min: 0, max: 30, value: mine?.days ?? 3 });
+  const agent = h('select', {}, agents.filter((a) => !a.builtin && a.enabled).map((a) => h('option', { value: a.id, selected: a.id === mine?.agent }, a.name)));
+  const text = h('textarea', { rows: 4, maxlength: 1500 }, mine?.template || cur.template);
+  const state = h('select', {}, h('option', { value: '1', selected: !!mine }, 'On'), h('option', { value: '', selected: !mine }, 'Off'));
+  if (!await ask({ title: `Payment reminders for ${e.name}`, ok: 'Save', wide: true,
+    text: 'People with an open order who agreed to updates get a reminder by themselves, once per due date, at the sending pace. Your switch is the confirmation.',
+    body: [h('div', { class: 'grid2' }, field('Automatic reminders', state), field('Days before the due date', days)), field('Replies go to', agent), field('Message', text, '{first_name} {amount} {due} {event} {ways_to_pay}')] })) return;
+  const on = !!state.value;
+  tryApi(() => api('PUT', `/api/order-reminders/${e.id}`, { on, days: Number(days.value), agent: agent.value, template: text.value }), on ? 'Reminders on' : 'Reminders off');
 }
 
 // ---------- Orders ----------
@@ -137,6 +155,8 @@ async function orderList(event) {
   $('#main').replaceChildren(h('div', { class: 'card' }, peopleNav('people/orders'),
     h('div', { class: 'sec-head' }, h('h2', {}, `Orders${ev ? `: ${ev.name}` : ''} (${g.orders.length})`), h('button', { class: 'btn small primary', type: 'button', onclick: create }, '+ New'), helpLink('orders.md')),
     h('div', { class: 'ld-tools', style: 'margin-top:8px' }, seg, h('a', { class: 'btn small', href: `/api/orders/csv?status=${status}${event ? `&event=${enc(event)}` : ''}`, download: '' }, 'CSV')),
+    sendingOn() && g.orders.some((o) => o.left > 0) ? h('p', { class: 'small', style: 'margin:4px 0 0' }, h('a', { class: 'btn small', href: `#people/sending/new?kind=orders${event ? `&event=${enc(event)}` : ''}` }, 'Send reminders'),
+      ' to the people who have not paid') : null,
     g.events.length ? group('By event', h('ul', {}, ev ? row('All events', '', { href: '#people/orders' }) : null, g.events.filter((x) => !ev || x.id === ev.id).map((x) => row(x.name,
       `${money(x.paid, x.currency)} of ${money(x.total, x.currency)} collected · ${x.unpaid ? `${plural(x.unpaid, 'order')} not fully paid` : 'all paid'}`, { href: `#people/orders?event=${enc(x.id)}` })))) : null,
     g.orders.length ? h('ul', { class: 'people-list', style: 'margin-top:10px' }, g.orders.map((o) => row(o.who, [o.title, o.left && o.status !== 'cancelled' ? `${money(o.left, o.currency)} left` : money(o.total, o.currency),

@@ -542,6 +542,7 @@ export function connectEvents() {
     const a = JSON.parse(e.data);
     dropCache();
     S.feed.unshift(a); S.feed.length = Math.min(S.feed.length, 500);
+    S.onFeed?.(a); // a screen that follows live work (082: a run's page)
     if (S.tab === 'activity' && (!S.feedAgent || a.agent === S.feedAgent) && (!S.feedChat || a.chat === S.feedChat)) { const f = $('#feed'); if (f) feedPrepend(f, a); }
     // People filled in the background (phone contacts, group members): redraw the list unless the owner is typing
     if (S.tab === 'people' && / People$/.test(a.summary || '') && /^#people\/?$/.test(location.hash) && !document.activeElement?.matches('input, textarea, select')) show('people');

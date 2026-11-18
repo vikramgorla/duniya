@@ -520,6 +520,23 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   db.db.prepare("INSERT OR REPLACE INTO owner_links (tenant_id, user_id, phone, status, code_hash, expires_at, linked_at) SELECT 'default', id, ?, 'linked', NULL, 0, ? FROM users WHERE username = 'admin'").run(P(1), now - 2 * D);
   await wa.start({ onMessage: createRouter(wa), onHistory: createHistoryHandler() });
   for (let i = 0; i < 6; i++) await wa.upkeep(Date.now() + 61000); // 075: memory measured a minute after start; 077: Telegram group sizes (one group per tick)
+  // 082: Lists and sending: most adults said yes to updates (one said STOP); a finished run to the Badminton list and
+  // a payment reminder for Sankranti in progress (sent, a reply, someone who said stop, people waiting). Fake people only.
+  await mods.setModuleOn('sending', true, 'admin');
+  const snd = await imp('src/modules/sending/index.js');
+  for (const i of [0, 1, 3, 4, 5, 6, 7, 9, 11]) pa.recordConsent(pid[i], 'updates', 'yes', 'Said yes at the picnic');
+  pa.recordConsent(pid[8], 'updates', 'no', 'Replied STOP');
+  const seedRun = async (body, marks, finish) => {
+    const p = await snd.preview({ agent: 'school', purpose: 'updates', ...body }, 'admin');
+    snd.startRun(p.run.id, 'admin');
+    const rows = db.db.prepare("SELECT person, facts FROM snd_recipients WHERE run = ? AND status = 'waiting' ORDER BY n").all(p.run.id);
+    marks.forEach((st, i) => rows[i] && db.db.prepare('UPDATE snd_recipients SET status = ?, text = ?, at = ?, replied_at = ? WHERE run = ? AND person = ?')
+      .run(st, p.samples[i % Math.max(1, p.samples.length)]?.text || body.template, now - (marks.length - i) * 9 * MIN, st === 'replied' || st === 'stop' ? now - (marks.length - i) * 7 * MIN : null, p.run.id, rows[i].person));
+    if (finish) db.db.prepare("UPDATE snd_runs SET status = 'done', finished_at = ? WHERE id = ?").run(now - 2 * H, p.run.id);
+    db.db.prepare('UPDATE snd_runs SET created_at = created_at - ? WHERE id = ?').run(finish ? D : 0, p.run.id);
+  };
+  await seedRun({ title: 'Badminton moves to the new hall', audience: { kind: 'list', list: bad.id }, template: 'Hi {first_name}, from next Tuesday badminton is in the new hall (Rue du Lac 4), same time. See you there!' }, ['replied', 'sent', 'replied'], true);
+  await seedRun({ title: `Payment reminder: Sankranti ${yr}`, audience: { kind: 'orders', event: sank.id }, template: om.reminderTemplate(sank.id), noReplyLimit: 0 }, ['replied', 'sent', 'stop'], false);
   // #91: Chats shows "Loaded 12 earlier messages" (rides) and "Loading recent messages from your phone…" (Family)
   prefs.noteLatestKeys([2, 5, 6, 7].map((n) => ({ chat: G(n), isGroup: true, msgId: `last-${n}`, participant: `${P(n)}@s.whatsapp.net`, ts: now - n * H })));
   const phoneHistory = await imp('src/core/history-load.js');

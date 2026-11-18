@@ -12,10 +12,10 @@ const appsLine = (p) => [p.apps.map((a) => APPS[a] || a).join(' · ') || 'No app
 /** One person row: avatar · name · apps and last contact · chevron (calm rows, 073). `end`: a control next to the row. */
 export const personRow = (p, sub = appsLine(p), end = null) => h('li', { class: end ? 'has-end' : null }, h('a', { class: 'lrow', href: personHref(p.id || p.person) }, avatar(p.who || p.name, p.id || p.person, 's'),
   h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, p.name), sub ? h('span', { class: 'lrow-sub' }, sub) : null), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')), end);
-/** People · Households · Lists, and Events · Orders when their module is on (081; one switch on each list). */
+/** People · Households · Lists, and Events · Orders · Sending when their module is on (081, 082; one switch on each list). */
 const modsOn = () => S.status?.settings?.modulesOn || [];
 export const peopleNav = (on) => h('nav', { class: 'seg pnav', 'aria-label': 'People, households, lists and modules', style: 'margin-bottom:10px' },
-  [['people', 'People'], ['people/households', 'Households'], ['people/lists', 'Lists'], modsOn().includes('events') && ['people/events', 'Events'], modsOn().includes('orders') && ['people/orders', 'Orders']].filter(Boolean).map(([href, l]) => h('a', { href: `#${href}`, class: href === on ? 'on' : null, 'aria-current': href === on ? 'page' : null }, l)));
+  [['people', 'People'], ['people/households', 'Households'], ['people/lists', 'Lists'], modsOn().includes('events') && ['people/events', 'Events'], modsOn().includes('orders') && ['people/orders', 'Orders'], modsOn().includes('sending') && ['people/sending', 'Sending']].filter(Boolean).map(([href, l]) => h('a', { href: `#${href}`, class: href === on ? 'on' : null, 'aria-current': href === on ? 'page' : null }, l)));
 
 /** Pick a person by typing a name: a search field with up to six matches. Returns { el, value() }. */
 export function pickPerson(label, exclude = '') {
@@ -36,6 +36,7 @@ export async function renderPeople() {
   const [, a, b] = location.hash.slice(1).split('/').map(decodeURIComponent);
   if (a === 'households' || a === 'lists') return import('./people-groups.js').then((m) => m.renderGroup(a, b || ''));
   if (a === 'events' || a?.startsWith('orders')) return import('./events.js').then((m) => m.renderModule(a, b || '')); // 081
+  if (a === 'sending') return import('./sending.js').then((m) => m.renderSending(location.hash.slice(1).split('/').slice(2).join('/'))); // 082
   if (a) return renderPerson(a);
   const [k, v] = filter.split(':');
   const page = (offset) => api('GET', `/api/people?q=${enc(query)}&${k ? `${k}=${enc(v)}&` : ''}limit=${PAGE}&offset=${offset}`);
