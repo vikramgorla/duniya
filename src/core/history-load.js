@@ -36,7 +36,8 @@ const lastStart = new Map();
 // No timers of their own: each pending chat has a due time (kept in kv, so it survives a restart) and the shared
 // upkeep tick (upkeep.js, run by the scheduler every 30 s) runs at most RETRIES_PER_TICK due ones.
 const MIN = 60000;
-const RETRY_BACKOFF_MS = [2 * MIN, 15 * MIN, 60 * MIN, 6 * 60 * MIN, 24 * 60 * MIN, 24 * 60 * MIN, 24 * 60 * MIN];
+// #178: three tries, each from a different stored message (the oldest may have been deleted on the phone), then stop
+const RETRY_BACKOFF_MS = [2 * MIN, 15 * MIN, 60 * MIN];
 const ONLINE_GAP_MS = 60000; // "phone seen online" makes a chat due at most once a minute
 const RETRIES_PER_TICK = 2;
 const RETRY_KEY = 'historyRetries';
@@ -119,8 +120,8 @@ export function historyStatus(chat) {
 
 
 /** The key WhatsApp needs: the oldest stored message of the chat, else the newest key seen while it was off. */
-function anchorOf(chat) {
-  const m = oldestStoredMessage(chat);
+function anchorOf(chat, skip = 0) {
+  const m = oldestStoredMessage(chat, skip) || oldestStoredMessage(chat);
   if (m) return { msgId: m.msg_id, fromMe: !!m.from_agent, participant: m.sender_jid || '', ts: m.ts };
   return latestKey(chat);
 }
@@ -131,7 +132,7 @@ function finish(chat, l, state, error = '') {
   l.state = state; l.doneAt = Date.now(); if (error) l.error = error;
   const agent = agentForChat(chat);
   activity('memory.history', { agent: agent?.id || '', chat,
-    summary: state === 'loaded' && !l.loaded ? 'The phone answered other chats but had no earlier messages for this one' : state === 'loaded' ? `Loaded ${l.loaded} earlier message${l.loaded === 1 ? '' : 's'} from the phone` : state === 'no_response' ? 'The phone did not send earlier messages (it may be offline); retrying automatically' : `Loading earlier messages failed: ${error}; retrying automatically` });
+    summary: state === 'loaded' && !l.loaded ? 'The phone answered other chats but had no earlier messages for this one' : state === 'loaded' ? `Loaded ${l.loaded} earlier message${l.loaded === 1 ? '' : 's'} from the phone` : state === 'no_response' ? ((l.attempt || 0) >= RETRY_BACKOFF_MS.length ? `The phone sent nothing earlier after ${RETRY_BACKOFF_MS.length + 1} tries: there may be nothing earlier, or the messages were deleted on the phone. Stopped; Load earlier tries again` : 'The phone did not send earlier messages (it may be offline); retrying automatically') : `Loading earlier messages failed: ${error}; retrying automatically` });
   if (l.ids.length) summarizeAfterLoad(chat, agent, l.ids).catch(() => {});
   if (state === 'loaded') dropRetry(chat);
   else if (state === 'no_response' || state === 'failed') planRetry(chat, l, l.attempt || 0);
@@ -163,7 +164,7 @@ export async function loadChatHistory(chat, { count, by = 'panel', reason = 'but
   const since = Date.now() - (lastStart.get(chat) || 0);
   if (reason === 'button' && since < COOLDOWN_MS) throw fail(`Please wait ${Math.ceil((COOLDOWN_MS - since) / 1000)} s before asking the phone again`, 429);
   const n = Math.max(1, Math.min(MAX_LOAD, Math.round(Number(count)) || historyLoadCount() || DEFAULT_LOAD));
-  const anchor = anchorOf(chat);
+  const anchor = anchorOf(chat, reason === 'retry' ? attempt : 0);
   lastStart.set(chat, Date.now());
   if (reason !== 'retry') dropRetry(chat);
   const l = { state: 'loading', requested: n, loaded: 0, pages: 0, at: Date.now(), ids: [], by, attempt: reason === 'retry' ? attempt : 0 };

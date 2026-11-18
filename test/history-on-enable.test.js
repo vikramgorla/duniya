@@ -236,3 +236,55 @@ test('#167: the phone answers one chat but not another → "nothing earlier", no
   assert.ok(!s.retryAt, 'no automatic retries');
   assert.ok(!JSON.parse(t.db.kvGet('historyRetries') || '{}')[B]);
 });
+
+test('#178: unanswered loads stop after 3 retries, each from another stored message (the oldest may be deleted on the phone)', async () => {
+  hl.resetHistoryLoads();
+  const F = 'g11@g.us';
+  t.chatPrefs.setChatPrefs(F, { enabled: true });
+  await t.onHistory(phoneMsgs(F, 4, { prefix: 'f11' }).slice(-3));
+  t.phone.online = false;
+  await hl.loadChatHistory(F, { reason: 'switch_on' });
+  await settle(F);
+  const anchors = [t.historyAsks.at(-1).anchor.msgId];
+  for (let i = 1; i <= 3; i++) {
+    assert.equal(await hl.historyRetryTick(Date.now() + 2 * 86400000), 1, `retry ${i} runs`);
+    await settle(F);
+    anchors.push(t.historyAsks.at(-1).anchor.msgId);
+  }
+  assert.equal(new Set(anchors).size, 3, 'retries ask from other stored messages (3 stored, so 3 different anchors)');
+  assert.equal(await hl.historyRetryTick(Date.now() + 3 * 86400000), 0, 'after the third retry: stopped');
+  assert.ok(!JSON.parse(t.db.kvGet('historyRetries') || '{}')[F]);
+  const acts = t.db.db.prepare("SELECT summary FROM activity WHERE chat = ? ORDER BY id DESC LIMIT 1").get(F);
+  assert.match(acts.summary, /nothing earlier after 4 tries.*Stopped/);
+  t.phone.online = true;
+});
+
+test('#178: a message deleted for everyone in WhatsApp, or by the owner in the panel, is removed from the stored messages', async () => {
+  const H = 'g12@g.us';
+  t.chatPrefs.setChatPrefs(H, { enabled: true });
+  await t.onHistory(phoneMsgs(H, 3, { prefix: 'h12' }));
+  const [a, b] = stored(H);
+  await t.route({ ...t.msg({ chat: H, text: '', phone: '41790000002' }), kind: 'deleted', target: a.msg_id });
+  assert.ok(!stored(H).some((m) => m.id === a.id), 'deleted for everyone → gone');
+  const r = await t.api(owner, 'DELETE', `/api/chats/${enc(H)}/messages/${b.id}`);
+  assert.equal(r.status, 200);
+  assert.ok(!stored(H).some((m) => m.id === b.id));
+  assert.equal((await t.api(owner, 'DELETE', `/api/chats/${enc(H)}/messages/${b.id}`)).status, 404);
+});
+
+test('#178: after a deletion the chat summary is rebuilt from what is stored (the agent forgets it)', async () => {
+  const K = 'g13@g.us';
+  t.chatPrefs.setChatPrefs(K, { enabled: true });
+  await t.onHistory(phoneMsgs(K, 3, { prefix: 'k13' }));
+  const mem = await import('../src/core/memory.js');
+  t.db.setChatMemory(K, 'They talked about the SECRET plan', 0);
+  const [a] = stored(K);
+  await t.api(owner, 'DELETE', `/api/chats/${enc(K)}/messages/${a.id}`);
+  const n = t.summaryReqs.length;
+  assert.equal(await mem.rebuildStaleSummary(() => null), true);
+  const req = t.summaryReqs.slice(n).map((b) => JSON.stringify(b.messages)).find((x) => /rebuilt after a message was deleted/.test(x));
+  assert.ok(req, 'one summary call, marked as a rebuild');
+  assert.doesNotMatch(req, /SECRET/, 'rebuilt from scratch, not from the old summary');
+  assert.doesNotMatch(t.db.getChatMemory(K).summary, /SECRET/);
+  assert.equal(await mem.rebuildStaleSummary(() => null), false, 'nothing else to rebuild');
+});

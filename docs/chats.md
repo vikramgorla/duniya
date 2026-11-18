@@ -42,6 +42,9 @@ the right in its agent's colour, with the agent's avatar and name (a link to the
   latest** goes back to the newest.
 - Answers in a chat that is **Private to members** are shown here but not rated, as in Review.
 - Each look is recorded in Activity (who looked, never the text).
+- **Delete a message:** tap it → **Delete**. It is gone from the stored messages and the agent forgets it (the chat's
+  summary is rebuilt without it). Nothing changes in WhatsApp. A message deleted *for everyone* in WhatsApp is removed
+  here by itself. Admin MCP: `delete_chat_message`.
 
 **Chats → a chat → Memory**: the running summary (when it was updated, from how many messages), the notes people asked
 the agent to keep (**Delete** per note), **Rebuild summary** and **Erase memory** (asks first; it cannot be undone).
@@ -76,8 +79,9 @@ Chats start off, so the history WhatsApp sends when you link a number is not sto
 chat's newest message). When you switch a chat **on**, the server asks your phone for its last 50 messages
 (**Settings → Chats & direct messages**, 0–200) and builds the running summary from them.
 
-- The phone must be **online**. No answer within a minute → *Will retry automatically…*: after 2 min, 15 min, 1 h,
-  6 h, then daily for three days, and right away when your phone shows up online. Nothing to click.
+- The phone must be **online**. No answer within a minute → *Will retry automatically…*: after 2 min, 15 min and 1 h,
+  each time from another stored message (in case the oldest was deleted on the phone), and right away when your phone
+  shows up online. Then it stops: there may be nothing earlier. Nothing to click.
 - **Messages → Load earlier from your phone** (optional) asks for messages before the oldest stored one. Admin MCP:
   `load_chat_history`.
 - The agent is told what it has ("12 stored messages since 3 Nov") and says so instead of guessing.

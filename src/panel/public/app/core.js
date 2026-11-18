@@ -543,6 +543,8 @@ export function connectEvents() {
     dropCache();
     S.feed.unshift(a); S.feed.length = Math.min(S.feed.length, 500);
     if (S.tab === 'activity' && (!S.feedAgent || a.agent === S.feedAgent) && (!S.feedChat || a.chat === S.feedChat)) { const f = $('#feed'); if (f) feedPrepend(f, a); }
+    // People filled in the background (phone contacts, group members): redraw the list unless the owner is typing
+    if (S.tab === 'people' && / People$/.test(a.summary || '') && /^#people\/?$/.test(location.hash) && !document.activeElement?.matches('input, textarea, select')) show('people');
     if (S.tab === 'overview') { const r = $('#recent'); if (r) { feedPrepend(r, a, 8); $('#recent + .empty')?.remove(); } livePulse(a); }
   };
 }

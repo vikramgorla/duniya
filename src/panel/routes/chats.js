@@ -5,12 +5,12 @@ import { agentForChat, bindChat, listAgents } from '../../core/agents.js';
 import { allChatPrefs, ignoredCounts, isChatEnabled, isChatPrivate, seenChats, setChatPrefs } from '../../core/chat-prefs.js';
 import { personInfo } from '../../core/contacts.js';
 import { chatLabel, chatLabels } from '../../core/chat-names.js';
-import { listMessages, namesInChat, searchStored } from '../../core/db.js';
+import { listMessages, namesInChat, searchStored, deleteStoredMessage } from '../../core/db.js';
 import { isChatAlias, listDirectChats } from '../../core/direct-chats.js';
 import { activity } from '../../core/events.js';
 import { historyLoadCount, historyStatus, loadChatHistory } from '../../core/history-load.js';
 import { memberTag, personView, tagsInChat } from '../../core/member-tags.js';
-import { eraseChatMemory, maybeSummarize, memoryView } from '../../core/memory.js';
+import { eraseChatMemory, forgetDeleted, maybeSummarize, memoryView } from '../../core/memory.js';
 import { ratingsOf } from '../../core/review.js';
 import { visibleChats } from '../../core/owner-assistant.js';
 import { maybePostNotice, noticePostedAt, setChatNoticeOff } from '../../core/privacy-notice.js';
@@ -110,6 +110,14 @@ export function chatRoutes(route, { channel } = {}) {
       : { ...m, name: personInfo({ phone: m.sender, jid: senderJid, fallbackName: m.name }).label, ...(memberTag(chat, { phone: m.sender, jid: senderJid }, tags) ? { tag: memberTag(chat, { phone: m.sender, jid: senderJid }, tags) } : {}) }));
     if (!q.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${q.get('q') ? ` (search “${String(q.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;
+  }, { role: 'admin' });
+  // #178: delete one stored message (admins and owners); the agent forgets it (the chat summary is rebuilt). WhatsApp is unchanged.
+  route('DELETE', '/api/chats/:chat/messages/:id', async (req, res, body, q, p, user) => {
+    const chat = decodeURIComponent(p.chat);
+    if (!deleteStoredMessage(chat, Number(p.id))) throw Object.assign(new Error('Message not found'), { status: 404 });
+    forgetDeleted(chat);
+    activity('config', { chat, summary: `A stored message was deleted by ${user.username}` });
+    return { ok: true };
   }, { role: 'admin' });
   // 070: Search messages across chats. Owner only; the chats the owner assistant may read (on, not private to
   // members); newest first, 30 at a time (`before` = the last id). Each search is recorded like a look at messages.

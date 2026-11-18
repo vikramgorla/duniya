@@ -9,9 +9,9 @@ import { capsOf, isGroup } from '../channels/index.js';
 import { getSetting } from './store.js';
 import { listAgents as allAgents, getAgent, agentForChat, roleIn, isBuiltin, updateAgent } from './agents.js';
 import { runAgent, handleConfirmCommand } from './runner.js';
-import { logMessage, messageByMsgId, saveReaction, savePollVote, pollTally, setMessageText, moveChatData } from './db.js';
+import { logMessage, messageByMsgId, deleteMessageByMsgId, saveReaction, savePollVote, pollTally, setMessageText, moveChatData } from './db.js';
 import { activity } from './events.js';
-import { maybeSummarize } from './memory.js';
+import { maybeSummarize, forgetDeleted } from './memory.js';
 import { setChatChannel } from './chat-tools.js';
 import { countStat } from './stats.js';
 import { silenceReason } from './silences.js';
@@ -187,6 +187,10 @@ const whoOf = (msg) => personInfo({ phone: msg.phone, jid: msg.senderJid, fallba
 function recordEvent(msg) {
   const who = msg.phone || msg.senderJid || 'someone';
   const agent = agentForChat(msg.chat);
+  if (msg.kind === 'deleted') { // #178: deleted for everyone in WhatsApp → gone from Duniya's stored messages too
+    if (deleteMessageByMsgId(msg.chat, msg.target)) forgetDeleted(msg.chat), activity('memory.history', { agent: agent?.id || '', chat: msg.chat, summary: 'A message deleted in WhatsApp was removed from the stored messages' });
+    return;
+  }
   if (msg.kind === 'reaction') {
     const target = msg.target ? messageByMsgId(msg.chat, msg.target) : null;
     if (!target?.from_agent && !(agent?.enabled && msg.isGroup)) return;
