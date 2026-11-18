@@ -33,8 +33,6 @@ const info = (id) => MODULES.find((m) => m.id === id) || null;
 const live = new Map();
 
 const onList = () => { const l = getSetting('modulesOn', []); return Array.isArray(l) ? l.filter((id) => info(id)) : []; };
-/** Is a module switched on (and loaded)? */
-export const moduleOn = (id) => live.has(id);
 /** The manifests of the modules that are on. */
 export const liveModules = () => [...live.values()].map((l) => l.manifest);
 
@@ -138,10 +136,9 @@ export function exportModuleRows(person) {
       const rows = db.prepare(`SELECT * FROM ${t} WHERE tenant_id = ? AND ${col} = ?`).all(TENANT, person);
       if (!rows.length) continue;
       (out[m.id] ||= {})[t] = rows.map(({ tenant_id: _, ...r }) => r);
-      for (const [c, fk, parent] of m.children.filter(([x, , p]) => p === t && hasTable(x))) {
+      for (const [c, fk] of m.children.filter(([x, , p]) => p === t && hasTable(x))) {
         const kids = db.prepare(`SELECT * FROM ${c} WHERE tenant_id = ? AND ${fk} IN (SELECT id FROM ${t} WHERE tenant_id = ? AND ${col} = ?)`).all(TENANT, TENANT, person);
         if (kids.length) out[m.id][c] = kids.map(({ tenant_id: _, ...r }) => r);
-        void parent;
       }
     }
   }

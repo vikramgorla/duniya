@@ -31,9 +31,10 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS ord_orders_status ON ord_orders (tenant_id, status, due);
   CREATE INDEX IF NOT EXISTS ord_orders_event ON ord_orders (tenant_id, event, status);
-  CREATE INDEX IF NOT EXISTS ord_orders_person ON ord_orders (tenant_id, person) WHERE person <> '';
-  CREATE INDEX IF NOT EXISTS ord_orders_household ON ord_orders (tenant_id, household) WHERE household <> '';
-  CREATE INDEX IF NOT EXISTS ord_orders_registration ON ord_orders (tenant_id, registration) WHERE registration <> '';
+  CREATE INDEX IF NOT EXISTS ord_orders_person ON ord_orders (tenant_id, person);
+  CREATE INDEX IF NOT EXISTS ord_orders_household ON ord_orders (tenant_id, household);
+  CREATE INDEX IF NOT EXISTS ord_orders_registration ON ord_orders (tenant_id, registration);
+  CREATE INDEX IF NOT EXISTS ord_orders_created ON ord_orders (tenant_id, created_at);
   CREATE TABLE IF NOT EXISTS ord_lines (tenant_id TEXT NOT NULL, ord TEXT NOT NULL, n INTEGER NOT NULL, item TEXT NOT NULL, qty INTEGER NOT NULL, price INTEGER NOT NULL, PRIMARY KEY (tenant_id, ord, n));
   CREATE TABLE IF NOT EXISTS ord_payments (
     tenant_id TEXT NOT NULL, id TEXT NOT NULL, ord TEXT NOT NULL, amount INTEGER NOT NULL, at TEXT NOT NULL, method TEXT NOT NULL DEFAULT '',
@@ -176,14 +177,15 @@ export function removePayment(id, payment, by = 'panel') {
 
 // ---------- lists ----------
 const STATUS_SQL = { open: "status IN ('open', 'part')", paid: "status = 'paid'", refunded: "status = 'refunded'", cancelled: "status = 'cancelled'" };
-/** Orders by status (open = open or part paid; overdue = open past the due date; all), optionally of one event. Newest first, ≤ 500. */
+/** Orders by status (open = open or part paid; overdue = open past the due date; all), optionally of one event. Due first (All: newest first), ≤ 200. */
 export function listOrders({ status = 'open', event = '' } = {}) {
   const t = today();
   const where = status === 'overdue' ? `${STATUS_SQL.open} AND due <> '' AND due < ?` : STATUS_SQL[status] || '1 = 1';
   const args = status === 'overdue' ? [t] : [];
+  const order = status === 'all' ? 'created_at DESC' : 'due, created_at DESC'; // all: newest first, walking ord_orders_created
   const rows = event
-    ? db.prepare(`SELECT * FROM ord_orders WHERE tenant_id = ? AND event = ? AND ${where} ORDER BY due, created_at DESC LIMIT 500`).all(TENANT, event, ...args)
-    : db.prepare(`SELECT * FROM ord_orders WHERE tenant_id = ? AND ${where} ORDER BY due, created_at DESC LIMIT 500`).all(TENANT, ...args);
+    ? db.prepare(`SELECT * FROM ord_orders WHERE tenant_id = ? AND event = ? AND ${where} ORDER BY ${order} LIMIT 200`).all(TENANT, event, ...args)
+    : db.prepare(`SELECT * FROM ord_orders WHERE tenant_id = ? AND ${where} ORDER BY ${order} LIMIT 200`).all(TENANT, ...args);
   return rows.map((o) => view(o));
 }
 /** Totals of an event's orders (cancelled left out): { orders, total, paid, open, unpaid (orders not fully paid) }. */
@@ -252,11 +254,13 @@ function onRegistration(reg) {
 const orderRows = (list) => list.map((o) => ({ name: `${o.title}: ${money(o.total, o.currency)}`, sub: `${STATUS_WORD[o.status]}${o.left && o.status !== 'cancelled' ? ` · ${money(o.left, o.currency)} left` : ''}${o.due ? ` · due ${o.due}` : ''}`, href: `#people/orders/${o.id}` }));
 function personSections(person) {
   const hs = householdsOf(person).map((h) => h.id);
-  const list = db.prepare(`SELECT * FROM ord_orders WHERE tenant_id = ? AND (person = ?${hs.length ? ` OR household IN (${hs.map(() => '?').join(',')})` : ''}) ORDER BY created_at DESC LIMIT 20`).all(TENANT, person, ...hs).map((o) => view(o));
+  const mine = db.prepare('SELECT * FROM ord_orders INDEXED BY ord_orders_person WHERE tenant_id = ? AND person = ? ORDER BY created_at DESC LIMIT 20').all(TENANT, person);
+  const theirs = hs.flatMap((h) => db.prepare('SELECT * FROM ord_orders INDEXED BY ord_orders_household WHERE tenant_id = ? AND household = ? ORDER BY created_at DESC LIMIT 20').all(TENANT, h));
+  const list = [...mine, ...theirs].sort((a, b) => b.created_at - a.created_at).slice(0, 20).map((o) => view(o));
   return list.length ? [{ title: 'Orders and payments', rows: orderRows(list) }] : [];
 }
 function householdSections(id) {
-  const list = db.prepare('SELECT * FROM ord_orders WHERE tenant_id = ? AND household = ? ORDER BY created_at DESC LIMIT 20').all(TENANT, id).map((o) => view(o));
+  const list = db.prepare('SELECT * FROM ord_orders INDEXED BY ord_orders_household WHERE tenant_id = ? AND household = ? ORDER BY created_at DESC LIMIT 20').all(TENANT, id).map((o) => view(o));
   return list.length ? [{ title: 'Orders and payments', rows: orderRows(list) }] : [];
 }
 function eventSections(event) {

@@ -268,7 +268,7 @@ export function listPeople({ q: text = '', tag = '', list = '', household = '', 
     args.push(like, like, like, like, like, like, like, ...(d.length >= 3 ? [`%${d}%`] : []));
   }
   // #174: a filter picks its people through its own index (the members of a tag, list or household; an app's identities)
-  if (tag) { where.push('p.id IN (SELECT t.person FROM person_tags t WHERE t.tenant_id = ? AND t.tag = ?)'); args.push(TENANT, normTag(tag)); }
+  if (tag) { where.push('p.id IN (SELECT t.person FROM person_tags t INDEXED BY person_tags_tag WHERE t.tenant_id = ? AND t.tag = ?)'); args.push(TENANT, normTag(tag)); }
   if (list) { where.push('p.id IN (SELECT l.person FROM person_list_members l WHERE l.tenant_id = ? AND l.list = ?)'); args.push(TENANT, String(list)); }
   if (household) { where.push('p.id IN (SELECT m.person FROM household_members m WHERE m.tenant_id = ? AND m.household = ?)'); args.push(TENANT, String(household)); }
   if (app === 'none') where.push('NOT EXISTS (SELECT 1 FROM identities i WHERE i.tenant_id = p.tenant_id AND i.person = p.id)');

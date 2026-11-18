@@ -32,8 +32,8 @@ db.exec(`
     attended INTEGER NOT NULL DEFAULT 0, by TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (tenant_id, id)
   );
   CREATE INDEX IF NOT EXISTS ev_registrations_event ON ev_registrations (tenant_id, event, status, created_at);
-  CREATE INDEX IF NOT EXISTS ev_registrations_person ON ev_registrations (tenant_id, person) WHERE person <> '';
-  CREATE INDEX IF NOT EXISTS ev_registrations_household ON ev_registrations (tenant_id, household) WHERE household <> '';
+  CREATE INDEX IF NOT EXISTS ev_registrations_person ON ev_registrations (tenant_id, person);
+  CREATE INDEX IF NOT EXISTS ev_registrations_household ON ev_registrations (tenant_id, household);
   CREATE TABLE IF NOT EXISTS ev_duties (
     tenant_id TEXT NOT NULL, id TEXT NOT NULL, event TEXT NOT NULL, task TEXT NOT NULL, at TEXT NOT NULL DEFAULT '', needed INTEGER NOT NULL DEFAULT 1,
     created_at INTEGER NOT NULL, PRIMARY KEY (tenant_id, id)
