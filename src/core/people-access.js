@@ -69,7 +69,6 @@ export const chatsOfPerson = (person) => st('SELECT chat, wrote, member, last_at
   .all(TENANT, String(person)).map((r) => ({ chat: r.chat, wrote: !!r.wrote, member: !!r.member, lastAt: r.lastAt }));
 
 // ---------- agent access ----------
-export const PEOPLE_ACCESS = ['off', 'own', 'everyone'];
 /**
  * What an agent may see in People for one turn: null (nothing), { all: true }, or { chats, lists } (its own chats and
  * the lists the owner shared with it). `owner`: the sender of this turn is the owner (owner-level access).

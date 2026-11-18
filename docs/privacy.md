@@ -34,6 +34,9 @@ context…" (edit under **Settings → Privacy notice**).
   sends to a [prepared direct chat](chats.md#set-up-a-direct-chat-before-the-person-writes) carries it too.
 - A [welcome message](agents.md#quick-replies-welcome--faq) for new members comes after the notice when the notice is
   still due.
+- Each person's page records that they saw it (*Consent → Saw the privacy notice*, with the source and date):
+  everyone known to be in the group when it is posted, later members when they show up, and people who got the
+  direct-message line ([People → Consent](people.md#consent)).
 - Admin MCP: `get_privacy_notice`, `set_privacy_notice`, `set_chat_privacy_notice`.
 
 ![Privacy notice settings](site/img/card-privacy.webp)
@@ -45,8 +48,8 @@ context…" (edit under **Settings → Privacy notice**).
 | **Stored messages** | only chats that are on, for memory, with retention limits (90 days and 5 000 per chat by default, pruned every hour; **Server → Health**). Switching a chat on loads its recent messages from your phone ([Agents → Earlier messages](chats.md#earlier-messages-when-a-chat-is-switched-on)). Admins and owners can read them; every look is in the activity log. Erase a chat's memory with one click |
 | **Search messages** | the owner only, over chats that are on and not *Private to members*; each search is in the activity log with its words and the number found, never message text ([Agents → Chats](chats.md#search-messages-owner)) |
 | **Answer ratings** | 👍 / 👎 on an agent's answers (*Review*): who rated and when, no copy of the text; gone with the answer. Answers in private chats are not shown ([Review and teach](agents.md#review-and-teach)) |
-| **People** | a person is stored only when they write in a chat that is on, or when you add them: their app ids and phone, the name their app showed, and what you add (name, nickname, birthday, ties, households, notes, tags, lists). Agent notes never copy message text unless the activity log is *verbose*. Export or erase anyone on their page; erase removes their stored messages too ([People](people.md#merge-export-erase)) |
-| **Names and member tags** | phone contact, business and profile names from your linked phone (they name people but never add anyone to People; agents use the same name you see, phone contact names included, unless you switch that off on the People screen); group member tags only for chats that are on, erased with the chat's memory ([Agents → Contacts](chats.md#which-name-is-shown)) |
+| **People** | a person is stored when they write in, or are a member of, a chat that is on, when WhatsApp syncs their number from your phone, or when you add them: their app ids and phone, the name their app showed, the chats (that are on) they are in, and what you add (name, nickname, birthday, ties, households, notes, tags, lists, consents). Agent notes never copy message text unless the activity log is *verbose*. Agents see only the people of their own chats unless you choose *Everyone in People* per agent, and never hidden people; the card about the sender never holds message text ([People → What agents see](people.md#what-agents-see)). **Hide** someone to keep them out of lists and agents; **Export** anyone ([People](people.md#hide-merge-export)) |
+| **Names and member tags** | phone contact, business and profile names from your linked phone (each synced number is a person, *From your phone*; agents use the same name you see, phone contact names included, unless you switch that off on the People screen); group member tags only for chats that are on, erased with the chat's memory ([Agents → Contacts](chats.md#which-name-is-shown)) |
 | **Telegram phone numbers** | a person's phone is stored with their Telegram id only when they share their own contact with the bot (*Share my number*); it joins them to the same person as on WhatsApp ([Telegram](telegram.md#share-my-number-one-person-on-both-apps)). A contact someone else forwards is never used |
 | **Chats that are off** | the id, time and sender id of the newest message only (no text, no names), to ask the phone for history later |
 | **Activity log** | minimal, normal or verbose, by category and per chat, with retention. Errors, confirmations, configuration changes and channel status are always recorded |
@@ -56,6 +59,15 @@ context…" (edit under **Settings → Privacy notice**).
 | **Keys and passwords** | never through a chat or a model: entered on one-time panel links; a key pasted to the owner assistant is not read, stored or logged ([Owner assistant](owner-assistant.md#what-it-may-do-decided-in-code)) |
 
 ![Logging settings](site/img/card-logging.webp)
+
+## Delete a person
+
+For a privacy request ("delete everything about me"), the panel's **Hide** is not enough: it keeps their data. Ask an
+AI assistant connected with the [admin tools](admin-mcp.md) (or your owner assistant) to **erase** them
+(`erase_person`, owner only): it shows what goes and waits for your confirmation, then deletes their stored messages in
+every chat, their direct chat's memory, notes, ties, household memberships, tags, list entries, consents and app
+accounts. The activity log keeps only counts. If they write again in a chat that is on, or WhatsApp syncs their number
+from your phone again, they come back as a new person; **Hide** them then.
 
 > [!WARNING]
 > Use a **dedicated WhatsApp number** and tell your groups that the assistant keeps context.

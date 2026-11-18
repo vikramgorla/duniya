@@ -13,7 +13,7 @@ import { agentName } from './contacts.js';
 /** The name an agent sees (#113: phone contact names only while the owner allows them). */
 const nameFor = (p) => (p.phone ? agentName({ phone: p.phone, fallbackName: seenNameOf(p.id) }) || `+${p.phone}` : p.ownName || seenNameOf(p.id) || 'Someone');
 
-export const PEOPLE_DEFAULT_ALLOW = { organizer: ['people:*'], participant: ['people:find_person', 'people:get_person'] };
+const PEOPLE_DEFAULT_ALLOW = { organizer: ['people:*'], participant: ['people:find_person', 'people:get_person'] };
 // 079, one release only (remove in the next): saved `contacts:` rules of 078 keep working as the matching people rules.
 const LEGACY = { 'contacts:*': ['people:*'], 'contacts:find_contact': ['people:find_person', 'people:get_person'], 'contacts:save_contact': ['people:add_note', 'people:tag_person'] };
 /** The people rules of a role: its explicit people: (or old contacts:) rules, else the defaults. */
