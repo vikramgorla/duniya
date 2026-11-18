@@ -38,6 +38,13 @@
 > [!TIP]
 > Ask the owner assistant *"how many kids registered for Sankranti?"* or *"who is on the waiting list?"*.
 
+## Message the families
+
+With [Lists and sending](sending.md) on, an event's page has **⋯ → Message registered people**: a message to its
+registered people, **one per household** (to one adult who agreed to updates), each with their own numbers
+(`{people}`: *2 adults, 1 kid*), the date and the place. With Orders on too, **⋯ → Automatic payment reminders…**
+reminds people who have not paid, a few days before the due date.
+
 ## What agents can do
 
 | Tool | Who | Confirm |
@@ -57,4 +64,4 @@ Admin MCP: `list_events`, `get_event`, `save_event`, `delete_event`*, `register_
 `save_event_duty` (* needs `confirm_action`).
 
 ---
-**Next:** [Orders and payments](orders.md) · [Modules](modules.md) · [People](people.md) · [Docs index](README.md)
+**Next:** [Orders and payments](orders.md) · [Lists and sending](sending.md) · [Modules](modules.md) · [People](people.md) · [Docs index](README.md)

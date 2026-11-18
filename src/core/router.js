@@ -26,6 +26,7 @@ import { recordUsage } from './usage.js';
 import { noteJoin } from './welcome.js';
 import { notePerson } from './people.js';
 import { inRole, notePersonChat } from './people-access.js';
+import { interceptMessage } from '../modules/index.js';
 import { drainReads, paceReply, queueRead, readWhenDue } from './pace.js';
 
 // 059: the built-in owner assistant is reached through the owner hand-off only, never by routing.
@@ -279,6 +280,8 @@ export function createRouter(channel) {
     msg.personId = notePerson(msg);
     if (!openAgent) notePersonChat(msg.personId, msg.chat, 'wrote'); // 079: which agents may see them
     if (!openAgent) queueRead(msg); // 080: chats that are on: read (blue ticks) after the read delay, answered or not
+    // 082: replies to list messages are counted; "stop" / "start" are answered by the Sending module (no model)
+    if (!msg.isGroup && msg.personId && await interceptMessage(msg, channel)) return;
     // Groups: remember everything said (bound or not, paused or not) so agents have context.
     let rowId = 0;
     if (msg.isGroup) {

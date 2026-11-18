@@ -55,7 +55,7 @@ then takes about five taps: link WhatsApp, connect a model, pick a template, swi
 </tr>
 </table>
 
-More: [People](docs/people.md) (everyone from your chats and your phone in one place: families, kids, notes, tags, lists, consent; agents know who is writing and see only their own chats' people) · [Events](docs/events.md) and [orders & payments](docs/orders.md) (registrations with kids, waiting list, duties, who paid; agents register people) · [Telegram](docs/telegram.md) · [MCP tool services](docs/agents.md#tool-services-mcp) · [manage it from ChatGPT or Claude](docs/admin-mcp.md) ·
+More: [People](docs/people.md) (everyone from your chats and your phone in one place: families, kids, notes, tags, lists, consent; agents know who is writing and see only their own chats' people) · [Events](docs/events.md) and [orders & payments](docs/orders.md) (registrations with kids, waiting list, duties, who paid; agents register people) · [Lists and sending](docs/sending.md) (message a list, an event's families or everyone who owes: consent checked per message, each person's own wording, a person's pace, stop signals, payment reminders) · [Telegram](docs/telegram.md) · [MCP tool services](docs/agents.md#tool-services-mcp) · [manage it from ChatGPT or Claude](docs/admin-mcp.md) ·
 [your own domain](docs/domains-and-access.md) · [how it works](docs/architecture.md).
 
 > [!WARNING]

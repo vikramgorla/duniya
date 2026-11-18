@@ -39,6 +39,17 @@ context…" (edit under **Settings → Privacy notice**).
   direct-message line ([People → Consent](people.md#consent)).
 - Admin MCP: `get_privacy_notice`, `set_privacy_notice`, `set_chat_privacy_notice`.
 
+## Consent for messages to lists
+
+- [Lists and sending](sending.md) messages a person only when their page says *Yes* to the purpose (*May receive
+  updates* or *May receive marketing*), checked in code right before each message. *Not asked* counts as no.
+- A reply **stop** (*unsubscribe*, *arrête*, *basta* and the like, or asking the agent in any words) records *No* for
+  that purpose with the source and time, confirms once and pauses the run; **start** records *Yes* again.
+- Chats that are off, hidden people and people without an app are never messaged. The first message to someone in a
+  direct chat carries the privacy line, like any first reply.
+- What was sent is stored with the run (the text each person got, when, whether they replied) and in the chat's
+  messages; **Export** and **Erase** of a person include it.
+
 ![Privacy notice settings](site/img/card-privacy.webp)
 
 ## What is kept, and who sees it

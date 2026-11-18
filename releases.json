@@ -1,6 +1,21 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.44.0": {
+      "breaking": false,
+      "title": "Lists and sending: message the families, with consent",
+      "summary": "A new module under Settings → Modules. Send a message to a list, a tag, a household, an event's families or everyone who still owes. Only people who said yes get it (checked before every message), each person gets their own wording with their own facts, and it goes out one at a time at a person's pace on WhatsApp (or fast on Telegram). Nothing is sent before you confirm the preview. Pacing lowers the risk of a WhatsApp ban; it does not remove it, and WhatsApp's terms restrict bulk messaging.",
+      "changes": [
+        { "type": "new", "text": "People → Sending: a message to a list, a tag, a household, people registered for an event, or people with an open order; or one post in a group." },
+        { "type": "new", "text": "A preview before anything is sent: who gets it, on which app, how long it takes, who is skipped and why, and three sample messages." },
+        { "type": "new", "text": "Consent is checked before every message (updates or marketing; not asked counts as no). A reply \"stop\" records no and confirms once; \"start\" undoes it." },
+        { "type": "new", "text": "Each person gets their own wording with their name, household, event and open amount; facts are never invented." },
+        { "type": "new", "text": "The sending pace drives it: sending hours, typing, random gaps, a longer pause, a daily limit, slower for people who never wrote. It waits for tomorrow by itself at the limit." },
+        { "type": "new", "text": "Runs pause and tell you when someone says stop, several people in a row do not answer, messages fail, or WhatsApp logs out." },
+        { "type": "new", "text": "Payment reminders: Send reminders on Orders, or automatically a few days before the due date per event. Events: Message registered people (one message per household)." },
+        { "type": "new", "text": "Agents can prepare a message to a list for an organizer to confirm; anyone can tell the agent they want no more messages. AI assistants can send, pause, resume and stop." }
+      ]
+    },
     "2.43.0": {
       "breaking": false,
       "title": "Events, orders and payments",

@@ -94,6 +94,7 @@ const CARDS = [
   ['card-modules', 'settings/modules', '', 'box:Modules', 900], // 081: Settings → Modules
   ['card-event', 'people/events', "document.querySelector('.people-list a').click(); await T.until('.person-page'); await T.wait(400);", '.person-page', 900], // 081: an event's page
   ['card-orders', 'people/orders', '', '#main .card', 900], // 081: People → Orders
+  ['card-sending', 'people/sending', "[...document.querySelectorAll('.people-list a')].find((a) => a.textContent.includes('Payment')).click(); await T.until('.person-page'); await T.wait(400);", '.person-page', 900], // 082: a run's page
   ['card-pace', 'settings/sending-pace', "await T.click('Custom', 'button', 300);", 'box:Sending pace', 900], // 080: Settings → Sending pace
   ['card-web-access', 'settings/web-access', '', 'box:Web address & access', 900],
   ['card-small-server', 'server', '', 'box:This server', 1100],

@@ -12,6 +12,9 @@
 //   person       person(id) / household(id) → page sections [{ title, rows: [{ name, sub?, href? }] }]
 //   upkeep       upkeep(now): a bounded amount of background work on the scheduler's tick
 //   on           { <signal>: fn } — signals other modules send (emit), e.g. events → orders: 'registration'
+//   intercept    intercept(msg, channel): a direct message from a person in a chat that is on, before the agent;
+//                true = answered here (082: replies to list messages, stop / start)
+//   api          functions other modules may call while this one is on (082: Orders and Events start sends)
 // Timeline entries are written with People's addEvent() when something happens to a person.
 import { db } from '../core/db.js';
 import { fail } from '../core/config.js';
@@ -27,6 +30,8 @@ export const MODULES = [
   { id: 'orders', label: 'Orders and payments', line: 'What people owe and paid, with price lists per event; records payments, never takes money',
     refs: { person: [['ord_orders', 'person']], household: [['ord_orders', 'household']] },
     children: [['ord_lines', 'ord', 'ord_orders'], ['ord_payments', 'ord', 'ord_orders']], load: () => import('./orders/index.js') },
+  { id: 'sending', label: 'Lists and sending', line: 'Send a message to a list, an event or people who owe, one person at a time, with consent and a human pace',
+    refs: { person: [['snd_recipients', 'person']], household: [] }, children: [], load: () => import('./sending/index.js') },
 ];
 const info = (id) => MODULES.find((m) => m.id === id) || null;
 /** @type {Map<string, { manifest: any, costMb: number }>} */
@@ -65,6 +70,16 @@ export async function setModuleOn(id, on, by = '') {
   activity('config', { summary: `${m.label} switched ${on ? 'on' : 'off'}${on ? '' : ' (data kept)'}${by ? ` (${by})` : ''}` });
   bus.emit('status');
   return moduleRows();
+}
+
+/** The api of a module that is on (082), or null. */
+export const moduleApi = (id) => live.get(id)?.manifest.api || null;
+/** Router (082): a direct message from a person; true when a module answered it (the agent then stays out). */
+export async function interceptMessage(msg, channel) {
+  for (const m of liveModules()) {
+    try { if (m.intercept && await m.intercept(msg, channel)) return true; } catch (e) { activity('error', { summary: `${m.id}: ${e.message}` }); }
+  }
+  return false;
 }
 
 /** A signal from one module to the others that are on (e.g. events → orders: a registration changed). */

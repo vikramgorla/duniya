@@ -68,8 +68,9 @@ One row per purpose: **Saw the privacy notice**, **May receive updates**, **May 
 
 - *Saw the privacy notice* is recorded by itself: when the notice is posted in a group that is on (everyone known to be
   in it, and later members when they show up), and when the notice line is added to a direct-message answer.
-- Change any row with its menu; it records your user name and the time. Sending to lists will only use people who said
-  yes (a later module).
+- Change any row with its menu; it records your user name and the time. [Lists and sending](sending.md) messages only
+  people who said yes to its purpose (*updates* or *marketing*), checked right before each message; a reply **stop**
+  records *No* (*Replied STOP*), **start** records *Yes* again.
 
 ## What agents see
 
@@ -123,8 +124,8 @@ a tie from both.
   owner assistant through the admin tools).
 - Agent notes never hold message text: a note that copies one of the person's stored messages is refused, unless your
   logging policy keeps message contents (*verbose*, [Privacy](privacy.md)).
-- The timeline also shows what happened: added to People, joined a household, merged, merge undone. Later modules
-  (events, orders, surveys) will write here too.
+- The timeline also shows what happened: added to People, joined a household, merged, merge undone. Modules write
+  here too (registrations, payments; [Lists and sending](sending.md) lists the messages a person got on their page).
 
 ## Tags and lists
 
