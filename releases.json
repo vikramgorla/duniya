@@ -1,6 +1,17 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.42.0": {
+      "breaking": false,
+      "title": "Reads and types at a person's pace",
+      "summary": "Messages in chats that are on now get blue ticks after a natural pause, and replies show typing for a time that fits them. Normal pace is on by default; change it under Settings → Sending pace.",
+      "changes": [
+        { "type": "new", "text": "Read receipts: messages in chats that are on are marked read after a short random pause, before the agent types; messages it leaves alone are read too. Chats that are off are never touched. A switch turns it off." },
+        { "type": "improved", "text": "Typing… now lasts as long as the reply would take to type (at most 8 seconds) instead of a quick flash." },
+        { "type": "new", "text": "Settings → Sending pace: Careful, Normal or Faster, or your own ranges for read delay, typing speed, gaps between messages, new chats a day and sending hours." },
+        { "type": "new", "text": "Intros to new direct chats count toward a daily limit (40 by default); a number linked in the last week starts lower and grows over the week." }
+      ]
+    },
     "2.41.0": {
       "breaking": false,
       "title": "Delete stored messages; calmer history loading",

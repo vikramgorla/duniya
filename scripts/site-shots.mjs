@@ -91,6 +91,7 @@ const CARDS = [
   ['card-owner-assistant', 'settings/owner-assistant', 'T.openAll(T.box("Owner assistant"));', 'box:Owner assistant', 900],
   ['card-owner-agent', 'agents/owner-assistant', '', '.ap-card', 900], // 059: the owner assistant's own editor
   ['card-privacy', 'settings/privacy-notice', '', 'box:Privacy notice', 900],
+  ['card-pace', 'settings/sending-pace', "await T.click('Custom', 'button', 300);", 'box:Sending pace', 900], // 080: Settings → Sending pace
   ['card-web-access', 'settings/web-access', '', 'box:Web address & access', 900],
   ['card-small-server', 'server', '', 'box:This server', 1100],
   ['card-small-mode', 'settings/small-mode', '', '#small-mode', 900],

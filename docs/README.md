@@ -38,6 +38,7 @@
 | <img src="img/thumb-usage.webp" alt="" width="120"> | **[Usage & spending caps](spending.md)** | you want to see or limit what it costs |
 | <img src="img/thumb-mcp.webp" alt="" width="120"> | **[Tool services (MCP)](agents.md#tool-services-mcp)** | agents need real tools: a calendar, a planner, GIFs |
 | <img src="img/thumb-assistants.webp" alt="" width="120"> | **[Manage from ChatGPT or Claude](admin-mcp.md)** | you want to run Duniya by chatting with an AI assistant |
+| <img src="img/thumb-pace.webp" alt="" width="120"> | **[Sending pace](sending-pace.md)** | messages should be read, answered and sent at a person's pace: read receipts, typing, new chats a day |
 | <img src="img/thumb-privacy.webp" alt="" width="120"> | **[Privacy](privacy.md)** | you want to know what is stored, who sees it, and what groups are told |
 
 ## Run your server

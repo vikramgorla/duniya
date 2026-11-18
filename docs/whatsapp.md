@@ -22,7 +22,7 @@
 > [!WARNING]
 > Duniya uses the open-source [Baileys](https://github.com/WhiskeySockets/Baileys) library, not the official
 > WhatsApp Business API. Agents only answer when addressed and are rate-limited to keep the risk of a ban low, but use
-> a number you can afford to lose.
+> a number you can afford to lose. [Sending pace](sending-pace.md) makes it read, type and send like a person.
 
 ## Settings → Channels → WhatsApp
 
@@ -59,4 +59,4 @@ Admin MCP: `list_channels`, `set_channel_enabled` (switching off asks for confir
 `add_whatsapp_number`, `remove_whatsapp_number` (confirmation required).
 
 ---
-**Next:** [Add a model](models.md) · [Connect Telegram](telegram.md) · [Chats](chats.md) · [Docs index](README.md)
+**Next:** [Add a model](models.md) · [Sending pace](sending-pace.md) · [Connect Telegram](telegram.md) · [Chats](chats.md) · [Docs index](README.md)

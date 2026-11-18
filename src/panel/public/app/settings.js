@@ -641,8 +641,8 @@ const paceLine = (p) => `Reads after ${p.readMin}–${secs(p.readMax)} · types 
 function paceCard(st) {
   const pick = { preset: st.preset };
   const F = [['readMin', 'Read after at least (s)'], ['readMax', 'Read after at most (s)'], ['cps', 'Typing speed (characters/s)'], ['jitter', 'Typing jitter (%)'], ['gapMin', 'Shortest gap (s)'], ['gapMax', 'Longest gap (s)'],
-    ['dailyNew', 'New chats a day'], ['hoursFrom', 'Send from'], ['hoursTo', 'Send until'], ['pauseEvery', 'Longer pause every (messages, 0 = never)'], ['pauseMinutes', 'Longer pause (minutes)']];
-  const inputs = Object.fromEntries(F.map(([k, l]) => [k, h('input', { type: k.startsWith('hours') ? 'time' : 'number', value: st[k], step: k === 'cps' ? 0.5 : 1, 'aria-label': l, disabled: !can('admin') })]));
+    ['dailyNew', 'New chats a day'], ['hoursFrom', 'Send from'], ['hoursTo', 'Send until'], ['pauseEvery', 'Pause every (messages)'], ['pauseMinutes', 'Pause for (minutes)']];
+  const inputs = Object.fromEntries(F.map(([k, l]) => [k, h('input', { type: k.startsWith('hours') ? 'time' : 'number', value: st[k], step: k === 'cps' ? 0.5 : k.startsWith('hours') ? 60 : 1, 'aria-label': l, disabled: !can('admin') })]));
   const custom = h('div', { class: `pace-grid${st.preset === 'custom' ? '' : ' hide'}` }, F.map(([k, l]) => h('div', {}, h('label', {}, l), inputs[k])));
   const line = h('p', { class: 'small', style: 'margin:8px 0 0' }, st.preset === 'custom' ? '' : paceLine(st));
   const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Pace' }, [['careful', 'Careful'], ['normal', 'Normal'], ['faster', 'Faster'], ['custom', 'Custom']].map(([v, l]) => h('button', { type: 'button', class: st.preset === v ? 'on' : '', 'aria-pressed': String(st.preset === v), disabled: !can('admin'),

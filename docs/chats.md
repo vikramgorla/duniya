@@ -100,7 +100,7 @@ settings stay together.
 > [!NOTE]
 > Nothing is sent to the person. **Send intro…** lets the agent write first: you see the exact text (with the privacy
 > line the first time) and it goes out only when you press **Send intro now**. Owner assistant and admin MCP:
-> `prepare_direct_chat`, `send_chat_intro` (confirmed).
+> `prepare_direct_chat`, `send_chat_intro` (confirmed). Intros count toward the [new chats a day](sending-pace.md#new-chats-a-day).
 
 People who write to an agent number privately get the agent chosen for that number
 ([Connect WhatsApp](whatsapp.md#settings--channels--whatsapp)); a person can be given another agent on their chat's page.
