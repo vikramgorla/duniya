@@ -223,7 +223,7 @@ export async function runAgent(ctx) {
   }
 
   for (const code of codes) {
-    reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm.ttlMinutes || 9} min).`;
+    reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm?.ttlMinutes || 9} min).`;
   }
   ctx.usage = usage;
   const via = failed.length ? ` (after ${failed.map((f) => `${f.name}: ${REASON_TEXT[f.reason] || f.reason}`).join(', ')})` : '';

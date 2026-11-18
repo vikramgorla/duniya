@@ -87,6 +87,16 @@ export async function seedScale(t, N = FULL) {
     for (let i = 0; i < N.people; i++) re.run(chats[i % N.on], `m${i}`, phoneOf(i % N.active), `Contact ${i % N.active}`, '👍', now - i * 60000);
     const mt = db.prepare('INSERT OR IGNORE INTO member_tags (chat, member, phone, label, ts) VALUES (?, ?, ?, ?, ?)');
     for (let i = 0; i < N.people * 0.6; i++) mt.run(groups[i % groups.length], `${phoneOf(i)}@s.whatsapp.net`, phoneOf(i), 'driver', now);
+    // 079: the chats people are in (wrote in, from the stored messages; members of the groups that are on), where they
+    // came from (a third from the phone's contacts), consents, and a few hidden
+    db.prepare(`INSERT OR IGNORE INTO person_chats (tenant_id, person, chat, wrote, member, last_at)
+      SELECT 'default', 'p_' || printf('%012d', CAST(substr(sender, 5) AS INTEGER) - 5000000), chat, 1, 0, MAX(ts) FROM messages WHERE from_agent = 0 GROUP BY sender, chat`).run();
+    const pc = db.prepare('INSERT OR IGNORE INTO person_chats (tenant_id, person, chat, wrote, member, last_at) VALUES (?, ?, ?, 0, 1, ?)');
+    for (const [g, chat] of groups.filter((c) => chats.indexOf(c) < N.on).entries()) for (let m = 0; m < 100; m++) pc.run('default', personId((g * 100 + m) % N.people), chat, now);
+    db.prepare("UPDATE people SET source = 'phone' WHERE CAST(substr(id, 3) AS INTEGER) % 3 = 0 AND CAST(substr(id, 3) AS INTEGER) >= ?").run(N.active);
+    db.prepare('UPDATE people SET hidden = 1 WHERE CAST(substr(id, 3) AS INTEGER) % 97 = 0').run();
+    const cs = db.prepare("INSERT OR IGNORE INTO person_consents (tenant_id, person, purpose, value, source, at) VALUES (?, ?, 'privacy_notice', 'yes', 'Group notice', ?)");
+    for (let i = 0; i < N.people; i++) cs.run('default', personId(i), now);
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
   db.exec('PRAGMA wal_checkpoint(TRUNCATE)');

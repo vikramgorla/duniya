@@ -132,6 +132,10 @@ test('changes to someone else wait for an organizer\'s confirm code; a note abou
   const olga = people.personByPhone(ORG);
   r = await toolTurn('g1@g.us', ORG, '!panduga', 'people__tag_person', { person: olga.id, add: ['treasurer'] });
   assert.match(r.result, /tags: treasurer/);
+  // an agent without a tool-service confirm setting holds people changes the same way
+  r = await toolTurn('g2@g.us', ORG, '!help', 'people__tag_person', { person: hari.id, add: ['cook'] });
+  assert.match(r.result, /Held/);
+  assert.match(t.sent.at(-1).text, /confirm [A-Z0-9]{4}\* to apply.*valid 9 min/);
   // participants cannot change anyone
   r = await toolTurn('g1@g.us', '41790000401', '!panduga', 'people__add_note', { person: gita.id, text: 'x' });
   assert.ok(r.isError);
