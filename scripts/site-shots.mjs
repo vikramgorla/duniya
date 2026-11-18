@@ -74,6 +74,7 @@ const CARDS = [
   ['card-ask', 'overview', ASK + ' show(S.tab); await T.wait(600);', '#ov-ask', 1100],
   ['card-quiet', 'overview', '', '#ov-silences', 1100],
   ['card-wa-numbers', 'settings/whatsapp', '', '#ch-whatsapp', 600], // 071: Connect WhatsApp; 075: Settings → Channels → WhatsApp
+  ['card-telegram', 'settings/telegram', 'T.openAll();', '#ch-telegram', 600], // 077: Settings → Channels → Telegram
   ['card-update-notes', 'overview', UPDATE_NOTES, 'dialog.ask', 900],
   ['card-checklist', 'overview', START, '#ov-checklist', 1100, fakeChecklist('chat')],
   ['card-start-model', 'overview', START, '#ov-checklist', 1100, fakeChecklist('provider')],

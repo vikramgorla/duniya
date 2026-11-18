@@ -175,7 +175,7 @@ function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
     const fbLine = h('span', { class: 'small muted' }, chatFallbackLine(c.fallback, models));
     const openFallback = (ch) => open(chatFallbackEditor(ch, models, { onClose: () => extra.replaceChildren(),
       onSaved: async (fallback) => { if (await savePrefs({ fallback })) { fbLine.textContent = chatFallbackLine(c.fallback, models); extra.replaceChildren(); } } }));
-    const meta = [c.isGroup ? `Group · ${plural(c.size || 0, 'member')}` : c.phone ? `+${c.phone}` : 'Person', c.lastAt ? `last message ${ago(c.lastAt)} ago` : '', us?.chat?.[c.id] ? usageLine(us.chat[c.id]) : ''].filter(Boolean).join(' · ');
+    const meta = [c.isGroup ? `${c.channel === 'telegram' ? 'Telegram group' : 'Group'} · ${plural(c.size || 0, 'member')}` : c.phone ? `+${c.phone}` : c.channel === 'telegram' ? 'Telegram' : 'Person', c.lastAt ? `last message ${ago(c.lastAt)} ago` : '', us?.chat?.[c.id] ? usageLine(us.chat[c.id]) : ''].filter(Boolean).join(' · ');
     const intro = !c.isGroup && admin && c.enabled && c.agent ? h('button', { class: 'btn small', type: 'button', onclick: () => open(introCard(c, { onClose: () => extra.replaceChildren(), onSent: () => extra.replaceChildren() })) }, c.introAt ? 'Send another intro…' : 'Send intro…') : null;
     // 072: section rows, their current value filled in when the chat's memory arrives
     const subs = {};
