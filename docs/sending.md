@@ -109,6 +109,13 @@ Progress (sent of total, replied, said stop, skipped, failed), **Pause / Resume*
 for, the message, and each person: what they got and when they replied. It updates by itself. **People → Sending**
 keeps the history; a person's page lists the messages they got (*Messages from lists*).
 
+## Surveys and campaigns
+
+- A message can carry a [survey](surveys.md): `{survey}` and each person's own `{survey_link}`; they answer in the chat
+  or on the link page.
+- A [campaign](campaigns.md) is a few messages over days, confirmed once: follow-ups skip people who replied,
+  registered, paid or finished the survey.
+
 ## Agents
 
 With the module on, agents get (**Tools** on the agent's page):
@@ -127,4 +134,4 @@ confirm), `control_send` (pause, resume, stop), `save_send_audience`, `set_payme
 everyone who hasn't paid for Sankranti"* shows you the preview first.
 
 ---
-**Next:** [Sending pace](sending-pace.md) · [People](people.md) · [Orders and payments](orders.md) · [Privacy](privacy.md) · [Docs index](README.md)
+**Next:** [Campaigns](campaigns.md) · [Surveys](surveys.md) · [Sending pace](sending-pace.md) · [People](people.md) · [Orders and payments](orders.md) · [Privacy](privacy.md) · [Docs index](README.md)

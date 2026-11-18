@@ -14,7 +14,8 @@
   Instant online payment by default). Status: **Open**, **Part paid**, **Paid**, **Refunded**, **Cancelled**.
 - Once a day you get one message with the open orders due within three days or overdue (owner alerts). With
   [Lists and sending](sending.md) on, **Send reminders** messages the people themselves, and an event can send them
-  automatically a few days before the due date.
+  automatically a few days before the due date; a [campaign](campaigns.md) follows up only with people who have not
+  paid.
 
 ![Orders: not paid, totals per event, and each order with what is left and when it is due](site/img/card-orders.webp)
 

@@ -1,6 +1,21 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.45.0": {
+      "breaking": false,
+      "title": "Surveys and campaigns",
+      "summary": "Two additions for reaching people. Surveys (a new module): a few questions people answer in the chat, where the agent asks one at a time, or with their own link; results with bars, each person's answers, CSV. Campaigns (in Lists and sending): a few messages over days, confirmed once, where follow-ups skip people who replied, registered, paid or answered. Same consent, pace and stop signals as every send.",
+      "changes": [
+        { "type": "new", "text": "Settings → Modules → Surveys: questions with one or several choices, a number or a short text; required or optional." },
+        { "type": "new", "text": "People answer in the chat (the agent asks the next question and saves each answer, checked) or on their own link page; no sign-in." },
+        { "type": "new", "text": "Survey results: counts per choice, averages, the latest notes, each person's answers, CSV; a person's page lists their answers." },
+        { "type": "new", "text": "Send a survey with any message: {survey} and each person's own {survey_link}." },
+        { "type": "new", "text": "People → Sending → New campaign: messages and waits of some days, confirmed once; a campaign page with each step's progress, pause, resume and stop." },
+        { "type": "new", "text": "Campaign follow-ups skip people who replied, said stop, registered for the event, paid for it or finished the survey; an optional last day." },
+        { "type": "new", "text": "AI assistants and the owner assistant can make surveys, read the answers and start, pause or stop campaigns." },
+        { "type": "improved", "text": "The orders of one event load the same quick way on large servers." }
+      ]
+    },
     "2.44.0": {
       "breaking": false,
       "title": "Lists and sending: message the families, with consent",

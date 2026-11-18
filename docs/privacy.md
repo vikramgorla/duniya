@@ -50,6 +50,15 @@ context…" (edit under **Settings → Privacy notice**).
 - What was sent is stored with the run (the text each person got, when, whether they replied) and in the chat's
   messages; **Export** and **Erase** of a person include it.
 
+## Survey links and answers
+
+- Each person gets their own link (`/s/…`); only a hash of it is stored. Anyone with the link can answer as that
+  person, so it is sent only to them. No sign-in, no cookies; the page shows every text as text, takes the form only
+  from itself and slows down anyone who opens links too fast.
+- Answers (and how: chat or link) are stored per person and survey; the owner and admins see them, agents' organizers
+  see the answers of people their agent may see. **Export** and **Erase** of a person include them; deleting a
+  survey deletes its answers.
+
 ![Privacy notice settings](site/img/card-privacy.webp)
 
 ## What is kept, and who sees it

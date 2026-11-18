@@ -35,6 +35,7 @@
 | <img src="img/thumb-people.webp" alt="" width="120"> | **[People](people.md)** | you want one place for who is who: families and kids, notes, tags, lists, merge, export and erase |
 | <img src="img/thumb-events.webp" alt="" width="120"> | **[Events](events.md)** · [Orders and payments](orders.md) · [Modules](modules.md) | you run family events: registrations with kids, a waiting list, duties, who paid what |
 | <img src="img/thumb-sending.webp" alt="" width="120"> | **[Lists and sending](sending.md)** | you want to message a list, an event's families or everyone who owes: with consent, each person's own wording, at a person's pace |
+| <img src="img/thumb-surveys.webp" alt="" width="120"> | **[Surveys](surveys.md)** · [Campaigns](campaigns.md) | you want answers to a few questions (in chat or by link), or a short series of messages with follow-ups only to who has not answered or paid |
 | <img src="img/thumb-telegram.webp" alt="" width="120"> | **[Connect Telegram](telegram.md)** | your groups are on Telegram too: add a bot, same agents, one person on both apps |
 | <img src="img/thumb-photos-voice.webp" alt="" width="120"> | **[Photos & voice](models.md#photos--voice)** | agents should see photos, hear voice notes or reply with voice |
 | <img src="img/thumb-usage.webp" alt="" width="120"> | **[Usage & spending caps](spending.md)** | you want to see or limit what it costs |

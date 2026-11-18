@@ -43,7 +43,8 @@
 With [Lists and sending](sending.md) on, an event's page has **⋯ → Message registered people**: a message to its
 registered people, **one per household** (to one adult who agreed to updates), each with their own numbers
 (`{people}`: *2 adults, 1 kid*), the date and the place. With Orders on too, **⋯ → Automatic payment reminders…**
-reminds people who have not paid, a few days before the due date.
+reminds people who have not paid, a few days before the due date. A [campaign](campaigns.md) can invite, wait and
+follow up only with those who have not registered or paid.
 
 ## What agents can do
 

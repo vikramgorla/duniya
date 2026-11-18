@@ -125,7 +125,8 @@ a tie from both.
 - Agent notes never hold message text: a note that copies one of the person's stored messages is refused, unless your
   logging policy keeps message contents (*verbose*, [Privacy](privacy.md)).
 - The timeline also shows what happened: added to People, joined a household, merged, merge undone. Modules write
-  here too (registrations, payments; [Lists and sending](sending.md) lists the messages a person got on their page).
+  here too (registrations, payments; [Lists and sending](sending.md) lists the messages a person got on their page,
+  [Surveys](surveys.md) their answers).
 
 ## Tags and lists
 
@@ -164,4 +165,4 @@ The [owner assistant](owner-assistant.md) uses the same tools: it reads People d
 your confirmation.
 
 ---
-**Next:** [Events](events.md) · [Orders and payments](orders.md) · [Chats](chats.md) · [Privacy](privacy.md) · [Docs index](README.md)
+**Next:** [Lists and sending](sending.md) · [Surveys](surveys.md) · [Events](events.md) · [Orders and payments](orders.md) · [Chats](chats.md) · [Privacy](privacy.md) · [Docs index](README.md)
