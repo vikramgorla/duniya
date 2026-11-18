@@ -4,7 +4,7 @@
 import { changeWithAi as changeWithAiDialog } from './ai-helper.js';
 import { answerActions } from './answers.js';
 import { askCard } from './ask.js';
-import { tagInput } from './tags.js';
+import { peoplePicker, tagInput } from './tags.js';
 import { S, api, ask, avatar, can, field, fieldError, h, icon, lines, menu, splitLines, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
 import { fallbackLine, fallbackPicker } from './fallback.js';
 import { browseButton } from './registry.js';
@@ -13,6 +13,9 @@ import { ROLE_LABEL, globRe, markSaved, serverConfig, serverState, toolGrid, too
 import { capEditor, usageSummary } from './usage.js';
 
 const DM_LABEL = { members: 'Members of its groups', organizers: 'Organizers only', anyone: 'Anyone', none: 'Nobody' };
+// 079: which people an agent's People tools and sender cards may see
+const PEOPLE_SHORT = { own: 'sees its chats’ people', everyone: 'sees everyone in People', off: 'no People access' };
+const PEOPLE_ACCESS = { own: 'Its own chats (default)', everyone: 'Everyone in People', off: 'Nobody' };
 // 076: how an agent answers in groups
 const GROUP_REPLIES = { followups: 'When woken + follow-ups', wake: 'Only when woken', auto: 'Whenever needed' };
 const tick = (input, label) => h('label', { class: 'tick' }, input, ` ${label}`);
@@ -37,8 +40,8 @@ const SECTIONS = [
     sub: (x) => trunc(x.c.description || x.c.prompt || 'Not written yet', 60), build: buildCharacter },
   { group: 'What it does', id: 'where', agent: true, icon: 'chats', c: 'c3', title: () => 'Where it answers', help: 'agents.md#create-and-change-agents', line: () => 'The chats it serves, the words that wake it and who may write to it directly.',
     sub: (x) => [plural(x.chats.length, 'chat'), x.c.triggers?.length ? x.c.triggers.join(', ') : 'no wake word', `direct: ${DM_LABEL[x.c.dm]?.toLowerCase() || x.c.dm}`].join(' · '), build: buildWhere },
-  { group: 'What it does', id: 'people', agent: true, icon: 'people', c: 'c4', title: () => 'People', help: 'agents.md#roles', line: () => 'Organizers use organizer tools and confirm changes; everyone else is a participant.',
-    sub: (x) => (x.c.organizers?.length ? plural(x.c.organizers.length, 'organizer') : 'Group admins are organizers'), build: buildPeople },
+  { group: 'What it does', id: 'people', agent: true, icon: 'people', c: 'c4', title: () => 'People', help: 'agents.md#roles', line: () => 'Who is an organizer, and which people it may know about.',
+    sub: (x) => [x.c.organizers?.length ? plural(x.c.organizers.length, 'organizer') : 'Group admins are organizers', PEOPLE_SHORT[x.c.peopleAccess || 'own']].join(' · '), build: buildPeople },
   { group: 'What it does', id: 'quick', agent: true, icon: 'send', c: 'c2', title: () => 'Quick replies & FAQ', help: 'agents.md#quick-replies-welcome--faq', line: () => 'Instant answers from your text: no AI, no tokens.',
     sub: (x) => { const n = (x.c.quickReplies || []).length; const f = (x.c.faq?.items || []).length; return n || f ? [n ? plural(n, 'quick reply', 'quick replies') : '', f ? plural(f, 'question') : ''].filter(Boolean).join(' · ') : 'None'; }, build: buildQuick },
   { group: 'What it does', id: 'welcome', agent: true, icon: 'people', c: 'c3', title: () => 'Welcome', help: 'agents.md#quick-replies-welcome--faq', line: () => 'Greets people who join a group, once per person.',
@@ -217,32 +220,39 @@ function buildWhere(x) {
   value: () => ({ triggers: F.triggers.values(), respondToMentions: F.respondToMentions.checked, groupReplies: F.groupReplies.value, dm: F.dm.value }) };
 }
 function buildPeople(x) {
+  // 079: roles are numbers, people and lists. Group members switch between participant and organizer here; everyone
+  // else (people in People, lists, numbers) is picked below. People access: which people its tools and cards may see.
   const orgSet = new Set(x.c.organizers || []);
-  const groupPhones = new Set();
-  const F = { organizers: h('textarea', { style: 'min-height:60px', 'aria-label': 'More organizers' }), participants: h('textarea', { value: lines(x.c.participants), style: 'min-height:50px', 'aria-label': 'Extra participants' }) };
-  const syncOthers = () => { F.organizers.value = [...orgSet].filter((p) => !groupPhones.has(p)).join('\n'); };
-  syncOthers();
-  F.organizers.addEventListener('input', () => {
-    for (const p of [...orgSet]) if (!groupPhones.has(p)) orgSet.delete(p);
-    for (const l of splitLines(F.organizers.value)) { const d = l.replace(/\D/g, ''); if (d) orgSet.add(d); }
-  });
+  const memberKeys = new Set(); // the entries the member switches stand for (number and person of each member)
+  const F = { access: h('select', { 'aria-label': 'People access', disabled: !can('admin') }, Object.entries(PEOPLE_ACCESS).map(([v, l]) => h('option', { value: v, selected: (x.c.peopleAccess || 'own') === v }, l))) };
   const box = h('div', {}, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading group members…'));
+  const more = h('div', {});
   const ready = api('GET', `/api/agents/${x.enc}/people`).then((pp) => {
     if (pp.suggested) for (const g of pp.groups) for (const m of g.members) if (m.suggested) orgSet.add(m.phone);
-    for (const g of pp.groups) for (const m of g.members) if (m.phone) groupPhones.add(m.phone);
-    syncOthers();
+    for (const g of pp.groups) for (const m of g.members) for (const k of [m.phone, m.person]) if (k) memberKeys.add(k);
+    const isOrg = (m) => orgSet.has(m.phone) || (m.person && orgSet.has(m.person));
     const role = (m) => (!m.phone ? h('span', { class: 'small muted' }, 'number hidden') : seg(`Role of ${whoLabel(m)}`, [['participant', 'Participant'], ['organizer', 'Organizer']],
-      orgSet.has(m.phone) ? 'organizer' : 'participant', (v) => { if (v === 'organizer') orgSet.add(m.phone); else orgSet.delete(m.phone); syncOthers(); }));
+      isOrg(m) ? 'organizer' : 'participant', (v) => { orgSet.delete(m.phone); if (m.person) orgSet.delete(m.person); if (v === 'organizer') orgSet.add(m.person || m.phone); box.dispatchEvent(new Event('input', { bubbles: true })); }));
     box.replaceChildren(
       pp.suggested && pp.groups.some((g) => g.members.some((m) => m.suggested)) ? h('p', { class: 'small muted' }, 'No roles saved yet: the group admins are its organizers.') : null,
       pp.groups.length ? pp.groups.map((g) => block(`${g.name} · ${plural(g.members.length, 'member')}`, g.error ? h('div', { class: 'small', style: 'color:var(--bad)' }, g.error) : null,
-        h('ul', { class: 'people' }, g.members.map((m) => h('li', {}, h('span', { class: 'who' }, h('b', {}, m.phone ? h('a', { href: `#people/${encodeURIComponent(m.phone)}` }, whoLabel(m)) : whoLabel(m)), tagPill(m.tag), m.admin ? h('span', { class: 'small muted' }, ' · admin') : null), role(m))))))
+        h('ul', { class: 'people' }, g.members.map((m) => h('li', {}, h('span', { class: 'who' }, h('b', {}, m.phone ? h('a', { href: `#people/${encodeURIComponent(m.person || m.phone)}` }, whoLabel(m)) : whoLabel(m)), tagPill(m.tag), m.admin ? h('span', { class: 'small muted' }, ' · admin') : null), role(m))))))
         : h('p', { class: 'small muted' }, 'Choose this agent for a group on Chats to pick people from its members.'));
+    const entry = new Map(pp.entries.map((e) => [e.value, e]));
+    const pick = (values, label, o = {}) => peoplePicker(values.map((v) => entry.get(v) || { value: v, label: v, kind: 'phone' }), { label, lists: pp.lists, ...o });
+    F.organizers = pick([...orgSet].filter((v) => !memberKeys.has(v)), 'More organizers');
+    F.participants = pick(x.c.participants || [], 'Extra participants');
+    F.lists = pick(x.c.peopleLists || [], 'Lists shared with this agent', { only: 'list', placeholder: 'Type a list name' });
+    more.replaceChildren(field('More organizers', F.organizers, 'People, lists (e.g. "Committee") or numbers. A role follows the person on WhatsApp and Telegram.'),
+      field('Extra participants who may message it directly', F.participants));
+    shared.replaceChildren(field('Lists shared with it', F.lists, 'It also sees the people on these lists.'));
   }).catch((e) => box.replaceChildren(h('p', { class: 'small muted' }, `Could not load members: ${e.message}`)));
+  const shared = h('div', {});
   return { F, ready, el: h('div', {}, box,
-    h('details', { class: 'sblock' }, h('summary', {}, 'People outside these groups'),
-      field('More organizers (one number per line, with country code)', F.organizers), field('Extra participants who may message it directly', F.participants))),
-  value: () => ({ organizers: [...orgSet], participants: splitLines(F.participants.value) }) };
+    h('details', { class: 'sblock' }, h('summary', {}, 'People outside these groups'), more),
+    block('People access', field('Which people it may look up and know about', F.access, 'Its People tools and the short card about who is writing. Own chats: people who write in or are members of its chats, plus the lists below. When you write to it yourself, it sees everyone.'), shared)),
+  value: () => ({ organizers: [...[...orgSet].filter((v) => memberKeys.has(v)), ...(F.organizers?.values() || [...orgSet].filter((v) => !memberKeys.has(v)))],
+    participants: F.participants?.values() || x.c.participants || [], peopleAccess: F.access.value, peopleLists: F.lists?.values() || x.c.peopleLists || [] }) };
 }
 function buildModel(x) {
   const F = { model: modelSelect(x.models, x.c.model, { autoLabel: `Auto${x.models.resolvedDefault ? ` (now ${x.models.resolvedDefault})` : ''}` }) };
