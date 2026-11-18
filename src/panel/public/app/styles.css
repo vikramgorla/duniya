@@ -748,7 +748,8 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
 .person-page .lgroup { margin: var(--s3) calc(-1 * var(--s2)) 0; }
 .person-page .lgroup li + li { border-top: 1px solid var(--line); }
 .person-page .lempty { padding: 4px 10px; }
-.person-page .lgroup li.has-end { display: flex; align-items: center; } .person-page .lgroup li.has-end > .lrow { flex: 1; min-width: 0; }
+.person-page .lgroup li.has-end, .people-list li.has-end { display: flex; align-items: center; } .person-page .lgroup li.has-end > .lrow, .people-list li.has-end > .lrow { flex: 1; min-width: 0; }
+.row-end { display: inline-flex; align-items: center; gap: 6px; padding-right: 6px; }
 .person-page .lgroup .eyebrow .help { margin-left: 4px; }
 .pnav a { padding: 5px 12px; border-radius: 8px; color: var(--muted); font-size: var(--fs-s); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
 .pnav a.on { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(16,18,22,.12); }

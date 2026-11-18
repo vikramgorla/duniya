@@ -43,7 +43,7 @@ export function moduleRoutes(route) {
   route('GET', '/api/orders', async (req, res, body, q) => (await ord()).ordersPage(filter(q)), admin);
   route('GET', '/api/orders/csv', async (req, res, body, q) => sendCsv(res, `orders-${filter(q).status}`, (await ord()).csvRows(filter(q))), admin);
   route('POST', '/api/orders', async (req, res, body, q, p, user) => [201, (await ord()).createOrder(body, user.username)], admin);
-  route('GET', '/api/orders/:id', async (req, res, body, q, p) => (await ord()).getOrder(p.id), admin);
+  route('GET', '/api/orders/:id', async (req, res, body, q, p) => { const m = await ord(); return { ...m.getOrder(p.id), methods: m.paymentMethods() }; }, admin);
   route('PUT', '/api/orders/:id', async (req, res, body, q, p, user) => (await ord()).updateOrder(p.id, body, user.username), admin);
   route('DELETE', '/api/orders/:id', async (req, res, body, q, p, user) => (await ord()).deleteOrder(p.id, user.username), admin);
   route('POST', '/api/orders/:id/payments', async (req, res, body, q, p, user) => [201, (await ord()).addPayment(p.id, body, user.username)], admin);

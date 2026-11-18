@@ -400,6 +400,29 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   pa.recordConsent(pid[2], 'updates', 'yes', 'Asked at the school picnic');
   contacts.syncWhatsAppContacts(['Dr. Rossi', 'Garage Favre', 'Isabelle (piano)', 'Kofi', 'Mme Perret'].map((name, i) => ({ id: `${P(30 + i)}@s.whatsapp.net`, name })));
   pp.setHidden(pp.personByPhone(P(33)).id, true, 'admin');
+  // 081: Events and Orders on: Sankranti (households with kids, a price list, duties, part and full payments), a picnic
+  // whose organizer confirms (one to confirm, a waiting list), and an overdue order by hand. Fake people only.
+  const mods = await imp('src/modules/index.js');
+  for (const id of ['events', 'orders']) await mods.setModuleOn(id, true, 'admin');
+  const evm = await imp('src/modules/events/index.js'); const om = await imp('src/modules/orders/index.js');
+  const yr = new Date().getFullYear() + 1;
+  const sank = evm.saveEvent({ name: `Sankranti ${yr}`, starts: `${yr}-01-14`, place: 'Salle des Fêtes, Morges', capacity: 40, deadline: `${yr}-01-08`, per: 'household', confirm: 'auto',
+    prices: { adult: 25, kid: 10, freeUnder: 8 }, payBy: `${yr}-01-10` }, 'admin').event;
+  evm.register({ event: sank.id, household: chary.id, notes: 'vegetarian' }, { by: 'School buddy' });
+  evm.register({ event: sank.id, household: font.id }, { by: 'admin' });
+  for (const [i, a, k] of [[4, 1, 0], [5, 2, 1], [6, 2, 2], [7, 1, 0], [9, 2, 0]]) evm.register({ event: sank.id, person: pid[i], adults: a, kids: k, notes: i === 6 ? 'no nuts' : '' }, { by: 'admin' });
+  for (const [task, at, needed, who] of [['Set up chairs', '09:00', 3, [3, 7]], ['Kitchen', '11:00', 2, [0]], ['Rangoli at the door', '10:00', 1, [2]]]) {
+    const d = evm.saveDuty({ event: sank.id, task, at, needed }, 'admin').find((x) => x.task === task);
+    for (const i of who) evm.takeDuty(d.id, pid[i], 'admin');
+  }
+  const pic = evm.saveEvent({ name: 'Summer picnic', starts: `${yr}-06-20`, place: 'Parc de l’Indépendance, Morges', capacity: 6, per: 'person', confirm: 'organizer' }, 'admin').event;
+  for (const i of [1, 3, 8, 10, 4]) evm.register({ event: pic.id, person: pid[i], adults: i === 3 ? 3 : 1 }, { by: 'admin' });
+  evm.register({ event: pic.id, person: pid[11] }, { by: 'Car pooling', organizer: false });
+  const charyOrder = om.listOrders({ status: 'open', event: sank.id }).find((o) => o.household === chary.id);
+  om.addPayment(charyOrder.id, { amount: 30, method: 'Cash' }, 'admin');
+  om.addPayment(om.listOrders({ status: 'open', event: sank.id }).find((o) => o.household === font.id).id, { method: 'Bank transfer' }, 'admin');
+  om.addPayment(om.listOrders({ status: 'open', event: sank.id }).find((o) => o.person === pid[7]).id, { method: 'Instant online payment' }, 'admin');
+  om.createOrder({ person: pid[9], title: 'Club T-shirts', lines: [{ item: 'T-shirt', qty: 2, price: 18 }], due: new Date(now - 6 * 86400000).toISOString().slice(0, 10) }, 'admin');
   db.addPending({ code: 'K7Q2', agent: 'carpool', server: 'calendar', confirmTool: 'confirm', confirmId: 'cf_demo_1', tool: 'events_create', chat: G(3), requester: P(2), summary: 'Add “Friday ride: Marc 07:40 Morges → Geneva” to the shared calendar', expires: now + 50 * MIN });
 
   // activity

@@ -2,7 +2,7 @@
 // people.js on first visit. A household's kid without any app is reached through its adults.
 import { $, api, ask, emptyState, field, h, icon, menu, tryApi } from './core.js';
 import { helpLink, plural } from './shared.js';
-import { peopleNav, personRow, pickPerson } from './people.js';
+import { moduleBlocks, peopleNav, personRow, pickPerson } from './people.js';
 const enc = encodeURIComponent;
 const KIND = {
   households: { title: 'Households', one: 'household', api: '/api/households', add: 'New household', example: 'e.g. Chary family', help: 'people.md#households',
@@ -43,7 +43,7 @@ async function renderOne(kind, id) {
     if (!await ask({ title: `Edit ${g.name}`, ok: 'Save', body: [field('Name', name), house ? field('Address (optional)', address) : null] })) return;
     redraw(() => api('PUT', `${k.api}/${enc(id)}`, { name: name.value, address: address.value }), 'Saved');
   };
-  const remove = async () => (await ask({ title: `Delete ${g.name}?`, danger: true, ok: `Delete ${k.one}`, text: `The ${k.one} goes; the people in it stay in People.` }))
+  const remove = async () => (await ask({ title: `Delete ${g.name}?`, danger: true, ok: `Delete ${k.one}`, text: `The ${k.one} goes; the people in it stay in People.${house && g.modules?.length ? ' Its event registrations and orders go too.' : ''}` }))
     && tryApi(async () => { await api('DELETE', `${k.api}/${enc(id)}`); location.hash = `people/${kind}`; }, 'Deleted');
   const add = async () => {
     const pk = pickPerson('Who');
@@ -61,6 +61,6 @@ async function renderOne(kind, id) {
       menu(`More for ${g.name}`, h('button', { class: 'btn small', type: 'button', onclick: edit }, 'Edit…'), h('button', { class: 'btn small danger', type: 'button', onclick: remove }, 'Delete…'))),
     h('div', { class: 'lgroup' }, h('div', { class: 'eyebrow' }, 'Members'), h('ul', {}, members.map((m) => personRow({ id: m.person, name: m.name, apps: m.apps || [] }, sub(m), out(m))),
       h('li', {}, h('button', { class: 'lrow', type: 'button', onclick: add }, h('span', { class: 'lmark c3', 'aria-hidden': 'true' }, '+'),
-        h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, 'Add a person')), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))))));
+        h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, 'Add a person')), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'))))), moduleBlocks(g.modules)));
   $('#main h2')?.focus({ preventScroll: true });
 }
