@@ -47,6 +47,7 @@ export async function renderSettings() {
         [0, 25, 50, 100, 200].map((n) => h('option', { value: n, selected: Number(S.status?.settings?.historyLoadCount ?? 50) === n }, n ? `${n} messages` : 'Nothing'))), 'Asked from your phone, which must be online.')),
     'privacy-notice': notice ? privacyNoticeCard(notice) : null,
     'photos-voice': await photosVoiceCard().catch(loadErr('Photos & voice')),
+    'sending-pace': await api('GET', '/api/pace').then(paceCard, loadErr('Sending pace')),
     secrets: can('admin') ? await secretsCard().catch(loadErr('Secrets')) : null,
     users: owner ? usersCard(users, inv, signin) : null,
     'sign-in': owner && signin ? signinCard(signin) : null,
@@ -78,14 +79,14 @@ export async function renderSettings() {
   $('#main').replaceChildren(listDetail({ screen: 'settings', title: 'Settings', page: (id) => by[id],
     groups: [{ title: 'Channels', items: channels }, ...SETTINGS_GROUPS.map(([g, ids]) => ({ title: g, items: ids.filter((id) => by[id]).map((id) => ({ id, name: title[id], sub: SECTION_SUB[id], mark: h('span', { class: `lmark ${SECTION_ICON[id][1]}`, 'aria-hidden': 'true' }, icon(SECTION_ICON[id][0])) })) }))] }));
 }
-const SETTINGS_GROUPS = [['Agents & chats', ['tool-services', 'owner-assistant', 'direct-messages', 'privacy-notice', 'photos-voice']],
+const SETTINGS_GROUPS = [['Agents & chats', ['tool-services', 'owner-assistant', 'direct-messages', 'privacy-notice', 'photos-voice', 'sending-pace']],
   ['People & sign-in', ['users', 'sign-in', 'google', 'assistants', 'password', 'my-google']], ['Server', ['updates', 'web-access', 'secrets', 'logging', 'small-mode']],
   ['Help', ['getting-started', 'whatsapp-helpers', 'release-notes']]];
-const SECTION_ICON = { 'tool-services': ['models', 'c4'], 'owner-assistant': ['agents', 'c5'], 'direct-messages': ['chats', 'c3'], 'privacy-notice': ['shield', 'c3'], 'photos-voice': ['image', 'c2'],
+const SECTION_ICON = { 'tool-services': ['models', 'c4'], 'owner-assistant': ['agents', 'c5'], 'direct-messages': ['chats', 'c3'], 'privacy-notice': ['shield', 'c3'], 'photos-voice': ['image', 'c2'], 'sending-pace': ['pending', 'c1'],
   users: ['people', 'c4'], 'sign-in': ['lock', 'c0'], google: ['globe', 'c4'], assistants: ['agents', 'c1'], password: ['secrets', 'c0'], 'my-google': ['people', 'c0'],
   'web-access': ['globe', 'c3'], secrets: ['secrets', 'c1'], logging: ['activity', 'c0'], 'small-mode': ['server', 'c0'], updates: ['refresh', 'c5'], 'getting-started': ['overview', 'c5'], 'whatsapp-helpers': ['chats', 'c0'], 'release-notes': ['notes', 'c2'] };
 const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assistant': 'Your own chat, alerts, weekly summary', 'direct-messages': 'Direct messages, earlier messages',
-  'privacy-notice': 'What groups are told', 'photos-voice': 'Pictures, voice notes, speech', users: 'Who can use this panel', 'sign-in': 'Passwords or Google only',
+  'privacy-notice': 'What groups are told', 'photos-voice': 'Pictures, voice notes, speech', 'sending-pace': 'Read receipts, typing, new chats a day', users: 'Who can use this panel', 'sign-in': 'Passwords or Google only',
   google: 'Google sign-in client', assistants: 'ChatGPT, Claude and other MCP clients', password: 'Change your password', 'my-google': 'Link your Google account',
   'web-access': 'Domain, HTTPS, who may open the panel', secrets: 'Keys and tokens', logging: 'What is recorded, for how long', 'small-mode': 'Heavier features on a small server', updates: 'Version, automatic updates, last update',
   'getting-started': 'The first-run guide', 'whatsapp-helpers': 'Commands in WhatsApp', 'release-notes': "What's new in each version" };
@@ -631,6 +632,34 @@ function webAccessCard(initial) {
     if (w.pending || sw?.applying || (trial && !trial.until)) timer = setTimeout(reload, 4000);
   };
   draw(initial);
+  return card;
+}
+
+// ---------- Settings → Sending pace (080): read receipts, typing, gaps, new chats a day, sending hours ----------
+const secs = (n) => (n >= 60 ? `${Math.round(n / 6) / 10} min` : `${n} s`);
+const paceLine = (p) => `Reads after ${p.readMin}–${secs(p.readMax)} · types ${p.cps} characters a second · ${secs(p.gapMin)}–${secs(p.gapMax)} between messages to a list, a ${p.pauseMinutes}-minute pause every ${p.pauseEvery || '∞'} · ${p.dailyNew} new chats a day, ${p.hoursFrom}–${p.hoursTo}`;
+function paceCard(st) {
+  const pick = { preset: st.preset };
+  const F = [['readMin', 'Read after at least (s)'], ['readMax', 'Read after at most (s)'], ['cps', 'Typing speed (characters/s)'], ['jitter', 'Typing jitter (%)'], ['gapMin', 'Shortest gap (s)'], ['gapMax', 'Longest gap (s)'],
+    ['dailyNew', 'New chats a day'], ['hoursFrom', 'Send from'], ['hoursTo', 'Send until'], ['pauseEvery', 'Longer pause every (messages, 0 = never)'], ['pauseMinutes', 'Longer pause (minutes)']];
+  const inputs = Object.fromEntries(F.map(([k, l]) => [k, h('input', { type: k.startsWith('hours') ? 'time' : 'number', value: st[k], step: k === 'cps' ? 0.5 : 1, 'aria-label': l, disabled: !can('admin') })]));
+  const custom = h('div', { class: `pace-grid${st.preset === 'custom' ? '' : ' hide'}` }, F.map(([k, l]) => h('div', {}, h('label', {}, l), inputs[k])));
+  const line = h('p', { class: 'small', style: 'margin:8px 0 0' }, st.preset === 'custom' ? '' : paceLine(st));
+  const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Pace' }, [['careful', 'Careful'], ['normal', 'Normal'], ['faster', 'Faster'], ['custom', 'Custom']].map(([v, l]) => h('button', { type: 'button', class: st.preset === v ? 'on' : '', 'aria-pressed': String(st.preset === v), disabled: !can('admin'),
+    onclick: (e) => { pick.preset = v; seg.querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === e.target); x.setAttribute('aria-pressed', String(x === e.target)); }); custom.classList.toggle('hide', v !== 'custom'); line.textContent = v === 'custom' ? '' : paceLine(st.presets[v]); } }, l)));
+  const save = async () => {
+    const body = pick.preset === 'custom' ? { preset: 'custom', custom: Object.fromEntries(F.map(([k]) => [k, k.startsWith('hours') ? inputs[k].value : Number(inputs[k].value)])) } : { preset: pick.preset };
+    try { card.replaceWith(paceCard(await api('PUT', '/api/pace', body))); toast('Saved'); } catch (e) { fieldError(e, inputs); }
+  };
+  const t = st.today;
+  const card = h('div', { class: 'card' }, h('h2', {}, 'Sending pace'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'How Duniya reads, types and sends on WhatsApp: at a person\'s pace, with natural variation.'),
+    h('label', { class: 'inline' }, toggle(st.readReceipts, (v) => tryApi(() => api('PUT', '/api/pace', { readReceipts: v }), v ? 'Read receipts on' : 'Read receipts off'), !can('admin'), 'Read receipts'),
+      h('b', {}, 'Read receipts: mark messages in chats that are on as read')),
+    h('div', { class: 'small muted', style: 'margin:4px 0 12px' }, 'Blue ticks after the read delay, also for messages the agent leaves alone. Chats that are off are never touched; Telegram has no read receipts.'),
+    seg, line, custom,
+    can('admin') ? h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: save }, 'Save') : null,
+    h('p', { class: 'small muted', style: 'margin-bottom:0' }, `Today: ${t.used} of ${t.cap} new chats${t.warmup ? ' (a newly linked number starts lower and grows over a week)' : ''}. Replies type for at most 8 seconds. Sending to ${st.example.count} people would take about ${st.example.days > 1 ? `${st.example.days} days` : `${Math.round(st.example.minutes / 6) / 10} hours`} at this pace; hours are in ${st.timezone}.`));
   return card;
 }
 

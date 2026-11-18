@@ -15,6 +15,7 @@ import { activity } from './events.js';
 import { dmNoticeOnce, dmNoticePending } from './privacy-notice.js';
 import { putTtl, takeTtl } from './ttl-store.js';
 import { newToken, sha256 } from './crypto.js';
+import { takeNewChat } from './pace.js';
 import { MAIN, chatKey, splitChat, isLidJid, pnJid, isDirectChat as isDirect, phoneOfChat } from '../channels/whatsapp/ids.js';
 
 db.exec(`
@@ -234,6 +235,7 @@ export async function sendIntro(chat, { token } = {}, { channel, by = '' } = {})
   if (!t || t.chat !== chat) throw bad('Preview the intro first and confirm it within 10 minutes', 'token', 409);
   const { agent, phone } = introTarget(chat);
   if (!channel?.send) throw bad('WhatsApp is not available', null, 503);
+  takeNewChat(splitChat(chat).number); // 080: counts toward today's new chats (Settings → Sending pace); refused at the cap
   let text = t.text;
   const notice = dmNoticeOnce(phone || chat); // 044: the DM privacy line, once per person
   if (notice) text = `${text}\n\n_${notice}_`;

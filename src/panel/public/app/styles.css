@@ -135,6 +135,7 @@ main.enter > * { animation: enter var(--slow) var(--ease) both; }
 .grid { display: grid; gap: var(--s3); grid-template-columns: repeat(auto-fit, minmax(min(310px, 100%), 1fr)); }
 .tiles { display: grid; gap: var(--s3); grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); }
 .row { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; } .row > input, .row > select, .row > div { flex: 1; min-width: 120px; }
+.pace-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--s2) var(--s3); margin-top: var(--s3); } .pace-grid input { width: 100%; }
 .row.nowrap > input { flex: 1; }
 .spread { justify-content: space-between; } .nowrap { flex-wrap: nowrap; }
 .btns { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }

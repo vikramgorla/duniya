@@ -10,6 +10,7 @@
 //     reconnecting for 15 minutes is reported to the owner once
 //   - People (078): merge undo records older than 30 days (at most 200 per tick); 079: the members of those groups
 //     become people (identities only), and up to 300 changed phone contacts per tick become people
+//   - read receipts (080): the ones that are due (pace.js; also drained on every incoming message)
 //   - agent apps (074): turns whose tool calls nobody answered are ended; idle app runtimes (Copilot) are stopped
 // Names and group refreshes are skipped while memory is tight (optional work, resources.js).
 import { optionalPaused } from './resources.js';
@@ -25,6 +26,7 @@ import { noteMembers, syncPhonePeople } from './people-access.js';
 import { rebuildStaleSummary } from './memory.js';
 import { agentForChat } from './agents.js';
 import { channelOf } from '../channels/index.js';
+import { drainReads } from './pace.js';
 
 const GROUP_EVERY_MS = 12 * 3600000;
 const DOWN_ALERT_MS = 15 * 60000;
@@ -55,12 +57,13 @@ let running = false;
 export async function upkeepTick(channel, now = Date.now()) {
   if (running) return { skipped: 'running' };
   running = true;
-  const done = { retries: 0, names: false, groups: 0, prune: null, phonePeople: 0 };
+  const done = { retries: 0, names: false, groups: 0, prune: null, phonePeople: 0, reads: 0 };
   try {
     try { done.prune = retentionTick(now); } catch (e) { activity('error', { summary: `Pruning old data failed: ${e.message}` }); }
     try { pruneMerges(now); } catch { /* 078: retried next tick */ }
     try { appsTick(now); } catch { /* 074: agent apps — abandoned turns, idle runtimes; never blocks upkeep */ }
     await channelHealth(channel, now);
+    try { done.reads = await drainReads(channel, now); } catch { /* 080: retried next tick */ }
     try { done.retries = await historyRetryTick(now); } catch (e) { activity('error', { summary: `History retry failed: ${e.message}` }); }
     if (optionalPaused()) return { ...done, skipped: 'memory' };
     try { done.names = !!(await channel?.upkeep?.())?.ok; } catch { /* the channel reports its own failures */ }

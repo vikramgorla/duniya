@@ -1,6 +1,6 @@
 // @ts-check
 import { isChatEnabled } from './chat-prefs.js';
-import { env } from './config.js';
+import { env, localParts } from './config.js';
 import { isGroup } from '../channels/index.js';
 import { getSetting } from './store.js';
 import { listAgents, isBuiltin } from './agents.js';
@@ -10,20 +10,11 @@ import { activity } from './events.js';
 import { runOwnerSchedule } from './owner-assistant.js';
 import { upkeepTick } from './upkeep.js';
 
-function nowParts(tz) {
-  const fmt = new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short',
-  });
-  const p = Object.fromEntries(fmt.formatToParts(new Date()).map((x) => [x.type, x.value]));
-  return { date: `${p.year}-${p.month}-${p.day}`, hhmm: `${p.hour === '24' ? '00' : p.hour}:${p.minute}`, day: p.weekday.slice(0, 3).toLowerCase() };
-}
-
 const dayMatches = (days, day) => !days || days === 'daily' || days.split(',').map((d) => d.trim().toLowerCase()).includes(day);
 
 /** Run one schedule now. Returns [{chat, reply}] */
 export async function runSchedule(agent, sched, channel, { force = false } = {}) {
-  const { date } = nowParts(agent.timezone || env.timezone);
+  const { date } = localParts(agent.timezone || env.timezone);
   if (isBuiltin(agent)) return runOwnerSchedule(sched, { date, force }); // 059: to linked owners and admins
   const chats = sched.chats === 'all' ? agent.chats : sched.chats;
   const results = [];
@@ -58,7 +49,7 @@ export function startScheduler(channel) {
     const paused = getSetting('paused', false);
     for (const agent of listAgents()) {
       if (!agent.enabled || (paused && !isBuiltin(agent))) continue; // 059: the owner assistant's schedules run even while paused
-      const { hhmm, day } = nowParts(agent.timezone || env.timezone);
+      const { hhmm, day } = localParts(agent.timezone || env.timezone);
       for (const s of agent.schedules || []) {
         if (s.enabled === false || s.at !== hhmm || !dayMatches(s.days, day)) continue;
         await runSchedule(agent, s, channel);

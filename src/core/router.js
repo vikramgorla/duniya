@@ -26,6 +26,7 @@ import { recordUsage } from './usage.js';
 import { noteJoin } from './welcome.js';
 import { notePerson } from './people.js';
 import { inRole, notePersonChat } from './people-access.js';
+import { drainReads, paceReply, queueRead, readWhenDue } from './pace.js';
 
 // 059: the built-in owner assistant is reached through the owner hand-off only, never by routing.
 const listAgents = () => allAgents().filter((b) => !isBuiltin(b));
@@ -235,6 +236,7 @@ export function createRouter(channel) {
   async function route(incoming) {
     // 049 (#92): a direct message from a prepared person may arrive from their LID; use the prepared chat id.
     const msg = resolveDirectChat(incoming);
+    drainReads(channel).catch(() => {}); // 080: read receipts that are due go out on every incoming message (and the upkeep tick)
     // #91: newest message key per chat (metadata only, also while the chat is off) to load history when it goes on.
     if (msg.msgId && (!msg.kind || msg.kind === 'text')) {
       try { noteLatestKeys([{ chat: msg.chat, number: msg.number, isGroup: msg.isGroup, msgId: msg.msgId, fromMe: !!msg.fromMe, participant: msg.isGroup && !msg.fromMe ? msg.senderJid : '', ts: msg.ts }]); } catch { /* best effort */ }
@@ -276,6 +278,7 @@ export function createRouter(channel) {
     // 075: who wrote, across channels (ids and phone only; chats that are on or answered only)
     msg.personId = notePerson(msg);
     if (!openAgent) notePersonChat(msg.personId, msg.chat, 'wrote'); // 079: which agents may see them
+    if (!openAgent) queueRead(msg); // 080: chats that are on: read (blue ticks) after the read delay, answered or not
     // Groups: remember everything said (bound or not, paused or not) so agents have context.
     let rowId = 0;
     if (msg.isGroup) {
@@ -394,11 +397,12 @@ export function createJoinHandler(channel) {
 const overloadedAt = new Map();
 
 /** Send a reply (as a voice note when the agent's setting asks for it) and remember it. */
-async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false, textOnly = false } = {}) {
+async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false, textOnly = false, typingSince = null } = {}) {
   if (msg.isGroup) agentSpoke(msg.chat, agent.id); // 076: replies right after this may be follow-ups
   if (textOnly) { /* built-in answers (054): always text */ } else if (voiceNow && wantsVoice(agent, { voiceIn, text })) {
     const v = await speak(text, { agent, chat: msg.chat }).catch(() => null);
     if (v) {
+      await readWhenDue(channel, msg); // 080: read before the answer
       const sent = await channel.sendMedia(msg.chat, { kind: 'audio', base64: v.buffer.toString('base64'), mimetype: 'audio/ogg', voiceNote: true, ...(quoteOf(msg).quote ? { quote: quoteOf(msg).quote } : {}) });
       const notice = !msg.isGroup ? dmNoticeOnce(msg.phone || msg.chat) : null; // 044: once per person
       if (notice) await channel.send(msg.chat, `_${notice}_`).catch(() => {});
@@ -414,6 +418,7 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
       return;
     } catch { /* queue full: send it as text */ }
   }
+  await paceReply(channel, msg, text, (await typingSince?.catch(() => 0)) || 0); // 080: read, then typing for the reply's length
   if (!msg.isGroup) { const notice = dmNoticeOnce(msg.phone || msg.chat); if (notice) text = `${text}\n\n_${notice}_`; } // 044: once per person
   const sent = await channel.send(msg.chat, text, quoteOf(msg));
   countStat('reply', { agent: agent.id });
@@ -428,6 +433,7 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
 /** One agent turn for a routed message (inline for text; from the media queue for photos and voice notes). */
 async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, queued = false, judge = false }) {
   let media = null;
+  /** @type {Promise<number>|null} */ let typingSince = null;
   try {
     if (queued) {
       media = await prepareInbound(msg, { agent, chat: msg.chat });
@@ -449,7 +455,8 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
 
     if (out === undefined) {
       if (!text) return;
-      await channel.typing?.(msg.chat);
+      // 080: the message is read after its read delay, then "typing…" shows; the model works meanwhile
+      if (!judge) typingSince = readWhenDue(channel, msg).then(async () => { await channel.typing?.(msg.chat); return Date.now(); });
       const ctx = {
         // #113: the name the owner knows them by (phone contact name unless switched off on the Contacts page)
         agent, role, chat: msg.chat, senderName: agentName({ phone: msg.phone, jid: msg.senderJid, fallbackName: msg.senderName }) || msg.senderName, requester: msg.phone,
@@ -480,7 +487,7 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
       if (ctx.modelError) quiet('model_error', agent.id);
       else if (!out) quiet('no_reply', agent.id);
     }
-    if (out) await deliver(channel, msg, agent, out, { voiceIn, voiceNow: queued });
+    if (out) await deliver(channel, msg, agent, out, { voiceIn, voiceNow: queued, typingSince });
   } finally {
     media?.cleanup?.();
   }

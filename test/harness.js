@@ -184,7 +184,7 @@ export function fakeChatProvider({ name = 'fake', models = ['fake-large', 'fake-
   return f;
 }
 
-export async function setup({ bindings = {}, env = {}, seed = true, extend = null, beforeImport = null, chatsOn = true, privacyNotice = false } = {}) {
+export async function setup({ bindings = {}, env = {}, seed = true, extend = null, beforeImport = null, chatsOn = true, privacyNotice = false, readReceipts = false } = {}) {
   const t = {
     mcpCalls: [], claudeReqs: [], summaryReqs: [], script: [], sent: [], claudeFail: [], claudeStreamFail: [], claudeStreams: 0,
     summaryText: 'Decisions: take the 9:10 train. Rao family arrives Saturday.', summaryFail: false,
@@ -305,7 +305,7 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
   t.tmp = tmp;
   Object.assign(process.env, {
     DATA_DIR: join(tmp, 'data'), ANTHROPIC_BASE_URL: `http://127.0.0.1:${t.claudeHttp.address().port}`,
-    ADMIN_PASSWORD: 'correct horse battery', PANEL_PORT: '0', WELCOME_DELAY_MS: '20', WELCOME_GAP_MS: '0', ...env,
+    ADMIN_PASSWORD: 'correct horse battery', PANEL_PORT: '0', WELCOME_DELAY_MS: '20', WELCOME_GAP_MS: '0', PACE_TIME_SCALE: '0', ...env,
   });
   if (beforeImport) await beforeImport(t);
   t.store = await import('../src/core/store.js');
@@ -319,6 +319,8 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
   await t.agents.loadAgents();
   // 044: the privacy notice is on by default; tests written before it switch it off (pass { privacyNotice: true }).
   if (!privacyNotice) t.store.updateSettings({ privacyNotice: { enabled: false } });
+  // 080: read receipts are on by default; tests written before them switch them off (pass { readReceipts: true }).
+  if (!readReceipts) t.store.updateSettings({ sendingPace: { preset: 'normal', readReceipts: false } });
   if (seed) {
     t.store.setSecret('ANTHROPIC_API_KEY', 'test');
     t.store.setSecret('PANDUGA_MCP_URL', `http://127.0.0.1:${t.mcpHttp.address().port}/mcp`);
