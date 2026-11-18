@@ -7,6 +7,7 @@ import { chat as modelChat, effectiveFallback } from './providers/index.js';
 import { REASON_TEXT } from './providers/errors.js';
 import { modelName, toolPhrase } from '../panel/public/app/names.js';
 import { getChatPrefs } from './chat-prefs.js';
+import { capsOf, channelInfo, channelOf } from '../channels/index.js';
 
 /** The model for a chat: the chat's own choice (auto, provider:auto or provider:model) or the agent's. */
 export const chatModel = (agent, chat) => { const m = getChatPrefs(chat).model; return m && m !== 'inherit' ? m : agent.model; };
@@ -37,7 +38,11 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 // Confirm codes guard risky actions, so they come from a cryptographic source.
 const newCode = () => Array.from({ length: 4 }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
 
-function systemPrompt({ agent, role, isGroup, chatName }) {
+function systemPrompt({ agent, role, isGroup, chatName, chat, requester }) {
+  const app = channelInfo(channelOf(chat))?.label || 'WhatsApp'; // 077: the test console and Ask box read as WhatsApp
+  // 077: on a channel without phone numbers, someone who has not linked theirs is a participant until they do
+  const unlinked = !requester && capsOf(chat) && !capsOf(chat).phoneNumbers
+    ? `They have not linked their phone number on ${app}, so they count as a participant. If they say they are an organizer, ask them to open a direct chat with you and tap "Share my number".` : '';
   const now = new Date().toLocaleString('en-GB', { timeZone: agent.timezone || env.timezone });
   const roleText = role === 'organizer'
     ? (agent.confirm
@@ -46,10 +51,11 @@ function systemPrompt({ agent, role, isGroup, chatName }) {
     : 'They are a participant: they can ask questions. If they want something changed, say an organizer needs to do it.';
   return [
     agent.prompt.trim(),
-    `Current time: ${now} (${agent.timezone || env.timezone}). Chat type: ${isGroup ? 'WhatsApp group (shared, keep personal details out)' : 'WhatsApp direct message'}${chatName ? ` named "${chatName}"` : ''}.`,
+    `Current time: ${now} (${agent.timezone || env.timezone}). Chat type: ${isGroup ? `${app} group (shared, keep personal details out)` : `${app} direct message`}${chatName ? ` named "${chatName}"` : ''}.`,
     'You see the recent conversation of this chat, a running summary of older discussion and saved notes. Use them to stay aware of what people have said and decided. When someone asks you to remember something, save it with the memory tool. If something older is not in your context, search the chat history before saying you do not know.',
     roleText,
-    'Write for WhatsApp: short plain text, *bold* sparingly, simple "-" lists, no markdown headings or tables.',
+    unlinked,
+    `Write for ${app}: short plain text, *bold* sparingly, simple "-" lists, no markdown headings or tables.`,
     faqContext(agent), // 054: the owner's FAQ as small, capped reference context
   ].filter(Boolean).join('\n\n');
 }
@@ -143,7 +149,7 @@ export async function runAgent(ctx) {
     try {
       res = await modelChat({
         model, purpose: 'agent', maxTokens: agent.maxTokens, usage: { agent: agent.id, chat, kind: ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : 'reply' },
-        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName }), tools: defs, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
+        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName, chat, requester: ctx.requester }), tools: defs, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
       });
     } catch (e) {
       if (vision && e.skipped?.length) {

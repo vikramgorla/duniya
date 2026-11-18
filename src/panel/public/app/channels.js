@@ -1,8 +1,8 @@
 // Settings → Channels (075): one row per channel this server has (today WhatsApp), and the channel's page. The
 // WhatsApp page holds the numbers (moved here from Overview): QR / pairing code, direct-message agent, add, unlink,
 // remove; plus on/off and the memory the channel uses. Module of the panel (063).
-import { S, api, ask, can, field, h, icon, menu, refreshStatus, time, toggle, tryApi } from './core.js';
-import { plural } from './shared.js';
+import { S, api, ask, can, extLink, field, h, icon, menu, refreshStatus, time, toggle, tryApi } from './core.js';
+import { helpLink, plural } from './shared.js';
 import { checklistNext, goTo, linkNumberBox } from './start.js';
 
 /** A channel's state in a few words, for its row and its page. */
@@ -10,6 +10,7 @@ function channelLine(c) {
   if (c.state === 'not_set_up') return 'Not set up yet';
   if (c.state === 'off') return 'Switched off';
   if (c.state === 'error') return 'Did not start';
+  if (c.info) return c.connected ? `Connected as @${c.info.username}` : c.status === 'error' ? 'Needs attention' : 'Connecting…'; // 077: a bot
   return c.accounts > 1 ? `${c.connected} of ${plural(c.accounts, 'number')} connected` : c.connected ? 'Connected' : 'Not connected';
 }
 const tone = (c) => (c.state === 'on' && c.connected === c.accounts && c.accounts ? 'ok' : c.state === 'on' ? 'warn' : c.state === 'off' ? '' : 'bad');
@@ -39,7 +40,7 @@ function drawPage(box, id) {
   const sig = JSON.stringify([c, (st.channel.numbers || []).map((n) => ({ ...n, since: 0 })), st.agents.map((a) => a.id)]);
   if (box.childElementCount && sig === pageSig) return;
   pageSig = sig;
-  box.replaceChildren(statusCard(c), c.state === 'on' && id === 'whatsapp' ? numbersCard(st) : null);
+  box.replaceChildren(statusCard(c), c.state === 'on' && id === 'whatsapp' ? numbersCard(st) : null, id === 'telegram' && c.state !== 'not_set_up' ? botCard(c, st) : null);
 }
 
 function statusCard(c) {
@@ -52,10 +53,52 @@ function statusCard(c) {
     !setUp && can('owner') ? toggle(c.state === 'on' || c.state === 'error', flip, false, `${c.label} on`) : null),
   h('p', { class: 'small', style: 'margin:6px 0 0' }, h('span', { class: `dot ${tone(c) || 'off'}`, 'aria-hidden': 'true' }), ` ${channelLine(c)}`),
   c.error ? h('div', { class: 'note bad' }, `It did not start: ${c.error}. It is tried again at the next restart; switching it off and on tries now.`) : null,
-  setUp ? [h('p', { class: 'small muted' }, 'Link the phone number your agents answer from. Nothing of WhatsApp runs on this server until you do.'),
-    can('admin') ? h('button', { class: 'btn primary', onclick: () => tryApi(async () => { await api('PUT', `/api/channels/${c.id}`, { enabled: true }); await refreshStatus(); }, 'Getting a QR code…') }, 'Link WhatsApp') : null]
-    : h('p', { class: 'small muted', style: 'margin-bottom:0' }, memoryLine(c)),
-  c.state === 'off' ? h('p', { class: 'small muted' }, 'Agents do not answer on WhatsApp while it is off.') : null);
+  setUp && c.id === 'telegram' ? connectTelegram()
+    : setUp ? [h('p', { class: 'small muted' }, 'Link the phone number your agents answer from. Nothing of WhatsApp runs on this server until you do.'),
+      can('admin') ? h('button', { class: 'btn primary', onclick: () => tryApi(async () => { await api('PUT', `/api/channels/${c.id}`, { enabled: true }); await refreshStatus(); }, 'Getting a QR code…') }, 'Link WhatsApp') : null]
+      : h('p', { class: 'small muted', style: 'margin-bottom:0' }, memoryLine(c)),
+  c.state === 'on' && c.lastError && c.status === 'error' ? h('div', { class: 'note bad' }, c.lastError) : null,
+  c.state === 'off' ? h('p', { class: 'small muted' }, `Agents do not answer on ${c.label} while it is off.`) : null);
+}
+
+// ---------- Telegram (077) ----------
+/** The one-time secret page for the bot token (the token is never shown or sent back), then back to this page. */
+const pasteToken = () => tryApi(async () => {
+  const r = await api('POST', '/api/secret-links', { name: 'TELEGRAM_BOT_TOKEN' });
+  const token = /#secret=([a-f0-9]{64})$/.exec(r.link)?.[1];
+  if (token) (await import('./login.js')).renderSecretLink(token, 'settings/telegram');
+});
+function connectTelegram() {
+  return [h('ol', { class: 'steps' },
+    h('li', {}, h('b', { class: 't' }, 'Create a bot in Telegram'),
+      h('p', { class: 'small muted', style: 'margin:0 0 6px' }, 'Open @BotFather, send /newbot and choose a name. It answers with a token.'), extLink('https://t.me/BotFather', 'Open @BotFather')),
+    h('li', {}, h('b', { class: 't' }, 'Paste the token here'),
+      h('p', { class: 'small muted', style: 'margin:0 0 6px' }, 'It goes straight to this server, encrypted, and is never shown again.'),
+      can('admin') ? h('button', { class: 'btn small primary', onclick: pasteToken }, 'Paste the bot token') : h('span', { class: 'small muted' }, 'An admin can do this.'))),
+  h('p', { class: 'small muted', style: 'margin-bottom:0' }, 'Nothing of Telegram runs on this server until then.')];
+}
+function botCard(c, st) {
+  const b = c.info;
+  const dmSel = h('select', { disabled: !can('admin'), style: 'max-width:260px', 'aria-label': 'Direct messages to the bot go to',
+    onchange: (e) => tryApi(() => api('PUT', '/api/channels/telegram/settings', { dmAgent: e.target.value }), 'Saved') },
+  h('option', { value: '' }, 'Default agent (see Chats & direct messages)'), st.agents.map((a) => h('option', { value: a.id, selected: b?.dmAgent === a.id }, a.name)));
+  const privacy = b?.canReadAll ? 'Sees every message in its groups, so agents can follow the conversation.'
+    : 'Sees only messages that mention it, reply to it or start with /. Enough for agents you call by name.';
+  return h('div', { class: 'card', id: 'tg-bot' },
+    h('div', { class: 'row spread' }, h('h2', {}, 'Bot'), b ? extLink(b.link, `@${b.username}`, 'small') : null),
+    b ? [h('div', { class: 'row', style: 'flex-wrap:wrap;margin-bottom:6px' }, extLink(b.groupLink, 'Add to a group', 'btn small primary'), extLink(b.link, 'Open a direct chat')),
+      h('p', { class: 'small muted' }, 'New groups show up in Chats, off until you switch them on.'),
+      h('p', { class: 'small', style: 'margin-bottom:4px' }, privacy, ' ', helpLink('telegram.md#privacy-mode', 'Help: what the bot sees')),
+      b.canReadAll ? null : h('details', { class: 'mut' }, h('summary', { class: 'small muted', style: 'cursor:pointer' }, 'Let agents follow the whole conversation'),
+        h('ol', { class: 'small', style: 'padding-left:18px' }, h('li', {}, 'In @BotFather send /setprivacy, choose ', h('b', {}, `@${b.username}`), ' and tap Disable.'),
+          h('li', {}, 'Remove the bot from the group and add it again (Telegram applies the change only then).'),
+          h('li', {}, 'Or make the bot an admin of the group: admins see every message.'))),
+      h('p', { class: 'small muted' }, 'People link their phone number by opening a direct chat with the bot and tapping “Share my number”. Then they are the same person as on WhatsApp, with the same roles.')]
+      : h('p', { class: 'small muted' }, 'Connecting to Telegram…'),
+    field('Direct messages to the bot go to', dmSel),
+    can('admin') ? h('div', { class: 'row', style: 'margin-top:8px;flex-wrap:wrap' }, h('button', { class: 'btn small', onclick: pasteToken }, 'Replace token'),
+      can('owner') ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: 'Disconnect the Telegram bot?', text: 'The token is removed from this server and agents stop answering on Telegram. Chats keep their memory. The bot itself stays in Telegram.', ok: 'Disconnect', danger: true }))
+        && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'TELEGRAM_BOT_TOKEN', value: '' }); await refreshStatus(); }, 'Disconnected') }, 'Disconnect') : null) : null);
 }
 
 const pillFor = (x) => h('span', { class: `pill ${x.status === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(x.status) ? 'warn' : 'bad'}` }, x.status === 'open' ? 'connected' : x.status === 'qr' ? 'waiting for scan' : x.status.replace('_', ' '));

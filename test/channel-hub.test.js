@@ -11,7 +11,7 @@ import { setup } from './harness.js';
 const ROOT = resolve(import.meta.dirname, '..');
 let t; let channels; let people; let hubMod;
 // A second, made-up channel ("fk:<account>#<id>", groups start with g): only reactions and quotes, no phone numbers.
-const FAKE = { id: 'fake', label: 'Fake chat', prefix: 'fk', setup: 'token',
+const FAKE = { id: 'fake', label: 'Fake chat', prefix: 'fk', setup: 'token', secret: { name: 'FAKE_CHAT_TOKEN', pattern: /^fake-/, hint: 'Not a fake token' },
   caps: { groups: true, media: false, voiceNotes: false, location: false, contactCards: false, reactions: true, quotes: true, edit: false, delete: false, polls: false,
     groupInvite: false, groupMembers: false, groupAdmin: false, profile: false, block: false, history: false, memberTags: false, typing: true, phoneNumbers: false, markup: 'plain', maxText: 4096 },
   ids: { isChat: () => false, isGroup: (c) => String(c).split('#')[1]?.startsWith('g'), isDirect: (c) => !String(c).split('#')[1]?.startsWith('g'),
@@ -45,7 +45,7 @@ test('075: ids — WhatsApp ids unchanged, prefixed ids parse, helpers ask the c
   assert.equal(c.channelOf('g1@g.us'), 'whatsapp');
   assert.equal(c.channelOf('shop#41790000555@s.whatsapp.net'), 'whatsapp');
   assert.equal(c.channelOf('fk:a#g1'), 'fake');
-  assert.equal(c.channelOf('tg:bot1#-1001'), '', 'an unknown prefix belongs to no channel');
+  assert.equal(c.channelOf('xx:bot1#-1001'), '', 'an unknown prefix belongs to no channel');
   assert.equal(c.channelOf('panel test'), '');
   assert.deepEqual(c.splitChatId('fk:a#g1'), { channel: 'fake', account: 'a', native: 'g1' });
   assert.deepEqual(c.splitChatId('shop#g1@g.us'), { channel: 'whatsapp', account: 'shop', native: 'g1@g.us' });
@@ -72,11 +72,13 @@ test('075: the hub loads a channel only when set up and on; switching off stops 
   const st = await hub.status();
   assert.equal(st.status, 'not_set_up');
   assert.deepEqual(st.numbers, []);
-  assert.deepEqual(st.channels.map((c) => [c.id, c.state]), [['whatsapp', 'not_set_up'], ['fake', 'not_set_up']]);
+  assert.deepEqual(st.channels.map((c) => [c.id, c.state]), [['whatsapp', 'not_set_up'], ['telegram', 'not_set_up'], ['fake', 'not_set_up']]);
   await assert.rejects(hub.send('fk:a#g1', 'hi'), (e) => e.status === 409 && /not set up/.test(e.message));
   await assert.rejects(hub.send('nothing', 'hi'), (e) => e.status === 400);
   assert.equal(await hub.isMember('fk:a#g1', '1', 'x'), false, 'membership questions never throw');
 
+  await assert.rejects(hub.setEnabled('fake', true), (e) => e.status === 409 && /paste its token first/.test(e.message), 'a token channel needs its token first');
+  t.store.setSecret('FAKE_CHAT_TOKEN', 'fake-1'); // saving the token starts it (077)
   const row = await hub.setEnabled('fake', true, 'admin');
   assert.equal(row.state, 'on');
   assert.deepEqual(loaded, ['fake']);
@@ -96,11 +98,17 @@ test('075: the hub loads a channel only when set up and on; switching off stops 
 
   await hub.setEnabled('fake', false, 'admin');
   assert.ok(log.includes('stop'));
-  assert.equal((await hub.channels()).find((c) => c.id === 'fake').state, 'not_set_up', 'off and never set up reads as not set up');
+  assert.equal((await hub.channels()).find((c) => c.id === 'fake').state, 'off');
   assert.deepEqual(t.store.getSetting('channelsOff'), ['fake']);
   await assert.rejects(hub.send('fk:a#g1', 'again'), (e) => e.status === 409);
   await hub.setEnabled('fake', true);
   assert.deepEqual(loaded, ['fake', 'fake'], 'switched on again: a new adapter instance');
+  t.store.setSecret('FAKE_CHAT_TOKEN', 'fake-2'); // a new token: stopped and started again
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(loaded, ['fake', 'fake', 'fake']);
+  t.store.setSecret('FAKE_CHAT_TOKEN', ''); // token removed: stopped, not set up
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal((await hub.channels()).find((c) => c.id === 'fake').state, 'not_set_up');
   t.store.updateSettings({ channelsOff: [] });
 });
 

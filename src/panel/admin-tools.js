@@ -419,7 +419,7 @@ export const TOOLS = [
     run: (a, x) => x.call('GET', '/api/secrets') },
   // 060: values never pass through an AI assistant or a chat: the user enters them on a one-time panel link.
   { name: 'set_secret', noConfirm: true, calls: [['POST', '/api/secret-links']],
-    description: 'Set or replace a secret (API key, token) or the API key of a model account WITHOUT seeing its value: returns a one-time link (15 minutes, single use) to a panel page where a signed-in owner or admin pastes the value. Give the link to the user exactly as returned; never ask them to type a key in the chat. Afterwards list_secrets (or list_model_accounts) shows it as set. Give name (UPPER_SNAKE_CASE) or account (an API-key account id from list_model_accounts).',
+    description: 'Set or replace a secret (API key, token) or the API key of a model account WITHOUT seeing its value: returns a one-time link (15 minutes, single use) to a panel page where a signed-in owner or admin pastes the value. Give the link to the user exactly as returned; never ask them to type a key in the chat. Afterwards list_secrets (or list_model_accounts) shows it as set. Give name (UPPER_SNAKE_CASE) or account (an API-key account id from list_model_accounts). To connect a Telegram bot: name TELEGRAM_BOT_TOKEN; Telegram starts by itself once it is saved.',
     input: { name: str('Secret name, UPPER_SNAKE_CASE (or give account)'), account: str('Model account id whose API key to set (optional, instead of name)') },
     run: async (a, x) => {
       if (a.value !== undefined) throw fail('Secret values are never taken here: give only the name and send the user the link');
@@ -585,15 +585,19 @@ export const TOOLS = [
     },
     run: (a, x) => x.call('DELETE', `/api/users/${enc(a.user_id)}`) },
 
-  // ---------- channels (075) and WhatsApp numbers ----------
+  // ---------- channels (075, 077) and WhatsApp numbers ----------
   { name: 'list_channels', readOnly: true, calls: [['GET', '/api/channels']],
-    description: 'The chat channels of this server (today: WhatsApp) with their state (on, off, not set up), numbers/accounts connected and memory used.', input: {},
+    description: 'The chat channels of this server (WhatsApp, Telegram) with their state (on, off, not set up), accounts connected, memory used and, for Telegram, the bot (@username, whether it sees every group message, its add-to-group link). Telegram is set up with set_secret name TELEGRAM_BOT_TOKEN (the user pastes the token from @BotFather on the one-time link).', input: {},
     run: (a, x) => x.call('GET', '/api/channels') },
   { name: 'set_channel_enabled', calls: [['PUT', '/api/channels/x']], risky: (a) => a.enabled === false,
     description: 'Switch a channel on or off. Off closes its connections and frees its memory: agents stop answering there until it is on again (stays linked). Switching off needs confirm_action.',
-    input: { channel: str('Channel id, e.g. "whatsapp" (see list_channels)'), enabled: { type: 'boolean' } }, required: ['channel', 'enabled'],
+    input: { channel: str('Channel id: "whatsapp" or "telegram" (see list_channels)'), enabled: { type: 'boolean' } }, required: ['channel', 'enabled'],
     preview: async (a) => `Switch ${a.channel} off: its connections close and agents stop answering on it until it is switched on again. Nothing is unlinked.`,
     run: (a, x) => x.call('PUT', `/api/channels/${enc(a.channel)}`, { enabled: !!a.enabled }) },
+  { name: 'set_telegram_dm_agent', calls: [['PUT', '/api/channels/telegram/settings']],
+    description: 'Choose the agent that answers direct messages to the Telegram bot (empty: the default agent for direct messages).',
+    input: { agent: str('Agent id (see list_agents), or empty for the default') },
+    run: (a, x) => x.call('PUT', '/api/channels/telegram/settings', { dmAgent: a.agent || '' }) },
   { name: 'list_whatsapp_numbers', readOnly: true, calls: [['GET', '/api/status']], description: 'WhatsApp numbers and their connection state. Linking a number (QR code / pairing) is done in the panel.', input: {},
     run: async (a, x) => (await numbers(x)).map((n) => ({ id: n.id, label: n.label, status: n.status, me: n.me, dmAgent: n.dmAgent || '' })) },
   { name: 'add_whatsapp_number', calls: [['POST', '/api/whatsapp/numbers']],

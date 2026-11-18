@@ -212,6 +212,11 @@ export function searchNotes(chats, query, limit = 20) {
 }
 export const deleteAgentNotes = (agent) => db.prepare('DELETE FROM notes WHERE chat = ?').run(`agent:${agent}`).changes;
 
+/** 077: a chat's stored messages, reactions, polls, memory, notes and tags move to its new id (Telegram supergroups). */
+export function moveChatData(from, to) {
+  for (const t of ['messages', 'wa_reactions', 'wa_polls', 'chat_memory', 'notes', 'member_tags']) db.prepare(`UPDATE OR IGNORE ${t} SET chat = ? WHERE chat = ?`).run(to, from);
+}
+
 export function eraseChat(chat) {
   db.prepare('DELETE FROM messages WHERE chat = ?').run(chat);
   db.prepare('DELETE FROM wa_reactions WHERE chat = ?').run(chat);
@@ -325,6 +330,8 @@ export function savePoll({ chat, msgId, name, options, selectable = 1, creator =
     .run(chat, String(msgId), String(name || ''), JSON.stringify(options || []), Number(selectable) || 0, creator, message, ts);
 }
 export const getPoll = (chat, msgId) => pollRow(db.prepare('SELECT * FROM wa_polls WHERE chat = ? AND msg_id = ?').get(chat, String(msgId)));
+/** 077: the poll a channel knows by its own poll id (stored in `message`, e.g. "tg:<poll id>"), or null. */
+export const pollByRef = (ref) => (ref ? pollRow(db.prepare('SELECT * FROM wa_polls WHERE message = ? ORDER BY ts DESC LIMIT 1').get(String(ref))) : null);
 export const latestPoll = (chat) => pollRow(db.prepare('SELECT * FROM wa_polls WHERE chat = ? ORDER BY ts DESC LIMIT 1').get(chat));
 export const recentPolls = (chat, limit = 3) => db.prepare('SELECT * FROM wa_polls WHERE chat = ? ORDER BY ts DESC LIMIT ?').all(chat, limit).map(pollRow).reverse();
 /** A voter's latest choice replaces their earlier one (empty list = vote withdrawn). */

@@ -6,6 +6,7 @@
 // Chat ids: WhatsApp keeps its ids as they are (a JID, "<number>#<jid>" on other numbers), so no data migrates.
 // Every other channel uses "<prefix>:<account>#<native id>", e.g. "tg:bot1#-1001234567" for a Telegram group.
 import * as wa from './whatsapp/ids.js';
+import * as tg from './telegram/ids.js';
 
 /**
  * What a channel can do. Tools (chat-tools.js) name the capability they need; agents only get the tools the chat's
@@ -21,15 +22,25 @@ const WHATSAPP_CAPS = { groups: true, media: true, voiceNotes: true, location: t
   edit: true, delete: true, polls: true, groupInvite: true, groupMembers: true, groupAdmin: true, profile: true, block: true,
   history: true, memberTags: true, typing: true, phoneNumbers: true, markup: 'whatsapp', maxText: 65536 };
 
+/** 077: what a Telegram bot can do through the Bot API (no phone numbers, no history, no adding people by number). */
+/** @type {Capabilities} */
+const TELEGRAM_CAPS = { groups: true, media: true, voiceNotes: true, location: true, contactCards: true, reactions: true, quotes: true,
+  edit: true, delete: true, polls: true, groupInvite: true, groupMembers: false, groupAdmin: true, profile: false, block: false,
+  history: false, memberTags: false, typing: true, phoneNumbers: false, markup: 'whatsapp', maxText: 4096 };
+
 /**
  * One entry per channel Duniya has. `prefix`: the chat id prefix ('' = unprefixed, WhatsApp only). `ids`: how its ids
  * read (isChat, isGroup, isDirect, phoneOf, personOf = the sender id of a direct chat, phoneChat = the direct chat with
- * a phone number, only on channels that use phone numbers). `setup`: how an owner connects it.
+ * a phone number, only on channels that use phone numbers). `setup`: how an owner connects it. `secret` (token
+ * channels): the stored secret that sets it up, the pattern a value must match and what to say when it does not.
  */
 export const CHANNELS = [
   { id: 'whatsapp', label: 'WhatsApp', prefix: '', setup: 'qr', caps: WHATSAPP_CAPS,
     ids: { isChat: wa.isWhatsAppChat, isGroup: wa.isGroupChat, isDirect: wa.isDirectChat, phoneOf: wa.phoneOfChat, personOf: wa.personJidOfChat,
       phoneChat: (account, phone) => wa.chatKey(account || wa.MAIN, wa.pnJid(phone)) } },
+  { id: 'telegram', label: 'Telegram', prefix: tg.PREFIX, setup: 'token', caps: TELEGRAM_CAPS,
+    secret: { name: 'TELEGRAM_BOT_TOKEN', pattern: /^\d{5,16}:[A-Za-z0-9_-]{30,64}$/, hint: 'This does not look like a bot token from @BotFather (digits, a colon, then about 35 letters and digits).' },
+    ids: { isChat: tg.isTelegramChat, isGroup: tg.isGroupChat, isDirect: tg.isDirectChat, phoneOf: () => '', personOf: tg.personOfChat } },
 ];
 const PREFIXED = /^([a-z]{2,8}):([^#]*)#(.+)$/;
 

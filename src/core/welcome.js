@@ -13,7 +13,7 @@ import { activity } from './events.js';
 import { countStat } from './stats.js';
 import { recordUsage } from './usage.js';
 import { fillPlaceholders, todayText, DEFAULT_WELCOME } from './quick.js';
-import { isGroup } from '../channels/index.js';
+import { channelOf, isGroup } from '../channels/index.js';
 
 db.exec(`CREATE TABLE IF NOT EXISTS welcome_seen (tenant_id TEXT NOT NULL, key TEXT NOT NULL, ts INTEGER NOT NULL, PRIMARY KEY (tenant_id, key))`);
 
@@ -98,7 +98,7 @@ async function flush(channel, chat) {
   lastSent.set(chat, Date.now());
   const ins = db.prepare('INSERT OR IGNORE INTO welcome_seen (tenant_id, key, ts) VALUES (?, ?, ?)');
   for (const [key] of people) ins.run(TENANT, key, Date.now());
-  logMessage({ channel: 'whatsapp', chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
+  logMessage({ channel: channelOf(chat), chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
   countStat('reply', { agent: agent.id });
   recordUsage({ agent: agent.id, chat, provider: 'built-in', model: 'welcome', kind: 'welcome', cost: 0, priced: 'free' });
   activity('message.out', { agent: agent.id, chat, summary: `Welcome posted for ${people.length} new member${people.length === 1 ? '' : 's'}` });

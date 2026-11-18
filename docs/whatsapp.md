@@ -59,4 +59,4 @@ Admin MCP: `list_channels`, `set_channel_enabled` (switching off asks for confir
 `add_whatsapp_number`, `remove_whatsapp_number` (confirmation required).
 
 ---
-**Next:** [Add a model](models.md) · [Chats](chats.md) · [Docs index](README.md)
+**Next:** [Add a model](models.md) · [Connect Telegram](telegram.md) · [Chats](chats.md) · [Docs index](README.md)

@@ -5,6 +5,7 @@
 import { activity } from '../../core/events.js';
 import { SECRET_NAME_RE, getUser, createUser, updateUser, onUserDeleted } from '../../core/store.js';
 import { accountById } from '../../core/providers/index.js';
+import { CHANNELS } from '../../channels/index.js';
 import { passwordLoginAllowed } from '../../core/google-signin.js';
 import { tellUser } from '../../core/owner-assistant.js';
 import { createLink, peekLink, takeLink, dropLinks, linkUrl } from '../../core/one-time-links.js';
@@ -44,7 +45,8 @@ export function linkRoutes(route, { invoke }) {
     } else {
       const name = String(body.name || '').trim();
       if (!SECRET_NAME_RE.test(name)) return [400, { error: 'Secret names must be UPPER_SNAKE_CASE', field: 'name' }];
-      target = { name, label: name };
+      const ch = CHANNELS.find((c) => c.secret?.name === name); // 077: "the Telegram bot token", not its variable name
+      target = { name, label: ch ? `the ${ch.label} bot token` : name };
     }
     // notify: tell the asker "saved" in their own owner-assistant chat (only theirs, never another chat).
     const { token, expiresAt } = createLink('secret', { ...target, by: user.id, byName: user.username, notify: !!body.notify });

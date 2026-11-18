@@ -1,5 +1,6 @@
 flowchart TD
   WA["WhatsApp adapter<br/>linked devices"] --> HUB["Channel hub<br/>loads a channel only<br/>when set up and on"]
+  TG["Telegram adapter<br/>bot, long polling"] --> HUB
   HUB --> AL{"Allow-list:<br/>chat on?"}
   AL -- "off" --> X["dropped"]
   AL -- "on" --> R["Router<br/>triggers, roles, rate limits"]

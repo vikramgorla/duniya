@@ -21,7 +21,7 @@ character.
 1. **Settings → Owner assistant → Link my WhatsApp** shows a one-time message `link CODE` (valid 10 minutes).
 2. Send it from your phone to any agent number.
 3. Confirm "Linked +41…" in the panel.
-4. Message an agent number: "what did the families decide this week?", "send me a dancing GIF", "post a poll in
+4. Message an agent number (or the [Telegram bot](telegram.md), once you shared your number with it): "what did the families decide this week?", "send me a dancing GIF", "post a poll in
    Carpool: pizza or dosa?", "turn off the helper agent".
 
 <p align="center"><img src="diagrams/owner-dm-routing.svg" alt="Your DM to an agent number goes to that agent when it starts with an agent trigger or confirm CODE; otherwise to the owner assistant with your panel role, whose changes need confirm CODE" width="415"></p>

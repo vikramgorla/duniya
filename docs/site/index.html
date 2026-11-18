@@ -164,14 +164,21 @@
         <div class="shot"><video autoplay muted loop playsinline preload="none" poster="video/chat-on-poster.webp" width="1280" height="800" aria-label="Switching a chat on and choosing its agent"><source src="video/chat-on.mp4" type="video/mp4"></video></div>
       </article>
 
-      <article class="tile half">
+      <article class="tile third">
+        <span class="label">Telegram</span>
+        <h3>Your Telegram groups too, with one bot.</h3>
+        <p>Make a bot in @BotFather and paste its token: the same agents, memory, quick replies and polls answer in your Telegram groups. People tap <b>Share my number</b> once, and <strong>the same phone on WhatsApp and Telegram is the same person, with the same role</strong>. Official, free, a few MB.</p>
+        <a class="shot tall" href="img/card-telegram.webp"><img src="img/card-telegram.webp" width="1160" height="1306" loading="lazy" alt="Settings, Telegram: connected as @duniya_family_bot, buttons Add to a group and Open a direct chat, what the bot sees in groups, and the agent for direct messages."></a>
+      </article>
+
+      <article class="tile third">
         <span class="label">Small servers</span>
         <h3>Made for a free 1&nbsp;GB VM.</h3>
         <p>About 180 MB of memory. Photos and voice notes queue, heavy extras stay off, old data is pruned every hour, and a dropped connection, a crash or a full disk sort themselves out. <b>Health</b> shows what is kept and since when.</p>
         <a class="shot tall" href="img/card-health.webp"><img src="img/card-health.webp" width="690" height="1402" loading="lazy" alt="Server Health: database size, stored messages, activity and usage detail with how long each is kept, and the last automatic clean-up."></a>
       </article>
 
-      <article class="tile half">
+      <article class="tile third">
         <span class="label">Backups &amp; updates</span>
         <h3>Encrypted backups. Updates that tell you what's new.</h3>
         <p>Scheduled, encrypted backups to a private GitHub repo or S3. Updates install from the panel after a backup and show every release in between; breaking ones wait for your OK on the panel or WhatsApp.</p>
@@ -259,7 +266,7 @@
       <details><summary>Will people in the group know there is an assistant?</summary><p>Yes. When you switch a group on, the number posts a short privacy notice once (your text, per-group opt-out), and a person's first direct reply gets one line. Agents only answer when someone addresses them.</p></details>
       <details><summary>Who can see the messages?</summary><p>Only chats you switched on are stored, for the agent's memory, and old messages are pruned by themselves. Owners and admins can read what was stored; every look is in the activity log. Chats marked <i>Private to members</i> are hidden from your assistant and from search.</p></details>
       <details><summary>Can I use my Claude Pro/Max subscription?</summary><p>Yes, through Claude Code: Duniya runs Anthropic's own, unmodified Claude Code app on your server, signed in with your own account (a token from <code>claude setup-token</code>), for your personal use within your plan's limits. Your ChatGPT plan works the same way through Codex (or OpenAI's Sign in with ChatGPT), and Copilot through GitHub's SDK, also on a 1 GB server. <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/models.md#agent-apps">What the terms say</a>.</p></details>
-      <details><summary>Only WhatsApp?</summary><p>WhatsApp today. Chat apps plug in as channels that load only when you set one up (a fresh server loads no WhatsApp code until you link a number), so a Telegram bot is next without making the server heavier. <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/small-servers.md#channels-load-only-when-used">How channels stay light</a>.</p></details>
+      <details><summary>Only WhatsApp?</summary><p>WhatsApp and Telegram. Telegram works through an official bot: paste its token, add it to a group, and the same agents answer there; people who share their number are the same person on both apps. Channels load only when you set one up, so neither costs memory until then. <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/telegram.md">Connect Telegram</a></p></details>
       <details><summary>Do I need to know Linux?</summary><p>No. The Oracle and Google buttons need no terminal skills, and afterwards updates, OS packages, logs, restarts and backups are buttons in the panel.</p></details>
       <details><summary>Can several people manage it?</summary><p>Yes: owners, admins and viewers, with passwords or Sign in with Google. You can also manage it from ChatGPT or Claude, with the same roles and a confirmation for risky actions.</p></details>
       <details><summary>How do I report a security issue?</summary><p>Privately, through GitHub's “Report a vulnerability” on the repository; see <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/SECURITY.md">SECURITY.md</a>.</p></details>

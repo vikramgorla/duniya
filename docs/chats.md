@@ -9,6 +9,7 @@
 - Switching a chat on picks its agent, posts the privacy notice once and loads recent messages from your phone.
 - **Add a direct chat** sets up a person before they write. Names come from your phone's contacts.
 - The owner can search what was said in every chat that is on: press **/** and type.
+- [Telegram](telegram.md) groups and people are listed the same way, with *Telegram* in their line.
 
 ![Chats: one row per chat with its switch; a chat's page beside it](site/img/chats-desktop.webp)
 
@@ -19,7 +20,7 @@
   search box sit above it; **Add a direct chat** is the last row.
 - **A chat's page** (on a computer beside the list, on a phone over it): its agent (**Open <agent>** jumps to the
   agent), why it stayed quiet with a one-tap fix, then rows that open their own page: **Messages**, **Memory**,
-  **WhatsApp group** (groups) and **Activity**. Below them: model and **Fallback…**
+  **WhatsApp group** or **Telegram group** (groups) and **Activity**. Below them: model and **Fallback…**
   ([Models](models.md#fallback-and-several-accounts)), activity log level, welcome override, **Private to members**,
   the privacy notice and the [spending cap](spending.md). For a person, **⋯ → Send intro…**.
 - Links: `#chats/<chat id>` opens a chat; `#chats/<chat id>/messages`, `/memory` and `/group` open a section;

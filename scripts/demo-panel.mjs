@@ -220,7 +220,12 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const { createHub } = await imp('src/channels/hub.js');
   const { createWhatsAppAdapter } = await imp('src/channels/whatsapp/index.js');
   // 075: the real hub and WhatsApp adapter over fake sessions (one per number)
-  const createChannelHub = (factory) => createHub({ loaders: { whatsapp: async () => createWhatsAppAdapter({ factory }) } });
+  // 077: a fake Telegram bot (test/fake-telegram.js: a fake Bot API, no network), loaded only once its token is stored
+  const { fakeBotApi } = await imp('test/fake-telegram.js');
+  const { createTelegramAdapter } = await imp('src/channels/telegram/index.js');
+  const bot = fakeBotApi({ me: { first_name: 'Family helper', username: 'duniya_family_bot' } });
+  const createChannelHub = (factory) => createHub({ loaders: { whatsapp: async () => createWhatsAppAdapter({ factory }),
+    telegram: async () => createTelegramAdapter({ fetch: bot.fetch, api: 'https://api.telegram.invalid' }) } });
   const { createRouter, createHistoryHandler } = await imp('src/core/router.js');
 
   if (empty) return startEmpty({ imp, createChannelHub, createRouter, createHistoryHandler });
@@ -296,7 +301,8 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const tpl = (f) => JSON.parse(readFileSync(join(ROOT, 'templates', f), 'utf8'));
   const mk = (id, file, patch) => agents.createAgent({ id, config: { ...tpl(file), enabled: true, ...patch }, by: 'admin' });
   await mk('school', 'school-friends.json', { chats: [G(1)], model: 'auto' });
-  await mk('family', 'family.json', { chats: [G(2), `${P(4)}@s.whatsapp.net`], model: 'chatgpt:gpt-5.5', organizers: [`+${P(4)}`] });
+  const TG = (n) => `tg:${bot.bot.id}#-10017000000${n}`; // 077: Telegram groups of the demo bot
+  await mk('family', 'family.json', { chats: [G(2), `${P(4)}@s.whatsapp.net`, TG(1)], model: 'chatgpt:gpt-5.5', organizers: [`+${P(4)}`] });
   await mk('carpool', 'carpool.json', {
     chats: [G(3)], model: 'anthropic:claude-haiku-5-5', organizers: [`+${P(2)}`],
     mcpServers: { transport: { type: 'local', package: 'mcp-swiss@latest', args: [], env: {} }, calendar: { url: 'https://calendar.example.org/mcp', auth: 'oauth' } },
@@ -311,7 +317,16 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   globalMcp.saveGlobalServer('weather', { url: weatherUrl, defaults: { organizer: ['*'], participant: ['forecast'] } }, 'admin');
 
   // chats: on/off (silent by default), direct chats seen
-  for (const c of [G(1), G(2), G(3), G(4), `club#${G(8)}`, `${P(4)}@s.whatsapp.net`]) prefs.setChatPrefs(c, { enabled: true });
+  for (const c of [G(1), G(2), G(3), G(4), `club#${G(8)}`, `${P(4)}@s.whatsapp.net`, TG(1)]) prefs.setChatPrefs(c, { enabled: true });
+  // 077: Telegram: the bot is in two groups (Cousins on, Running club off); Ravi linked his number, so he is one person
+  store.setSecret('TELEGRAM_BOT_TOKEN', bot.token);
+  bot.group(TG(1).split('#')[1], { title: 'Cousins 🇮🇳', admins: [{ id: 501, first_name: 'Ravi', is_bot: false }], members: [502, 503, 504, 505] });
+  bot.group(TG(2).split('#')[1], { title: 'Running club', admins: [], members: [506, 507] });
+  for (const [n, title] of [[1, 'Cousins 🇮🇳'], [2, 'Running club']]) { prefs.noteChat({ chat: TG(n), number: String(bot.bot.id), isGroup: true }); (await imp('src/core/chat-names.js')).rememberGroupNames([{ id: TG(n), name: title }]); }
+  (await imp('src/core/people.js')).personFor({ channel: 'telegram', externalId: '501', phone: P(4) });
+  for (const [i, [name, text, fromAgent]] of [['Ravi', 'Who brings the cake on Sunday?', false], ['Priya', 'I can bake one 🎂', false], ['', 'Priya bakes the cake. I saved it as a note.', true]].entries()) {
+    db.logMessage({ channel: 'telegram', chat: TG(1), agent: fromAgent ? 'family' : '', msgId: `t${i}`, sender: fromAgent ? '' : name === 'Ravi' ? P(4) : '', senderJid: fromAgent ? '' : String(501 + i), name, text, addressed: i === 0, fromAgent, ts: now - (3 - i) * 17 * MIN });
+  }
   prefs.setChatPrefs(G(3), { logging: 'verbose' }); prefs.setChatPrefs(G(2), { logging: 'minimal' });
   prefs.setChatPrefs(G(3), { fallback: { mode: 'on', chain: ['chatgpt:auto', 'anthropic:claude-haiku-5-5'] } }); // #65: own chain
   prefs.ignoredCounts.set(G(5), 37); prefs.ignoredCounts.set(G(6), 12); prefs.ignoredCounts.set(G(7), 5);
@@ -407,7 +422,9 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   }
   store.updateSettings({ modelPrices: { 'anthropic:claude-haiku-5-5': { in: 1, out: 5 }, 'anthropic:claude-sonnet-5-5': { in: 3, out: 15 } } });
   // 069: one clean-up as the upkeep tick does it, so Server → Health shows its last run
-  (await imp('src/core/retention.js')).retentionTick();
+  const retention = await imp('src/core/retention.js');
+  retention.retentionTick();
+  retention.checkDisk(Date.now(), { free: 38 * 2 ** 30, total: 48 * 2 ** 30 }); // a healthy disk in the shots, whatever the machine taking them has
   // spending caps (040), owner alerts and weekly counters (041); 059: the alert number and character are the owner assistant's
   const budget = await imp('src/core/budget.js'); const stats = await imp('src/core/stats.js');
   budget.setCap('agent', 'carpool', { cost: 2 });
@@ -447,13 +464,13 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   await imp('src/core/owner-assistant.js');
   db.db.prepare("INSERT OR REPLACE INTO owner_links (tenant_id, user_id, phone, status, code_hash, expires_at, linked_at) SELECT 'default', id, ?, 'linked', NULL, 0, ? FROM users WHERE username = 'admin'").run(P(1), now - 2 * D);
   await wa.start({ onMessage: createRouter(wa), onHistory: createHistoryHandler() });
-  await wa.upkeep(Date.now() + 61000); // 075: the memory WhatsApp uses is measured a minute after start; the demo has no scheduler
+  for (let i = 0; i < 6; i++) await wa.upkeep(Date.now() + 61000); // 075: memory measured a minute after start; 077: Telegram group sizes (one group per tick)
   // #91: Chats shows "Loaded 12 earlier messages" (rides) and "Loading recent messages from your phone…" (Family)
   prefs.noteLatestKeys([2, 5, 6, 7].map((n) => ({ chat: G(n), isGroup: true, msgId: `last-${n}`, participant: `${P(n)}@s.whatsapp.net`, ts: now - n * H })));
   const phoneHistory = await imp('src/core/history-load.js');
   for (const c of [G(3), G(2)]) await phoneHistory.loadChatHistory(c, { by: 'admin', reason: 'switch_on' });
   system.startMetrics();
-  const noise = () => db.db.prepare("DELETE FROM activity WHERE summary LIKE 'Panel login%' OR summary LIKE 'Owner \"admin\" created%' OR summary LIKE 'Backup passphrase changed%' OR summary LIKE 'User %' OR summary LIKE 'Contact %' OR summary LIKE 'Global tool service%' OR summary LIKE 'Created \"%' OR (type = 'backup.done' AND ts > ?)").run(now - 60000);
+  const noise = () => db.db.prepare("DELETE FROM activity WHERE summary LIKE 'Panel login%' OR summary LIKE 'Owner \"admin\" created%' OR summary LIKE 'Backup passphrase changed%' OR summary LIKE 'User %' OR summary LIKE 'Contact %' OR summary LIKE 'Global tool service%' OR summary LIKE 'Created \"%' OR summary LIKE 'The server disk%' OR summary LIKE 'Disk space is back%' OR (type = 'backup.done' AND ts > ?)").run(now - 60000);
   noise(); setInterval(noise, 300).unref();
   return { base: `http://127.0.0.1:${panel.address().port}`, dataDir };
 }

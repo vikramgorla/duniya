@@ -34,6 +34,8 @@ const q = {
   touch: db.prepare('UPDATE identities SET phone = ?, last_seen = ? WHERE tenant_id = ? AND channel = ? AND external_id = ?'),
   move: db.prepare('UPDATE identities SET person = ? WHERE tenant_id = ? AND person = ?'),
   dropPerson: db.prepare('DELETE FROM people WHERE tenant_id = ? AND id = ?'),
+  phoneOf: db.prepare('SELECT phone FROM identities WHERE tenant_id = ? AND channel = ? AND external_id = ?'),
+  byChannelPhone: db.prepare("SELECT external_id AS id FROM identities WHERE tenant_id = ? AND channel = ? AND phone = ? AND phone <> '' ORDER BY last_seen DESC LIMIT 1"),
   list: db.prepare('SELECT channel, external_id AS externalId, phone, first_seen AS firstSeen, last_seen AS lastSeen FROM identities WHERE tenant_id = ? AND person = ? ORDER BY first_seen'),
 };
 const CACHE_MAX = 2000;
@@ -81,6 +83,18 @@ export function personById(id) {
 }
 /** The person with this phone number, or null. */
 export const personByPhone = (phone) => { const id = q.byPhone.get(TENANT, digits(phone))?.id; return id ? personById(id) : null; };
+
+/**
+ * 077: the phone an identity is linked to ('' when none). Channels without phone numbers (Telegram) pass it with every
+ * message of that sender: only a phone the channel verified (its own contact, shared by that person) is ever stored.
+ */
+export function phoneOfIdentity(channel, externalId) {
+  const hit = cache.get(`${channel}|${externalId}`);
+  if (hit?.phone) return hit.phone;
+  try { return q.phoneOf.get(TENANT, String(channel), String(externalId || ''))?.phone || ''; } catch { return ''; }
+}
+/** 077: the id of a person on a channel, found by their phone ('' when they never linked it there). */
+export const identityByPhone = (channel, phone) => (digits(phone) ? q.byChannelPhone.get(TENANT, String(channel), digits(phone))?.id || '' : '');
 
 /** The person who wrote a message (router, for chats that are on). Never throws; '' when unknown. */
 export function notePerson(msg) {

@@ -126,7 +126,7 @@ section { padding: 84px 0; }
 .tiles { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
 .tile { grid-column: span 5; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 26px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .tile.wide { grid-column: span 7; }
-.tile.half { grid-column: span 6; }
+.tile.third { grid-column: span 4; }
 .tile h3 { font-size: clamp(22px, 2.4vw, 28px); font-weight: 700; }
 .tile p { color: var(--muted); font-size: 15.5px; margin: 0; }
 .tile p strong, .tile p b { color: var(--ink); font-weight: 600; }
@@ -194,7 +194,7 @@ footer small { color: var(--muted); font-size: 13px; display: block; margin-top:
   .hero-text, .faq { grid-template-columns: 1fr; gap: 28px; }
   .hero-text { gap: 20px; }
   .steps { grid-template-columns: 1fr; }
-  .tile, .tile.wide, .tile.half { grid-column: span 12; }
+  .tile, .tile.wide, .tile.third { grid-column: span 12; }
   .install { grid-template-columns: 1fr; }
   .chatmock { right: 10px; }
   .top nav { display: none; }

@@ -5,11 +5,12 @@ import { getAgent, listAgents } from '../../core/agents.js';
 import { restartSoon } from '../../core/config.js';
 import { healthView, setRetention } from '../../core/retention.js';
 import { dropPending, listPending, takePending } from '../../core/db.js';
-import { activity } from '../../core/events.js';
+import { activity, bus } from '../../core/events.js';
 import { withChatNames } from '../../core/chat-names.js';
 import { globalServers } from '../../core/global-mcp.js';
 import { applyPending } from '../../core/runner.js';
 import { referencedSecrets } from '../../core/schema.js';
+import { CHANNELS } from '../../channels/index.js';
 import { getSetting, listSecrets, setSecret, updateSettings } from '../../core/store.js';
 import { logs as sysLogs, metricsHistory, opsStatus, osUpdates, requestOp, snapshot as sysSnapshot } from '../../core/system.js';
 import { PLAN_PROVIDERS, listPrices, setPrice, usageReport } from '../../core/usage.js';
@@ -38,7 +39,9 @@ export function systemRoutes(route, { channel } = {}) {
     }));
   });
   route('PUT', '/api/secrets', async (req, res, body, q, p, user) => {
-    setSecret(String(body.name || ''), String(body.value || ''));
+    const tokenOf = CHANNELS.find((c) => c.secret?.name === body.name)?.secret; // 077: a channel's token is checked before it is stored
+    if (tokenOf && body.value && !tokenOf.pattern.test(String(body.value).trim())) return [400, { error: tokenOf.hint, field: 'value' }];
+    setSecret(String(body.name || ''), String(body.value || '').trim());
     activity('system', { summary: `Secret ${body.value ? 'set' : 'removed'}: ${body.name} (by ${user.username})` });
     return { ok: true };
   });
@@ -75,6 +78,15 @@ export function systemRoutes(route, { channel } = {}) {
   route('PUT', '/api/channels/:id', async (req, res, body, q, p, user) => {
     if (!body.enabled && user.role !== 'owner') return [403, { error: 'Only the owner can switch a channel off' }];
     return channel.setEnabled(p.id, !!body.enabled, user.username);
+  }, { role: 'admin' });
+  // 077: where the Telegram bot's direct messages go ('' = the default agent)
+  route('PUT', '/api/channels/telegram/settings', async (req, res, body, q, p, user) => {
+    const dmAgent = String(body.dmAgent || '');
+    if (dmAgent && !listAgents().some((a) => a.id === dmAgent)) return [400, { error: 'Unknown agent', field: 'dmAgent' }];
+    updateSettings({ telegram: { ...getSetting('telegram', {}), dmAgent } });
+    bus.emit('status');
+    activity('config', { summary: `Telegram direct messages go to ${listAgents().find((a) => a.id === dmAgent)?.name || 'the default agent'} (${user.username})` });
+    return { dmAgent };
   }, { role: 'admin' });
   // ---------- WhatsApp ----------
   route('POST', '/api/whatsapp/pair', async (req, res, body) => ({ code: await channel.pair(body.phone, body.number) }));
