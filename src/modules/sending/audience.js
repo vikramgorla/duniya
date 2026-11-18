@@ -16,11 +16,11 @@ import { getChatPrefs } from '../../core/chat-prefs.js';
 import { channelOf, isDirect, phoneChat } from '../../channels/index.js';
 import { need } from '../index.js';
 
-export const KINDS = { list: 'A list', tag: 'A tag', household: 'A household', event: 'People registered for an event', orders: 'People with an open order', people: 'Chosen people' };
+const KINDS = { list: 'A list', tag: 'A tag', household: 'A household', event: 'People registered for an event', orders: 'People with an open order', people: 'Chosen people' };
 export const PURPOSES = { updates: 'Updates', marketing: 'Marketing' };
 const MAX = 5000;
 /** The placeholders a message may use, and the audience kinds that have them. */
-export const FIELDS = { first_name: null, name: null, household: null, event: ['event', 'orders'], date: ['event', 'orders'], place: ['event', 'orders'], people: ['event'], amount: ['orders'], due: ['orders'], ways_to_pay: ['orders'] };
+const FIELDS = { first_name: null, name: null, household: null, event: ['event', 'orders'], date: ['event', 'orders'], place: ['event', 'orders'], people: ['event'], amount: ['orders'], due: ['orders'], ways_to_pay: ['orders'] };
 
 /** A validated audience (400 with field "audience" when it names nothing). */
 export function cleanAudience(a = {}) {

@@ -31,7 +31,7 @@ import { listEstimate, listGapMs, sendingHoursNow, takeListSend, typeBefore } fr
 import { chat as modelChat } from '../../core/providers/index.js';
 import { isGroup, phoneOf, splitChatId } from '../../channels/index.js';
 import { changeOrHold } from '../index.js';
-import { KINDS, PURPOSES, cleanAudience, describe, fill, missingFields, resolve, usedFacts } from './audience.js';
+import { PURPOSES, cleanAudience, describe, fill, missingFields, resolve, usedFacts } from './audience.js';
 import { sendingTools } from './tools.js';
 
 db.exec(`
@@ -374,4 +374,4 @@ function apply(action, agent) {
 }
 export const hold = (ctx, p) => changeOrHold(ctx, 'sending', { op: 'start', run: p.run.id }, p.line);
 
-export const manifest = { id: 'sending', tools: sendingTools, apply, person: personSections, upkeep, intercept, api: { preview, startRun, kinds: KINDS } };
+export const manifest = { id: 'sending', tools: sendingTools, apply, person: personSections, upkeep, intercept, api: { preview, startRun } };
