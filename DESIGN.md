@@ -266,12 +266,18 @@ The same thing looks and behaves the same wherever it appears, and every place l
   ⋯ for the row's rare action. Details tables become muted summary lines with a *Details* disclosure (Server → Health,
   This server); Logs start as one row and load when opened.
 - **A person's page** (`#people/<id or number>`, 078): header (avatar, name, *+number · apps · nickname*, one muted
-  line with birthday, since and last contact, ⋯ Edit / Merge / Export / Erase), then hairline groups: *Family and
+  line with birthday, since and last contact, ⋯ Edit / Hide (or Show again) / Merge / Export; 079: no destructive
+  action in the panel, a hidden person shows one `.note` line with *Show again*), then hairline groups: *Family and
   ties* (a tie is one row that reads as a sentence from this page, "Parent of Vedika", with the other person's avatar
   and a × to remove; households as rows; *Add a tie* and *Add to a household* as the last rows), *Notes and timeline*
   (a note box, then notes and muted events, newest first; agent notes say *Agent*), *Tags and lists* (the shared
-  `tagInput()` from `tags.js`, saves at once; lists as rows), their chats, their apps. Merge suggestions and *Undo
+  `tagInput()` from `tags.js`, saves at once; lists as rows), their chats, *Consent* (one row per purpose: label and a
+  muted source/date line left, a compact Yes/No `select` right; *Not asked: counts as no*), *Agents that can see them*
+  (rows with the reason), their apps. Merge suggestions and *Undo
   merge* are one line with a `.qfix` link. A person without an app says who reaches them instead of offering a chat.
+- **People and lists as tags** (079): `peoplePicker()` in `tags.js` — chosen people, lists (marked ≡) and numbers as
+  the same `.tag` chips as words; typing shows up to seven matches as small buttons under the box; Enter adds a typed
+  number. Used for an agent's organizers, extra participants and shared lists.
 - **People · Households · Lists** (078): one small switch (`.seg.pnav`, links) at the top of the three lists; each
   row opens a page with a back link; a household lists adults, then kids.
 

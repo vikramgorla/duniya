@@ -73,7 +73,7 @@ export const TOOLS = [
     input: { id: str('New agent id (lowercase letters, digits, -). Optional: derived from the name'), template: str('Template id (optional)'), config: obj('Configuration fields (optional, override the template)') },
     run: (a, x) => x.call('POST', '/api/agents', { id: a.id, template: a.template, config: a.config || {} }) },
   { name: 'update_agent', calls: [['PUT', '/api/agents/x']],
-    description: 'Change fields of an agent (only the fields given change), e.g. { "prompt": "…", "triggers": ["silku", "!help"], "model": "auto" } or { "groupReplies": "followups" | "wake" | "auto" } (in groups: when woken and replies right after it speaks, only when woken, or whenever a message is for it) or { "fallback": { "mode": "off" } } (model fallback: inherit | on | off, optional "chain"). Returns the agent and any warnings. For owner-assistant, how it is reached and its permissions are fixed in code (chats, triggers, people, confirm, quick answers are ignored); alerts: { to: "+41…" } sets where owner alerts go (owner only).',
+    description: 'Change fields of an agent (only the fields given change), e.g. { "prompt": "…", "triggers": ["silku", "!help"], "model": "auto" } or { "groupReplies": "followups" | "wake" | "auto" } (in groups: when woken and replies right after it speaks, only when woken, or whenever a message is for it) or { "fallback": { "mode": "off" } } (model fallback: inherit | on | off, optional "chain") or { "peopleAccess": "own" | "everyone" | "off", "peopleLists": ["l_…"] } (which people its People tools and sender cards may see: its own chats plus shared lists, everyone in People, or nobody) or { "organizers": [phone, "p_…" person, "l_…" list] } (roles follow a person on every app). Returns the agent and any warnings. For owner-assistant, how it is reached and its permissions are fixed in code (chats, triggers, people, confirm, quick answers are ignored); alerts: { to: "+41…" } sets where owner alerts go (owner only).',
     input: { agent_id: str('Agent id'), changes: obj('Fields to change') }, required: ['agent_id', 'changes'],
     run: (a, x) => x.call('PUT', `/api/agents/${enc(a.agent_id)}`, a.changes || {}) },
   // 054: built-in answers without AI (quick replies, !help, welcome, FAQ).
@@ -254,12 +254,13 @@ export const TOOLS = [
     run: async (a, x) => (await x.call('GET', '/api/owner-assistant/weekly-preview')).text },
   // ---------- People (078, PRM core): people, households, lists ----------
   { name: 'list_people', readOnly: true, calls: [['GET', '/api/people']],
-    description: 'People: everyone who wrote in a chat that is on, or whom the owner added (also kids without a phone). Each has id, name (own name > phone contact > business > profile name), nickname, phone, apps (whatsapp, telegram), lastContact. Search by name, nickname, number, tag or note; filter by tag, list id, household id or app ("none" = no app).',
+    description: 'People: everyone who wrote in or is a member of a chat that is on, every contact synced from the owner\'s phone, and whom the owner added (also kids without a phone). Each has id, name (own name > phone contact > business > profile name), nickname, phone, source (chat, phone, owner), apps (whatsapp, telegram), lastContact. Search by name, nickname, number, tag or note; filter by tag, list id, household id, app ("none" = no app) or source. Hidden people only with hidden: true.',
     input: { query: str('Search text (optional)'), tag: str('Only people with this tag (optional)'), list: str('Only members of this list id (optional)'), household: str('Only members of this household id (optional)'),
-      app: str('whatsapp, telegram or none (optional)'), offset: int('Skip this many (paging; 100 per call)') },
-    run: (a, x) => x.call('GET', `/api/people?${new URLSearchParams({ q: a.query || '', tag: a.tag || '', list: a.list || '', household: a.household || '', app: a.app || '', offset: String(Number(a.offset) || 0) })}`) },
+      app: str('whatsapp, telegram or none (optional)'), source: { type: 'string', enum: ['chat', 'phone', 'owner'], description: 'Where they came from (optional)' },
+      hidden: bool('Only the hidden people (optional)'), offset: int('Skip this many (paging; 100 per call)') },
+    run: (a, x) => x.call('GET', `/api/people?${new URLSearchParams({ q: a.query || '', tag: a.tag || '', list: a.list || '', household: a.household || '', app: a.app || '', source: a.source || '', hidden: a.hidden ? '1' : '', offset: String(Number(a.offset) || 0) })}`) },
   { name: 'get_person', readOnly: true, calls: [['GET', '/api/people/x']],
-    description: 'One person, as on their page: name, nickname, phone, birthday, apps, ties to other people as read from their side ("Child of Ravi"), households with their role (adult or kid), who reaches them when they have no app, notes and timeline, tags, lists, their direct chat and the groups they wrote in, merges that can be undone and merge suggestions. Use it for "who is X\'s kid?" or "which household is Y in?". By person id or phone.',
+    description: 'One person, as on their page: name, nickname, phone, birthday, apps, ties to other people as read from their side ("Child of Ravi"), households with their role (adult or kid), who reaches them when they have no app, notes and timeline, tags, lists, their direct chat and the groups they are in, consents (privacy notice seen, updates, marketing: yes/no with source and date; unknown = no), the agents that can see them, hidden, merges that can be undone and merge suggestions. Use it for "who is X\'s kid?" or "which household is Y in?". By person id or phone.',
     input: { person: str('Person id (p_…) or phone with country code') }, required: ['person'],
     run: (a, x) => x.call('GET', `/api/people/${enc(a.person)}`) },
   { name: 'add_person', calls: [['POST', '/api/people']], description: 'Add a person to People: name, optional nickname, phone with country code, birthday (2015-04-23 or --04-23), shared (participants may look them up through agents). A kid without a phone is fine.',
@@ -297,13 +298,19 @@ export const TOOLS = [
   { name: 'export_person', readOnly: true, calls: [['GET', '/api/people/x/export']], description: 'Owner only: everything stored about one person as JSON (their page, names, notes, ties, households, tags, lists and their stored messages).',
     input: { person: str('Person id or phone') }, required: ['person'],
     run: (a, x) => x.call('GET', `/api/people/${enc(a.person)}/export`) },
+  { name: 'set_person_hidden', calls: [['PUT', '/api/people/x/hidden']], description: 'Hide a person (hidden: true) or show them again (false). Hidden people leave People lists, search, agent tools and sender cards; their data stays and the phone\'s contact sync does not bring them back. The panel\'s way to "remove" someone.',
+    input: { person: str('Person id or phone'), hidden: bool('true = hide, false = show again') }, required: ['person', 'hidden'],
+    run: (a, x) => x.call('PUT', `/api/people/${enc(a.person)}/hidden`, { hidden: !!a.hidden }) },
+  { name: 'set_person_consent', calls: [['PUT', '/api/people/x/consents']], description: 'Record a person\'s consent for a purpose: privacy_notice (saw the privacy notice), updates (may receive updates), marketing (may receive marketing); answer yes or no. Recorded with who set it and when. Unknown counts as no.',
+    input: { person: str('Person id or phone'), purpose: { type: 'string', enum: ['privacy_notice', 'updates', 'marketing'] }, answer: { type: 'string', enum: ['yes', 'no'] } }, required: ['person', 'purpose', 'answer'],
+    run: (a, x) => x.call('PUT', `/api/people/${enc(a.person)}/consents`, { purpose: a.purpose, value: a.answer }) },
   { name: 'erase_person', risky: true, calls: [['GET', '/api/people/x'], ['DELETE', '/api/people/x']],
-    description: 'Owner only: erase one person — their stored messages in every chat, their direct chat\'s memory, notes, ties, household memberships, tags, list entries and apps. Cannot be undone. Needs confirm_action.',
+    description: 'Owner only, for privacy requests (the panel only hides people): erase one person — their stored messages in every chat, their direct chat\'s memory, notes, ties, household memberships, tags, list entries, consents and apps. Cannot be undone. Needs confirm_action.',
     input: { person: str('Person id or phone') }, required: ['person'],
     preview: async (a, x) => {
       const p = await x.call('GET', `/api/people/${enc(a.person)}`);
       if (p.notInPeople) throw fail('Not in People', 404);
-      return `Erase "${p.name}" from Duniya: their stored messages in every chat, their direct chat's memory (${p.direct.length}), ${p.timeline.length} notes and events, ${p.ties.length} ties, ${p.households.length} household memberships, tags and lists. This cannot be undone. If they write again in a chat that is on, they come back as a new person.`;
+      return `Erase "${p.name}" from Duniya: their stored messages in every chat, their direct chat's memory (${p.direct.length}), ${p.timeline.length} notes and events, ${p.ties.length} ties, ${p.households.length} household memberships, tags and lists. This cannot be undone. If they write again in a chat that is on (or WhatsApp syncs their number from your phone again), they come back as a new person. To keep them out without deleting, use set_person_hidden.`;
     },
     run: (a, x) => x.call('DELETE', `/api/people/${enc(a.person)}`) },
   { name: 'list_households', readOnly: true, calls: [['GET', '/api/households']], description: 'Households (e.g. "Chary family") with address and how many adults and kids.', input: {},

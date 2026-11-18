@@ -1,6 +1,6 @@
 // @ts-check
 // Phone contact names (issue #11, #110, 078): the names WhatsApp syncs from the linked phone(s). They are the name
-// source for people; they never create a person (078: People — saved names, notes and Shared live in people.js).
+// source for people; 079: every synced number also becomes a person (source "phone", people-access.js).
 //
 // 057 (#110): WhatsApp gives three kinds of names and they are kept apart, so a later profile-name update never
 // replaces the name from the owner's address book:
@@ -15,6 +15,7 @@ import { digits } from './config.js';
 import { bareJid, isLidJid, pnDigits } from '../channels/whatsapp/ids.js';
 import { getSetting, updateSettings } from './store.js';
 import { ownNameOf } from './people.js';
+import { syncPhonePeople } from './people-access.js';
 
 const TENANT = 'default';
 db.exec(`
@@ -28,6 +29,8 @@ db.exec(`
     biz_name TEXT NOT NULL DEFAULT '', push_name TEXT NOT NULL DEFAULT '', updated_at INTEGER,
     PRIMARY KEY (tenant_id, lid)
   );
+  -- 079: the phone contacts that changed since the last pass become people (people-access.js syncPhonePeople)
+  CREATE INDEX IF NOT EXISTS contacts_updated ON contacts (tenant_id, updated_at, phone);
 `);
 const HIDDEN_NUMBER = 'Unknown (hidden number)';
 const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, 100);
@@ -82,6 +85,7 @@ export function syncWhatsAppContacts(list = []) {
     }
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
+  if (n) try { syncPhonePeople(); } catch { /* 079: the upkeep tick does the rest */ }
   return n;
 }
 /** LIDs with names but no phone yet (the channel asks Baileys for their mapping). */

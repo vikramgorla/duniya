@@ -19,9 +19,11 @@ export const AGENT_DEFAULTS = Object.freeze({
   respondToMentions: true,
   groupReplies: 'followups', // 076: wake | followups | auto
   dm: 'members',
-  organizers: [],
+  organizers: [], // 079: phone numbers, people (p_…) and lists (l_…)
   participants: [],
   chats: [],
+  peopleAccess: 'own', // 079: which people its tools and sender cards may see: off | own (its chats + shared lists) | everyone
+  peopleLists: [], // 079: lists (l_…) the owner shares with it
   mcpServers: {},
   tools: { participant: [], organizer: [], deny: [] },
   confirm: null,
@@ -46,7 +48,7 @@ const SCHEDULE_KINDS = ['prompt', 'weekly-summary'];
 export const AGENT_ID_RE = /^[a-z0-9][a-z0-9-]{1,40}$/;
 export const SERVER_KEY_RE = /^[a-z][a-z0-9_]{0,30}$/;
 /** Rule prefixes of built-in tools: a tool service may not use these names. */
-export const RESERVED_SERVER_KEYS = ['local', 'memory', 'contacts', 'whatsapp', 'media'];
+export const RESERVED_SERVER_KEYS = ['local', 'memory', 'contacts', 'people', 'whatsapp', 'media'];
 const TOOL_GLOB_RE = /^[\w*?.-]+$/;
 const RULE_RE = /^(local|memory|[a-z][a-z0-9_]*):[\w*?.-]+$/;
 const SECRET_REF_RE = /^\$\{[A-Z][A-Z0-9_]{1,63}\}$/;
@@ -89,8 +91,10 @@ const list = (v, field) => {
   if (!Array.isArray(v)) fail(field, 'must be a list');
   return v.map((x) => String(x).trim()).filter(Boolean);
 };
-const phones = (v, field) => [...new Set(list(v, field).map(digits))].map((d) => {
-  if (d.length < 6) fail(field, `"${d}" is not a full phone number with country code`);
+const PERSON_REF_RE = /^[pl]_[a-f0-9]{6,32}$/;
+/** 079: role entries — phone numbers (digits), people (p_…) and lists (l_…). */
+const roleEntries = (v, field) => [...new Set(list(v, field).map((x) => (PERSON_REF_RE.test(String(x).trim()) ? String(x).trim() : digits(x))))].map((d) => {
+  if (!PERSON_REF_RE.test(d) && d.length < 6) fail(field, `"${d}" is not a full phone number with country code, a person or a list`);
   return d;
 });
 function urlOrRef(v, field) {
@@ -166,8 +170,12 @@ export function validateAgentConfig(input) {
   if (!GROUP_REPLIES.includes(out.groupReplies)) fail('groupReplies', 'must be wake, followups or auto');
   if (!['none', 'organizers', 'members', 'anyone'].includes(c.dm)) fail('dm', 'must be none, organizers, members or anyone');
   out.dm = c.dm;
-  out.organizers = phones(c.organizers, 'organizers');
-  out.participants = phones(c.participants, 'participants');
+  out.organizers = roleEntries(c.organizers, 'organizers');
+  out.participants = roleEntries(c.participants, 'participants');
+  if (!['off', 'own', 'everyone'].includes(c.peopleAccess)) fail('peopleAccess', 'must be off, own or everyone');
+  out.peopleAccess = c.peopleAccess;
+  out.peopleLists = [...new Set(list(c.peopleLists, 'peopleLists'))];
+  if (out.peopleLists.some((l) => !/^l_[a-f0-9]{6,32}$/.test(l))) fail('peopleLists', 'must be list ids (l_…)');
   out.chats = [...new Set(list(c.chats, 'chats'))];
   out.timezone = str(c.timezone, 'timezone', { max: 60 });
   if (out.timezone) {

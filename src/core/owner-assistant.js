@@ -244,14 +244,14 @@ const agentRole = (user) => (ROLE_RANK[user.role] >= ROLE_RANK.admin ? 'organize
 
 /**
  * The record as the agent machinery sees it for one user and turn: its chats are the user's own chat and, for owners
- * and admins, every chat that is on and not private (sends there are held for confirm); contacts tools and chat
+ * and admins, every chat that is on and not private (sends there are held for confirm); people tools and chat
  * history search stay off (the admin tools cover people; its own conversation is not chat history).
  */
 function ownerAgent(user, ownChat = '') {
   const rec = record();
   const role = agentRole(user);
   return { ...rec, chats: [ownChat, ...(role === 'organizer' ? visibleChats() : [])].filter(Boolean), confirm: null,
-    tools: { ...rec.tools, deny: [...rec.tools.deny, ...WA_NEVER, 'contacts:*', 'memory:search_history'] } };
+    tools: { ...rec.tools, deny: [...rec.tools.deny, ...WA_NEVER, 'people:*', 'memory:search_history'] } };
 }
 
 /** A chat named by the model: the user's own chat, or a chat that is on and not private, by id, group title or contact name. */

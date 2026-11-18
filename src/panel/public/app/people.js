@@ -1,14 +1,14 @@
 // People (078, PRM core): the list, a person's page, and the People · Households · Lists switch. Households and Lists
 // load from people-groups.js. Module of the panel (063). Text from WhatsApp or people is built from text nodes.
 import { $, S, ago, api, ask, avatar, can, emptyState, field, h, icon, menu, tryApi } from './core.js';
-import { helpLink, plural } from './shared.js';
+import { helpLink } from './shared.js';
 import { tagInput } from './tags.js';
 let query = ''; let filter = '';
 const PAGE = 100;
 const APPS = { whatsapp: 'WhatsApp', telegram: 'Telegram' };
 const enc = encodeURIComponent;
 const personHref = (id) => `#people/${enc(id)}`;
-const appsLine = (p) => [p.apps.map((a) => APPS[a] || a).join(' · ') || 'No app', p.lastContact ? `${ago(p.lastContact)} ago` : ''].filter(Boolean).join(' · ');
+const appsLine = (p) => [p.apps.map((a) => APPS[a] || a).join(' · ') || 'No app', p.lastContact ? `${ago(p.lastContact)} ago` : p.source === 'phone' ? 'from your phone' : ''].filter(Boolean).join(' · ');
 /** One person row: avatar · name · apps and last contact · chevron (calm rows, 073). `end`: a control next to the row. */
 export const personRow = (p, sub = appsLine(p), end = null) => h('li', { class: end ? 'has-end' : null }, h('a', { class: 'lrow', href: personHref(p.id || p.person) }, avatar(p.who || p.name, p.id || p.person, 's'),
   h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, p.name), sub ? h('span', { class: 'lrow-sub' }, sub) : null), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')), end);
@@ -42,10 +42,12 @@ export async function renderPeople() {
   let timer; search.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { query = search.value; renderPeople().then(() => { const i = $('#main input[type=search]'); i?.focus(); i?.setSelectionRange(i.value.length, i.value.length); }); }, 250); };
   const opt = (value, label) => h('option', { value, selected: value === filter }, label);
   const pick = h('select', { 'aria-label': 'Show', onchange: () => { filter = pick.value; renderPeople(); } }, opt('', 'Everyone'),
+    h('optgroup', { label: 'Source' }, opt('source:chat', 'From chats'), opt('source:phone', 'From your phone'), opt('source:owner', 'Added by you')),
     h('optgroup', { label: 'App' }, opt('app:whatsapp', 'On WhatsApp'), opt('app:telegram', 'On Telegram'), opt('app:none', 'No app (e.g. kids)')),
     sum?.tags.length ? h('optgroup', { label: 'Tag' }, sum.tags.map((t) => opt(`tag:${t.tag}`, `#${t.tag} (${t.count})`))) : null,
     sum?.lists.length ? h('optgroup', { label: 'List' }, sum.lists.map((l) => opt(`list:${l.id}`, l.name))) : null,
-    sum?.households.length ? h('optgroup', { label: 'Household' }, sum.households.map((x) => opt(`household:${x.id}`, x.name))) : null);
+    sum?.households.length ? h('optgroup', { label: 'Household' }, sum.households.map((x) => opt(`household:${x.id}`, x.name))) : null,
+    sum?.hidden ? opt('hidden:1', `Hidden (${sum.hidden})`) : null);
   const add = async () => {
     const F = { name: h('input', { autocomplete: 'off' }), phone: h('input', { placeholder: '+41 79 000 00 01', inputmode: 'tel', autocomplete: 'off' }), birthday: h('input', { placeholder: '2015-04-23', autocomplete: 'off' }) };
     if (!await ask({ title: 'Add a person', ok: 'Add person', body: [field('Name', F.name), field('Number (optional)', F.phone, 'Leave empty for a kid without a phone.'), field('Birthday (optional)', F.birthday)] })) return;
@@ -56,18 +58,19 @@ export async function renderPeople() {
   const more = h('button', { class: 'btn', type: 'button', hidden: list.length < PAGE, style: 'margin-top:10px', onclick: () => tryApi(async () => {
     const next = await page(ul.childElementCount); ul.append(...next.map((p) => personRow(p))); more.hidden = next.length < PAGE;
   }) }, 'Show more');
-  const n = sum?.names;
+  // 079: the count is everyone (or how many match out of everyone); where people come from, in one line
+  const total = sum?.people ?? list.length;
+  const count = query || filter ? `${list.length.toLocaleString()}${list.length === PAGE ? '+' : ''} of ${total.toLocaleString()}` : total.toLocaleString();
+  const WHERE = 'People appear when they write in, or are members of, a chat that is on, and from your phone’s contacts.';
   $('#main').replaceChildren(h('div', { class: 'card' }, peopleNav('people'),
-    h('div', { class: 'sec-head' }, h('h2', {}, `People (${(query || filter || !sum ? list.length : sum.people).toLocaleString()}${list.length === PAGE ? '+' : ''})`),
+    h('div', { class: 'sec-head' }, h('h2', {}, `People (${count})`),
       h('button', { class: 'btn small primary', type: 'button', onclick: add }, '+ Add'), helpLink('people.md')),
     h('div', { class: 'ld-tools', style: 'margin-top:8px' }, search, pick),
-    n ? h('p', { class: 'small muted', role: 'status' }, `Names: ${n.book} from your phone · ${plural(n.profile, 'profile name')}${n.hiddenNumbers ? ` · ${n.hiddenNumbers} hidden numbers` : ''}${sum.refreshedAt ? ` · refreshed ${ago(sum.refreshedAt)} ago` : ''}.`,
-      ' ', h('button', { class: 'btn small ghost', title: 'Optional: the server also does this by itself', onclick: () => tryApi(async () => { await api('POST', '/api/people/refresh-names'); setTimeout(renderPeople, 4000); }, 'Asked WhatsApp for names') }, 'Refresh')) : null,
-    sum ? h('label', { class: 'tick small', style: 'justify-content:flex-start' }, h('input', { type: 'checkbox', checked: sum.namesForAgents !== false, disabled: !can('owner'),
+    list.length ? [ul, more, !query && !filter && total < 20 ? h('p', { class: 'small muted' }, WHERE) : null] : query || filter ? h('p', { class: 'muted' }, 'Nobody matches.')
+      : emptyState('list', 'No people yet', `${WHERE} You can also add someone, a kid without a phone too.`, h('button', { class: 'btn primary', onclick: add }, 'Add a person')),
+    sum ? h('label', { class: 'tick small muted', style: 'justify-content:flex-start;margin-top:14px' }, h('input', { type: 'checkbox', checked: sum.namesForAgents !== false, disabled: !can('owner'),
       onchange: (e) => tryApi(async () => { await api('PUT', '/api/people/agent-names', { enabled: e.target.checked }); }, e.target.checked ? 'Agents use your contact names' : 'Agents use profile names') }),
-      ' Agents may use the names from your phone contacts') : null,
-    list.length ? [ul, more] : query || filter ? h('p', { class: 'muted' }, 'Nobody matches.')
-      : emptyState('list', 'No people yet', 'People appear when they write in a chat that is on. You can also add someone, a kid without a phone too.', h('button', { class: 'btn primary', onclick: add }, 'Add a person'))));
+      ' Agents may use the names from your phone contacts') : null));
 }
 
 /** Save something on a person and draw the page again. */
@@ -78,7 +81,8 @@ const rowBtn = (label, sub, onclick) => h('li', {}, h('button', { class: 'lrow',
 const x = (label, onclick) => h('button', { class: 'btn small ghost icon rm', type: 'button', 'aria-label': label, title: label, onclick }, '×');
 const TIES = [['parent', 'Parent of', false], ['parent', 'Child of', true], ['partner', 'Partner of', false], ['sibling', 'Sibling of', false], ['works_with', 'Works with', false], ['custom', 'Something else…', false]];
 
-/** A person's page: name and apps, then Family and ties, Notes and timeline, Tags and lists, their chats; ⋯ Edit, Merge, Export, Erase. */
+/** A person's page: name and apps, then Family and ties, Notes and timeline, Tags and lists, their chats, Consent and the agents
+ *  that can see them (079); ⋯ Edit, Merge, Export, Hide / Show again. */
 async function renderPerson(ref) {
   const back = h('a', { class: 'sub-back', href: '#people' }, icon('back'), 'People');
   const p = await api('GET', `/api/people/${enc(ref)}`).catch(() => null);
@@ -92,7 +96,7 @@ async function renderPerson(ref) {
   const noApp = !p.notInPeople && !p.apps.length && !p.phone;
   const chats = noApp ? null : [block('Direct chat', '', h('ul', {}, p.direct.length ? p.direct.map((c) => chatRow(c, ''))
     : p.phone ? rowBtn('Set up a direct chat', 'Give them an agent, before they write', setUp) : null)),
-  block('Groups they wrote in', '', p.groups.length ? h('ul', {}, p.groups.map((c) => chatRow(c, `wrote ${ago(c.lastAt)} ago`))) : h('p', { class: 'small muted lempty' }, 'No stored message from them in a group that is on.'))];
+  block('Their groups', '', p.groups.length ? h('ul', {}, p.groups.map((c) => chatRow(c, c.wrote ? `wrote ${ago(c.lastAt)} ago` : 'member'))) : h('p', { class: 'small muted lempty' }, 'Not in a group that is on.'))];
   if (p.notInPeople) {
     const addThem = () => act(ref, () => api('POST', '/api/people', { name: p.name.startsWith('+') ? '' : p.name, phone: p.phone }), 'Added to People');
     $('#main').replaceChildren(h('div', { class: 'card person-page' }, back, h('div', { class: 'ap-head' }, avatar(p.name, p.phone, 'l'),
@@ -120,9 +124,15 @@ async function renderPerson(ref) {
     const a = h('a', { href: URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })), download: `person-${p.id}.json` });
     document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }, 'Exported');
-  const erase = async () => (await ask({ title: `Erase ${p.name}?`, danger: true, typed: 'erase', ok: 'Erase person',
-    text: 'Their stored messages in every chat, their direct chat’s memory, notes, ties, households, tags and lists are deleted. This cannot be undone.\n\nIf they write again in a chat that is on, they come back as a new person.' }))
-    && tryApi(async () => { await api('DELETE', `/api/people/${p.id}`); location.hash = 'people'; }, 'Erased');
+  // 079: Hide instead of Erase — out of lists, search and agents; the data stays; Show again undoes it
+  const hide = async () => (await ask({ title: `Hide ${p.name}?`, ok: 'Hide',
+    text: 'They leave People lists and search, and agents no longer see them. Their notes, ties and chats stay, and your phone’s contacts don’t bring them back. Show them again any time (People → Hidden).' }))
+    && act(p.id, () => api('PUT', `/api/people/${p.id}/hidden`, { hidden: true }), 'Hidden');
+  const showAgain = () => act(p.id, () => api('PUT', `/api/people/${p.id}/hidden`, { hidden: false }), 'Shown again');
+  const consentRow = (c) => h('li', { style: 'display:flex;align-items:center;gap:10px;padding:8px 10px' },
+    h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, c.label), h('span', { class: 'lrow-sub' }, c.known ? `${c.source || 'Recorded'} · ${ago(c.at)} ago` : 'Not asked: counts as no')),
+    h('select', { 'aria-label': c.label, style: 'width:auto;flex:none', onchange: (e) => act(p.id, () => api('PUT', `/api/people/${p.id}/consents`, { purpose: c.purpose, value: e.target.value }), 'Saved') },
+      h('option', { value: 'yes', selected: c.value === 'yes' }, 'Yes'), h('option', { value: 'no', selected: c.value === 'no' }, 'No')));
   const owner = can('owner');
   // Family and ties
   const addTie = async () => {
@@ -166,9 +176,10 @@ async function renderPerson(ref) {
       menu(`More for ${p.name}`, h('button', { class: 'btn small', type: 'button', onclick: edit }, 'Edit…'),
         owner ? h('button', { class: 'btn small', type: 'button', onclick: () => merge() }, 'Merge…') : null,
         owner ? h('button', { class: 'btn small', type: 'button', onclick: exportIt }, 'Export') : null,
-        owner ? h('button', { class: 'btn small danger', type: 'button', onclick: erase }, 'Erase…') : null)),
+        p.hidden ? h('button', { class: 'btn small', type: 'button', onclick: showAgain }, 'Show again') : h('button', { class: 'btn small', type: 'button', onclick: hide }, 'Hide…'))),
+    p.hidden ? h('p', { class: 'note' }, 'Hidden: not in People lists, search or agents. ', h('button', { class: 'qfix', type: 'button', onclick: showAgain }, 'Show again')) : null,
     h('p', { class: 'small muted', style: 'margin:6px 0 0' }, [p.birthday ? `Birthday ${p.birthday.replace(/^--/, '')}` : '', p.shared ? 'Shared with participants' : '', `In People since ${new Date(p.createdAt).toLocaleDateString()}`,
-      p.lastContact ? `last contact ${ago(p.lastContact)} ago` : ''].filter(Boolean).join(' · ')),
+      p.lastContact ? `last contact ${ago(p.lastContact)} ago` : '', p.source === 'phone' ? 'from your phone’s contacts' : ''].filter(Boolean).join(' · ')),
     owner && p.suggestions.map((s) => h('p', { class: 'note' }, `${s.reason} as ${s.name}. `, h('button', { class: 'qfix', type: 'button', onclick: () => merge(s.id, s.name) }, `Merge ${s.name} into ${p.name}`))),
     owner && p.merges.map((m) => h('p', { class: 'small muted' }, `Merged with ${m.name} ${ago(m.at)} ago. `, h('button', { class: 'qfix', type: 'button', onclick: () => act(p.id, () => api('POST', `/api/people/merges/${m.id}/undo`), 'Merge undone') }, 'Undo merge'))),
     block('Family and ties', 'people.md#family-and-ties', h('ul', {}, p.ties.map((t) => personRow({ id: t.other.id, who: t.other.name, name: `${t.label} ${t.other.name}` }, '', x(`Remove ${t.label} ${t.other.name}`, () => act(p.id, () => api('DELETE', `/api/people/${p.id}/ties/${t.id}`), 'Tie removed')))),
@@ -184,6 +195,10 @@ async function renderPerson(ref) {
         h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, l.name), h('span', { class: 'lrow-sub' }, 'List')), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')),
       x(`Take off ${l.name}`, () => act(p.id, () => api('DELETE', `/api/lists/${l.id}/members/${p.id}`), 'Taken off the list')))), rowBtn('Add to a list', '', addToList))),
     chats,
+    block('Consent', 'people.md#consent', h('ul', {}, p.consents.map(consentRow))),
+    block('Agents that can see them', 'people.md#what-agents-see', p.agents.length ? h('ul', { class: 'mini-list' }, p.agents.map((a) => h('li', {}, h('a', { class: 'lrow', href: `#agents/${enc(a.id)}/people` },
+      h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, a.name), h('span', { class: 'lrow-sub' }, a.why)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))))
+      : h('p', { class: 'small muted lempty' }, p.hidden ? 'None while they are hidden.' : 'None: agents see the people of their own chats, or everyone when you choose that for an agent.')),
     p.identities.length ? block('Apps', '', h('ul', { class: 'mini-list' }, p.identities.map((i) => h('li', { class: 'small', style: 'padding:6px 10px' },
       `${APPS[i.channel] || i.channel}${i.name ? ` · ${i.name}` : ''}${i.phone ? ` · +${i.phone}` : ''} · since ${new Date(i.firstSeen).toLocaleDateString()}`)))) : null));
   $('#main h2')?.focus({ preventScroll: true });

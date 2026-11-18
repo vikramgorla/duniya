@@ -19,6 +19,8 @@ import { silenceReason } from './silences.js';
 import { countStat } from './stats.js';
 import { planAttachments, visionCallOptions, noVisionNote } from './media-ai.js';
 import { faqContext } from './quick.js';
+import { peopleScope, senderCard } from './people-access.js';
+import { applyPeopleAction } from './people-tools.js';
 
 const MAX_TOOL_ROUNDS = 8;
 
@@ -112,7 +114,19 @@ export async function runAgent(ctx) {
     }
     if (budget.action === 'fallback') model = budget.model;
   }
-  const { defs, run, meta } = await toolsFor(agent, role, { chat });
+  const { defs, run, meta } = await toolsFor(agent, role, { chat, owner: !!ctx.ownerTurn });
+  const codes = [];
+  // 079: a people change about someone other than the sender waits for an organizer's confirm code (like previews)
+  ctx.hold = ({ kind, action, summary }) => {
+    const code = newCode();
+    addPending({ code, agent: agent.id, server: `local:${kind}`, confirmTool: kind, confirmId: JSON.stringify(action), tool: `${kind}:${action.op}`, chat,
+      requester: ctx.requester, summary: String(summary).slice(0, 500), expires: Date.now() + (agent.confirm?.ttlMinutes || 9) * 60000 });
+    codes.push(code);
+    activity('confirm.created', { agent: agent.id, chat, summary: `${code}: ${kind}:${action.op}` });
+    return code;
+  };
+  // 079: a short card about the sender from People (never message text), when the agent's People access allows it
+  const card = ctx.personId ? senderCard(ctx.personId, peopleScope(agent, { owner: !!ctx.ownerTurn }), senderName) : '';
   for (const err of meta.get('__errors') || []) activity('error', { agent: agent.id, chat, summary: err });
 
   const memory = buildContext({ agent, chat: ctx.contextChat || chat, excludeId: ctx.msgRowId || 0 });
@@ -126,13 +140,12 @@ export async function runAgent(ctx) {
   const notes = [ctx.mediaNote, plan.note].filter(Boolean).join('\n');
   // #163: the panel test console sends its conversation so far (it is not stored as chat history)
   const thread = Array.isArray(ctx.thread) && ctx.thread.length ? `Earlier in this test conversation:\n${ctx.thread.map((t) => `${t.from === 'agent' ? 'You' : senderName}: ${t.text}`).join('\n')}\n\n` : '';
-  const turnText = `${memory ? `${memory}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}${ctx.unaddressed ? `\n\n${JUDGE_NOTE}` : ''}`;
+  const turnText = `${memory ? `${memory}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${card ? `${card}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}${ctx.unaddressed ? `\n\n${JUDGE_NOTE}` : ''}`;
   const messages = [{
     role: 'user',
     content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText,
   }];
 
-  const codes = [];
   let reply = '';
   const usage = { input: 0, output: 0 };
   // Fallback (042): per model call, keeping this turn's messages, so tools that already ran never run again and
@@ -210,7 +223,7 @@ export async function runAgent(ctx) {
   }
 
   for (const code of codes) {
-    reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm.ttlMinutes || 9} min).`;
+    reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm?.ttlMinutes || 9} min).`;
   }
   ctx.usage = usage;
   const via = failed.length ? ` (after ${failed.map((f) => `${f.name}: ${REASON_TEXT[f.reason] || f.reason}`).join(', ')})` : '';
@@ -239,6 +252,12 @@ export async function handleConfirmCommand({ agent, text, role, chat }) {
 }
 
 export async function applyPending(agent, row) {
+  if (row.server === 'local:people') { // 079: a held People change
+    let text; let failed = false;
+    try { text = applyPeopleAction(JSON.parse(row.confirm_id), agent); } catch (e) { text = e.message; failed = true; }
+    activity(failed ? 'tool.error' : 'confirm.applied', { agent: agent.id, chat: row.chat, summary: `${row.code}: ${row.tool}${failed ? ' failed' : ''}` });
+    return failed ? `Could not apply ${row.code}: ${text}` : `Done (${row.code}). ${text}`;
+  }
   const conn = organizerConnection(agent, row.server);
   const out = await conn.call(row.confirm_tool, { [agent.confirm.idField || 'confirm_id']: row.confirm_id });
   activity(out.isError ? 'tool.error' : 'confirm.applied', {

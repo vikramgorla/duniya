@@ -65,7 +65,7 @@ test('073: a person\'s page — their direct chat, the groups they wrote in, als
   await t.api(owner, 'POST', `/api/people/${pr.id}/notes`, { text: 'treasurer' });
   await t.agents.bindChat('41790000002@s.whatsapp.net', 'panduga');
   t.chatPrefs.noteChat({ chat: '41790000002@s.whatsapp.net', isGroup: false, name: 'Priya', phone: '41790000002' });
-  t.db.logMessage({ channel: 'whatsapp', chat: 'g1@g.us', msgId: 'p1', sender: '41790000002', name: 'Priya', text: 'hello', ts: Date.now() });
+  await t.route(t.msg({ chat: 'g1@g.us', msgId: 'p1', phone: '41790000002', senderJid: '41790000002@s.whatsapp.net', senderName: 'Priya', text: 'hello' })); // 079: noted as a chat of theirs
   const p = (await t.api(owner, 'GET', '/api/people/41790000002')).body;
   assert.equal(p.name, 'Priya');
   assert.equal(p.timeline.find((n) => n.kind === 'note').text, 'treasurer');

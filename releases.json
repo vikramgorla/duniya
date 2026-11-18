@@ -1,6 +1,22 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.40.0": {
+      "breaking": false,
+      "title": "People and agents: agents know who is writing, everyone is in People",
+      "summary": "Everyone from your chats that are on and from your phone's contacts is now in People by itself. Agents get a short card about who is writing and People tools, and see only the people of their own chats unless you choose otherwise. Nothing to do: saved organizer numbers move to the person on the first start.",
+      "changes": [
+        { "type": "new", "text": "Members of groups that are on, and every contact synced from your phone, become people by themselves. The People count is everyone; filter by where they came from: chats, your phone or added by you." },
+        { "type": "new", "text": "Agents know who is writing: a short card with name, nickname, household, tags and your notes (never message text)." },
+        { "type": "new", "text": "People tools for agents: find a person, see their card, add a note, tag them or add them to a list. Changes about someone else wait for an organizer's confirm code." },
+        { "type": "new", "text": "People access per agent: the people of its own chats (default), plus lists you share with it, or everyone in People, or nobody. When you write to an agent yourself, it sees everyone." },
+        { "type": "new", "text": "Organizers can be people or a list (for example the committee), and a person keeps the role on WhatsApp and Telegram." },
+        { "type": "new", "text": "Consent on each person's page: saw the privacy notice (recorded by itself), may receive updates, may receive marketing." },
+        { "type": "improved", "text": "A person's page shows their groups (also where they are only a member) and the agents that can see them." },
+        { "type": "removed", "text": "Erase is no longer in the panel: Hide keeps someone out of People and agents, and Show again brings them back. A true delete for privacy requests stays available to AI assistants with the admin tools, with a confirmation." },
+        { "type": "removed", "text": "The line about names from your phone on the People screen: those names are people now." }
+      ]
+    },
     "2.39.1": {
       "breaking": false,
       "title": "Faster person pages and lists on large servers",

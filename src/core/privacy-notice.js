@@ -10,6 +10,7 @@ import { activity } from './events.js';
 import { sha256 } from './crypto.js';
 import { bad } from './config.js';
 import { isGroup } from '../channels/index.js';
+import { noticePostedInGroup, noticeSeenInDm } from './people-access.js';
 
 export const DEFAULT_GROUP_TEXT = 'Messages in this group are stored so the assistant has context. The group\'s organiser can review them. Ask an organiser if you have questions.';
 export const DEFAULT_DM_TEXT = 'Messages in this chat are stored so the assistant has context. The organiser can review them.';
@@ -81,6 +82,7 @@ export async function maybePostNotice(chat, channel) {
     return { posted: false, reason: e.message };
   }
   db.prepare('INSERT OR REPLACE INTO privacy_notices (tenant_id, chat, text_hash, posted_at) VALUES (?, ?, ?, ?)').run(TENANT, chat, sha256(text), Date.now());
+  noticePostedInGroup(chat); // 079: a consent record for everyone known to be in the group (later members when noted)
   activity('config', { chat, agent: agent?.id || '', summary: `Privacy notice posted (${d.reason})` });
   return { posted: true, reason: d.reason };
 }
@@ -103,6 +105,7 @@ export function dmNoticeOnce(who) {
   const s = noticeSettings();
   if (!s.enabled || !s.dmFirstReply || !who) return '';
   const r = db.prepare('INSERT OR IGNORE INTO privacy_dm_seen (tenant_id, who, ts) VALUES (?, ?, ?)').run(TENANT, String(who), Date.now());
+  if (r.changes) noticeSeenInDm(who); // 079: recorded on the person (consent: privacy notice seen)
   return r.changes ? s.dmText : '';
 }
 /** The DM notice line the next message to this person would carry (or ''), without recording it (049: intro preview). */

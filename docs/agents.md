@@ -137,8 +137,20 @@ Admin MCP and owner assistant: `set_agent_quick_answers` (only the parts given c
 
 | Role | Who | Gets |
 |---|---|---|
-| **Organizer** | phone numbers saved on the agent; while none are saved, the WhatsApp admins of its groups | organizer tools; confirms changes |
+| **Organizer** | people, lists and numbers saved on the agent (agent page → **People**); while none are saved, the WhatsApp admins of its groups | organizer tools; confirms changes |
 | **Participant** | everyone else in a bound group | participant tools |
+
+- Switch group members between *Participant* and *Organizer*; under **People outside these groups** type a name, a
+  list (e.g. *Committee*: everyone on it is an organizer) or a number with country code.
+- A person is the same role on every app: an organizer on WhatsApp is one on Telegram too, once they shared their
+  number with the bot ([People → Roles that follow a person](people.md#roles-that-follow-a-person)).
+
+### People access
+
+**People access** (agent page → **People**) decides which people its People tools and the short card about the sender
+may see: **Its own chats** (default: people who write in or are members of its chats, plus **Lists shared with it**),
+**Everyone in People**, or **Nobody**. When you write to the agent yourself, that turn sees everyone. Details and the
+tools: [People → What agents see](people.md#what-agents-see).
 
 > [!IMPORTANT]
 > The model never sees or calls the confirm tool. Permissions are decided in code, not by the prompt.

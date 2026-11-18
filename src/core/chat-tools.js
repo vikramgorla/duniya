@@ -12,6 +12,7 @@ import {
   logMessage, messageByMsgId, lastAgentMessage, setMessageText, searchMessages, namesInChat, getPoll, latestPoll, recentPolls, pollTally,
 } from './db.js';
 import { activity } from './events.js';
+import { inRole } from './people-access.js';
 import { capsOf, channelOf, isGroup, CHANNELS } from '../channels/index.js';
 import { toolPhrase } from '../panel/public/app/names.js';
 
@@ -318,7 +319,7 @@ const DEFS = [
     input_schema: { type: 'object', properties: { person: str('Phone number with country code') }, required: ['person'] },
     async run(input, ctx) {
       const d = digits(input.person);
-      if ((ctx.agent.organizers || []).includes(d)) throw fail('Organizers of this agent cannot be blocked');
+      if (inRole(ctx.agent.organizers || [], { phone: d })) throw fail('Organizers of this agent cannot be blocked');
       const chat = blockChat(ctx);
       await need().block(chat, input.person);
       return { chat, result: { blocked: true }, summary: `Blocked +${d}` };

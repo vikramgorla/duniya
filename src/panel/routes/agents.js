@@ -12,6 +12,8 @@ import { installPackage, installedInfo, localServiceCheck } from '../../core/mcp
 import { GLOBAL_SCOPE, OAUTH_ROLES, disconnect as disconnectOAuth, finishSignIn, listConnections, probeServer, startSignIn } from '../../core/mcp-oauth.js';
 import { mcpConnection, resetMcpPool } from '../../core/mcp.js';
 import { personView, tagsInChat } from '../../core/member-tags.js';
+import { inRole, roleEntry } from '../../core/people-access.js';
+import { listLists, personByPhone } from '../../core/people.js';
 import { builtinAnswer, todayText } from '../../core/quick.js';
 import { stripTriggers } from '../../core/router.js';
 import { handleConfirmCommand, runAgent } from '../../core/runner.js';
@@ -121,12 +123,16 @@ export function agentRoutes(route, { channel } = {}) {
         members: members.map((m) => ({
           // 057: one resolver — own name > address book > business > profile > number; hidden numbers never as digits
           ...personView({ phone: m.phone, jid: m.jid, fallbackName: names[m.phone] }, chat, tags), admin: m.admin,
-          role: m.phone && agent.organizers.includes(m.phone) ? 'organizer' : suggest && m.admin && m.phone ? 'organizer' : 'participant',
+          // 079: roles are numbers, people and lists; a member is matched by number and by person
+          person: m.phone ? personByPhone(m.phone)?.id || '' : '',
+          role: m.phone && inRole(agent.organizers, { phone: m.phone }) ? 'organizer' : suggest && m.admin && m.phone ? 'organizer' : 'participant',
           suggested: suggest && m.admin && !!m.phone,
         })).sort((a, b) => (b.admin - a.admin) || (a.name || a.phone).localeCompare(b.name || b.phone)),
       });
     }
-    return { suggested: suggest, organizers: agent.organizers, participants: agent.participants, groups };
+    // 079: every saved entry with its name (person, list or number), and the lists the editor offers
+    return { suggested: suggest, organizers: agent.organizers, participants: agent.participants, groups,
+      entries: [...new Set([...agent.organizers, ...agent.participants, ...(agent.peopleLists || [])])].map(roleEntry), lists: listLists() };
   }
 
   // ---------- tool service sign-in (009) ----------

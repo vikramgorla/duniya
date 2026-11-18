@@ -5,11 +5,15 @@
 **Do it:** panel → **More → People** → tap a person (or **+ Add** for someone new, a kid without a phone too).
 
 **In 30 seconds**
-- People who write in a chat that is **on** appear by themselves, one person across WhatsApp and Telegram (the same
-  phone number is the same person). Chats that are off store nobody.
-- A person's page shows their apps, **Family and ties**, **Notes and timeline**, **Tags and lists** and their chats.
+- Everyone appears by themselves: people who write in, or are members of, a chat that is **on**, and every contact
+  WhatsApp syncs from your phone. One person across WhatsApp and Telegram (the same phone number is the same person).
+  Chats that are off add nobody.
+- A person's page shows their apps, **Family and ties**, **Notes and timeline**, **Tags and lists**, their chats,
+  **Consent** and **Agents that can see them**.
 - **Households** group adults and kids. A kid without a phone is never messaged: they are reached through the adults.
-- **Merge** two entries of the same human in one tap, with 30 days to undo. **Export** or **Erase** anyone.
+- Agents see only the people of their own chats (or everyone, if you choose so per agent), and get a short card about
+  whoever writes to them. **Hide** keeps someone out of all of that.
+- **Merge** two entries of the same human in one tap, with 30 days to undo. **Export** anyone.
 - Ask the owner assistant *"who is Ravi's kid?"* or *"which household is Mia in?"*.
 
 ![Anu's page: partner of Ravi, parent of Vedika and Kabir, the Chary family, notes, tags and lists, her chats](site/img/card-person.webp)
@@ -18,31 +22,81 @@
 
 - **People · Households · Lists** sit at the top; each is a list, and a row opens its page (`#people/<id>`,
   `#people/households/<id>`, `#people/lists/<id>`).
-- One row per person: name, their apps (*WhatsApp · Telegram*, or *No app*) and the last contact.
+- **People (N)** counts everyone (hidden people aside); with a search or a filter it says how many match, e.g.
+  *People (12 of 640)*.
+- One row per person: name, their apps (*WhatsApp · Telegram*, or *No app*) and the last contact (*from your phone*
+  when they only came from your contacts).
 - **Search** finds names (yours, phone contact, business, profile), nicknames, numbers, tags and notes. **Show**
-  filters by app (*No app* finds the kids), tag, list or household.
-- The line under the search says how many names came from your phone; **Refresh** is optional (it happens by itself
-  after a number connects, then daily). **Agents may use the names from your phone contacts** (owner, on by default):
-  switch it off if your address book holds private labels; agents then see business or profile names.
+  filters by **Source** (*From chats*, *From your phone*, *Added by you*), app (*No app* finds the kids), tag, list,
+  household, or **Hidden**.
+- **Agents may use the names from your phone contacts** (owner, on by default, at the bottom): switch it off if your
+  address book holds private labels; agents then see business or profile names.
 - Press **/** anywhere: Find anything lists people, households and lists too.
 
-> [!NOTE]
-> Your phone's address book never adds anyone to People: it only gives names. A person comes in when they write in a
-> chat that is on, or when you add them.
+## Where people come from
+
+| Source | How | When |
+|---|---|---|
+| **From chats** | they wrote in a chat that is on, or are a member of a group that is on | at once when they write; members when a group is switched on, when its members change, and every 12 hours |
+| **From your phone** | WhatsApp synced their number with a name from your address book or their profile | after the sync, 300 per minute at most (the upkeep) |
+| **Added by you** | **+ Add**, or an AI assistant through the admin tools | at once |
+
+Only identities and names come in: no message is read for it. Leaving a group takes the person out of that group's
+people, not out of People. Someone from your phone who later writes in a chat that is on counts as *From chats*.
 
 ## A person's page
 
 **Header:** name, number, apps, nickname, birthday, *in People since* and the last contact. **⋯** holds **Edit…**
-(name, nickname, number, birthday, *Shared*), and for the owner **Merge…**, **Export** and **Erase…**.
+(name, nickname, number, birthday, *Shared*), **Hide…** (or **Show again**), and for the owner **Merge…** and
+**Export**.
 
-- **Shared:** participants may look this person up through agents (the agents' *find contact* tool). Organizers see
-  everyone.
-- **Their chats:** the direct chat (or **Set up a direct chat**) and the groups they wrote in. A direct chat's page links
-  back with **Person page ›**; names in a chat's *Messages* and in group member lists open the person too.
+- **Shared:** participants may look this person up through agents (*find person*, *get person*). Organizers see
+  everyone the agent may see.
+- **Their chats:** the direct chat (or **Set up a direct chat**) and **Their groups**: the groups that are on where they
+  wrote (*wrote 2 h ago*) or are a member. A direct chat's page links back with **Person page ›**; names in a chat's
+  *Messages* and in group member lists open the person too.
+- **Consent** and **Agents that can see them**: see below.
 - **Apps:** each app account with the name it showed and since when.
 
 A number that wrote in a chat but is not in People (for example before you switched the chat on) still has a page with
 **Add to People**.
+
+## Consent
+
+One row per purpose: **Saw the privacy notice**, **May receive updates**, **May receive marketing**, each *Yes* or
+*No* with where it came from and when. *Not asked* counts as **no**.
+
+- *Saw the privacy notice* is recorded by itself: when the notice is posted in a group that is on (everyone known to be
+  in it, and later members when they show up), and when the notice line is added to a direct-message answer.
+- Change any row with its menu; it records your user name and the time. Sending to lists will only use people who said
+  yes (a later module).
+
+## What agents see
+
+Each agent's **People** section has **People access** (decided in code, never by the prompt):
+
+| Setting | The agent's People tools and sender card see |
+|---|---|
+| **Its own chats** (default) | people who wrote in, or are members of, the chats assigned to it, plus the **Lists shared with it** |
+| **Everyone in People** | everyone (also people only from your phone) |
+| **Nobody** | no People tools, no card |
+
+- **When you write to an agent yourself** (your number linked to the owner assistant, on any app, in any chat), that
+  turn sees everyone, like the owner assistant. Other people's turns in the same group stay scoped.
+- **Hidden** people are never shown to an agent.
+- **The sender card:** each turn, the agent gets a few lines about who is writing: name (the one it may use), nickname,
+  households, tags and your latest notes and agent notes. Never message text.
+- **Agent tools** (`people:` rules; participants get *find* and *get* of *Shared* people only): *find person*, *get
+  person* (their card), *add note* (marked as the agent's), *tag person*, *add to list*. A change about anyone other than
+  the sender waits for an organizer's *confirm XXXX*. Agents can never merge, hide, export or erase.
+- **Agents that can see them** on a person's page lists the agents and why (*In its chats*, *A list shared with it*,
+  *Everyone in People*).
+
+## Roles that follow a person
+
+An agent's organizers and extra participants can be **people**, **lists** (e.g. *organizers = the Committee list*) or
+numbers. A person is an organizer on every app they use: on Telegram too once they shared their number with the bot. A
+saved number still works and matches the person who holds it.
 
 ## Family and ties
 
@@ -78,37 +132,36 @@ a tie from both.
 - **Lists** are named groups you fill by hand (*Badminton Tuesdays*, *Christmas cards*): **Lists → + New**, then
   **Add a person**, or **Add to a list** on a person's page.
 
-## Merge, export, erase
+## Hide, merge, export
 
 - **Merge…** (owner): choose the other entry of the same human; their apps, notes, ties, households, tags and lists
   move here. The page then offers **Undo merge** for 30 days. When there is evidence (a verified phone number of one
   person belongs to the other), the page suggests the merge: one tap.
 - **Export** (owner) downloads everything stored about the person as JSON: their page, names, notes, ties, households,
   tags, lists and their stored messages.
-- **Erase…** (owner, type *erase*): deletes their stored messages in every chat, their direct chat's memory, notes,
-  ties, household memberships, tags, list entries and app accounts. The activity log keeps only counts. If they write
-  again in a chat that is on, they come back as a new person.
+- **Hide…**: they leave People lists and search, and agents no longer see them (tools and the sender card). Their
+  notes, ties and chats stay, and your phone's contacts never bring them back as someone new. **Show → Hidden** lists
+  them; **Show again** undoes it.
+- **Erase** (a true delete, for privacy requests) is not in the panel: ask an AI assistant with the admin tools
+  (`erase_person`, owner only, with a confirmation). See [Privacy](privacy.md#delete-a-person).
 
-## From Contacts to People
+## After updating to 2.40
 
-Up to version 2.38 saved names, notes and *Shared* lived on a **Contacts** screen. On the first start of 2.39 they
-move into People by themselves: each saved name and *Shared* goes to the person with that number, and each note becomes
-a note on their timeline. Nothing to do; old `#contacts` links open People.
+Nothing to do. On the first start the app notes, from what is stored, which chats each person wrote in and the privacy
+notices they saw, and saved organizer or participant numbers that belong to someone in People become that person (so
+the role follows them to Telegram). Old agent tool rules for `contacts:` keep working as the matching `people:` rules
+for this release. Your phone's contacts become people over the next minutes.
 
 ## AI assistants and the owner assistant
 
 Admin MCP tools ([Manage from ChatGPT or Claude](admin-mcp.md)): `list_people`, `get_person`, `add_person`,
 `update_person`, `add_person_note`, `set_person_tie`, `remove_person_tie`, `set_person_tags`, `merge_people`* ,
-`undo_merge`*, `export_person`, `erase_person`*, `list_households`, `get_household`, `save_household`,
+`undo_merge`*, `export_person`, `set_person_hidden`, `set_person_consent`, `erase_person`*, `list_households`, `get_household`, `save_household`,
 `set_household_member`, `list_people_lists`, `save_people_list`, `set_list_member`, `people_names_status`,
 `refresh_contact_names`, `set_contact_names_for_agents`* (* needs `confirm_action`).
 
 The [owner assistant](owner-assistant.md) uses the same tools: it reads People directly and every change waits for
 your confirmation.
-
-> [!NOTE]
-> In this release agents in chats keep their *find contact* tool and see only what you shared. Agent tools for People
-> (who is writing, their household) come in a later step.
 
 ---
 **Next:** [Chats](chats.md) · [Privacy](privacy.md) · [Docs index](README.md)

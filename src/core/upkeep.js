@@ -8,7 +8,8 @@
 //   - retention and health (069): free disk space every tick; old data pruned in bounded batches at most hourly
 //     (retention.js) — also while memory is tight (pruning makes things smaller); a WhatsApp number that keeps
 //     reconnecting for 15 minutes is reported to the owner once
-//   - People (078): merge undo records older than 30 days (at most 200 per tick)
+//   - People (078): merge undo records older than 30 days (at most 200 per tick); 079: the members of those groups
+//     become people (identities only), and up to 300 changed phone contacts per tick become people
 //   - agent apps (074): turns whose tool calls nobody answered are ended; idle app runtimes (Copilot) are stopped
 // Names and group refreshes are skipped while memory is tight (optional work, resources.js).
 import { optionalPaused } from './resources.js';
@@ -20,6 +21,8 @@ import { retentionTick } from './retention.js';
 import { sendOwnerAlert } from './owner-alerts.js';
 import { appsTick } from './providers/apps.js';
 import { pruneMerges } from './people-ops.js';
+import { noteMembers, syncPhonePeople } from './people-access.js';
+import { channelOf } from '../channels/index.js';
 
 const GROUP_EVERY_MS = 12 * 3600000;
 const DOWN_ALERT_MS = 15 * 60000;
@@ -50,7 +53,7 @@ let running = false;
 export async function upkeepTick(channel, now = Date.now()) {
   if (running) return { skipped: 'running' };
   running = true;
-  const done = { retries: 0, names: false, groups: 0, prune: null };
+  const done = { retries: 0, names: false, groups: 0, prune: null, phonePeople: 0 };
   try {
     try { done.prune = retentionTick(now); } catch (e) { activity('error', { summary: `Pruning old data failed: ${e.message}` }); }
     try { pruneMerges(now); } catch { /* 078: retried next tick */ }
@@ -59,14 +62,19 @@ export async function upkeepTick(channel, now = Date.now()) {
     try { done.retries = await historyRetryTick(now); } catch (e) { activity('error', { summary: `History retry failed: ${e.message}` }); }
     if (optionalPaused()) return { ...done, skipped: 'memory' };
     try { done.names = !!(await channel?.upkeep?.())?.ok; } catch { /* the channel reports its own failures */ }
-    if (typeof channel?.refreshGroup !== 'function') return done;
+    try { done.phonePeople = syncPhonePeople(); } catch (e) { activity('error', { summary: `Phone contacts to People failed: ${e.message}` }); }
+    if (typeof channel?.groupMembers !== 'function') return done;
     const on = new Set(enabledChats().filter(isGroup));
     for (const c of [...groupDue.keys()]) if (!on.has(c)) groupDue.delete(c);
     for (const c of on) if (!groupDue.has(c)) groupDue.set(c, now); // new or just switched on: due now
     const due = [...groupDue].filter(([, at]) => at <= now).sort((a, b) => a[1] - b[1]).slice(0, GROUPS_PER_TICK);
     for (const [chat] of due) {
       groupDue.set(chat, now + GROUP_EVERY_MS);
-      try { await channel.refreshGroup(chat); done.groups++; } catch { /* offline or not a member: try again next round */ }
+      try {
+        await channel.refreshGroup?.(chat);
+        noteMembers(channelOf(chat), chat, await channel.groupMembers(chat) || []); // 079: members become people
+        done.groups++;
+      } catch { /* offline or not a member: try again next round */ }
     }
     return done;
   } finally { running = false; }

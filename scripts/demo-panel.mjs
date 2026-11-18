@@ -393,6 +393,13 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   for (const i of [3, 5, 9, 11]) pp.setListMember(bad.id, pid[i]);
   const xmas = pp.saveList({ name: 'Christmas cards' });
   for (const id of [pid[0], pid[2], pid[6], meier.id]) pp.setListMember(xmas.id, id);
+  // 079: the chats people are in (wrote / members), the notice they saw, more contacts only from the phone, one hidden
+  const pa = await imp('src/core/people-access.js');
+  for (const [i, id] of pid.entries()) pa.notePersonChat(id, G(i % 3 === 1 ? 3 : 1), i % 2 ? 'member' : 'wrote');
+  pa.noticePostedInGroup(G(1), Date.now() - 20 * 86400000);
+  pa.recordConsent(pid[2], 'updates', 'yes', 'Asked at the school picnic');
+  contacts.syncWhatsAppContacts(['Dr. Rossi', 'Garage Favre', 'Isabelle (piano)', 'Kofi', 'Mme Perret'].map((name, i) => ({ id: `${P(30 + i)}@s.whatsapp.net`, name })));
+  pp.setHidden(pp.personByPhone(P(33)).id, true, 'admin');
   db.addPending({ code: 'K7Q2', agent: 'carpool', server: 'calendar', confirmTool: 'confirm', confirmId: 'cf_demo_1', tool: 'events_create', chat: G(3), requester: P(2), summary: 'Add “Friday ride: Marc 07:40 Morges → Geneva” to the shared calendar', expires: now + 50 * MIN });
 
   // activity

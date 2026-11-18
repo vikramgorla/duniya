@@ -26,6 +26,8 @@ const BUDGETS = {
   'activity (one chat)': 5, // GET /api/activity?chat=…; CI 1.4
   'router (stored, not addressed)': 2, // one group message through the router: allow-list, person, store, why-quiet; CI 0.3
   'agent context build': 3, // memory.buildContext for a busy group (recent messages, summary, notes); CI 0.6
+  'sender card': 3, // 079: the People card of the sender each agent turn gets
+  'people tool: find (own chats)': 15, // 079: people__find_person for an agent that sees its own chats only
 };
 const RUNS = 9;
 
@@ -47,6 +49,8 @@ const ALLOW_SCANS = [
   { table: 'households', sql: 'SELECT COUNT(*) n FROM households WHERE tenant_id = ?', why: 'People summary count' },
   { table: 'person_tags', sql: 'SELECT tag, COUNT(*) AS count FROM person_tags WHERE tenant_id = ? GROUP BY tag', why: 'People summary: tags in use' },
   { table: 'contacts', sql: "SUM(book_name <> '') book", why: 'People summary: names from the phone' },
+  // 079, one time (remove with the migration): the chats people wrote in, from every stored message
+  { table: 'identities', sql: 'SELECT i.tenant_id, i.person, m.chat, 1, 0, MAX(m.ts) FROM messages m JOIN identities i', why: 'one-time migration 2.40' },
   // Households: the whole list by name (an owner has dozens; 1k in the fixture)
   { table: 'households', sql: "SUM(m.role = 'adult') AS adults", why: 'all households, by name' },
 ];
@@ -63,7 +67,9 @@ const { FULL, seedScale, personId, phoneOf } = await import('./scale-fixture.mjs
 const t = await setup({ env: { MEMORY_RETENTION_DAYS: '90' } });
 const { db } = t.db;
 const seed0 = performance.now();
+recording = false; // the fixture's own inserts are not the app's statements
 const { chats, groups } = await seedScale(t, FULL);
+recording = true;
 const seedMs = Math.round(performance.now() - seed0);
 const cookie = await t.login();
 const get = async (path) => { const r = await fetch(t.base + path, { headers: { cookie } }); await r.arrayBuffer(); if (r.status >= 500) throw new Error(`${path}: ${r.status}`); return r.status; };
@@ -84,6 +90,11 @@ measured['search messages'] = await time(() => get(`/api/search/messages?q=${enc
 measured['activity (one chat)'] = await time(() => get(`/api/activity?limit=200&chat=${enc(onGroup)}`));
 measured['router (stored, not addressed)'] = await time(() => t.route(t.msg({ chat: onGroup, phone: phoneOf(seq % 300), senderJid: `${phoneOf(seq % 300)}@s.whatsapp.net`, text: `just chatting ${seq++}`, msgId: `perf-${seq}` })));
 measured['agent context build'] = await time(() => t.memory.buildContext({ agent, chat: onGroup }));
+const access = await import('../src/core/people-access.js');
+const { peopleTools } = await import('../src/core/people-tools.js');
+measured['sender card'] = await time(() => access.senderCard(personId(5), access.peopleScope(agent), 'Contact 5'));
+const findTool = peopleTools.find((x) => x.name === 'find_person');
+measured['people tool: find (own chats)'] = await time(() => findTool.run({ query: 'contact 1' }, { agent, role: 'organizer' }));
 
 // Everything else on a hot path, for the query-plan check (not timed).
 const activityMid = db.prepare('SELECT id FROM activity WHERE id > ? ORDER BY id LIMIT 1').get(FULL.activity / 2)?.id || 1;
@@ -104,15 +115,33 @@ await t.route(t.msg({ chat: direct, isGroup: false, phone: phoneOf(3), senderJid
 t.script.push([{ type: 'tool_use', id: 'tu1', name: 'memory__search_history', input: { query: 'station' } }], [{ type: 'text', text: 'Nine at the station.' }]);
 await t.route(t.msg({ chat: onGroup, phone: phoneOf(5), senderJid: `${phoneOf(5)}@s.whatsapp.net`, text: `${agent.triggers[0]} when do we meet?`, msgId: `perf-ask-${seq++}` }));
 await t.onJoin({ chat: onGroup, participants: [{ jid: `${phoneOf(4999)}@s.whatsapp.net`, phone: phoneOf(4999) }] });
-// background work on the upkeep tick (bounded batches)
+// 079: an agent turn with the people tools (scoped), shared lists and Everyone, a change held for confirm
+t.script.push([{ type: 'tool_use', id: 'tu2', name: 'people__find_person', input: { query: 'contact 2' } }, { type: 'tool_use', id: 'tu3', name: 'people__get_person', input: { person: personId(5) } }],
+  [{ type: 'tool_use', id: 'tu4', name: 'people__add_note', input: { person: personId(7), text: 'Brings the speakers' } }], [{ type: 'text', text: 'Done.' }]);
+await t.agents.updateAgent(agent.id, { organizers: [phoneOf(5)], peopleLists: ['l_000000000003'] });
+await t.route(t.msg({ chat: onGroup, phone: phoneOf(5), senderJid: `${phoneOf(5)}@s.whatsapp.net`, text: `${agent.triggers[0]} who is contact 2?`, msgId: `perf-ask2-${seq++}` }));
+await t.agents.updateAgent(agent.id, { peopleAccess: 'everyone' });
+await findTool.run({ query: 'contact 3' }, { agent: t.agents.getAgent(agent.id), role: 'participant' });
+for (const [m, path, body] of [['PUT', `/api/people/${personId(8)}/hidden`, { hidden: true }], ['PUT', `/api/people/${personId(8)}/hidden`, { hidden: false }],
+  ['PUT', `/api/people/${personId(8)}/consents`, { purpose: 'updates', value: 'yes' }], ['GET', '/api/people?source=phone'], ['GET', '/api/people?hidden=1'],
+  ['GET', `/api/agents/${agent.id}/people`]]) await t.api(cookie, m, path, body);
+// background work on the upkeep tick (bounded batches): retention, members of groups that are on, phone contacts
 const { retentionTick } = await import('../src/core/retention.js');
 retentionTick(Date.now());
+const { upkeepTick } = await import('../src/core/upkeep.js');
+recording = false; db.prepare('UPDATE contacts SET updated_at = updated_at + 1 WHERE rowid % 10 = 0').run(); recording = true; // contacts that changed
+const members = (chat) => Array.from({ length: 150 }, (_, i) => ({ phone: phoneOf((chats.indexOf(chat) * 7 + i) % FULL.people), jid: `${phoneOf((chats.indexOf(chat) * 7 + i) % FULL.people)}@s.whatsapp.net` }));
+await upkeepTick({ groupMembers: async (chat) => members(chat), status: async () => ({ numbers: [] }) });
+// one-time migrations of this release (checked so their plans are seen; allowed below as one-time)
+access.migratePeopleChats();
+await t.agents.migrateRolesToPeople();
 
 // ---------- 1. query plans ----------
 recording = false; // the checks below prepare their own statements
 const big = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%'").all()
   .map((r) => r.name).filter((n) => db.prepare(`SELECT COUNT(*) AS n FROM "${n}"`).get().n >= 1000));
 const norm = (sql) => sql.replace(/\s+/g, ' ').trim();
+const partial = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND sql LIKE '% WHERE %'").all().map((r) => r.name));
 const KEYWORDS = new Set(['where', 'on', 'left', 'join', 'inner', 'cross', 'group', 'order', 'limit', 'set', 'using', 'natural', 'as', 'select', 'union', 'values']);
 /** Alias → table of a statement ("FROM people p", "JOIN identities AS i"). */
 function aliases(sql) {
@@ -132,7 +161,8 @@ for (const raw of SEEN) {
   checked++;
   const names = aliases(sql);
   // a SEARCH on the tenant alone ("(tenant_id=?)") reads the whole table too: every row has the same tenant
-  const scans = plan.map((d) => d.match(/^SCAN (\w+)(?!.*VIRTUAL TABLE)/)?.[1] || d.match(/^SEARCH (\w+) USING .*\(tenant_id=\?\)$/)?.[1]).filter(Boolean).map((a) => names.get(a) || a).filter((tb) => big.has(tb));
+  // (a partial index holds only the rows it names, e.g. the hidden people, so reading it whole is fine)
+  const scans = plan.map((d) => d.match(/^SCAN (\w+)(?!.*VIRTUAL TABLE)/)?.[1] || (!partial.has(d.match(/INDEX (\w+)/)?.[1]) && d.match(/^SEARCH (\w+) USING .*\(tenant_id=\?\)$/)?.[1])).filter(Boolean).map((a) => names.get(a) || a).filter((tb) => big.has(tb));
   if (VERBOSE) console.log(`${sql.slice(0, 160)}\n   ${plan.join(' · ')}`);
   for (const table of new Set(scans)) {
     const ok = ALLOW_SCANS.find((a) => a.table === table && sql.includes(a.sql));

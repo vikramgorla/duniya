@@ -60,7 +60,8 @@ test('a profile-name update never replaces the address-book name; precedence own
   c.syncWhatsAppContacts([{ id: '41790000102@s.whatsapp.net', notify: 'Ravi', verifiedName: 'Ravi Tours' }]);
   assert.equal(c.personInfo({ phone: '41790000102' }).name, 'Ravi Tours');
   assert.equal(c.personInfo({ phone: '41790000102' }).source, 'business');
-  (await import('../src/core/people.js')).createPerson({ phone: '41790000101', name: 'Priya (treasurer)' }); // 078: own names live in People
+  const people = await import('../src/core/people.js'); // 079: the synced number is a person already; own names live in People
+  people.updatePerson(people.personByPhone('41790000101').id, { name: 'Priya (treasurer)' });
   assert.deepEqual(c.personInfo({ phone: '41790000101' }), { phone: '41790000101', name: 'Priya (treasurer)', label: 'Priya (treasurer)', source: 'own', hidden: false });
   assert.equal(c.personInfo({ phone: '41790000999' }).label, '+41790000999');
   assert.equal(c.personInfo({ phone: '41790000999', fallbackName: '+41790000999' }).name, '', 'a fallback that is only the number is no name');
