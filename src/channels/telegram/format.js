@@ -3,7 +3,7 @@
 // gets plain text plus "entities" (offsets in UTF-16 units, which is how JavaScript counts), so nothing is parsed as
 // HTML or Markdown on Telegram's side and no text can break the message. Long texts are cut into messages of at most
 // 4096 characters, at a line break when possible.
-export const MAX_TEXT = 4096;
+const MAX_TEXT = 4096;
 
 const MARKS = [
   ['```', 'pre'], ['`', 'code'], ['*', 'bold'], ['_', 'italic'], ['~', 'strikethrough'],

@@ -288,6 +288,7 @@ export function createTelegramAdapter({ fetch: doFetch = globalThis.fetch, token
         }
       } catch (e) {
         if (signal.aborted) break;
+        if (e.tg === 0 && /TimeoutError|AbortError/.test(e.message)) continue; // a long poll that outlived its wait: ask again
         if (e.tg === 401 || e.tg === 404) { setState('error', 'Telegram did not accept the bot token. Paste the token from @BotFather again (Replace token).'); return; }
         if (e.tg === 409 && /webhook/i.test(e.message)) { // another setup sends this bot's updates to a webhook: take them back
           await call('deleteWebhook', {}).then(() => activity('config', { summary: 'Telegram: the bot had a webhook; it now delivers to this server' })).catch(() => {});

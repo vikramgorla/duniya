@@ -48,9 +48,10 @@ export function fakeBotApi({ token = FAKE_TOKEN, me = {} } = {}) {
       case 'getUpdates': {
         const ready = () => f.updates.filter((x) => x.update_id >= (params.offset || 0));
         if (!ready().length) {
-          await new Promise((resolve) => {
+          await new Promise((resolve) => { // like Telegram: answers [] after `timeout` seconds without updates
             waiter = resolve;
             init.signal?.addEventListener('abort', resolve, { once: true });
+            setTimeout(resolve, (params.timeout ?? 0) * 1000).unref?.();
           });
           waiter = null;
           if (init.signal?.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
