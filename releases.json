@@ -1,6 +1,19 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.38.0": {
+      "breaking": false,
+      "title": "Telegram: your agents in Telegram groups too",
+      "summary": "Add a Telegram bot under Settings → Channels → Telegram: paste the token from @BotFather and the same agents answer in your Telegram groups and chats. Nothing of Telegram runs until you do.",
+      "changes": [
+        { "type": "new", "text": "Telegram as a second channel: create a bot in @BotFather, paste its token on a one-time secure page, then add the bot to a group with one tap." },
+        { "type": "new", "text": "Telegram groups appear in Chats, off until you switch them on; agents, wake words, follow-ups, quick replies, FAQ, polls, photos and voice notes work as on WhatsApp." },
+        { "type": "new", "text": "People tap “Share my number” in a direct chat with the bot: the same phone on WhatsApp and Telegram is then the same person, with the same role. A forwarded contact never counts." },
+        { "type": "new", "text": "Your Telegram reaches your owner assistant once you shared your number with the bot." },
+        { "type": "improved", "text": "The Telegram page shows what the bot can see in groups and exactly what to change so agents can follow the whole conversation." },
+        { "type": "improved", "text": "Managing Duniya from ChatGPT or Claude: connect a Telegram bot with a one-time link and choose the agent for its direct messages." }
+      ]
+    },
     "2.37.0": {
       "breaking": false,
       "title": "Agents follow the conversation in groups",

@@ -9,7 +9,7 @@
   CPUs, **medium** otherwise.
 - Photos and voice notes queue up (one at a time on small servers); text never waits.
 - Under memory pressure optional work pauses; replies continue.
-- A channel loads only when it is set up and on: a fresh install loads no WhatsApp code and opens no connection;
+- A channel loads only when it is set up and on: a fresh install loads no WhatsApp or Telegram code and opens no connection;
   switching a channel off frees its connections and caches. [Channels](#channels-load-only-when-used).
 - On-server speech and local tool services are off on small servers; **Small server mode** (Settings → Server)
   allows them anyway, slower and one at a time.
@@ -100,16 +100,17 @@ Max age: `MEDIA_JOB_MAX_AGE_MIN` (15). [Settings](settings.md)
 
 ## Channels load only when used
 
-Each chat channel (today WhatsApp) is a module the server loads only when the channel is set up and switched on.
+Each chat channel (WhatsApp, Telegram) is a module the server loads only when the channel is set up and switched on.
 
 | | Memory (measured on the app, 35 s after start) |
 |---|---|
 | Fresh install, no WhatsApp number | ~150 MB: WhatsApp's library is not loaded, no connection is open |
 | One WhatsApp number linked | ~180–200 MB: WhatsApp (Baileys) adds roughly 30–45 MB |
+| A Telegram bot | a few MB more (about 8 MB after 2 000 messages in 50 groups, in a test): no library, one pending request at a time |
 
-- **Settings → WhatsApp** and **Server → Health** show the memory a channel uses, measured a minute after it starts
+- **Settings → Channels** (each channel's page) and **Server → Health** show the memory a channel uses, measured a minute after it starts
   (the difference in the app's memory, so an estimate).
-- **Switching a channel off** (owner, **Settings → WhatsApp**) closes its connections and drops its caches. Its code
+- **Switching a channel off** (owner, on the channel's page) closes its connections and drops its caches. Its code
   stays loaded until the next restart, which happens by itself at the next update.
 - Under memory pressure a live channel is never switched off: replies matter most. Its optional upkeep (contact
   names, member lists) pauses like other optional work.

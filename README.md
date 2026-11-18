@@ -23,8 +23,9 @@
 </p>
 
 Duniya links to a spare WhatsApp number and runs helpers in the chats you choose: a car-pool planner, a school-class
-assistant, a family organiser. **You** pick which chats they join, which model they use and what they may do. Every
-chat is silent until you switch it on.
+assistant, a family organiser. Groups on Telegram too: add a bot, and the same agents answer there, with the same
+person on both apps. **You** pick which chats they join, which model they use and what they may do. Every chat is
+silent until you switch it on.
 
 ## Install
 
@@ -49,12 +50,12 @@ then takes about five taps: link WhatsApp, connect a model, pick a template, swi
 <tr>
 <td valign="top"><a href="docs/privacy.md"><img src="docs/img/thumb-privacy.webp" alt="Privacy notice settings" width="100%"></a><br><b>Silent by default</b><br>Off chats are never stored or sent to a model; groups are told once. Tools are allowed per role, in code.</td>
 <td valign="top"><a href="docs/everyday.md#on-your-phone"><img src="docs/img/thumb-phone.webp" alt="The panel on a phone" width="100%"></a><br><b>On your phone</b><br>Installs on your home screen: tab bar at your thumb, compact screens, live, light and dark. Nothing from a store.</td>
-<td valign="top"><a href="docs/small-servers.md"><img src="docs/img/thumb-small-server.webp" alt="Server card for a small server" width="100%"></a><br><b>Made for a 1 GB VM</b><br>~180 MB of RAM. Channels load only when used (WhatsApp today, more to come). Old data pruned by itself; reconnects, crashes and a full disk handled without you.</td>
+<td valign="top"><a href="docs/small-servers.md"><img src="docs/img/thumb-small-server.webp" alt="Server card for a small server" width="100%"></a><br><b>Made for a 1 GB VM</b><br>~180 MB of RAM. Channels load only when used: WhatsApp, and <a href="docs/telegram.md">Telegram</a> (a bot, a few MB). Old data pruned by itself; reconnects, crashes and a full disk handled without you.</td>
 <td valign="top"><a href="docs/backups-and-updates.md"><img src="docs/img/thumb-backups.webp" alt="Backups page" width="100%"></a><br><b>Backups &amp; updates</b><br>Encrypted to GitHub or S3. One-click updates that show what's new; breaking ones wait for you. No SSH.</td>
 </tr>
 </table>
 
-More: [MCP tool services](docs/agents.md#tool-services-mcp) · [manage it from ChatGPT or Claude](docs/admin-mcp.md) ·
+More: [Telegram](docs/telegram.md) · [MCP tool services](docs/agents.md#tool-services-mcp) · [manage it from ChatGPT or Claude](docs/admin-mcp.md) ·
 [your own domain](docs/domains-and-access.md) · [how it works](docs/architecture.md).
 
 > [!WARNING]

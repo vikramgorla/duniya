@@ -107,7 +107,8 @@ returns the JSON answer, `[status, answer]`, or throws `fail(message, status)` /
 
 ## Adding a channel
 
-Chat channels plug into the hub (`src/channels/hub.js`); WhatsApp (`src/channels/whatsapp/`) is the reference. The rest of
+Chat channels plug into the hub (`src/channels/hub.js`); WhatsApp (`src/channels/whatsapp/`) and Telegram
+(`src/channels/telegram/`, a bot over `fetch` with no dependency) are the references. The rest of
 the app never asks which channel a chat is on: it calls `channel.send(chat, …)`, `isGroup(chat)`, `phoneOf(chat)` and so
 on, and the hub and the catalogue answer from the chat id.
 
@@ -121,10 +122,13 @@ on, and the hub and the catalogue answer from the chat id.
    `sendMedia`, `groupInfo`, …), all with the app chat id first; `upkeep()` for bounded background work. Inbound
    messages go to `handlers.onMessage` in the one shape described at the top of `hub.js` (`chat`, `isGroup`,
    `phone` only when the channel vouches for it, `senderJid` = the sender's id on the channel, `mentioned`,
-   `replyToAgent`, …). Telegram: pass a phone only after `contact.user_id === from.id` (request_contact), so people
+   `replyToAgent`, …). Channels without phone numbers pass a phone only for a verified identity (Telegram: the person
+   shared their own contact, `contact.user_id === from.id`; later messages read it with `phoneOfIdentity`), so people
    join across channels safely (`src/core/people.js`).
 3. **Hub wiring** in `hub.js`: a loader (`import('./<id>/index.js')`), how to tell it is set up (a setting or a file,
-   without loading it) and, if needed, its first account when it is switched on.
+   without loading it) and, if needed, its first account when it is switched on. A token channel needs only a
+   `secret` in its catalogue entry (`name`, `pattern`, `hint`): it is set up while that secret is stored, the token is
+   checked when saved, and saving or removing it restarts or stops the channel.
 4. **No timers, no idle sockets:** reconnect with backoff inside the adapter on events; periodic work goes through
    `upkeep()` (the hub calls one channel per 30-second tick). Nothing opens while the channel is not set up or off.
 5. **Dependencies:** prefer none (`fetch`, Node's `WebSocket`). A dependency must be pure JS, imported only inside the
@@ -132,7 +136,8 @@ on, and the hub and the catalogue answer from the chat id.
 6. **Panel:** the channel appears under **Settings → Channels** by itself (from the catalogue); its page goes into
    `app/channels.js`. Only real channels are listed — no "coming soon" rows.
 7. **Tests** with a fake adapter: `createHub({ loaders: { <id>: async () => fake } })` (see `test/channel-hub.test.js`);
-   the lazy-loading test checks that a fresh install never imports the channel's library.
+   the lazy-loading test checks that a fresh install never imports the channel's library. A channel over HTTP can also
+   run its real adapter against a fake API, as `test/fake-telegram.js` does for Telegram (tests and the demo panel).
 
 ## Type checking
 
