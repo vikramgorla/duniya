@@ -55,6 +55,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS messages_chat ON messages(chat, id);
   CREATE INDEX IF NOT EXISTS messages_chat_ts ON messages(chat, ts);
   CREATE UNIQUE INDEX IF NOT EXISTS messages_chat_msgid ON messages(chat, msg_id) WHERE msg_id IS NOT NULL;
+  -- #174: a person's messages by their number or their id (person page: the groups they wrote in; export, erase, the
+  -- agent-note check). About 4 MB each per 200k stored messages.
+  CREATE INDEX IF NOT EXISTS messages_sender ON messages(sender);
+  CREATE INDEX IF NOT EXISTS messages_sender_jid ON messages(sender_jid);
   -- 026: reactions and polls (WhatsApp features)
   CREATE TABLE IF NOT EXISTS wa_reactions (
     chat TEXT, msg_id TEXT, sender TEXT, name TEXT, emoji TEXT, ts INTEGER, PRIMARY KEY (chat, msg_id, sender)
@@ -235,12 +239,13 @@ export function insertActivity(a) {
 /** @param {{ limit?: number|string, agent?: string, chat?: string, before?: number }} [o]  limit: as sent (a query string is fine) */
 export function listActivity({ limit = 200, agent = '', chat = '', before = 0 } = {}) {
   const lim = Math.min(Number(limit) || 200, 1000);
-  const where = ['(? = 0 OR id < ?)'];
+  const where = []; // #174: an older page starts at its row id (no walk over the newer rows)
   /** @type {(string|number)[]} */
-  const args = [before, before];
+  const args = [];
+  if (Number(before)) { where.push('id < ?'); args.push(Number(before)); }
   if (agent) { where.push('agent = ?'); args.push(agent); }
   if (chat) { where.push('chat = ?'); args.push(chat); }
-  const rows = db.prepare(`SELECT * FROM activity WHERE ${where.join(' AND ')} ORDER BY id DESC LIMIT ?`).all(...args, lim);
+  const rows = db.prepare(`SELECT * FROM activity ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT ?`).all(...args, lim);
   return rows.map((r) => ({ ...r, detail: r.detail ? JSON.parse(r.detail) : null }));
 }
 

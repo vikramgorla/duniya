@@ -1,6 +1,14 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.39.1": {
+      "breaking": false,
+      "title": "Faster person pages and lists on large servers",
+      "changes": [
+        { "type": "improved", "text": "Faster person pages, People lists and People search when there are many stored messages and people (a person's page went from about 0.2 s to a few milliseconds)." },
+        { "type": "improved", "text": "Older pages of Activity and the hourly clean-up read only what they need." }
+      ]
+    },
     "2.39.0": {
       "breaking": false,
       "title": "People: who is who, families and kids, in one place",

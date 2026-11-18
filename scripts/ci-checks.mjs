@@ -13,6 +13,8 @@
 //     duplication above its threshold (.jscpd.json); the panel's modules link and stay within their first-screen and
 //     total budgets (scripts/check-panel.mjs, 063).
 //  7. Types (fails, 063): `tsc` checks every file that starts with // @ts-check (tsconfig.json, npm run typecheck).
+//  8. Performance (fails, #174): no full scans of large tables on hot paths and every time budget met against the
+//     scale fixture (scripts/check-perf.mjs, npm run check:perf; ~30 s).
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -105,4 +107,8 @@ try {
   console.log('::error::Type errors in files with // @ts-check. Fix them (or add a JSDoc type where the code is right). Run `npm run typecheck` for details.');
   console.log(String(e.stdout || '') + String(e.stderr || e.message));
 }
+// 8. performance budgets: query plans and timings against the scale fixture (its own process: it records statements)
+try {
+  console.log(execFileSync(process.execPath, ['--disable-warning=ExperimentalWarning', join(root, 'scripts', 'check-perf.mjs')], { cwd: root, encoding: 'utf8', env: { ...process.env, PANEL_PORT: '0' } }).trim());
+} catch (e) { failed = true; console.log(String(e.stdout || e.message)); }
 process.exit(failed ? 1 : 0);

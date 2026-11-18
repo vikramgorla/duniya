@@ -174,7 +174,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX UI: `npm run check:responsive` passes (375 / 393 / 1440, light + dark); DESIGN.md checklist met
 - [ ] TXXX Security review: no secrets, TLS never disabled, no shell with untrusted input, untrusted text rendered as text, permissions enforced in code; CodeQL clean at high / error
 - [ ] TXXX Privacy review: chat allow-list respected, no message contents in logs beyond the logging policy, privacy notice behaviour intact
-- [ ] TXXX Small-server impact on a 1 GB / 1 vCPU VM considered (memory, CPU, downloads, media queue / timeouts)
+- [ ] TXXX Small-server impact on a 1 GB / 1 vCPU VM considered (memory, CPU, downloads, media queue / timeouts); new queries pass `npm run check:perf` (no full scans of large tables; budgets in `scripts/check-perf.mjs`, raised only with a reason; new hot paths added to its workload)
 - [ ] TXXX No chores for the owner: what the server can do or retry itself is automatic (shared upkeep tick, no new timers); buttons optional
 - [ ] TXXX Lean code: what this change replaces is deleted; no compatibility layer or one-time migration left after its release; existing resolvers/tick/switches/helpers reused; `node scripts/ci-checks.mjs` passes (knip, jscpd, panel size budget); tests check behaviour, not internals; UI: no new polling (live data over `/api/events`)
 - [ ] TXXX Admin MCP tools in `src/panel/admin-tools.js` for new panel functionality (risky actions confirm)

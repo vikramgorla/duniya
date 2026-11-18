@@ -132,7 +132,7 @@ const LABEL = `COALESCE(NULLIF(p.name, ''), NULLIF(c.book_name, ''), NULLIF(c.bi
   CASE WHEN p.phone <> '' THEN '+' || p.phone END, 'Unknown')`;
 const FROM = "FROM people p LEFT JOIN contacts c ON c.tenant_id = p.tenant_id AND c.phone = p.phone AND p.phone <> ''";
 const ROW = `p.id, p.phone, p.name AS ownName, p.nickname, p.birthday, p.shared, p.created_at AS createdAt, ${LABEL} AS label,
-  (SELECT group_concat(DISTINCT i.channel) FROM identities i WHERE i.tenant_id = p.tenant_id AND i.person = p.id) AS apps,
+  (SELECT group_concat(DISTINCT i.channel) FROM identities i INDEXED BY identities_person WHERE i.tenant_id = p.tenant_id AND i.person = p.id) AS apps,
   (SELECT MAX(i.last_seen) FROM identities i WHERE i.tenant_id = p.tenant_id AND i.person = p.id) AS lastContact`;
 const view = (r) => r && ({
   id: r.id, name: r.label, ownName: r.ownName, nickname: r.nickname, phone: r.phone, birthday: r.birthday, shared: !!r.shared,
@@ -239,14 +239,18 @@ export function listPeople({ q: text = '', tag = '', list = '', household = '', 
       OR EXISTS (SELECT 1 FROM person_notes n WHERE n.tenant_id = p.tenant_id AND n.person = p.id AND n.kind = 'note' AND lower(n.text) LIKE ?)${d.length >= 3 ? ' OR p.phone LIKE ?' : ''})`);
     args.push(like, like, like, like, like, like, like, ...(d.length >= 3 ? [`%${d}%`] : []));
   }
-  if (tag) { where.push('EXISTS (SELECT 1 FROM person_tags t WHERE t.tenant_id = p.tenant_id AND t.person = p.id AND t.tag = ?)'); args.push(normTag(tag)); }
-  if (list) { where.push('EXISTS (SELECT 1 FROM person_list_members l WHERE l.tenant_id = p.tenant_id AND l.person = p.id AND l.list = ?)'); args.push(String(list)); }
-  if (household) { where.push('EXISTS (SELECT 1 FROM household_members m WHERE m.tenant_id = p.tenant_id AND m.person = p.id AND m.household = ?)'); args.push(String(household)); }
+  // #174: a filter picks its people through its own index (the members of a tag, list or household; an app's identities)
+  if (tag) { where.push('p.id IN (SELECT t.person FROM person_tags t WHERE t.tenant_id = ? AND t.tag = ?)'); args.push(TENANT, normTag(tag)); }
+  if (list) { where.push('p.id IN (SELECT l.person FROM person_list_members l WHERE l.tenant_id = ? AND l.list = ?)'); args.push(TENANT, String(list)); }
+  if (household) { where.push('p.id IN (SELECT m.person FROM household_members m WHERE m.tenant_id = ? AND m.household = ?)'); args.push(TENANT, String(household)); }
   if (app === 'none') where.push('NOT EXISTS (SELECT 1 FROM identities i WHERE i.tenant_id = p.tenant_id AND i.person = p.id)');
-  else if (app) { where.push('EXISTS (SELECT 1 FROM identities i WHERE i.tenant_id = p.tenant_id AND i.person = p.id AND i.channel = ?)'); args.push(String(app)); }
+  else if (app) { where.push('p.id IN (SELECT i.person FROM identities i WHERE i.tenant_id = ? AND i.channel = ?)'); args.push(TENANT, String(app)); }
   if (shared) where.push('p.shared = 1');
+  // Without such a filter every person's display name is needed to sort (and to search) by it: the one full read of
+  // `people`, marked for scripts/check-perf.mjs and kept within its time budget.
+  const all = !(tag || list || household || (app && app !== 'none')) ? '/* people: every name sorts */ ' : '';
   // the page is chosen by name first; apps and last contact are looked up for that page only
-  const sql = `SELECT ${ROW} ${FROM} WHERE p.tenant_id = ? AND p.id IN (SELECT p.id ${FROM} WHERE ${where.join(' AND ')} ORDER BY lower(${LABEL}) LIMIT ? OFFSET ?) ORDER BY lower(label)`;
+  const sql = `SELECT ${ROW} ${FROM} WHERE p.tenant_id = ? AND p.id IN (SELECT ${all}p.id ${FROM} WHERE ${where.join(' AND ')} ORDER BY lower(${LABEL}) LIMIT ? OFFSET ?) ORDER BY lower(label)`;
   return db.prepare(sql).all(TENANT, ...args, Math.min(Number(limit) || 100, 500), Math.max(0, Number(offset) || 0)).map(view);
 }
 /** How many people, households and lists there are, and the tags in use (with counts) for the filters. */

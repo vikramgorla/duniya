@@ -109,7 +109,9 @@ function prune(now) {
   let left = false;
   // stored messages: per chat, older than the days or beyond the cap
   let budget = BATCH;
-  for (const { chat } of db.prepare('SELECT DISTINCT chat FROM messages').all()) {
+  // #174: the chats with stored messages, one index lookup per chat (a skip-scan, not a walk over every message)
+  for (const { chat } of db.prepare(`WITH RECURSIVE c(chat) AS (SELECT MIN(chat) FROM messages UNION ALL
+    SELECT (SELECT MIN(chat) FROM messages WHERE chat > c.chat) FROM c WHERE c.chat IS NOT NULL) SELECT chat FROM c WHERE chat IS NOT NULL`).all()) {
     if (budget <= 0) { left = true; break; }
     let n = del('DELETE FROM messages WHERE id IN (SELECT id FROM messages WHERE chat = ? AND ts < ? LIMIT ?)', chat, now - r.messagesDays * DAY, budget);
     budget -= n;
@@ -119,7 +121,8 @@ function prune(now) {
   }
   // activity: days, then the entry cap
   removed.activity += del('DELETE FROM activity WHERE id IN (SELECT id FROM activity WHERE ts < ? LIMIT ?)', now - Math.max(1, log.retentionDays) * DAY, BATCH);
-  const edge = db.prepare('SELECT id FROM activity ORDER BY id DESC LIMIT 1 OFFSET ?').get(Math.max(100, log.maxEntries));
+  // #174: the entry cap by row id (ids of the newest entries have no gaps: only the oldest are ever removed)
+  const edge = db.prepare('SELECT id FROM activity WHERE id <= (SELECT MAX(id) FROM activity) - ? ORDER BY id DESC LIMIT 1').get(Math.max(100, log.maxEntries));
   if (edge) removed.activity += del('DELETE FROM activity WHERE id IN (SELECT id FROM activity WHERE id <= ? ORDER BY id LIMIT ?)', edge.id, BATCH);
   removed.usage += del('DELETE FROM usage WHERE id IN (SELECT id FROM usage WHERE ts < ? LIMIT ?)', now - r.usageDays * DAY, BATCH);
   left ||= removed.activity >= BATCH || removed.usage >= BATCH;
