@@ -10,7 +10,8 @@
 //     registered (the Events module's 'registration' signal); new numbers change an unpaid order; a cancellation
 //     cancels an unpaid one.
 //   - Before the due date the owner gets one list a day of open orders due within three days or overdue (owner
-//     alert; sending reminders to people comes with list sending).
+//     alert). 082: with Lists and sending on, reminders go to the people themselves: "Send reminders" (a run the owner
+//     confirms) or, per event, automatically N days before the due date (the owner's switch is the confirmation).
 import { randomBytes } from 'node:crypto';
 import { db, kvGet, kvSet } from '../../core/db.js';
 import { fail, plural } from '../../core/config.js';
@@ -18,7 +19,7 @@ import { TENANT, getSetting, updateSettings } from '../../core/store.js';
 import { activity } from '../../core/events.js';
 import { addEvent, getHousehold, householdsOf, personRow } from '../../core/people.js';
 import { sendOwnerAlert } from '../../core/owner-alerts.js';
-import { changeOrHold } from '../index.js';
+import { changeOrHold, moduleApi } from '../index.js';
 import { getEvent } from '../events/index.js';
 import { orderTools } from './tools.js';
 
@@ -269,16 +270,60 @@ function eventSections(event) {
   const cur = getEvent(event).currency;
   return [{ title: 'Payments', rows: [{ name: `${money(t.paid, cur)} paid of ${money(t.total, cur)}`, sub: `${plural(t.unpaid, 'order')} not fully paid · ${money(t.open, cur)} open`, href: `#people/orders?event=${event}` }] }];
 }
+// ---------- reminders to people (082, through Lists and sending) ----------
+const REMIND = { event: 'Hi {first_name}, a friendly reminder: {amount} is still open for {event}, due {due}. You can pay by {ways_to_pay}. Thank you!',
+  none: 'Hi {first_name}, a friendly reminder: {amount} is still open, due {due}. You can pay by {ways_to_pay}. Thank you!' };
+/** The reminder message a run starts from (the owner can change it before confirming). */
+export const reminderTemplate = (event = '') => (event ? REMIND.event : REMIND.none);
+/** Automatic reminders per event: { [event]: { days, agent, template } } (only events that have them switched on). */
+export const autoReminders = () => { const s = getSetting('orderReminders', {}); return s && typeof s === 'object' ? s : {}; };
+/** Switch automatic reminders for an event on (days before the due date, the agent that sends, the message) or off. */
+export function setAutoReminders(event, { on = true, days = 3, agent = '', template = '' } = {}, by = 'panel') {
+  const ev = getEvent(event);
+  const next = { ...autoReminders() };
+  if (!on) delete next[ev.id];
+  else {
+    const d = Number(days);
+    if (!Number.isInteger(d) || d < 0 || d > 30) throw fail('Days before the due date: 0 to 30', 400, { field: 'days' });
+    const text = String(template || '').trim().slice(0, 1500) || reminderTemplate(ev.id);
+    next[ev.id] = { days: d, agent: String(agent || ''), template: text };
+  }
+  updateSettings({ orderReminders: next });
+  activity('config', { summary: `Automatic payment reminders for ${ev.name}: ${on ? `${plural(next[ev.id].days, 'day')} before the due date` : 'off'} (${by})` });
+  return next[ev.id] || null;
+}
+/** Once a day: events whose open orders fall due within their reminder days start a reminder run (once per due date). */
+async function autoRemind(now) {
+  const api = moduleApi('sending');
+  if (!api) return;
+  const today = new Date(now).toISOString().slice(0, 10);
+  for (const [event, r] of Object.entries(autoReminders())) {
+    const due = db.prepare("SELECT MIN(due) AS due FROM ord_orders WHERE tenant_id = ? AND event = ? AND status IN ('open', 'part') AND due <> ''").get(TENANT, event)?.due;
+    if (!due || due < today || kvGet(`orders.autoReminded:${event}`) === due) continue;
+    if ((Date.parse(`${due}T00:00Z`) - Date.parse(`${today}T00:00Z`)) / 86400000 > r.days) continue;
+    kvSet(`orders.autoReminded:${event}`, due);
+    try {
+      const p = await api.preview({ title: `Payment reminder: ${eventName(event)}`, audience: { kind: 'orders', event }, purpose: 'updates', agent: r.agent, template: r.template, noReplyLimit: 0 }, 'automatic reminders', 'auto');
+      if (!p.to.total) continue;
+      api.startRun(p.run.id, 'automatic reminders');
+      await sendOwnerAlert(`Duniya: automatic payment reminders for ${eventName(event)} started: ${plural(p.to.total, 'person', 'people')}${p.skipped.length ? `, ${p.skipped.length} skipped` : ''}. People → Sending shows them.`, { kind: 'orders' });
+    } catch (e) { activity('error', { summary: `Automatic payment reminders for ${eventName(event)}: ${e.message}` }); }
+  }
+}
+
 /** Once a day: the owner gets the open orders due within three days or overdue (bounded). */
 async function upkeep(now = Date.now()) {
   const day = new Date(now).toISOString().slice(0, 10);
   if (kvGet('orders.remindedOn') === day) return;
   kvSet('orders.remindedOn', day);
+  await autoRemind(now);
   const soon = new Date(now + 3 * 86400000).toISOString().slice(0, 10);
   const list = db.prepare(`SELECT * FROM ord_orders WHERE tenant_id = ? AND ${STATUS_SQL.open} AND due <> '' AND due <= ? ORDER BY due LIMIT 30`).all(TENANT, soon).map((o) => view(o));
   if (!list.length) return;
   const lines = list.slice(0, 15).map((o) => `• ${o.who}: ${money(o.left, o.currency)} for ${o.title}, ${o.overdue ? `overdue since ${o.due}` : `due ${o.due}`}`);
-  await sendOwnerAlert(`Duniya: ${plural(list.length, 'open order')} due soon or overdue:\n${lines.join('\n')}${list.length > 15 ? `\n… and more under People → Orders` : ''}`, { kind: 'orders' });
+  const more = list.length > 15 ? '\n… and more under People → Orders' : '';
+  const send = moduleApi('sending') ? '\nTo remind them: People → Orders → Send reminders.' : '';
+  await sendOwnerAlert(`Duniya: ${plural(list.length, 'open order')} due soon or overdue:\n${lines.join('\n')}${more}${send}`, { kind: 'orders' });
 }
 
 /** A held change an organizer confirmed: payment or refund. */

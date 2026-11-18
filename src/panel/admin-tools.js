@@ -31,6 +31,8 @@ async function chatName(x, chat) {
   const c = (await x.call('GET', '/api/chats')).find((r) => r.id === chat);
   return c ? `"${c.name}"` : `"${chat}"`;
 }
+/** 082: the body of a send preview from admin tool arguments. */
+const sendBody = (a) => ({ title: a.title, audience: a.audience, purpose: a.purpose, template: a.template, agent: a.agent, mode: a.mode, group: a.group, noReplyLimit: a.no_reply_limit });
 /** 081: an event id from an id or (part of) a name, upcoming first. */
 async function eventIdOf(x, ref) {
   const r = String(ref || '').trim().toLowerCase();
@@ -341,9 +343,9 @@ export const TOOLS = [
     description: 'Modules (Settings → Modules): Events and Orders and payments, each on or off with its memory use, and the owner\'s payment methods when Orders is on.',
     input: {}, run: (a, x) => x.call('GET', '/api/modules') },
   { name: 'set_module_enabled', risky: true, calls: [['PUT', '/api/modules/x']],
-    description: 'Switch a module on or off (module: events or orders). Off removes its agent tools and pages and keeps its data. Needs confirm_action.',
-    input: { module: str('events or orders', { enum: ['events', 'orders'] }), on: bool('true = on') }, required: ['module', 'on'],
-    preview: async (a) => `Switch ${a.module === 'orders' ? 'Orders and payments' : 'Events'} ${a.on ? 'on: agents get its tools' : 'off: its agent tools and pages go; its data is kept'}.`,
+    description: 'Switch a module on or off (module: events, orders or sending = Lists and sending). Off removes its agent tools and pages and keeps its data. Needs confirm_action.',
+    input: { module: str('events, orders or sending', { enum: ['events', 'orders', 'sending'] }), on: bool('true = on') }, required: ['module', 'on'],
+    preview: async (a) => `Switch ${{ orders: 'Orders and payments', sending: 'Lists and sending' }[a.module] || 'Events'} ${a.on ? 'on: agents get its tools' : 'off: its agent tools and pages go; its data is kept'}.`,
     run: (a, x) => x.call('PUT', `/api/modules/${enc(a.module)}`, { on: !!a.on }) },
   { name: 'list_events', readOnly: true, calls: [['GET', '/api/module/events']],
     description: 'Events (Events module): upcoming ones (or past: true), each with dates, place, capacity, deadline, currency, prices, how registration works and counts: registrations, adults, kids, people, waiting list, pending, places left.',
@@ -393,6 +395,29 @@ export const TOOLS = [
   { name: 'set_payment_methods', calls: [['PUT', '/api/orders/methods']],
     description: 'Replace the owner\'s list of payment methods (e.g. ["Cash", "Bank transfer", "TWINT"]). Payments use one of these.',
     input: { methods: { type: 'array', items: { type: 'string' } } }, required: ['methods'], run: (a, x) => x.call('PUT', '/api/orders/methods', { methods: a.methods }) },
+  // ---------- Lists and sending (082) ----------
+  { name: 'list_sends', readOnly: true, calls: [['GET', '/api/sending']],
+    description: 'Messages sent to lists (Lists and sending module): the newest runs with title, audience, purpose, state (running, paused with the reason, stopped, done), what it waits for (sending hours, daily limit, offline) and counts (sent, replied, said stop, skipped, waiting, failed); and the saved audiences.',
+    input: {}, run: (a, x) => x.call('GET', '/api/sending') },
+  { name: 'get_send', readOnly: true, calls: [['GET', '/api/sending/runs/x']], description: 'One run: its settings and counts, and each recipient (name, app, status, why skipped or failed, the text they got, when they replied).',
+    input: { run: str('Run id'), status: str('Only recipients in this status (waiting, sent, replied, stop, skipped, failed)') }, required: ['run'],
+    run: (a, x) => x.call('GET', `/api/sending/runs/${enc(a.run)}${a.status ? `?status=${enc(a.status)}` : ''}`) },
+  { name: 'send_to_people', risky: true, calls: [['POST', '/api/sending/preview'], ['POST', '/api/sending/runs/x/start']],
+    description: 'Send a message to people, one at a time at a person\'s pace (Lists and sending module). audience: { kind: list (list id) | tag (tag) | household (household id) | event (event id: its registered people, one message per household) | orders (event id optional: people with an open order) | people (person ids) }. purpose: updates or marketing (only people who said yes get it). template: the message; each person gets their own wording; placeholders {first_name}, {name}, {household}, events {event} {date} {place} {people}, orders {amount} {due} {ways_to_pay}. agent: who replies (default the first agent). Or mode: group with group (a group chat id that is on) to post once. Needs confirm_action: show the preview (who, how many, channel, duration, skipped and why, a sample).',
+    input: { audience: obj('Who'), purpose: str('updates or marketing', { enum: ['updates', 'marketing'] }), template: str('The message'), title: str('A short title'), agent: str('Agent id'),
+      mode: str('direct (default) or group', { enum: ['direct', 'group'] }), group: str('Group chat id (mode group)'), no_reply_limit: int('Pause after this many people in a row did not answer (default 20, 0 = never)') }, required: ['purpose', 'template'],
+    preview: async (a, x) => (await x.call('POST', '/api/sending/preview', sendBody(a))).line,
+    run: async (a, x) => { const p = await x.call('POST', '/api/sending/preview', sendBody(a)); return { run: await x.call('POST', `/api/sending/runs/${enc(p.run.id)}/start`), skipped: p.skipped.length }; } },
+  { name: 'control_send', calls: [['PUT', '/api/sending/runs/x']], description: 'Pause, resume or stop a run of messages to a list.',
+    input: { run: str('Run id'), action: str('pause, resume or stop', { enum: ['pause', 'resume', 'stop'] }) }, required: ['run', 'action'],
+    run: (a, x) => x.call('PUT', `/api/sending/runs/${enc(a.run)}`, { action: a.action }) },
+  { name: 'save_send_audience', calls: [['POST', '/api/sending/filters']], description: 'Save an audience under a name to send to it again (e.g. "Families with an open order for Diwali").',
+    input: { name: str('Name'), audience: obj('As in send_to_people') }, required: ['name', 'audience'], run: (a, x) => x.call('POST', '/api/sending/filters', { name: a.name, audience: a.audience }) },
+  { name: 'set_payment_reminders', risky: true, calls: [['GET', '/api/order-reminders'], ['PUT', '/api/order-reminders/x']],
+    description: 'Automatic payment reminders for an event (Orders with Lists and sending): on, days before the due date (0–30), the agent that sends, the message (default: a friendly reminder with the amount, due date and ways to pay). People who agreed to updates get them by themselves. Needs confirm_action.',
+    input: { event: str('Event id'), on: bool('true = on'), days: int('Days before the due date'), agent: str('Agent id'), template: str('Message') }, required: ['event', 'on'],
+    preview: async (a, x) => `${a.on ? `Send payment reminders automatically ${a.days ?? 3} days before the due date of event ${a.event}, to everyone with an open order who agreed to updates. Message: "${a.template || (await x.call('GET', `/api/order-reminders?event=${enc(a.event)}`)).template}"` : `Stop automatic payment reminders for event ${a.event}.`}`,
+    run: (a, x) => x.call('PUT', `/api/order-reminders/${enc(a.event)}`, { on: !!a.on, days: a.days, agent: a.agent, template: a.template }) },
   { name: 'list_households', readOnly: true, calls: [['GET', '/api/households']], description: 'Households (e.g. "Chary family") with address and how many adults and kids.', input: {},
     run: (a, x) => x.call('GET', '/api/households') },
   { name: 'get_household', readOnly: true, calls: [['GET', '/api/households/x']], description: 'One household with its members (person id, name, role adult or kid, reachable = has an app).',

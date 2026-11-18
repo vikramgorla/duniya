@@ -1,5 +1,6 @@
 // @ts-check
-// Modules (081): Settings → Modules (on/off), the module tools for agent tool lists, and the Events and Orders pages.
+// Modules (081): Settings → Modules (on/off), the module tools for agent tool lists, and the Events and Orders pages;
+// 082: Lists and sending (runs with a preview, pause / resume / stop, saved audiences) and payment reminders.
 // The module code loads with import() only when it is on (need() answers 409 with the reason when it is off).
 import { MODULES, moduleRows, moduleSections, need, setModuleOn, liveModules } from '../../modules/index.js';
 import { send } from '../http.js';
@@ -48,4 +49,17 @@ export function moduleRoutes(route) {
   route('DELETE', '/api/orders/:id', async (req, res, body, q, p, user) => (await ord()).deleteOrder(p.id, user.username), admin);
   route('POST', '/api/orders/:id/payments', async (req, res, body, q, p, user) => [201, (await ord()).addPayment(p.id, body, user.username)], admin);
   route('DELETE', '/api/orders/:id/payments/:pay', async (req, res, body, q, p, user) => (await ord()).removePayment(p.id, p.pay, user.username), admin);
+  // 082: payment reminders to people (through Lists and sending): the message to start from, automatic ones per event
+  route('GET', '/api/order-reminders', async (req, res, body, q) => { const m = await ord(); return { template: m.reminderTemplate(q.get('event') || ''), auto: m.autoReminders() }; }, admin);
+  route('PUT', '/api/order-reminders/:event', async (req, res, body, q, p, user) => ({ auto: (await ord()).setAutoReminders(p.event, body, user.username) }), admin);
+
+  // ---------- Lists and sending (082) ----------
+  const snd = () => need('sending');
+  route('GET', '/api/sending', async () => { const m = await snd(); return { runs: m.listRuns(), filters: m.listFilters() }; }, admin);
+  route('POST', '/api/sending/preview', async (req, res, body, q, p, user) => (await snd()).preview(body, user.username), admin);
+  route('GET', '/api/sending/runs/:id', async (req, res, body, q, p) => (await snd()).runPage(p.id, q.get('status') || ''), admin);
+  route('POST', '/api/sending/runs/:id/start', async (req, res, body, q, p, user) => (await snd()).startRun(p.id, user.username), admin);
+  route('PUT', '/api/sending/runs/:id', async (req, res, body, q, p, user) => (await snd()).controlRun(p.id, String(body.action || ''), user.username), admin);
+  route('POST', '/api/sending/filters', async (req, res, body) => [201, (await snd()).saveFilter(body)], admin);
+  route('DELETE', '/api/sending/filters/:id', async (req, res, body, q, p) => (await snd()).deleteFilter(p.id), admin);
 }

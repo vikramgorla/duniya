@@ -7,9 +7,12 @@
 //     queued; a chat switched off later is dropped from the queue. Channels without read receipts (Telegram) skip it.
 //   - typing: before a reply, "typing…" shows for a time that fits the reply's length (characters per second with
 //     jitter), at most 8 seconds.
-//   - new chats: a daily cap of new 1:1 chats per number (intros today, list sending in step 4), lower for a number
-//     linked in the last week (warm-up), and sending hours in the owner's time zone. listEstimate() turns the gaps,
-//     the longer pause every N messages, the cap and the hours into "how long does a list of N take".
+//   - new chats: a daily cap of new 1:1 chats per number (intros, and list messages to people who never wrote), lower
+//     for a number linked in the last week (warm-up), and sending hours in the owner's time zone. listEstimate() turns
+//     the gaps, the longer pause every N messages, the cap and the hours into "how long does a list of N take".
+//   - list messages (082, the Sending module): the gap after each one, the longer pause, typing by length after the
+//     chat's unread messages are read, and a daily cap: people who never wrote count as new chats (with warm-up and
+//     twice the gap), people who wrote may get three times as many.
 // Random values are bell-shaped (mean of three uniform draws), never fixed intervals.
 // PACE_TIME_SCALE scales every wait (tests run with 0 or a small fraction; 1 in production).
 import { bad, env, localParts, plural } from './config.js';
@@ -157,8 +160,38 @@ export function takeNewChat(number = 'main', now = Date.now()) {
   return { ...n, used: n.used + 1, left: n.left - 1 };
 }
 
+// ---------- list messages (082): the Sending module sends one at a time on the scheduler tick ----------
+const KNOWN_FACTOR = 3; // people who wrote first may get three times the new-chats cap a day
+/** Is it within the sending hours now (owner's time zone)? */
+export const sendingHoursNow = (now = Date.now()) => inHours(paceSettings(), now);
+/** The wait after a list message (ms): a random gap within the owner's range, twice as long for someone who never
+ * wrote, plus the longer pause after every `pauseEvery` messages (`count` = list messages this number sent so far). */
+export function listGapMs({ known = false, count = 0 } = {}) {
+  const p = paceSettings();
+  const pause = p.pauseEvery && count > 0 && count % p.pauseEvery === 0 ? p.pauseMinutes * 60000 : 0;
+  return Math.round(between(p.gapMin, p.gapMax) * 1000 * (known ? 1 : 2) + pause);
+}
+/** Count one list message on a number: someone who never wrote is a new chat (the cap with warm-up); someone who
+ * wrote counts against three times that. Refused (429, with the reason) at the cap. */
+export function takeListSend(number = 'main', known = false, now = Date.now()) {
+  if (!known) return takeNewChat(number, now);
+  const { cap } = capFor(number, paceSettings(), now);
+  const [d, n] = String(kvGet(`paceKnown:${number}`) || '').split('|');
+  const today = localParts(ownerTz(), now).date;
+  const used = d === today ? Number(n) || 0 : 0;
+  if (used >= cap * KNOWN_FACTOR) throw bad(`Today's limit of ${plural(cap * KNOWN_FACTOR, 'list message')} to people who wrote before is reached. It resets tomorrow.`, null, 429);
+  kvSet(`paceKnown:${number}`, `${today}|${used + 1}`);
+  return { cap: cap * KNOWN_FACTOR, used: used + 1 };
+}
+/** Before a list message: the chat's unread messages are read first, then "typing…" for the message's length. */
+export async function typeBefore(channel, chat, text) {
+  await markChat(channel, chat);
+  try { await channel.typing?.(chat); } catch { /* best effort */ }
+  await sleep(typingMs(text));
+}
+
 /** About how long sending to `count` people takes at this pace: { minutes, days } (gaps, longer pauses, cap, hours). */
-function listEstimate(count, p = paceSettings()) {
+export function listEstimate(count, p = paceSettings()) {
   const n = Math.max(0, Math.round(count));
   const gap = (p.gapMin + p.gapMax) / 2 / 60 + 0.1;
   const pauses = p.pauseEvery ? Math.floor(Math.max(0, n - 1) / p.pauseEvery) : 0;
