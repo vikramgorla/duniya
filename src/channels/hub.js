@@ -16,23 +16,26 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DATA_DIR, fail } from '../core/config.js';
-import { getSetting, updateSettings } from '../core/store.js';
+import { getSecret, getSetting, onSecretChange, updateSettings } from '../core/store.js';
 import { activity, bus } from '../core/events.js';
 import { noteChat } from '../core/chat-prefs.js';
 import { rememberGroupNames } from '../core/chat-names.js';
 import { CHANNELS, channelInfo, channelOf } from './index.js';
 
 /** How to load each channel's adapter, and whether the owner has set it up (without loading it). */
-const DEFAULT_LOADERS = { whatsapp: async () => (await import('./whatsapp/index.js')).createWhatsAppAdapter() };
+const DEFAULT_LOADERS = { whatsapp: async () => (await import('./whatsapp/index.js')).createWhatsAppAdapter(),
+  telegram: async () => (await import('./telegram/index.js')).createTelegramAdapter() };
 const numbers = () => { const l = getSetting('whatsappNumbers', null); return Array.isArray(l) ? l : []; };
+/** Set up without loading anything: WhatsApp has numbers or a linked device; token channels (077) have their secret. */
 const SET_UP = { whatsapp: () => numbers().length > 0 || existsSync(resolve(DATA_DIR, 'whatsapp-auth')) };
+const isSetUp = (id) => (SET_UP[id] ? SET_UP[id]() : !!(channelInfo(id)?.secret && getSecret(channelInfo(id).secret.name)));
 const FIRST_ACCOUNT = { whatsapp: () => { if (!numbers().length) updateSettings({ whatsappNumbers: [{ id: 'main', label: 'Main' }] }); } };
 const offList = () => { const l = getSetting('channelsOff', []); return Array.isArray(l) ? l : []; };
 
 /** Chat actions every adapter may offer; a missing one answers 501. */
 const CHAT_ACTIONS = ['send', 'groupMembers', 'refreshGroup', 'sendMedia', 'sendLocation', 'sendContact', 'react', 'editMessage', 'deleteMessage', 'markRead',
   'presence', 'sendPoll', 'downloadMedia', 'fetchHistory', 'groupInfo', 'groupInviteLink', 'groupRevokeInvite', 'groupParticipants', 'groupSubject',
-  'groupDescription', 'groupPicture', 'groupSettings', 'groupLeave', 'profile', 'block', 'unblock', 'setProfileName', 'setProfileStatus'];
+  'groupDescription', 'groupPicture', 'groupSettings', 'groupLeave', 'profile', 'block', 'unblock', 'setProfileName', 'setProfileStatus', 'askForPhone'];
 /** WhatsApp's own account actions (QR, pairing code, numbers), used by the WhatsApp channel page and the admin MCP. */
 const WHATSAPP_ACTIONS = ['pair', 'logout', 'restart', 'renameNumber', 'removeNumber', 'lookupNumber', 'groupCreate', 'refreshNames'];
 const MB = 1048576;
@@ -50,10 +53,16 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     onMessage: async (m) => { // every channel's chats are noted for the Chats list (metadata only, also while off)
       try { noteChat({ chat: m.chat, number: m.number, isGroup: m.isGroup, name: m.isGroup ? '' : m.senderName, phone: m.isGroup ? '' : m.phone }); } catch { /* best effort */ }
       return handlers.onMessage(m);
-    } });
+    },
+    onSeen: (c) => { try { noteChat(c); } catch { /* best effort */ } } }); // 077: a group the bot was added to, before anyone writes
 
-  async function load(id) {
-    if (live.has(id)) return live.get(id).adapter;
+  const loading = new Map(); // id → the load in progress (a token saved while the channel is switched on loads once)
+  function load(id) {
+    if (live.has(id)) return Promise.resolve(live.get(id).adapter);
+    if (!loading.has(id)) loading.set(id, loadNow(id).finally(() => loading.delete(id)));
+    return loading.get(id);
+  }
+  async function loadNow(id) {
     const make = loaders[id];
     if (!make) throw fail(`Unknown channel "${id}"`, 404);
     const rssBefore = process.memoryUsage().rss;
@@ -70,7 +79,7 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
       throw e;
     }
   }
-  const setUp = (id) => !!SET_UP[id]?.();
+  const setUp = isSetUp;
   const label = (id) => channelInfo(id)?.label || id;
   /** The live adapter of a channel; a 409 that says why when it is not running. */
   function adapter(id) {
@@ -103,7 +112,7 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
       const accounts = st?.numbers || [];
       out.push({ id: c.id, label: c.label, setup: c.setup, state: l ? 'on' : errors.has(c.id) ? 'error' : !setUp(c.id) ? 'not_set_up' : 'off',
         error: errors.get(c.id) || '', accounts: accounts.length, connected: accounts.filter((n) => n.status === 'open').length,
-        memoryMb: l?.costMb ?? null, measuring: !!l && l.costMb === null });
+        memoryMb: l?.costMb ?? null, measuring: !!l && l.costMb === null, info: st?.info || null, status: st?.status || '', lastError: st?.lastError || '' });
     }
     return out;
   }
@@ -111,6 +120,7 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
   /** Switch a channel on (setting it up with its first account when needed) or off (adapter stopped and dropped). */
   async function setEnabled(id, on, by = '') {
     if (!channelInfo(id)) throw fail(`Unknown channel "${id}"`, 404);
+    if (on && !setUp(id) && !FIRST_ACCOUNT[id]) throw fail(`${label(id)} is not set up yet: ${channelInfo(id).secret ? 'paste its token first' : 'set it up first'}`, 409);
     const off = offList().filter((x) => x !== id);
     updateSettings({ channelsOff: on ? off : [...off, id] });
     if (on) { FIRST_ACCOUNT[id]?.(); await load(id); } else {
@@ -122,11 +132,23 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     return (await channels()).find((c) => c.id === id);
   }
 
+  /** 077: a token channel's secret was saved or removed: (re)start it with the new token, or stop it. */
+  async function secretChanged(name) {
+    const c = CHANNELS.find((x) => x.secret?.name === name);
+    if (!c) return;
+    const l = live.get(c.id); live.delete(c.id);
+    await l?.adapter.stop().catch(() => {});
+    errors.delete(c.id);
+    if (setUp(c.id) && !offList().includes(c.id)) await load(c.id).catch(() => {});
+    else bus.emit('status');
+  }
+
   return {
     ...actions,
     /** Start every channel that is set up and on. */
     async start(h) {
       handlers = h;
+      onSecretChange((name) => { secretChanged(name).catch(() => {}); });
       for (const l of live.values()) await l.adapter.start(wrapped()); // switched on in the panel before the app finished starting
       for (const c of CHANNELS) if (setUp(c.id) && !offList().includes(c.id)) await load(c.id).catch(() => {});
     },

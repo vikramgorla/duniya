@@ -15,7 +15,7 @@ import { ratingsOf } from '../../core/review.js';
 import { visibleChats } from '../../core/owner-assistant.js';
 import { maybePostNotice, noticePostedAt, setChatNoticeOff } from '../../core/privacy-notice.js';
 import { chatToolCatalog } from '../../core/chat-tools.js';
-import { isGroup, personOfChat, splitChatId } from '../../channels/index.js';
+import { channelInfo, channelOf, isGroup, personOfChat, splitChatId } from '../../channels/index.js';
 
 /** Leave out empty values and settings at their default. */
 const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && v !== '' && v !== false && v !== 0 && v !== 'inherit'));
@@ -49,7 +49,7 @@ export function chatRoutes(route, { channel } = {}) {
     return [...groups, ...people, ...missing].map((c) => {
       const number = c.number || splitChatId(c.id).account;
       const pr = prefs[c.id];
-      return compact({ ...c, number, numberLabel: numbers.get(number) || number, agent: owner.get(c.id), model: pr?.model, logging: pr?.logging,
+      return compact({ ...c, number, numberLabel: channelOf(c.id) === 'whatsapp' || !channelOf(c.id) ? numbers.get(number) || number : channelInfo(channelOf(c.id))?.label, channel: channelOf(c.id) || undefined, agent: owner.get(c.id), model: pr?.model, logging: pr?.logging,
         fallback: pr?.fallback && (pr.fallback.mode !== 'inherit' || pr.fallback.chain?.length) ? pr.fallback : null, enabled: pr?.enabled, ignored: ignoredCounts.get(c.id),
         private: pr?.private, noticeOff: pr?.noticeOff, welcome: pr?.welcome, noticePostedAt: c.isGroup ? noticePostedAt(c.id) : null, history: historyStatus(c.id) });
     });

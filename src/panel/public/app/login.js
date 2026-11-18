@@ -61,12 +61,12 @@ async function renderSignup(app, brand, token) {
 }
 
 /** 060: a one-time secret link (/#secret=…): a signed-in owner or admin pastes a key; it never passes through a chat. */
-export async function renderSecretLink(token) {
-  history.replaceState(null, '', '#settings/secrets'); // the token leaves the address bar and the history
+export async function renderSecretLink(token, backTo = 'settings/secrets') {
+  history.replaceState(null, '', `#${backTo}`); // the token leaves the address bar and the history
   const main = $('#main');
   const card = h('form', { class: 'card', style: 'max-width:520px;margin:0 auto' }, h('h2', {}, 'Enter a secret'));
   main.replaceChildren(card);
-  const back = h('button', { class: 'btn', type: 'button', onclick: () => show('settings') }, 'Back to the panel');
+  const back = h('button', { class: 'btn', type: 'button', onclick: () => show(backTo.split('/')[0]) }, 'Back to the panel');
   let d;
   try { d = await api('POST', '/api/secret-links/open', { token }); } catch (x) { return card.append(h('p', { class: 'small' }, x.message), back); }
   const val = h('input', { type: 'password', placeholder: 'paste the value', autocomplete: 'off', spellcheck: 'false', 'aria-label': `Value for ${d.for}` });

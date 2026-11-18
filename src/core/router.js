@@ -1,15 +1,15 @@
 // @ts-check
-import { isChatEnabled, ignoredCounts, noteLatestKeys } from './chat-prefs.js';
+import { isChatEnabled, ignoredCounts, noteLatestKeys, moveChatPrefs } from './chat-prefs.js';
 import { agentSpoke, shouldJudge, verdictOf, closeFollowups } from './group-replies.js';
 import { storeLoadedBatch, setHistoryChannel, historyChatActive } from './history-load.js';
 import { personInfo, agentName } from './contacts.js';
 import { memberTag } from './member-tags.js';
 import { env, clip } from './config.js';
-import { isGroup } from '../channels/index.js';
+import { capsOf, isGroup } from '../channels/index.js';
 import { getSetting } from './store.js';
-import { listAgents as allAgents, getAgent, agentForChat, roleIn, isBuiltin } from './agents.js';
+import { listAgents as allAgents, getAgent, agentForChat, roleIn, isBuiltin, updateAgent } from './agents.js';
 import { runAgent, handleConfirmCommand } from './runner.js';
-import { logMessage, messageByMsgId, saveReaction, savePollVote, pollTally, setMessageText } from './db.js';
+import { logMessage, messageByMsgId, saveReaction, savePollVote, pollTally, setMessageText, moveChatData } from './db.js';
 import { activity } from './events.js';
 import { maybeSummarize } from './memory.js';
 import { setChatChannel } from './chat-tools.js';
@@ -90,6 +90,10 @@ export async function resolveRole(agent, msg, channel) {
   return 'participant';
 }
 
+/** The agent a channel account sends its direct messages to (a WhatsApp number's, the Telegram bot's), '' for the default. */
+const accountDmAgent = (msg) => (msg.channel === 'telegram' ? getSetting('telegram', {})?.dmAgent
+  : (getSetting('whatsappNumbers', null) || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent) || '';
+
 /** Pick the agent for a direct message, or null. */
 async function agentForDm(msg, channel, { openOnly = false } = {}) {
   // A 1:1 chat an admin assigned to an agent (Chats page) always goes to that agent.
@@ -98,15 +102,13 @@ async function agentForDm(msg, channel, { openOnly = false } = {}) {
   if (openOnly) { // chat is off: only an agent that explicitly answers anyone may take it
     const open = listAgents().filter((b) => b.enabled && b.dm === 'anyone');
     const lower = msg.text.trim().toLowerCase();
-    const numberDefault = (getSetting('whatsappNumbers', null) || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
-    return earliestTriggered(open, lower) || open.find((b) => b.id === numberDefault) || open.find((b) => b.id === getSetting('defaultDmAgent', '')) || open[0] || null;
+    return earliestTriggered(open, lower) || open.find((b) => b.id === accountDmAgent(msg)) || open.find((b) => b.id === getSetting('defaultDmAgent', '')) || open[0] || null;
   }
   const lower = msg.text.trim().toLowerCase();
   const enabled = listAgents().filter((b) => b.enabled);
   const byTrigger = earliestTriggered(enabled, lower);
-  const numberDefault = (getSetting('whatsappNumbers', null) || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
   const candidates = byTrigger ? [byTrigger]
-    : [getAgent(numberDefault), getAgent(getSetting('defaultDmAgent', '')), ...enabled].filter((b) => b?.enabled);
+    : [getAgent(accountDmAgent(msg)), getAgent(getSetting('defaultDmAgent', '')), ...enabled].filter((b) => b?.enabled);
   for (const agent of candidates) {
     if (agent.dm === 'none') continue;
     const role = await resolveRole(agent, msg, channel);
@@ -128,8 +130,7 @@ function dmSilence(msg) {
   const enabled = all.filter((b) => b.enabled);
   if (!enabled.length) return { agent: all[0]?.id || '', reason: all.length ? 'agent_disabled' : 'no_agent' };
   const lower = msg.text.trim().toLowerCase();
-  const numberDefault = (getSetting('whatsappNumbers', null) || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent;
-  const c = earliestTriggered(enabled, lower) || [getAgent(numberDefault), getAgent(getSetting('defaultDmAgent', ''))].find((b) => b?.enabled) || enabled[0];
+  const c = earliestTriggered(enabled, lower) || [getAgent(accountDmAgent(msg)), getAgent(getSetting('defaultDmAgent', ''))].find((b) => b?.enabled) || enabled[0];
   return { agent: c.id, reason: c.dm === 'none' ? 'dm_not_allowed' : 'role_not_allowed' };
 }
 
@@ -199,6 +200,21 @@ function recordEvent(msg) {
     activity('whatsapp.vote', { agent: agent?.id || '', chat: msg.chat,
       summary: `${whoOf(msg)} voted ${msg.selected?.length ? msg.selected.join(', ') : '(withdrew)'} in "${clip(p.name, 60)}" → ${pollTally(p).map((o) => `${o.name} ${o.votes}`).join(', ')}` });
   }
+}
+
+/**
+ * 077: a chat got a new id (Telegram turns a group into a supergroup): its settings, agent and memory move with it.
+ * Only chats that were on carry anything over; a chat that was off just shows up under its new id (off).
+ */
+export function createChatMoveHandler() {
+  return async ({ from, to }) => {
+    if (!from || !to || from === to) return;
+    const agent = agentForChat(from);
+    moveChatData(from, to);
+    moveChatPrefs(from, to);
+    if (agent) await updateAgent(agent.id, { chats: agent.chats.map((c) => (c === from ? to : c)) }, 'Telegram').catch(() => {});
+    activity('config', { chat: to, agent: agent?.id || '', summary: 'Telegram upgraded this group (new id): its settings, agent and memory moved with it' });
+  };
 }
 
 /** Build the live message router for a channel. */
@@ -283,7 +299,11 @@ export function createRouter(channel) {
       if (msg.isGroup) {
         if (!groupAgent) { if (wakes) quiet('no_agent', ''); }
         else if (msg.mentioned || msg.replyToAgent || findTrigger(groupAgent, lower)) quiet('agent_disabled');
-      } else { const d = dmSilence(msg); quiet(d.reason, d.agent); }
+      } else {
+        const d = dmSilence(msg); quiet(d.reason, d.agent);
+        // 077: a channel without phone numbers does not know who this is yet: offer to link their number
+        if (d.reason === 'role_not_allowed' && !msg.phone && !capsOf(msg.chat)?.phoneNumbers) await channel.askForPhone?.(msg.chat, 'I answer only people I know here.').catch(() => {});
+      }
       return;
     }
     if (!msg.isGroup) {

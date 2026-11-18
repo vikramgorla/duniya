@@ -1,7 +1,7 @@
 // @ts-check
 import { loadAgents, listAgents } from './core/agents.js';
 import { createHub } from './channels/hub.js';
-import { createRouter, createHistoryHandler, createJoinHandler, closeRouter } from './core/router.js';
+import { createRouter, createHistoryHandler, createJoinHandler, createChatMoveHandler, closeRouter } from './core/router.js';
 import { startScheduler } from './core/scheduler.js';
 import { startPanel } from './panel/server.js';
 import { providerRoutes } from './panel/routes/providers.js';
@@ -25,13 +25,13 @@ await loadAgents();
 startResourceWatch();
 console.log(`Agents: ${listAgents().map((b) => `${b.id}${b.enabled ? '' : ' (disabled)'}`).join(', ') || 'none'}`);
 
-// 075: the channel hub loads a channel (WhatsApp: Baileys) only when it is set up and on
+// 075: the channel hub loads a channel (WhatsApp: Baileys; 077: Telegram) only when it is set up and on
 const channels = createHub();
 const panel = startPanel({ channel: channels, extend: [providerRoutes, backupRoutes, updateRoutes] });
 const router = createRouter(channels); // sets the history channel before retries resume
 resumeHistoryRetries(); // 057: history loads the phone did not answer retry by themselves, also after a restart
 await channels.start({ onMessage: router, onHistory: createHistoryHandler(), onJoin: createJoinHandler(channels),
-  onMemberTag: createMemberTagHandler(), onPhoneActive: () => historyPhoneOnline(), onGroupChange: (ev) => markGroupDue(ev.chat) });
+  onMemberTag: createMemberTagHandler(), onPhoneActive: () => historyPhoneOnline(), onGroupChange: (ev) => markGroupDue(ev.chat), onChatMoved: createChatMoveHandler() });
 startScheduler(channels);
 startBackupScheduler();
 startUpdateScheduler();

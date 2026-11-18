@@ -206,7 +206,7 @@ const DEFS = [
       return { chat, result: { ok: true }, summary: `Deleted "${clip(ref.text, 80)}"` };
     } },
   { name: 'create_poll', cap: 'polls', roles: ['organizer', 'participant'],
-    description: 'Post a WhatsApp poll with 2–12 options; single choice by default or several answers with multiple=true. Votes arrive automatically; read them with poll_results.',
+    description: 'Post a poll with 2–12 options; single choice by default or several answers with multiple=true. Votes arrive automatically; read them with poll_results.',
     input_schema: { type: 'object', properties: { question: str('The poll question', { maxLength: 255 }), options: { type: 'array', items: { type: 'string', maxLength: 100 }, minItems: 2, maxItems: 12 },
       multiple: { type: 'boolean', description: 'Allow several answers (default false)' }, chat: CHAT }, required: ['question', 'options'] },
     async run(input, ctx) {
@@ -300,7 +300,7 @@ const DEFS = [
       return { chat, result: { ok: true }, summary: `Settings: ${changed.map(([k, v]) => `${k} ${v ? 'on' : 'off'}`).join(', ')}` };
     } },
   { name: 'profile_info', cap: 'profile', roles: ['organizer', 'participant'],
-    description: 'WhatsApp profile of a person: name seen in this chat, "about" text and profile picture link. Default: the person you are talking to.',
+    description: 'Profile of a person: name seen in this chat, "about" text and profile picture link. Default: the person you are talking to.',
     input_schema: { type: 'object', properties: { person: str('Phone number with country code (default: the sender)'), chat: CHAT } },
     async run(input, ctx) {
       const chat = await targetChat(input, ctx, 'profile');
@@ -343,7 +343,7 @@ const scrubInput = (input) => Object.fromEntries(Object.entries(input || {}).map
 export const chatTools = DEFS.map((d) => ({
   name: d.name, description: d.description, input_schema: d.input_schema, roles: d.roles, cap: d.cap,
   async run(input, ctx) {
-    if (!d.roles.includes(ctx.role)) throw fail('Only organizers can do this');
+    if (!d.roles.includes(ctx.role)) throw fail(`Only organizers can do this.${!ctx.requester && capsOf(ctx.chat) && !capsOf(ctx.chat).phoneNumbers ? ' An organizer who has not linked their number yet: open a direct chat with the bot and tap "Share my number".' : ''}`);
     try {
       const out = await d.run(input || {}, ctx);
       activity('whatsapp.action', { agent: ctx.agent.id, chat: out.chat, summary: `${toolPhrase(d.name)} by ${ctx.senderName || 'someone'} (${ctx.role}): ${out.summary}`,

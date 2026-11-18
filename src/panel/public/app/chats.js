@@ -123,15 +123,19 @@ export async function renderChats() {
   apply();
 }
 const takePrefill = () => { const p = S.dmPrefill; S.dmPrefill = null; return p; };
-const emptyChats = () => (!(S.status?.channel?.numbers || []).some((n) => n.status === 'open')
+const emptyChats = () => (!(S.status?.channel?.channels || []).some((c) => c.connected)
   ? emptyState('chats', 'WhatsApp is not linked yet', 'Your groups and people show up here once your number is linked.', h('a', { class: 'btn small primary', href: '#overview/whatsapp' }, 'Link WhatsApp on Overview'))
-  : emptyState('chats', 'No chats yet', 'Groups appear once the linked number is in them.'));
+  : emptyState('chats', 'No chats yet', 'Groups appear once the linked number (or the Telegram bot) is in them.'));
 /** The sections of a chat's page (072): rows on the page, each its own page (#chats/<id>/<section>) with a back link. */
 const CHAT_SECTIONS = [
   { id: 'messages', icon: 'chats', c: 'c3', title: 'Messages', admin: true, help: 'chats.md#messages-and-memory', line: 'Who said what, with the 👍 / 👎 of each answer. Each look is recorded in Activity.' },
   { id: 'memory', icon: 'notes', c: 'c2', title: 'Memory', help: 'chats.md#messages-and-memory', line: 'What the agent remembers here: a running summary and notes.' },
   { id: 'group', icon: 'contacts', c: 'c4', title: 'WhatsApp group', admin: true, group: true, help: 'chats.md#whatsapp-group-tools', line: 'Changes happen in WhatsApp at once. Most need the agents’ number to be a group admin.' },
 ];
+/** 077: the chat's app ("Telegram", "WhatsApp"), for the group section's title and wording. */
+const appOf = (c) => (c?.channel === 'telegram' ? 'Telegram' : 'WhatsApp');
+const titleOf = (s, c) => (s.id === 'group' ? `${appOf(c)} group` : s.title);
+const lineOf = (s, c) => (s.id === 'group' && c.channel === 'telegram' ? 'Changes happen in Telegram at once. The bot must be a group admin with the matching right.' : s.line);
 const hasSection = (s, c) => (!s.admin || can('admin')) && (!s.group || c.isGroup);
 /** One chat's page (068, 072): a header (avatar, name, state, switch), why it stayed quiet, its agent, section rows
  *  (Messages, Memory, WhatsApp group, Activity), then the settings that save at once and the spending cap. */
@@ -145,10 +149,10 @@ function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
     const s = CHAT_SECTIONS.find((x) => x.id === sid && hasSection(x, c));
     root.replaceChildren(s ? h('div', { class: 'card ap-sec' },
       h('a', { class: 'sub-back', href: `#chats/${enc}`, onclick: (e) => { e.preventDefault(); go(''); } }, icon('back'), name),
-      h('div', { class: 'sec-head' }, h('h2', { tabindex: '-1' }, s.title), helpLink(s.help)),
-      h('p', { class: 'small muted sec-line' }, s.line),
+      h('div', { class: 'sec-head' }, h('h2', { tabindex: '-1' }, titleOf(s, c)), helpLink(s.help)),
+      h('p', { class: 'small muted sec-line' }, lineOf(s, c)),
       s.id === 'messages' ? messagesView(c, agents, takeSearch(c), at) : s.id === 'memory' ? memoryView(c) : groupView(c)) : home());
-    document.title = `${s ? `${s.title} · ` : ''}${name} · Duniya`;
+    document.title = `${s ? `${titleOf(s, c)} · ` : ''}${name} · Duniya`;
     if (push) { if (matchMedia('(max-width: 640px)').matches) window.scrollTo({ top: 0 }); root.querySelector('h2')?.focus({ preventScroll: true }); }
   }
   function home() {
@@ -180,7 +184,7 @@ function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
       h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, title), (subs[id] = h('span', { class: 'lrow-sub' }, sub))), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
     const firstSub = { messages: c.history?.state === 'loading' ? 'Loading recent messages from your phone…' : c.lastAt ? `Last message ${ago(c.lastAt)} ago` : 'Stored while the chat is on',
       memory: 'Summary and notes', group: 'Name, settings, invite link, members' };
-    const rows = CHAT_SECTIONS.filter((s) => hasSection(s, c)).map((s) => row(s.id, s.title, s.icon, s.c, `#chats/${enc}/${s.id}`, firstSub[s.id], (e) => { e.preventDefault(); go(s.id); }));
+    const rows = CHAT_SECTIONS.filter((s) => hasSection(s, c)).map((s) => row(s.id, titleOf(s, c), s.icon, s.c, `#chats/${enc}/${s.id}`, firstSub[s.id], (e) => { e.preventDefault(); go(s.id); }));
     rows.push(row('activity', 'Activity', 'activity', 'c0', `#activity/chat=${enc}`, 'Everything that happened here, newest first'));
     api('GET', `/api/chats/${enc}/memory`).then((m) => {
       if (subs.messages && c.history?.state !== 'loading') subs.messages.textContent = [plural(m.messageCount, 'stored message'), c.lastAt ? `last ${ago(c.lastAt)} ago` : ''].filter(Boolean).join(' · ');
@@ -230,12 +234,13 @@ function historyLine(c) {
  *  invite link, members with admin badges. */
 function groupView(c) {
   const enc = encodeURIComponent(c.id);
-  const body = h('div', { class: 'wa-card' }, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Asking WhatsApp…'));
+  const app = appOf(c);
+  const body = h('div', { class: 'wa-card' }, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ` Asking ${app}…`));
   const put = (patch, ok) => tryApi(() => api('PUT', `/api/chats/${enc}/whatsapp`, patch), ok);
   async function load() {
     let g;
     try { g = await api('GET', `/api/chats/${enc}/whatsapp`); } catch (e) {
-      body.replaceChildren(h('div', { class: 'note warn' }, `Could not read this group from WhatsApp: ${e.message}. Check that the number is connected (Overview) and still in the group.`));
+      body.replaceChildren(h('div', { class: 'note warn' }, `Could not read this group from ${app}: ${e.message}. Check that ${app === 'WhatsApp' ? 'the number' : 'the bot'} is connected (Settings → Channels) and still in the group.`));
       return;
     }
     const meAdmin = g.participants.some((p) => p.admin) ? null : h('div', { class: 'note warn' }, 'No admins found for this group.');
@@ -245,7 +250,7 @@ function groupView(c) {
     const showLink = async () => {
       const r = await tryApi(() => api('GET', `/api/chats/${enc}/whatsapp/invite`));
       if (!r) return;
-      linkBox.replaceChildren(r.link ? copyRow(r.link) : h('p', { class: 'small muted' }, 'WhatsApp did not return a link.'),
+      linkBox.replaceChildren(r.link ? copyRow(r.link) : h('p', { class: 'small muted' }, `${app} did not return a link.`),
         h('button', { class: 'btn small danger', onclick: async () => {
           if (!await ask({ title: 'Reset the invite link?', text: 'Anyone with the old link can no longer join with it. A new link is created.', ok: 'Reset link', danger: true })) return;
           const n = await tryApi(() => api('POST', `/api/chats/${enc}/whatsapp/invite/revoke`), 'New invite link created');
@@ -266,7 +271,7 @@ function groupView(c) {
       h('div', { class: 'wa-settings' },
         setting('announcement', 'Only admins send', 'Everyone else can read but not write.'),
         setting('locked', 'Only admins edit info', 'Name, picture and description.'),
-        setting('joinApproval', 'Approve new members', 'People joining by link wait for an admin.')),
+        app === 'WhatsApp' ? setting('joinApproval', 'Approve new members', 'People joining by link wait for an admin.') : null),
       h('div', { class: 'eyebrow', style: 'margin:14px 0 6px' }, 'Invite link'),
       linkBox, h('button', { class: 'btn small', onclick: (e) => { e.currentTarget.remove(); showLink(); } }, 'Show invite link'),
       h('details', { style: 'margin-top:14px' }, h('summary', { class: 'small', style: 'cursor:pointer' }, `Members (${g.participants.length})`),

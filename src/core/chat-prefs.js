@@ -60,6 +60,13 @@ export function setChatPrefs(chat, { model, logging, enabled, fallback, private:
   cache.set(chat, next);
   return next;
 }
+/** 077: a chat's settings (on/off, model, private…), its Chats entry and its privacy-notice record move to a new id. */
+export function moveChatPrefs(from, to) {
+  for (const t of ['chat_prefs', 'chats_seen', 'privacy_notices']) {
+    try { db.prepare(`UPDATE OR REPLACE ${t} SET chat = ? WHERE tenant_id = ? AND chat = ?`).run(to, TENANT, from); } catch { /* table not created in this process */ }
+  }
+  cache.delete(from); cache.delete(to);
+}
 export const allChatPrefs = () => Object.fromEntries(db.prepare('SELECT chat, model, logging, enabled, fallback, private, notice_off, welcome FROM chat_prefs WHERE tenant_id = ?').all(TENANT)
   .map((r) => [r.chat, { model: r.model, logging: r.logging, enabled: !!r.enabled, fallback: parseFallback(r.fallback), private: !!r.private, noticeOff: !!r.notice_off,
     welcome: WELCOME_MODES.includes(r.welcome) ? r.welcome : 'inherit' }]));
