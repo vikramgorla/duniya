@@ -176,7 +176,7 @@ When it fails:
   at `LIMIT`) goes on `ALLOW_SCANS` in `scripts/check-perf.mjs` with its reason; a marker comment in the SQL
   (`/* people: every name sorts */`) keeps the entry to that one statement.
 - **Raise a budget only with a reason**, like the panel budgets: keep the old value in the comment and say why in the
-  PR. Budgets are about twice what a CI runner measured. `--verbose` prints every checked plan.
+  PR. Budgets are about 2.5× what a CI runner measured (noted next to each). `--verbose` prints every checked plan.
 
 A path the workload does not reach is not checked: when you add a hot path (a new screen, router step or agent tool),
 add it to the workload in `check-perf.mjs`.

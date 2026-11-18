@@ -11,21 +11,21 @@
 //  2. Time budgets: the median of several runs of each key path stays within BUDGETS (milliseconds on a CI runner).
 //
 // Raising a budget or adding an allowed scan is a decision: keep the old value and say why in the comment, like the
-// panel budgets in scripts/check-panel.mjs. Budgets are ~2× what a CI runner measured, so noise does not fail a PR.
+// panel budgets in scripts/check-panel.mjs. Budgets are ~2.5× what a CI runner measured, so noise does not fail a PR.
 //   node scripts/check-perf.mjs            → check (exit 1 on a problem)
 //   node scripts/check-perf.mjs --verbose  → also print every checked plan
 import { DatabaseSync } from 'node:sqlite';
 
-// Budgets in ms (median of RUNS). Measured on a GitHub runner when #174 set them; doubled for headroom.
+// Budgets in ms (median of RUNS), about 2.5× what a GitHub runner measured when #174 set them (the CI value is noted).
 const BUDGETS = {
-  'person page': 30, // GET /api/people/:id (ties, households, timeline, tags, lists, their chats, merges)
-  'people list': 40, // GET /api/people (first page of 100, sorted by display name)
-  'people search': 60, // GET /api/people?q=…
-  'chat page (messages)': 40, // GET /api/chats/:chat/messages?limit=50
-  'search messages': 80, // GET /api/search/messages?q=… (full-text index)
-  'activity (one chat)': 40, // GET /api/activity?chat=…
-  'router (stored, not addressed)': 5, // one group message through the router: allow-list, person, store, why-quiet
-  'agent context build': 20, // memory.buildContext for a busy group (recent messages, summary, notes)
+  'person page': 12, // GET /api/people/:id (ties, households, timeline, tags, lists, their chats, merges); CI 4.6
+  'people list': 10, // GET /api/people (first page of 100, sorted by display name); CI 3.6
+  'people search': 30, // GET /api/people?q=… (names, nickname, number, tags, notes); CI 12.9
+  'chat page (messages)': 5, // GET /api/chats/:chat/messages?limit=50; CI 1.0
+  'search messages': 25, // GET /api/search/messages?q=… (full-text index, a word in every message); CI 10.5
+  'activity (one chat)': 5, // GET /api/activity?chat=…; CI 1.4
+  'router (stored, not addressed)': 2, // one group message through the router: allow-list, person, store, why-quiet; CI 0.3
+  'agent context build': 3, // memory.buildContext for a busy group (recent messages, summary, notes); CI 0.6
 };
 const RUNS = 9;
 
