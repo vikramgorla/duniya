@@ -21,6 +21,7 @@ Tick each item or write "n/a – reason".
 
 **Small servers**
 - [ ] Impact on a 1 GB / 1 vCPU VM considered (memory, CPU, downloads, queue/timeouts)
+- [ ] New queries pass `npm run check:perf` (no full scans of large tables, time budgets met; index sizes stated; budgets raised only with a reason)
 
 **Lean code**
 - [ ] What the change replaces is deleted; no compatibility layer or one-time migration left after its release; existing helpers reused
