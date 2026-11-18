@@ -15,6 +15,7 @@
 //   intercept    intercept(msg, channel): a direct message from a person in a chat that is on, before the agent;
 //                true = answered here (082: replies to list messages, stop / start)
 //   api          functions other modules may call while this one is on (082: Orders and Events start sends)
+//   card         card(person): a line for the agent's sender card (083: an open survey and its next question)
 // Timeline entries are written with People's addEvent() when something happens to a person.
 import { db } from '../core/db.js';
 import { fail } from '../core/config.js';
@@ -32,6 +33,8 @@ export const MODULES = [
     children: [['ord_lines', 'ord', 'ord_orders'], ['ord_payments', 'ord', 'ord_orders']], load: () => import('./orders/index.js') },
   { id: 'sending', label: 'Lists and sending', line: 'Send a message to a list, an event or people who owe, one person at a time, with consent and a human pace',
     refs: { person: [['snd_recipients', 'person']], household: [] }, children: [], load: () => import('./sending/index.js') },
+  { id: 'surveys', label: 'Surveys', line: 'Short forms people answer in chat or by a link; results per person and in total',
+    refs: { person: [['srv_people', 'person'], ['srv_answers', 'person']], household: [] }, children: [], load: () => import('./surveys/index.js') },
 ];
 const info = (id) => MODULES.find((m) => m.id === id) || null;
 /** @type {Map<string, { manifest: any, costMb: number }>} */
@@ -81,6 +84,9 @@ export async function interceptMessage(msg, channel) {
   }
   return false;
 }
+
+/** Lines the modules that are on add to an agent's card about the sender (083). */
+export const moduleCard = (person) => liveModules().map((m) => { try { return m.card?.(person) || ''; } catch { return ''; } }).filter(Boolean);
 
 /** A signal from one module to the others that are on (e.g. events → orders: a registration changed). */
 export function emit(signal, payload) {

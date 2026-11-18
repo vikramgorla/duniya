@@ -210,6 +210,11 @@ const STATES = [
   { name: 'sending', hash: 'people/sending', wait: 2000 }, // 082: People → Sending (history, saved audiences)
   { name: 'sending-run', hash: 'people/sending', wait: 2000, js: "[...document.querySelectorAll('.people-list a')].find((a) => a.textContent.includes('Payment')).click(); await T.until('.person-page'); await T.wait(300);" }, // 082: a run's page
   { name: 'sending-new', hash: 'people/sending/new', wait: 2000, js: "document.querySelector('#main textarea').value = 'Hi {first_name}, badminton is in the new hall from Tuesday.'; await T.click('Preview', 'button', 1500);" }, // 082: New message with its preview
+  { name: 'campaign', hash: 'people/sending', wait: 2000, js: "[...document.querySelectorAll('a.lrow')].find((a) => a.href.includes('/campaign/c')).click(); await T.until('.person-page'); await T.wait(300);" }, // 083: a campaign's steps
+  { name: 'campaign-new', hash: 'people/sending/campaign/new', wait: 2000 }, // 083: New campaign
+  { name: 'surveys', hash: 'people/surveys', wait: 2000 }, // 083: People → Surveys
+  { name: 'survey-page', hash: 'people/surveys', wait: 2000, js: "document.querySelector('.people-list a').click(); await T.until('.person-page'); await T.wait(300);" }, // 083: results and answers
+  { name: 'survey-edit', hash: 'people/surveys', wait: 2000, js: "document.querySelector('.people-list a').click(); await T.until('.person-page'); await T.wait(300); document.querySelector('.ap-head details.menu summary').click(); await T.click('Edit…', 'button', 600);" }, // 083: the survey editor
   { name: 'orders', hash: 'people/orders', wait: 2000 }, // 081: People → Orders (not paid, totals per event)
   { name: 'order-page', hash: 'people/orders', wait: 2000, js: "document.querySelector('.people-list a').click(); await T.until('.person-page'); await T.wait(300);" }, // 081: an order's lines and payments
   { name: 'person-modules', hash: 'people', wait: 2000, js: "[...document.querySelectorAll('.people-list a')].find((a) => a.textContent.includes('Anu')).click(); await T.until('.person-page'); await T.wait(300); [...document.querySelectorAll('.eyebrow')].find((e) => e.textContent === 'Events')?.scrollIntoView();" }, // 081: Events and Orders on a person's page

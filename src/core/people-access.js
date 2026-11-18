@@ -14,6 +14,7 @@ import { digits, clip, fail } from './config.js';
 import { TENANT } from './store.js';
 import { activity } from './events.js';
 import { forgetPeopleCache, householdsOf, personByPhone, personFor, personRow, tagsOf } from './people.js';
+import { moduleCard } from '../modules/index.js';
 
 const st = (() => { const m = new Map(); return (sql) => { let s = m.get(sql); if (!s) { s = db.prepare(sql); m.set(sql, s); } return s; }; })();
 
@@ -150,7 +151,7 @@ export function senderCard(person, scope, name = '') {
   return [`About the sender (from People; use it, don't recite it): ${name || p.ownName || 'unnamed'}${p.nickname ? ` ("${p.nickname}")` : ''}`,
     hh.length ? `Household: ${hh.map((h) => `${h.name} (${h.role})`).join(', ')}` : '',
     tags.length ? `Tags: ${tags.join(', ')}` : '',
-    ...notes.map((n) => `Note (${n.by}): ${clip(n.text, 160)}`)].filter(Boolean).join('\n');
+    ...notes.map((n) => `Note (${n.by}): ${clip(n.text, 160)}`), ...moduleCard(person)].filter(Boolean).join('\n');
 }
 
 // ---------- consent ----------

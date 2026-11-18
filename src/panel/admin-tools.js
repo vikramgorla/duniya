@@ -32,7 +32,8 @@ async function chatName(x, chat) {
   return c ? `"${c.name}"` : `"${chat}"`;
 }
 /** 082: the body of a send preview from admin tool arguments. */
-const sendBody = (a) => ({ title: a.title, audience: a.audience, purpose: a.purpose, template: a.template, agent: a.agent, mode: a.mode, group: a.group, noReplyLimit: a.no_reply_limit });
+const sendBody = (a) => ({ title: a.title, audience: a.audience, purpose: a.purpose, template: a.template, agent: a.agent, mode: a.mode, group: a.group, noReplyLimit: a.no_reply_limit, survey: a.survey });
+const campaignBody = (a) => ({ title: a.title, audience: a.audience, purpose: a.purpose, agent: a.agent, steps: a.steps, stops: a.stops, event: a.event, endDay: a.end_day, noReplyLimit: a.no_reply_limit });
 /** 081: an event id from an id or (part of) a name, upcoming first. */
 async function eventIdOf(x, ref) {
   const r = String(ref || '').trim().toLowerCase();
@@ -343,9 +344,9 @@ export const TOOLS = [
     description: 'Modules (Settings → Modules): Events and Orders and payments, each on or off with its memory use, and the owner\'s payment methods when Orders is on.',
     input: {}, run: (a, x) => x.call('GET', '/api/modules') },
   { name: 'set_module_enabled', risky: true, calls: [['PUT', '/api/modules/x']],
-    description: 'Switch a module on or off (module: events, orders or sending = Lists and sending). Off removes its agent tools and pages and keeps its data. Needs confirm_action.',
-    input: { module: str('events, orders or sending', { enum: ['events', 'orders', 'sending'] }), on: bool('true = on') }, required: ['module', 'on'],
-    preview: async (a) => `Switch ${{ orders: 'Orders and payments', sending: 'Lists and sending' }[a.module] || 'Events'} ${a.on ? 'on: agents get its tools' : 'off: its agent tools and pages go; its data is kept'}.`,
+    description: 'Switch a module on or off (module: events, orders, sending = Lists and sending, or surveys). Off removes its agent tools and pages and keeps its data. Needs confirm_action.',
+    input: { module: str('events, orders, sending or surveys', { enum: ['events', 'orders', 'sending', 'surveys'] }), on: bool('true = on') }, required: ['module', 'on'],
+    preview: async (a) => `Switch ${{ orders: 'Orders and payments', sending: 'Lists and sending', surveys: 'Surveys' }[a.module] || 'Events'} ${a.on ? 'on: agents get its tools' : 'off: its agent tools and pages go; its data is kept'}.`,
     run: (a, x) => x.call('PUT', `/api/modules/${enc(a.module)}`, { on: !!a.on }) },
   { name: 'list_events', readOnly: true, calls: [['GET', '/api/module/events']],
     description: 'Events (Events module): upcoming ones (or past: true), each with dates, place, capacity, deadline, currency, prices, how registration works and counts: registrations, adults, kids, people, waiting list, pending, places left.',
@@ -405,9 +406,35 @@ export const TOOLS = [
   { name: 'send_to_people', risky: true, calls: [['POST', '/api/sending/preview'], ['POST', '/api/sending/runs/x/start']],
     description: 'Send a message to people, one at a time at a person\'s pace (Lists and sending module). audience: { kind: list (list id) | tag (tag) | household (household id) | event (event id: its registered people, one message per household) | orders (event id optional: people with an open order) | people (person ids) }. purpose: updates or marketing (only people who said yes get it). template: the message; each person gets their own wording; placeholders {first_name}, {name}, {household}, events {event} {date} {place} {people}, orders {amount} {due} {ways_to_pay}. agent: who replies (default the first agent). Or mode: group with group (a group chat id that is on) to post once. Needs confirm_action: show the preview (who, how many, channel, duration, skipped and why, a sample).',
     input: { audience: obj('Who'), purpose: str('updates or marketing', { enum: ['updates', 'marketing'] }), template: str('The message'), title: str('A short title'), agent: str('Agent id'),
-      mode: str('direct (default) or group', { enum: ['direct', 'group'] }), group: str('Group chat id (mode group)'), no_reply_limit: int('Pause after this many people in a row did not answer (default 20, 0 = never)') }, required: ['purpose', 'template'],
+      mode: str('direct (default) or group', { enum: ['direct', 'group'] }), group: str('Group chat id (mode group)'), no_reply_limit: int('Pause after this many people in a row did not answer (default 20, 0 = never)'),
+      survey: str('Survey id (Surveys module): each person can answer it in chat or by their own {survey_link}') }, required: ['purpose', 'template'],
     preview: async (a, x) => (await x.call('POST', '/api/sending/preview', sendBody(a))).line,
     run: async (a, x) => { const p = await x.call('POST', '/api/sending/preview', sendBody(a)); return { run: await x.call('POST', `/api/sending/runs/${enc(p.run.id)}/start`), skipped: p.skipped.length }; } },
+  { name: 'start_campaign', risky: true, calls: [['POST', '/api/sending/campaigns/preview'], ['POST', '/api/sending/campaigns/x/start']],
+    description: 'A campaign (Lists and sending): a sequence of messages to one audience (as in send_to_people). steps: [{ kind: "message", template, survey? } | { kind: "wait", days }], starting with a message. stops: { replied, registered, paid, answered } — follow-ups skip people who replied (or said stop), registered for the event, paid for it (no open order), finished the survey. event: event id for registered / paid (default: the audience\'s). end_day: YYYY-MM-DD. Confirmed once for all steps; each message step goes out at the sending pace. Needs confirm_action.',
+    input: { title: str('Title'), audience: obj('Who (as in send_to_people)'), purpose: str('updates or marketing', { enum: ['updates', 'marketing'] }), agent: str('Agent id'), steps: { type: 'array', items: { type: 'object', additionalProperties: true } },
+      stops: obj('{ replied, registered, paid, answered }: true/false'), event: str('Event id'), end_day: str('Last day'), no_reply_limit: int('Pause a step after this many in a row did not answer (default 0)') }, required: ['audience', 'purpose', 'steps'],
+    preview: async (a, x) => (await x.call('POST', '/api/sending/campaigns/preview', campaignBody(a))).line,
+    run: async (a, x) => { const p = await x.call('POST', '/api/sending/campaigns/preview', campaignBody(a)); return x.call('POST', `/api/sending/campaigns/${enc(p.campaign.id)}/start`); } },
+  { name: 'get_campaign', readOnly: true, calls: [['GET', '/api/sending/campaigns/x']], description: 'One campaign: its steps, each with its run (state, sent, replied, skipped, waiting), the current step, the stop rules and the end day.',
+    input: { campaign: str('Campaign id') }, required: ['campaign'], run: (a, x) => x.call('GET', `/api/sending/campaigns/${enc(a.campaign)}`) },
+  { name: 'control_campaign', calls: [['PUT', '/api/sending/campaigns/x']], description: 'Pause, resume or stop a campaign (and the run of its current step).',
+    input: { campaign: str('Campaign id'), action: str('pause, resume or stop', { enum: ['pause', 'resume', 'stop'] }) }, required: ['campaign', 'action'],
+    run: (a, x) => x.call('PUT', `/api/sending/campaigns/${enc(a.campaign)}`, { action: a.action }) },
+  // ---------- Surveys (083) ----------
+  { name: 'list_surveys', readOnly: true, calls: [['GET', '/api/surveys']], description: 'Surveys (Surveys module): title, questions, open or closed, how many were asked, started and finished.',
+    input: {}, run: (a, x) => x.call('GET', '/api/surveys') },
+  { name: 'get_survey_results', readOnly: true, calls: [['GET', '/api/surveys/x']],
+    description: 'What people answered ("what did people answer?"): per question the counts per choice, the average / min / max / sum of numbers, the latest short texts; and each person\'s answers, whether they finished and how (chat or link).',
+    input: { survey: str('Survey id') }, required: ['survey'], run: (a, x) => x.call('GET', `/api/surveys/${enc(a.survey)}`) },
+  { name: 'save_survey', calls: [['POST', '/api/surveys'], ['PUT', '/api/surveys/x']],
+    description: 'Create or change a survey: title, intro, questions [{ text, kind: single | multi | text | number, options (for single and multi), required (default true) }], status open or closed. Once people answered, questions can be reworded but not added, removed or changed in kind. Send it with send_to_people (survey).',
+    input: { id: str('Survey id (to change one)'), title: str('Title'), intro: str('A short intro'), questions: { type: 'array', items: { type: 'object', additionalProperties: true } }, status: str('open or closed', { enum: ['open', 'closed'] }) },
+    run: (a, x) => { const { id, ...body } = a; return id ? x.call('PUT', `/api/surveys/${enc(id)}`, body) : x.call('POST', '/api/surveys', body); } },
+  { name: 'delete_survey', risky: true, calls: [['GET', '/api/surveys/x'], ['DELETE', '/api/surveys/x']], description: 'Delete a survey with all its answers. Needs confirm_action.',
+    input: { survey: str('Survey id') }, required: ['survey'],
+    preview: async (a, x) => { const r = await x.call('GET', `/api/surveys/${enc(a.survey)}`); return `Delete the survey "${r.survey.title}" and the answers of ${r.counts.started} people. This cannot be undone.`; },
+    run: (a, x) => x.call('DELETE', `/api/surveys/${enc(a.survey)}`) },
   { name: 'control_send', calls: [['PUT', '/api/sending/runs/x']], description: 'Pause, resume or stop a run of messages to a list.',
     input: { run: str('Run id'), action: str('pause, resume or stop', { enum: ['pause', 'resume', 'stop'] }) }, required: ['run', 'action'],
     run: (a, x) => x.call('PUT', `/api/sending/runs/${enc(a.run)}`, { action: a.action }) },

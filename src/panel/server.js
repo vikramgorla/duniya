@@ -31,11 +31,17 @@ import { moduleRoutes } from './routes/modules.js';
 const ROLE_RANK = { viewer: 1, admin: 2, owner: 3 };
 
 // ---------- helpers ----------
-async function readBody(req) {
+async function readBody(req, form = false) {
   let size = 0; const chunks = [];
   for await (const c of req) { size += c.length; if (size > 2e6) throw new Error('Body too large'); chunks.push(c); }
   const raw = Buffer.concat(chunks).toString('utf8');
+  if (form) return new URLSearchParams(raw);
   return raw ? JSON.parse(raw) : {};
+}
+/** 083: a plain HTML form of a public page (survey links): urlencoded, and the browser says it comes from this site. */
+function formAllowed(req) {
+  if (!String(req.headers['content-type'] || '').startsWith('application/x-www-form-urlencoded')) return false;
+  try { return new URL(String(req.headers.origin || '')).host === req.headers.host; } catch { return false; }
 }
 
 export function startPanel({ channel, extend = [] }) {
@@ -44,8 +50,9 @@ export function startPanel({ channel, extend = [] }) {
   const routes = [];
   /** opts.role: minimum role (default: viewer for GET, admin otherwise). opts.public: no auth. */
   /** opts.raw: the handler reads the (binary) request body itself; see uploadAllowed() for the CSRF guard. */
+  /** opts.form (083, public pages): the body is a same-origin HTML form (URLSearchParams); see formAllowed(). */
   const route = (method, pattern, handler, opts = {}) => routes.push({
-    method, handler, public: !!opts.public, raw: !!opts.raw,
+    method, handler, public: !!opts.public, raw: !!opts.raw, form: !!opts.form,
     role: opts.role || (method === 'GET' ? 'viewer' : 'admin'),
     re: new RegExp(`^${pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)')}$`),
   });
@@ -140,10 +147,12 @@ export function startPanel({ channel, extend = [] }) {
       }
       if (req.method !== 'GET' && r.raw) {
         if (!uploadAllowed(req)) return send(res, 415, { error: 'Uploads must come from the panel' });
+      } else if (req.method !== 'GET' && r.form) {
+        if (!formAllowed(req)) return send(res, 403, { error: 'Send the form from its page' });
       } else if (req.method !== 'GET' && !String(req.headers['content-type'] || '').startsWith('application/json')) {
         return send(res, 415, { error: 'JSON required' }); // CSRF guard (with SameSite=Strict)
       }
-      const body = req.method === 'GET' || r.raw ? {} : await readBody(req);
+      const body = req.method === 'GET' || r.raw ? {} : await readBody(req, r.form);
       const out = await r.handler(req, res, body, url.searchParams, url.pathname.match(r.re).groups || {}, user);
       if (out === null) return;
       if (Array.isArray(out) && typeof out[0] === 'number' && out.length === 2) return send(res, out[0], out[1]);

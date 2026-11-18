@@ -59,9 +59,10 @@ export const sendingTools = [
     input_schema: { type: 'object', properties: {
       to: { type: 'string', enum: ['list', 'tag', 'household', 'event', 'orders'] }, name: { type: 'string', description: 'The list, tag, household or event (for orders: optional event)' },
       purpose: { type: 'string', enum: ['updates', 'marketing'], description: 'updates (news about things they take part in) or marketing' },
-      title: { type: 'string', maxLength: 80 }, message: { type: 'string', maxLength: 1500 } }, required: ['to', 'purpose', 'message'] },
+      title: { type: 'string', maxLength: 80 }, message: { type: 'string', maxLength: 1500 }, survey: { type: 'string', description: 'A survey title to send with it (people answer in chat, or by {survey_link})' } }, required: ['to', 'purpose', 'message'] },
     async run(a, ctx) {
-      const p = await preview({ title: a.title || a.message.slice(0, 40), audience: await audienceOf(a), purpose: a.purpose, agent: ctx.agent.id, template: a.message },
+      const survey = a.survey ? (await needModule('surveys')).findSurvey(a.survey).id : '';
+      const p = await preview({ title: a.title || a.message.slice(0, 40), audience: await audienceOf(a), purpose: a.purpose, agent: ctx.agent.id, template: a.message, survey },
         `${ctx.agent.name} (organizer)`, 'agent', { visible: (id) => canSee(peopleScope(ctx.agent, { owner: !!ctx.ownerTurn }), id) });
       if (!p.to.total) return `Nobody would get it: ${p.skipped.length} skipped (${[...new Set(p.skipped.map((s) => s.reason))].join(', ')}).`;
       return hold(ctx, p);

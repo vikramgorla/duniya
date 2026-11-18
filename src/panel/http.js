@@ -14,7 +14,7 @@ import { newToken } from '../core/crypto.js';
  * viewer for GET, admin otherwise); opts.public: no sign-in; opts.raw: the handler reads a binary body (uploads).
  * @typedef {(method: string, pattern: string,
  *   handler: (req: any, res: any, body: any, q: URLSearchParams, p: Record<string, string>, user: any) => any,
- *   opts?: { role?: 'viewer' | 'admin' | 'owner', public?: boolean, raw?: boolean }) => void} Route
+ *   opts?: { role?: 'viewer' | 'admin' | 'owner', public?: boolean, raw?: boolean, form?: boolean }) => void} Route
  * @typedef {{ channel?: any, invoke?: Function }} RouteContext  what a route module may use: the WhatsApp channel(s), in-process calls
  */
 export const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
