@@ -64,7 +64,7 @@ export async function upkeepTick(channel, now = Date.now()) {
     try { done.retries = await historyRetryTick(now); } catch (e) { activity('error', { summary: `History retry failed: ${e.message}` }); }
     if (optionalPaused()) return { ...done, skipped: 'memory' };
     try { done.names = !!(await channel?.upkeep?.())?.ok; } catch { /* the channel reports its own failures */ }
-    try { await rebuildStaleSummary(agentForChat); } catch { /* #180: retried next tick */ }
+    try { await rebuildStaleSummary(agentForChat); } catch { /* #178: retried next tick */ }
     try { done.phonePeople = syncPhonePeople(); } catch (e) { activity('error', { summary: `Phone contacts to People failed: ${e.message}` }); }
     if (typeof channel?.groupMembers !== 'function') return done;
     const on = new Set(enabledChats().filter(isGroup));

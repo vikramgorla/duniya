@@ -36,7 +36,7 @@ const lastStart = new Map();
 // No timers of their own: each pending chat has a due time (kept in kv, so it survives a restart) and the shared
 // upkeep tick (upkeep.js, run by the scheduler every 30 s) runs at most RETRIES_PER_TICK due ones.
 const MIN = 60000;
-// #180: three tries, each from a different stored message (the oldest may have been deleted on the phone), then stop
+// #178: three tries, each from a different stored message (the oldest may have been deleted on the phone), then stop
 const RETRY_BACKOFF_MS = [2 * MIN, 15 * MIN, 60 * MIN];
 const ONLINE_GAP_MS = 60000; // "phone seen online" makes a chat due at most once a minute
 const RETRIES_PER_TICK = 2;

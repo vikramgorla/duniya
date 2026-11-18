@@ -170,7 +170,7 @@ export function insertEarlierMessages(chat, rows) {
   return out;
 }
 /** #91: the oldest stored message of a chat that has a WhatsApp id (anchor for loading earlier messages). */
-/** The anchor for loading history: the oldest stored message, or the skip-th oldest (#180: retries try another one). */
+/** The anchor for loading history: the oldest stored message, or the skip-th oldest (#178: retries try another one). */
 export const oldestStoredMessage = (chat, skip = 0) => db.prepare('SELECT * FROM messages WHERE chat = ? AND msg_id IS NOT NULL ORDER BY id LIMIT 1 OFFSET ?').get(chat, skip) || null;
 /** #91: how much of a chat is stored: { count, since } (since = time of the oldest stored message). */
 export const storedSpan = (chat) => { const r = db.prepare('SELECT COUNT(*) AS n, MIN(ts) AS since FROM messages WHERE chat = ?').get(chat); return { count: r.n, since: r.since || null }; };
@@ -313,7 +313,7 @@ export function listMessages(chat, { before = 0, limit = 50, q = '', around = 0 
 }
 
 // ---- WhatsApp reactions and polls (026) ----
-/** #180: a message deleted for everyone in WhatsApp is deleted here too (search index by trigger). */
+/** #178: a message deleted for everyone in WhatsApp is deleted here too (search index by trigger). */
 export const deleteMessageByMsgId = (chat, msgId) => db.prepare('DELETE FROM messages WHERE chat = ? AND msg_id = ?').run(chat, String(msgId)).changes;
 export const deleteStoredMessage = (chat, id) => db.prepare('DELETE FROM messages WHERE chat = ? AND id = ?').run(chat, id).changes;
 export const messageByMsgId = (chat, msgId) => db.prepare('SELECT * FROM messages WHERE chat = ? AND msg_id = ?').get(chat, String(msgId)) || null;

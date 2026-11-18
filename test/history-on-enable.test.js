@@ -237,7 +237,7 @@ test('#167: the phone answers one chat but not another → "nothing earlier", no
   assert.ok(!JSON.parse(t.db.kvGet('historyRetries') || '{}')[B]);
 });
 
-test('#180: unanswered loads stop after 3 retries, each from another stored message (the oldest may be deleted on the phone)', async () => {
+test('#178: unanswered loads stop after 3 retries, each from another stored message (the oldest may be deleted on the phone)', async () => {
   hl.resetHistoryLoads();
   const F = 'g11@g.us';
   t.chatPrefs.setChatPrefs(F, { enabled: true });
@@ -259,7 +259,7 @@ test('#180: unanswered loads stop after 3 retries, each from another stored mess
   t.phone.online = true;
 });
 
-test('#180: a message deleted for everyone in WhatsApp, or by the owner in the panel, is removed from the stored messages', async () => {
+test('#178: a message deleted for everyone in WhatsApp, or by the owner in the panel, is removed from the stored messages', async () => {
   const H = 'g12@g.us';
   t.chatPrefs.setChatPrefs(H, { enabled: true });
   await t.onHistory(phoneMsgs(H, 3, { prefix: 'h12' }));
@@ -272,7 +272,7 @@ test('#180: a message deleted for everyone in WhatsApp, or by the owner in the p
   assert.equal((await t.api(owner, 'DELETE', `/api/chats/${enc(H)}/messages/${b.id}`)).status, 404);
 });
 
-test('#180: after a deletion the chat summary is rebuilt from what is stored (the agent forgets it)', async () => {
+test('#178: after a deletion the chat summary is rebuilt from what is stored (the agent forgets it)', async () => {
   const K = 'g13@g.us';
   t.chatPrefs.setChatPrefs(K, { enabled: true });
   await t.onHistory(phoneMsgs(K, 3, { prefix: 'k13' }));

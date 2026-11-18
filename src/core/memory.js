@@ -271,7 +271,7 @@ export const memoryTools = [
   },
 ];
 
-// #180: a message was deleted (for everyone in WhatsApp, or by the owner in the panel). The running summary may still
+// #178: a message was deleted (for everyone in WhatsApp, or by the owner in the panel). The running summary may still
 // mention it, so it is rebuilt from what is stored now: one chat per upkeep tick, retried on the next tick if the model fails.
 const stale = new Set();
 export function forgetDeleted(chat) { if (getChatMemory(chat)?.summary) stale.add(chat); }

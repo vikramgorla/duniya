@@ -302,7 +302,7 @@ function messagesView(c, agents, q0 = '', at = 0) {
   const more = h('button', { class: 'btn small', type: 'button', onclick: () => load('older') }, 'Load older');
   const latest = h('button', { class: 'btn small hide', type: 'button', onclick: () => { at = 0; load(); } }, 'Show the latest');
   const agentOf = (id) => agents.find((b) => b.id === id)?.name || (id === 'owner-assistant' ? 'Owner assistant' : 'Agent');
-  // #180: delete a stored message (tap a message to show it); the chat's summary is rebuilt without it
+  // #178: delete a stored message (tap a message to show it); the chat's summary is rebuilt without it
   const del = (m) => admin ? h('button', { class: 'btn small msg-del', type: 'button', onclick: async (e) => {
     e.stopPropagation();
     if (!await ask({ title: 'Delete this message?', text: 'It is removed from the stored messages and the agent forgets it (the chat summary is rebuilt). Nothing changes in WhatsApp.', ok: 'Delete', danger: true })) return;

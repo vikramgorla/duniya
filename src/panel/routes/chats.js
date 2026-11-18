@@ -111,7 +111,7 @@ export function chatRoutes(route, { channel } = {}) {
     if (!q.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${q.get('q') ? ` (search “${String(q.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;
   }, { role: 'admin' });
-  // #180: delete one stored message (admins and owners); the agent forgets it (the chat summary is rebuilt). WhatsApp is unchanged.
+  // #178: delete one stored message (admins and owners); the agent forgets it (the chat summary is rebuilt). WhatsApp is unchanged.
   route('DELETE', '/api/chats/:chat/messages/:id', async (req, res, body, q, p, user) => {
     const chat = decodeURIComponent(p.chat);
     if (!deleteStoredMessage(chat, Number(p.id))) throw Object.assign(new Error('Message not found'), { status: 404 });

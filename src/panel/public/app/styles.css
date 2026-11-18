@@ -776,6 +776,6 @@ button.lrow { width: 100%; border: 0; background: none; font: inherit; text-alig
 .tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 10px; border-radius: 999px; background: var(--bg-2); font-size: var(--fs-s); overflow-wrap: anywhere; }
 .tag-x { font: inherit; border: 0; background: none; color: var(--muted); cursor: pointer; min-width: 40px; min-height: 40px; margin: -9px -4px -9px -6px; border-radius: 999px; }
 .tag-x:hover { color: var(--ink); background: var(--line); }
-/* #180: a stored message's Delete shows on hover or after tapping the message */
+/* #178: a stored message's Delete shows on hover or after tapping the message */
 .msgs .msg-del { display: none; margin-top: 6px; }
 .msgs [data-msg]:hover .msg-del, .msgs [data-msg]:focus-within .msg-del { display: inline-flex; }
