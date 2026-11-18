@@ -36,7 +36,7 @@ export async function seedScale(t, N = FULL) {
   for (const c of chats.slice(0, N.on)) t.chatPrefs.setChatPrefs(c, { enabled: true });
   // 081: Events and Orders on (their tables), seeded below; 082: Lists and sending too
   const mods = await import('../src/modules/index.js');
-  for (const id of ['events', 'orders', 'sending']) await mods.setModuleOn(id, true, 'fixture');
+  for (const id of ['events', 'orders', 'sending', 'surveys']) await mods.setModuleOn(id, true, 'fixture');
   db.exec('BEGIN');
   try {
     const seen = db.prepare('INSERT OR REPLACE INTO chats_seen (tenant_id, chat, number, is_group, name, phone, last_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
@@ -137,6 +137,25 @@ export async function seedScale(t, N = FULL) {
         const st = last && i >= 1000 ? 'waiting' : RS[i % RS.length]; const at = st === 'waiting' || st === 'skipped' ? null : now - (30 - r) * DAY + i * 60000;
         rr.run(id, i, personId((i * 3 + r) % N.people), `Contact ${i}`, `${phoneOf((i * 3 + r) % N.people)}@s.whatsapp.net`, st, st === 'skipped' ? 'Not asked about updates' : '', at ? 'Hi there' : '', at, st === 'replied' ? at + 600000 : null);
       }
+    }
+    // 083: 5 surveys of 4 questions; 4,000 people asked the first one, 3,000 answered (12k answers); 5 campaigns over the runs
+    const sq = JSON.stringify([{ id: 'q1', text: 'Which day?', kind: 'single', options: ['Sat', 'Sun'], required: true }, { id: 'q2', text: 'Bring?', kind: 'multi', options: ['Salad', 'Drinks', 'Dessert'], required: true },
+      { id: 'q3', text: 'How many?', kind: 'number', options: [], required: true }, { id: 'q4', text: 'Notes', kind: 'text', options: [], required: false }]);
+    for (let v = 0; v < 5; v++) db.prepare("INSERT INTO srv_surveys (tenant_id, id, title, intro, questions, status, created_at) VALUES ('default', ?, ?, '', ?, 'open', ?)").run(`sv_${String(v).padStart(12, '0')}`, `Survey ${v}`, sq, now - v * DAY);
+    const sp = db.prepare("INSERT INTO srv_people (tenant_id, survey, person, token, invited_at, started_at, done_at, via) VALUES ('default', 'sv_000000000000', ?, ?, ?, ?, ?, 'chat')");
+    const sa = db.prepare("INSERT INTO srv_answers (tenant_id, survey, person, q, value, at) VALUES ('default', 'sv_000000000000', ?, ?, ?, ?)");
+    for (let i = 0; i < 4000; i++) {
+      const done = i < 3000;
+      sp.run(personId(i), `tok${String(i).padStart(60, '0')}`, now - DAY, done ? now - DAY + i : null, done ? now - DAY + i : null);
+      if (!done) continue;
+      sa.run(personId(i), 'q1', JSON.stringify(i % 2 ? 'Sat' : 'Sun'), now); sa.run(personId(i), 'q2', JSON.stringify(['Salad', 'Drinks'].slice(0, 1 + (i % 2))), now);
+      sa.run(personId(i), 'q3', String(1 + (i % 5)), now); sa.run(personId(i), 'q4', JSON.stringify(`Note ${i}`), now);
+    }
+    const steps = JSON.stringify([{ kind: 'message', template: 'Hi {first_name}' }, { kind: 'wait', days: 3 }, { kind: 'message', template: 'Again {first_name}' }]);
+    for (let c = 0; c < 5; c++) {
+      db.prepare("INSERT INTO snd_campaigns (tenant_id, id, title, audience, purpose, agent, steps, stops, status, step, step_at, created_at) VALUES ('default', ?, ?, ?, 'updates', 'agent-0', ?, ?, ?, 1, ?, ?)")
+        .run(`cmp_${String(c).padStart(12, '0')}`, `Campaign ${c}`, JSON.stringify({ kind: 'list', list: 'l_000000000003' }), steps, JSON.stringify({ replied: true, answered: true }), c ? 'done' : 'running', now - DAY, now - 2 * DAY);
+      db.prepare("INSERT INTO snd_campaign_runs (tenant_id, campaign, step, run) VALUES ('default', ?, 0, ?)").run(`cmp_${String(c).padStart(12, '0')}`, `run_${String(20 + c).padStart(12, '0')}`);
     }
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
