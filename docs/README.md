@@ -4,7 +4,7 @@
 
 <p>
   <a href="install.md"><img src="img/btn-install.svg" alt="Install on any server" height="32"></a>
-  <a href="https://vikramgorla.github.io/whatsapp-agent-duniya/"><img src="img/btn-website.svg" alt="See the website" height="32"></a>
+  <a href="https://vikramgorla.github.io/duniya/"><img src="img/btn-website.svg" alt="See the website" height="32"></a>
 </p>
 
 **In 30 seconds**
@@ -83,4 +83,4 @@ The panel's **Server** page has a **Hosting help** card that links to the right 
 Feature specs: [`specs/`](../specs) · design language: [DESIGN.md](../DESIGN.md).
 
 ---
-**Next:** [Install](install.md) · [Getting started](getting-started.md) · [Website](https://vikramgorla.github.io/whatsapp-agent-duniya/)
+**Next:** [Install](install.md) · [Getting started](getting-started.md) · [Website](https://vikramgorla.github.io/duniya/)

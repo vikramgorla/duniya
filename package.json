@@ -1,10 +1,10 @@
 {
   "name": "duniya",
-  "version": "2.46.0",
+  "version": "2.46.1",
   "private": true,
   "description": "Self-hosted AI agents for WhatsApp and Telegram groups and chats: any model, MCP tools, People, events and orders, admin panel.",
   "license": "MIT",
-  "repository": "github:vikramgorla/whatsapp-agent-duniya",
+  "repository": "github:vikramgorla/duniya",
   "type": "module",
   "main": "src/index.js",
   "scripts": {

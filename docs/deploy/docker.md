@@ -3,7 +3,7 @@
 **Duniya in containers on any machine with Docker: three commands, data in one volume.**
 
 ```bash
-git clone https://github.com/vikramgorla/whatsapp-agent-duniya && cd duniya
+git clone https://github.com/vikramgorla/duniya && cd duniya
 cp .env.example .env
 docker compose up -d
 ```
@@ -31,7 +31,7 @@ The first screen asks for the setup code: `docker compose exec app duniya show-s
 in `.env`.
 
 > [!NOTE]
-> Images: `ghcr.io/vikramgorla/whatsapp-agent-duniya:v<version>` or `:latest`, amd64 and arm64, published on each
+> Images: `ghcr.io/vikramgorla/duniya:v<version>` or `:latest`, amd64 and arm64, published on each
 > release. Command line: `docker compose exec app duniya help`.
 
 ## Update the app
@@ -51,7 +51,7 @@ in `.env`.
 > Forgetting your `--profile` flags (e.g. `docker compose --profile https pull`) leaves Caddy or cloudflared out.
 
 > [!TIP]
-> Pin a version: `image: ghcr.io/vikramgorla/whatsapp-agent-duniya:v2.9.2` in a `docker-compose.override.yml`.
+> Pin a version: `image: ghcr.io/vikramgorla/duniya:v2.9.2` in a `docker-compose.override.yml`.
 > Host OS updates are yours (`apt upgrade`).
 
 ## Recreate from scratch
@@ -73,7 +73,7 @@ in `.env`.
 ```bash
 docker compose down        # removes the containers; the volumes (your data) stay
 docker compose down -v     # also deletes the volumes: database, WhatsApp link, local backups. Back up first!
-docker image rm ghcr.io/vikramgorla/whatsapp-agent-duniya caddy:2 cloudflare/cloudflared 2>/dev/null
+docker image rm ghcr.io/vikramgorla/duniya caddy:2 cloudflare/cloudflared 2>/dev/null
 ```
 
 Then delete the cloned folder, and close ports 80/443 if you opened them.

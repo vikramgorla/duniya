@@ -239,7 +239,7 @@ Before and after #174 (performance budgets), same fixture (900 people writing th
 
 No attribution trailers or footers in commits and PRs (no Co-Authored-By, session links or 'Generated with' lines).
 Commits are authored by the repository owner's identity; no AI co-author trailers or signatures; squash merges use an
-explicit message. Squash-merge with `gh api -X PUT repos/vikramgorla/whatsapp-agent-duniya/pulls/N/merge -f merge_method=squash -f
+explicit message. Squash-merge with `gh api -X PUT repos/vikramgorla/duniya/pulls/N/merge -f merge_method=squash -f
 commit_title="<PR title> (#N)" -f commit_message="<short summary>"`, so GitHub does not append trailers from the branch commits.
 
 ## Repository and forks
@@ -283,7 +283,7 @@ under the new name from the next release on.
    an entry for it to `releases.json` with its [release notes](#release-notes) (CI fails without a title and changes).
 2. Merge to `main` (or push a `vX.Y.Z` tag, or run the workflow by hand).
 3. The release workflow creates the tag and GitHub release (notes built from the entry by `scripts/release-notes.mjs`),
-   attaches the OCI stack zip (`duniya.zip`) and publishes `ghcr.io/vikramgorla/whatsapp-agent-duniya` (named after
+   attaches the OCI stack zip (`duniya.zip`) and publishes `ghcr.io/vikramgorla/duniya` (named after
    the repository that runs it, so a fork publishes its own).
 
 ### Release notes
