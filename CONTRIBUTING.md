@@ -43,22 +43,27 @@ forks](docs/development.md#repository-and-forks)).
 A fork is a full Duniya of your own: its own releases, Docker image, website and installer.
 
 1. **Fork** on GitHub (keep the name or choose another).
-2. **Enable Actions** in the fork (**Actions** tab → *I understand my workflows, go ahead and enable them*), then run
-   **Actions → Fork setup → Run workflow** (it also runs on every push to `main`). It sees that the repository is now
-   yours, runs `npm run repo:sync`, and opens a pull request *Set up this repository: you/name* that points
+2. **Enable Actions** in the fork (**Actions** tab → *I understand my workflows, go ahead and enable them*).
+3. **Let Actions open pull requests** (off by default on new repositories and forks): **Settings → Actions → General →
+   Workflow permissions** → tick **Allow GitHub Actions to create and approve pull requests** → Save.
+4. **Run Actions → Fork setup → Run workflow** (it also runs on every push to `main`). It sees that the repository is
+   now yours, runs `npm run repo:sync`, and opens a pull request *Set up this repository: you/name* that points
    `package.json`, the README buttons, the install command, the website, the OCI/GCP defaults and the compose image at
-   your fork. Merge it. (If Actions may not open pull requests in your fork, the run summary has a link to open it, or
-   allow it under **Settings → Actions → General**. Without Actions: `npm run repo:sync -- --repo you/name`, commit.)
-3. **Enable Pages:** **Settings → Pages → Source: GitHub Actions**, then run **Actions → Pages**. The website is at
+   your fork. Merge it.
+   - **No pull request?** Then step 3 was skipped: the workflow still succeeds, pushes the branch
+     `repo-sync/<you>-<name>` and prints a *compare* link in the run summary (**Actions → Fork setup → the run**).
+     Open that link → **Create pull request** → merge. Or allow step 3 and run the workflow again.
+   - **Without Actions:** `npm run repo:sync -- --repo you/name`, commit, push.
+5. **Enable Pages:** **Settings → Pages → Source: GitHub Actions**, then run **Actions → Pages**. The website is at
    `https://<you>.github.io/<name>/`.
-4. **Release:** bump the version and add a `releases.json` entry in a PR; merging publishes the release, `duniya.zip`
+6. **Release:** bump the version and add a `releases.json` entry in a PR; merging publishes the release, `duniya.zip`
    (the OCI stack) and `ghcr.io/<you>/<name>`. Make the package public under your profile → **Packages** if Docker
    users should pull it without signing in.
-5. **Install from your fork:**
+7. **Install from your fork:**
    `curl -fsSL https://raw.githubusercontent.com/you/duniya/main/install.sh | sudo DUNIYA_REPO=you/duniya bash`.
    Servers update from your releases; an existing server switches under **Settings → Updates → Update source** or with
    `sudo duniya source you/duniya`.
-6. **Stay in sync with upstream:** **Sync fork** on your fork's GitHub page (or `git fetch upstream && git merge
+8. **Stay in sync with upstream:** **Sync fork** on your fork's GitHub page (or `git fetch upstream && git merge
    upstream/main`). The sync keeps your slug: if a merge brings back upstream links, `node scripts/ci-checks.mjs`
    says so and `npm run repo:sync` fixes them (the Fork setup workflow does it for you on the next push).
 

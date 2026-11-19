@@ -48,5 +48,5 @@ jobs:
           elif gh api "repos/$GITHUB_REPOSITORY/pulls?head=${GITHUB_REPOSITORY%%/*}:$branch&state=open" --jq '.[0].html_url // empty' | grep -q .; then
             echo "The pull request for $branch is already open; it was updated." | tee -a "$GITHUB_STEP_SUMMARY"
           else
-            echo "Actions may not open pull requests in this repository (Settings → Actions → General → Allow GitHub Actions to create pull requests). Open it yourself: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$branch" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "Pushed the branch $branch, but Actions may not open pull requests here. Open it yourself: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$branch?expand=1 (Create pull request, then merge). To let this workflow do it next time: Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests." | tee -a "$GITHUB_STEP_SUMMARY"
           fi

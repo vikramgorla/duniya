@@ -122,7 +122,10 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
   Rules. When one changes, change the other in the same week.
 - **Repository slug:** never hard-code the GitHub owner/name. It lives only in `package.json` `repository`; code
   reads `REPO` from `src/core/config.js` (`src/core/repo.js` derives every URL), docs and infra are rewritten with
-  `npm run repo:sync`, and `ci-checks.mjs` fails on a project URL with another slug.
+  `npm run repo:sync`, and `ci-checks.mjs` fails on a project URL with another slug. After a fork or rename, the
+  *Fork setup* workflow opens the set-up PR only if Actions may create pull requests (Settings → Actions → General);
+  otherwise look for the branch `repo-sync/<owner>-<name>` and open the PR from it via REST
+  (`gh api -X POST repos/{o}/{r}/pulls -f head=repo-sync/<owner>-<name> -f base=main …`).
 - **Dependencies:** runtime deps are limited (Baileys, Anthropic SDK, MCP SDK, pino, qrcode); a new one needs a stated
   reason in the plan. Other providers use `fetch`.
 - **Commits:** clear messages. No attribution trailers or footers in commits and PRs (no Co-Authored-By, session links
