@@ -280,8 +280,25 @@ The same thing looks and behaves the same wherever it appears, and every place l
 - **People and lists as tags** (079): `peoplePicker()` in `tags.js` — chosen people, lists (marked ≡) and numbers as
   the same `.tag` chips as words; typing shows up to seven matches as small buttons under the box; Enter adds a typed
   number. Used for an agent's organizers, extra participants and shared lists.
-- **People · Households · Lists** (078): one small switch (`.seg.pnav`, links) at the top of the three lists; each
-  row opens a page with a back link; a household lists adults, then kids.
+- **People · Households · Lists** (078): one small switch (`.seg.pnav`, links) at the top of the three lists (and Events,
+  Orders, Sending, Surveys when on); it wraps on a phone, never scrolls them out of sight (085); each row opens a page
+  with a back link; a household lists adults, then kids.
+
+## Numbers, money and days (085)
+
+- **One format, the reader's locale.** Money is `money(cents, currency)` (`Intl` currency: *CHF 60.00*, *€12.50*), days
+  are `day(date, near)` (*14 Jan*, *14 Jan 2027* in another year; with `near`, *today*, *tomorrow*, *in 3 days*, *6 days
+  ago* within a week), phone numbers are grouped (*+41 79 000 00 01*), all in `people.js` for the People screens. The
+  server sends days as parts (`{ day, before }` in a row's `sub`), never preformatted `2027-01-14`; agents and admin
+  tools use the one server `money()` in `src/core/config.js`.
+- **Words for states, the same everywhere:** an order is *Not paid*, *Part paid*, *Paid*, *Overdue*; a message is
+  *Sending*, *Paused*, *Done*, *Stopped*; a campaign is *Running*; a person on a message is *Sent*, *Replied*, *Said
+  stop*, *Waiting*; on a survey *Finished*, *Part-way*, *Asked*.
+- **What someone got or answered** is a `.quote` (2 px rule, muted, two lines on a row) under their name; the row opens
+  the person and ends in their state pill.
+- **Rows' ⋯ are quiet** (no border, muted), so a list of registrations or duties reads as one calm column.
+- **Related things link both ways:** an event's and a survey's page end with *Messages* (what was sent to their people,
+  and the add row to send one); a person's page lists their events, orders, messages and surveys.
 
 ## Standalone pages (064, 070)
 

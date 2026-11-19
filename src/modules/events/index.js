@@ -305,13 +305,13 @@ function personSections(person) {
   const duties = db.prepare(`SELECT d.task, d.at, e.name AS ename, e.id AS eid FROM ev_duty_people p JOIN ev_duties d ON d.tenant_id = p.tenant_id AND d.id = p.duty
     JOIN ev_events e ON e.tenant_id = d.tenant_id AND e.id = d.event WHERE p.tenant_id = ? AND p.person = ? ORDER BY e.starts DESC LIMIT 20`).all(TENANT, person);
   if (!regs.length && !duties.length) return [];
-  return [{ title: 'Events', rows: [...regs.map((r) => ({ name: r.ename, sub: `${r.starts.slice(0, 10)} · ${STATUS_WORD[r.status]}${r.household ? ' (household)' : ''} · ${r.adults + r.kids} ${r.adults + r.kids === 1 ? 'person' : 'people'}`, href: `#people/events/${r.event}` })),
+  return [{ title: 'Events', rows: [...regs.map((r) => ({ name: r.ename, sub: [{ day: r.starts }, `${STATUS_WORD[r.status]}${r.household ? ' with their household' : ''}`, `${r.adults + r.kids} ${r.adults + r.kids === 1 ? 'person' : 'people'}`], href: `#people/events/${r.event}` })),
     ...duties.map((d) => ({ name: `Duty: ${d.task}`, sub: `${d.ename}${d.at ? ` · ${d.at}` : ''}`, href: `#people/events/${d.eid}` }))] }];
 }
 function householdSections(id) {
   const regs = db.prepare(`SELECT r.*, e.name AS ename, e.starts FROM ev_registrations r JOIN ev_events e ON e.tenant_id = r.tenant_id AND e.id = r.event
     WHERE r.tenant_id = ? AND r.household = ? ORDER BY e.starts DESC LIMIT 20`).all(TENANT, id);
-  return regs.length ? [{ title: 'Events', rows: regs.map((r) => ({ name: r.ename, sub: `${r.starts.slice(0, 10)} · ${STATUS_WORD[r.status]} · ${r.adults} adults, ${r.kids} kids`, href: `#people/events/${r.event}` })) }] : [];
+  return regs.length ? [{ title: 'Events', rows: regs.map((r) => ({ name: r.ename, sub: [{ day: r.starts }, STATUS_WORD[r.status], `${r.adults} ${r.adults === 1 ? 'adult' : 'adults'}, ${r.kids} ${r.kids === 1 ? 'kid' : 'kids'}`], href: `#people/events/${r.event}` })) }] : [];
 }
 
 /** A held change an organizer confirmed (or a change about the sender). */

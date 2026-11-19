@@ -5,12 +5,11 @@
 //   organizers    registration_list (names, counts, notes), and — held for an organizer's "confirm XXXX" —
 //                 register_someone, update_registration (confirm / waiting list / cancel), assign_duty
 // Hidden people (People → Hide) are left out of names agents see.
-import { clip, fail } from '../../core/config.js';
+import { clip, fail, money } from '../../core/config.js';
 import { householdsOf, listHouseholds, listPeople, personByRef, personRow } from '../../core/people.js';
 import { canSee, peopleScope } from '../../core/people-access.js';
 import { STATUS_WORD, change, counts, dutiesOf, findDuty, findEvent, getEvent, listEvents, registrationFor, registrationsOf } from './index.js';
 
-const money = (cents, cur) => `${cur} ${(cents / 100).toFixed(2)}`;
 const me = (ctx) => { if (!ctx.personId) throw fail('I do not know who you are on this app yet, so I cannot register you. Ask an organizer.'); return ctx.personId; };
 const organizer = (ctx) => ctx.role === 'organizer' || !!ctx.ownerTurn;
 const nameOf = (id) => { const p = personRow(id); return !p ? 'Someone' : p.hidden ? '(hidden)' : p.name; };

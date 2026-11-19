@@ -96,7 +96,7 @@ const CARDS = [
   ['card-orders', 'people/orders', '', '#main .card', 900], // 081: People → Orders
   ['card-survey', 'people/surveys', "document.querySelector('.people-list a').click(); await T.until('.person-page'); await T.wait(400);", '.person-page', 900], // 083: a survey's results
   ['card-campaign', 'people/sending', "[...document.querySelectorAll('a.lrow')].find((a) => a.href.includes('/campaign/c')).click(); await T.until('.person-page'); await T.wait(400);", '.person-page', 900], // 083: a campaign's steps
-  ['card-sending', 'people/sending', "[...document.querySelectorAll('.people-list a')].find((a) => a.textContent.includes('Payment')).click(); await T.until('.person-page'); await T.wait(400);", '.person-page', 900], // 082: a run's page
+  ['card-sending', 'people/sending', "[...document.querySelectorAll('a.lrow')].find((a) => a.textContent.includes('Payment')).click(); await T.until('.person-page'); await T.wait(400);", '.person-page', 900], // 082: a run's page
   ['card-pace', 'settings/sending-pace', "await T.click('Custom', 'button', 300);", 'box:Sending pace', 900], // 080: Settings → Sending pace
   ['card-web-access', 'settings/web-access', '', 'box:Web address & access', 900],
   ['card-small-server', 'server', '', 'box:This server', 1100],

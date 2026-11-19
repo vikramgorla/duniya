@@ -79,13 +79,16 @@ function connectTelegram() {
 }
 function botCard(c, st) {
   const b = c.info;
+  const disconnect = async () => (await ask({ title: 'Disconnect the Telegram bot?', text: 'The token is removed from this server and agents stop answering on Telegram. Chats keep their memory. The bot itself stays in Telegram.', ok: 'Disconnect', danger: true }))
+        && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'TELEGRAM_BOT_TOKEN', value: '' }); await refreshStatus(); }, 'Disconnected');
   const dmSel = h('select', { disabled: !can('admin'), style: 'max-width:260px', 'aria-label': 'Direct messages to the bot go to',
     onchange: (e) => tryApi(() => api('PUT', '/api/channels/telegram/settings', { dmAgent: e.target.value }), 'Saved') },
   h('option', { value: '' }, 'Default agent (see Chats & direct messages)'), st.agents.map((a) => h('option', { value: a.id, selected: b?.dmAgent === a.id }, a.name)));
   const privacy = b?.canReadAll ? 'Sees every message in its groups, so agents can follow the conversation.'
     : 'Sees only messages that mention it, reply to it or start with /. Enough for agents you call by name.';
   return h('div', { class: 'card', id: 'tg-bot' },
-    h('div', { class: 'row spread' }, h('h2', {}, 'Bot'), b ? extLink(b.link, `@${b.username}`, 'small') : null),
+    h('div', { class: 'row spread' }, h('h2', {}, 'Bot'), h('span', { class: 'row', style: 'gap:6px' }, b ? extLink(b.link, `@${b.username}`, 'small') : null,
+      can('admin') ? menu('More for the bot', h('button', { class: 'btn small', type: 'button', onclick: pasteToken }, 'Replace token…'), can('owner') ? h('button', { class: 'btn small danger', type: 'button', onclick: disconnect }, 'Disconnect…') : null) : null)),
     b ? [h('div', { class: 'row', style: 'flex-wrap:wrap;margin-bottom:6px' }, extLink(b.groupLink, 'Add to a group', 'btn small primary'), extLink(b.link, 'Open a direct chat')),
       h('p', { class: 'small muted' }, 'New groups show up in Chats, off until you switch them on.'),
       h('p', { class: 'small', style: 'margin-bottom:4px' }, privacy, ' ', helpLink('telegram.md#privacy-mode', 'Help: what the bot sees')),
@@ -93,12 +96,9 @@ function botCard(c, st) {
         h('ol', { class: 'small', style: 'padding-left:18px' }, h('li', {}, 'In @BotFather send /setprivacy, choose ', h('b', {}, `@${b.username}`), ' and tap Disable.'),
           h('li', {}, 'Remove the bot from the group and add it again (Telegram applies the change only then).'),
           h('li', {}, 'Or make the bot an admin of the group: admins see every message.'))),
-      h('p', { class: 'small muted' }, 'People link their phone number by opening a direct chat with the bot and tapping “Share my number”. Then they are the same person as on WhatsApp, with the same roles.')]
+      h('p', { class: 'small muted' }, 'Someone who taps “Share my number” in a chat with the bot is the same person as on WhatsApp. ', helpLink('telegram.md', 'Help: one person on both apps'))]
       : h('p', { class: 'small muted' }, 'Connecting to Telegram…'),
-    field('Direct messages to the bot go to', dmSel),
-    can('admin') ? h('div', { class: 'row', style: 'margin-top:8px;flex-wrap:wrap' }, h('button', { class: 'btn small', onclick: pasteToken }, 'Replace token'),
-      can('owner') ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: 'Disconnect the Telegram bot?', text: 'The token is removed from this server and agents stop answering on Telegram. Chats keep their memory. The bot itself stays in Telegram.', ok: 'Disconnect', danger: true }))
-        && tryApi(async () => { await api('PUT', '/api/secrets', { name: 'TELEGRAM_BOT_TOKEN', value: '' }); await refreshStatus(); }, 'Disconnected') }, 'Disconnect') : null) : null);
+    field('Direct messages to the bot go to', dmSel));
 }
 
 const pillFor = (x) => h('span', { class: `pill ${x.status === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(x.status) ? 'warn' : 'bad'}` }, x.status === 'open' ? 'connected' : x.status === 'qr' ? 'waiting for scan' : x.status.replace('_', ' '));

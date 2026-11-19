@@ -4,7 +4,7 @@
 at a time at a person's pace, and only if they said yes.**
 
 **Do it:** **Settings → Modules** → **Lists and sending** on → **People → Sending → + New message** → **Preview** →
-**Start sending**.
+**Send to N people**.
 
 **In 30 seconds**
 - **To:** a list, a tag, a household, the people registered for an event, people with an open order (all, or of one
@@ -21,7 +21,7 @@ at a time at a person's pace, and only if they said yes.**
 - Replies go to the agent you chose, like any message. **"stop"** (or *unsubscribe*, *arrête*, *basta*, …) records
   *No* and confirms once; **"start"** undoes it.
 
-![A run's page: the payment reminder for Sankranti, 3 of 5 sent, 2 replied, 1 said stop; who got it and who is waiting](site/img/card-sending.webp)
+![A message's page: the payment reminder for Sankranti, 3 of 5 sent, 2 replied, 1 said stop; who got it and who is waiting](site/img/card-sending.webp)
 
 > [!WARNING]
 > Pacing lowers the risk that WhatsApp restricts or bans your number, but it does **not** remove it. WhatsApp's terms
@@ -38,10 +38,9 @@ at a time at a person's pace, and only if they said yes.**
    on with it (the preview says how many).
 5. **Message**, with the facts it may use: `{first_name}`, `{name}`, `{household}`; for events `{event}`, `{date}`,
    `{place}`, `{people}` (e.g. *2 adults, 1 kid*); for open orders `{amount}`, `{due}`, `{ways_to_pay}`.
-6. **Pause when this many in a row do not answer** (default 20; 0 for reminders nobody needs to answer).
-7. **Preview** → check the samples and who is skipped → **Start sending to N people**.
-
-**Save audience…** keeps the choice under a name for next time.
+6. **More options**: **Pause when this many in a row do not answer** (default 20; 0 for reminders nobody needs to
+   answer) and **Save this audience…** (keeps the choice under a name for next time).
+7. **Preview** → check the samples and who is skipped → **Send to N people**.
 
 ## Who gets it
 
@@ -52,7 +51,7 @@ at a time at a person's pace, and only if they said yes.**
 | An event | its **registered** people; a registered household gets **one** message, to one adult who agreed |
 | Open orders | everyone with an order not fully paid (of one event, or all), one message per household, with the open amount |
 
-Skipped, with the reason on the preview and the run's page: *Said no to updates*, *Not asked about updates*, *Hidden in
+Skipped, with the reason on the preview and the message's page: *Said no to updates*, *Not asked about updates*, *Hidden in
 People*, *No app to reach them*, *Their chat is switched off*, *A household without adults*. Consent is checked again
 right before each message, so a *No* recorded meanwhile still counts.
 
@@ -96,18 +95,20 @@ Look at it, then **Resume** or **Stop**. The daily limit and the sending hours o
 
 ## Payment reminders and event messages
 
-- **People → Orders → Send reminders**: a new message to everyone with an open order (of the event you filter by), with
+- **People → Orders → Remind everyone who has not paid**: a new message to everyone with an open order (of the event you filter by), with
   a friendly reminder to start from: amount, due date, ways to pay. Preview, then start.
 - **Automatic reminders**: on an event's page **⋯ → Automatic payment reminders…** → *On*, days before the due date,
   the agent, the message. Once per due date, people with an open order who agreed to updates get it by themselves;
   your switch is the confirmation. You get an owner alert when it starts.
-- **Message registered people**: on an event's page **⋯ → Message registered people**: one message per household.
+- **Message the registered people**: on an event's page, under **Messages**: one message per household.
 
-## The run's page
+## A message's page
 
 Progress (sent of total, replied, said stop, skipped, failed), **Pause / Resume**, **⋯ → Stop…**, what it is waiting
-for, the message, and each person: what they got and when they replied. It updates by itself. **People → Sending**
-keeps the history; a person's page lists the messages they got (*Messages from lists*).
+for, the message, and each person as a row: their state (*Sent*, *Replied*, *Said stop*, *Waiting*), when, and the
+wording they got; a tap opens their page. It updates by itself. **People → Sending** keeps the history (*Messages*,
+*Campaigns*, *Saved audiences*); a person's page lists the messages they got (*Messages from lists*), and an event's
+and a survey's page list the messages sent to their people.
 
 ## Surveys and campaigns
 
