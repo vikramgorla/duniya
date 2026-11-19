@@ -7,6 +7,12 @@
 <p align="center"><b>AI agents for your WhatsApp and Telegram groups and chats, on your own free server, run from a calm web panel.</b></p>
 
 <p align="center">
+  <a href="https://github.com/vikramgorla/duniya/actions/workflows/ci.yml"><img src="https://github.com/vikramgorla/duniya/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/vikramgorla/duniya/releases/latest"><img src="https://img.shields.io/github/v/release/vikramgorla/duniya?label=release&color=4d9b00" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-4d9b00" alt="MIT license"></a>
+</p>
+
+<p align="center">
   <a href="https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/duniya/releases/latest/download/duniya.zip"><img src="https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg" alt="Deploy to Oracle Cloud" height="32"></a>
   <a href="https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fduniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md"><img src="https://gstatic.com/cloudssh/images/open-btn.svg" alt="Open in Cloud Shell" height="32"></a>
   <a href="https://vikramgorla.github.io/duniya/"><img src="docs/img/btn-website.svg" alt="See the website" height="32"></a>
@@ -27,6 +33,11 @@ assistant, a family organiser. Groups on Telegram too: add a bot, and the same a
 person on both apps. **You** pick which chats they join, which model they use and what they may do. Every chat is
 silent until you switch it on.
 
+**For** organisers of family, school, club and neighbourhood groups who want their data on their own server. **Not**
+the official WhatsApp Business API, and not for bulk marketing. **Costs:** free software (MIT), a free server on
+Oracle or Google Cloud, free or cheap models (OpenRouter's free ones, your ChatGPT or Claude plan, or a key with a
+spending cap). [Is it for me?](docs/README.md#what-is-duniya-and-is-it-for-me)
+
 ## Install
 
 ```bash
@@ -36,7 +47,8 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/duniya/main/install.sh 
 Any Ubuntu/Debian server with 1 GB of memory, or one click on Oracle Cloud or Google Cloud (free tiers), or
 [Docker](docs/deploy/docker.md). It ends with the panel address and a setup code; **Getting started** on Overview
 then takes about five taps: link WhatsApp, connect a model, pick a template, switch a group on, send a test.
-[Install guide →](docs/install.md) · [Where is my panel?](docs/install.md#where-is-my-panel-find-the-ip--url)
+[Install guide →](docs/install.md) · [Where is my panel?](docs/install.md#where-is-my-panel-find-the-ip--url) ·
+[Stuck? Troubleshooting](docs/troubleshooting.md)
 
 ## Highlights
 
@@ -72,6 +84,7 @@ and image at your fork ([Forking](CONTRIBUTING.md#forking)); servers install fro
 ---
 
 <sub>[Feature specs](specs) · [Design language](DESIGN.md) · [AGENTS.md](AGENTS.md) (working rules, Definition of
-Done) · [Security policy](SECURITY.md) · [MIT license](LICENSE). Duniya is an independent open-source project, not
+Done) · [Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Security policy](SECURITY.md) ·
+[MIT license](LICENSE). Duniya is an independent open-source project, not
 affiliated with, endorsed by or sponsored by WhatsApp, Telegram or Meta. WhatsApp and Telegram are trademarks of their
 owners.</sub>

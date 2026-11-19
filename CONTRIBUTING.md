@@ -4,6 +4,24 @@ Thanks for helping. Duniya is [MIT licensed](LICENSE); contributions are accepte
 working rules and the **Definition of Done** are in [AGENTS.md](AGENTS.md) (they apply to people and AI agents
 alike). This page is the short version, plus how to run your own fork.
 
+Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Getting help
+
+- **Stuck installing or using it?** Read [Troubleshooting](docs/troubleshooting.md) (the ten most common first-day
+  problems), then open an issue with the **Question or help** template. Remove keys, setup codes and phone numbers
+  first.
+- **Found a bug?** The **Bug** template; **an idea?** The **Feature / improvement** template.
+- **A security problem?** Privately, never in an issue: [SECURITY.md](SECURITY.md).
+
+## Good first issues
+
+Issues labelled **`good first issue`** are small and fully described: what to change, where (files), and how to check
+it (a test or a screen in the demo panel). They need no server and no real WhatsApp: everything runs against the demo
+panel (`node scripts/demo-panel.mjs`) and the test fakes. Say in the issue that you are taking it, so nobody else does
+it at the same time; ask there if anything is unclear. Maintainers: when you open one, add the files to touch and the
+check that proves it works.
+
 ## How to contribute
 
 1. **Start from an issue.** Open one (bug or feature template) or pick an open one. Every change has an issue with

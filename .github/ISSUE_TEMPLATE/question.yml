@@ -1,0 +1,19 @@
+name: Question or help
+description: Stuck installing or using Duniya? Ask here.
+labels: ["status: triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "First look at the [troubleshooting guide](https://github.com/vikramgorla/duniya/blob/main/docs/troubleshooting.md): it covers the ten most common first-day problems. **Never paste keys, passwords, setup codes or real phone numbers.**"
+  - type: textarea
+    attributes: { label: What are you trying to do?, description: "e.g. link a second number, get the agent to answer in a group" }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: What happened instead?, description: "What you did, what you saw (screenshots welcome; hide numbers and names)" }
+    validations: { required: true }
+  - type: dropdown
+    attributes: { label: Where does it run?, options: ["Oracle Cloud (one click)", "Google Cloud (Cloud Shell)", "Own server (install.sh)", "Docker", "Not installed yet"] }
+  - type: input
+    attributes: { label: Version, description: "Settings → Updates (e.g. v2.47.0), or sudo duniya status" }
+  - type: textarea
+    attributes: { label: Log lines (optional), description: "sudo duniya doctor, or the last lines of sudo duniya logs, with keys and numbers removed", render: text }

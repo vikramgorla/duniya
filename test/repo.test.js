@@ -59,6 +59,7 @@ Install: curl -fsSL https://raw.githubusercontent.com/{U}/whatsapp-agent-duniya/
 Site: https://{U}.github.io/whatsapp-agent-duniya/ and [guides](https://github.com/{U}/whatsapp-agent-duniya/blob/main/docs/README.md).
 Cloud Shell: cloudshell_git_repo=https%3A%2F%2Fgithub.com%2F{U}%2Fwhatsapp-agent-duniya&x=1
 Image: ghcr.io/{U}/whatsapp-agent-duniya:latest · API: gh api repos/{U}/whatsapp-agent-duniya/pulls
+Badge: https://img.shields.io/github/v/release/{U}/whatsapp-agent-duniya?label=release
 Example: DUNIYA_REPO=you/duniya, https://github.com/you/duniya. Not ours: https://github.com/WhiskeySockets/Baileys and https://github.com/{U}/duniya-backups.
 Service whatsapp-agent-duniya.service in /opt/whatsapp-agent-duniya stays. Clone git@github.com:{U}/whatsapp-agent-duniya.git
 `;
@@ -83,7 +84,7 @@ test('084 repo:sync: a fork rewrites only project URLs, idempotent; the drift ch
   assert.equal(p.read('install.sh'), 'DEFAULT_REPO="https://github.com/Alice/my-bot.git"\n');
   const r = p.read('README.md');
   for (const want of ['raw.githubusercontent.com/Alice/my-bot/main/install.sh', 'https://alice.github.io/my-bot/', 'github.com/Alice/my-bot/blob/main/docs/README.md',
-    'github.com%2FAlice%2Fmy-bot&x=1', 'ghcr.io/alice/my-bot:latest', 'repos/Alice/my-bot/pulls', 'git@github.com:Alice/my-bot.git']) assert.ok(r.includes(want), want);
+    'github.com%2FAlice%2Fmy-bot&x=1', 'ghcr.io/alice/my-bot:latest', 'repos/Alice/my-bot/pulls', 'git@github.com:Alice/my-bot.git', 'shields.io/github/v/release/Alice/my-bot?label']) assert.ok(r.includes(want), want);
   for (const keep of ['https://github.com/you/duniya', 'https://github.com/WhiskeySockets/Baileys', up('github.com/{U}/duniya-backups'), 'whatsapp-agent-duniya.service', '/opt/whatsapp-agent-duniya', '# Duniya']) assert.ok(r.includes(keep), keep);
   assert.equal(p.read('specs/001-old/spec.md'), up('History: https://github.com/{U}/whatsapp-agent-duniya\n'), 'specs keep their history');
 

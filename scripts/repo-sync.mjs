@@ -25,7 +25,7 @@ const TEXT = /\.(md|js|mjs|cjs|json|ya?ml|sh|tf|html|css|svg|mmd|txt|example|web
 const OWNER = '[A-Za-z0-9][A-Za-z0-9-]{0,38}';
 const NAME = '[A-Za-z0-9._-]+';
 const REFS = [
-  { re: new RegExp(`(api\\.github\\.com/repos/|github\\.com[/:]|githubusercontent\\.com/|ghcr\\.io/|\\brepos/)(${OWNER})/(${NAME})`, 'g'), sep: '/' },
+  { re: new RegExp(`(api\\.github\\.com/repos/|github\\.com[/:]|githubusercontent\\.com/|ghcr\\.io/|shields\\.io/github/v/release/|\\brepos/)(${OWNER})/(${NAME})`, 'g'), sep: '/' },
   { re: new RegExp(`(github\\.com%2F)(${OWNER})%2F(${NAME})`, 'gi'), sep: '%2F' },
   { re: new RegExp(`()\\b(${OWNER})\\.github\\.io/(${NAME})`, 'g'), sep: '.github.io/' },
 ];
