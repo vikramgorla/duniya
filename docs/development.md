@@ -165,7 +165,9 @@ and the retention pass of the upkeep tick.
    database. A full scan of a large table (≥ 1 000 rows in the fixture) fails: `SCAN <table>` with or without an index,
    and a `SEARCH` on the tenant alone (`(tenant_id=?)` reads every row). So a new query without an index fails CI.
 2. **Time budgets.** The median of 9 runs of each key path (person page, people list and search, a chat's messages,
-   search messages, one chat's activity, the router per message, an agent's context) stays within `BUDGETS`.
+   search messages, one chat's activity, the router per message, an agent's context) stays within `BUDGETS`. A path
+   over budget is measured again (twice at most) and keeps its best median, so a slow moment on a shared CI runner
+   does not fail a PR; a real regression is slow every time and still fails.
 
 When it fails:
 - **Add the index** (in the `CREATE TABLE` block of its module) or **write the query so it can use one**: put the

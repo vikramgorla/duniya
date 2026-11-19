@@ -8,7 +8,9 @@
 //     run through EXPLAIN QUERY PLAN against the seeded database. A full scan (`SCAN <table>`, with or without an
 //     index) of a large table (≥ 1,000 rows in the fixture) fails, unless the statement is on ALLOW_SCANS below with
 //     the reason. So a new query without an index fails CI.
-//  2. Time budgets: the median of several runs of each key path stays within BUDGETS (milliseconds on a CI runner).
+//  2. Time budgets: the median of several runs of each key path stays within BUDGETS (milliseconds on a CI runner);
+//     a path over budget is measured again (RETRIES) and keeps its best median, so a slow moment on a shared runner
+//     does not fail a PR while a real regression (slow every time) still does.
 //
 // Raising a budget or adding an allowed scan is a decision: keep the old value and say why in the comment, like the
 // panel budgets in scripts/check-panel.mjs. Budgets are ~2.5× what a CI runner measured, so noise does not fail a PR.
@@ -40,6 +42,7 @@ const BUDGETS = {
   'survey link page': 10, // 083: GET /s/<token> (the public page: token → survey, the person's answers)
 };
 const RUNS = 9;
+const RETRIES = 2; // #195: a path over budget is measured again this many times (see below)
 
 // Full scans of large tables that are fine, each with its reason. `sql` is a piece of the normalized statement.
 const ALLOW_SCANS = [
@@ -91,40 +94,42 @@ const onGroup = groups.find((g) => chats.indexOf(g) < FULL.on && t.agents.agentF
 const agent = t.agents.agentForChat(onGroup);
 const enc = encodeURIComponent;
 const measured = {};
+const paths = {}; // name → the timed call, so a path over budget can be measured again
+const bench = async (k, fn) => { paths[k] = fn; measured[k] = await time(fn); };
 let seq = 0;
-measured['person page'] = await time(() => get(`/api/people/${personId(12)}`));
-measured['people list'] = await time(() => get('/api/people'));
-measured['people search'] = await time(() => get(`/api/people?q=${enc('contact 12')}`));
-measured['chat page (messages)'] = await time(() => get(`/api/chats/${enc(onGroup)}/messages?limit=50`));
-measured['search messages'] = await time(() => get(`/api/search/messages?q=${enc('station nine')}`));
-measured['activity (one chat)'] = await time(() => get(`/api/activity?limit=200&chat=${enc(onGroup)}`));
-measured['router (stored, not addressed)'] = await time(() => t.route(t.msg({ chat: onGroup, phone: phoneOf(seq % 300), senderJid: `${phoneOf(seq % 300)}@s.whatsapp.net`, text: `just chatting ${seq++}`, msgId: `perf-${seq}` })));
-measured['agent context build'] = await time(() => t.memory.buildContext({ agent, chat: onGroup }));
+await bench('person page', () => get(`/api/people/${personId(12)}`));
+await bench('people list', () => get('/api/people'));
+await bench('people search', () => get(`/api/people?q=${enc('contact 12')}`));
+await bench('chat page (messages)', () => get(`/api/chats/${enc(onGroup)}/messages?limit=50`));
+await bench('search messages', () => get(`/api/search/messages?q=${enc('station nine')}`));
+await bench('activity (one chat)', () => get(`/api/activity?limit=200&chat=${enc(onGroup)}`));
+await bench('router (stored, not addressed)', () => t.route(t.msg({ chat: onGroup, phone: phoneOf(seq % 300), senderJid: `${phoneOf(seq % 300)}@s.whatsapp.net`, text: `just chatting ${seq++}`, msgId: `perf-${seq}` })));
+await bench('agent context build', () => t.memory.buildContext({ agent, chat: onGroup }));
 const access = await import('../src/core/people-access.js');
 const { peopleTools } = await import('../src/core/people-tools.js');
-measured['sender card'] = await time(() => access.senderCard(personId(5), access.peopleScope(agent), 'Contact 5'));
+await bench('sender card', () => access.senderCard(personId(5), access.peopleScope(agent), 'Contact 5'));
 const findTool = peopleTools.find((x) => x.name === 'find_person');
-measured['people tool: find (own chats)'] = await time(() => findTool.run({ query: 'contact 1' }, { agent, role: 'organizer' }));
+await bench('people tool: find (own chats)', () => findTool.run({ query: 'contact 1' }, { agent, role: 'organizer' }));
 // 081: Events and Orders (the fixture switched both on)
 const { eventTools } = await import('../src/modules/events/tools.js');
 const { orderTools } = await import('../src/modules/orders/tools.js');
 const mTool = (list, n) => list.find((x) => x.name === n);
 const orgCtx = { agent, role: 'organizer', personId: personId(10) };
-measured['event page'] = await time(() => get('/api/module/events/ev_000000000003'));
-measured['registration list (agent tool)'] = await time(() => mTool(eventTools, 'registration_list').run({ event: 'ev_000000000003' }, orgCtx));
-measured['orders list'] = await time(() => get('/api/orders'));
-measured["who hasn't paid (agent tool)"] = await time(() => mTool(orderTools, 'who_has_not_paid').run({ event: 'Event 3' }, orgCtx));
+await bench('event page', () => get('/api/module/events/ev_000000000003'));
+await bench('registration list (agent tool)', () => mTool(eventTools, 'registration_list').run({ event: 'ev_000000000003' }, orgCtx));
+await bench('orders list', () => get('/api/orders'));
+await bench("who hasn't paid (agent tool)", () => mTool(orderTools, 'who_has_not_paid').run({ event: 'Event 3' }, orgCtx));
 // 082: Lists and sending (the fixture switched it on: 30 runs of 2,000 recipients)
 const { resolve: recipientsOf } = await import('../src/modules/sending/audience.js');
-measured['sending run page'] = await time(() => get('/api/sending/runs/run_000000000012'));
-measured['sending history'] = await time(() => get('/api/sending'));
-measured['sending recipients of an event'] = await time(() => recipientsOf({ kind: 'event', event: 'ev_000000000003' }, 'updates', new Set(['whatsapp', 'telegram'])));
+await bench('sending run page', () => get('/api/sending/runs/run_000000000012'));
+await bench('sending history', () => get('/api/sending'));
+await bench('sending recipients of an event', () => recipientsOf({ kind: 'event', event: 'ev_000000000003' }, 'updates', new Set(['whatsapp', 'telegram'])));
 // 083: Surveys and campaigns (5 surveys, 3,000 people answered the first; 5 campaigns). A real link: invite person 4100.
-measured['survey results'] = await time(() => get('/api/surveys/sv_000000000000'));
-measured['campaign page'] = await time(() => get('/api/sending/campaigns/cmp_000000000000'));
+await bench('survey results', () => get('/api/surveys/sv_000000000000'));
+await bench('campaign page', () => get('/api/sending/campaigns/cmp_000000000000'));
 const surveyLink = (await import('../src/modules/surveys/index.js')).invite('sv_000000000000', personId(4100)).survey_link || '';
 const linkPath = `/s/${surveyLink.split('/s/')[1]}`;
-measured['survey link page'] = await time(() => fetch(t.base + linkPath).then((r) => r.arrayBuffer()));
+await bench('survey link page', () => fetch(t.base + linkPath).then((r) => r.arrayBuffer()));
 
 // Everything else on a hot path, for the query-plan check (not timed).
 const activityMid = db.prepare('SELECT id FROM activity WHERE id > ? ORDER BY id LIMIT 1').get(FULL.activity / 2)?.id || 1;
@@ -221,6 +226,15 @@ for (const raw of SEEN) {
 for (const a of ALLOW_SCANS) if (!allowedUsed.has(a)) console.log(`::warning::check-perf: allowed scan no longer seen (remove it from ALLOW_SCANS): ${a.table} / ${a.sql}`);
 
 // ---------- 2. time budgets ----------
+// #195: shared CI runners have slow moments (a 6 ms path once took 18 ms). A path over budget is measured again, up to
+// RETRIES times, and keeps its best median: a real regression is slow every time and still fails; a noisy moment does not.
+for (const k of Object.keys(BUDGETS)) {
+  for (let i = 0; i < RETRIES && !(measured[k] <= BUDGETS[k]); i++) {
+    const again = await time(paths[k]);
+    console.log(`check-perf: "${k}" ${measured[k].toFixed(1)} ms over its ${BUDGETS[k]} ms budget; measured again: ${again.toFixed(1)} ms`);
+    measured[k] = Math.min(measured[k], again);
+  }
+}
 const over = Object.entries(BUDGETS).filter(([k, ms]) => !(measured[k] <= ms));
 console.log(`check-perf: fixture seeded in ${seedMs} ms; ${checked} statements checked against ${[...big].length} large tables`);
 console.table(Object.fromEntries(Object.entries(BUDGETS).map(([k, ms]) => [k, { 'median ms': +Number(measured[k]).toFixed(1), 'budget ms': ms }])));
