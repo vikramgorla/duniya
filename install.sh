@@ -132,7 +132,14 @@ fi
 
 HOSTNAME_PUBLIC=""
 case "$EXPOSURE" in
-  domain) HOSTNAME_PUBLIC="$DOMAIN" ;;
+  domain) HOSTNAME_PUBLIC="$DOMAIN"
+    # 086: a domain that does not point here yet fails later as a certificate error; say it now, in plain words
+    if [ "$DRY_RUN" -eq 0 ] && command -v getent >/dev/null; then
+      IP="$(public_ip)"; DNS_IPS="$(getent ahosts "$DOMAIN" 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ' ')"
+      if [ -n "$IP" ] && ! printf '%s' " $DNS_IPS" | grep -qF " $IP "; then
+        warn "$DOMAIN points to ${DNS_IPS:-nothing yet}, not to this server ($IP). Add a DNS A record $DOMAIN → $IP; HTTPS starts by itself once it points here (it can take a few minutes)."
+      fi
+    fi ;;
   ip) IP="$(public_ip)"; [ -n "$IP" ] || die "Could not detect the public IP"; HOSTNAME_PUBLIC="$(echo "$IP" | tr '.:' '--').sslip.io" ;;
 esac
 PUBLIC_URL=""
@@ -155,7 +162,8 @@ export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=l NEEDRESTART_SUSPEND=1  # don't let needrestart restart services in the middle of the install
 # On a fresh cloud VM, unattended-upgrades holds the apt lock for several minutes after boot; wait instead of failing.
 echo 'DPkg::Lock::Timeout "1200";' > /etc/apt/apt.conf.d/90duniya-wait-for-lock
-trap 'echo "whatsapp-agent-duniya install FAILED at line $LINENO (see output above)" >&2' ERR
+# 086: a failure says what to do next, not only where it stopped
+trap 'printf "\n\033[1;31mxx\033[0m Duniya install stopped at line %s (the reason is just above).\n   It is safe to run the same command again: it picks up where it stopped.\n   Still stuck? See docs/troubleshooting.md, or open an issue with the last 30 lines of this output.\n" "$LINENO" >&2' ERR
 
 # ---------- swap for small machines ----------
 MEM_MB=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
@@ -441,10 +449,10 @@ fi
 
 # ---------- summary ----------
 say "Waiting for the service"
-CODE=""
-for _ in $(seq 1 40); do
+CODE=""; HEALTHY=0
+for _ in $(seq 1 60); do
   if curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1; then
-    [ -f "$DATA_DIR/setup-code.txt" ] && CODE="$(cat "$DATA_DIR/setup-code.txt")"
+    HEALTHY=1; [ -f "$DATA_DIR/setup-code.txt" ] && CODE="$(cat "$DATA_DIR/setup-code.txt")"
     break
   fi
   sleep 1
@@ -465,8 +473,16 @@ case "$EXPOSURE" in
   tailscale) echo "  Admin panel: ${PUBLIC_URL:-https://<this machine>.<your tailnet>.ts.net}   (from devices in your tailnet)" ;;
   local) echo "  Admin panel: ssh -L $PORT:127.0.0.1:$PORT <user>@<this server>, then open http://localhost:$PORT" ;;
 esac
-if [ -n "$CODE" ]; then echo "  Setup code:  $CODE   (enter it in the panel to create the owner account)"
+if [ "$HEALTHY" -eq 0 ]; then
+  warn "The app has not answered yet (a small server can take a few minutes on the first start)."
+  echo "  Watch it start:  sudo duniya logs -f     The setup code will be in: sudo cat $DATA_DIR/setup-code.txt"
+elif [ -n "$CODE" ]; then echo "  Setup code:  $CODE   (enter it in the panel to create the owner account)"
 elif [ -n "${ADMIN_PASSWORD:-$OLD_PW}" ]; then echo "  Sign in as:  admin (the password you provided)"
 else echo "  Already set up: sign in with your existing account."; fi
+# 086: what comes after the install, for someone who has never done this
+GUIDE="${REPO%.git}/blob/main/docs/getting-started.md"
+[[ "$REPO" == https://github.com/* ]] || GUIDE="docs/getting-started.md in the project"
+echo "  Next:        open the panel; Getting started links WhatsApp (or Telegram), a model and a first agent in about five taps."
+echo "  Guide:       $GUIDE"
 echo "  Logs:        sudo duniya logs -f      (all commands: sudo duniya help)"
 echo "  Re-run this installer any time to update or change how the panel is reached."

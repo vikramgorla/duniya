@@ -10,7 +10,23 @@
 **In 30 seconds**
 - New here? Follow **1 → 8** below: install, then the panel's *Getting started* does the rest in about five taps.
 - Every page opens with what it is for, the one thing to do and a 30-second summary.
-- Already running? Jump to [Run your server](#run-your-server). Something missing? Press **/** in the panel.
+- Already running? Jump to [Run your server](#run-your-server). Stuck? [Troubleshooting](troubleshooting.md).
+
+## What is Duniya, and is it for me?
+
+Duniya puts AI helpers into the WhatsApp and Telegram groups you choose: a car-pool planner, a school-class assistant,
+a family organiser. It runs on a small server you own (free on Oracle or Google Cloud) and you manage it from a web
+panel on your phone or computer. Chats stay silent until you switch them on.
+
+| It is for you if… | It is not for you if… |
+|---|---|
+| you organise a family, school, club or neighbourhood group and want a helper that answers, reminds and keeps track | you need the official WhatsApp Business API, a customer-support desk or marketing at scale |
+| you want your chats and data on your own server, and to choose the AI model (free ones included) | you cannot use a spare phone number for the agents (a prepaid SIM is enough) |
+| you can click through a cloud sign-up, or paste one command into a server | you want a hosted app with nothing to install |
+
+What it costs: the software is free (MIT). The server can be free (Oracle or Google free tier) or a few euros a month
+anywhere else. Models: free OpenRouter models, your ChatGPT or Claude plan, or pay per use with a key; spending caps
+stop it at your limit.
 
 ## Start here
 
@@ -53,6 +69,7 @@
 | <img src="img/thumb-web-access.webp" alt="" width="120"> | **[Domains & access](domains-and-access.md)** | you want your own domain, a proxy/CDN, an IP allow-list, or no open ports |
 | `GOOGLE` | **[Sign in with Google](google-sign-in.md)** | people should sign in with Google |
 | `2.x` | **[Upgrading](upgrading.md)** | a release needs a step from you |
+| `HELP` | **[Troubleshooting](troubleshooting.md)** | something does not work on the first day: QR code, phone offline, model key, silent agent, HTTPS, memory, updates |
 | `CLI` | **[Command line](cli.md)** | the panel is not enough: lost password, locked out |
 
 <details>

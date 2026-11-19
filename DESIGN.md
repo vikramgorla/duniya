@@ -70,7 +70,7 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
 - **Avatars** (`avatar(name, id)`): initials on one of the five "people" colours, the same colour for the same agent
   or chat everywhere (agent cards, Overview, Chats, Activity); grey when off.
 - **Status console:** Overview opens with one sentence about the state ("Everything is running", "A WhatsApp
-  number needs attention"; on a fresh install the first missing thing: "Link your WhatsApp number to begin") and
+  number needs attention"; on a fresh install the first missing thing: "Link WhatsApp or Telegram to begin") and
   compact status chips with an LED, written as a phrase: "WhatsApp connected", "2 agents live", "3 chats on",
   "Nothing waiting".
 - **On the accent:** anything drawn on lime (`--signal`, and `--accent` in dark mode) — text, icons, badges — uses the

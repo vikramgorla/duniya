@@ -285,3 +285,16 @@ test('#165: "Everyone: all tools" (service:* for both roles) gives participants 
   assert.deepEqual(p.sort(), o.sort());
   await t.api(owner, 'PUT', '/api/agents/panduga', { tools: before });
 });
+
+test('086: Getting started step 1 is done by a connected Telegram bot as well as by a linked WhatsApp number', async () => {
+  const real = t.channel.status;
+  const step = async () => (await t.api(owner, 'GET', '/api/checklist')).body.steps.find((s) => s.id === 'whatsapp');
+  try {
+    t.channel.status = async () => ({ numbers: [{ id: 'main', status: 'qr' }], channels: [{ id: 'whatsapp', connected: 0 }, { id: 'telegram', connected: 0 }] });
+    assert.equal((await step()).done, false, 'nothing linked yet');
+    t.channel.status = async () => ({ numbers: [{ id: 'main', status: 'qr' }], channels: [{ id: 'whatsapp', connected: 0 }, { id: 'telegram', connected: 1 }] });
+    const s = await step();
+    assert.equal(s.done, true, 'a Telegram bot alone completes the first step');
+    assert.match(s.title, /Telegram/);
+  } finally { t.channel.status = real; }
+});

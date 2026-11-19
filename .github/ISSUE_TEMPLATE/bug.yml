@@ -2,6 +2,9 @@ name: Bug
 description: Something does not work as expected
 labels: ["type: bug", "status: triage"]
 body:
+  - type: markdown
+    attributes:
+      value: "Stuck rather than broken? The [troubleshooting guide](https://github.com/vikramgorla/duniya/blob/main/docs/troubleshooting.md) may have the fix. **Never paste keys, passwords, setup codes or real phone numbers.**"
   - type: textarea
     attributes: { label: What happened, description: "Steps, what you expected, what you saw (screenshots welcome)" }
     validations: { required: true }

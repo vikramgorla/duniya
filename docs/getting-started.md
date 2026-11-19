@@ -5,7 +5,8 @@
 **Do it:** open the panel → **Overview** → **Getting started**: the current step opens right there.
 
 **In 30 seconds**
-- Five steps, in order: link WhatsApp, connect a model, create an agent, switch a chat on, send a test.
+- Five steps, in order: link WhatsApp (or Telegram), connect a model, create an agent, switch a chat on, send a test.
+- Every step can be skipped and brought back; nothing you do here is final.
 - Chats are **off** until you switch them on: nothing stored, no model call.
 - Each step links to its guide: [WhatsApp](whatsapp.md), [models](models.md), [agents](agents.md), [chats](chats.md).
 
@@ -30,12 +31,14 @@ through five steps; the one you are on opens in place:
 
 ![Getting started: switch a chat on](site/img/card-checklist.webp)
 
-1. **Link your WhatsApp number**: tap **Show the QR code** (WhatsApp loads only now) and scan it with the phone of
-   the agents' number (*WhatsApp → Settings → Linked devices → Link a device*), or get a pairing code. Use a number just for the agents. [Connect WhatsApp](whatsapp.md)
-2. **Connect an AI model**: paste any key into the one box: Duniya recognises OpenRouter (`sk-or-`, free models
-   only), Anthropic (`sk-ant-`), a Claude Code token from `claude setup-token` (`sk-ant-oat01-`), OpenAI (`sk-`) and GitHub Copilot
-   (`github_pat_`). No key yet? **Free key from
-   OpenRouter ↗**, or **Use my ChatGPT plan**. Everything else: [Models](models.md).
+1. **Link WhatsApp (or Telegram)**: tap **Show the QR code** (WhatsApp loads only now) and scan it with the phone of
+   the agents' number (*WhatsApp → Settings → Linked devices → Link a device*), or get a pairing code. Use a number
+   just for the agents. [Connect WhatsApp](whatsapp.md). Groups on Telegram? **Connect a Telegram bot instead**: a
+   connected bot completes this step too. [Connect Telegram](telegram.md)
+2. **Connect an AI model**: paste a key into the one box. No key yet? The free start: sign up at **OpenRouter**, tap
+   *Create key*, copy it and paste it (Duniya then uses free models only). Or **use your ChatGPT plan**, or Claude,
+   Copilot and the rest under [Models](models.md). The box recognises OpenRouter (`sk-or-`), Anthropic (`sk-ant-`), a
+   Claude Code token (`sk-ant-oat01-`), OpenAI (`sk-`) and GitHub Copilot (`github_pat_`).
 3. **Create your first agent**: tap a template (Car pooling, Family, Event planning…) or describe it in your own words
    and let the AI helper draft it. You can change everything later. [Agents](agents.md)
 4. **Switch a chat on**: tap **Switch on** next to a group. The agent is chosen for it, the group gets a short privacy
@@ -67,4 +70,4 @@ Getting started**). Afterwards: **Backups** (passphrase, GitHub or S3, schedule)
 </details>
 
 ---
-**Next:** [Connect WhatsApp](whatsapp.md) · [Agents](agents.md) · [Everyday use](everyday.md) · [Docs index](README.md)
+**Next:** [Connect WhatsApp](whatsapp.md) · [Agents](agents.md) · [Everyday use](everyday.md) · Stuck? [Troubleshooting](troubleshooting.md)

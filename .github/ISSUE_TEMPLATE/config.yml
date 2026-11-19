@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Troubleshooting guide
+    url: https://github.com/vikramgorla/duniya/blob/main/docs/troubleshooting.md
+    about: The ten most common first-day problems (QR code, phone offline, model key, silent agent, HTTPS, memory, updates), each with its fix.
+  - name: Guides
+    url: https://github.com/vikramgorla/duniya/blob/main/docs/README.md
+    about: Install, Getting started, every screen and setting, in the order you need them.
+  - name: Report a security problem privately
+    url: https://github.com/vikramgorla/duniya/security/advisories/new
+    about: Please do not open a public issue for vulnerabilities (see SECURITY.md).

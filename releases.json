@@ -1,6 +1,18 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.47.1": {
+      "breaking": false,
+      "title": "An easier first day for new owners",
+      "changes": [
+        { "type": "improved", "text": "Getting started accepts Telegram for its first step: a connected Telegram bot is a start too, and step one links to it." },
+        { "type": "improved", "text": "The model step explains the free start in plain words: sign up at OpenRouter, create a key, paste it." },
+        { "type": "improved", "text": "A fresh Overview is calmer: while Getting started is open, no row of red status chips and no cards that repeat its steps." },
+        { "type": "improved", "text": "The installer says what to do when something fails, warns when your domain does not point to the server yet, and ends with where to go next." },
+        { "type": "new", "text": "A troubleshooting guide for the ten most common first-day problems, and a Question or help form on GitHub." },
+        { "type": "fixed", "text": "Agents list who has not paid and who registered as fast as before 2.47.0 again." }
+      ]
+    },
     "2.47.0": {
       "breaking": false,
       "title": "Calmer, clearer People, events, orders, sending and surveys",

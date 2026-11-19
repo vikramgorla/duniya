@@ -7,9 +7,17 @@
 <meta name="description" content="Duniya runs AI agents in the WhatsApp and Telegram groups and chats you choose, on your own free server, from a calm web panel. Silent by default, your own assistant, any model with a backup, search and review, backups and one-click updates.">
 <meta name="theme-color" content="#f2f1ec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0b0c0f" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://vikramgorla.github.io/duniya/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://vikramgorla.github.io/duniya/">
+<meta property="og:site_name" content="Duniya">
 <meta property="og:title" content="Duniya · AI agents for your WhatsApp and Telegram groups">
 <meta property="og:description" content="Helpers for your family, school, car-pool and club chats, on your own server, managed from a calm web panel.">
-<meta property="og:image" content="img/overview-desktop.webp">
+<meta property="og:image" content="https://vikramgorla.github.io/duniya/img/share.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Duniya: AI helpers for your WhatsApp and Telegram groups, on your own free server">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="img/logo-small.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -22,6 +30,7 @@
     <nav aria-label="Sections">
       <a href="#how">How it works</a>
       <a href="#features">Features</a>
+      <a href="#fit">Is it for me?</a>
       <a href="#install">Install</a>
       <a href="#faq">FAQ</a>
       <a href="https://github.com/vikramgorla/duniya/blob/main/docs/README.md">Guides</a>
@@ -58,7 +67,7 @@
       <div class="frame">
         <div class="bar"><i></i><i></i><i></i><small>Overview · Chats · Agents · Review · Models · Server · Search</small>
           <button class="vbtn" type="button" data-video="tour">Pause</button></div>
-        <video id="tour" autoplay muted loop playsinline preload="metadata" poster="video/tour-poster.webp" width="1280" height="800" aria-label="A 25-second tour of the panel: Overview with Ask, a chat's page, an agent and its Review, Models, Server Health, and searching messages">
+        <video id="tour" muted loop playsinline preload="none" poster="video/tour-poster.webp" width="1280" height="800" aria-label="A 25-second tour of the panel: Overview with Ask, a chat's page, an agent and its Review, Models, Server Health, and searching messages">
           <source src="video/tour.mp4" type="video/mp4">
         </video>
       </div>
@@ -82,6 +91,42 @@
   </div>
 </div>
 
+<!-- ======================= FIT (086) ======================= -->
+<section id="fit">
+  <div class="wrap">
+    <div class="head">
+      <span class="label"><i class="led"></i>Is it for me?</span>
+      <h2>Made for organisers, not for marketing.</h2>
+    </div>
+    <div class="install fit">
+      <div class="panel">
+        <h3>A good fit</h3>
+        <ul class="ticks">
+          <li>You run a family, school, club or neighbourhood group and want a helper that answers, reminds and keeps track</li>
+          <li>You want the chats and the data on a server you own, and to choose the AI model</li>
+          <li>You can click through a cloud sign-up, or paste one command into a server</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Not the right tool</h3>
+        <ul class="ticks no">
+          <li>You need the official WhatsApp Business API, a support desk or bulk marketing</li>
+          <li>You cannot give the agents a spare number (a prepaid SIM is enough)</li>
+          <li>You want a hosted app with nothing to set up</li>
+        </ul>
+      </div>
+    </div>
+    <div class="panel cost">
+      <span class="label">What it costs</span>
+      <ul class="costs">
+        <li><b>0&nbsp;€</b><span>The software: open source, MIT</span></li>
+        <li><b>0&nbsp;€</b><span>The server on Oracle or Google free tiers (or a few € a month anywhere)</span></li>
+        <li><b>0&nbsp;€ +</b><span>Models: OpenRouter's free ones, your ChatGPT or Claude plan, or pay per use with a monthly cap</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+<hr class="rule">
 <!-- ======================= HOW ======================= -->
 <section id="how">
   <div class="wrap">
@@ -162,7 +207,7 @@
           <li>Keys and passwords never pass through a chat: one-time panel links</li>
           <li>Every look at stored messages is in the activity log</li>
         </ul>
-        <div class="shot"><video autoplay muted loop playsinline preload="none" poster="video/chat-on-poster.webp" width="1280" height="800" aria-label="Switching a chat on and choosing its agent"><source src="video/chat-on.mp4" type="video/mp4"></video></div>
+        <div class="shot"><video muted loop playsinline preload="none" poster="video/chat-on-poster.webp" width="1280" height="800" aria-label="Switching a chat on and choosing its agent"><source src="video/chat-on.mp4" type="video/mp4"></video></div>
       </article>
 
       <article class="tile wide">
@@ -283,7 +328,12 @@
       <span class="label">One command · any Ubuntu / Debian server</span>
       <div class="term"><button class="copy" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/vikramgorla/duniya/main/install.sh | sudo bash">Copy</button><pre><span class="p">$ </span>curl -fsSL https://raw.githubusercontent.com/vikramgorla/duniya/main/install.sh | sudo bash</pre></div>
       <p>x86_64 or arm64, 1 GB of memory. It asks how the panel is reached: an automatic <code>sslip.io</code> address, your domain, Cloudflare Tunnel, Tailscale or local only. Run it again to update.</p>
-      <p class="also"><a href="https://github.com/vikramgorla/duniya/blob/main/docs/install.md">All install options →</a><a href="https://github.com/vikramgorla/duniya/blob/main/docs/deploy/docker.md">Docker Compose →</a><a href="https://github.com/vikramgorla/duniya/blob/main/docs/install.md#where-is-my-panel-find-the-ip--url">Where is my panel? →</a></p>
+      <p class="also"><a href="https://github.com/vikramgorla/duniya/blob/main/docs/install.md">All install options →</a><a href="https://github.com/vikramgorla/duniya/blob/main/docs/install.md#where-is-my-panel-find-the-ip--url">Where is my panel? →</a><a href="https://github.com/vikramgorla/duniya/blob/main/docs/troubleshooting.md">Stuck? Troubleshooting →</a></p>
+    </div>
+    <div class="panel cmd">
+      <span class="label">Docker · any machine with Docker Compose</span>
+      <div class="term"><button class="copy" type="button" data-copy="git clone https://github.com/vikramgorla/duniya.git &amp;&amp; cd duniya &amp;&amp; docker compose up -d">Copy</button><pre><span class="p">$ </span>git clone https://github.com/vikramgorla/duniya.git &amp;&amp; cd duniya &amp;&amp; docker compose up -d</pre></div>
+      <p>The panel on <code>http://localhost:8080</code>; profiles add HTTPS for your domain or a Cloudflare Tunnel. <a href="https://github.com/vikramgorla/duniya/blob/main/docs/deploy/docker.md">Docker guide →</a></p>
     </div>
   </div>
 </section>
@@ -305,6 +355,8 @@
       <details><summary>Who can see the messages?</summary><p>Only chats you switched on are stored, for the agent's memory, and old messages are pruned by themselves. Owners and admins can read what was stored; every look is in the activity log. Chats marked <i>Private to members</i> are hidden from your assistant and from search.</p></details>
       <details><summary>Can I use my Claude Pro/Max subscription?</summary><p>Yes, through Claude Code: Duniya runs Anthropic's own, unmodified Claude Code app on your server, signed in with your own account (a token from <code>claude setup-token</code>), for your personal use within your plan's limits. Your ChatGPT plan works the same way through Codex (or OpenAI's Sign in with ChatGPT), and Copilot through GitHub's SDK, also on a 1 GB server. <a href="https://github.com/vikramgorla/duniya/blob/main/docs/models.md#agent-apps">What the terms say</a>.</p></details>
       <details><summary>Only WhatsApp?</summary><p>WhatsApp and Telegram. Telegram works through an official bot: paste its token, add it to a group, and the same agents answer there; people who share their number are the same person on both apps. Channels load only when you set one up, so neither costs memory until then. <a href="https://github.com/vikramgorla/duniya/blob/main/docs/telegram.md">Connect Telegram</a></p></details>
+      <details><summary>What do I need to start?</summary><p>A spare phone number for the agents (a prepaid SIM in an old phone is fine), or a Telegram bot; a free Oracle or Google Cloud account (or any small Linux server); and a model: a free OpenRouter key takes two minutes. The panel's <b>Getting started</b> then takes about five taps.</p></details>
+      <details><summary>Something did not work. Where do I look?</summary><p>The <a href="https://github.com/vikramgorla/duniya/blob/main/docs/troubleshooting.md">troubleshooting guide</a> covers the ten most common first-day problems (QR code, phone offline, model key, a silent agent, HTTPS, memory, updates). The panel's <b>Why agents stayed quiet</b> names the reason an agent did not answer, with the fix. Still stuck? Open an issue with the <i>Question or help</i> template.</p></details>
       <details><summary>Do I need to know Linux?</summary><p>No. The Oracle and Google buttons need no terminal skills, and afterwards updates, OS packages, logs, restarts and backups are buttons in the panel.</p></details>
       <details><summary>Can several people manage it?</summary><p>Yes: owners, admins and viewers, with passwords or Sign in with Google. You can also manage it from ChatGPT or Claude, with the same roles and a confirmation for risky actions.</p></details>
       <details><summary>Can I fork it and run my own version?</summary><p>Yes, it is MIT licensed. Fork it on GitHub and enable Actions: a workflow points the install command, the buttons, this website and the Docker image at your fork and opens a pull request. Servers can then install from your fork (<code>DUNIYA_REPO=you/duniya</code>) or switch to it under <b>Settings → Updates</b>. <a href="https://github.com/vikramgorla/duniya/blob/main/CONTRIBUTING.md#forking">How to fork</a>.</p></details>
@@ -326,6 +378,7 @@
       <a href="https://github.com/vikramgorla/duniya/blob/main/docs/README.md">Guides</a>
       <a href="https://github.com/vikramgorla/duniya/releases">Releases</a>
       <a href="https://github.com/vikramgorla/duniya/blob/main/CONTRIBUTING.md">Contributing</a>
+      <a href="https://github.com/vikramgorla/duniya/blob/main/CODE_OF_CONDUCT.md">Code of conduct</a>
       <a href="https://github.com/vikramgorla/duniya/blob/main/SECURITY.md">Security</a>
     </nav>
   </div>
@@ -338,8 +391,10 @@
     try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied'; } catch { b.textContent = 'Select & copy'; }
     setTimeout(() => { b.textContent = 'Copy'; }, 1600);
   }));
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  document.querySelectorAll('video').forEach((v) => { if (still) { v.removeAttribute('autoplay'); v.pause(); } });
+  // 086: videos load only when they are on screen, and not at all on small screens or with data saver (the poster shows)
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches || matchMedia('(max-width: 640px)').matches || navigator.connection?.saveData;
+  const seen = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { seen.unobserve(e.target); e.target.preload = 'auto'; e.target.play().catch(() => {}); } }));
+  document.querySelectorAll('video').forEach((v) => { if (!still) seen.observe(v); });
   document.querySelectorAll('[data-video]').forEach((b) => {
     const v = document.getElementById(b.dataset.video);
     const label = () => { b.textContent = v.paused ? 'Play' : 'Pause'; };

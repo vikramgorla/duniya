@@ -148,8 +148,8 @@ async function fakeRegistry(weatherUrl) {
  *  install, with Car pooling as the new agent; `done: true` shows the closing "All set" card. Screenshots only. */
 export function fakeChecklist(next, { done = false } = {}) {
   const ids = ['whatsapp', 'provider', 'agent', 'chat', 'reply'];
-  const titles = { whatsapp: 'Link your WhatsApp number', provider: 'Connect an AI model', agent: 'Create your first agent', chat: 'Switch a chat on', reply: 'Send a test message' };
-  const hints = { whatsapp: 'Use the phone of the number your agents answer from.', provider: 'Agents need a model to think with. Paste a key, or start free with OpenRouter.',
+  const titles = { whatsapp: 'Link WhatsApp (or Telegram)', provider: 'Connect an AI model', agent: 'Create your first agent', chat: 'Switch a chat on', reply: 'Send a test message' };
+  const hints = { whatsapp: 'Scan the QR code with the phone of the number your agents will use (best a spare one), like WhatsApp on a computer.', provider: 'Agents need a model to think with. The quickest free start: a free OpenRouter key, pasted here.',
     agent: 'Pick a template or describe it in your own words; you can change everything later.', chat: 'Every chat starts Off, so agents stay silent. Choose the group your agent should answer in.',
     reply: 'Ask your agent something here, or write to it in the chat you switched on.' };
   const n = done ? ids.length : ids.indexOf(next);

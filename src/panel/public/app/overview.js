@@ -58,13 +58,14 @@ export async function renderOverview(soft) {
   const led = (ok, text, href) => h(href ? 'a' : 'span', { class: 'led', ...(href ? { href } : {}) }, h('span', { class: `dot ${ok === true ? 'ok' : ok === false ? 'bad' : 'warn'}`, 'aria-hidden': 'true' }), text);
   // 062: the first thing that is missing, in the order Getting started asks for it
   const noModel = S.checklist?.steps?.find((x) => x.id === 'provider')?.done === false;
-  const headline = st.settings.paused ? 'All agents are paused' : wa.state === 'off' ? 'WhatsApp is switched off' : !open ? 'Link your WhatsApp number to begin' : noModel ? 'Connect an AI model so agents can answer'
+  const tgOk = (st.channel.channels || []).some((c) => c.id !== 'whatsapp' && c.connected > 0);
+  const headline = st.settings.paused ? 'All agents are paused' : wa.state === 'off' && !tgOk ? 'WhatsApp is switched off' : !open && !tgOk ? 'Link WhatsApp or Telegram to begin' : noModel ? 'Connect an AI model so agents can answer'
     : !st.agents.length ? 'Create your first agent' : st.enabledChats === 0 ? 'No chat is switched on — agents stay silent' : allGood ? 'Everything is running'
       : open < numbers.length ? 'A WhatsApp number needs attention' : live ? 'Running, with something to check' : 'No agent is switched on yet';
   const hero = h('div', { class: 'card console' },
     h('div', {}, h('div', { class: 'eyebrow' }, `${hello} · ${S.user.username}`),
       h('h2', {}, headline)),
-    allGood && !st.pending ? h('p', { class: 'small muted calm-line' }, [numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : 'WhatsApp connected', `${plural(live, 'agent')} live`, `${plural(st.enabledChats, 'chat')} on`].join(' · ')) : h('div', { class: 'leds' },
+    checklistActive() ? null : allGood && !st.pending ? h('p', { class: 'small muted calm-line' }, [numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : 'WhatsApp connected', `${plural(live, 'agent')} live`, `${plural(st.enabledChats, 'chat')} on`].join(' · ')) : h('div', { class: 'leds' },
       // 066: plain sentence-case chips ("2 agents live"), not mono caps
       led(numbers.length && open === numbers.length ? true : open ? null : false, wa.state === 'off' ? 'WhatsApp off' : numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : open ? 'WhatsApp connected' : 'WhatsApp not linked', '#settings/whatsapp'),
       led(st.settings.paused ? false : live ? true : null, st.settings.paused ? 'Agents paused' : live ? `${plural(live, 'agent')} live` : 'No agent live'),
@@ -72,7 +73,7 @@ export async function renderOverview(soft) {
       led(st.pending ? null : true, st.pending ? `${st.pending} waiting for a confirm` : 'Nothing waiting')),
     st.enabledChats === 0 && open && st.agents.length && !checklistActive() ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
   const silencesSlot = h('div', { id: 'ov-silences-slot', 'data-jump': 'quiet', style: `grid-column:1/-1${S.silences?.length ? '' : ';display:none'}` }, S.silences?.length ? silencesCard(S.silences, refreshSilences) : null);
-  $('#main').replaceChildren(hero, whatsNewBox(), updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), channelsCard, control, server, silencesSlot, recent));
+  $('#main').replaceChildren(hero, whatsNewBox(), updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), checklistActive() && !open ? null : channelsCard, checklistActive() && !st.agents.length ? null : control, server, silencesSlot, recent));
   refreshSilences();
   // the feed and the chat names it shows (064) load after the first paint
   Promise.resolve(S.feed.length ? S.feed : api('GET', '/api/activity?limit=50'))
