@@ -34,7 +34,7 @@ class McpConnection {
       const headers = { ...this.headers, ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) };
       transport = new StreamableHTTPClientTransport(new URL(this.url), { requestInit: { headers }, authProvider: this.authProvider || undefined });
     }
-    const client = new Client({ name: 'whatsapp-agent-duniya', version: '1.0.0' });
+    const client = new Client({ name: 'duniya', version: '1.0.0' });
     try { await client.connect(transport); } catch (e) { try { await transport.close(); } catch { /* ignore */ } throw e; }
     this.client = client;
   }

@@ -1,6 +1,6 @@
 # Duniya guides
 
-**Everything you need to run AI agents in your WhatsApp groups, in the order you'll need it.**
+**Everything you need to run AI agents in your WhatsApp and Telegram groups, in the order you'll need it.**
 
 <p>
   <a href="install.md"><img src="img/btn-install.svg" alt="Install on any server" height="32"></a>

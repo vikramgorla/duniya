@@ -6,6 +6,7 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, copyFileSync, exis
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setup } from './harness.js';
+import { repoLinks } from '../src/core/repo.js';
 
 const t = await setup({ env: { RATE_LIMIT_PER_MIN: '100' } });
 after(() => t.close());
@@ -81,8 +82,8 @@ test('045: CI rule and release notes', () => {
   assert.match(rel.releaseCheck({ version: '2.9.1', previous: 'v2.9.0', releases: rel.normalizeReleases({ versions: { '2.9.1': { breaking: false } } }) }).errors[0], /no title/);
   assert.match(rel.releaseCheck({ version: '2.9.1', previous: 'v2.9.0', releases: rel.normalizeReleases({ versions: { '2.9.1': { breaking: false, title: 'T' } } }) }).errors[0], /no changes/, '065: every version lists its changes');
   assert.deepEqual(rel.releaseCheck({ version: '2.9.0', previous: 'v2.8.2', releases }), { errors: [], warnings: [] });
-  assert.match(rel.releaseNotes(releases, 'v3.0.0'), /Breaking release[\s\S]*### Big[\s\S]*- Do X[\s\S]*\*\*New\*\*\n\n- Polls[\s\S]*\*\*Fixed\*\*\n\n- Typo[\s\S]*More: /);
-  assert.equal(rel.releaseNotes(releases, 'v1.0.0'), '');
+  assert.match(rel.releaseNotes(releases, 'v3.0.0', repoLinks('alice/duniya')), /Breaking release[\s\S]*### Big[\s\S]*- Do X[\s\S]*\*\*New\*\*\n\n- Polls[\s\S]*\*\*Fixed\*\*\n\n- Typo[\s\S]*More: \[docs\/README.md\]\(https:\/\/github.com\/alice\/duniya\/blob\/v3.0.0\//);
+  assert.equal(rel.releaseNotes(releases, 'v1.0.0', repoLinks('alice/duniya')), '');
   // the repository's own file is valid and passes for the current version
   const own = rel.normalizeReleases(JSON.parse(readFileSync(resolve(import.meta.dirname, '../releases.json'), 'utf8')));
   assert.equal(own['2.0.0'].breaking, true);

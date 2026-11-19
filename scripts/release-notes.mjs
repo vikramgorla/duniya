@@ -7,11 +7,15 @@
 //     Needs GITHUB_TOKEN (contents: write) and GITHUB_REPOSITORY; GITHUB_API_URL is GitHub's API unless set.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { normalizeReleases, releaseNotes } from '../src/core/releases.js';
+import { normalizeReleases, releaseNotes as notesOf } from '../src/core/releases.js';
+import { parseRepo, repoLinks } from '../src/core/repo.js';
 
 const [version, what = '--notes'] = process.argv.slice(2);
 if (!version) { console.error('usage: release-notes.mjs <version> [--title|--notes] | --sync'); process.exit(2); }
-const releases = normalizeReleases(JSON.parse(readFileSync(resolve(import.meta.dirname, '..', 'releases.json'), 'utf8')));
+const read = (f) => JSON.parse(readFileSync(resolve(import.meta.dirname, '..', f), 'utf8'));
+const releases = normalizeReleases(read('releases.json'));
+const repo = repoLinks(parseRepo(read('package.json').repository)?.slug || '');
+const releaseNotes = (all, tag) => notesOf(all, tag, repo);
 const titleOf = (tag) => { const e = releases[tag.slice(1)]; return `${e?.breaking ? '⚠️ Breaking — ' : ''}${tag}${e?.title ? `: ${e.title}` : ''}`; };
 
 /** Our notes, then what GitHub generated for the release (from "## What's Changed" or "**Full Changelog**" on). */

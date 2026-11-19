@@ -83,7 +83,7 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
     const { version } = await fetchVersion().catch(() => ({ version: undefined }));
     sock = makeSocket({
       auth, version, logger,
-      browser: Browsers.ubuntu('whatsapp-agent-duniya'),
+      browser: Browsers.ubuntu('Duniya'),
       markOnlineOnConnect: false,
       syncFullHistory: false,
       cachedGroupMetadata: async (jid) => groupCache.get(jid)?.meta,

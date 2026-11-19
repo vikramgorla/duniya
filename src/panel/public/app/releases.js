@@ -1,10 +1,9 @@
 // Release notes (065): what each version brings, shown before an update (every version between the running one and
 // the target), once after an update ("What's new") and in Settings → Help → Release notes. Module of the panel.
 import { api, ask, h, tryApi } from './core.js';
-import { plural } from './shared.js';
+import { plural, repoFile } from './shared.js';
 
 const KINDS = [['new', 'New'], ['improved', 'Improved'], ['fixed', 'Fixed'], ['removed', 'Removed']];
-const DOCS = 'https://github.com/vikramgorla/whatsapp-agent-duniya/blob/';
 const parts = (v) => String(v || '').replace(/^v/, '').split('.').map(Number);
 /** Version a is not newer than b. */
 export const notAfter = (a, b) => { const [x, y] = [parts(a), parts(b)]; const i = x.findIndex((n, k) => n !== y[k]); return i < 0 || x[i] < y[i]; };
@@ -27,7 +26,7 @@ export function releaseList(versions, { open = 2 } = {}) {
       const list = (r.changes || []).filter((c) => c.type === kind);
       return list.length ? h('div', { class: `rel-group ${kind}` }, h('div', { class: 'eyebrow' }, label), h('ul', {}, list.map((c) => h('li', {}, c.text)))) : null;
     }),
-    r.docs ? h('a', { class: 'small rel-more', href: `${DOCS}v${r.version}/${r.docs}`, target: '_blank', rel: 'noopener' }, 'Read more ↗') : null)));
+    r.docs ? h('a', { class: 'small rel-more', href: repoFile(r.docs, `v${r.version}`), target: '_blank', rel: 'noopener' }, 'Read more ↗') : null)));
 }
 
 /** A line such as "3 releases · 12 changes" for a range. */

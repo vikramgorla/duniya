@@ -2,8 +2,15 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { applyPendingRestore } from './restore-apply.js';
+import { parseRepo, repoLinks } from './repo.js';
 
 export const ROOT = resolve(import.meta.dirname, '..', '..');
+/** package.json of the running checkout, read once (an update restarts the process). */
+export const PKG = (() => { try { return JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')); } catch { return {}; } })();
+/** The running version, "vX.Y.Z" ('unknown' without a package.json). */
+export const APP_VERSION = PKG.version ? `v${PKG.version}` : 'unknown';
+/** 084: the project's GitHub repository and its URLs, from `repository` in package.json (the one place it lives). */
+export const REPO = repoLinks(parseRepo(PKG.repository)?.slug || 'duniya/duniya');
 
 function parseEnv(text) {
   const out = {};

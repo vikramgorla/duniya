@@ -82,7 +82,7 @@ async function registryGet(path, params = {}) {
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.data;
   let res;
   try {
-    res = await fetch(url, { redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { accept: 'application/json', 'user-agent': 'whatsapp-agent-duniya' } });
+    res = await fetch(url, { redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { accept: 'application/json', 'user-agent': 'duniya' } });
   } catch (e) {
     throw fail(e?.name === 'TimeoutError' ? 'The MCP Registry did not answer in time; try again' : `Could not reach the MCP Registry (${url.host})`, 502);
   }

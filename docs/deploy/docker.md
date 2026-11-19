@@ -3,7 +3,7 @@
 **Duniya in containers on any machine with Docker: three commands, data in one volume.**
 
 ```bash
-git clone https://github.com/vikramgorla/whatsapp-agent-duniya && cd whatsapp-agent-duniya
+git clone https://github.com/vikramgorla/whatsapp-agent-duniya && cd duniya
 cp .env.example .env
 docker compose up -d
 ```

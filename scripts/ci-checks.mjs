@@ -15,12 +15,15 @@
 //  7. Types (fails, 063): `tsc` checks every file that starts with // @ts-check (tsconfig.json, npm run typecheck).
 //  8. Performance (fails, #174): no full scans of large tables on hot paths and every time budget met against the
 //     scale fixture (scripts/check-perf.mjs, npm run check:perf; ~30 s).
+//  9. Repository (fails, 084): every project URL in tracked files (README, docs, website, infra, installer) uses the
+//     slug in package.json `repository` (scripts/repo-sync.mjs; fix with npm run repo:sync). specs/ keep their history.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { normalizeReleases, releaseCheck } from '../src/core/releases.js';
 import { checkDocLinks } from './check-doc-links.mjs';
 import { checkDiagrams } from './render-diagrams.mjs';
+import { findDrift } from './repo-sync.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const read = (f) => readFileSync(resolve(root, f), 'utf8');
@@ -67,6 +70,13 @@ if (off.length) {
   const { problems, count } = checkDiagrams();
   for (const p of problems) { failed = true; console.log(`::error::Diagrams: ${p}`); }
   if (!problems.length) console.log(`Diagrams: ok (${count} up to date)`);
+}
+
+// 9. one repository slug (084): no project URL with another owner/name (a rename or fork runs npm run repo:sync)
+{
+  const drift = findDrift();
+  for (const d of drift) { failed = true; console.log(`::error file=${d.file},line=${d.line}::${d.found} is not this repository (package.json repository). Run npm run repo:sync (it writes ${d.next}).`); }
+  if (!drift.length) console.log('Repository: ok (every project URL uses the slug in package.json)');
 }
 
 // 5. docs freshness hint

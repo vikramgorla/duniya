@@ -1,6 +1,6 @@
 // Server screen: metrics, health, OS updates, maintenance helper, logs, hosting. Module of the panel (063).
 import { $, S, ago, api, ask, can, field, h, serverBadge, time, tryApi } from './core.js';
-import { DOCS, SIZE_LABEL, bytes, meter, pct, plural } from './shared.js';
+import { docsUrl, SIZE_LABEL, bytes, meter, pct, plural } from './shared.js';
 function spark(values, max) {
   const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('viewBox', '0 0 100 30'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('class', 'spark');
@@ -35,7 +35,7 @@ function hostingCard(hosting) {
   const p = hosting?.provider;
   const link = (key, primary) => { const [name, path, what] = HOST_GUIDES[key];
     return h('div', { class: 'list-row' }, h('div', { class: 'grow' }, h('b', {}, name), h('div', { class: 'small muted' }, what)),
-      h('a', { class: `btn small${primary ? ' primary' : ''}`, href: DOCS + path, target: '_blank', rel: 'noopener' }, 'Open guide')); };
+      h('a', { class: `btn small${primary ? ' primary' : ''}`, href: docsUrl(path), target: '_blank', rel: 'noopener' }, 'Open guide')); };
   const known = HOST_GUIDES[p];
   return h('div', { class: 'card', id: 'hosting-help' }, h('h2', {}, 'Hosting help'),
     known ? link(p, true) : [h('p', { class: 'small muted', style: 'margin-top:0' }, 'Pick where this server runs.'), link('oci'), link('gcp'), link('server'), link('docker')],
@@ -146,7 +146,7 @@ export async function renderServer() {
     const lastLine = last ? h('p', { class: 'small', style: 'margin:0 0 6px' }, h('span', { class: 'muted' }, `Last: ${ops.actions[last.action] || last.action} · ${time(last.endedAt)} · `),
       ops.result?.text ? h('b', {}, ops.result.text) : last.state === 'done' ? 'done' : h('b', { style: 'color:var(--bad)' }, 'failed')) : null;
     // 056: the root maintenance helper updates itself from a release (version 3+); older ones need one root run.
-    const helperDoc = h('a', { href: `${DOCS}upgrading.md#the-maintenance-helper`, target: '_blank', rel: 'noopener' }, 'how to reinstall');
+    const helperDoc = h('a', { href: docsUrl('upgrading.md#the-maintenance-helper'), target: '_blank', rel: 'noopener' }, 'how to reinstall');
     const oldHelper = !ops?.available || !(ops.helperOutdated || !ops.helperCurrent) ? null
       : ops.helperSelfUpdate ? h('div', { class: 'note info', id: 'helper-update', style: 'margin-top:10px' },
         h('b', {}, 'A newer maintenance helper comes with this release'), ` (version ${ops.helperVersion} → ${ops.helperBundled}). It normally updates itself after an app update; if that did not happen, update it here. It is downloaded from the official repository by the server itself.`,
