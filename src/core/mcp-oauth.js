@@ -2,7 +2,7 @@
 // Uses the MCP SDK's standard flow (RFC 9728 discovery, RFC 8414, dynamic registration, PKCE S256, resource
 // indicator, refresh) with a provider backed by an encrypted table, one connection per agent × service × role
 // (or, for a global tool service, per service × role with agent_id = GLOBAL_SCOPE).
-import { fail } from './config.js';
+import { REPO, fail } from './config.js';
 import { auth } from '@modelcontextprotocol/sdk/client/auth.js';
 import { db } from './db.js';
 import { TENANT } from './store.js';
@@ -97,7 +97,7 @@ class Provider {
   get redirectUrl() { return this._redirect; }
   get clientMetadata() {
     return {
-      client_name: 'whatsapp-agent-duniya', client_uri: 'https://github.com/vikramgorla/whatsapp-agent-duniya',
+      client_name: 'Duniya', client_uri: REPO.url,
       redirect_uris: [this._redirect], grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'],
       token_endpoint_auth_method: this.fixedClient?.client_secret ? 'client_secret_basic' : 'none',
     };
@@ -197,7 +197,7 @@ export async function probeServer(rawUrl, { fetchFn = fetch } = {}) {
   const init = {
     method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(15000),
     headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'whatsapp-agent-duniya', version: '1' } } }),
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'duniya', version: '1' } } }),
   };
   let res;
   for (let hop = 0; hop < 5; hop++) {

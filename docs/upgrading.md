@@ -8,6 +8,7 @@
 - Semver: minor = features, patch = fixes, major = may need a reinstall.
 - Since 2.9.0 the app asks you before a breaking release; older servers: update to 2.9.0 first.
 - Releases that need a step from you are listed [below](#how-breaking-releases-reach-you).
+- Updates come from where you installed (the project or a fork); [switch the source](#update-source) any time.
 - Every update shows what each release in between brings, and Overview says what's new afterwards.
 
 ## Within 2.x
@@ -31,13 +32,34 @@ the update dialog for the versions you are about to get) and on
 > - **Photos & voice** need `ffmpeg` and `bzip2` (voice replies, on-server speech): re-run the installer; the Docker
 >   image includes them.
 
+## Update source
+
+Updates come from the repository the server was installed from: the project, or a fork. **Settings → Updates →
+Update source** shows it (*the project* or *not the project*) and switches it:
+
+1. Type `owner/name` or `https://github.com/owner/name` (a fork, or the project again: **Use the project**).
+2. **Change** → confirm. The server reads that repository's releases first; if it can't (typo, private, offline),
+   nothing changes.
+3. **Check now** shows what that source has. Updates install its releases from then on.
+
+On the server: `sudo duniya source` shows it, `sudo duniya source owner/name` switches the app **and** the
+maintenance helper (from the panel only the app moves: the helper keeps the source in its root-owned config, because
+the app must never choose what root downloads). Re-running the installer keeps the source in use, or takes
+`--repo owner/name`. Docker: set `image:` in `docker-compose.yml` (e.g. `ghcr.io/you/duniya:latest`).
+
+> [!NOTE]
+> **The repository was renamed or moved?** GitHub forwards git and release links from the old name, so servers keep
+> updating; switch the source to the new name when convenient. GitHub Pages is not forwarded: the website moves to
+> `https://<owner>.github.io/<new-name>/`.
+
 ## The maintenance helper
 
 The root maintenance helper (`/usr/local/sbin/duniya-ops`) applies OS updates, restarts and web address changes. The
 app has no root, so the in-panel app update cannot change it directly.
 
 **Since 2.17 it updates itself.** After an app update the app asks it once; the server itself downloads that
-release's helper from the official repository (HTTPS, certificate checked, only `deploy/ops`) and installs it. If that
+release's helper from the repository in its install config (HTTPS, certificate checked, only `deploy/ops`) and
+installs it. If that
 did not happen: **Server → OS updates & maintenance → Update maintenance helper**.
 
 | Panel says | Do this |
@@ -55,8 +77,8 @@ did not happen: **Server → OS updates & maintenance → Update maintenance hel
 <details><summary>How it stays safe</summary>
 
 - The app only writes the action word and its release number (`vX.Y.Z`, checked strictly by the helper).
-- The repository address comes from the root-owned `/etc/duniya/install.conf` (https only) or the official one,
-  never from the app; git runs as root only in the root-owned `/var/lib/duniya-ops/src`, with a clean environment,
+- The repository address comes only from the root-owned `/etc/duniya/install.conf` (https only; written by the
+  installer and `sudo duniya source`), never from the app; git runs as root only in the root-owned `/var/lib/duniya-ops/src`, with a clean environment,
   no hooks, one tag, shallow and blobless (a few hundred KB), and that folder is removed afterwards.
 - No downgrades: releases older than 2.17.0 or than the last one it installed are refused, and so is a helper with a
   lower version line. The new helper must parse (`bash -n`) and is renamed into place.

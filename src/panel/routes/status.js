@@ -12,15 +12,12 @@ import { serverSize, setSmallServerMode, smallServerMode } from '../../core/reso
 import { getSettings, updateSettings } from '../../core/store.js';
 import { osUpdatesCached, rebootStatus } from '../../core/system.js';
 import { whatsNew } from '../../core/updates.js';
-import { ROOT } from '../../core/config.js';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { APP_VERSION, ROOT } from '../../core/config.js';
 import { execFile } from 'node:child_process';
 
-const PKG_VERSION = (() => { try { return `v${JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')).version}`; } catch { return ''; } })();
 // The running version cannot change without a restart: ask git once, not on every status (058).
 let versionOnce = null;
-const gitVersion = () => (versionOnce ||= new Promise((r) => execFile('git', ['log', '-1', '--format=%h'], { cwd: ROOT }, (e, out) => r([PKG_VERSION, e ? '' : out.trim()].filter(Boolean).join(' · ') || 'unknown'))));
+const gitVersion = () => (versionOnce ||= new Promise((r) => execFile('git', ['log', '-1', '--format=%h'], { cwd: ROOT }, (e, out) => r([APP_VERSION, e ? '' : out.trim()].filter(Boolean).join(' · ') || 'unknown'))));
 const startedAt = Date.now();
 /** What Small server mode is and what it covers here (055). */
 const smallModeView = () => ({ enabled: smallServerMode(), server: serverSize(),

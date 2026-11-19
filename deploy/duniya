@@ -65,5 +65,19 @@ case "${1:-}" in
       *) exit $rc ;;
     esac
     ;;
+  source)
+    # 084: the app switches its git source (validated, fetched, put back on failure); root then points the maintenance
+    # helper's install config at the same repository, only when it is a plain GitHub https URL.
+    [ $# -gt 1 ] || { run_app "$@"; exit $?; }
+    out="$(run_app "$@")"; rc=$?
+    printf '%s\n' "$out" | grep -v '^source-url ' || true
+    [ $rc -eq 0 ] || exit $rc
+    url="$(printf '%s\n' "$out" | sed -n 's/^source-url //p' | tail -n1)"
+    conf="${DUNIYA_INSTALL_CONF:-/etc/duniya/install.conf}"
+    if [[ "$url" =~ ^https://github\.com/[A-Za-z0-9-]+/[A-Za-z0-9._-]+\.git$ ]] && [ -f "$conf" ]; then
+      if grep -q '^REPO=' "$conf"; then sed -i "s|^REPO=.*|REPO='$url'|" "$conf"; else echo "REPO='$url'" >> "$conf"; fi
+      echo "✓ The maintenance helper updates from there too."
+    fi
+    ;;
   *) run_app "$@"; exit $? ;;
 esac

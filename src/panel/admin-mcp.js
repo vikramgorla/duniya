@@ -4,12 +4,10 @@
 //   /.well-known/oauth-protected-resource[/mcp]  RFC 9728   /.well-known/oauth-authorization-server  RFC 8414
 //   /oauth/register (RFC 7591, public clients)  /oauth/authorize (consent page)  /oauth/token  /oauth/revoke (RFC 7009)
 //   /mcp  Streamable HTTP, stateless, JSON responses. Every call acts as the panel user who approved the assistant.
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { ROOT } from '../core/config.js';
+import { APP_VERSION, REPO } from '../core/config.js';
 import { authenticate, createSession, sessionUser } from '../core/store.js';
 import { passwordLoginAllowed } from '../core/google-signin.js';
 import { activity } from '../core/events.js';
@@ -29,9 +27,8 @@ function bearerToken(header) {
   const t = h.slice(7).trim();
   return t && !/\s/.test(t) ? t : undefined;
 }
-import { TOOLS, scrub } from './admin-tools.js';
+import { TOOLS, scrub, toolHints, toolTitle } from './admin-tools.js';
 
-const VERSION = (() => { try { return JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')).version; } catch { return '0'; } })();
 const ROLE_RANK = { viewer: 1, admin: 2, owner: 3 };
 const MAX_OUTPUT = 60000;
 const CORS = {
@@ -85,9 +82,11 @@ export function createAdminMcp({ invoke, routeRole }) {
   }
 
   // ---------- metadata ----------
+  const SERVER_INFO = { name: 'duniya-admin', title: 'Duniya admin', version: APP_VERSION.replace(/^v/, ''), websiteUrl: REPO.pages,
+    description: 'Manage a self-hosted Duniya server (AI agents for WhatsApp and Telegram): agents, chats, people, events, models, backups and updates. Risky changes need a confirmation.' };
   const resourceMetadata = (req) => ({
     resource: resourceOf(req), authorization_servers: [baseUrl(req)], scopes_supported: [SCOPE], bearer_methods_supported: ['header'],
-    resource_name: 'Duniya admin (WhatsApp agents)',
+    resource_name: 'Duniya admin',
   });
   const serverMetadata = (req) => {
     const b = baseUrl(req);
@@ -260,19 +259,20 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
     if (text.length > MAX_OUTPUT) text = `${text.slice(0, MAX_OUTPUT)}… (truncated; ask for less, e.g. a smaller limit)`;
     return { content: [{ type: 'text', text }] };
   }
-  const toolDefs = (user) => [
-    ...TOOLS.filter((t) => allowed(user, t.name)).map((t) => ({
-      name: t.name, description: t.description,
-      inputSchema: { type: 'object', properties: t.input, ...(t.required ? { required: t.required } : {}) },
-      annotations: { readOnlyHint: !!t.readOnly, destructiveHint: !!t.risky, openWorldHint: false },
-    })),
-    ...(ROLE_RANK[user.role] >= ROLE_RANK.admin ? [{
-      name: 'confirm_action',
-      description: 'Carry out a risky action that a tool previewed (it returned a confirm_code). Only call this after the user has read the preview and said yes.',
-      inputSchema: { type: 'object', properties: { confirm_code: { type: 'string', description: 'The confirm_code from the preview' } }, required: ['confirm_code'] },
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
-    }] : []),
-  ];
+  // 084: confirm_action carries out any risky tool: destructive, idempotent (a code works once; repeating it changes
+  // nothing), open-world when some risky tool is.
+  const CONFIRM = {
+    name: 'confirm_action',
+    description: 'Carry out a risky action that a tool previewed (it returned a confirm_code). Only call this after the user has read the preview and said yes.',
+    input: { confirm_code: { type: 'string', description: 'The confirm_code from the preview' } }, required: ['confirm_code'],
+    destructive: true, idempotent: true, openWorld: TOOLS.some((t) => t.risky && t.openWorld),
+  };
+  const toolDef = (t) => ({
+    name: t.name, title: toolTitle(t.name), description: t.description,
+    inputSchema: { type: 'object', properties: t.input, ...(t.required ? { required: t.required } : {}) },
+    annotations: { title: toolTitle(t.name), ...toolHints(t) },
+  });
+  const toolDefs = (user) => [...TOOLS.filter((t) => allowed(user, t.name)), ...(ROLE_RANK[user.role] >= ROLE_RANK.admin ? [CONFIRM] : [])].map(toolDef);
 
   async function mcp(req, res) {
     const bearer = bearerToken(req.headers.authorization);
@@ -289,9 +289,9 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
     try { body = JSON.parse((await rawBody(req, 2e6)) || 'null'); } catch { return json(res, 400, { jsonrpc: '2.0', error: { code: -32700, message: 'Parse error' }, id: null }); }
     const ctx = { user: auth.user, client: auth.client };
     ctx.x = { call: (method, path, b) => invoke(auth.user, method, path, b, { host: req.headers.host }) };
-    const server = new Server({ name: 'duniya-admin', title: 'Duniya admin', version: VERSION }, {
+    const server = new Server({ ...SERVER_INFO, icons: [{ src: `${baseUrl(req)}/icons/icon-192.png`, mimeType: 'image/png', sizes: ['192x192'] }] }, {
       capabilities: { tools: {} },
-      instructions: `You manage a self-hosted WhatsApp agent platform ("Duniya") as panel user ${auth.user.username} (${auth.user.role}). `
+      instructions: `You manage a self-hosted AI agent platform for WhatsApp and Telegram ("Duniya") as panel user ${auth.user.username} (${auth.user.role}). `
         + 'Use the list/get tools to look before changing anything. Risky tools return a preview and a confirm_code: show the preview to the user and call confirm_action only after they agree. '
         + 'Never ask the user for keys, passwords or passphrases: set_secret and add_user return one-time links where people enter them in the panel.',
     });

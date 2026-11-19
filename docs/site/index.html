@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Duniya · AI agents for your WhatsApp groups, on your own server</title>
-<meta name="description" content="Duniya runs AI agents in the WhatsApp groups and chats you choose, on your own free server, from a calm web panel. Silent by default, your own assistant, any model with a backup, search and review, backups and one-click updates.">
+<title>Duniya · AI agents for your WhatsApp and Telegram groups, on your own server</title>
+<meta name="description" content="Duniya runs AI agents in the WhatsApp and Telegram groups and chats you choose, on your own free server, from a calm web panel. Silent by default, your own assistant, any model with a backup, search and review, backups and one-click updates.">
 <meta name="theme-color" content="#f2f1ec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0b0c0f" media="(prefers-color-scheme: dark)">
-<meta property="og:title" content="Duniya · AI agents for your WhatsApp groups">
+<meta property="og:title" content="Duniya · AI agents for your WhatsApp and Telegram groups">
 <meta property="og:description" content="Helpers for your family, school, car-pool and club chats, on your own server, managed from a calm web panel.">
 <meta property="og:image" content="img/overview-desktop.webp">
 <link rel="icon" href="img/logo-small.svg" type="image/svg+xml">
@@ -44,7 +44,7 @@
         <span><i class="led"></i>Agents <b>5 live</b></span>
         <span><i class="led off"></i>Other chats <b>silent</b></span>
       </div>
-      <h1>Helpers for your WhatsApp groups, <em>on your server.</em></h1>
+      <h1>Helpers for your WhatsApp and Telegram groups, <em>on your server.</em></h1>
       <p class="lede">AI agents for your family, school, car-pool and club chats. <strong>You choose the chats, the model and what they may do</strong>, from a calm web panel on a free server you own.</p>
       <div class="hero-side">
         <div class="cta">
@@ -258,7 +258,7 @@
         <span class="label">One click · free</span>
         <h3>Oracle Cloud</h3>
         <p>Always Free VM that installs itself, with HTTPS at <code>https://&lt;ip&gt;.sslip.io</code>. No domain, no terminal.</p>
-        <a class="btn primary" href="https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip"><span class="led" aria-hidden="true"></span>Deploy to Oracle Cloud</a>
+        <a class="btn primary" href="https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/duniya.zip"><span class="led" aria-hidden="true"></span>Deploy to Oracle Cloud</a>
         <ol>
           <li>Click the button, pick your <b>home region</b>, keep the free shape.</li>
           <li><b>Apply</b>. When the job says <i>Succeeded</i>, reload the page.</li>
@@ -300,13 +300,14 @@
     </div>
     <div class="qa">
       <details open><summary>Is this the official WhatsApp Business API?</summary><p>No. Duniya links to a normal WhatsApp number as a linked device (like WhatsApp Web) with the open-source Baileys library. That keeps it free and simple, but unofficial clients can be banned, so use a dedicated number. Agents only reply when woken, or to follow-ups right after they spoke, and are rate-limited.</p></details>
-      <details><summary>What does it cost?</summary><p>The software is free and open source; the server can be free on Oracle Cloud or Google Cloud. For models, use OpenRouter's free models, your ChatGPT, Claude or Copilot plan (through the official Codex, Claude Code or Copilot app on your server), or pay per use with an API key. Usage shows tokens and cost, and monthly spending caps stop surprises.</p></details>
+      <details><summary>What does it cost?</summary><p>The software is free and open source (MIT); the server can be free on Oracle Cloud or Google Cloud. For models, use OpenRouter's free models, your ChatGPT, Claude or Copilot plan (through the official Codex, Claude Code or Copilot app on your server), or pay per use with an API key. Usage shows tokens and cost, and monthly spending caps stop surprises.</p></details>
       <details><summary>Will people in the group know there is an assistant?</summary><p>Yes. When you switch a group on, the number posts a short privacy notice once (your text, per-group opt-out), and a person's first direct reply gets one line. Agents only answer when someone addresses them.</p></details>
       <details><summary>Who can see the messages?</summary><p>Only chats you switched on are stored, for the agent's memory, and old messages are pruned by themselves. Owners and admins can read what was stored; every look is in the activity log. Chats marked <i>Private to members</i> are hidden from your assistant and from search.</p></details>
       <details><summary>Can I use my Claude Pro/Max subscription?</summary><p>Yes, through Claude Code: Duniya runs Anthropic's own, unmodified Claude Code app on your server, signed in with your own account (a token from <code>claude setup-token</code>), for your personal use within your plan's limits. Your ChatGPT plan works the same way through Codex (or OpenAI's Sign in with ChatGPT), and Copilot through GitHub's SDK, also on a 1 GB server. <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/models.md#agent-apps">What the terms say</a>.</p></details>
       <details><summary>Only WhatsApp?</summary><p>WhatsApp and Telegram. Telegram works through an official bot: paste its token, add it to a group, and the same agents answer there; people who share their number are the same person on both apps. Channels load only when you set one up, so neither costs memory until then. <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/telegram.md">Connect Telegram</a></p></details>
       <details><summary>Do I need to know Linux?</summary><p>No. The Oracle and Google buttons need no terminal skills, and afterwards updates, OS packages, logs, restarts and backups are buttons in the panel.</p></details>
       <details><summary>Can several people manage it?</summary><p>Yes: owners, admins and viewers, with passwords or Sign in with Google. You can also manage it from ChatGPT or Claude, with the same roles and a confirmation for risky actions.</p></details>
+      <details><summary>Can I fork it and run my own version?</summary><p>Yes, it is MIT licensed. Fork it on GitHub and enable Actions: a workflow points the install command, the buttons, this website and the Docker image at your fork and opens a pull request. Servers can then install from your fork (<code>DUNIYA_REPO=you/duniya</code>) or switch to it under <b>Settings → Updates</b>. <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/CONTRIBUTING.md#forking">How to fork</a>.</p></details>
       <details><summary>How do I report a security issue?</summary><p>Privately, through GitHub's “Report a vulnerability” on the repository; see <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/SECURITY.md">SECURITY.md</a>.</p></details>
     </div>
   </div>
@@ -318,7 +319,7 @@
   <div class="wrap">
     <div>
       <a class="brand" href="#top"><img src="img/logo.svg" alt="" width="32" height="32">Duniya</a>
-      <small><i>Duniya</i> means “the world”. An independent open-source project, not affiliated with WhatsApp or Meta.</small>
+      <small><i>Duniya</i> means “the world”. An independent open-source project under the <a href="https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/LICENSE">MIT license</a>, not affiliated with WhatsApp, Telegram or Meta.</small>
     </div>
     <nav aria-label="Project links">
       <a href="https://github.com/vikramgorla/whatsapp-agent-duniya">GitHub</a>

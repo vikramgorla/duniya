@@ -113,7 +113,26 @@ function updatesCard(u, { line, check, reviewBtn, updateBtn, docker }) {
       h('div', { class: 'row', style: 'margin-top:8px' }, mode, channel, at, h('button', { class: 'btn', onclick: () => tryApi(() => api('PUT', '/api/updates/settings', { mode: mode.value, channel: channel.value, at: at.value, keepPreUpdate: Number(keep.value) }), 'Saved') }, 'Save')),
       h('p', { class: 'small muted' }, 'Automatic installs never cross a breaking release: you are asked first, here and on WhatsApp. ',
         u.backup ? 'A local backup is made before every update; keep the last ' : 'Set a backup passphrase under Backups to get a local backup before every update; keep the last ', keep, ' pre-update backups.')),
+    sourceBlock(u.source),
     h('div', { class: 'sblock' }, h('button', { class: 'btn small', onclick: async () => (await ask({ title: 'Restart the service?', text: 'Agents pause for a few seconds; the page reloads by itself.', ok: 'Restart service', danger: true })) && api('POST', '/api/system/restart').catch(() => {}).then(() => { toast('Restarting…'); setTimeout(() => location.reload(), 6000); }) }, 'Restart service')));
+}
+
+/** 084: where updates come from (the checkout's git source): the project, a fork or another repository; changeable. */
+function sourceBlock(src) {
+  if (!src) return null;
+  const input = h('input', { value: src.repo || '', placeholder: 'owner/name', 'aria-label': 'Update source (owner/name or GitHub address)', style: 'max-width:340px', autocomplete: 'off', spellcheck: 'false' });
+  const where = src.repo ? extLink(`https://github.com/${src.repo}`, src.repo, '') : h('code', {}, src.url || 'unknown');
+  const save = async (repo) => {
+    if (!repo || repo === src.repo) return;
+    if (!await ask({ title: `Update from ${repo}?`, text: `Future updates install the releases of ${repo} instead of ${src.repo || src.url}. Its releases are read first; nothing changes if that fails.`, ok: 'Change source' })) return;
+    if (await tryApi(() => api('PUT', '/api/updates/source', { repo }), `Updates now come from ${repo}`)) renderSettings();
+  };
+  return h('div', { class: 'sblock' }, h('h3', {}, 'Update source'),
+    h('p', { class: 'small' }, 'Updates come from ', where, src.official ? ' (the project).' : ` · not the project (${src.project}).`),
+    h('div', { class: 'row', style: 'margin-top:8px' }, input, h('button', { class: 'btn', onclick: () => save(input.value.trim()) }, 'Change'),
+      src.official ? null : h('button', { class: 'btn ghost', onclick: () => save(src.project) }, 'Use the project')),
+    h('p', { class: 'small muted' }, 'A fork or another GitHub repository: owner/name or its https address. The server maintenance helper keeps the source it was installed from; ',
+      h('code', {}, 'sudo duniya source owner/name'), ' moves both.'));
 }
 
 // ---------- Settings → Server: Small server mode (055), one switch for heavier features on a small server ----------

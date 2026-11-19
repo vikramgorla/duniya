@@ -3,9 +3,10 @@
 // panel user, so role gates, validation and activity logging are exactly the panel's. `calls` names the routes a
 // tool uses: the minimum role to see and run the tool is the highest role those routes require.
 // Risky tools never run directly: they return a plain-language preview and a confirm code for confirm_action.
+import { fail } from '../core/config.js';
 /** 065: version a is not newer than b ("2.9.0" vs "v2.10.0"). */
 const notAfter = (a, b) => { const [x, y] = [a, b].map((v) => String(v).replace(/^v/, '').split('.').map(Number)); const i = x.findIndex((n, k) => n !== y[k]); return i < 0 || x[i] < y[i]; };
-const iso = (ts) => (ts ? new Date(ts).toISOString() : null); // no imports: tests and the admin MCP load this catalog statically
+const iso = (ts) => (ts ? new Date(ts).toISOString() : null);
 
 const enc = encodeURIComponent;
 const str = (description, extra = {}) => ({ type: 'string', description, ...extra });
@@ -47,7 +48,28 @@ async function numbers(x) {
   return ch?.numbers || (ch ? [{ id: 'main', label: 'Main', ...ch }] : []);
 }
 
-/** @type {Array<{name, description, input, required?, calls, risky?, readOnly?, noConfirm?, run, preview?}>} noConfirm: the owner assistant runs it without a confirm code (logged). */
+/**
+ * 084: the four MCP tool hints, all explicit booleans (directories such as OpenAI's refuse a tool with one missing),
+ * derived from what a tool calls so they cannot drift: read-only tools are neither destructive nor open-world-writing
+ * and are idempotent; a write is destructive when it is risky (confirm gate) or overwrites/deletes (PUT, DELETE),
+ * idempotent when it only PUTs/DELETEs. `destructive` / `idempotent` on a tool override the derivation (a POST that
+ * sets a value); `openWorld` marks tools that reach outside this server (WhatsApp/Telegram, a model, GitHub, apt…).
+ * @param {{ readOnly?: boolean, risky?: boolean, destructive?: boolean, idempotent?: boolean, openWorld?: boolean, calls?: string[][] }} t
+ */
+export function toolHints(t) {
+  const writes = (t.calls || []).map(([m]) => m).filter((m) => m !== 'GET');
+  const readOnlyHint = !!t.readOnly;
+  return {
+    readOnlyHint,
+    destructiveHint: !readOnlyHint && (t.destructive ?? (!!t.risky || writes.some((m) => m === 'PUT' || m === 'DELETE'))),
+    idempotentHint: readOnlyHint || (t.idempotent ?? writes.every((m) => m === 'PUT' || m === 'DELETE')),
+    openWorldHint: !!t.openWorld,
+  };
+}
+/** A tool's human-readable title from its name: list_agents → "List agents". */
+export const toolTitle = (name) => name.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+/** @type {Array<{name, description, input, required?, calls, risky?, readOnly?, destructive?, idempotent?, openWorld?, noConfirm?, run, preview?}>} noConfirm: the owner assistant runs it without a confirm code (logged). */
 export const TOOLS = [
   // ---------- overview & activity ----------
   { name: 'get_overview', readOnly: true, calls: [['GET', '/api/status'], ['GET', '/api/checklist']],
@@ -108,7 +130,7 @@ export const TOOLS = [
     description: 'Members of the agent\'s WhatsApp groups (name, number, group admin) with their role for this agent (organizer or participant). To change roles, update_agent with "organizers" (phone numbers).',
     input: { agent_id: str('Agent id') }, required: ['agent_id'],
     run: (a, x) => x.call('GET', `/api/agents/${enc(a.agent_id)}/people`) },
-  { name: 'draft_agent_with_ai', calls: [['POST', '/api/ai/agent-draft']],
+  { name: 'draft_agent_with_ai', openWorld: true, calls: [['POST', '/api/ai/agent-draft']],
     description: 'Ask the app\'s AI helper to draft a new agent (no agent_id) or changes to an agent from a plain-language request. Returns a summary, the changed fields (before/after) and the full proposed config. Nothing is saved: apply with create_agent (config = proposed) or update_agent (changes = the changed fields).',
     input: { agent_id: str('Agent to change (omit to draft a new agent)'), request: str('What you want, in plain words'), model: str('Model to use: "auto" (default) or provider:model') }, required: ['request'],
     run: (a, x) => x.call('POST', '/api/ai/agent-draft', { agentId: a.agent_id, request: a.request, model: a.model || 'auto' }) },
@@ -125,10 +147,10 @@ export const TOOLS = [
     input: { agent_id: str('Agent id') }, required: ['agent_id'],
     preview: async (a, x) => `Delete the agent ${await agentName(x, a.agent_id)}. Its chats stop getting replies and its settings are gone (export it first to keep a copy). This cannot be undone.`,
     run: (a, x) => x.call('DELETE', `/api/agents/${enc(a.agent_id)}`) },
-  { name: 'run_schedule_now', calls: [['POST', '/api/agents/x/schedules/y/run']], description: 'Run one of an agent\'s scheduled posts now (it posts to the chat as it would on schedule). For owner-assistant the result goes to every linked owner and admin in their own chat (weekly-summary = the weekly summary).',
+  { name: 'run_schedule_now', openWorld: true, calls: [['POST', '/api/agents/x/schedules/y/run']], description: 'Run one of an agent\'s scheduled posts now (it posts to the chat as it would on schedule). For owner-assistant the result goes to every linked owner and admin in their own chat (weekly-summary = the weekly summary).',
     input: { agent_id: str('Agent id'), schedule_id: str('Schedule id (see get_agent → schedules)') }, required: ['agent_id', 'schedule_id'],
     run: (a, x) => x.call('POST', `/api/agents/${enc(a.agent_id)}/schedules/${enc(a.schedule_id)}/run`) },
-  { name: 'test_agent', calls: [['POST', '/api/agents/x/test']],
+  { name: 'test_agent', openWorld: true, calls: [['POST', '/api/agents/x/test']],
     description: 'Send a test message to an agent, like the panel\'s test console, and get its reply. Nothing is posted to WhatsApp. "as" picks the sender\'s role (organizer or participant). "path" says what answered: quick (quick reply or !help), faq or model.',
     input: { agent_id: str('Agent id'), text: str('Message text'), as: { type: 'string', enum: ['organizer', 'participant'], description: 'Sender role (default participant)' },
       chat: str('Test as if in this chat of the agent (its memory, group or direct, model); omit for a new direct chat') }, required: ['agent_id', 'text'],
@@ -169,16 +191,16 @@ export const TOOLS = [
       return x.call('PUT', `/api/chats/${enc(a.chat)}/prefs`, { model: a.model, logging: a.logging, ...(fallback ? { fallback } : {}), ...(a.welcome ? { welcome: a.welcome } : {}) });
     } },
   // #91: chats that are off store nothing, so a chat switched on starts empty; these load earlier messages from the phone.
-  { name: 'load_chat_history', noConfirm: true, calls: [['POST', '/api/chats/x/history'], ['GET', '/api/chats/x/history']],
+  { name: 'load_chat_history', openWorld: true, noConfirm: true, calls: [['POST', '/api/chats/x/history'], ['GET', '/api/chats/x/history']],
     description: 'Load recent messages of a chat that is on from the linked phone ("Load recent messages" on the Chats page): asks WhatsApp for up to `count` messages from before the oldest stored one (default the setting, max 200), so the agent has earlier context and a summary. The phone must be online; the answer comes within about a minute. Unanswered loads retry automatically (backoff, sooner when the phone comes online; retryAt in the status), so calling again is optional. Call with status_only to see the status (state loading, loaded, no_response, no_anchor or failed; loaded = how many were stored). At most once per 30 s per chat. Only adds messages; nothing is sent to the chat.',
     input: { chat: str('Chat id (see list_chats); the chat must be on'), count: int('How many messages (optional, 1–200)', { minimum: 1, maximum: 200 }), status_only: bool('Only show the status of the last load (optional)') }, required: ['chat'],
     run: async (a, x) => (a.status_only ? x.call('GET', `/api/chats/${enc(a.chat)}/history`) : x.call('POST', `/api/chats/${enc(a.chat)}/history`, { count: a.count })) },
-  { name: 'set_history_on_switch_on', calls: [['POST', '/api/settings']],
+  { name: 'set_history_on_switch_on', destructive: true, idempotent: true, calls: [['POST', '/api/settings']],
     description: 'How many earlier messages are loaded from the phone when a chat is switched on (0 = none, max 200, default 50).',
     input: { count: int('Messages (0–200)', { minimum: 0, maximum: 200 }) }, required: ['count'],
     run: async (a, x) => ({ historyLoadCount: (await x.call('POST', '/api/settings', { historyLoadCount: a.count })).historyLoadCount }) },
   // ---------- prepared direct chats (049, #92) ----------
-  { name: 'prepare_direct_chat', calls: [['POST', '/api/direct-chats'], ['POST', '/api/chats/x/intro/preview'], ['POST', '/api/chats/x/intro']],
+  { name: 'prepare_direct_chat', openWorld: true, calls: [['POST', '/api/direct-chats'], ['POST', '/api/chats/x/intro/preview'], ['POST', '/api/chats/x/intro']],
     risky: (a) => !!a.send_intro, // sending a message to the person needs confirm_action
     description: 'Set up a direct (1:1) chat with a person BEFORE they have written: assign an agent, switch the chat on or off, mark it private to members, and optionally set model, logging and a monthly spending cap. Use the person\'s phone number with country code (find it with list_contacts). Their first message then goes to this agent with these settings, whichever form WhatsApp uses. The chat is switched on when an agent is given, unless enabled is false. Nothing is sent to the person unless send_intro is true: then the agent also sends a short first message (or intro_text), which needs confirm_action.',
     input: { phone: str('Phone number with country code, e.g. +41 79 123 45 67'), number: str('Which of your WhatsApp numbers (id, default "main"; see get_overview)'), agent_id: str('Agent to answer this person (optional)'),
@@ -194,7 +216,7 @@ export const TOOLS = [
       const p = await x.call('POST', `/api/chats/${enc(chat.chat)}/intro/preview`, { text: a.intro_text });
       return { ...chat, intro: await x.call('POST', `/api/chats/${enc(chat.chat)}/intro`, { token: p.token }) };
     } },
-  { name: 'send_chat_intro', risky: true, calls: [['POST', '/api/chats/x/intro/preview'], ['POST', '/api/chats/x/intro']],
+  { name: 'send_chat_intro', openWorld: true, risky: true, calls: [['POST', '/api/chats/x/intro/preview'], ['POST', '/api/chats/x/intro']],
     description: 'Let the chat\'s agent send a first message (greeting / intro) to a direct chat, e.g. one set up with prepare_direct_chat. The chat must be on with an enabled agent. Without text a short intro by the agent is used. Needs confirm_action; the preview shows the exact text.',
     input: { chat: str('Direct chat id (see list_chats or prepare_direct_chat)'), text: str('Intro text (optional)') }, required: ['chat'],
     preview: async (a, x) => {
@@ -403,14 +425,14 @@ export const TOOLS = [
   { name: 'get_send', readOnly: true, calls: [['GET', '/api/sending/runs/x']], description: 'One run: its settings and counts, and each recipient (name, app, status, why skipped or failed, the text they got, when they replied).',
     input: { run: str('Run id'), status: str('Only recipients in this status (waiting, sent, replied, stop, skipped, failed)') }, required: ['run'],
     run: (a, x) => x.call('GET', `/api/sending/runs/${enc(a.run)}${a.status ? `?status=${enc(a.status)}` : ''}`) },
-  { name: 'send_to_people', risky: true, calls: [['POST', '/api/sending/preview'], ['POST', '/api/sending/runs/x/start']],
+  { name: 'send_to_people', openWorld: true, risky: true, calls: [['POST', '/api/sending/preview'], ['POST', '/api/sending/runs/x/start']],
     description: 'Send a message to people, one at a time at a person\'s pace (Lists and sending module). audience: { kind: list (list id) | tag (tag) | household (household id) | event (event id: its registered people, one message per household) | orders (event id optional: people with an open order) | people (person ids) }. purpose: updates or marketing (only people who said yes get it). template: the message; each person gets their own wording; placeholders {first_name}, {name}, {household}, events {event} {date} {place} {people}, orders {amount} {due} {ways_to_pay}. agent: who replies (default the first agent). Or mode: group with group (a group chat id that is on) to post once. Needs confirm_action: show the preview (who, how many, channel, duration, skipped and why, a sample).',
     input: { audience: obj('Who'), purpose: str('updates or marketing', { enum: ['updates', 'marketing'] }), template: str('The message'), title: str('A short title'), agent: str('Agent id'),
       mode: str('direct (default) or group', { enum: ['direct', 'group'] }), group: str('Group chat id (mode group)'), no_reply_limit: int('Pause after this many people in a row did not answer (default 20, 0 = never)'),
       survey: str('Survey id (Surveys module): each person can answer it in chat or by their own {survey_link}') }, required: ['purpose', 'template'],
     preview: async (a, x) => (await x.call('POST', '/api/sending/preview', sendBody(a))).line,
     run: async (a, x) => { const p = await x.call('POST', '/api/sending/preview', sendBody(a)); return { run: await x.call('POST', `/api/sending/runs/${enc(p.run.id)}/start`), skipped: p.skipped.length }; } },
-  { name: 'start_campaign', risky: true, calls: [['POST', '/api/sending/campaigns/preview'], ['POST', '/api/sending/campaigns/x/start']],
+  { name: 'start_campaign', openWorld: true, risky: true, calls: [['POST', '/api/sending/campaigns/preview'], ['POST', '/api/sending/campaigns/x/start']],
     description: 'A campaign (Lists and sending): a sequence of messages to one audience (as in send_to_people). steps: [{ kind: "message", template, survey? } | { kind: "wait", days }], starting with a message. stops: { replied, registered, paid, answered } — follow-ups skip people who replied (or said stop), registered for the event, paid for it (no open order), finished the survey. event: event id for registered / paid (default: the audience\'s). end_day: YYYY-MM-DD. Confirmed once for all steps; each message step goes out at the sending pace. Needs confirm_action.',
     input: { title: str('Title'), audience: obj('Who (as in send_to_people)'), purpose: str('updates or marketing', { enum: ['updates', 'marketing'] }), agent: str('Agent id'), steps: { type: 'array', items: { type: 'object', additionalProperties: true } },
       stops: obj('{ replied, registered, paid, answered }: true/false'), event: str('Event id'), end_day: str('Last day'), no_reply_limit: int('Pause a step after this many in a row did not answer (default 0)') }, required: ['audience', 'purpose', 'steps'],
@@ -418,7 +440,7 @@ export const TOOLS = [
     run: async (a, x) => { const p = await x.call('POST', '/api/sending/campaigns/preview', campaignBody(a)); return x.call('POST', `/api/sending/campaigns/${enc(p.campaign.id)}/start`); } },
   { name: 'get_campaign', readOnly: true, calls: [['GET', '/api/sending/campaigns/x']], description: 'One campaign: its steps, each with its run (state, sent, replied, skipped, waiting), the current step, the stop rules and the end day.',
     input: { campaign: str('Campaign id') }, required: ['campaign'], run: (a, x) => x.call('GET', `/api/sending/campaigns/${enc(a.campaign)}`) },
-  { name: 'control_campaign', calls: [['PUT', '/api/sending/campaigns/x']], description: 'Pause, resume or stop a campaign (and the run of its current step).',
+  { name: 'control_campaign', openWorld: true, calls: [['PUT', '/api/sending/campaigns/x']], description: 'Pause, resume or stop a campaign (and the run of its current step).',
     input: { campaign: str('Campaign id'), action: str('pause, resume or stop', { enum: ['pause', 'resume', 'stop'] }) }, required: ['campaign', 'action'],
     run: (a, x) => x.call('PUT', `/api/sending/campaigns/${enc(a.campaign)}`, { action: a.action }) },
   // ---------- Surveys (083) ----------
@@ -435,12 +457,12 @@ export const TOOLS = [
     input: { survey: str('Survey id') }, required: ['survey'],
     preview: async (a, x) => { const r = await x.call('GET', `/api/surveys/${enc(a.survey)}`); return `Delete the survey "${r.survey.title}" and the answers of ${r.counts.started} people. This cannot be undone.`; },
     run: (a, x) => x.call('DELETE', `/api/surveys/${enc(a.survey)}`) },
-  { name: 'control_send', calls: [['PUT', '/api/sending/runs/x']], description: 'Pause, resume or stop a run of messages to a list.',
+  { name: 'control_send', openWorld: true, calls: [['PUT', '/api/sending/runs/x']], description: 'Pause, resume or stop a run of messages to a list.',
     input: { run: str('Run id'), action: str('pause, resume or stop', { enum: ['pause', 'resume', 'stop'] }) }, required: ['run', 'action'],
     run: (a, x) => x.call('PUT', `/api/sending/runs/${enc(a.run)}`, { action: a.action }) },
   { name: 'save_send_audience', calls: [['POST', '/api/sending/filters']], description: 'Save an audience under a name to send to it again (e.g. "Families with an open order for Diwali").',
     input: { name: str('Name'), audience: obj('As in send_to_people') }, required: ['name', 'audience'], run: (a, x) => x.call('POST', '/api/sending/filters', { name: a.name, audience: a.audience }) },
-  { name: 'set_payment_reminders', risky: true, calls: [['GET', '/api/order-reminders'], ['PUT', '/api/order-reminders/x']],
+  { name: 'set_payment_reminders', openWorld: true, risky: true, calls: [['GET', '/api/order-reminders'], ['PUT', '/api/order-reminders/x']],
     description: 'Automatic payment reminders for an event (Orders with Lists and sending): on, days before the due date (0–30), the agent that sends, the message (default: a friendly reminder with the amount, due date and ways to pay). People who agreed to updates get them by themselves. Needs confirm_action.',
     input: { event: str('Event id'), on: bool('true = on'), days: int('Days before the due date'), agent: str('Agent id'), template: str('Message') }, required: ['event', 'on'],
     preview: async (a, x) => `${a.on ? `Send payment reminders automatically ${a.days ?? 3} days before the due date of event ${a.event}, to everyone with an open order who agreed to updates. Message: "${a.template || (await x.call('GET', `/api/order-reminders?event=${enc(a.event)}`)).template}"` : `Stop automatic payment reminders for event ${a.event}.`}`,
@@ -474,7 +496,7 @@ export const TOOLS = [
       return `${a.enabled ? 'Let agents use' : 'Stop agents using'} the names from your phone contacts (now ${cur.namesForAgents === false ? 'off' : 'on'}).${a.enabled ? ' A private label you saved for someone can then appear in agent replies.' : ' Agents then see business or profile names.'}`;
     },
     run: (a, x) => x.call('PUT', '/api/people/agent-names', { enabled: !!a.enabled }) },
-  { name: 'refresh_contact_names', calls: [['POST', '/api/people/refresh-names']], description: 'Optional: ask WhatsApp for address-book names now (the server also does this by itself after connecting and daily). Changes nothing in WhatsApp.',
+  { name: 'refresh_contact_names', openWorld: true, calls: [['POST', '/api/people/refresh-names']], description: 'Optional: ask WhatsApp for address-book names now (the server also does this by itself after connecting and daily). Changes nothing in WhatsApp.',
     input: {}, run: (a, x) => x.call('POST', '/api/people/refresh-names') },
   { name: 'get_agent_memory', readOnly: true, calls: [['GET', '/api/agents/x/memory']], description: 'Notes an agent shares across all its chats (shared memory). Delete one with delete_note.',
     input: { agent_id: str('Agent id') }, required: ['agent_id'],
@@ -482,7 +504,7 @@ export const TOOLS = [
   { name: 'get_chat_memory', readOnly: true, calls: [['GET', '/api/chats/x/memory']], description: 'What an agent remembers about a chat: running summary, notes and message counts.',
     input: { chat: str('Chat id') }, required: ['chat'],
     run: (a, x) => x.call('GET', `/api/chats/${enc(a.chat)}/memory`) },
-  { name: 'rebuild_chat_summary', calls: [['POST', '/api/chats/x/memory/summarize']], description: 'Rebuild the running summary of a chat now.',
+  { name: 'rebuild_chat_summary', openWorld: true, calls: [['POST', '/api/chats/x/memory/summarize']], description: 'Rebuild the running summary of a chat now.',
     input: { chat: str('Chat id') }, required: ['chat'],
     run: (a, x) => x.call('POST', `/api/chats/${enc(a.chat)}/memory/summarize`) },
   { name: 'delete_chat_message', risky: true, calls: [['DELETE', '/api/chats/x/messages/1']], description: 'Delete one stored message of a chat (id from list_chat_messages); the agent forgets it (the chat summary is rebuilt). WhatsApp is unchanged. Messages deleted for everyone in WhatsApp are removed automatically. Needs confirm_action.',
@@ -495,20 +517,20 @@ export const TOOLS = [
     run: (a, x) => x.call('DELETE', `/api/chats/${enc(a.chat)}/memory`) },
 
   // ---------- WhatsApp groups (026) ----------
-  { name: 'get_group_info', readOnly: true, calls: [['GET', '/api/chats/x/whatsapp']],
+  { name: 'get_group_info', openWorld: true, readOnly: true, calls: [['GET', '/api/chats/x/whatsapp']],
     description: 'A WhatsApp group\'s name, description, settings (only admins send, only admins edit info, join approval) and members with admin badges.',
     input: { chat: str('Group chat id (see list_chats)') }, required: ['chat'],
     run: (a, x) => x.call('GET', `/api/chats/${enc(a.chat)}/whatsapp`) },
-  { name: 'get_group_invite_link', readOnly: true, calls: [['GET', '/api/chats/x/whatsapp/invite']],
+  { name: 'get_group_invite_link', openWorld: true, readOnly: true, calls: [['GET', '/api/chats/x/whatsapp/invite']],
     description: 'The invite link of a WhatsApp group (the agent\'s number must be a group admin). Each look is recorded.',
     input: { chat: str('Group chat id') }, required: ['chat'],
     run: (a, x) => x.call('GET', `/api/chats/${enc(a.chat)}/whatsapp/invite`) },
-  { name: 'reset_group_invite_link', risky: true, calls: [['POST', '/api/chats/x/whatsapp/invite/revoke']],
+  { name: 'reset_group_invite_link', openWorld: true, risky: true, calls: [['POST', '/api/chats/x/whatsapp/invite/revoke']],
     description: 'Reset a WhatsApp group\'s invite link (the old link stops working). Needs confirm_action.',
     input: { chat: str('Group chat id') }, required: ['chat'],
     preview: async (a, x) => `Reset the invite link of ${await chatName(x, a.chat)}. Anyone holding the old link can no longer join with it; share the new link instead.`,
     run: (a, x) => x.call('POST', `/api/chats/${enc(a.chat)}/whatsapp/invite/revoke`) },
-  { name: 'update_group', calls: [['PUT', '/api/chats/x/whatsapp']],
+  { name: 'update_group', openWorld: true, calls: [['PUT', '/api/chats/x/whatsapp']],
     description: 'Change a WhatsApp group: name, description, only_admins_send, only_admins_edit_info, join_approval. Give only what changes. The agent\'s number must be a group admin.',
     input: { chat: str('Group chat id'), name: str('New group name (optional)'), description: str('New description (optional, empty clears)'),
       only_admins_send: bool('Only admins can send messages (optional)'), only_admins_edit_info: bool('Only admins can edit name/picture/description (optional)'),
@@ -533,15 +555,15 @@ export const TOOLS = [
     description: 'How several accounts of one provider are used: "order" (the first account, the others only when it fails) or "spread" (least recently used first). provider = the provider value from list_model_accounts (e.g. openai, chatgpt, copilot, openrouter).',
     input: { provider: str('Provider'), strategy: { type: 'string', enum: ['order', 'spread'], description: 'order or spread' } }, required: ['provider', 'strategy'],
     run: (a, x) => x.call('PUT', '/api/fallback/strategy', { group: a.provider, strategy: a.strategy }) },
-  { name: 'retry_model_account', calls: [['POST', '/api/accounts/x/retry']],
+  { name: 'retry_model_account', openWorld: true, calls: [['POST', '/api/accounts/x/retry']],
     description: 'Clear the pause of a model account (after fixing its key, quota or sign-in) so it is tried again on the next message.',
     input: { account: str('Account id (see list_model_accounts)') }, required: ['account'],
     run: (a, x) => x.call('POST', `/api/accounts/${enc(a.account)}/retry`, {}) },
-  { name: 'test_model_provider', calls: [['POST', '/api/providers/x/test']],
+  { name: 'test_model_provider', openWorld: true, calls: [['POST', '/api/providers/x/test']],
     description: 'Send a tiny test prompt through one connected account (anthropic, openai, chatgpt, copilot, openrouter, another account id such as openai-work, or an endpoint id) and return the reply and response time. No fallback.',
     input: { provider: str('Account id') }, required: ['provider'],
     run: (a, x) => x.call('POST', `/api/providers/${enc(a.provider)}/test`, {}) },
-  { name: 'set_default_models', calls: [['POST', '/api/models/defaults']], description: 'Set the default model for agents and/or the background model (summaries). Values: "auto" or provider:model.',
+  { name: 'set_default_models', destructive: true, idempotent: true, calls: [['POST', '/api/models/defaults']], description: 'Set the default model for agents and/or the background model (summaries). Values: "auto" or provider:model.',
     input: { default_model: str('Default model (optional)'), background_model: str('Background model (optional)') },
     run: (a, x) => {
       const b = {};
@@ -555,7 +577,7 @@ export const TOOLS = [
     description: 'Tool services (MCP servers) defined once for all agents: their settings (secret names, never values), default tools per role, and which agents use them, switched them off (opted out) or replace them with their own service of the same name.',
     input: {},
     run: (a, x) => x.call('GET', '/api/tool-services') },
-  { name: 'add_global_tool_service', risky: true, calls: [['PUT', '/api/tool-services/x']],
+  { name: 'add_global_tool_service', openWorld: true, risky: true, calls: [['PUT', '/api/tool-services/x']],
     description: 'Add (or replace) a tool service available to every agent. config: remote { url, auth: "none" | "token" | "oauth", tokens: { organizer, participant } as ${SECRET} references, headers } or local { type: "local", package, args, env, allowScripts } (local: owner only). defaults: tool-name globs per role used where an agent has no explicit "<name>:" rules, e.g. { "organizer": ["*"], "participant": ["agenda_*"] } (default: organizers all, participants none). OAuth services still need Connect in the panel (Settings → Tool services). An agent opts out with update_agent { "globalMcp": { "disabled": ["<name>"] } }. Needs confirm_action.',
     input: { name: str('Service name (lowercase letters, digits, _)'), config: obj('Service settings, optionally with "defaults"') }, required: ['name', 'config'],
     preview: async (a, x) => {
@@ -576,7 +598,7 @@ export const TOOLS = [
     run: (a, x) => x.call('DELETE', `/api/tool-services/${enc(a.name)}`) },
 
   // ---------- browse the MCP Registry (052) ----------
-  { name: 'search_mcp_registry', readOnly: true, calls: [['GET', '/api/tool-services/registry']],
+  { name: 'search_mcp_registry', openWorld: true, readOnly: true, calls: [['GET', '/api/tool-services/registry']],
     description: 'Search the MCP Registry (registry.modelcontextprotocol.io, or the private registry set in Settings → Tool services) for tool services to add. Returns per entry: registry name, title, publisher (verified GitHub account or domain), whether it can run here hosted (remote) or as a local npm package, which keys it needs, trust hints and warnings, source link. Use next_cursor for more. Add one with add_tool_service_from_registry.',
     input: { query: str('Words in the service name, e.g. "notion" or "github"'), limit: int('How many (default 10, max 30)', { minimum: 1, maximum: 30 }), cursor: str('next_cursor from an earlier search (optional)') },
     run: async (a, x) => {
@@ -590,7 +612,7 @@ export const TOOLS = [
           keys: s.auth.text, trust: s.trust.level, trust_hints: s.trust.hints, warnings: s.trust.warnings, source: s.repository?.url || null })),
       };
     } },
-  { name: 'add_tool_service_from_registry', risky: true, calls: [['POST', '/api/tool-services/registry/add']],
+  { name: 'add_tool_service_from_registry', openWorld: true, risky: true, calls: [['POST', '/api/tool-services/registry/add']],
     description: 'Add a tool service from the MCP Registry to one agent or to all agents. kind "remote" (hosted; default when offered) or "local" (npm package run on this server; owner only, refused on small servers unless Small server mode is on). values: non-secret settings by field id (e.g. {"env:WORKSPACE": "acme"}). Keys and tokens are never passed here: store each with set_secret under the secret name the preview shows (or in the panel), then add. Organizers get its tools, participants none; risky tools are listed; a preview/confirm service gets the confirm step. Needs confirm_action.',
     input: { server: str('Registry name, e.g. io.github.owner/server'), target: str('"all" for all agents, or an agent id'), kind: str('remote or local', { enum: ['remote', 'local'] }),
       name: str('Tool service name (lowercase letters, digits, _; default from the registry name)'), values: obj('Non-secret field values by field id'), replace: bool('Replace a tool service with the same name') },
@@ -647,7 +669,7 @@ export const TOOLS = [
     run: (a, x) => x.call('DELETE', `/api/pending/${enc(a.code)}`) },
 
   // ---------- settings ----------
-  { name: 'set_agents_paused', calls: [['POST', '/api/settings']], description: 'Pause (true) or resume (false) all agents at once.',
+  { name: 'set_agents_paused', destructive: true, idempotent: true, calls: [['POST', '/api/settings']], description: 'Pause (true) or resume (false) all agents at once.',
     input: { paused: bool('true = pause all agents') }, required: ['paused'],
     run: async (a, x) => ({ paused: !!(await x.call('POST', '/api/settings', { paused: !!a.paused })).paused }) },
   { name: 'set_small_server_mode', risky: true, calls: [['GET', '/api/server/small-mode'], ['PUT', '/api/server/small-mode']],
@@ -676,9 +698,18 @@ export const TOOLS = [
     description: 'Release notes of the installed version and the ones before it (what is new, improved, fixed or removed per version, newest first). Optional from (exclusive) and to (inclusive), e.g. from v2.24.0 to v2.26.0 for "what changed in the last update".',
     input: { from: str('Versions after this one (optional, e.g. v2.24.0)'), to: str('Up to this version (optional)') },
     run: (a, x) => x.call('GET', `/api/releases?${new URLSearchParams({ from: a.from || '', to: a.to || '' })}`) },
-  { name: 'check_for_updates', calls: [['POST', '/api/updates/check']], description: 'Check GitHub for a newer version now.', input: {},
+  { name: 'check_for_updates', idempotent: true, openWorld: true, calls: [['POST', '/api/updates/check']], description: 'Check GitHub for a newer version now.', input: {},
     run: (a, x) => x.call('POST', '/api/updates/check') },
-  { name: 'apply_update', risky: true, calls: [['POST', '/api/updates/apply']],
+  { name: 'set_update_source', openWorld: true, risky: true, calls: [['GET', '/api/updates'], ['PUT', '/api/updates/source']],
+    description: 'Change where updates come from: another GitHub repository (owner/name or https://github.com/owner/name), e.g. a fork, or back to the project (source.project in get_update_status). Its releases are read first; nothing changes if that fails. The root maintenance helper keeps its own source (sudo duniya source on the server changes both). Needs confirm_action.',
+    input: { repo: str('owner/name or https://github.com/owner/name') }, required: ['repo'],
+    preview: async (a, x) => {
+      const cur = (await x.call('GET', '/api/updates')).source;
+      if (!cur) throw fail('Docker install: the image comes from the registry, not a git source');
+      return `Switch updates from ${cur.repo || cur.url || 'the current source'} to ${String(a.repo).trim()}: future updates install that repository's releases`;
+    },
+    run: (a, x) => x.call('PUT', '/api/updates/source', { repo: a.repo }) },
+  { name: 'apply_update', openWorld: true, risky: true, calls: [['POST', '/api/updates/apply']],
     description: 'Install an update and restart; a local backup is made first when a backup passphrase is set. By default installs the newest release that needs no decision. breaking: true also crosses a breaking release (show its steps to the owner first). Needs confirm_action.',
     input: { breaking: bool('Also install a breaking release (owner decision)'), backup: bool('Make a backup first (default true)') },
     preview: async (a, x) => {
@@ -712,13 +743,13 @@ export const TOOLS = [
       return parts.length ? `Change ${parts.join('; ')}.` : 'Nothing to change.';
     },
     run: (a, x) => x.call('PUT', '/api/server/retention', { messagesDays: a.messages_days, messagesPerChat: a.messages_per_chat, usageDays: a.usage_days }) },
-  { name: 'list_os_updates', readOnly: true, calls: [['GET', '/api/system/os-updates']], description: 'Operating-system package updates, grouped: install (will install now; count = how many), phased (Ubuntu is rolling them out gradually: they install automatically within days, or now with run_maintenance os-update-all) and held (kept back, with the reason in why).',
+  { name: 'list_os_updates', openWorld: true, readOnly: true, calls: [['GET', '/api/system/os-updates']], description: 'Operating-system package updates, grouped: install (will install now; count = how many), phased (Ubuntu is rolling them out gradually: they install automatically within days, or now with run_maintenance os-update-all) and held (kept back, with the reason in why).',
     input: { refresh: bool('Check again now (slower)') },
     run: (a, x) => x.call('GET', `/api/system/os-updates${a.refresh ? '?refresh=1' : ''}`) },
   { name: 'get_maintenance_status', readOnly: true, calls: [['GET', '/api/system/ops']], description: 'Available server maintenance actions, the state of the last one, result.text (summary of the last OS update), reboot (whether a restart is needed to finish updates, and for which packages) and the maintenance helper: helperVersion, helperBundled (the one this release ships), helperOutdated, helperSelfUpdate (it can update itself with run_maintenance update-helper; otherwise sudo duniya update once or a reinstall).', input: {},
     run: (a, x) => x.call('GET', '/api/system/ops') },
-  { name: 'run_maintenance', risky: true, calls: [['POST', '/api/system/ops']],
-    description: 'Run a server maintenance action: os-update (install OS updates; Ubuntu\'s gradual roll-outs wait), os-update-all (also the updates Ubuntu is still rolling out gradually), os-cleanup, restart-web, restart-tunnel, reboot (also finishes updates that need a restart) or update-helper (the root maintenance helper fetches the copy of this app\'s release from the official repository and installs it; get_maintenance_status shows helperOutdated / helperSelfUpdate). Needs confirm_action.',
+  { name: 'run_maintenance', openWorld: true, risky: true, calls: [['POST', '/api/system/ops']],
+    description: 'Run a server maintenance action: os-update (install OS updates; Ubuntu\'s gradual roll-outs wait), os-update-all (also the updates Ubuntu is still rolling out gradually), os-cleanup, restart-web, restart-tunnel, reboot (also finishes updates that need a restart) or update-helper (the root maintenance helper fetches the copy of this app\'s release from the repository it was installed from and installs it; get_maintenance_status shows helperOutdated / helperSelfUpdate). Needs confirm_action.',
     input: { action: { type: 'string', enum: ['os-update', 'os-update-all', 'os-cleanup', 'restart-web', 'restart-tunnel', 'reboot', 'update-helper'], description: 'Action' } }, required: ['action'],
     preview: async (a, x) => {
       const ops = await x.call('GET', '/api/system/ops');
@@ -726,7 +757,7 @@ export const TOOLS = [
       if (!label) throw fail('Unknown action');
       const effect = { reboot: 'The whole server restarts: agents and the panel are offline for a few minutes.', 'os-update': 'Takes a few minutes; services may restart.',
         'os-update-all': 'Takes a few minutes; services may restart. Also installs updates Ubuntu is still rolling out gradually (normally they come within days).',
-        'update-helper': `The root helper downloads its own files of this app's release (helper ${ops.helperVersion} → ${ops.helperBundled}) from the official repository and installs them; agents keep running.`,
+        'update-helper': `The root helper downloads its own files of this app's release (helper ${ops.helperVersion} → ${ops.helperBundled}) from the repository it was installed from and installs them; agents keep running.`,
         'restart-web': 'The panel and AI-assistant access are unreachable for a few seconds.', 'restart-tunnel': 'The panel and AI-assistant access are unreachable for a few seconds.' }[a.action] || '';
       return `${label}. ${effect}`.trim();
     },
@@ -741,9 +772,9 @@ export const TOOLS = [
   { name: 'list_backups', readOnly: true, calls: [['GET', '/api/backups/list']], description: 'Backups available in one place: local (default), github or s3.',
     input: { source: { type: 'string', enum: ['local', 'github', 's3'], description: 'Where (default local)' } },
     run: (a, x) => x.call('GET', `/api/backups/list?source=${enc(a.source || 'local')}`) },
-  { name: 'run_backup', calls: [['POST', '/api/backups/run']], description: 'Make an encrypted backup now and send it to the configured places.', input: {},
+  { name: 'run_backup', openWorld: true, calls: [['POST', '/api/backups/run']], description: 'Make an encrypted backup now and send it to the configured places.', input: {},
     run: (a, x) => x.call('POST', '/api/backups/run') },
-  { name: 'restore_backup', risky: true, calls: [['POST', '/api/backups/restore']],
+  { name: 'restore_backup', openWorld: true, risky: true, calls: [['POST', '/api/backups/restore']],
     description: 'Restore a backup (replaces all current data) and restart. Uses the backup passphrase stored on this server (never ask for one); a backup made elsewhere or with another passphrase cannot be restored here: the error gives the panel link to restore it there. Needs confirm_action.',
     input: { source: { type: 'string', enum: ['local', 'github', 's3'], description: 'Where the backup is' }, file: str('Backup file name (see list_backups)') },
     required: ['source', 'file'],
@@ -793,7 +824,7 @@ export const TOOLS = [
   { name: 'list_channels', readOnly: true, calls: [['GET', '/api/channels']],
     description: 'The chat channels of this server (WhatsApp, Telegram) with their state (on, off, not set up), accounts connected, memory used and, for Telegram, the bot (@username, whether it sees every group message, its add-to-group link). Telegram is set up with set_secret name TELEGRAM_BOT_TOKEN (the user pastes the token from @BotFather on the one-time link).', input: {},
     run: (a, x) => x.call('GET', '/api/channels') },
-  { name: 'set_channel_enabled', calls: [['PUT', '/api/channels/x']], risky: (a) => a.enabled === false,
+  { name: 'set_channel_enabled', openWorld: true, calls: [['PUT', '/api/channels/x']], risky: (a) => a.enabled === false,
     description: 'Switch a channel on or off. Off closes its connections and frees its memory: agents stop answering there until it is on again (stays linked). Switching off needs confirm_action.',
     input: { channel: str('Channel id: "whatsapp" or "telegram" (see list_channels)'), enabled: { type: 'boolean' } }, required: ['channel', 'enabled'],
     preview: async (a) => `Switch ${a.channel} off: its connections close and agents stop answering on it until it is switched on again. Nothing is unlinked.`,
@@ -804,7 +835,7 @@ export const TOOLS = [
     run: (a, x) => x.call('PUT', '/api/channels/telegram/settings', { dmAgent: a.agent || '' }) },
   { name: 'list_whatsapp_numbers', readOnly: true, calls: [['GET', '/api/status']], description: 'WhatsApp numbers and their connection state. Linking a number (QR code / pairing) is done in the panel.', input: {},
     run: async (a, x) => (await numbers(x)).map((n) => ({ id: n.id, label: n.label, status: n.status, me: n.me, dmAgent: n.dmAgent || '' })) },
-  { name: 'add_whatsapp_number', calls: [['POST', '/api/whatsapp/numbers']],
+  { name: 'add_whatsapp_number', openWorld: true, calls: [['POST', '/api/whatsapp/numbers']],
     description: 'Add another WhatsApp number. Afterwards, open the panel (Settings → WhatsApp) on a computer to link it with the phone (QR code).',
     input: { label: str('Name shown in the panel, e.g. "Carpool phone"'), id: str('Short id (optional, lowercase letters, digits, -)') }, required: ['label'],
     run: async (a, x) => ({ ...(await x.call('POST', '/api/whatsapp/numbers', { id: a.id, label: a.label })), next: 'Open the panel → Settings → WhatsApp to link this number with its phone.' }) },
@@ -842,7 +873,7 @@ export const TOOLS = [
       const r = await x.call('PUT', '/api/media/settings', body);
       return { settings: r.settings, summary: r.summary };
     } },
-  { name: 'install_speech_engine', calls: [['POST', '/api/media/local/x/install']],
+  { name: 'install_speech_engine', openWorld: true, calls: [['POST', '/api/media/local/x/install']],
     description: 'Owner only. Download an on-server speech engine (stt = listening, Whisper tiny ~115 MB; tts = speaking, Piper voice ~65 MB) into the data folder. Needs a server with 2 GB+ of memory. Runs in the background; check get_photos_and_voice for progress.',
     input: { engine: { type: 'string', enum: ['stt', 'tts'], description: 'stt (listening) or tts (speaking)' } }, required: ['engine'],
     run: (a, x) => x.call('POST', `/api/media/local/${enc(a.engine)}/install`) },
@@ -859,5 +890,5 @@ export const TOOLS = [
       const r = await x.call('PUT', `/api/agents/${enc(a.agent_id)}`, { media });
       return { agent: r.id, media: r.config?.media };
     } },
-];import { fail } from '../core/config.js';
+];
 

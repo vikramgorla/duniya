@@ -31,9 +31,11 @@ test('058: the panel shell is compressed, keeps its security headers and holds n
   const html = brotliDecompressSync(br.body).toString('utf8');
   assert.ok(br.body.length < html.length / 2, 'much smaller on the wire');
   // the same bytes as the file (nothing inlined: no user data, no secrets), except the versioned links and the module
-  // list the server fills in (063: import map + modulepreload)
+  // list the server fills in (063: import map + modulepreload; 084: the repository for guide links, from package.json)
   const modules = html.slice(html.indexOf('<script type="importmap">'), html.lastIndexOf('<link rel="modulepreload"'));
-  assert.equal(html.replace(/<script type="importmap">[\s\S]*<link rel="modulepreload" [^>]*>/, '<!--modules-->').replace(/\?v=[A-Za-z0-9_-]{16}"/g, '"'), shellFile);
+  assert.equal(html.replace(/<meta name="duniya-repo"[\s\S]*<link rel="modulepreload" [^>]*>/, '<!--modules-->').replace(/\?v=[A-Za-z0-9_-]{16}"/g, '"'), shellFile);
+  const repo = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).repository.replace(/^github:/, '');
+  assert.match(html, new RegExp(`<meta name="duniya-repo" content="https://github\\.com/${repo.replace('.', '\\.')}">`));
   assert.ok(modules.length > 100);
 
   const gz = await get('/', { 'accept-encoding': 'gzip' });

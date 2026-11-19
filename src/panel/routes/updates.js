@@ -1,6 +1,6 @@
 // @ts-check
 // Panel routes for updates (008, 045; owner only) and the installed release notes (065; everyone signed in).
-import { getUpdateSettings, setUpdateSettings, updateStatus, checkForUpdate, applyUpdate, installKind, updateRunning, backupConfigured, installedReleases, runningVersion, markSeen } from '../../core/updates.js';
+import { getUpdateSettings, setUpdateSettings, updateStatus, checkForUpdate, applyUpdate, installKind, updateRunning, backupConfigured, installedReleases, runningVersion, markSeen, updateSource, setUpdateSource } from '../../core/updates.js';
 import { restartSoon } from '../../core/config.js';
 import { releaseRange } from '../../core/releases.js';
 import { pendingDecision, snoozeDecision, runConfirmedUpdate, setUpdateRestart } from '../../core/update-decision.js';
@@ -9,7 +9,16 @@ const OWNER = { role: 'owner' };
 
 export function updateRoutes(route, { restart = () => restartSoon(500) } = {}) {
   setUpdateRestart(restart);
-  route('GET', '/api/updates', async () => ({ settings: getUpdateSettings(), status: updateStatus(), install: installKind(), running: updateRunning(), decision: pendingDecision(), backup: backupConfigured() }), OWNER);
+  route('GET', '/api/updates', async () => {
+    const install = installKind();
+    return { settings: getUpdateSettings(), status: updateStatus(), install, running: updateRunning(), decision: pendingDecision(), backup: backupConfigured(),
+      source: install === 'docker' ? null : await updateSource() }; // 084: where updates come from
+  }, OWNER);
+  // 084: switch the update source (owner/name or a GitHub https URL); fetched first, put back when that fails
+  route('PUT', '/api/updates/source', async (req, res, body, q, p, user) => {
+    if (updateRunning()) return [409, { error: 'An update is running: change the source when it has finished' }];
+    return setUpdateSource(body.repo, { by: user?.username || '' });
+  }, OWNER);
   // 065: release notes of the installed version: all of them, or the versions after `from` up to `to` (newest first)
   route('GET', '/api/releases', async (req, res, body, q) => ({ running: runningVersion(), versions: releaseRange(installedReleases(), q.get('from') || '', q.get('to') || '') }));
   route('POST', '/api/releases/seen', async (req, res, body, q, p, user) => markSeen(user), { role: 'viewer' });

@@ -20,7 +20,7 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/m
 | **Setup time** | ~3 min clicks + 10–15 min install (E2.1.Micro: 20–30) | ~15 min | 10–15 min | minutes (image pull) |
 | **Open ports** | 80, 443 (or none with a tunnel) | 80, 443 (or none) | your choice | none by default |
 | **Best for** | most people: one click, no terminal | a Google account and a terminal-friendly tutorial | a VPS you already have | a home server or laptop |
-| **Start** | [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip) | [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fwhatsapp-agent-duniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md) | [one command](#one-command-ubuntudebian) | [compose](deploy/docker.md) |
+| **Start** | [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/duniya.zip) | [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fwhatsapp-agent-duniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md) | [one command](#one-command-ubuntudebian) | [compose](deploy/docker.md) |
 | **Guide** | [Oracle Cloud](deploy/oci-free-tier.md) | [Google Cloud](deploy/google-cloud.md) | [below](#managing-your-server) | [Docker](deploy/docker.md) |
 
 > [!NOTE]
@@ -58,10 +58,19 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/m
 | `--tailscale-authkey <tskey-…>` | `https://<machine>.<tailnet>.ts.net`, your tailnet only | none |
 | `--local-only` | `ssh -L 8080:127.0.0.1:8080 you@server` → `http://localhost:8080`, or your own tunnel (frp, ngrok, Pangolin, zrok) to `http://127.0.0.1:8080` | none |
 
+**From a fork** (or any GitHub repository with Duniya's releases): say where with `DUNIYA_REPO=owner/name` or
+`--repo owner/name`, and fetch the installer from that repository too. The server then installs and updates from it;
+switch later under **Settings → Updates → Update source** or with `sudo duniya source owner/name`
+([Upgrading](upgrading.md#update-source)).
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/you/duniya/main/install.sh | sudo DUNIYA_REPO=you/duniya bash -s -- --ip-https --yes
+```
+
 > [!TIP]
 > Tailscale: turn on **MagicDNS** and **HTTPS Certificates** in the Tailscale admin console; Tailscale Funnel can
 > make it public. `--help` lists every option (`--admin-password`, `--update-mode off|notify|auto`, `--branch`,
-> `--dry-run`, …).
+> `--repo`, `--dry-run`, …). Re-running the installer keeps the update source the server already uses.
 
 ## Google Cloud (Always Free e2-micro)
 

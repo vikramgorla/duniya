@@ -191,6 +191,30 @@ test('tools via the SDK client: read and write as the approving user, logged as 
   const del = (await c.listTools()).tools.find((x) => x.name === 'delete_agent');
   assert.equal(del.annotations.destructiveHint, true);
 
+  // 084: every tool (confirm_action too) declares all four hints as booleans that fit what it does, and a title
+  const tools = (await c.listTools()).tools;
+  const HINTS = ['readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint'];
+  for (const x of tools) {
+    assert.deepEqual(HINTS.map((k) => typeof x.annotations?.[k]), HINTS.map(() => 'boolean'), x.name);
+    assert.ok(x.title && x.annotations.title === x.title, `${x.name} has a title`);
+    if (x.annotations.readOnlyHint) assert.ok(!x.annotations.destructiveHint && x.annotations.idempotentHint, `${x.name}: read-only is neither destructive nor repeat-sensitive`);
+    if (/^(delete|erase|remove|restore)_/.test(x.name)) assert.ok(x.annotations.destructiveHint && !x.annotations.readOnlyHint, `${x.name} is destructive`);
+    if (/^(list|get)_/.test(x.name)) assert.ok(x.annotations.readOnlyHint, `${x.name} is read-only`);
+  }
+  const hints = (n) => HINTS.map((k) => tools.find((x) => x.name === n).annotations[k]);
+  assert.deepEqual(hints('confirm_action'), [false, true, true, true]);
+  assert.deepEqual(hints('create_agent'), [false, false, false, false], 'adds something: not destructive, not repeatable');
+  assert.deepEqual(hints('update_agent'), [false, true, true, false], 'overwrites: destructive, repeatable');
+  assert.deepEqual(hints('send_to_people'), [false, true, false, true], 'sends messages: open world');
+  assert.deepEqual(hints('set_update_source'), [false, true, true, true]);
+  assert.equal(tools.find((x) => x.name === 'list_agents').title, 'List agents');
+  const info = c.getServerVersion();
+  assert.equal(info.name, 'duniya-admin');
+  assert.match(info.version, /^\d+\.\d+\.\d+$/);
+  assert.match(info.description, /WhatsApp and Telegram/);
+  assert.match(info.websiteUrl, /^https:\/\/[a-z0-9-]+\.github\.io\/[^/]+\/$/);
+  assert.equal((await fetch(info.icons[0].src)).status, 200, 'the icon is served');
+
   const agents = JSON.parse(text(await c.callTool({ name: 'list_agents', arguments: {} })));
   assert.deepEqual(agents.map((b) => b.id).sort(), ['helper', 'owner-assistant', 'panduga']);
   const ov = JSON.parse(text(await c.callTool({ name: 'get_overview', arguments: {} })));

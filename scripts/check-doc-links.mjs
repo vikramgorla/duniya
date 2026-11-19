@@ -6,9 +6,12 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseRepo } from '../src/core/repo.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const BLOB = /https:\/\/github\.com\/vikramgorla\/whatsapp-agent-duniya\/(?:blob|tree)\/main\/([^\s"'`)<>]+)/g;
+// 084: links into this repository, whatever its slug (package.json `repository`)
+const SLUG = String(parseRepo(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).repository)?.slug).replace(/[\\^$.*+?()[\]{}|/-]/g, '\\$&');
+const BLOB = new RegExp(`https://github\\.com/${SLUG}/(?:blob|tree)/main/([^\\s"'\`)<>]+)`, 'gi');
 
 /** Remove fenced and inline code so example links inside code are not checked. */
 function stripCode(md) {

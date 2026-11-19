@@ -12,7 +12,8 @@
 | `PUBLIC_URL` | from the request | Public address of the panel (set by the installer); used for sign-in redirects and the MCP address |
 | `TRUST_PROXY` | off | Trust `X-Forwarded-*` headers from a reverse proxy |
 | `PANEL_HOST` / `PANEL_PORT` | `127.0.0.1` / `8080` | Where the panel listens |
-| `ADMIN_PASSWORD` | — | Create owner `admin` with this password on first start (otherwise a setup code is printed) |
+| `ADMIN_PASSWORD` | — | Create owner `admin` with this password on first start (otherwise a setup code is printed); never logged or returned ([SECURITY.md](../SECURITY.md#secrets-from-the-environment)) |
+| `MASTER_KEY` | generated `master.key` | 32 bytes, base64: the key that encrypts stored secrets, kept outside the data directory ([SECURITY.md](../SECURITY.md#secrets-from-the-environment)) |
 | `DATA_DIR` | `data` | SQLite database, WhatsApp sessions, local backups |
 | `TZ_DEFAULT` | `Europe/Zurich` | Default timezone for schedules |
 | `RATE_LIMIT_PER_MIN` | 6 | Requests one person may make to one agent per minute |

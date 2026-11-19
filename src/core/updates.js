@@ -6,7 +6,8 @@
 import { execFile, spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ROOT, fail } from './config.js';
+import { APP_VERSION, REPO, ROOT, bad, fail } from './config.js';
+import { parseRepo, repoLinks, sameRepo } from './repo.js';
 import { getSetting, updateSettings, getSecret } from './store.js';
 import { kvGet, kvSet } from './db.js';
 import { activity } from './events.js';
@@ -15,7 +16,8 @@ import { runBackup } from './backup/index.js';
 
 export { parseVersion, compareVersions };
 
-const git = (args, cwd) => new Promise((res, rej) => execFile('git', args, { cwd, timeout: 60000 }, (e, out, err) => (e ? rej(new Error((err || e.message).trim())) : res(out.trim()))));
+// GIT_TERMINAL_PROMPT=0: a repository that needs a password fails at once instead of waiting for one.
+const git = (args, cwd) => new Promise((res, rej) => execFile('git', args, { cwd, timeout: 60000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }, (e, out, err) => (e ? rej(new Error((err || e.message).trim())) : res(out.trim()))));
 
 // The checkout this process updates. Tests point it at a temporary git repository (with the version "running" there).
 let appRoot = ROOT;
@@ -47,9 +49,8 @@ export function setUpdateSettings(patch) {
 }
 const savedStatus = () => { try { return JSON.parse(kvGet('updates:status') || 'null'); } catch { return null; } };
 // The version this process is running (read once at start; an update restarts the process).
-const STARTED_VERSION = (() => { try { return `v${JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')).version}`; } catch { return 'unknown'; } })();
-export const RUNNING_VERSION = STARTED_VERSION;
-export const runningVersion = () => runningOverride || STARTED_VERSION;
+export const RUNNING_VERSION = APP_VERSION;
+export const runningVersion = () => runningOverride || APP_VERSION;
 // 065: the release notes of the installed version (its own releases.json; read once, an update restarts the process).
 let installedOnce = null;
 export const installedReleases = () => (installedOnce ||= (() => { try { return normalizeReleases(JSON.parse(readFileSync(resolve(ROOT, 'releases.json'), 'utf8'))); } catch { return {}; } })());
@@ -105,6 +106,42 @@ export async function checkForUpdate({ root = appRoot, channel = getUpdateSettin
   const status = { current, currentVersion: `v${pkg}`, latest, available, target, targetVersion, tags, releases, channel, checkedAt: Date.now(), lastResult: savedStatus()?.lastResult || null };
   if (root === appRoot) kvSet('updates:status', JSON.stringify(status));
   return withAnalysis(status, channel === 'stable' ? current : `v${pkg}`);
+}
+
+// ---------------------------------------------------------------- update source (084)
+/** A URL without credentials (an installer given --git-token keeps a token in the remote: never shown or returned). */
+const withoutAuth = (u) => String(u || '').replace(/^(https?:\/\/)[^/@]*@/, '$1');
+/**
+ * Where updates come from: the checkout's git remote (installed from, or changed later), as { url, repo, project,
+ * official }: `repo` is its owner/name on GitHub (null for another host), `project` the repository in package.json.
+ */
+export async function updateSource({ root = appRoot } = {}) {
+  const url = withoutAuth(await git(['config', '--get', 'remote.origin.url'], root).catch(() => ''));
+  const repo = parseRepo(url)?.slug || null;
+  return { url, repo, project: REPO.slug, official: sameRepo(repo, REPO.slug) };
+}
+/**
+ * Switch the update source to another GitHub repository (owner/name or https://github.com/owner/name). Its tags are
+ * fetched first (they replace the old source's); if that fails the previous source is put back. Returns the new check.
+ * The root maintenance helper keeps the source in the root-owned install config (`sudo duniya source` changes both).
+ */
+export async function setUpdateSource(input, { root = appRoot, by = '' } = {}) {
+  if (installKind() === 'docker') throw fail('Docker install: the image comes from the registry, not a git source', 400);
+  const r = parseRepo(input);
+  if (!r) throw bad('Enter owner/name or https://github.com/owner/name', 'repo');
+  const next = repoLinks(r.slug).git;
+  const prev = await git(['config', '--get', 'remote.origin.url'], root);
+  if (withoutAuth(prev) === next) return { source: await updateSource({ root }), status: updateStatus() };
+  await git(['remote', 'set-url', 'origin', next], root);
+  try {
+    await git(['fetch', '-q', '--force', '--prune', '--prune-tags', 'origin', '+refs/tags/*:refs/tags/*'], root);
+  } catch (e) {
+    await git(['remote', 'set-url', 'origin', prev], root);
+    throw bad(`Could not read ${r.slug} on GitHub (${String(e.message).split('\n').pop().slice(0, 160)}). Is the name right and the repository public? The update source was not changed.`, 'repo');
+  }
+  activity('system', { summary: `Update source changed to ${r.slug}${by ? ` by ${by}` : ''}` });
+  const status = await checkForUpdate({ root }).catch(() => updateStatus());
+  return { source: await updateSource({ root }), status };
 }
 
 // ---------------------------------------------------------------- what's new (065)

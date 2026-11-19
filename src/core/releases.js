@@ -87,7 +87,8 @@ export function analyzeJump({ current, target, versions = [], releases = {} }) {
 }
 
 /** Release notes (Markdown) for one version, for the GitHub release body. '' when there is no entry. */
-export function releaseNotes(releases, version) {
+/** @param {{ blob: (ref: string, path: string) => string }} repo where the docs link points (repo.js repoLinks) */
+export function releaseNotes(releases, version, repo) {
   const e = releases[bare(version)];
   if (!e) return '';
   const lines = [];
@@ -101,7 +102,7 @@ export function releaseNotes(releases, version) {
   }
   if (e.data === 'not-migrated') lines.push('**Data:** not migrated: older data, backups or settings named above are not read.', '');
   if (e.data === 'migrated') lines.push('**Data:** migrated automatically.', '');
-  lines.push(`More: [${e.docs || 'docs/README.md'}](https://github.com/vikramgorla/whatsapp-agent-duniya/blob/v${bare(version)}/${e.docs || 'docs/README.md'})`, '');
+  lines.push(`More: [${e.docs || 'docs/README.md'}](${repo.blob(`v${bare(version)}`, e.docs || 'docs/README.md')})`, '');
   return lines.join('\n');
 }
 

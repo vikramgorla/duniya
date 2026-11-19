@@ -17,7 +17,7 @@ const BUNDLED = Number(helperText.match(/^# duniya-ops-version: (\d+)$/m)[1]);
 const sh = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: 'pipe', encoding: 'utf8', ...opts });
 const git = (dir, ...args) => sh('git', ['-C', dir, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...args]);
 
-// ---------- a fake "official repository": releases with their deploy/ops files ----------
+// ---------- a fake upstream repository: releases with their deploy/ops files ----------
 const base = mkdtempSync(join(tmpdir(), 'duniya-helper-'));
 const work = join(base, 'work');
 const bare = join(base, 'bare.git');
@@ -148,10 +148,19 @@ test('056 helper: git as root is locked down (https only with TLS checks, no hoo
   assert.match(fn, /env -i PATH=\/usr\/local\/bin:\/usr\/bin:\/bin HOME="\$src" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=\/dev\/null/);
   assert.match(fn, /fetch -q --depth 1 --filter=blob:none --no-tags origin "\+refs\/tags\/\$tag:refs\/tags\/\$tag"/);
   assert.doesNotMatch(fn, /APP_DIR|\/opt\/whatsapp-agent-duniya/, 'never reads the app checkout');
-  // Repository: root-owned install config (https only) or the official one; the app can only name a release.
+  // Repository: only the root-owned install config (https only); the app can only name a release.
   const repo = helperText.slice(helperText.indexOf('helper_repo() {'), helperText.indexOf('update_helper() {'));
   assert.match(repo, /\^https:\/\//);
-  assert.match(helperText, /^OFFICIAL_REPO=https:\/\/github\.com\/vikramgorla\/whatsapp-agent-duniya\.git$/m);
+  assert.doesNotMatch(helperText, /github\.com\//, '084: no repository built in');
+});
+
+test('084 helper: without an https repository in the install config, update-helper refuses (nothing is fetched)', () => {
+  const s = server();
+  writeFileSync(join(s.d, 'install.conf'), "REPO='git@github.com:x/y.git'\n");
+  const r = s.run('v2.17.0', { repo: '' });
+  assert.equal(r.status.state, 'failed');
+  assert.match(r.log, /has no https repository. Re-run the installer once/);
+  assert.equal(r.release, null);
 });
 
 // ---------- the app side ----------
@@ -198,7 +207,6 @@ test('056 app: update-helper writes only the action word and this release number
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(readFileSync(join(ops, 'req/request'), 'utf8'), 'update-helper\n');
   assert.equal(readFileSync(join(ops, 'req/helper-version'), 'utf8'), `v${PKG}\n`);
-  assert.match(sys.appVersion(), /^v\d+\.\d+\.\d+$/);
   clearReq();
 });
 

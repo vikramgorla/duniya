@@ -36,7 +36,7 @@ async function api(token, method, path, body) {
     method,
     headers: {
       ...(tok ? { authorization: `Bearer ${tok}` } : {}), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28',
-      'user-agent': 'whatsapp-agent-duniya', ...(body ? { 'content-type': 'application/json' } : {}),
+      'user-agent': 'duniya', ...(body ? { 'content-type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(120000),
@@ -51,7 +51,7 @@ export const whoami = async (token) => (await api(token, 'GET', '/user'))?.login
 
 export async function createRepo(token, name = 'duniya-backups') {
   const r = await api(token, 'POST', '/user/repos', {
-    name, private: true, auto_init: true, description: 'Encrypted backups from whatsapp-agent-duniya (do not make public)',
+    name, private: true, auto_init: true, description: 'Encrypted backups from Duniya (do not make public)',
   });
   return r.full_name;
 }
@@ -79,7 +79,7 @@ export async function upload(token, { repo, branch, path = 'backups' }, file, bu
     // A repository created empty (github.com/new) has no commit yet and the Git Data API refuses empty
     // repositories: create a first commit with the contents API, then continue.
     await api(token, 'PUT', `/repos/${repo}/contents/README.md`, {
-      message: 'Duniya backups', content: Buffer.from('Encrypted backups from whatsapp-agent-duniya. Keep this repository private.\n').toString('base64'),
+      message: 'Duniya backups', content: Buffer.from('Encrypted backups from Duniya. Keep this repository private.\n').toString('base64'),
     });
     ref = await getRef();
   }
@@ -116,7 +116,7 @@ export const webBase = WEB;
 /** The manifest the panel posts to github.com/settings/apps/new (no webhook, contents write on chosen repos). */
 export function appManifest({ name, baseUrl }) {
   return {
-    name, url: baseUrl, description: 'Encrypted backups from a whatsapp-agent-duniya server. Install it only on the private backup repository.',
+    name, url: baseUrl, description: 'Encrypted backups from a Duniya server. Install it only on the private backup repository.',
     redirect_url: `${baseUrl}/backups/github-app/callback`, setup_url: `${baseUrl}/backups/github-app/installed`,
     public: false, default_permissions: { contents: 'write', metadata: 'read' },
   };

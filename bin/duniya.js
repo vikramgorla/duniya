@@ -42,6 +42,8 @@ ${bold('Server')}
   logs [-f]                               Show the service log (-f keeps following it)
   update [--check] [--breaking]           Update to the newest release that needs no decision (--check only looks;
                                           --breaking also installs a breaking release). Backup first when set up
+  source [owner/name]                     Where updates come from; with a GitHub repository (owner/name or its
+                                          https address, e.g. your fork) switch to it (the maintenance helper too)
   open-access                             Remove the IP allow-list (if it locked you out of the panel)
 
 Examples
@@ -261,6 +263,16 @@ const commands = {
     process.stdout.write(r.log.endsWith('\n') ? r.log : `${r.log}\n`);
     if (r.code !== 0) fail('Update failed; the previous version is kept.');
     out(green(`✓ Updated to ${target}.`) + (process.env.DUNIYA_WRAPPER ? ' Restarting…' : ' Now restart: sudo duniya restart'));
+  },
+
+  // 084: the update source (the checkout's git remote); the root wrapper also moves the maintenance helper's source
+  async source(args) {
+    if (installKind() === 'docker') { out('In Docker, the image comes from the registry: set image: in docker-compose.yml.'); return; }
+    await core();
+    const u = await import('../src/core/updates.js');
+    const s = args[0] ? (await u.setUpdateSource(args[0], { by: 'command line' })).source : await u.updateSource();
+    out(`${args[0] ? green('✓ Updates now come from') : 'Updates come from'} ${bold(s.repo || s.url || 'unknown')}${s.official ? dim(' (the project)') : dim(` · the project is ${s.project}`)}`);
+    if (args[0] && process.env.DUNIYA_WRAPPER) out(`source-url ${s.url}`); // read by /usr/local/bin/duniya (root) for the helper
   },
 
   async 'open-access'() {

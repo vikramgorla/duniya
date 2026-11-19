@@ -33,7 +33,13 @@ Then a Duniya page opens: sign in (if asked), check what the assistant may do, *
 
 > [!IMPORTANT]
 > Viewers stay read-only; owner-only actions stay owner-only. Risky: deleting an agent, erasing memory, removing
-> secrets or users, sign-up links, WhatsApp numbers, restoring backups, updates, restarts.
+> secrets or users, sign-up links, WhatsApp numbers, restoring backups, updates, the update source, restarts.
+
+Every tool has a title and all four safety hints that app directories (ChatGPT, Claude) read, derived in one place
+from what the tool does (`toolHints` in `src/panel/admin-tools.js`): **read-only** (only looks), **destructive**
+(overwrites or deletes, or needs a confirmation), **idempotent** (repeating it changes nothing more) and **open world**
+(reaches outside the server: sends WhatsApp or Telegram messages, calls a model, GitHub, apt). The server introduces
+itself with a name, version, description, website and icon.
 
 ## No secrets through the assistant
 
@@ -80,7 +86,8 @@ rotation). Spec: [`specs/017-admin-mcp/`](../specs/017-admin-mcp/spec.md).
 | Channels | `list_channels` (state, numbers or bot connected, memory used, the Telegram bot's name and privacy mode), `set_channel_enabled` (switching a channel off needs `confirm_action`), `set_telegram_dm_agent`; connect Telegram with `set_secret` `TELEGRAM_BOT_TOKEN` (one-time link) |
 | Models | models, accounts (`list_model_accounts` with each account's health: paused until when and why, e.g. a usage limit; for [agent apps](models.md#agent-apps) also whether the app is downloaded and its measured memory), fallback, photos & voice. Agent apps are connected by the owner in the panel (their own sign-in) |
 | Tools | global tool services, browse and add from the MCP Registry (`search_mcp_registry`, `add_tool_service_from_registry`), secrets, confirmations, logging |
-| Server | updates (`get_update_status` with the notes of every release in between, incl. breaking releases: `apply_update` with `breaking: true`, `snooze_update_decision`), release notes (`get_release_notes`: what each installed version brought, any range), metrics (with hosting), OS updates (`list_os_updates`: will install / rolling out gradually / held back; `run_maintenance` `os-update` or `os-update-all` to include gradual updates; restart-needed status), the root maintenance helper (`get_maintenance_status` → `helperOutdated`, `helperSelfUpdate`; `run_maintenance` `update-helper`), Small server mode (`set_small_server_mode`, confirm required), health and retention (`get_server_health`: database size, oldest kept data, last clean-up, disk, queue, clock; `set_retention`, confirm required), restart, backups |
+| Server | updates (`get_update_status` with the notes of every release in between, incl. breaking releases: `apply_update` with `breaking: true`, `snooze_update_decision`; the update source: `source` in `get_update_status`,
+`set_update_source` to a fork or back to the project, confirm required), release notes (`get_release_notes`: what each installed version brought, any range), metrics (with hosting), OS updates (`list_os_updates`: will install / rolling out gradually / held back; `run_maintenance` `os-update` or `os-update-all` to include gradual updates; restart-needed status), the root maintenance helper (`get_maintenance_status` → `helperOutdated`, `helperSelfUpdate`; `run_maintenance` `update-helper`), Small server mode (`set_small_server_mode`, confirm required), health and retention (`get_server_health`: database size, oldest kept data, last clean-up, disk, queue, clock; `set_retention`, confirm required), restart, backups |
 
 The list is in `src/panel/admin-tools.js`; a feature that adds panel functionality adds its tool there
 ([AGENTS.md](../AGENTS.md)). The [owner assistant](owner-assistant.md) uses the same tools from WhatsApp.

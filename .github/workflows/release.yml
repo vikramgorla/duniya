@@ -42,10 +42,12 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          # 084: the image is named after this repository (a fork publishes its own); registry names are lowercase
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - name: Build OCI Resource Manager stack zip
         if: steps.v.outputs.skip == 'false'
-        run: cd infra/oci && zip -r ../../whatsapp-agent-duniya.zip . -x '.terraform/*' '*.tfstate*' 'backend.tf'
+        run: cd infra/oci && zip -r ../../duniya.zip . -x '.terraform/*' '*.tfstate*' 'backend.tf'
 
       - name: Create GitHub release (creates the tag if needed)
         if: steps.v.outputs.skip == 'false'
@@ -58,7 +60,7 @@ jobs:
           version="${{ steps.v.outputs.version }}"
           title="$(node scripts/release-notes.mjs "$version" --title)"
           node scripts/release-notes.mjs "$version" --notes > release-notes.md
-          gh release create "$version" whatsapp-agent-duniya.zip \
+          gh release create "$version" duniya.zip \
             --target "$GITHUB_SHA" --title "$title" --notes-file release-notes.md --generate-notes
 
       - uses: docker/setup-qemu-action@v4
@@ -79,8 +81,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ steps.v.outputs.version }}
-            ghcr.io/${{ github.repository }}:latest
+            ${{ steps.v.outputs.image }}:${{ steps.v.outputs.version }}
+            ${{ steps.v.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.licenses=MIT
 
   # 069: older release pages had short notes; keep every release's text equal to its releases.json entry.
   notes:

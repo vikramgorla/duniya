@@ -56,9 +56,10 @@ elsewhere is restored here in the panel).
 
 Overview's **Server** card has one update row: *Up to date · v2.33.0 · checked 2m ago* (or *Update available*), with
 **Release notes**, the one action and ⋯ (**Check now**, **Update settings**). **Settings → Updates** has the whole story:
-the last update with the backup made before it, **Check now**, the settings and **Restart service**.
+the last update with the backup made before it, **Check now**, the settings, the **Update source** (the project or a
+fork; [switch it](upgrading.md#update-source)) and **Restart service**.
 
-![Settings → Updates: up to date, Check now, Release notes, the update settings and Restart service](site/img/card-updates.webp)
+![Settings → Updates: up to date, Check now, Release notes, the update settings, the update source and Restart service](site/img/card-updates.webp)
 
 **Update to vX.Y.Z** (on the row or the page) opens what you get first: every release between your version
 and the new one, newest first, with what is **new**, **improved**, **fixed** or **removed** (long lists fold; releases

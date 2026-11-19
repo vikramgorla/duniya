@@ -6,7 +6,7 @@
 import os from 'node:os';
 import { readFileSync, existsSync, writeFileSync, statfsSync, statSync, mkdirSync } from 'node:fs';
 import { execFile } from 'node:child_process';
-import { DATA_DIR, ROOT, plural, fail } from './config.js';
+import { APP_VERSION, DATA_DIR, ROOT, plural, fail } from './config.js';
 import { getSetting, updateSettings } from './store.js';
 import { activity } from './events.js';
 
@@ -94,7 +94,7 @@ function sample() {
 export function maybeUpdateHelper({ by = 'auto (after app update)', bundled = opsHelperBundled() } = {}) {
   if (!opsAvailable()) return { requested: false, reason: 'no helper' };
   const installed = opsHelperVersion();
-  const v = appVersion();
+  const v = APP_VERSION;
   if (!(installed < bundled)) return { requested: false, reason: 'current' };
   if (installed < OPS_HELPER_SELF_UPDATE) return { requested: false, reason: 'too_old' };
   if (getSetting('opsHelperAuto', null)?.version === v) return { requested: false, reason: 'already tried' };
@@ -314,7 +314,6 @@ function opsHelperVersion() {
 }
 /** The helper version this app release ships (deploy/ops/duniya-ops in the app's checkout; read, never run). */
 const opsHelperBundled = () => helperVersionOf(read(`${ROOT}/deploy/ops/duniya-ops`));
-export const appVersion = () => { try { return `v${JSON.parse(read(`${ROOT}/package.json`)).version}`; } catch { return ''; } };
 const RELEASE_RE = /^v\d{1,4}\.\d{1,4}\.\d{1,4}$/;
 export function opsStatus() {
   let status = null;
@@ -343,7 +342,7 @@ export function requestOp(action, by = '', { files = {} } = {}) {
     if (opsHelperVersion() < OPS_HELPER_SELF_UPDATE) {
       throw fail('This server\'s maintenance helper is too old to update itself: run sudo duniya update on the server once, or reinstall if you have no SSH access. After that it updates itself.', 400, { code: 'helper_too_old' });
     }
-    const v = appVersion();
+    const v = APP_VERSION;
     if (!RELEASE_RE.test(v)) throw fail('The app version is not a release number');
     files = { ...files, 'helper-version': `${v}\n` }; // the helper accepts only vX.Y.Z and fetches that release itself
   }

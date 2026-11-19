@@ -25,7 +25,8 @@ Tick each item or write "n/a – reason".
 
 **Lean code**
 - [ ] What the change replaces is deleted; no compatibility layer or one-time migration left after its release; existing helpers reused
-- [ ] `node scripts/ci-checks.mjs` passes (knip, jscpd, panel budgets, types); tests check behaviour, not internals
+- [ ] `node scripts/ci-checks.mjs` passes (knip, jscpd, panel budgets, types, one repository slug); tests check behaviour, not internals
+- [ ] No hard-coded repository owner/name: code reads `REPO` (`src/core/config.js`), docs are rewritten by `npm run repo:sync`
 - [ ] UI: no new polling (live data over `/api/events`)
 
 **Docs**

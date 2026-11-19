@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# whatsapp-agent-duniya installer — install or update on Ubuntu/Debian (x86_64, arm64).
+# Duniya installer — install or update on Ubuntu/Debian (x86_64, arm64).
 #
 #   curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash
 #   curl -fsSL …/install.sh | sudo bash -s -- --ip-https --yes
@@ -14,7 +14,8 @@
 #                            tunnel of your own pointed at http://127.0.0.1:8080)
 # Other:
 #   --admin-password PW      create owner "admin" with this password (otherwise a one-time setup code is printed)
-#   --repo URL               git repository (default: https://github.com/vikramgorla/whatsapp-agent-duniya.git)
+#   --repo REPO              where to install and update from: owner/name on GitHub (e.g. your fork) or an https git
+#                            URL (default: this project; or set DUNIYA_REPO=owner/name). Re-runs keep the source.
 #   --branch NAME            branch to install (default: main)
 #   --git-token TOKEN        read-only token for a private repository
 #   --update-mode MODE       off | notify | auto (default: notify)
@@ -22,7 +23,9 @@
 #   --dry-run                print what would happen and exit
 set -euo pipefail
 
-REPO="https://github.com/vikramgorla/whatsapp-agent-duniya.git"
+# 084: the project's repository, kept in step with package.json by `npm run repo:sync` (never edit it by hand).
+DEFAULT_REPO="https://github.com/vikramgorla/whatsapp-agent-duniya.git"
+REPO=""
 BRANCH="main"
 EXPOSURE=""
 DOMAIN=""
@@ -42,13 +45,21 @@ PORT=8080
 say()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; exit "${2:-1}"; }
-usage() { sed -n '2,27p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//' || true; }
+usage() { sed -n '2,23p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//' || true; }
 
 # Re-runs reuse previous choices
 if [ -f "$CONF_DIR/install.conf" ]; then
   # shellcheck disable=SC1091
   . "$CONF_DIR/install.conf"
 fi
+
+# Where to install from (084): --repo, then DUNIYA_REPO, then the source this server already updates from (it may
+# have been changed in the panel), then the previous run's choice, then the project.
+EXISTING_REPO=""
+if [ -d "$APP_DIR/.git" ] && id "$APP_USER" >/dev/null 2>&1; then
+  EXISTING_REPO="$(sudo -u "$APP_USER" git -C "$APP_DIR" config --get remote.origin.url 2>/dev/null | sed -E 's#^https://[^/@]*@#https://#' || true)"
+fi
+REPO="${DUNIYA_REPO:-${EXISTING_REPO:-${REPO:-$DEFAULT_REPO}}}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -71,6 +82,9 @@ while [ $# -gt 0 ]; do
 done
 
 case "$UPDATE_MODE" in off|notify|auto) ;; *) die "--update-mode must be off, notify or auto" ;; esac
+# owner/name → its GitHub URL; anything else must be a plain https URL (it is written to install.conf and used by root)
+if [[ "$REPO" =~ ^(github:)?([A-Za-z0-9][A-Za-z0-9-]{0,38})/([A-Za-z0-9._-]+)$ ]]; then REPO="https://github.com/${BASH_REMATCH[2]}/${BASH_REMATCH[3]%.git}.git"; fi
+[[ "$REPO" =~ ^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~-]+)+/?$ ]] || die "--repo: use owner/name or an https git URL (got: $REPO)"
 case "$EXPOSURE" in ''|domain|ip|tunnel|tailscale|local) ;; *) die "Unknown exposure: $EXPOSURE" ;; esac
 if [ -n "$TS_AUTHKEY" ] && ! [[ "$TS_AUTHKEY" =~ ^tskey-[A-Za-z0-9_-]+$ ]]; then die "--tailscale-authkey: that does not look like a Tailscale auth key (tskey-…)"; fi
 
@@ -173,6 +187,11 @@ CLONE_URL="$REPO"
 if [ -d "$APP_DIR/.git" ]; then
   say "Updating code"
   chown -R "$APP_USER:$APP_USER" "$APP_DIR"
+  if [ "$EXISTING_REPO" != "$REPO" ]; then
+    say "Switching the source to $REPO"
+    sudo -u "$APP_USER" git -C "$APP_DIR" remote set-url origin "$CLONE_URL"
+    sudo -u "$APP_USER" git -C "$APP_DIR" fetch -q --force --prune --prune-tags origin '+refs/tags/*:refs/tags/*'
+  fi
   sudo -u "$APP_USER" git -C "$APP_DIR" fetch -q origin --tags
   sudo -u "$APP_USER" git -C "$APP_DIR" checkout -q "$BRANCH" 2>/dev/null || sudo -u "$APP_USER" git -C "$APP_DIR" checkout -q -b "$BRANCH" "origin/$BRANCH"
   sudo -u "$APP_USER" git -C "$APP_DIR" merge -q --ff-only "origin/$BRANCH"

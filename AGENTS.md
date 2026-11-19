@@ -120,6 +120,9 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
   reinstall freely (see `docs/upgrading.md`). A migration a release needs is removed in the next release.
 - **Ruleset file mirrors the live ruleset:** `.github/rulesets/main-protection.json` must match GitHub → Settings →
   Rules. When one changes, change the other in the same week.
+- **Repository slug:** never hard-code the GitHub owner/name. It lives only in `package.json` `repository`; code
+  reads `REPO` from `src/core/config.js` (`src/core/repo.js` derives every URL), docs and infra are rewritten with
+  `npm run repo:sync`, and `ci-checks.mjs` fails on a project URL with another slug.
 - **Dependencies:** runtime deps are limited (Baileys, Anthropic SDK, MCP SDK, pino, qrcode); a new one needs a stated
   reason in the plan. Other providers use `fetch`.
 - **Commits:** clear messages. No attribution trailers or footers in commits and PRs (no Co-Authored-By, session links
@@ -151,7 +154,7 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 | `install.sh`, `deploy/`, `infra/oci/`, `infra/gcp/`, `Dockerfile` | Installer, root maintenance helper (`deploy/ops/`), OCI stack, GCP script, Docker |
 | `templates/` | Agent templates (JSON) |
 | `test/` | `node:test` e2e tests with fakes (`harness.js`) |
-| `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `measure-load.mjs` (`npm run measure:load`), `check-panel.mjs` (modules link, budgets), `check-perf.mjs` + `scale-fixture.mjs` (query plans and time budgets on 200k messages / 5k people), `ci-checks.mjs` (versions, releases, docs, knip, jscpd, panel budgets, types, check-perf), `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails), `render-diagrams.mjs` (`npm run docs:diagrams`: docs/diagrams/*.mmd → SVG) |
+| `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `measure-load.mjs` (`npm run measure:load`), `check-panel.mjs` (modules link, budgets), `check-perf.mjs` + `scale-fixture.mjs` (query plans and time budgets on 200k messages / 5k people), `ci-checks.mjs` (versions, releases, docs, knip, jscpd, panel budgets, types, check-perf, repository slug), `repo-sync.mjs` (`npm run repo:sync`: project URLs from `package.json` `repository`), `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails), `render-diagrams.mjs` (`npm run docs:diagrams`: docs/diagrams/*.mmd → SVG) |
 | `docs/` | Reference docs (`docs/README.md` index), deploy guides, diagrams (`docs/diagrams/`), the website `docs/site/` |
 | `specs/`, `.specify/` | Spec Kit: one folder per feature; constitution and templates |
 

@@ -1,0 +1,52 @@
+name: Fork setup
+
+# 084: a fork (or a renamed repository) points every link, the installer, the website and the infra defaults at
+# itself. When this repository's name differs from package.json `repository`, `npm run repo:sync` rewrites the project
+# URLs and a pull request is opened (or, when Actions may not open pull requests here, a branch with a link in the run
+# summary). When the name matches (the project itself, or a fork already set up) nothing happens.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: fork-setup
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Is this repository set up?
+        id: check
+        run: |
+          if node scripts/repo-sync.mjs --check --repo "$GITHUB_REPOSITORY"; then echo "sync=false" >> "$GITHUB_OUTPUT"; else echo "sync=true" >> "$GITHUB_OUTPUT"; fi
+      - name: Point the project at this repository and open a pull request
+        if: steps.check.outputs.sync == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="repo-sync/${GITHUB_REPOSITORY//\//-}"
+          node scripts/repo-sync.mjs --repo "$GITHUB_REPOSITORY"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q -b "$branch"
+          git commit -qam "Point the project at $GITHUB_REPOSITORY (npm run repo:sync)"
+          git push -q --force origin "$branch"
+          body="This repository is $GITHUB_REPOSITORY, so README buttons, the install command, the website, the infra defaults and the update source of new installs now point here (package.json repository + npm run repo:sync). Merge it, then enable Pages (Settings → Pages → Source: GitHub Actions) for the website. See CONTRIBUTING.md#forking."
+          if gh api "repos/$GITHUB_REPOSITORY/pulls" -f head="$branch" -f base=main -f title="Set up this repository: $GITHUB_REPOSITORY" -f body="$body" --jq .html_url > pr.txt 2>err.txt; then
+            echo "Opened $(cat pr.txt)" | tee -a "$GITHUB_STEP_SUMMARY"
+          elif gh api "repos/$GITHUB_REPOSITORY/pulls?head=${GITHUB_REPOSITORY%%/*}:$branch&state=open" --jq '.[0].html_url // empty' | grep -q .; then
+            echo "The pull request for $branch is already open; it was updated." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Actions may not open pull requests in this repository (Settings → Actions → General → Allow GitHub Actions to create pull requests). Open it yourself: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$branch" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
