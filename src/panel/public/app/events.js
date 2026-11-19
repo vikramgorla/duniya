@@ -1,15 +1,13 @@
 // Events and Orders (081): People → Events (list → event page with registrations, waiting list, duties, payments)
 // and People → Orders (list with filters and totals per event → order page with lines and payments). Loaded from
 // people.js on first visit, only when the module is on. Names and notes are built from text nodes.
-import { $, S, api, ask, can, emptyState, field, h, icon, menu, tryApi } from './core.js';
+import { $, S, api, ask, avatar, can, emptyState, field, h, icon, menu, tryApi } from './core.js';
 import { helpLink, plural } from './shared.js';
-import { moduleBlocks, peopleNav, pickPerson } from './people.js';
+import { day, money, moduleBlocks, peopleNav, pickPerson } from './people.js';
 const enc = encodeURIComponent;
 const STATUS = { registered: ['Registered', 'ok'], waiting: ['Waiting list', 'warn'], pending: ['To confirm', 'info'], cancelled: ['Cancelled', ''],
-  open: ['Open', 'warn'], part: ['Part paid', 'info'], paid: ['Paid', 'ok'], refunded: ['Refunded', ''] };
+  open: ['Not paid', 'warn'], part: ['Part paid', 'info'], paid: ['Paid', 'ok'], refunded: ['Refunded', ''], overdue: ['Overdue', 'bad'] };
 const pill = (s) => h('span', { class: `pill ${STATUS[s]?.[1] || ''}` }, STATUS[s]?.[0] || s);
-const money = (c, cur) => `${cur} ${(Number(c || 0) / 100).toFixed(2)}`;
-const day = (d) => (d ? new Date(`${d.slice(0, 10)}T12:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 export const row = (name, sub, { href = null, mark = null, end = null, onclick = null } = {}) => h('li', { class: end ? 'has-end' : null },
   h(href ? 'a' : 'button', { class: 'lrow', href, type: href ? null : 'button', onclick }, mark,
     h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, name), sub ? h('span', { class: 'lrow-sub' }, sub) : null), href || onclick ? h('span', { class: 'chev', 'aria-hidden': 'true' }, '›') : null), end);
@@ -17,7 +15,21 @@ const addRow = (label, sub, onclick) => row(label, sub, { onclick, mark: h('span
 export const group = (title, ...kids) => h('div', { class: 'lgroup' }, h('div', { class: 'eyebrow' }, title), kids);
 const dateMark = (d) => h('span', { class: 'lmark c2', 'aria-hidden': 'true' }, d ? String(Number(d.slice(8, 10))) : '?');
 export const back = (href, label) => h('a', { class: 'sub-back', href }, icon('back'), label);
-const sendingOn = () => (S.status?.settings?.modulesOn || []).includes('sending'); // 082: Lists and sending
+const modOn = (id) => (S.status?.settings?.modulesOn || []).includes(id);
+const sendingOn = () => modOn('sending'); // 082: Lists and sending
+/** 085: the messages and campaigns sent to an event's (or a survey's) people, newest first, and a row to send a new one. */
+export async function sentBlock(match, newHref, newLabel) {
+  if (!sendingOn() || !can('admin')) return null;
+  const g = await api('GET', '/api/sending').catch(() => null);
+  if (!g) return null;
+  const runs = g.runs.filter(match); const camps = g.campaigns.filter(match);
+  return group('Messages', h('ul', {}, runs.map((r) => row(r.title, `${day(r.createdAt, true)} · ${r.counts.reached} of ${r.counts.total - r.counts.skipped} sent`, { href: `#people/sending/${enc(r.id)}`, end: h('span', { class: 'row-end' }, runPill(r.status)) })),
+    camps.map((c) => row(c.title, `Campaign · step ${Math.min(c.step + 1, c.steps.length)} of ${c.steps.length}`, { href: `#people/sending/campaign/${enc(c.id)}`, end: h('span', { class: 'row-end' }, runPill(c.status, true)) })),
+    addRow(newLabel, 'Each person in their own chat, if they agreed', () => { location.hash = newHref; })));
+}
+const RUN = { running: ['Sending', 'info'], paused: ['Paused', 'warn'], stopped: ['Stopped', ''], done: ['Done', 'ok'], draft: ['Draft', ''] };
+/** A message's (or campaign's: running = "Running") state as a pill. */
+export const runPill = (s, campaign = false) => h('span', { class: `pill ${RUN[s]?.[1] || ''}` }, campaign && s === 'running' ? 'Running' : RUN[s]?.[0] || s);
 const done = (redraw) => (r) => { if (r !== undefined) redraw(); return r; };
 
 /** #people/events[/id], #people/orders[?event=…][/id] */
@@ -58,8 +70,8 @@ async function eventList() {
   $('#main').replaceChildren(h('div', { class: 'card' }, peopleNav('people/events'),
     h('div', { class: 'sec-head' }, h('h2', {}, `Events (${list.length})`), h('button', { class: 'btn small primary', type: 'button', onclick: create }, '+ New'), helpLink('events.md')),
     h('div', { class: 'ld-tools', style: 'margin-top:8px' }, seg),
-    list.length ? h('ul', { class: 'people-list' }, list.map((e) => row(e.name, [day(e.starts), e.place, countsLine(e.counts)].filter(Boolean).join(' · '), { href: `#people/events/${enc(e.id)}`, mark: dateMark(e.starts) })))
-      : emptyState('list', past ? 'No past events' : 'No upcoming events', 'An event has a date, places, a deadline and a price list. People register through an agent ("register us for Sankranti") or here.', h('button', { class: 'btn primary', onclick: create }, 'New event'))));
+    list.length ? h('ul', { class: 'people-list' }, list.map((e) => row(e.name, [day(e.starts, true), e.place, plural(e.counts.people, 'person', 'people')].filter(Boolean).join(' · '), { href: `#people/events/${enc(e.id)}`, mark: dateMark(e.starts) })))
+      : emptyState('list', past ? 'No past events' : 'No upcoming events', 'Create one; people then register here or by asking an agent ("register us for Sankranti").', h('button', { class: 'btn primary', onclick: create }, 'New event'))));
 }
 
 async function eventPage(id) {
@@ -102,23 +114,26 @@ async function eventPage(id) {
       h('button', { class: 'btn small danger', type: 'button', onclick: () => tryApi(() => api('DELETE', `/api/module/duties/${d.id}`), 'Duty removed').then(done(redraw)) }, 'Remove duty')) : null });
   const remove = async () => (await ask({ title: `Delete ${e.name}?`, danger: true, ok: 'Delete event', text: `Its ${plural(g.registrations.length, 'registration')} and duties go too; unpaid orders are cancelled. This cannot be undone.` }))
     && tryApi(async () => { await api('DELETE', `/api/module/events/${e.id}`); location.hash = 'people/events'; }, 'Deleted');
-  const prices = e.prices.adult || e.prices.kid ? `${money(e.prices.adult, e.currency)} per adult, ${money(e.prices.kid, e.currency)} per kid${e.prices.freeUnder ? `, free under ${e.prices.freeUnder}` : ''}` : '';
+  const prices = e.prices.adult || e.prices.kid ? `${money(e.prices.adult, e.currency)} an adult, ${money(e.prices.kid, e.currency)} a kid${e.prices.freeUnder ? ` (under ${e.prices.freeUnder} free)` : ''}` : '';
   const cancelled = by('cancelled');
+  const came = by('registered').filter((r) => r.attended).length;
+  const today = new Date().toISOString().slice(0, 10);
+  const sent = await sentBlock((x) => ['event', 'orders'].includes(x.audience?.kind) && x.audience.event === e.id, `people/sending/new?kind=event&event=${enc(e.id)}&title=${enc(e.name)}`, 'Message the registered people');
   $('#main').replaceChildren(h('div', { class: 'card person-page' }, bk,
     h('div', { class: 'ap-head' }, dateMark(e.starts),
       h('div', { class: 'ap-title' }, h('h2', { tabindex: '-1' }, e.name), h('div', { class: 'small muted' }, [`${day(e.starts)}${e.ends && e.ends !== e.starts ? ` – ${day(e.ends)}` : ''}`, e.place].filter(Boolean).join(' · '))),
       can('admin') ? menu(`More for ${e.name}`, h('button', { class: 'btn small', type: 'button', onclick: () => editEvent(e).then(done(redraw)) }, 'Edit…'),
-        sendingOn() ? h('a', { class: 'btn small', href: `#people/sending/new?kind=event&event=${enc(e.id)}&title=${enc(e.name)}` }, 'Message registered people') : null,
-        sendingOn() && (S.status?.settings?.modulesOn || []).includes('orders') ? h('button', { class: 'btn small', type: 'button', onclick: () => autoReminders(e) }, 'Automatic payment reminders…') : null,
+        sendingOn() && modOn('orders') ? h('button', { class: 'btn small', type: 'button', onclick: () => autoReminders(e) }, 'Automatic payment reminders…') : null,
         h('a', { class: 'btn small', href: `/api/module/events/${e.id}/csv`, download: '' }, 'Download CSV'), h('button', { class: 'btn small danger', type: 'button', onclick: remove }, 'Delete…')) : null),
-    h('p', { class: 'small', style: 'margin:8px 0 0' }, countsLine(c)),
-    h('p', { class: 'small muted', style: 'margin:4px 0 0' }, [e.per === 'household' ? 'Per household' : 'Per person', e.confirm === 'organizer' ? 'an organizer confirms' : 'confirmed automatically',
-      e.deadline ? `closes ${day(e.deadline)}` : '', prices, e.payBy ? `pay by ${day(e.payBy)}` : ''].filter(Boolean).join(' · ')),
+    h('p', { class: 'small', style: 'margin:8px 0 0' }, [countsLine(c), came ? `${came} came` : ''].filter(Boolean).join(' · ')),
+    h('p', { class: 'small muted', style: 'margin:4px 0 0' }, [e.deadline ? `Registration ${e.deadline < today ? 'closed' : 'closes'} ${day(e.deadline, true)}` : 'Registration open',
+      e.per === 'household' ? 'per household' : 'per person', e.confirm === 'organizer' ? 'an organizer confirms' : '', prices].filter(Boolean).join(' · ')),
     by('pending').length ? group('To confirm', h('ul', {}, by('pending').map(regRow))) : null,
     group('Registered', h('ul', {}, by('registered').map(regRow), addRow('Register someone', 'A person or a household', register))),
     by('waiting').length ? group('Waiting list', h('ul', {}, by('waiting').map(regRow)), h('p', { class: 'small muted lempty' }, 'They get a place by themselves, in order, when one opens up.')) : null,
     group('Duties', h('ul', {}, g.duties.map(dutyRow), addRow('Add a duty', 'A task, when, how many people', addDuty))),
     moduleBlocks(g.modules),
+    sent,
     cancelled.length ? h('details', { class: 'sblock' }, h('summary', {}, `Cancelled (${cancelled.length})`), h('ul', { class: 'mini-list' }, cancelled.map(regRow))) : null));
   $('#main h2')?.focus({ preventScroll: true });
 }
@@ -154,15 +169,15 @@ async function orderList(event) {
   const ev = g.events.find((x) => x.id === event);
   $('#main').replaceChildren(h('div', { class: 'card' }, peopleNav('people/orders'),
     h('div', { class: 'sec-head' }, h('h2', {}, `Orders${ev ? `: ${ev.name}` : ''} (${g.orders.length})`), h('button', { class: 'btn small primary', type: 'button', onclick: create }, '+ New'), helpLink('orders.md')),
-    h('div', { class: 'ld-tools', style: 'margin-top:8px' }, seg, h('a', { class: 'btn small', href: `/api/orders/csv?status=${status}${event ? `&event=${enc(event)}` : ''}`, download: '' }, 'CSV')),
-    sendingOn() && g.orders.some((o) => o.left > 0) ? h('p', { class: 'small', style: 'margin:4px 0 0' }, h('a', { class: 'btn small', href: `#people/sending/new?kind=orders${event ? `&event=${enc(event)}` : ''}` }, 'Send reminders'),
-      ' to the people who have not paid') : null,
+    h('div', { class: 'ld-tools', style: 'margin-top:8px' }, seg, menu('More for these orders', h('a', { class: 'btn small', href: `/api/orders/csv?status=${status}${event ? `&event=${enc(event)}` : ''}`, download: '' }, 'Download CSV'),
+      h('a', { class: 'btn small', href: '#settings/modules' }, 'Ways to pay…'))),
+    sendingOn() && g.orders.some((o) => o.left > 0) ? h('p', { class: 'small', style: 'margin:2px 0 0' }, h('a', { class: 'qfix', href: `#people/sending/new?kind=orders${event ? `&event=${enc(event)}` : ''}` }, 'Remind everyone who has not paid')) : null,
     g.events.length ? group('By event', h('ul', {}, ev ? row('All events', '', { href: '#people/orders' }) : null, g.events.filter((x) => !ev || x.id === ev.id).map((x) => row(x.name,
       `${money(x.paid, x.currency)} of ${money(x.total, x.currency)} collected · ${x.unpaid ? `${plural(x.unpaid, 'order')} not fully paid` : 'all paid'}`, { href: `#people/orders?event=${enc(x.id)}` })))) : null,
     g.orders.length ? h('ul', { class: 'people-list', style: 'margin-top:10px' }, g.orders.map((o) => row(o.who, [o.title, o.left && o.status !== 'cancelled' ? `${money(o.left, o.currency)} left` : money(o.total, o.currency),
-      o.due ? `${o.overdue ? 'overdue since' : 'due'} ${day(o.due)}` : ''].filter(Boolean).join(' · '), { href: `#people/orders/${enc(o.id)}`, end: h('span', { class: 'row-end' }, pill(o.status)) })))
-      : emptyState('list', 'Nothing here', 'Orders come from event registrations when the event has prices, or add one by hand. Duniya records payments; it never takes money.', null),
-    h('p', { class: 'small muted' }, `Ways to pay: ${g.methods.join(', ')}. `, h('a', { href: '#settings/modules' }, 'Change'))));
+      o.due ? `${o.overdue ? 'was due' : 'due'} ${day(o.due, true)}` : ''].filter(Boolean).join(' · '), { href: `#people/orders/${enc(o.id)}`, end: h('span', { class: 'row-end' }, pill(o.overdue ? 'overdue' : o.status)) })))
+      : emptyState('list', status === 'all' ? 'No orders yet' : 'Nothing here', status === 'all' ? 'An event with prices makes an order for each registration; add one by hand for anything else. Duniya records payments, it never takes money.' : 'No order in this view. All shows every order.',
+        status === 'all' ? h('button', { class: 'btn primary', onclick: create }, 'New order') : h('button', { class: 'btn', onclick: () => { status = 'all'; orderList(event); } }, 'Show all orders'))));
 }
 
 async function orderPage(id) {
@@ -186,11 +201,12 @@ async function orderPage(id) {
     && tryApi(async () => { await api('DELETE', `/api/orders/${o.id}`); location.hash = 'people/orders'; }, 'Deleted');
   const whoHref = o.person ? `#people/${enc(o.person)}` : `#people/households/${enc(o.household)}`;
   $('#main').replaceChildren(h('div', { class: 'card person-page' }, bk,
-    h('div', { class: 'ap-head' }, h('span', { class: 'lmark l c4', 'aria-hidden': 'true' }, o.currency.slice(0, 1)),
+    h('div', { class: 'ap-head' }, avatar(o.who, o.person || o.household, 'l'),
       h('div', { class: 'ap-title' }, h('h2', { tabindex: '-1' }, o.title), h('div', { class: 'small muted' }, h('a', { href: whoHref }, o.who), o.event ? [' · ', h('a', { href: `#people/events/${enc(o.event)}` }, o.eventName)] : null)),
       can('admin') ? menu('More for this order', h('button', { class: 'btn small', type: 'button', onclick: edit }, 'Edit…'),
         o.paid > 0 ? h('button', { class: 'btn small', type: 'button', onclick: () => pay(true) }, 'Refund…') : null, h('button', { class: 'btn small danger', type: 'button', onclick: remove }, 'Delete…')) : null),
-    h('p', { class: 'small', style: 'margin:8px 0 0' }, pill(o.status), ` ${money(o.paid, o.currency)} paid of ${money(o.total, o.currency)}${o.left && o.status !== 'cancelled' ? ` · ${money(o.left, o.currency)} left` : ''}${o.due ? ` · due ${day(o.due)}` : ''}`),
+    h('p', { class: 'small', style: 'margin:8px 0 0' }, pill(o.overdue ? 'overdue' : o.status), ' ', [`${money(o.total, o.currency)}`, o.paid ? `${money(o.paid, o.currency)} paid` : o.status === 'cancelled' ? '' : 'nothing paid yet',
+      o.left && o.status !== 'cancelled' ? `${money(o.left, o.currency)} left` : '', o.due && o.left ? `${o.overdue ? 'was due' : 'due'} ${day(o.due, true)}` : ''].filter(Boolean).join(' · ')),
     o.note ? h('p', { class: 'small muted' }, o.note) : null,
     group('Lines', h('ul', {}, o.lines.map((l) => row(`${l.qty} × ${l.item}`, `${money(l.price, o.currency)} each · ${money(l.qty * l.price, o.currency)}`)))),
     group('Payments', h('ul', {}, o.payments.map((p) => row(`${p.amount < 0 ? 'Refund' : 'Payment'} ${money(Math.abs(p.amount), o.currency)}`, [day(p.at), p.method, p.by].filter(Boolean).join(' · '), {

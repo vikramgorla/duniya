@@ -2,17 +2,18 @@
 // got what), and New message: audience, purpose, who replies, the message → the preview (who, how many, which app,
 // how long, who is skipped and why, three samples) → Start sending. Orders (Send reminders) and an event page (Message
 // registered people) open New message prefilled. Loaded from people.js; every text from people or models is a text node.
-import { $, S, api, ask, can, emptyState, field, h, menu, meterEl, time, toggle, tryApi } from './core.js';
+import { $, S, api, ask, avatar, can, emptyState, field, h, menu, meterEl, time, toggle, tryApi } from './core.js';
 import { helpLink, plural } from './shared.js';
-import { peopleNav } from './people.js';
-import { back, group, row } from './events.js';
+import { day, peopleNav } from './people.js';
+import { back, group, row, runPill } from './events.js';
 const enc = encodeURIComponent;
-const STATE = { running: ['Sending', 'info'], paused: ['Paused', 'warn'], stopped: ['Stopped', ''], done: ['Done', 'ok'], draft: ['Draft', ''] };
 const WAIT = { hours: 'Waiting for the sending hours', cap: 'Today\'s limit is reached: it carries on tomorrow by itself', offline: 'Waiting for WhatsApp to connect' };
-const PERSON = { waiting: 'Waiting', sending: 'Sending', sent: 'Sent', replied: 'Replied', stop: 'Said stop', skipped: 'Skipped', failed: 'Failed' };
-const pill = (s) => h('span', { class: `pill ${STATE[s]?.[1] || ''}` }, STATE[s]?.[0] || s);
+const PERSON = { waiting: ['Waiting', ''], sending: ['Sending', 'info'], sent: ['Sent', ''], replied: ['Replied', 'ok'], stop: ['Said stop', 'warn'], skipped: ['Skipped', ''], failed: ['Failed', 'bad'] };
+const pill = runPill;
 const KINDS = [['list', 'A list'], ['tag', 'A tag'], ['household', 'A household'], ['event', 'People registered for an event'], ['orders', 'People with an open order'], ['saved', 'A saved audience']];
-const FIELDS = '{first_name} {household} · events: {event} {date} {place} {people} · open orders: {amount} {due} {ways_to_pay} · surveys: {survey} {survey_link}';
+const FIELDS = [['Everyone', '{first_name} {household}'], ['Events', '{event} {date} {place} {people}'], ['Open orders', '{amount} {due} {ways_to_pay}'], ['Surveys', '{survey} {survey_link}']];
+/** 085: the fields a message may use, behind a small disclosure instead of a long hint. */
+const fieldsHelp = () => h('details', { class: 'small muted' }, h('summary', {}, 'Each person gets their own wording: fields you can use'), h('ul', { class: 'mini-list' }, FIELDS.map(([k, v]) => h('li', {}, `${k}: `, h('code', {}, v)))));
 const countsLine = (c) => [`${c.reached} of ${c.total - c.skipped} sent`, c.replied + c.stop ? `${c.replied + c.stop} replied` : '', c.stop ? `${c.stop} said stop` : '',
   c.skipped ? `${c.skipped} skipped` : '', c.failed ? `${c.failed} failed` : ''].filter(Boolean).join(' · ');
 
@@ -27,18 +28,17 @@ export function renderSending(b) {
 async function runList() {
   const g = await api('GET', '/api/sending');
   $('#main').replaceChildren(h('div', { class: 'card' }, peopleNav('people/sending'),
-    h('div', { class: 'sec-head' }, h('h2', {}, `Sending (${g.runs.length})`), h('a', { class: 'btn small primary', href: '#people/sending/new' }, '+ New message'), helpLink('sending.md')),
-    g.runs.length ? h('ul', { class: 'people-list', style: 'margin-top:10px' }, g.runs.map((r) => row(r.title, [r.audienceText, countsLine(r.counts), time(r.createdAt)].join(' · '),
-      { href: `#people/sending/${enc(r.id)}`, end: h('span', { class: 'row-end' }, pill(r.status)) })))
-      : emptyState('list', 'Nothing sent yet', 'Send a message to a list, a tag, a household, an event or people who still owe: each person gets their own wording, one at a time at a person\'s pace, and only if they agreed.',
+    h('div', { class: 'sec-head' }, h('h2', {}, 'Sending'), h('a', { class: 'btn small primary', href: '#people/sending/new' }, '+ New message'), helpLink('sending.md')),
+    h('p', { class: 'small muted', style: 'margin:2px 0 0' }, 'One person at a time, at a person\'s pace, only to people who agreed. ', h('a', { href: '#settings/sending-pace' }, 'Sending pace')),
+    g.runs.length ? group(`Messages (${g.runs.length})`, h('ul', {}, g.runs.map((r) => row(r.title, [r.audienceText, countsLine(r.counts), day(r.createdAt, true)].join(' · '),
+      { href: `#people/sending/${enc(r.id)}`, end: h('span', { class: 'row-end' }, pill(r.status)) }))))
+      : emptyState('list', 'Nothing sent yet', 'Message a list, an event\'s families or everyone who still owes: each person gets their own wording.',
         h('a', { class: 'btn primary', href: '#people/sending/new' }, 'New message')),
     group(`Campaigns (${g.campaigns.length})`, h('ul', {}, g.campaigns.map((c) => row(c.title, `${c.audienceText} · step ${Math.min(c.step + 1, c.steps.length)} of ${c.steps.length}`,
-      { href: `#people/sending/campaign/${enc(c.id)}`, end: h('span', { class: 'row-end' }, pill(c.status)) })),
+      { href: `#people/sending/campaign/${enc(c.id)}`, end: h('span', { class: 'row-end' }, pill(c.status, true)) })),
     can('admin') ? row('New campaign', 'Messages over days; follow-ups only to who has not answered, registered or paid', { href: '#people/sending/campaign/new', mark: h('span', { class: 'lmark c3', 'aria-hidden': 'true' }, '+') }) : null)),
     g.filters.length ? group('Saved audiences', h('ul', {}, g.filters.map((f) => row(f.name, f.text, { href: `#people/sending/new?saved=${enc(f.id)}`,
-      end: can('admin') ? h('button', { class: 'btn small ghost icon rm', type: 'button', 'aria-label': `Remove ${f.name}`, title: 'Remove', onclick: () => tryApi(() => api('DELETE', `/api/sending/filters/${f.id}`), 'Removed').then(runList) }, '×') : null })))) : null,
-    h('p', { class: 'small muted' }, 'Pacing lowers the risk that WhatsApp restricts your number, but does not remove it; WhatsApp\'s terms restrict bulk messaging. Send only to people who expect it. ',
-      h('a', { href: '#settings/sending-pace' }, 'Sending pace'))));
+      end: can('admin') ? h('button', { class: 'btn small ghost icon rm', type: 'button', 'aria-label': `Remove ${f.name}`, title: 'Remove', onclick: () => tryApi(() => api('DELETE', `/api/sending/filters/${f.id}`), 'Removed').then(runList) }, '×') : null })))) : null));
 }
 
 /** The fields New message and New campaign share: title, who (audience), purpose, who replies, a survey (083). */
@@ -101,17 +101,19 @@ async function newMessage(q) {
       p.samples.length ? group('Samples (each person gets their own wording)', h('ul', { class: 'mini-list' }, p.samples.map((s) => h('li', {}, h('b', {}, s.to), h('div', { class: 'small', style: 'white-space:pre-wrap' }, s.text))))) : null,
       p.skipped.length ? h('details', { class: 'sblock' }, h('summary', {}, `Skipped (${p.skipped.length})`), h('ul', { class: 'mini-list' }, p.skipped.map((s) => h('li', {}, `${s.name}: ${s.reason}`)))) : null,
       h('div', { class: 'row', style: 'gap:8px;margin-top:10px' },
-        p.to.total ? h('button', { class: 'btn primary', type: 'button', onclick: async () => { const r = await tryApi(() => api('POST', `/api/sending/runs/${p.run.id}/start`), 'Sending started'); if (r) location.hash = `people/sending/${r.id}`; } }, `Start sending to ${plural(p.to.total, 'person', 'people')}`) : h('p', { class: 'muted' }, 'Nobody would get it.'))));
+        p.to.total ? h('button', { class: 'btn primary', type: 'button', onclick: async () => { const r = await tryApi(() => api('POST', `/api/sending/runs/${p.run.id}/start`), 'Sending started'); if (r) location.hash = `people/sending/${r.id}`; } }, `Send to ${plural(p.to.total, 'person', 'people')}`) : h('p', { class: 'muted' }, 'Nobody would get it: see who is skipped and why.')),
+      p.to.total ? h('p', { class: 'small muted' }, 'Bulk messages can get a WhatsApp number restricted: send only to people who expect it.') : null));
     out.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
   $('#main').replaceChildren(h('div', { class: 'card' }, back('#people/sending', 'Sending'),
     h('div', { class: 'sec-head' }, h('h2', { tabindex: '-1' }, 'New message'), helpLink('sending.md')),
-    field('Title', F.title, 'For you: the history and the owner alerts use it.'), field('How', F.mode), to, which,
-    h('div', { class: 'grid2' }, field('Purpose', F.purpose, 'Only people who said yes to it get the message.'), field('Replies go to', F.agent)),
-    field('Message', F.template, `Each person gets their own wording, with their facts: ${FIELDS}`),
-    surveys.length ? field('Survey (optional)', F.survey, 'People answer in the chat, or with their own {survey_link}.') : null,
-    field('Pause when this many in a row do not answer', F.quiet, '0 = never (e.g. reminders nobody needs to answer).'),
-    h('div', { class: 'row', style: 'gap:8px' }, h('button', { class: 'btn primary', type: 'button', onclick: previewIt }, 'Preview'), h('button', { class: 'btn', type: 'button', onclick: saveAudience }, 'Save audience…')),
+    field('Title', F.title, 'Only you see it.'), field('How', F.mode), to, which,
+    h('div', { class: 'grid2' }, field('Purpose', F.purpose, 'Only people who said yes to it get it.'), field('Replies go to', F.agent)),
+    field('Message', F.template), fieldsHelp(),
+    surveys.length ? field('Survey (optional)', F.survey) : null,
+    h('details', { class: 'sblock' }, h('summary', {}, 'More options'), field('Pause when this many in a row do not answer', F.quiet, '0 = never (for reminders nobody needs to answer).'),
+      h('button', { class: 'btn small', type: 'button', onclick: saveAudience }, 'Save this audience…')),
+    h('div', { class: 'row', style: 'gap:8px;margin-top:12px' }, h('button', { class: 'btn primary', type: 'button', onclick: previewIt }, 'Preview')),
     out));
   $('#main h2')?.focus({ preventScroll: true });
 }
@@ -119,7 +121,7 @@ async function newMessage(q) {
 async function runPage(id) {
   const g = await api('GET', `/api/sending/runs/${enc(id)}`).catch(() => null);
   const bk = back('#people/sending', 'Sending');
-  if (!g) { $('#main').replaceChildren(h('div', { class: 'card' }, bk, h('p', { class: 'muted' }, 'This run is gone.'))); return; }
+  if (!g) { $('#main').replaceChildren(h('div', { class: 'card' }, bk, h('p', { class: 'muted' }, 'This message is gone.'))); return; }
   const { run: r, recipients } = g;
   const here = location.hash;
   let soon;
@@ -129,8 +131,13 @@ async function runPage(id) {
   const stop = async () => (await ask({ title: `Stop "${r.title}"?`, danger: true, ok: 'Stop sending', text: `${plural(r.counts.waiting, 'person', 'people')} who have not got it yet will not get it. This cannot be undone.` })) && act('stop', 'Stopped');
   const m = meterEl(); m.set(r.counts.total - r.counts.skipped ? r.counts.reached / (r.counts.total - r.counts.skipped) : 0);
   const by = (s) => recipients.filter((x) => x.status === s);
-  const who = (x) => row(x.name, [x.channel === 'telegram' ? 'Telegram' : x.channel === 'whatsapp' ? 'WhatsApp' : '', x.reason, x.at ? time(x.at) : '', x.repliedAt ? `replied ${time(x.repliedAt)}` : ''].filter(Boolean).join(' · '),
-    { href: x.person.startsWith('p_') ? `#people/${enc(x.person)}` : null });
+  // 085: one person per row: avatar · name · state and time (the wording they got, quoted) · state pill; the row opens the person
+  const live = ['running', 'paused'].includes(r.status);
+  const who = (x) => h('li', { class: 'has-end' }, h(x.person.startsWith('p_') ? 'a' : 'div', { class: 'lrow', href: x.person.startsWith('p_') ? `#people/${enc(x.person)}` : null }, avatar(x.name, x.person, 's'),
+    h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, x.name),
+      h('span', { class: 'lrow-sub' }, [x.channel === 'telegram' ? 'Telegram' : '', x.reason, x.repliedAt ? `replied ${time(x.repliedAt)}` : x.at ? time(x.at) : x.status === 'waiting' ? (live ? 'in the queue' : 'not sent') : ''].filter(Boolean).join(' · ')),
+      x.text ? h('span', { class: 'quote' }, x.text) : null)),
+  h('span', { class: 'row-end' }, h('span', { class: `pill ${PERSON[x.status]?.[1] || ''}` }, PERSON[x.status]?.[0] || x.status)));
   const sentList = [...by('replied'), ...by('stop'), ...by('sent')];
   $('#main').replaceChildren(h('div', { class: 'card person-page' }, bk,
     h('div', { class: 'ap-head' }, h('div', { class: 'ap-title' }, h('h2', { tabindex: '-1' }, r.title), h('div', { class: 'small muted' }, `${r.audienceText} · ${r.purpose} · replies go to ${r.agentName || r.agent}`)),
@@ -142,9 +149,9 @@ async function runPage(id) {
     can('admin') ? h('div', { class: 'row', style: 'gap:8px;margin-top:8px' },
       r.status === 'running' ? h('button', { class: 'btn', type: 'button', onclick: () => act('pause', 'Paused') }, 'Pause') : null,
       r.status === 'paused' ? h('button', { class: 'btn primary', type: 'button', onclick: () => act('resume', 'Resumed') }, 'Resume') : null) : null,
-    h('details', { class: 'sblock' }, h('summary', {}, 'The message'), h('p', { class: 'small', style: 'white-space:pre-wrap' }, r.template)),
-    sentList.length ? group(`Got it (${sentList.length})`, h('ul', {}, sentList.map((x) => h('li', {}, h('details', {}, h('summary', {}, `${x.name} · ${PERSON[x.status]}${x.at ? ` · ${time(x.at)}` : ''}`), h('p', { class: 'small', style: 'white-space:pre-wrap' }, x.text)))))) : null,
-    by('waiting').length ? group(`Waiting (${by('waiting').length})`, h('ul', {}, by('waiting').slice(0, 50).map(who))) : null,
+    group('The message', h('p', { class: 'quote', style: 'margin:0 10px' }, r.template)),
+    sentList.length ? group(`Sent (${sentList.length})`, h('ul', {}, sentList.map(who))) : null,
+    by('waiting').length ? group(`${live ? 'Waiting' : 'Not sent'} (${by('waiting').length})`, h('ul', {}, by('waiting').slice(0, 50).map(who))) : null,
     by('failed').length ? group(`Failed (${by('failed').length})`, h('ul', {}, by('failed').map(who))) : null,
     by('skipped').length ? h('details', { class: 'sblock' }, h('summary', {}, `Skipped (${by('skipped').length})`), h('ul', { class: 'mini-list' }, by('skipped').map((x) => h('li', {}, `${x.name}: ${x.reason}`)))) : null));
   $('#main h2')?.focus({ preventScroll: true });
@@ -157,7 +164,7 @@ async function newCampaign() {
   const steps = [{ kind: 'message', template: '', survey: '' }, { kind: 'wait', days: 3 }, { kind: 'message', template: '', survey: '' }];
   const list = h('div', {});
   const draw = () => list.replaceChildren(...steps.map((st, i) => h('div', { class: 'sblock' },
-    st.kind === 'wait' ? field(`Step ${i + 1}: wait`, h('input', { type: 'number', min: 1, max: 90, value: st.days, oninput: (e) => { st.days = Number(e.target.value); } }), 'Days')
+    st.kind === 'wait' ? field(`Step ${i + 1}: wait this many days`, h('input', { type: 'number', min: 1, max: 90, value: st.days, oninput: (e) => { st.days = Number(e.target.value); } }))
       : [field(`Step ${i + 1}: message`, h('textarea', { rows: 3, maxlength: 1500, placeholder: i ? 'Hi {first_name}, a quick reminder…' : 'Hi {first_name}, …', oninput: (e) => { st.template = e.target.value; } }, st.template)),
         surveys.length ? field('Survey (optional)', (() => { const sel = surveyPick(st.survey); sel.onchange = () => { st.survey = sel.value; }; return sel; })()) : null],
     i ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { steps.splice(i, 1); draw(); } }, 'Remove step') : null)));
@@ -178,7 +185,7 @@ async function newCampaign() {
   $('#main').replaceChildren(h('div', { class: 'card' }, back('#people/sending', 'Sending'),
     h('div', { class: 'sec-head' }, h('h2', { tabindex: '-1' }, 'New campaign'), helpLink('campaigns.md')),
     field('Title', F.title), to, which, h('div', { class: 'grid2' }, field('Purpose', F.purpose), field('Replies go to', F.agent)),
-    h('h3', {}, 'Steps'), list,
+    h('h3', {}, 'Steps'), fieldsHelp(), list,
     h('div', { class: 'row', style: 'gap:8px' }, h('button', { class: 'btn small', type: 'button', onclick: () => { steps.push({ kind: 'message', template: '', survey: '' }); draw(); } }, '+ Message'),
       h('button', { class: 'btn small', type: 'button', onclick: () => { steps.push({ kind: 'wait', days: 3 }); draw(); } }, '+ Wait')),
     h('h3', {}, 'Follow-ups skip people when'),
@@ -199,14 +206,14 @@ async function campaignPage(id) {
   const act = (action, ok) => tryApi(() => api('PUT', `/api/sending/campaigns/${c.id}`, { action }), ok).then((x) => x && campaignPage(id));
   const stop = async () => (await ask({ title: `Stop "${c.title}"?`, danger: true, ok: 'Stop the campaign', text: 'Its current step stops too and no later step is sent. This cannot be undone.' })) && act('stop', 'Stopped');
   const stepLine = (st, i) => {
-    const state = st.run ? countsLine(st.run.counts) : st.current && st.kind === 'wait' ? `waiting until ${time(c.stepAt + st.days * 86400000)}` : i < c.step ? 'done' : 'later';
-    return row(st.kind === 'wait' ? `${i + 1}. Wait ${plural(st.days, 'day')}` : `${i + 1}. ${st.template}`, `${st.current ? 'Now · ' : ''}${state}${st.survey ? ' · with a survey' : ''}`,
+    const state = st.run ? countsLine(st.run.counts) : st.current && st.kind === 'wait' ? `next step ${day(c.stepAt + st.days * 86400000, true)}` : i < c.step ? 'Done' : c.status === 'stopped' ? 'Not sent' : 'Not started';
+    return row(st.kind === 'wait' ? `${i + 1}. Wait ${plural(st.days, 'day')}` : `${i + 1}. ${st.template}`, `${st.current && st.kind !== 'wait' ? 'Now · ' : ''}${state}${st.survey ? ' · with a survey' : ''}`,
       { href: st.run ? `#people/sending/${enc(st.run.id)}` : null, end: st.run ? h('span', { class: 'row-end' }, pill(st.run.status)) : null });
   };
   $('#main').replaceChildren(h('div', { class: 'card person-page' }, bk,
-    h('div', { class: 'ap-head' }, h('div', { class: 'ap-title' }, h('h2', { tabindex: '-1' }, c.title), h('div', { class: 'small muted' }, `${c.audienceText} · ${c.purpose}${c.endDay ? ` · until ${c.endDay}` : ''}`)),
+    h('div', { class: 'ap-head' }, h('div', { class: 'ap-title' }, h('h2', { tabindex: '-1' }, c.title), h('div', { class: 'small muted' }, `${c.audienceText} · ${c.purpose}${c.endDay ? ` · until ${day(c.endDay)}` : ''}`)),
       can('admin') && ['running', 'paused'].includes(c.status) ? menu(`More for ${c.title}`, h('button', { class: 'btn small danger', type: 'button', onclick: stop }, 'Stop…')) : null),
-    h('p', { class: 'small', style: 'margin:8px 0 0' }, pill(c.status), ` Step ${Math.min(c.step + 1, c.steps.length)} of ${c.steps.length}`),
+    h('p', { class: 'small', style: 'margin:8px 0 0' }, pill(c.status, true), ` Step ${Math.min(c.step + 1, c.steps.length)} of ${c.steps.length}`),
     c.reason ? h('p', { class: 'small', role: 'status' }, c.reason) : null,
     can('admin') ? h('div', { class: 'row', style: 'gap:8px;margin-top:8px' }, c.status === 'running' ? h('button', { class: 'btn', type: 'button', onclick: () => act('pause', 'Paused') }, 'Pause') : null,
       c.status === 'paused' ? h('button', { class: 'btn primary', type: 'button', onclick: () => act('resume', 'Resumed') }, 'Resume') : null) : null,

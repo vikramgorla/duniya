@@ -3,11 +3,11 @@
 //   everyone      what_do_i_owe (the sender's and their households' open orders, and how to pay)
 //   organizers    who_has_not_paid (with totals), and — held for an organizer's "confirm XXXX" — mark_paid, refund
 // Duniya records payments; it never takes money. Hidden people are left out of names agents see.
-import { clip, fail } from '../../core/config.js';
+import { clip, fail, money } from '../../core/config.js';
 import { listHouseholds, listPeople, personByRef, personRow } from '../../core/people.js';
 import { canSee, peopleScope } from '../../core/people-access.js';
 import { findEvent } from '../events/index.js';
-import { STATUS_WORD, change, eventTotals, listOrders, money, openOrdersOf, paymentMethods } from './index.js';
+import { STATUS_WORD, change, eventTotals, listOrders, openOrdersOf, paymentMethods } from './index.js';
 
 const ev = { type: 'string', description: 'Event name (or part of it) or id (optional)' };
 const shown = (o) => ({ who: o.person && personRow(o.person)?.hidden ? '(hidden)' : o.who, for: o.title, total: money(o.total, o.currency), paid: money(o.paid, o.currency),

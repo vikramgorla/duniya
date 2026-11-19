@@ -55,6 +55,7 @@ test('sent with a list message: each person gets their own link; the link page i
   const toRavi = t.sent.find((m) => m.chat === jid(RAVI)).text.match(/\/s\/([A-Za-z0-9_-]+)/)[1];
   assert.notEqual(link.split('/s/')[1], toRavi, 'one link per person');
   assert.equal((await api('GET', `/api/surveys/${survey.id}`)).counts.invited, 3);
+  assert.equal((await api('GET', '/api/sending')).runs.find((r) => r.id === p.run.id).survey, survey.id, '085: the history says which survey a message carried');
   const page = await fetch(link);
   const html = await page.text();
   assert.equal(page.status, 200);

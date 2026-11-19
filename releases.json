@@ -1,6 +1,20 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.47.0": {
+      "breaking": false,
+      "title": "Calmer, clearer People, events, orders, sending and surveys",
+      "changes": [
+        { "type": "improved", "text": "Dates, amounts and phone numbers read the same everywhere, in your language's format, with \"tomorrow\" or \"6 days ago\" when it is close." },
+        { "type": "new", "text": "An event's page and a survey's page list the messages and campaigns sent to their people, with a row to send a new one." },
+        { "type": "improved", "text": "A message's page shows each person as a row with their state (Sent, Replied, Said stop, Waiting), the wording they got, and a tap to their page; a survey's page does the same for answers, finished first." },
+        { "type": "improved", "text": "Orders past their due date say Overdue, and an order's page says how much is left and how late it is." },
+        { "type": "improved", "text": "On a phone, People's switch shows Events, Orders, Sending and Surveys instead of hiding them off-screen." },
+        { "type": "improved", "text": "Past events show how many people came; registrations and duties have a quiet ⋯ instead of a button on every row." },
+        { "type": "improved", "text": "Sending pace: tapping Careful, Normal or Faster saves at once. Updates settings save as you change them, with clear labels." },
+        { "type": "improved", "text": "Shorter help texts on Sending, New message, Modules, Sending pace and Telegram; the details are behind ?." }
+      ]
+    },
     "2.46.3": {
       "breaking": false,
       "title": "Steadier speed checks",
