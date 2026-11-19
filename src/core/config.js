@@ -56,7 +56,13 @@ export const digits = (s) => String(s ?? '').replace(/\D/g, '');
 export const clip = (s, n = 120) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
 /** An error the panel answers with `status` (default 400); `extra` (field, code, …) goes along to the client. */
 /** Cents → "CHF 25.00", "€25.00": one money format for agents, module rows and the admin tools (085). */
-export const money = (cents, cur) => { const v = Number(cents || 0) / 100; try { return new Intl.NumberFormat('en', { style: 'currency', currency: cur }).format(v).replace(/\u00a0/g, ' '); } catch { return `${cur} ${v.toFixed(2)}`; } };
+const moneyFormats = new Map(); // one formatter per currency: building one costs more than formatting (hot paths list hundreds)
+export const money = (cents, cur) => {
+  const v = Number(cents || 0) / 100;
+  let f = moneyFormats.get(cur);
+  if (f === undefined) { try { f = new Intl.NumberFormat('en', { style: 'currency', currency: cur }); } catch { f = null; } moneyFormats.set(cur, f); }
+  return f ? f.format(v).replace(/\u00a0/g, ' ') : `${cur} ${v.toFixed(2)}`;
+};
 export const fail = (message, status = 400, extra = {}) => Object.assign(new Error(message), { status, ...extra });
 /** A 400-style error the panel shows next to `field`. */
 export const bad = (message, field, status = 400) => fail(message, status, field ? { field } : {});

@@ -9,7 +9,8 @@
         { "type": "improved", "text": "The model step explains the free start in plain words: sign up at OpenRouter, create a key, paste it." },
         { "type": "improved", "text": "A fresh Overview is calmer: while Getting started is open, no row of red status chips and no cards that repeat its steps." },
         { "type": "improved", "text": "The installer says what to do when something fails, warns when your domain does not point to the server yet, and ends with where to go next." },
-        { "type": "new", "text": "A troubleshooting guide for the ten most common first-day problems, and a Question or help form on GitHub." }
+        { "type": "new", "text": "A troubleshooting guide for the ten most common first-day problems, and a Question or help form on GitHub." },
+        { "type": "fixed", "text": "Agents list who has not paid and who registered as fast as before 2.47.0 again." }
       ]
     },
     "2.47.0": {
