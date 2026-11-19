@@ -5,7 +5,7 @@ import { browseButton, registrySettingsBox } from './registry.js';
 import { channelItems, channelPage } from './channels.js';
 import { listDetail } from './listdetail.js';
 import { releaseList } from './releases.js';
-import { SETTINGS_SECTIONS, SIZE_LABEL, SMALL_MODE_LINK, loadModels, modelSelect, openAgent, plural } from './shared.js';
+import { SETTINGS_SECTIONS, SIZE_LABEL, SMALL_MODE_LINK, helpLink, loadModels, modelSelect, openAgent, plural } from './shared.js';
 import { globRe, markSaved, serverConfig, serverState, toolServiceEditor } from './tool-editor.js';
 import { renderUpdates } from './updates.js';
 /** Settings → Secrets (062: was its own tab). Redraws itself after a change. */
@@ -97,10 +97,13 @@ const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assis
 function updatesPage() { const box = h('div', {}); renderUpdates(box, { page: updatesCard }); return box; }
 function updatesCard(u, { line, check, reviewBtn, updateBtn, docker }) {
   const st = u.status || {}; const d = u.decision; const lr = st.lastResult;
-  const mode = h('select', { 'aria-label': 'Updates' }, ['notify', 'auto', 'off'].map((m) => h('option', { value: m, selected: u.settings.mode === m }, { notify: 'Notify me', auto: 'Install automatically', off: 'Off' }[m])));
-  const channel = h('select', { 'aria-label': 'Release channel' }, ['stable', 'main'].map((m) => h('option', { value: m, selected: u.settings.channel === m }, m === 'stable' ? 'Stable releases' : 'Latest (main)')));
-  const at = h('input', { value: u.settings.at, style: 'max-width:90px', 'aria-label': 'Time of day for automatic installs' });
-  const keep = h('input', { type: 'number', min: 1, max: 20, value: u.settings.keepPreUpdate ?? 3, style: 'max-width:70px', 'aria-label': 'Pre-update backups to keep' });
+  const mode = h('select', {}, ['notify', 'auto', 'off'].map((m) => h('option', { value: m, selected: u.settings.mode === m }, { notify: 'Notify me', auto: 'Install automatically', off: 'Off' }[m])));
+  const channel = h('select', {}, ['stable', 'main'].map((m) => h('option', { value: m, selected: u.settings.channel === m }, m === 'stable' ? 'Stable releases' : 'Latest (main)')));
+  const at = h('input', { type: 'time', value: u.settings.at, step: 60 });
+  const keep = h('input', { type: 'number', min: 1, max: 20, value: u.settings.keepPreUpdate ?? 3 });
+  // 085: each setting saves at once (one save model), with labels instead of a sentence with a field inside it
+  const saveSettings = () => tryApi(() => api('PUT', '/api/updates/settings', { mode: mode.value, channel: channel.value, at: at.value, keepPreUpdate: Number(keep.value) }), 'Saved');
+  for (const x of [mode, channel, at, keep]) x.addEventListener('change', saveSettings);
   const notes = d ? h('div', { class: 'small', style: 'margin-top:4px' }, d.steps.map((x) => `v${x.version}: ${x.title}`).join(' · '),
     d.snoozedUntil ? h('div', { class: 'muted' }, `Reminder snoozed until ${time(d.snoozedUntil)}`) : d.dismissed ? h('div', { class: 'muted' }, 'Dismissed: no more reminders for this release') : null)
     : st.available && st.notes?.length ? h('div', { class: 'small', style: 'margin-top:4px' }, `${plural(st.notes.length, 'release')} · newest: ${st.notes[0].title}`) : null;
@@ -110,9 +113,8 @@ function updatesCard(u, { line, check, reviewBtn, updateBtn, docker }) {
     lr ? h('p', { class: 'small muted' }, lr.ok ? `Last update: ${lr.from ? `${lr.from} → ` : ''}${lr.target} on ${time(lr.at)}${lr.backup ? ` · backup ${lr.backup}` : ''}` : `Last update failed on ${time(lr.at)}; the previous version kept running.`) : null,
     h('div', { class: 'row', style: 'margin-top:8px' }, reviewBtn, updateBtn, h('button', { class: 'btn small', onclick: check }, 'Check now'), h('a', { class: 'btn small ghost', href: '#settings/release-notes' }, 'Release notes')),
     h('div', { class: 'sblock' }, h('h3', {}, 'Settings'),
-      h('div', { class: 'row', style: 'margin-top:8px' }, mode, channel, at, h('button', { class: 'btn', onclick: () => tryApi(() => api('PUT', '/api/updates/settings', { mode: mode.value, channel: channel.value, at: at.value, keepPreUpdate: Number(keep.value) }), 'Saved') }, 'Save')),
-      h('p', { class: 'small muted' }, 'Automatic installs never cross a breaking release: you are asked first, here and on WhatsApp. ',
-        u.backup ? 'A local backup is made before every update; keep the last ' : 'Set a backup passphrase under Backups to get a local backup before every update; keep the last ', keep, ' pre-update backups.')),
+      h('div', { class: 'grid2' }, field('New versions', mode, 'Breaking releases always wait for your OK.'), field('Releases', channel), field('Install at', at), field('Backups before an update, keep', keep)),
+      u.backup ? null : h('p', { class: 'small muted' }, 'No backup is made before an update until a backup passphrase is set. ', h('a', { href: '#backups' }, 'Backups'))),
     sourceBlock(u.source),
     h('div', { class: 'sblock' }, h('button', { class: 'btn small', onclick: async () => (await ask({ title: 'Restart the service?', text: 'Agents pause for a few seconds; the page reloads by itself.', ok: 'Restart service', danger: true })) && api('POST', '/api/system/restart').catch(() => {}).then(() => { toast('Restarting…'); setTimeout(() => location.reload(), 6000); }) }, 'Restart service')));
 }
@@ -131,8 +133,7 @@ function sourceBlock(src) {
     h('p', { class: 'small' }, 'Updates come from ', where, src.official ? ' (the project).' : ` · not the project (${src.project}).`),
     h('div', { class: 'row', style: 'margin-top:8px' }, input, h('button', { class: 'btn', onclick: () => save(input.value.trim()) }, 'Change'),
       src.official ? null : h('button', { class: 'btn ghost', onclick: () => save(src.project) }, 'Use the project')),
-    h('p', { class: 'small muted' }, 'A fork or another GitHub repository: owner/name or its https address. The server maintenance helper keeps the source it was installed from; ',
-      h('code', {}, 'sudo duniya source owner/name'), ' moves both.'));
+    h('p', { class: 'small muted' }, 'A fork or another repository, as owner/name. ', helpLink('backups-and-updates.md#updates', 'Help: update source')));
 }
 
 // ---------- Settings → Server: Small server mode (055), one switch for heavier features on a small server ----------
@@ -666,20 +667,22 @@ function paceCard(st) {
   const custom = h('div', { class: `pace-grid${st.preset === 'custom' ? '' : ' hide'}` }, F.map(([k, l]) => h('div', {}, h('label', {}, l), inputs[k])));
   const line = h('p', { class: 'small', style: 'margin:8px 0 0' }, st.preset === 'custom' ? '' : paceLine(st));
   const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Pace' }, [['careful', 'Careful'], ['normal', 'Normal'], ['faster', 'Faster'], ['custom', 'Custom']].map(([v, l]) => h('button', { type: 'button', class: st.preset === v ? 'on' : '', 'aria-pressed': String(st.preset === v), disabled: !can('admin'),
-    onclick: (e) => { pick.preset = v; seg.querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === e.target); x.setAttribute('aria-pressed', String(x === e.target)); }); custom.classList.toggle('hide', v !== 'custom'); line.textContent = v === 'custom' ? '' : paceLine(st.presets[v]); } }, l)));
+    onclick: (e) => { pick.preset = v; seg.querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === e.target); x.setAttribute('aria-pressed', String(x === e.target)); }); custom.classList.toggle('hide', v !== 'custom'); saveBtn.classList.toggle('hide', v !== 'custom'); line.textContent = v === 'custom' ? '' : paceLine(st.presets[v]); if (v !== 'custom') save(); } }, l)));
   const save = async () => {
     const body = pick.preset === 'custom' ? { preset: 'custom', custom: Object.fromEntries(F.map(([k]) => [k, k.startsWith('hours') ? inputs[k].value : Number(inputs[k].value)])) } : { preset: pick.preset };
-    try { card.replaceWith(paceCard(await api('PUT', '/api/pace', body))); toast('Saved'); } catch (e) { fieldError(e, inputs); }
+    try { card.replaceWith(paceCard(await api('PUT', '/api/pace', body))); toast(body.preset === 'custom' ? 'Saved' : `Pace: ${body.preset[0].toUpperCase()}${body.preset.slice(1)}`); } catch (e) { fieldError(e, inputs); }
   };
+  // 085: a preset saves at once (one tap); only Custom has fields and a Save
+  const saveBtn = h('button', { class: `btn primary${st.preset === 'custom' ? '' : ' hide'}`, style: 'margin-top:12px', onclick: save }, 'Save');
   const t = st.today;
   const card = h('div', { class: 'card' }, h('h2', {}, 'Sending pace'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'How Duniya reads, types and sends on WhatsApp: at a person\'s pace, with natural variation.'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Duniya reads, types and sends at a person\'s pace. ', helpLink('sending-pace.md')),
     h('label', { class: 'inline' }, toggle(st.readReceipts, (v) => tryApi(() => api('PUT', '/api/pace', { readReceipts: v }), v ? 'Read receipts on' : 'Read receipts off'), !can('admin'), 'Read receipts'),
       h('b', {}, 'Read receipts: mark messages in chats that are on as read')),
-    h('div', { class: 'small muted', style: 'margin:4px 0 12px' }, 'Blue ticks after the read delay, also for messages the agent leaves alone. Chats that are off are never touched; Telegram has no read receipts.'),
+    h('div', { class: 'small muted', style: 'margin:4px 0 12px' }, 'Chats that are off are never marked as read.'),
     seg, line, custom,
-    can('admin') ? h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: save }, 'Save') : null,
-    h('p', { class: 'small muted', style: 'margin-bottom:0' }, `Today: ${t.used} of ${t.cap} new chats${t.warmup ? ' (a newly linked number starts lower and grows over a week)' : ''}. Replies type for at most 8 seconds. Sending to ${st.example.count} people would take about ${st.example.days > 1 ? `${st.example.days} days` : `${Math.round(st.example.minutes / 6) / 10} hours`} at this pace; hours are in ${st.timezone}.`));
+    can('admin') ? saveBtn : null,
+    h('p', { class: 'small muted', style: 'margin-bottom:0' }, `Today: ${t.used} of ${t.cap} new chats${t.warmup ? ' (a new number starts lower for a week)' : ''} · ${st.example.count} people take about ${st.example.days > 1 ? `${st.example.days} days` : `${Math.round(st.example.minutes / 6) / 10} hours`} · hours in ${st.timezone}`));
   return card;
 }
 
@@ -689,12 +692,12 @@ function modulesCard(st) {
     on ? `${m.label} on` : `${m.label} off · data kept`);
   const methods = h('textarea', { rows: 3, value: (st.methods || []).join('\n'), 'aria-label': 'Ways to pay, one per line', disabled: !can('admin') });
   const card = h('div', { class: 'card' }, h('h2', {}, 'Modules'),
-    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Built-in features on top of People. Switch one on and agents get its tools; switch it off and its tools and pages go, its data stays.'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'Features on top of People. Off hides them; their data stays. ', helpLink('modules.md')),
     h('ul', { class: 'people-list' }, st.modules.map((m) => h('li', { class: 'has-end' }, h(m.on ? 'a' : 'div', { class: 'lrow', href: m.on ? `#people/${m.id}` : null },
       h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, m.label), h('span', { class: 'lrow-sub' }, `${m.line}${m.on && m.memoryMb !== null ? ` · about ${m.memoryMb} MB` : ''}`))),
     h('span', { class: 'row-end' }, toggle(m.on, (v) => flip(m, v), !can('admin'), m.label))))),
-    st.methods ? h('div', { class: 'sblock' }, h('h3', {}, 'Ways to pay'), field('One per line', methods, 'Payments are recorded with one of these. Duniya never takes money.'),
-      can('admin') ? h('button', { class: 'btn', style: 'margin-top:8px', onclick: () => tryApi(() => api('PUT', '/api/orders/methods', { methods: methods.value.split('\n') }), 'Saved') }, 'Save') : null) : null);
+    st.methods ? h('div', { class: 'sblock' }, h('h3', {}, 'Ways to pay'), field('One per line', methods, 'Duniya records payments; it never takes money.'),
+      can('admin') ? h('button', { class: 'btn', style: 'margin-top:8px', onclick: () => tryApi(() => api('PUT', '/api/orders/methods', { methods: methods.value.split('\n') }), 'Saved') }, 'Save ways to pay') : null) : null);
   return card;
 }
 

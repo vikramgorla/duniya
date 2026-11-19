@@ -212,7 +212,9 @@ export function runPage(id, status = '') {
 /** A run's state and counts (campaign steps). */
 export const runSummary = (id) => { const r = runRow(id); return r ? { id: r.id, status: r.status, reason: r.reason, wait: r.wait, counts: counts(r.id) } : null; };
 /** History: the newest 50 runs (drafts left out). */
-export const listRuns = () => db.prepare("SELECT * FROM snd_runs WHERE tenant_id = ? AND status <> 'draft' ORDER BY created_at DESC LIMIT 50").all(TENANT).map(runView);
+/** The last 50 runs, newest first, with the survey each carries (085: an event's and a survey's pages link to them). */
+export const listRuns = () => db.prepare(`SELECT r.*, v.survey FROM snd_runs r LEFT JOIN snd_run_surveys v ON v.tenant_id = r.tenant_id AND v.run = r.id
+  WHERE r.tenant_id = ? AND r.status <> 'draft' ORDER BY r.created_at DESC LIMIT 50`).all(TENANT).map((r) => ({ ...runView(r), survey: r.survey || '' }));
 
 // ---------- saved audiences ----------
 export const listFilters = () => db.prepare('SELECT id, name, audience FROM snd_filters WHERE tenant_id = ? ORDER BY lower(name)').all(TENANT)
@@ -392,7 +394,7 @@ function personSections(person) {
   const rows = db.prepare(`SELECT r.status, r.at, s.id, s.title FROM snd_recipients r INDEXED BY snd_recipients_person JOIN snd_runs s ON s.tenant_id = r.tenant_id AND s.id = r.run
     WHERE r.tenant_id = ? AND r.person = ? AND s.status <> 'draft' ORDER BY r.at DESC LIMIT 10`).all(TENANT, person);
   const word2 = { sent: 'sent', replied: 'replied', stop: 'said stop', skipped: 'skipped', failed: 'failed', waiting: 'waiting', sending: 'sending' };
-  return rows.length ? [{ title: 'Messages from lists', rows: rows.map((r) => ({ name: r.title, sub: `${word2[r.status] || r.status}${r.at ? ` · ${new Date(r.at).toISOString().slice(0, 10)}` : ''}`, href: `#people/sending/${r.id}` })) }] : [];
+  return rows.length ? [{ title: 'Messages from lists', rows: rows.map((r) => ({ name: r.title, sub: [word2[r.status] || r.status, r.at ? { day: r.at } : ''].filter(Boolean), href: `#people/sending/${r.id}` })) }] : [];
 }
 /** An organizer confirmed a run an agent prepared. */
 function apply(action, agent) {

@@ -3,7 +3,7 @@
 // panel user, so role gates, validation and activity logging are exactly the panel's. `calls` names the routes a
 // tool uses: the minimum role to see and run the tool is the highest role those routes require.
 // Risky tools never run directly: they return a plain-language preview and a confirm code for confirm_action.
-import { fail } from '../core/config.js';
+import { fail, money } from '../core/config.js';
 /** 065: version a is not newer than b ("2.9.0" vs "v2.10.0"). */
 const notAfter = (a, b) => { const [x, y] = [a, b].map((v) => String(v).replace(/^v/, '').split('.').map(Number)); const i = x.findIndex((n, k) => n !== y[k]); return i < 0 || x[i] < y[i]; };
 const iso = (ts) => (ts ? new Date(ts).toISOString() : null);
@@ -413,7 +413,7 @@ export const TOOLS = [
   { name: 'record_payment', risky: true, calls: [['GET', '/api/orders/x'], ['POST', '/api/orders/x/payments']],
     description: 'Record a payment for an order (amount, default: what is left; method from the owner\'s payment methods; date), or a refund (refund: true; default: all that was paid). Duniya records payments; it never takes money. Needs confirm_action.',
     input: { order: str('Order id'), amount: { type: 'number', description: 'Amount, e.g. 25 or 12.50' }, method: str('Payment method'), at: str('Date (default today)'), refund: bool('Money given back') }, required: ['order'],
-    preview: async (a, x) => { const o = await x.call('GET', `/api/orders/${enc(a.order)}`); return `Record a ${a.refund ? 'refund' : 'payment'} of ${a.amount ?? ((a.refund ? o.paid : o.left) / 100).toFixed(2)} ${o.currency} for ${o.who} (${o.title})${a.method ? `, ${a.method}` : ''}.`; },
+    preview: async (a, x) => { const o = await x.call('GET', `/api/orders/${enc(a.order)}`); return `Record a ${a.refund ? 'refund' : 'payment'} of ${money(a.amount != null ? Math.round(a.amount * 100) : a.refund ? o.paid : o.left, o.currency)} for ${o.who} (${o.title})${a.method ? `, ${a.method}` : ''}.`; },
     run: (a, x) => x.call('POST', `/api/orders/${enc(a.order)}/payments`, { amount: a.amount, method: a.method, at: a.at, refund: !!a.refund }) },
   { name: 'set_payment_methods', calls: [['PUT', '/api/orders/methods']],
     description: 'Replace the owner\'s list of payment methods (e.g. ["Cash", "Bank transfer", "TWINT"]). Payments use one of these.',

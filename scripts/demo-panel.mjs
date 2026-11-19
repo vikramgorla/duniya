@@ -422,6 +422,12 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   om.addPayment(charyOrder.id, { amount: 30, method: 'Cash' }, 'admin');
   om.addPayment(om.listOrders({ status: 'open', event: sank.id }).find((o) => o.household === font.id).id, { method: 'Bank transfer' }, 'admin');
   om.addPayment(om.listOrders({ status: 'open', event: sank.id }).find((o) => o.person === pid[7]).id, { method: 'Instant online payment' }, 'admin');
+  // 085: a past event with attendance (Events → Past; "5 came" on its page)
+  const past = new Date(now - 26 * 86400000).toISOString().slice(0, 10);
+  const diwali = evm.saveEvent({ name: 'Diwali dinner', starts: past, place: 'Ravi & Priya’s, Morges', capacity: 0, per: 'household', confirm: 'auto' }, 'admin').event;
+  for (const [reg, came] of [[{ household: chary.id }, true], [{ household: font.id }, true], [{ person: pid[6], adults: 2, kids: 2 }, true], [{ person: pid[7] }, false]]) {
+    const r = evm.register({ event: diwali.id, ...reg }, { by: 'admin' }); if (came) evm.updateRegistration(r.id, { attended: true }, 'admin');
+  }
   om.createOrder({ person: pid[9], title: 'Club T-shirts', lines: [{ item: 'T-shirt', qty: 2, price: 18 }], due: new Date(now - 6 * 86400000).toISOString().slice(0, 10) }, 'admin');
   db.addPending({ code: 'K7Q2', agent: 'carpool', server: 'calendar', confirmTool: 'confirm', confirmId: 'cf_demo_1', tool: 'events_create', chat: G(3), requester: P(2), summary: 'Add “Friday ride: Marc 07:40 Morges → Geneva” to the shared calendar', expires: now + 50 * MIN });
 
@@ -555,8 +561,11 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   cmp.startCampaign(cp.campaign.id, 'admin');
   const firstRun = db.db.prepare("SELECT id FROM snd_runs WHERE title LIKE 'Payment reminder:%' ORDER BY created_at DESC LIMIT 1").get();
   db.db.prepare("UPDATE snd_runs SET status = 'done', finished_at = ? WHERE id = ?").run(now - 3 * D, firstRun.id);
+  db.db.prepare("UPDATE snd_recipients SET status = 'sent', text = ?, at = ? WHERE run = ? AND status = 'waiting'").run('Hi, a friendly reminder about Sankranti.', now - 3 * D, firstRun.id); // 085: a finished step has nobody waiting
   db.db.prepare('INSERT INTO snd_campaign_runs (tenant_id, campaign, step, run) VALUES (?, ?, 0, ?)').run('default', cp.campaign.id, firstRun.id);
   db.db.prepare('UPDATE snd_campaigns SET step = 1, step_at = ? WHERE id = ?').run(now - 3 * D, cp.campaign.id);
+  // 085: a message still going out (Sending: "Sending", people in the queue), carrying the picnic survey
+  await seedRun({ title: 'Summer picnic: which Sunday?', audience: { kind: 'list', list: bad.id }, survey: pic2.id, template: 'Hi {first_name}, three quick questions about {survey}: answer here in the chat.' }, ['replied', 'sent'], false);
   // #91: Chats shows "Loaded 12 earlier messages" (rides) and "Loading recent messages from your phone…" (Family)
   prefs.noteLatestKeys([2, 5, 6, 7].map((n) => ({ chat: G(n), isGroup: true, msgId: `last-${n}`, participant: `${P(n)}@s.whatsapp.net`, ts: now - n * H })));
   const phoneHistory = await imp('src/core/history-load.js');

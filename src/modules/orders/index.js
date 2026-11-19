@@ -14,7 +14,7 @@
 //     confirms) or, per event, automatically N days before the due date (the owner's switch is the confirmation).
 import { randomBytes } from 'node:crypto';
 import { db, kvGet, kvSet } from '../../core/db.js';
-import { fail, plural } from '../../core/config.js';
+import { fail, money, plural } from '../../core/config.js';
 import { TENANT, getSetting, updateSettings } from '../../core/store.js';
 import { activity } from '../../core/events.js';
 import { addEvent, getHousehold, householdsOf, personRow } from '../../core/people.js';
@@ -49,8 +49,6 @@ const clean = (v, n = 120) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(
 const today = () => new Date().toISOString().slice(0, 10);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 export const STATUS_WORD = { open: 'open', part: 'part paid', paid: 'paid', refunded: 'refunded', cancelled: 'cancelled' };
-/** "CHF 25.00" */
-export const money = (cents, cur) => `${cur} ${(Number(cents || 0) / 100).toFixed(2)}`;
 const cents = (v, field) => {
   const n = Math.round(Number(String(v ?? '').replace(',', '.')) * 100);
   if (!Number.isFinite(n) || Math.abs(n) > 1e9) throw fail('Give an amount, e.g. 25 or 12.50', 400, { field });
@@ -252,7 +250,9 @@ function onRegistration(reg) {
 }
 
 // ---------- pages, reminders ----------
-const orderRows = (list) => list.map((o) => ({ name: `${o.title}: ${money(o.total, o.currency)}`, sub: `${STATUS_WORD[o.status]}${o.left && o.status !== 'cancelled' ? ` · ${money(o.left, o.currency)} left` : ''}${o.due ? ` · due ${o.due}` : ''}`, href: `#people/orders/${o.id}` }));
+// 085: the panel formats the due day ({ day }) in the reader's locale
+const orderRows = (list) => list.map((o) => ({ name: `${o.title}: ${money(o.total, o.currency)}`, href: `#people/orders/${o.id}`,
+  sub: [o.overdue ? 'overdue' : STATUS_WORD[o.status], o.left && o.status !== 'cancelled' ? `${money(o.left, o.currency)} left` : '', o.due ? { day: o.due, before: o.overdue ? 'was due' : 'due' } : ''].filter(Boolean) }));
 function personSections(person) {
   const hs = householdsOf(person).map((h) => h.id);
   const mine = db.prepare('SELECT * FROM ord_orders INDEXED BY ord_orders_person WHERE tenant_id = ? AND person = ? ORDER BY created_at DESC LIMIT 20').all(TENANT, person);

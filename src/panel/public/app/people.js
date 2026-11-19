@@ -1,10 +1,12 @@
 // People (078, PRM core): the list, a person's page, and the People · Households · Lists switch. Households and Lists
 // load from people-groups.js. Module of the panel (063). Text from WhatsApp or people is built from text nodes.
 import { $, S, ago, api, ask, avatar, can, emptyState, field, h, icon, menu, tryApi } from './core.js';
-import { helpLink } from './shared.js';
+import { day, helpLink, phone } from './shared.js';
 import { tagInput } from './tags.js';
 let query = ''; let filter = '';
 const PAGE = 100;
+/** "2015-04-23" → "23 Apr 2015", "--04-23" (no year) → "23 Apr" (085). */
+const birthday = (b) => { const m = /^(\d{4}|-)-?(\d{2})-(\d{2})$/.exec(b); return m ? new Date(m[1] === '-' ? 2000 : Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: m[1] === '-' ? undefined : 'numeric' }) : b; };
 const APPS = { whatsapp: 'WhatsApp', telegram: 'Telegram' };
 const enc = encodeURIComponent;
 const personHref = (id) => `#people/${enc(id)}`;
@@ -26,7 +28,7 @@ export function pickPerson(label, exclude = '') {
   input.oninput = () => { chosen = ''; who.textContent = ''; clearTimeout(timer); timer = setTimeout(async () => {
     const list = input.value.trim() ? await api('GET', `/api/people?q=${enc(input.value)}&limit=7`).catch(() => []) : [];
     hits.replaceChildren(...list.filter((p) => p.id !== exclude).slice(0, 6).map((p) => h('button', { type: 'button', class: 'btn small', onclick: () => {
-      chosen = p.id; input.value = p.name; who.textContent = `Chosen: ${p.name}${p.phone ? ` · +${p.phone}` : ''}`; hits.replaceChildren();
+      chosen = p.id; input.value = p.name; who.textContent = `Chosen: ${p.name}${p.phone ? ` · ${phone(p.phone)}` : ''}`; hits.replaceChildren();
     } }, p.name)), input.value.trim() && !list.length ? h('span', { class: 'small muted' }, 'Nobody in People matches.') : null);
   }, 250); };
   return { el: field(label, h('div', {}, input, hits, who)), value: () => chosen };
@@ -42,7 +44,7 @@ export async function renderPeople() {
   const [k, v] = filter.split(':');
   const page = (offset) => api('GET', `/api/people?q=${enc(query)}&${k ? `${k}=${enc(v)}&` : ''}limit=${PAGE}&offset=${offset}`);
   const [list, sum] = await Promise.all([page(0), api('GET', '/api/people/summary').catch(() => null)]);
-  const search = h('input', { type: 'search', placeholder: 'Search name, number, tag or note', 'aria-label': 'Search people', value: query });
+  const search = h('input', { type: 'search', placeholder: 'Search people', 'aria-label': 'Search people by name, number, tag or note', title: 'Name, number, tag or note', value: query });
   let timer; search.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { query = search.value; renderPeople().then(() => { const i = $('#main input[type=search]'); i?.focus(); i?.setSelectionRange(i.value.length, i.value.length); }); }, 250); };
   const opt = (value, label) => h('option', { value, selected: value === filter }, label);
   const pick = h('select', { 'aria-label': 'Show', onchange: () => { filter = pick.value; renderPeople(); } }, opt('', 'Everyone'),
@@ -78,8 +80,10 @@ export async function renderPeople() {
 }
 
 /** 081: what the modules that are on add to a person's, household's or event's page: titled groups of link rows. */
+// 085: a row's line may be parts, days among them ({ day, before }), formatted here in the reader's locale
+const subLine = (sub) => (Array.isArray(sub) ? sub.map((x) => (typeof x === 'string' ? x : `${x.before ? `${x.before} ` : ''}${day(x.day, true)}`)).join(' · ') : sub);
 export const moduleBlocks = (sections = []) => sections.map((s) => h('div', { class: 'lgroup' }, h('div', { class: 'eyebrow' }, s.title), h('ul', {}, s.rows.map((r) => h('li', {},
-  h('a', { class: 'lrow', href: r.href || null }, h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, r.name), r.sub ? h('span', { class: 'lrow-sub' }, r.sub) : null), r.href ? h('span', { class: 'chev', 'aria-hidden': 'true' }, '›') : null))))));
+  h('a', { class: 'lrow', href: r.href || null }, h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, r.name), r.sub ? h('span', { class: 'lrow-sub' }, subLine(r.sub)) : null), r.href ? h('span', { class: 'chev', 'aria-hidden': 'true' }, '›') : null))))));
 /** Save something on a person and draw the page again. */
 const act = (ref, fn, ok) => tryApi(fn, ok).then((r) => { if (r !== false) renderPerson(ref); return r; });
 const block = (title, help, ...kids) => h('div', { class: 'lgroup' }, h('div', { class: 'eyebrow' }, title, help ? [' ', helpLink(help)] : null), kids);
@@ -107,13 +111,13 @@ async function renderPerson(ref) {
   if (p.notInPeople) {
     const addThem = () => act(ref, () => api('POST', '/api/people', { name: p.name.startsWith('+') ? '' : p.name, phone: p.phone }), 'Added to People');
     $('#main').replaceChildren(h('div', { class: 'card person-page' }, back, h('div', { class: 'ap-head' }, avatar(p.name, p.phone, 'l'),
-      h('div', { class: 'ap-title' }, h('h2', { tabindex: '-1' }, p.name), h('div', { class: 'small muted num' }, `+${p.phone} · not in People`))),
+      h('div', { class: 'ap-title' }, h('h2', { tabindex: '-1' }, p.name), h('div', { class: 'small muted num' }, `${phone(p.phone)} · not in People`))),
     h('p', { class: 'small muted' }, 'People are added when they write in a chat that is on.', ' ', h('button', { class: 'btn small', onclick: addThem }, 'Add to People')), chats));
     return;
   }
   const edit = async () => {
     const F = { name: h('input', { value: p.ownName || '', placeholder: p.name, autocomplete: 'off' }), nickname: h('input', { value: p.nickname, autocomplete: 'off' }),
-      phone: h('input', { value: p.phone ? `+${p.phone}` : '', inputmode: 'tel', autocomplete: 'off' }), birthday: h('input', { value: p.birthday, placeholder: '2015-04-23 or --04-23', autocomplete: 'off' }),
+      phone: h('input', { value: p.phone ? phone(p.phone) : '', inputmode: 'tel', autocomplete: 'off' }), birthday: h('input', { value: p.birthday, placeholder: '2015-04-23 or --04-23', autocomplete: 'off' }),
       shared: h('input', { type: 'checkbox', checked: p.shared }) };
     if (!await ask({ title: `Edit ${p.name}`, ok: 'Save', body: [field('Name', F.name, 'Empty: the name from their apps.'), field('Nickname', F.nickname), field('Number', F.phone), field('Birthday', F.birthday),
       h('label', { class: 'tick' }, F.shared, ' Shared: participants may look them up through agents')] })) return;
@@ -176,7 +180,7 @@ async function renderPerson(ref) {
   const entry = (n) => h('li', { class: `tl ${n.kind}` }, h('div', {}, n.kind === 'event' ? h('span', { class: 'muted' }, n.text) : n.text),
     h('div', { class: 'small muted' }, [n.kind === 'event' ? '' : n.by === 'agent' ? 'Agent' : n.author || 'Owner', `${ago(n.at)} ago`].filter(Boolean).join(' · '),
       n.kind === 'note' ? [' ', x('Delete note', () => act(p.id, () => api('DELETE', `/api/people/${p.id}/notes/${n.id}`), 'Note deleted'))] : null));
-  const facts = [p.phone ? `+${p.phone}` : '', p.apps.map((a) => APPS[a] || a).join(' · ') || (p.reachVia.length ? `No app · reached through ${p.reachVia.map((r) => r.name).join(', ')}` : 'No app: agents never message them'), p.nickname ? `“${p.nickname}”` : ''].filter(Boolean).join(' · ');
+  const facts = [p.phone ? phone(p.phone) : '', p.apps.map((a) => APPS[a] || a).join(' · ') || (p.reachVia.length ? `No app · reached through ${p.reachVia.map((r) => r.name).join(', ')}` : 'No app: agents never message them'), p.nickname ? `“${p.nickname}”` : ''].filter(Boolean).join(' · ');
   $('#main').replaceChildren(h('div', { class: 'card person-page' }, back,
     h('div', { class: 'ap-head' }, avatar(p.name, p.id, 'l'),
       h('div', { class: 'ap-title' }, h('h2', { tabindex: '-1' }, p.name), h('div', { class: 'small muted num' }, facts)),
@@ -185,7 +189,7 @@ async function renderPerson(ref) {
         owner ? h('button', { class: 'btn small', type: 'button', onclick: exportIt }, 'Export') : null,
         p.hidden ? h('button', { class: 'btn small', type: 'button', onclick: showAgain }, 'Show again') : h('button', { class: 'btn small', type: 'button', onclick: hide }, 'Hide…'))),
     p.hidden ? h('p', { class: 'note' }, 'Hidden: not in People lists, search or agents. ', h('button', { class: 'qfix', type: 'button', onclick: showAgain }, 'Show again')) : null,
-    h('p', { class: 'small muted', style: 'margin:6px 0 0' }, [p.birthday ? `Birthday ${p.birthday.replace(/^--/, '')}` : '', p.shared ? 'Shared with participants' : '', `In People since ${new Date(p.createdAt).toLocaleDateString()}`,
+    h('p', { class: 'small muted', style: 'margin:6px 0 0' }, [p.birthday ? `Birthday ${birthday(p.birthday)}` : '', p.shared ? 'Shared with participants' : '', `In People since ${day(p.createdAt)}`,
       p.lastContact ? `last contact ${ago(p.lastContact)} ago` : '', p.source === 'phone' ? 'from your phone’s contacts' : ''].filter(Boolean).join(' · ')),
     owner && p.suggestions.map((s) => h('p', { class: 'note' }, `${s.reason} as ${s.name}. `, h('button', { class: 'qfix', type: 'button', onclick: () => merge(s.id, s.name) }, `Merge ${s.name} into ${p.name}`))),
     owner && p.merges.map((m) => h('p', { class: 'small muted' }, `Merged with ${m.name} ${ago(m.at)} ago. `, h('button', { class: 'qfix', type: 'button', onclick: () => act(p.id, () => api('POST', `/api/people/merges/${m.id}/undo`), 'Merge undone') }, 'Undo merge'))),
@@ -208,6 +212,6 @@ async function renderPerson(ref) {
       h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, a.name), h('span', { class: 'lrow-sub' }, a.why)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))))
       : h('p', { class: 'small muted lempty' }, p.hidden ? 'None while they are hidden.' : 'None: agents see the people of their own chats, or everyone when you choose that for an agent.')),
     p.identities.length ? block('Apps', '', h('ul', { class: 'mini-list' }, p.identities.map((i) => h('li', { class: 'small', style: 'padding:6px 10px' },
-      `${APPS[i.channel] || i.channel}${i.name ? ` · ${i.name}` : ''}${i.phone ? ` · +${i.phone}` : ''} · since ${new Date(i.firstSeen).toLocaleDateString()}`)))) : null));
+      `${APPS[i.channel] || i.channel}${i.name ? ` · ${i.name}` : ''}${i.phone ? ` · ${phone(i.phone)}` : ''} · since ${day(i.firstSeen)}`)))) : null));
   $('#main h2')?.focus({ preventScroll: true });
 }

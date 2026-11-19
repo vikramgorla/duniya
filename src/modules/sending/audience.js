@@ -8,7 +8,7 @@
 // and the facts their message may use (from People and the modules, never invented) — or the reason it is skipped:
 // hidden, no consent for the purpose (unknown = no), no app, their chat switched off.
 import { db } from '../../core/db.js';
-import { clip, fail, plural } from '../../core/config.js';
+import { clip, fail, money, plural } from '../../core/config.js';
 import { TENANT } from '../../core/store.js';
 import { getHousehold, householdsOf, personRow } from '../../core/people.js';
 import { chatsOfPerson, consentsOf } from '../../core/people-access.js';
@@ -72,7 +72,7 @@ async function units(a) {
     : db.prepare("SELECT person, household, currency, SUM(total - paid) AS left, MIN(due) AS due FROM ord_orders INDEXED BY ord_orders_status WHERE tenant_id = ? AND status IN ('open', 'part') GROUP BY person, household, currency LIMIT ?").all(TENANT, MAX);
   const ways = om.paymentMethods().join(', ');
   return rows.filter((r) => r.left > 0).map((r) => ({ person: r.household ? '' : r.person, household: r.household,
-    facts: { ...evFacts, amount: om.money(r.left, r.currency), due: day(r.due), ways_to_pay: ways } }));
+    facts: { ...evFacts, amount: money(r.left, r.currency), due: day(r.due), ways_to_pay: ways } }));
 }
 
 /** Where a person gets a message: their Telegram chat when they have one, else WhatsApp; and whether they wrote there. */
