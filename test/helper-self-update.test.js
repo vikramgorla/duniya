@@ -17,7 +17,7 @@ const BUNDLED = Number(helperText.match(/^# duniya-ops-version: (\d+)$/m)[1]);
 const sh = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: 'pipe', encoding: 'utf8', ...opts });
 const git = (dir, ...args) => sh('git', ['-C', dir, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...args]);
 
-// ---------- a fake "official repository": releases with their deploy/ops files ----------
+// ---------- a fake upstream repository: releases with their deploy/ops files ----------
 const base = mkdtempSync(join(tmpdir(), 'duniya-helper-'));
 const work = join(base, 'work');
 const bare = join(base, 'bare.git');

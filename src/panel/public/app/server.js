@@ -149,8 +149,8 @@ export async function renderServer() {
     const helperDoc = h('a', { href: docsUrl('upgrading.md#the-maintenance-helper'), target: '_blank', rel: 'noopener' }, 'how to reinstall');
     const oldHelper = !ops?.available || !(ops.helperOutdated || !ops.helperCurrent) ? null
       : ops.helperSelfUpdate ? h('div', { class: 'note info', id: 'helper-update', style: 'margin-top:10px' },
-        h('b', {}, 'A newer maintenance helper comes with this release'), ` (version ${ops.helperVersion} → ${ops.helperBundled}). It normally updates itself after an app update; if that did not happen, update it here. It is downloaded from the official repository by the server itself.`,
-        h('div', { class: 'row', style: 'margin-top:8px' }, act('update-helper', 'Update maintenance helper', 'primary', { title: 'Update the maintenance helper?', text: 'The server downloads the root maintenance helper of this release from the official repository. Agents keep running.' })))
+        h('b', {}, 'A newer maintenance helper comes with this release'), ` (version ${ops.helperVersion} → ${ops.helperBundled}). It normally updates itself after an app update; if that did not happen, update it here. It is downloaded by the server itself from the repository it was installed from.`,
+        h('div', { class: 'row', style: 'margin-top:8px' }, act('update-helper', 'Update maintenance helper', 'primary', { title: 'Update the maintenance helper?', text: 'The server downloads the root maintenance helper of this release from the repository it was installed from. Agents keep running.' })))
         : h('div', { class: 'note info', id: 'helper-update', style: 'margin-top:10px' },
           h('b', {}, 'This server has an older maintenance helper'), ' that cannot update itself yet. Run ', h('code', {}, 'sudo duniya update'),
           ' on the server once; after that it updates itself from here. No SSH access (for example an Oracle server created without an SSH key)? Reinstall instead: ', helperDoc, ' (your data comes back from a backup).');
