@@ -94,7 +94,7 @@ const STATES = [
   // 061: the install hint without the browser's install prompt (iPhone, Firefox): the manual steps instead of a button
   { name: 'overview-install-steps', hash: 'overview', js: "S.installPrompt = null; localStorage.removeItem('duniya.installHint'); show(S.tab); await T.wait(300);" },
   // 062: Getting started, each step open in place (as on a fresh install), and the closing card
-  ...['provider', 'agent', 'chat', 'reply'].map((step) => ({ name: `overview-start-${step}`, hash: 'overview', checklist: fakeChecklist(step), wait: 2000 })),
+  ...['whatsapp', 'provider', 'agent', 'chat', 'reply'].map((step) => ({ name: `overview-start-${step}`, hash: 'overview', checklist: fakeChecklist(step), wait: 2000 })),
   { name: 'overview-start-done', hash: 'overview', checklist: fakeChecklist('', { done: true }), wait: 2000 },
   // 062: Find anything (/ or ⌘K), empty and with a query
   { name: 'find', hash: 'overview', js: 'await openFind(); await T.wait(600);' },
