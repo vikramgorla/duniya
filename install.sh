@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Duniya installer — install or update on Ubuntu/Debian (x86_64, arm64).
 #
-#   curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/vikramgorla/duniya/main/install.sh | sudo bash
 #   curl -fsSL …/install.sh | sudo bash -s -- --ip-https --yes
 #
 # Panel exposure (pick one; asked interactively if omitted):
@@ -24,7 +24,7 @@
 set -euo pipefail
 
 # 084: the project's repository, kept in step with package.json by `npm run repo:sync` (never edit it by hand).
-DEFAULT_REPO="https://github.com/vikramgorla/whatsapp-agent-duniya.git"
+DEFAULT_REPO="https://github.com/vikramgorla/duniya.git"
 REPO=""
 BRANCH="main"
 EXPOSURE=""

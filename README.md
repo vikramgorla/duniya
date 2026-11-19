@@ -7,9 +7,9 @@
 <p align="center"><b>AI agents for your WhatsApp and Telegram groups and chats, on your own free server, run from a calm web panel.</b></p>
 
 <p align="center">
-  <a href="https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/duniya.zip"><img src="https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg" alt="Deploy to Oracle Cloud" height="32"></a>
-  <a href="https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fwhatsapp-agent-duniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md"><img src="https://gstatic.com/cloudssh/images/open-btn.svg" alt="Open in Cloud Shell" height="32"></a>
-  <a href="https://vikramgorla.github.io/whatsapp-agent-duniya/"><img src="docs/img/btn-website.svg" alt="See the website" height="32"></a>
+  <a href="https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/duniya/releases/latest/download/duniya.zip"><img src="https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg" alt="Deploy to Oracle Cloud" height="32"></a>
+  <a href="https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fduniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md"><img src="https://gstatic.com/cloudssh/images/open-btn.svg" alt="Open in Cloud Shell" height="32"></a>
+  <a href="https://vikramgorla.github.io/duniya/"><img src="docs/img/btn-website.svg" alt="See the website" height="32"></a>
 </p>
 
 <p align="center">
@@ -30,7 +30,7 @@ silent until you switch it on.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/vikramgorla/duniya/main/install.sh | sudo bash
 ```
 
 Any Ubuntu/Debian server with 1 GB of memory, or one click on Oracle Cloud or Google Cloud (free tiers), or
