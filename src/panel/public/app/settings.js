@@ -120,7 +120,7 @@ function updatesCard(u, { line, check, reviewBtn, updateBtn, docker }) {
 /** 084: where updates come from (the checkout's git source): the project, a fork or another repository; changeable. */
 function sourceBlock(src) {
   if (!src) return null;
-  const input = h('input', { value: src.repo || '', placeholder: 'owner/name', 'aria-label': 'Update source (owner/name or GitHub address)', style: 'max-width:280px', autocomplete: 'off', spellcheck: 'false' });
+  const input = h('input', { value: src.repo || '', placeholder: 'owner/name', 'aria-label': 'Update source (owner/name or GitHub address)', style: 'max-width:340px', autocomplete: 'off', spellcheck: 'false' });
   const where = src.repo ? extLink(`https://github.com/${src.repo}`, src.repo, '') : h('code', {}, src.url || 'unknown');
   const save = async (repo) => {
     if (!repo || repo === src.repo) return;
