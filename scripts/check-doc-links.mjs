@@ -10,7 +10,7 @@ import { parseRepo } from '../src/core/repo.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // 084: links into this repository, whatever its slug (package.json `repository`)
-const SLUG = String(parseRepo(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).repository)?.slug).replace(/[.]/g, '\\.');
+const SLUG = String(parseRepo(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).repository)?.slug).replace(/[\\^$.*+?()[\]{}|/-]/g, '\\$&');
 const BLOB = new RegExp(`https://github\\.com/${SLUG}/(?:blob|tree)/main/([^\\s"'\`)<>]+)`, 'gi');
 
 /** Remove fenced and inline code so example links inside code are not checked. */
