@@ -29,10 +29,11 @@ async function checklist(channel) {
   const first = pick?.id || '';
   const skipped = new Set(getSetting('checklistSkipped', null) || []);
   const steps = [
-    { id: 'whatsapp', title: 'Link your WhatsApp number', done: numbers.some((n) => n.status === 'open'), href: '#settings/whatsapp',
-      hint: 'Use the phone of the number your agents answer from (best a number just for them). Duniya links like WhatsApp on a computer.' },
+    // 086: Telegram alone is a start too (a bot connected counts)
+    { id: 'whatsapp', title: 'Link WhatsApp (or Telegram)', done: numbers.some((n) => n.status === 'open') || (ch?.channels || []).some((c) => c.id !== 'whatsapp' && c.connected > 0), href: '#settings/whatsapp',
+      hint: 'Scan the QR code with the phone of the number your agents will use (best a spare one), like WhatsApp on a computer.' },
     { id: 'provider', title: 'Connect an AI model', done: providers.some((p) => p.connected), href: '#models',
-      hint: 'Agents need a model to think with. Paste a key, or start free with OpenRouter.' },
+      hint: 'Agents need a model to think with. The quickest free start: a free OpenRouter key, pasted here.' },
     { id: 'agent', title: 'Create your first agent', done: agents.length > 0, href: '#agents', hint: 'Pick a template or describe it in your own words; you can change everything later.' },
     { id: 'chat', title: 'Switch a chat on', done: agents.some((a) => a.chats.some((c) => on.has(c))), href: '#chats',
       hint: 'Every chat starts Off, so agents stay silent. Choose the group your agent should answer in.' },
