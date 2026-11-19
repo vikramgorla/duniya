@@ -3,7 +3,7 @@
 **The panel on your own domain with no open ports on the server.**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash -s -- --cloudflare-token <token>
+curl -fsSL https://raw.githubusercontent.com/vikramgorla/duniya/main/install.sh | sudo bash -s -- --cloudflare-token <token>
 ```
 
 **In 30 seconds**

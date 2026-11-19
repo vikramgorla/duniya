@@ -33,7 +33,7 @@ set -euo pipefail
 
 PROJECT=""; REGION="us-central1"; ZONE=""; NAME="duniya"; DOMAIN=""; ADMIN_PASSWORD=""
 EXPOSURE_MODE="public"; CF_TOKEN=""; TS_AUTHKEY=""; NO_EXTERNAL_IP=0
-REPO="https://github.com/vikramgorla/whatsapp-agent-duniya.git"; BRANCH="main"; ASSUME_YES=0; DRY_RUN=0
+REPO="https://github.com/vikramgorla/duniya.git"; BRANCH="main"; ASSUME_YES=0; DRY_RUN=0
 FREE_REGIONS="us-central1 us-west1 us-east1"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BOOTSTRAP="$HERE/../oci/bootstrap.sh"

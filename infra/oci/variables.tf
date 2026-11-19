@@ -100,7 +100,7 @@ variable "ssh_ingress_cidr" {
 
 variable "repo_url" {
   type    = string
-  default = "https://github.com/vikramgorla/whatsapp-agent-duniya.git"
+  default = "https://github.com/vikramgorla/duniya.git"
 }
 
 variable "branch" {

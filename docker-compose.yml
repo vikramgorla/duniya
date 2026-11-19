@@ -4,7 +4,7 @@
 # Settings go in a .env file next to this one (see .env.example).
 services:
   app:
-    image: ghcr.io/vikramgorla/whatsapp-agent-duniya:latest
+    image: ghcr.io/vikramgorla/duniya:latest
     build: .
     restart: unless-stopped
     environment:

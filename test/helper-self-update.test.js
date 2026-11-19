@@ -151,7 +151,7 @@ test('056 helper: git as root is locked down (https only with TLS checks, no hoo
   // Repository: root-owned install config (https only) or the official one; the app can only name a release.
   const repo = helperText.slice(helperText.indexOf('helper_repo() {'), helperText.indexOf('update_helper() {'));
   assert.match(repo, /\^https:\/\//);
-  assert.match(helperText, /^OFFICIAL_REPO=https:\/\/github\.com\/vikramgorla\/whatsapp-agent-duniya\.git$/m);
+  assert.match(helperText, /^OFFICIAL_REPO=https:\/\/github\.com\/vikramgorla\/duniya\.git$/m);
 });
 
 // ---------- the app side ----------

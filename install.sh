@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # whatsapp-agent-duniya installer — install or update on Ubuntu/Debian (x86_64, arm64).
 #
-#   curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/vikramgorla/duniya/main/install.sh | sudo bash
 #   curl -fsSL …/install.sh | sudo bash -s -- --ip-https --yes
 #
 # Panel exposure (pick one; asked interactively if omitted):
@@ -14,7 +14,7 @@
 #                            tunnel of your own pointed at http://127.0.0.1:8080)
 # Other:
 #   --admin-password PW      create owner "admin" with this password (otherwise a one-time setup code is printed)
-#   --repo URL               git repository (default: https://github.com/vikramgorla/whatsapp-agent-duniya.git)
+#   --repo URL               git repository (default: https://github.com/vikramgorla/duniya.git)
 #   --branch NAME            branch to install (default: main)
 #   --git-token TOKEN        read-only token for a private repository
 #   --update-mode MODE       off | notify | auto (default: notify)
@@ -22,7 +22,7 @@
 #   --dry-run                print what would happen and exit
 set -euo pipefail
 
-REPO="https://github.com/vikramgorla/whatsapp-agent-duniya.git"
+REPO="https://github.com/vikramgorla/duniya.git"
 BRANCH="main"
 EXPOSURE=""
 DOMAIN=""

@@ -1,6 +1,14 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.45.1": {
+      "breaking": false,
+      "title": "Duniya, for WhatsApp and Telegram",
+      "changes": [
+        { "type": "improved", "text": "The project is now simply called Duniya (github.com/vikramgorla/duniya), and the panel, website and guides say WhatsApp and Telegram. Old links keep working; nothing changes on your server." },
+        { "type": "improved", "text": "Newly linked WhatsApp numbers show as \"Duniya\" in your phone's Linked devices." }
+      ]
+    },
     "2.45.0": {
       "breaking": false,
       "title": "Surveys and campaigns",

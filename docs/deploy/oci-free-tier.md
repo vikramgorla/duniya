@@ -2,7 +2,7 @@
 
 **A free VM that installs Duniya by itself: one button, one form, no terminal.**
 
-[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip)
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/duniya/releases/latest/download/duniya.zip)
 
 **In 30 seconds**
 - Button → form (owner password) → **Create** → job *Succeeded* in 2–3 minutes → install runs 10–15 minutes
@@ -113,7 +113,7 @@ Console labels checked November 2026; some pages show **tabs**, others a **Resou
 3. SSH in and run:
 
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash
+   curl -fsSL https://raw.githubusercontent.com/vikramgorla/duniya/main/install.sh | sudo bash
    ```
 
 The installer opens 80/443 in OCI's iptables for direct HTTPS. Manage it like any server:
@@ -167,8 +167,8 @@ ports).
 
 </details>
 
-1. Download [whatsapp-agent-duniya.zip](https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip)
-   (also on [Releases](https://github.com/vikramgorla/whatsapp-agent-duniya/releases)).
+1. Download [duniya.zip](https://github.com/vikramgorla/duniya/releases/latest/download/duniya.zip)
+   (also on [Releases](https://github.com/vikramgorla/duniya/releases)).
 2. ☰ → **Developer Services** → **Resource Manager** → **Stacks** (pick the compartment top left if needed).
 3. Stack row → **Actions** (⋮) → **Edit**.
 4. **Edit stack** → **.Zip file** → drag the zip or **Browse** → **Next**.

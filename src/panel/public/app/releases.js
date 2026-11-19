@@ -4,7 +4,7 @@ import { api, ask, h, tryApi } from './core.js';
 import { plural } from './shared.js';
 
 const KINDS = [['new', 'New'], ['improved', 'Improved'], ['fixed', 'Fixed'], ['removed', 'Removed']];
-const DOCS = 'https://github.com/vikramgorla/whatsapp-agent-duniya/blob/';
+const DOCS = 'https://github.com/vikramgorla/duniya/blob/';
 const parts = (v) => String(v || '').replace(/^v/, '').split('.').map(Number);
 /** Version a is not newer than b. */
 export const notAfter = (a, b) => { const [x, y] = [parts(a), parts(b)]; const i = x.findIndex((n, k) => n !== y[k]); return i < 0 || x[i] < y[i]; };

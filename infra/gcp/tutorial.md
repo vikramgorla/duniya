@@ -95,7 +95,7 @@ gcloud compute routers delete duniya-router --region us-central1
 ```
 
 Update, recreate, remove, find the IP, logs and serial console later:
-[Google Cloud guide](https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/deploy/google-cloud.md).
+[Google Cloud guide](https://github.com/vikramgorla/duniya/blob/main/docs/deploy/google-cloud.md).
 
 <walkthrough-conclusion-trophy></walkthrough-conclusion-trophy>
 

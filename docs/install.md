@@ -3,7 +3,7 @@
 **Duniya on a server of your own in 15–30 minutes, free on Oracle or Google Cloud.**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/vikramgorla/duniya/main/install.sh | sudo bash
 ```
 
 **In 30 seconds**
@@ -20,7 +20,7 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/m
 | **Setup time** | ~3 min clicks + 10–15 min install (E2.1.Micro: 20–30) | ~15 min | 10–15 min | minutes (image pull) |
 | **Open ports** | 80, 443 (or none with a tunnel) | 80, 443 (or none) | your choice | none by default |
 | **Best for** | most people: one click, no terminal | a Google account and a terminal-friendly tutorial | a VPS you already have | a home server or laptop |
-| **Start** | [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/whatsapp-agent-duniya/releases/latest/download/whatsapp-agent-duniya.zip) | [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fwhatsapp-agent-duniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md) | [one command](#one-command-ubuntudebian) | [compose](deploy/docker.md) |
+| **Start** | [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/vikramgorla/duniya/releases/latest/download/duniya.zip) | [![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fduniya&cloudshell_git_branch=main&cloudshell_tutorial=infra%2Fgcp%2Ftutorial.md) | [one command](#one-command-ubuntudebian) | [compose](deploy/docker.md) |
 | **Guide** | [Oracle Cloud](deploy/oci-free-tier.md) | [Google Cloud](deploy/google-cloud.md) | [below](#managing-your-server) | [Docker](deploy/docker.md) |
 
 > [!NOTE]
@@ -47,7 +47,7 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/m
 It asks how the panel should be reached, or say it up front:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash -s -- --ip-https --yes
+curl -fsSL https://raw.githubusercontent.com/vikramgorla/duniya/main/install.sh | sudo bash -s -- --ip-https --yes
 ```
 
 | Option | Panel address | Open ports |

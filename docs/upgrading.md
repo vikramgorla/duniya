@@ -21,7 +21,7 @@ Step by step per host: [Oracle Cloud](deploy/oci-free-tier.md#update-the-app) ·
 [Google Cloud](deploy/google-cloud.md#update-the-app) · [own server](install.md#managing-your-server) ·
 [Docker](deploy/docker.md#update-the-app). Release notes: in the panel (**Settings → Help → Release notes**, and in
 the update dialog for the versions you are about to get) and on
-[GitHub Releases](https://github.com/vikramgorla/whatsapp-agent-duniya/releases).
+[GitHub Releases](https://github.com/vikramgorla/duniya/releases).
 
 > [!NOTE]
 > Servers installed with an early 2.x may need one step:

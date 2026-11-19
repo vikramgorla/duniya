@@ -8,7 +8,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const BLOB = /https:\/\/github\.com\/vikramgorla\/whatsapp-agent-duniya\/(?:blob|tree)\/main\/([^\s"'`)<>]+)/g;
+const BLOB = /https:\/\/github\.com\/vikramgorla\/duniya\/(?:blob|tree)\/main\/([^\s"'`)<>]+)/g;
 
 /** Remove fenced and inline code so example links inside code are not checked. */
 function stripCode(md) {

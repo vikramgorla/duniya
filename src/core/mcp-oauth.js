@@ -97,7 +97,7 @@ class Provider {
   get redirectUrl() { return this._redirect; }
   get clientMetadata() {
     return {
-      client_name: 'whatsapp-agent-duniya', client_uri: 'https://github.com/vikramgorla/whatsapp-agent-duniya',
+      client_name: 'Duniya', client_uri: 'https://github.com/vikramgorla/duniya',
       redirect_uris: [this._redirect], grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'],
       token_endpoint_auth_method: this.fixedClient?.client_secret ? 'client_secret_basic' : 'none',
     };

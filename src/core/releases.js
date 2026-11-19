@@ -101,7 +101,7 @@ export function releaseNotes(releases, version) {
   }
   if (e.data === 'not-migrated') lines.push('**Data:** not migrated: older data, backups or settings named above are not read.', '');
   if (e.data === 'migrated') lines.push('**Data:** migrated automatically.', '');
-  lines.push(`More: [${e.docs || 'docs/README.md'}](https://github.com/vikramgorla/whatsapp-agent-duniya/blob/v${bare(version)}/${e.docs || 'docs/README.md'})`, '');
+  lines.push(`More: [${e.docs || 'docs/README.md'}](https://github.com/vikramgorla/duniya/blob/v${bare(version)}/${e.docs || 'docs/README.md'})`, '');
   return lines.join('\n');
 }
 
