@@ -3,8 +3,8 @@
 // how long, who is skipped and why, three samples) → Start sending. Orders (Send reminders) and an event page (Message
 // registered people) open New message prefilled. Loaded from people.js; every text from people or models is a text node.
 import { $, S, api, ask, avatar, can, emptyState, field, h, menu, meterEl, time, toggle, tryApi } from './core.js';
-import { day, helpLink, plural } from './shared.js';
-import { peopleNav } from './people.js';
+import { helpLink, plural } from './shared.js';
+import { day, peopleNav } from './people.js';
 import { back, group, row, runPill } from './events.js';
 const enc = encodeURIComponent;
 const WAIT = { hours: 'Waiting for the sending hours', cap: 'Today\'s limit is reached: it carries on tomorrow by itself', offline: 'Waiting for WhatsApp to connect' };

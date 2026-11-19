@@ -30,10 +30,11 @@ a time, or with their own link.**
 
 ## Send it
 
-1. On the survey's page, **Send it to people…** (or **People → Sending → + New message** and pick the **Survey**).
+1. On the survey's page, **Send it to people…** (later: **Messages → Send it to more people**), or **People → Sending →
+   + New message** and pick the **Survey**.
 2. Choose who, the purpose and the agent; the message starts as *"Hi {first_name}, a few quick questions about
    {survey}: answer here in the chat, or at {survey_link}"*. Change it as you like.
-3. **Preview** → **Start sending**. Each person gets their own link; the preview shows it as `…/s/…`.
+3. **Preview** → **Send to N people**. Each person gets their own link; the preview shows it as `…/s/…`.
 
 > [!NOTE]
 > Links need the address people can open: your domain ([Domains and access](domains-and-access.md)), or `PUBLIC_URL`.
@@ -50,9 +51,10 @@ a time, or with their own link.**
 
 ## Results
 
-On the survey's page: how many were asked, started and finished; per question the counts (bars), the average, lowest,
-highest and total of numbers, the latest short texts; **Answers** per person (how: chat or link). **⋯ → Download CSV**
-(spreadsheet-safe), **Close it** (no more answers), **Delete…**.
+On the survey's page: how many finished and how many are part-way; per question the counts (bars), the average,
+lowest, highest and total of numbers, the latest short texts; **People**: one row per person asked (*Finished*,
+*Part-way*, *Asked*; finished first) with their answers and how (chat or link), a tap opens their page; **Messages**:
+what carried the survey. **⋯ → Download CSV** (spreadsheet-safe), **Close it** (no more answers), **Delete…**.
 
 ## AI assistants and the owner assistant
 

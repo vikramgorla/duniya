@@ -11,9 +11,9 @@
   kids × kid price, kids under the free age at 0 (their birthday in People). New numbers change an unpaid order; a
   cancellation cancels it (if something was paid, the timeline says so and you refund).
 - Record **payments** (part or full) and **refunds** with a method from **your own list** (Cash, Bank transfer,
-  Instant online payment by default). Status: **Open**, **Part paid**, **Paid**, **Refunded**, **Cancelled**.
+  Instant online payment by default). Status: **Not paid**, **Part paid**, **Paid**, **Refunded**, **Cancelled**; **Overdue** once the due date has passed.
 - Once a day you get one message with the open orders due within three days or overdue (owner alerts). With
-  [Lists and sending](sending.md) on, **Send reminders** messages the people themselves, and an event can send them
+  [Lists and sending](sending.md) on, **Remind everyone who has not paid** messages the people themselves, and an event can send them
   automatically a few days before the due date; a [campaign](campaigns.md) follows up only with people who have not
   paid.
 

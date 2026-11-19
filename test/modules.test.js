@@ -215,5 +215,16 @@ test('admin MCP: modules on/off, events, registrations, duties, orders, payments
   assert.equal(ev.counts.kids, 2, 'how many kids registered');
   const unpaid = await tool('list_orders').run({ status: 'open', event: 'Sankranti' }, x);
   assert.ok(Array.isArray(unpaid.orders));
-  assert.match(await tool('record_payment').preview({ order: (await api('GET', '/api/orders')).orders[0].id, amount: 5 }, x), /Record a payment of 5/);
+  assert.match(await tool('record_payment').preview({ order: (await api('GET', '/api/orders')).orders[0].id, amount: 5 }, x), /Record a payment of CHF 5\.00 for /);
+});
+
+test('085: page rows carry days as parts the panel formats; an overdue order says so; one money format', async () => {
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  await api('POST', '/api/orders', { person: gita.id, title: 'Club cap', lines: [{ item: 'Cap', qty: 1, price: 12.5 }], due: yesterday });
+  const rows = (await api('GET', `/api/people/${gita.id}`)).modules.find((s) => s.title === 'Orders and payments').rows;
+  const cap = rows.find((r) => r.name.startsWith('Club cap'));
+  assert.equal(cap.name, 'Club cap: CHF 12.50');
+  assert.deepEqual(cap.sub, ['overdue', 'CHF 12.50 left', { day: yesterday, before: 'was due' }]);
+  const ev = (await api('GET', `/api/people/${anu.id}`)).modules.find((s) => s.title === 'Events').rows[0];
+  assert.ok(ev.sub.some((p) => typeof p === 'object' && /^\d{4}-\d{2}-\d{2}/.test(p.day)), 'the event day is a part, not a preformatted string');
 });

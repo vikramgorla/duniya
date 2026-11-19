@@ -1,12 +1,29 @@
 // People (078, PRM core): the list, a person's page, and the People · Households · Lists switch. Households and Lists
 // load from people-groups.js. Module of the panel (063). Text from WhatsApp or people is built from text nodes.
 import { $, S, ago, api, ask, avatar, can, emptyState, field, h, icon, menu, tryApi } from './core.js';
-import { day, helpLink, phone } from './shared.js';
+import { helpLink } from './shared.js';
 import { tagInput } from './tags.js';
+// ---------- money, days and numbers (085): one format on every screen, in the reader's locale ----------
+/** Cents → "CHF 60.00" (or "€60.00", "₹1,200.00": the reader's locale decides). */
+export const money = (cents, cur = 'CHF') => { const v = Number(cents || 0) / 100; try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(v); } catch { return `${cur} ${v.toFixed(2)}`; } };
+const DAY = 86400000;
+/** A calendar day ("2027-01-14" or a timestamp) → "14 Jan 2027" ("14 Jan" this year); `near`: "today", "tomorrow",
+ *  "yesterday", "in 3 days", "3 days ago" within a week. */
+export const day = (d, near = false) => {
+  if (!d) return '';
+  const at = typeof d === 'number' ? new Date(d) : new Date(`${String(d).slice(0, 10)}T12:00`);
+  if (Number.isNaN(at.getTime())) return String(d);
+  const n = Math.round((new Date(at).setHours(12, 0, 0, 0) - new Date().setHours(12, 0, 0, 0)) / DAY);
+  if (near && Math.abs(n) < 7) return n === 0 ? 'today' : n === 1 ? 'tomorrow' : n === -1 ? 'yesterday' : n > 0 ? `in ${n} days` : `${-n} days ago`;
+  return at.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: at.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+};
+/** Digits of a phone number → "+41 79 000 00 01", "+91 98765 43210", "+1 415 555 0100"; others as "+<digits>". */
+const PHONE = [/^(41)(\d{2})(\d{3})(\d{2})(\d{2})$/, /^(91)(\d{5})(\d{5})$/, /^(1)(\d{3})(\d{3})(\d{4})$/, /^(\d{2})(\d{3})(\d{3})(\d+)$/];
+const phone = (digits) => { const d = String(digits || '').replace(/\D/g, ''); const m = PHONE.map((re) => re.exec(d)).find(Boolean); return d ? `+${m ? m.slice(1).join(' ') : d}` : ''; };
 let query = ''; let filter = '';
 const PAGE = 100;
-/** "2015-04-23" → "23 Apr 2015", "--04-23" (no year) → "23 Apr" (085). */
-const birthday = (b) => { const m = /^(\d{4}|-)-?(\d{2})-(\d{2})$/.exec(b); return m ? new Date(m[1] === '-' ? 2000 : Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: m[1] === '-' ? undefined : 'numeric' }) : b; };
+/** A birthday: "2015-04-23" → "23 Apr 2015", "--04-23" (no year) → "23 Apr" (085). */
+const birthday = (b) => (b.startsWith('--') ? new Date(`2000${b.slice(1)}T12:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : day(b));
 const APPS = { whatsapp: 'WhatsApp', telegram: 'Telegram' };
 const enc = encodeURIComponent;
 const personHref = (id) => `#people/${enc(id)}`;

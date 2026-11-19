@@ -2,8 +2,8 @@
 // and People → Orders (list with filters and totals per event → order page with lines and payments). Loaded from
 // people.js on first visit, only when the module is on. Names and notes are built from text nodes.
 import { $, S, api, ask, avatar, can, emptyState, field, h, icon, menu, tryApi } from './core.js';
-import { day, helpLink, money, plural } from './shared.js';
-import { moduleBlocks, peopleNav, pickPerson } from './people.js';
+import { helpLink, plural } from './shared.js';
+import { day, money, moduleBlocks, peopleNav, pickPerson } from './people.js';
 const enc = encodeURIComponent;
 const STATUS = { registered: ['Registered', 'ok'], waiting: ['Waiting list', 'warn'], pending: ['To confirm', 'info'], cancelled: ['Cancelled', ''],
   open: ['Not paid', 'warn'], part: ['Part paid', 'info'], paid: ['Paid', 'ok'], refunded: ['Refunded', ''], overdue: ['Overdue', 'bad'] };
