@@ -242,13 +242,49 @@ Commits are authored by the repository owner's identity; no AI co-author trailer
 explicit message. Squash-merge with `gh api -X PUT repos/vikramgorla/whatsapp-agent-duniya/pulls/N/merge -f merge_method=squash -f
 commit_title="<PR title> (#N)" -f commit_message="<short summary>"`, so GitHub does not append trailers from the branch commits.
 
+## Repository and forks
+
+The GitHub repository lives in **one place**: `"repository": "github:owner/name"` in `package.json` (the standard
+npm field, next to the version; no extra file). Everything else follows from it:
+
+| Where | How it gets the repository |
+|---|---|
+| App, CLI, admin MCP | `REPO` from `src/core/config.js` (`url`, `git`, `pages`, `image`, `blob(ref, path)`; derived in `src/core/repo.js`) |
+| Panel | the shell's `<meta name="duniya-repo">` (filled by `src/panel/assets.js`), read by `docsUrl()` / `repoFile()` in `shared.js` |
+| Update source of a server | the checkout's git remote (installed from; changed in **Settings → Updates** or `duniya source`) |
+| Root maintenance helper | `/etc/duniya/install.conf` (written by the installer and `sudo duniya source`; nothing built in) |
+| Installer, GCP script, OCI stack, compose file, README, docs, website | absolute URLs rewritten by `npm run repo:sync`; `DUNIYA_REPO` / `--repo` override at install time |
+| Workflows | `github.repository` (release image `ghcr.io/<owner>/<name>` in lowercase, release assets, Pages) |
+
+`npm run repo:sync` (`scripts/repo-sync.mjs`) rewrites every project URL in tracked text files to the slug in
+`package.json`: `github.com/o/n`, `raw.githubusercontent.com/o/n`, `ghcr.io/o/n`, `repos/o/n`, `o.github.io/n` and
+URL-encoded forms, only for this project's names (prose and server-local names such as the systemd unit are never
+touched; `specs/` keep their history; example owners `you`, `alice`, `bob`, `carol` are left alone). `-- --repo owner/name` sets a new slug first, `-- --check` only lists. It is
+idempotent. `node scripts/ci-checks.mjs` fails on any project URL with another slug (`findDrift`), so nothing is
+forgotten. The fork-setup workflow (`.github/workflows/fork-setup.yml`) runs the sync on a fork or a renamed
+repository and opens a pull request; on the project itself it does nothing.
+
+**Renaming the repository** (owner):
+
+1. GitHub → the repository → **Settings → General → Repository name** → new name → **Rename**.
+2. Wait for the **Fork setup** workflow (runs on the next push to `main`, or **Actions → Fork setup → Run workflow**):
+   it opens *Set up this repository: owner/new-name*. Or locally: `npm run repo:sync -- --repo owner/new-name`, then a
+   PR. Add the old name to `FORMER_NAMES` in `scripts/repo-sync.mjs` in the same PR so stray old links are caught.
+3. Merge it. A release follows (version bump in the PR), so the OCI button finds `duniya.zip` under the new name.
+
+GitHub forwards old repository, git, raw and release URLs (servers keep updating; switch their source when
+convenient), **but not GitHub Pages**: the website moves to `https://<owner>.github.io/<new-name>/` (republished by
+the Pages workflow when `docs/site` changes; run it by hand once after the rename). The container image is published
+under the new name from the next release on.
+
 ## Releases
 
 1. Bump the version in `package.json`, `package-lock.json` and `infra/oci/schema.yaml` (CI checks they match) and add
    an entry for it to `releases.json` with its [release notes](#release-notes) (CI fails without a title and changes).
 2. Merge to `main` (or push a `vX.Y.Z` tag, or run the workflow by hand).
 3. The release workflow creates the tag and GitHub release (notes built from the entry by `scripts/release-notes.mjs`),
-   attaches the OCI stack zip and publishes `ghcr.io/vikramgorla/whatsapp-agent-duniya`.
+   attaches the OCI stack zip (`duniya.zip`) and publishes `ghcr.io/vikramgorla/whatsapp-agent-duniya` (named after
+   the repository that runs it, so a fork publishes its own).
 
 ### Release notes
 

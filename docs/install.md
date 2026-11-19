@@ -58,10 +58,19 @@ curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/m
 | `--tailscale-authkey <tskey-…>` | `https://<machine>.<tailnet>.ts.net`, your tailnet only | none |
 | `--local-only` | `ssh -L 8080:127.0.0.1:8080 you@server` → `http://localhost:8080`, or your own tunnel (frp, ngrok, Pangolin, zrok) to `http://127.0.0.1:8080` | none |
 
+**From a fork** (or any GitHub repository with Duniya's releases): say where with `DUNIYA_REPO=owner/name` or
+`--repo owner/name`, and fetch the installer from that repository too. The server then installs and updates from it;
+switch later under **Settings → Updates → Update source** or with `sudo duniya source owner/name`
+([Upgrading](upgrading.md#update-source)).
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/you/duniya/main/install.sh | sudo DUNIYA_REPO=you/duniya bash -s -- --ip-https --yes
+```
+
 > [!TIP]
 > Tailscale: turn on **MagicDNS** and **HTTPS Certificates** in the Tailscale admin console; Tailscale Funnel can
 > make it public. `--help` lists every option (`--admin-password`, `--update-mode off|notify|auto`, `--branch`,
-> `--dry-run`, …).
+> `--repo`, `--dry-run`, …). Re-running the installer keeps the update source the server already uses.
 
 ## Google Cloud (Always Free e2-micro)
 

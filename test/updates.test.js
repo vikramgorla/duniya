@@ -82,6 +82,54 @@ test('stable and main channels update a real checkout; failed dependency install
   assert.equal(git(app, 'rev-parse', 'HEAD'), before);
 });
 
+test('084 update source: shown without credentials, switched to a fork (its tags replace the old ones), refused or put back when wrong', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'duniya-src-'));
+  const repo = (name, versions) => {
+    const work = join(base, `${name}-work`); const bare = join(base, `${name}.git`);
+    execFileSync('git', ['init', '-q', '-b', 'main', work]);
+    for (const v of versions) { writeFileSync(join(work, 'package.json'), JSON.stringify({ name: 'x', version: v, note: name })); git(work, 'add', '-A'); git(work, 'commit', '-qm', v); git(work, 'tag', `v${v}`); }
+    execFileSync('git', ['clone', '-q', '--bare', work, bare]);
+    return bare;
+  };
+  const upstream = repo('upstream', ['1.0.0']);
+  const fork = repo('fork', ['1.0.0', '1.2.0']); // its own v1.0.0 (another commit) and a newer release
+  const app = join(base, 'app');
+  execFileSync('git', ['clone', '-q', upstream, app]);
+  // The "GitHub" repositories are local: git rewrites these URLs (no network; nothing in the app knows)
+  git(app, 'config', `url.${fork}.insteadOf`, 'https://github.com/alice/duniya.git');
+  git(app, 'config', `url.${join(base, 'missing.git')}.insteadOf`, 'https://github.com/bob/missing.git');
+  git(app, 'remote', 'set-url', 'origin', 'https://x-access-token:ghs_SECRET123@github.com/carol/duniya.git');
+  u._setAppRoot(app, { running: 'v1.0.0' });
+  try {
+    const owner = await t.login();
+    let g = (await t.api(owner, 'GET', '/api/updates')).body;
+    assert.deepEqual(g.source, { url: 'https://github.com/carol/duniya.git', repo: 'carol/duniya', project: JSON.parse(readFileSync(resolve(import.meta.dirname, '../package.json'), 'utf8')).repository.replace('github:', ''), official: false });
+    assert.doesNotMatch(JSON.stringify(g), /SECRET123/, 'a token in the remote is never returned');
+
+    for (const bad of ['', 'not a repo', 'https://gitlab.com/alice/duniya', 'alice/duniya; rm -rf /', 'git@github.com:alice/duniya.git']) {
+      const r = await t.api(owner, 'PUT', '/api/updates/source', { repo: bad });
+      assert.equal(r.status, 400, bad);
+      assert.equal(r.body.field, 'repo');
+    }
+    const missing = await t.api(owner, 'PUT', '/api/updates/source', { repo: 'bob/missing' });
+    assert.equal(missing.status, 400);
+    assert.match(missing.body.error, /Could not read bob\/missing on GitHub[\s\S]*The update source was not changed/);
+    assert.match(git(app, 'config', '--get', 'remote.origin.url'), /ghs_SECRET123@github\.com\/carol\/duniya/, 'the previous source (with its token) is put back');
+
+    const r = await t.api(owner, 'PUT', '/api/updates/source', { repo: 'https://github.com/alice/duniya' });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.source.repo, 'alice/duniya');
+    assert.equal(git(app, 'config', '--get', 'remote.origin.url'), 'https://github.com/alice/duniya.git');
+    assert.equal(git(app, 'rev-parse', 'v1.0.0'), execFileSync('git', ['--git-dir', fork, 'rev-parse', 'v1.0.0']).toString().trim(), 'the fork\'s tags replace the old source\'s');
+    assert.equal(r.body.status.latest, 'v1.2.0');
+    assert.equal(r.body.status.available, true);
+    g = (await t.api(owner, 'GET', '/api/updates')).body;
+    assert.equal(g.source.repo, 'alice/duniya');
+    const { listActivity } = await import('../src/core/db.js');
+    assert.ok(listActivity({ limit: 20 }).some((a) => a.summary === 'Update source changed to alice/duniya by admin'));
+  } finally { u._setAppRoot(null); }
+});
+
 test('update routes are owner only; settings validated', async () => {
   const owner = await t.login();
   await t.api(owner, 'POST', '/api/users', { username: 'adm', role: 'admin', password: 'admin-password-12' });

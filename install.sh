@@ -57,7 +57,7 @@ fi
 # have been changed in the panel), then the previous run's choice, then the project.
 EXISTING_REPO=""
 if [ -d "$APP_DIR/.git" ] && id "$APP_USER" >/dev/null 2>&1; then
-  EXISTING_REPO="$(sudo -u "$APP_USER" git -C "$APP_DIR" remote get-url origin 2>/dev/null | sed -E 's#^https://[^/@]*@#https://#' || true)"
+  EXISTING_REPO="$(sudo -u "$APP_USER" git -C "$APP_DIR" config --get remote.origin.url 2>/dev/null | sed -E 's#^https://[^/@]*@#https://#' || true)"
 fi
 REPO="${DUNIYA_REPO:-${EXISTING_REPO:-${REPO:-$DEFAULT_REPO}}}"
 

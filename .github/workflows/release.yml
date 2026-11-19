@@ -83,6 +83,9 @@ jobs:
           tags: |
             ${{ steps.v.outputs.image }}:${{ steps.v.outputs.version }}
             ${{ steps.v.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.licenses=MIT
 
   # 069: older release pages had short notes; keep every release's text equal to its releases.json entry.
   notes:

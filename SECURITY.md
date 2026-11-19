@@ -30,3 +30,18 @@ See [docs/upgrading.md](docs/upgrading.md).
 - The admin MCP server uses OAuth 2.1 with PKCE and resource-bound tokens; its tokens only open `/mcp`. The panel API
   accepts only the panel's session cookie (HttpOnly, SameSite=Strict).
 - CI runs CodeQL, `npm audit` (production, high+), Dependabot and secret scanning with push protection.
+
+## Secrets from the environment
+
+Two optional settings can come from the environment (`/etc/duniya/app.env` on installer servers, `.env` with Docker).
+Neither is needed: the normal path is the one-time setup code and panel links.
+
+| Variable | What it is for | Without it |
+|---|---|---|
+| `ADMIN_PASSWORD` | Creates the first owner, `admin`, with this password when no owner exists yet (`--admin-password` in the installer). Afterwards it changes nothing; passwords are changed in the panel or with `duniya reset-password`. | The installer prints a one-time setup code; the owner chooses a password in the panel. |
+| `MASTER_KEY` | The 32-byte key (base64) that encrypts stored secrets, instead of the generated `master.key` in the data directory (mode 0600). For setups that keep keys outside the data directory. Encrypted backups include it (so a restore works on a new server); keep a copy anyway: without it, stored secrets cannot be read. | A key is generated once in the data directory (and included in encrypted backups). |
+
+Both are read once at start, never written to the activity log or the service log, never sent to a model or an AI
+assistant, and never returned by any API (a test sweeps every read-only panel route with both set:
+`test/env-secrets.test.js`). Leave `ADMIN_PASSWORD` out of `app.env` once the owner exists if you prefer: nothing
+reads it again.

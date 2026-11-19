@@ -22,6 +22,7 @@ docker compose exec app duniya help   # Docker
 | `doctor` | checks DNS, HTTPS, ports, disk, memory, swap and prints fixes |
 | `backup-now`, `restart`, `logs [-f]` | maintenance |
 | `update [--check] [--breaking]` | newest release that needs no decision, backup first; `--breaking` also crosses a breaking release; also refreshes the root maintenance helper (OS updates) |
+| `source [owner/name]` | where updates come from; with a GitHub repository (e.g. your fork) switches the app and the maintenance helper to it ([Update source](upgrading.md#update-source)) |
 | `open-access` | removes the IP allow-list if it locked you out |
 
 ---

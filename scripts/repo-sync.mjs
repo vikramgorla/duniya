@@ -16,6 +16,8 @@ const root = resolve(import.meta.dirname, '..');
 // Names this project has had: a leftover URL with one of them and another owner/name is drift. Add the old name here
 // when renaming the repository, so stale links anywhere are caught.
 const FORMER_NAMES = ['whatsapp-agent-duniya'];
+// Example owners in docs and tests (`you/duniya`, alice/bob/carol in tests) are never rewritten or reported.
+const EXAMPLE_OWNERS = new Set(['you', 'alice', 'bob', 'carol']);
 // History is kept as written (specs describe the state when they were made).
 const SKIP = [/^specs\//, /^package-lock\.json$/];
 const TEXT = /\.(md|js|mjs|cjs|json|ya?ml|sh|tf|html|css|svg|mmd|txt|example|webmanifest|service|path)$|(^|\/)(Dockerfile|CODEOWNERS|duniya|duniya-ops|[^/.]+)$/;
@@ -39,7 +41,7 @@ function staleRefs(text, slug, names) {
     for (const m of text.matchAll(re)) {
       const [all, prefix, owner, rawName] = m;
       const name = rawName.replace(/(\.git)?\.*$/, '');
-      if (!names.has(name.toLowerCase()) || sameRepo(`${owner}/${name}`, slug)) continue;
+      if (!names.has(name.toLowerCase()) || sameRepo(`${owner}/${name}`, slug) || (EXAMPLE_OWNERS.has(owner.toLowerCase()) && !sameRepo(owner, t.owner))) continue;
       const ghcr = prefix === 'ghcr.io/';
       const nextOwner = sep === '.github.io/' ? t.owner.toLowerCase() : ghcr ? t.owner.toLowerCase() : t.owner;
       const nextName = ghcr ? t.name.toLowerCase() : t.name;

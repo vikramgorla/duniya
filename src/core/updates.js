@@ -116,7 +116,7 @@ const withoutAuth = (u) => String(u || '').replace(/^(https?:\/\/)[^/@]*@/, '$1'
  * official }: `repo` is its owner/name on GitHub (null for another host), `project` the repository in package.json.
  */
 export async function updateSource({ root = appRoot } = {}) {
-  const url = withoutAuth(await git(['remote', 'get-url', 'origin'], root).catch(() => ''));
+  const url = withoutAuth(await git(['config', '--get', 'remote.origin.url'], root).catch(() => ''));
   const repo = parseRepo(url)?.slug || null;
   return { url, repo, project: REPO.slug, official: sameRepo(repo, REPO.slug) };
 }
@@ -130,7 +130,7 @@ export async function setUpdateSource(input, { root = appRoot, by = '' } = {}) {
   const r = parseRepo(input);
   if (!r) throw bad('Enter owner/name or https://github.com/owner/name', 'repo');
   const next = repoLinks(r.slug).git;
-  const prev = await git(['remote', 'get-url', 'origin'], root);
+  const prev = await git(['config', '--get', 'remote.origin.url'], root);
   if (withoutAuth(prev) === next) return { source: await updateSource({ root }), status: updateStatus() };
   await git(['remote', 'set-url', 'origin', next], root);
   try {

@@ -58,6 +58,9 @@ then takes about five taps: link WhatsApp, connect a model, pick a template, swi
 More: [People](docs/people.md) (everyone from your chats and your phone in one place: families, kids, notes, tags, lists, consent; agents know who is writing and see only their own chats' people) · [Events](docs/events.md) and [orders & payments](docs/orders.md) (registrations with kids, waiting list, duties, who paid; agents register people) · [Lists and sending](docs/sending.md) (message a list, an event's families or everyone who owes: consent checked per message, each person's own wording, a person's pace, stop signals, payment reminders) · [Surveys](docs/surveys.md) and [campaigns](docs/campaigns.md) (answers in chat or by link; follow-ups only to who has not answered or paid) · [Telegram](docs/telegram.md) · [MCP tool services](docs/agents.md#tool-services-mcp) · [manage it from ChatGPT or Claude](docs/admin-mcp.md) ·
 [your own domain](docs/domains-and-access.md) · [how it works](docs/architecture.md).
 
+**Fork it:** MIT licensed. Fork on GitHub, enable Actions, and a workflow points the install command, buttons, website
+and image at your fork ([Forking](CONTRIBUTING.md#forking)); servers install from it with `DUNIYA_REPO=you/duniya`.
+
 > [!WARNING]
 > Use a **dedicated WhatsApp number**: Duniya links as a normal linked device (via
 > [Baileys](https://github.com/WhiskeySockets/Baileys)), and unofficial clients can be banned.
@@ -69,5 +72,6 @@ More: [People](docs/people.md) (everyone from your chats and your phone in one p
 ---
 
 <sub>[Feature specs](specs) · [Design language](DESIGN.md) · [AGENTS.md](AGENTS.md) (working rules, Definition of
-Done) · [Security policy](SECURITY.md). Duniya is an independent open-source project, not affiliated with, endorsed by
-or sponsored by WhatsApp or Meta. WhatsApp is a trademark of its owner.</sub>
+Done) · [Security policy](SECURITY.md) · [MIT license](LICENSE). Duniya is an independent open-source project, not
+affiliated with, endorsed by or sponsored by WhatsApp, Telegram or Meta. WhatsApp and Telegram are trademarks of their
+owners.</sub>
