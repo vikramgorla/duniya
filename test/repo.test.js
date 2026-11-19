@@ -10,6 +10,7 @@ import { parseRepo, repoLinks, sameRepo } from '../src/core/repo.js';
 import { findDrift } from '../scripts/repo-sync.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
+const up = (s) => s.replaceAll('{U}', 'upstream-owner');
 
 test('084 parseRepo: owner/name, github:, GitHub https URLs; nothing else', () => {
   for (const s of ['alice/duniya', 'github:alice/duniya', 'https://github.com/alice/duniya', 'https://github.com/alice/duniya.git', 'https://github.com/alice/duniya/', 'git+https://github.com/alice/duniya.git', { type: 'git', url: 'https://github.com/alice/duniya.git' }, ' alice/duniya ']) {
@@ -45,7 +46,8 @@ function project(files) {
   mkdirSync(join(d, 'scripts')); mkdirSync(join(d, 'src/core'), { recursive: true });
   cpSync(join(ROOT, 'scripts/repo-sync.mjs'), join(d, 'scripts/repo-sync.mjs'));
   cpSync(join(ROOT, 'src/core/repo.js'), join(d, 'src/core/repo.js'));
-  for (const [f, text] of Object.entries(files)) { mkdirSync(join(d, f, '..'), { recursive: true }); writeFileSync(join(d, f), text); }
+  // {U}: the upstream owner, filled in here so this file holds no URL that looks like the project's own
+  for (const [f, text] of Object.entries(files)) { mkdirSync(join(d, f, '..'), { recursive: true }); writeFileSync(join(d, f), up(text)); }
   execFileSync('git', ['init', '-q'], { cwd: d });
   execFileSync('git', ['add', '-A'], { cwd: d });
   const sync = (...args) => execFileSync(process.execPath, ['scripts/repo-sync.mjs', ...args], { cwd: d, encoding: 'utf8', env: { ...process.env, DUNIYA_REPO: '' } });
@@ -53,27 +55,27 @@ function project(files) {
 }
 
 const README = `# Duniya
-Install: curl -fsSL https://raw.githubusercontent.com/vikramgorla/whatsapp-agent-duniya/main/install.sh | sudo bash
-Site: https://vikramgorla.github.io/whatsapp-agent-duniya/ and [guides](https://github.com/vikramgorla/whatsapp-agent-duniya/blob/main/docs/README.md).
-Cloud Shell: cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fvikramgorla%2Fwhatsapp-agent-duniya&x=1
-Image: ghcr.io/vikramgorla/whatsapp-agent-duniya:latest · API: gh api repos/vikramgorla/whatsapp-agent-duniya/pulls
-Example: DUNIYA_REPO=you/duniya, https://github.com/you/duniya. Not ours: https://github.com/WhiskeySockets/Baileys and https://github.com/vikramgorla/duniya-backups.
-Service whatsapp-agent-duniya.service in /opt/whatsapp-agent-duniya stays. Clone git@github.com:vikramgorla/whatsapp-agent-duniya.git
+Install: curl -fsSL https://raw.githubusercontent.com/{U}/whatsapp-agent-duniya/main/install.sh | sudo bash
+Site: https://{U}.github.io/whatsapp-agent-duniya/ and [guides](https://github.com/{U}/whatsapp-agent-duniya/blob/main/docs/README.md).
+Cloud Shell: cloudshell_git_repo=https%3A%2F%2Fgithub.com%2F{U}%2Fwhatsapp-agent-duniya&x=1
+Image: ghcr.io/{U}/whatsapp-agent-duniya:latest · API: gh api repos/{U}/whatsapp-agent-duniya/pulls
+Example: DUNIYA_REPO=you/duniya, https://github.com/you/duniya. Not ours: https://github.com/WhiskeySockets/Baileys and https://github.com/{U}/duniya-backups.
+Service whatsapp-agent-duniya.service in /opt/whatsapp-agent-duniya stays. Clone git@github.com:{U}/whatsapp-agent-duniya.git
 `;
 
 test('084 repo:sync: a fork rewrites only project URLs, idempotent; the drift check sees what is left', () => {
   const p = project({
-    'package.json': `{\n  "name": "duniya",\n  "repository": "github:vikramgorla/whatsapp-agent-duniya"\n}\n`,
+    'package.json': `{\n  "name": "duniya",\n  "repository": "github:{U}/whatsapp-agent-duniya"\n}\n`,
     'README.md': README,
-    'install.sh': 'DEFAULT_REPO="https://github.com/vikramgorla/whatsapp-agent-duniya.git"\n',
-    'specs/001-old/spec.md': 'History: https://github.com/vikramgorla/whatsapp-agent-duniya\n',
+    'install.sh': 'DEFAULT_REPO="https://github.com/{U}/whatsapp-agent-duniya.git"\n',
+    'specs/001-old/spec.md': 'History: https://github.com/{U}/whatsapp-agent-duniya\n',
   });
   assert.match(p.sync('--check'), /Up to date/);
   assert.deepEqual(findDrift(p.d), []);
 
   assert.throws(() => p.sync('--repo', 'not a repo'), /--repo: use owner\/name/);
   assert.throws(() => p.sync('--check', '--repo', 'Alice/my-bot'), (e) => e.status === 1 && /would change README\.md/.test(e.stdout));
-  assert.equal(p.read('README.md'), README, '--check writes nothing');
+  assert.equal(p.read('README.md'), up(README), '--check writes nothing');
 
   const out = p.sync('--repo', 'https://github.com/Alice/my-bot');
   assert.match(out, /Synced: 3 files → Alice\/my-bot/);
@@ -82,17 +84,17 @@ test('084 repo:sync: a fork rewrites only project URLs, idempotent; the drift ch
   const r = p.read('README.md');
   for (const want of ['raw.githubusercontent.com/Alice/my-bot/main/install.sh', 'https://alice.github.io/my-bot/', 'github.com/Alice/my-bot/blob/main/docs/README.md',
     'github.com%2FAlice%2Fmy-bot&x=1', 'ghcr.io/alice/my-bot:latest', 'repos/Alice/my-bot/pulls', 'git@github.com:Alice/my-bot.git']) assert.ok(r.includes(want), want);
-  for (const keep of ['https://github.com/you/duniya', 'https://github.com/WhiskeySockets/Baileys', 'github.com/vikramgorla/duniya-backups', 'whatsapp-agent-duniya.service', '/opt/whatsapp-agent-duniya', '# Duniya']) assert.ok(r.includes(keep), keep);
-  assert.equal(p.read('specs/001-old/spec.md'), 'History: https://github.com/vikramgorla/whatsapp-agent-duniya\n', 'specs keep their history');
+  for (const keep of ['https://github.com/you/duniya', 'https://github.com/WhiskeySockets/Baileys', up('github.com/{U}/duniya-backups'), 'whatsapp-agent-duniya.service', '/opt/whatsapp-agent-duniya', '# Duniya']) assert.ok(r.includes(keep), keep);
+  assert.equal(p.read('specs/001-old/spec.md'), up('History: https://github.com/{U}/whatsapp-agent-duniya\n'), 'specs keep their history');
 
   // idempotent: a second run changes nothing
   assert.match(p.sync(), /Up to date: every project URL points to Alice\/my-bot/);
   assert.equal(p.read('README.md'), r);
 
   // a stale link added later (copied from upstream) is drift, with file, line and the fix
-  writeFileSync(join(p.d, 'docs.md'), 'one\nsee https://github.com/vikramgorla/duniya/blob/main/x.md\n');
+  writeFileSync(join(p.d, 'docs.md'), up('one\nsee https://github.com/{U}/duniya/blob/main/x.md\n'));
   execFileSync('git', ['add', 'docs.md'], { cwd: p.d });
-  assert.deepEqual(findDrift(p.d), [{ file: 'docs.md', line: 2, found: 'github.com/vikramgorla/duniya', next: 'github.com/Alice/my-bot' }]);
+  assert.deepEqual(findDrift(p.d), [{ file: 'docs.md', line: 2, found: up('github.com/{U}/duniya'), next: 'github.com/Alice/my-bot' }]);
   p.sync();
   assert.deepEqual(findDrift(p.d), []);
 });
