@@ -58,14 +58,13 @@ export async function renderOverview(soft) {
   const led = (ok, text, href) => h(href ? 'a' : 'span', { class: 'led', ...(href ? { href } : {}) }, h('span', { class: `dot ${ok === true ? 'ok' : ok === false ? 'bad' : 'warn'}`, 'aria-hidden': 'true' }), text);
   // 062: the first thing that is missing, in the order Getting started asks for it
   const noModel = S.checklist?.steps?.find((x) => x.id === 'provider')?.done === false;
-  const tgOk = (st.channel.channels || []).some((c) => c.id !== 'whatsapp' && c.connected > 0); // 086: Telegram alone is a start too
+  const tgOk = (st.channel.channels || []).some((c) => c.id !== 'whatsapp' && c.connected > 0);
   const headline = st.settings.paused ? 'All agents are paused' : wa.state === 'off' && !tgOk ? 'WhatsApp is switched off' : !open && !tgOk ? 'Link WhatsApp or Telegram to begin' : noModel ? 'Connect an AI model so agents can answer'
     : !st.agents.length ? 'Create your first agent' : st.enabledChats === 0 ? 'No chat is switched on — agents stay silent' : allGood ? 'Everything is running'
       : open < numbers.length ? 'A WhatsApp number needs attention' : live ? 'Running, with something to check' : 'No agent is switched on yet';
   const hero = h('div', { class: 'card console' },
     h('div', {}, h('div', { class: 'eyebrow' }, `${hello} · ${S.user.username}`),
       h('h2', {}, headline)),
-    // 086: during Getting started the steps say what is missing: no row of red and amber chips on a fresh install
     checklistActive() ? null : allGood && !st.pending ? h('p', { class: 'small muted calm-line' }, [numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : 'WhatsApp connected', `${plural(live, 'agent')} live`, `${plural(st.enabledChats, 'chat')} on`].join(' · ')) : h('div', { class: 'leds' },
       // 066: plain sentence-case chips ("2 agents live"), not mono caps
       led(numbers.length && open === numbers.length ? true : open ? null : false, wa.state === 'off' ? 'WhatsApp off' : numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : open ? 'WhatsApp connected' : 'WhatsApp not linked', '#settings/whatsapp'),

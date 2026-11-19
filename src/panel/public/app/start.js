@@ -64,13 +64,12 @@ function quickProviderBox() {
   const connect = async (e) => {
     e.preventDefault(); const v = key.value.trim();
     const kind = KEY_KINDS.find(([re]) => re.test(v));
-    if (!kind) { msg.textContent = v ? 'That does not look like a key: OpenRouter keys start with sk-or-, Claude keys with sk-ant-, OpenAI keys with sk-. Copy the whole key and paste it again.' : 'Paste a key first.'; return; }
+    if (!kind) { msg.textContent = v ? 'That does not look like a key (OpenRouter: sk-or-…, Claude: sk-ant-…, OpenAI: sk-…). Copy the whole key again.' : 'Paste a key first.'; return; }
     go.disabled = true; msg.replaceChildren(h('span', { class: 'spinner' }), ` Checking the ${kind[1]} key…`);
     try { await kind[2](v); S.overviewBusy = false; await checklistStep(`Connected: ${kind[1]}`); } catch (x) { msg.textContent = x.message; go.disabled = false; }
   };
   return h('div', {},
     h('form', { class: 'row', onsubmit: connect }, key, go), msg,
-    // 086: the free path spelled out for someone who has never made a key
     h('p', { class: 'small', style: 'margin:4px 0' }, h('b', {}, 'No key yet? Free in two minutes: '), 'sign up at ', extLink(LINKS.openrouterKeys, 'OpenRouter', ''), ', tap ', h('i', {}, 'Create key'), ', copy it and paste it above.'),
     h('p', { class: 'small muted', style: 'margin:0' }, 'Or ', h('a', { href: '#models/chatgpt' }, 'use your ChatGPT plan'), ' · ', h('a', { href: '#models/add' }, 'Claude, Copilot and other providers')));
 }
@@ -85,7 +84,7 @@ async function quickAgentBox() {
 }
 async function quickChatBox(agent) {
   const chats = (await api('GET', '/api/chats').catch(() => [])).filter((c) => c.isGroup && c.size && !c.enabled);
-  if (!chats.length) return h('p', { class: 'small muted' }, 'No groups yet. They appear here by themselves once WhatsApp is linked (on Telegram: once the bot is added to a group). For one person, use ', h('a', { href: '#chats' }, 'Chats → Add a direct chat'), '.');
+  if (!chats.length) return h('p', { class: 'small muted' }, 'No groups yet. They appear by themselves once WhatsApp is linked or the Telegram bot is in a group. For one person, use ', h('a', { href: '#chats' }, 'Chats → Add a direct chat'), '.');
   const list = h('div', { class: 'quick-chats' });
   const draw = (q = '') => list.replaceChildren(...chats.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())).slice(0, 6).map((c) => h('div', { class: 'row spread nowrap' },
     h('div', { style: 'min-width:0' }, h('b', {}, c.name), h('div', { class: 'small muted' }, `${c.size} members`)),
@@ -118,7 +117,7 @@ function quickTestBox(agent) {
 async function stepBody(s, c) {
   const n = (S.status?.channel?.numbers || []).find((x) => x.status !== 'open');
   switch (s.id) {
-    case 'whatsapp': return h('div', {}, n ? linkNumberBox(n) : linkWhatsAppButton(), // 086: a Telegram-only start is one tap away
+    case 'whatsapp': return h('div', {}, n ? linkNumberBox(n) : linkWhatsAppButton(),
       can('admin') ? h('p', { class: 'small muted', style: 'margin:8px 0 0' }, 'Your groups are on Telegram? ', h('a', { href: '#settings/telegram' }, 'Connect a Telegram bot instead')) : null);
     case 'provider': return quickProviderBox();
     case 'agent': return quickAgentBox();
@@ -145,7 +144,7 @@ async function drawChecklist(box, c) {
       s.done ? h('span', { class: 'pill ok' }, 'done')
         : s.skipped ? h('button', { class: 'btn small', title: 'Bring this step back', onclick: () => put({ unskip: s.id }) }, 'Skipped · undo')
           : s === next ? (can('admin') ? h('button', { class: 'btn small', title: 'Skip this step for now', onclick: () => put({ skip: s.id }) }, 'Skip') : h('a', { class: 'btn small primary', href: s.href, onclick: goTo(s.href) }, CHECK_ACTION[s.id] || 'Open'))
-            : h('a', { class: 'btn small', href: s.href, onclick: goTo(s.href) }, CHECK_ACTION[s.id] || 'Open'),
+            : null,
       s === next && body ? h('div', { class: 'ck-do' }, body) : null)))));
 }
 export function checklistBox() {
