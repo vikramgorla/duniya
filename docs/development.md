@@ -267,9 +267,12 @@ repository and opens a pull request; on the project itself it does nothing.
 **Renaming the repository** (owner):
 
 1. GitHub → the repository → **Settings → General → Repository name** → new name → **Rename**.
-2. Wait for the **Fork setup** workflow (runs on the next push to `main`, or **Actions → Fork setup → Run workflow**):
-   it opens *Set up this repository: owner/new-name*. Or locally: `npm run repo:sync -- --repo owner/new-name`, then a
-   PR. Add the old name to `FORMER_NAMES` in `scripts/repo-sync.mjs` in the same PR so stray old links are caught.
+2. Make sure **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull
+   requests** is ticked (off by default), then run **Actions → Fork setup → Run workflow** (it also runs on the next
+   push to `main`): it opens *Set up this repository: owner/new-name*. Without that permission the run still succeeds
+   but only pushes the branch `repo-sync/<owner>-<new-name>`, with a *compare* link in the run summary: open it and
+   create the pull request yourself. Or locally: `npm run repo:sync -- --repo owner/new-name`, then a PR. Add the old
+   name to `FORMER_NAMES` in `scripts/repo-sync.mjs` in the same PR so stray old links are caught.
 3. Merge it. A release follows (version bump in the PR), so the OCI button finds `duniya.zip` under the new name.
 
 GitHub forwards old repository, git, raw and release URLs (servers keep updating; switch their source when
