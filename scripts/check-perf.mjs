@@ -42,6 +42,8 @@ const BUDGETS = {
   'survey results': 90, // 083: GET /api/surveys/:id (totals of 4 questions over 3,000 answers each, 500 people with their answers)
   'campaign page': 15, // 083: GET /api/sending/campaigns/:id (steps with their runs' counts)
   'survey link page': 10, // 083: GET /s/<token> (the public page: token → survey, the person's answers)
+  'promises list': 15, // 092: GET /api/commitments (People → Promises: the first 200 open of 5,000, overdue first, names, chats, agents)
+  'usage per feature': 25, // 092: GET /api/usage?groupBy=feature&period=90d (Cost per feature over 20,000 usage rows)
 };
 const RUNS = 9;
 const RETRIES = 2; // #195: a path over budget is measured again this many times (see below)
@@ -66,6 +68,8 @@ const ALLOW_SCANS = [
   { table: 'contacts', sql: "SUM(book_name <> '') book", why: 'People summary: names from the phone' },
   // 081: Orders → All walks the orders newest first and stops at LIMIT (like Activity)
   { table: 'ord_orders', sql: 'SELECT * FROM ord_orders WHERE tenant_id = ? AND 1 = 1 ORDER BY created_at DESC LIMIT 200', why: 'newest first, stops at LIMIT' },
+  // 092: People → Promises → All walks the promises newest first and stops at LIMIT (like Activity)
+  { table: 'commitments', sql: 'SELECT c.* FROM commitments c ORDER BY c.id DESC LIMIT ?', why: 'newest first, stops at LIMIT' },
   // Households: the whole list by name (an owner has dozens; 1k in the fixture)
   { table: 'households', sql: "SUM(m.role = 'adult') AS adults", why: 'all households, by name' },
 ];
@@ -140,6 +144,9 @@ await bench('campaign page', () => get('/api/sending/campaigns/cmp_000000000000'
 const surveyLink = (await import('../src/modules/surveys/index.js')).invite('sv_000000000000', personId(4100)).survey_link || '';
 const linkPath = `/s/${surveyLink.split('/s/')[1]}`;
 await bench('survey link page', () => fetch(t.base + linkPath).then((r) => r.arrayBuffer()));
+// 092: People → Promises (5,000 promises) and Usage → Cost per feature
+await bench('promises list', () => get('/api/commitments'));
+await bench('usage per feature', () => get('/api/usage?groupBy=feature&period=90d'));
 
 // Everything else on a hot path, for the query-plan check (not timed).
 const activityMid = db.prepare('SELECT id FROM activity WHERE id > ? ORDER BY id LIMIT 1').get(FULL.activity / 2)?.id || 1;
@@ -159,6 +166,9 @@ for (const path of ['/api/status', '/api/checklist', '/api/chats', '/api/agents'
   '/api/sending/runs/run_000000000029?status=waiting', '/api/order-reminders?event=ev_000000000004',
   // 083: surveys and campaigns
   '/api/surveys', '/api/surveys/sv_000000000000/csv', `/api/people/${personId(10)}`,
+  // 092: promises by status and filters; cost per feature over all time
+  '/api/commitments?status=overdue', '/api/commitments?status=done', '/api/commitments?status=all', `/api/commitments?agent=${agent.id}`, `/api/commitments?person=${personId(12)}`,
+  `/api/commitments?chat=${enc(onGroup)}&status=overdue`, '/api/usage?groupBy=feature&period=all',
 ]) await get(path);
 // 082: previews of every kind of audience (the recipients queries), one send on the tick, a reply and a stop word
 for (const audience of [{ kind: 'list', list: 'l_000000000003' }, { kind: 'tag', tag: 'badminton' }, { kind: 'household', household: 'h_000000000004' }, { kind: 'orders', event: 'ev_000000000004' }, { kind: 'orders' }, { kind: 'people', people: [personId(2), personId(4)] }]) {

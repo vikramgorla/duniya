@@ -26,7 +26,6 @@ import { chatsOfPerson } from './people-access.js';
 import { channelOf, isGroup } from '../channels/index.js';
 import { chatChannel } from './chat-tools.js';
 import { registerBriefSection } from './brief.js';
-import { TENANT } from './store.js';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS commitments (
@@ -45,7 +44,7 @@ const PER_TICK = 3;
 const PROMISE = /\b(i'?ll|i will|i can|i'?m going to|i am going to|i shall|let me|je vais|je peux|ich werde|ich bringe|voy a|lo hago|i'?ll do|on it)\b/i;
 const DONE = /\b(done|did it|brought|paid|sent|finished|ready|delivered|sorted|handled|got (it|them)|fait|erledigt|bezahlt|hecho)\b|✅|✔️/i;
 const today = (tz = env.timezone, now = Date.now()) => localParts(tz, now).date;
-const view = (r, day = today()) => ({ id: r.id, agent: r.agent, chat: r.chat, person: r.person, who: r.who || r.person_name || '', what: r.what, due: r.due, status: r.status,
+const view = (r, day = today()) => ({ id: r.id, agent: r.agent, chat: r.chat, person: r.person, who: r.who || (r.person ? personRow(r.person)?.name : '') || '', what: r.what, due: r.due, status: r.status,
   overdue: r.status === 'open' && !!r.due && r.due < day, msg: r.msg || null, by: r.by, followedUpAt: r.followed_up_at || null, createdAt: r.created_at, updatedAt: r.updated_at });
 const STATUSES = ['open', 'overdue', 'done', 'dropped', 'all'];
 const notFound = () => Object.assign(new Error('No such promise'), { status: 404 });
@@ -59,14 +58,14 @@ const one = (id) => db.prepare('SELECT * FROM commitments WHERE id = ?').get(Mat
 export function listCommitments({ agent = '', person = '', chat = '', chats = null, status = 'open', limit = 200 } = {}) {
   if (!STATUSES.includes(status)) throw Object.assign(new Error(`status: ${STATUSES.join(', ')}`), { status: 400, field: 'status' });
   const day = today();
-  const where = []; /** @type {(string|number)[]} */ const args = [TENANT];
+  const where = []; /** @type {(string|number)[]} */ const args = [];
   if (status === 'overdue') { where.push("c.status = 'open' AND c.due <> '' AND c.due < ?"); args.push(day); } else if (status !== 'all') { where.push('c.status = ?'); args.push(status); }
   if (agent) { where.push('c.agent = ?'); args.push(agent); }
   if (person) { where.push('c.person = ?'); args.push(person); }
   if (chat) { where.push('c.chat = ?'); args.push(chat); }
   if (chats) { if (!chats.length) return []; where.push(`c.chat IN (${chats.map(() => '?').join(',')})`); args.push(...chats); }
   const order = status === 'open' || status === 'overdue' ? "c.due = '', c.due, c.id DESC" : status === 'all' ? 'c.id DESC' : 'c.updated_at DESC';
-  return db.prepare(`SELECT c.*, p.name AS person_name FROM commitments c LEFT JOIN people p ON p.tenant_id = ? AND p.id = c.person
+  return db.prepare(`SELECT c.* FROM commitments c
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY ${order} LIMIT ?`).all(...args, Math.min(Math.max(Number(limit) || 200, 1), 200)).map((r) => view(r, day));
 }
 /** One commitment (or null). */

@@ -102,9 +102,10 @@ function messagesOf(person) {
   const p = personRow(person);
   if (!p) return [];
   const ids = db.prepare('SELECT external_id FROM identities WHERE tenant_id = ? AND person = ? LIMIT 10').all(TENANT, person).map((r) => r.external_id);
-  const out = p.phone ? db.prepare('SELECT text, ts, channel FROM messages WHERE sender = ? AND from_agent = 0 ORDER BY id DESC LIMIT 100').all(p.phone) : [];
-  for (const id of ids) out.push(...db.prepare('SELECT text, ts, channel FROM messages WHERE sender_jid = ? AND from_agent = 0 ORDER BY id DESC LIMIT 50').all(id));
-  return out.sort((a, b) => b.ts - a.ts).slice(0, 100);
+  const out = new Map(); // by message id: a WhatsApp message matches both their number and their identity (092: counted once)
+  for (const m of p.phone ? db.prepare('SELECT id, text, ts, channel FROM messages WHERE sender = ? AND from_agent = 0 ORDER BY id DESC LIMIT 100').all(p.phone) : []) out.set(m.id, m);
+  for (const id of ids) for (const m of db.prepare('SELECT id, text, ts, channel FROM messages WHERE sender_jid = ? AND from_agent = 0 ORDER BY id DESC LIMIT 50').all(id)) out.set(m.id, m);
+  return [...out.values()].sort((a, b) => b.ts - a.ts).slice(0, 100);
 }
 /** Recompute one person's automatic preferences (the owner's own choices stay). */
 function compute(person, now = Date.now()) {
