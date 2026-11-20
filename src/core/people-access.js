@@ -8,6 +8,7 @@
 // Agent access is decided here, in code: an agent sees people from its own chats plus the lists the owner shares with
 // it ("Own chats", the default), everyone ("Everyone in People"), or nobody ("Off"). A turn whose sender is the owner
 // (verified identity, any channel) gets owner-level access. Hidden people are never shown to an agent.
+import { prefsLine } from './person-insights.js';
 import { randomBytes } from 'node:crypto';
 import { db, kvGet, kvSet } from './db.js';
 import { digits, clip, fail } from './config.js';
@@ -151,7 +152,7 @@ export function senderCard(person, scope, name = '') {
   return [`About the sender (from People; use it, don't recite it): ${name || p.ownName || 'unnamed'}${p.nickname ? ` ("${p.nickname}")` : ''}`,
     hh.length ? `Household: ${hh.map((h) => `${h.name} (${h.role})`).join(', ')}` : '',
     tags.length ? `Tags: ${tags.join(', ')}` : '',
-    ...notes.map((n) => `Note (${n.by}): ${clip(n.text, 160)}`), ...moduleCard(person)].filter(Boolean).join('\n');
+    ...notes.map((n) => `Note (${n.by}): ${clip(n.text, 160)}`), ...moduleCard(person), prefsLine(person)].filter(Boolean).join('\n');
 }
 
 // ---------- consent ----------

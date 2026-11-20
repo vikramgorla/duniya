@@ -10,6 +10,7 @@ import { activity } from './events.js';
 import { tagsInChat } from './member-tags.js';
 import { agentName } from './contacts.js';
 import { forgetChatLessons } from './lessons.js';
+import { forgetCommitments } from './commitments.js';
 
 export const DEFAULT_WINDOW = 30;
 export const memoryEnabled = (agent) => agent?.memory?.enabled !== false;
@@ -172,6 +173,7 @@ export function memoryView(chat) {
 export function eraseChatMemory(chat, by = 'panel') {
   eraseChat(chat);
   forgetChatLessons(chat); // 089: its own lessons and join-in feedback go with it
+  forgetCommitments({ chat }); // 091: and the promises made there
   activity('memory.erased', { chat, summary: `All stored messages, summary and notes erased (${by})` });
 }
 

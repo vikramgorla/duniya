@@ -12,6 +12,7 @@ import { clip, fail, money, plural } from '../../core/config.js';
 import { TENANT } from '../../core/store.js';
 import { getHousehold, householdsOf, personRow } from '../../core/people.js';
 import { chatsOfPerson, consentsOf } from '../../core/people-access.js';
+import { prefsOf } from '../../core/person-insights.js';
 import { getChatPrefs } from '../../core/chat-prefs.js';
 import { channelOf, isDirect, phoneChat } from '../../channels/index.js';
 import { need } from '../index.js';
@@ -78,10 +79,11 @@ async function units(a) {
 /** Where a person gets a message: their Telegram chat when they have one, else WhatsApp; and whether they wrote there. */
 function routeOf(p, on) {
   const chats = chatsOfPerson(p.id).filter((c) => isDirect(c.chat));
+  const wa = on.has('whatsapp') && chats.find((c) => channelOf(c.chat) === 'whatsapp');
+  if (wa && prefsOf(p.id).app === 'whatsapp') return { chat: wa.chat, channel: 'whatsapp', known: !!wa.wrote }; // 091: the app they answer on
   const tg = on.has('telegram') && chats.find((c) => channelOf(c.chat) === 'telegram');
   if (tg) return { chat: tg.chat, channel: 'telegram', known: !!tg.wrote };
   if (!on.has('whatsapp')) return null;
-  const wa = chats.find((c) => channelOf(c.chat) === 'whatsapp');
   if (wa) return { chat: wa.chat, channel: 'whatsapp', known: !!wa.wrote };
   return p.phone ? { chat: phoneChat(p.phone), channel: 'whatsapp', known: false } : null;
 }

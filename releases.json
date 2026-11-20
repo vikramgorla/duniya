@@ -1,6 +1,29 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.52.0": {
+      "breaking": false,
+      "title": "Promises kept, family ties suggested, and each person's language and hours",
+      "summary": "Agents can keep track of what people promise in your groups and remind them once, People suggests family ties it hears about (you decide), and every person's language, usual hours and app are learned and editable.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Track promises (per agent): \"I'll bring the speakers on Friday\" is noted, the person gets one gentle reminder when it is due, and it is marked done when the chat shows it. See them on the person's page and in your morning brief."
+        },
+        {
+          "type": "new",
+          "text": "People → Suggestions: family ties heard in conversations (\"my daughter Vedika\") to add or reject with one tap; nothing is saved without you."
+        },
+        {
+          "type": "new",
+          "text": "Each person's language, usual hours and app are learned from their messages and shown on their page; change any of them."
+        },
+        {
+          "type": "improved",
+          "text": "Agents answer people in their language, and messages to lists arrive in each person's usual hours and on the app they use."
+        }
+      ]
+    },
     "2.51.0": {
       "breaking": false,
       "title": "A morning brief, next steps to approve, and what you missed",

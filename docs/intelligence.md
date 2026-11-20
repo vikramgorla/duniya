@@ -27,6 +27,9 @@ on.
 | [Suggested next steps](owner-assistant.md#suggested-next-steps) | approve / dismiss each | on | none | nothing runs without your approval |
 | [Ask your data](owner-assistant.md#ask-your-data) | the owner assistant and organizers | on | the assistant's usual turn | read tools only; roles decided in code |
 | [Catch-up](owner-assistant.md#catch-up) | a button / a question | on demand | one background call, ≤ 600 tokens out | only chats that are on and not private |
+| [Commitments](#commitments) | agent → Promises & people → *Track promises*, *When one is due* | off (opt-in per agent); reminders in the chat | one small background call per promise-like message (≤ 150 tokens, ≤ 50 a day per agent); reminders written in code | the promise's short wording, who, due date; erased with the person or the chat's memory |
+| [Relationship cues](people.md#suggestions) | agent → Promises & people → *Suggest family ties* | off (opt-in per agent) | none: in code | suggestions only, saved by you; family words only |
+| [Preferences](people.md#preferences) | a person's page → Preferences | automatic, editable | none: in code | language, usual hours, app; erased with the person |
 | [When to join in](#when-to-join-in) | the same switches; feedback buttons | on (follow-ups and *Whenever needed* agents) | as lessons; at most 5 short join-in lessons in a judged turn | counts per chat, no message text |
 
 ## Smart model choice
@@ -94,6 +97,23 @@ lesson is used. At most 20 proposals per agent per day; each counts in Usage as 
 > reads, like a note.
 
 ![Lessons of the Car pooling agent: one waiting for approval, two saved (one about when to join in)](site/img/card-lessons.webp)
+
+## Commitments
+
+**What people promise in your groups, remembered, with one gentle reminder.** An agent's page → **Promises & people** →
+**Track promises**.
+
+1. In its chats that are on, a message that reads like a promise ("I'll bring the speakers on Friday", "I can pay on
+   Monday") is read by the background model once: *what* (in their words) and *when* it is due ("Friday" becomes a
+   date). It shows on the person's page (**Commitments**), on the agent's **Open promises**, and, when due, in your
+   [morning brief](owner-assistant.md#morning-brief).
+2. **When one is due**: *In the chat where it was promised* (default), *In a direct message* (their direct chat, when it
+   is on), or *Don't follow up*. One reminder, inside your sending hours, written in code: *"Anu, a friendly reminder:
+   you said you'd bring the speakers (by 2026-11-21). All set? Just reply here."*
+3. **Done**: when someone writes that it is done ("brought them ✅", "paid"), the model checks it against the open
+   promises of that chat and marks it done. **Done** / **Drop** on any row corrects it.
+
+At most 50 model calls per agent per day (Usage → Kind: *commitments*); other messages are never sent for this.
 
 ## When to join in
 

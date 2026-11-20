@@ -2,6 +2,8 @@
 // People operations (078, PRM core): merge two people (owner only, undoable for 30 days), export one person, erase one
 // person (079: admin MCP only, behind a confirm; the panel hides people instead). Merges are suggested only on evidence: an identity
 // whose verified phone is another person's number. Undo records are pruned on the upkeep tick (no timers).
+import { forgetPersonInsights } from './person-insights.js';
+import { forgetCommitments } from './commitments.js';
 import { randomBytes } from 'node:crypto';
 import { db } from './db.js';
 import { fail, plural } from './config.js';
@@ -184,6 +186,7 @@ export function erasePerson(id, by = 'panel') {
     return { messages, directChats: chats.length, notes, ties, households, moduleRows };
   });
   forgetPeopleCache();
+  forgetPersonInsights(p.id); forgetCommitments({ person: p.id }); // 091: what was learned about them
   // no name in the log: the person is gone
   activity('config', { summary: `Erased a person from People: ${plural(counts.messages, 'stored message')}, ${plural(counts.notes, 'note')}, ${plural(counts.ties, 'tie')} (${by})` });
   return counts;

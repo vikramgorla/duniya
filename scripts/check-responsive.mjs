@@ -228,6 +228,8 @@ const STATES = [
   { name: 'usage', hash: 'usage' },
   { name: 'agent-model-smart', hash: 'agents/office/model' },
   { name: 'agent-lessons', hash: 'agents/carpool/lessons', wait: 1500 },
+  { name: 'agent-promises', hash: 'agents/carpool/promises', wait: 1500 }, // 091: Promises & people with open promises
+  { name: 'person-prefs', hash: 'people/41790000001', wait: 1500 }, // 091: Preferences and Commitments on a person's page
   { name: 'settings-owner-brief', hash: 'settings/owner-assistant', wait: 1500 }, // 090: Morning brief block
   { name: 'chat-catch-up', hash: 'chats/120363041122330003%40g.us', wait: 1500 }, // 090: What did I miss? on a group's page // 089: lessons to approve, saved lessons, join-in // 088: Smart model choice: light and strong, Self-check
   { name: 'usage-models', hash: 'usage', js: "await T.click('Models', '.seg button', 300);" }, // 073: breakdown rows with prices and ⋯

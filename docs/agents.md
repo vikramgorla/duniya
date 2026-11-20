@@ -51,7 +51,8 @@ Admin MCP: `test_agent`.
 - **An agent's page:** a short header (avatar, name, state, switch, **⋯** with *Test*, *Change with AI*, *Duplicate*,
   *Export*, *Delete*), then its sections, each with its current value: **Character**, **Where it answers** (its chats,
   triggers, @mentions, direct messages), **People**, **Quick replies & FAQ**, **Welcome**, **Schedules**, **Model**,
-  **Tools**, **Memory**, **Photos & voice**, **Spending cap**, **Advanced**, **Review**, **Lessons** and **Test**. Tap one to open
+  **Tools**, **Memory**, **Photos & voice**, **Spending cap**, **Advanced**, **Promises & people** (track promises,
+  suggest family ties: [Smarter agents](intelligence.md#commitments)), **Review**, **Lessons** and **Test**. Tap one to open
   it.
 - **Saving:** each section saves on its own. It says *All changes saved* until you change something; then **Save**
   stays at the bottom of the screen. After saving, the toast offers **Undo**. Leaving with unsaved changes asks first.

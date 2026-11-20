@@ -305,7 +305,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const TG = (n) => `tg:${bot.bot.id}#-10017000000${n}`; // 077: Telegram groups of the demo bot
   await mk('family', 'family.json', { chats: [G(2), `${P(4)}@s.whatsapp.net`, TG(1)], model: 'chatgpt:gpt-5.5', organizers: [`+${P(4)}`] });
   await mk('carpool', 'carpool.json', {
-    chats: [G(3)], model: 'anthropic:claude-haiku-5-5', organizers: [`+${P(2)}`],
+    chats: [G(3)], model: 'anthropic:claude-haiku-5-5', organizers: [`+${P(2)}`], promises: { track: true, followUp: 'chat' }, cues: true, // 091
     mcpServers: { transport: { type: 'local', package: 'mcp-swiss@latest', args: [], env: {} }, calendar: { url: 'https://calendar.example.org/mcp', auth: 'oauth' } },
     tools: { participant: ['transport:*', 'calendar:events_list'], organizer: ['calendar:*'], deny: [] },
     // 054: built-in answers (no AI): an FAQ entry next to the template's quick replies and welcome
@@ -389,6 +389,13 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const font = pp.saveHousehold({ name: 'Fontaine family' });
   for (const [id, role] of [[pid[2], 'adult'], [pid[1], 'adult'], [kids[2].id, 'kid']]) pp.setHouseholdMember(font.id, id, role);
   pp.addTie(pid[0], pid[3], { kind: 'partner' });
+  // 091: promises people made in the rides group, a family tie heard there, and one person's preferences
+  const dayIn = (d) => new Date(now + d * 86400000).toISOString().slice(0, 10);
+  const promise = db.db.prepare('INSERT INTO commitments (agent, chat, person, who, what, due, msg, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  promise.run('carpool', G(3), pid[0], 'Marc', 'bring the child seat for Lea on Friday', dayIn(1), null, now - 5 * 3600000, now - 5 * 3600000);
+  promise.run('carpool', G(3), pid[2], 'Lea', 'pay Marc the CHF 12 for petrol', dayIn(0), null, now - 26 * 3600000, now - 26 * 3600000);
+  db.db.prepare("INSERT OR IGNORE INTO tie_suggestions (key, person, kind, name, word, agent, chat, status, created_at) VALUES (?, ?, 'child', 'Mira', 'daughter', 'carpool', ?, 'proposed', ?)").run(`${pid[0]}|child|mira`, pid[0], G(3), now - 2 * 3600000);
+  db.db.prepare("INSERT OR REPLACE INTO person_prefs (person, lang, hours_from, hours_to, app, computed_at) VALUES (?, 'fr', 7, 21, 'whatsapp', ?)").run(pid[0], now);
   for (const k of [kids[0], kids[1]]) { pp.addTie(pid[0], k.id, { kind: 'parent' }); pp.addTie(pid[3], k.id, { kind: 'parent' }); }
   pp.addTie(kids[0].id, kids[1].id, { kind: 'sibling' });
   pp.addTie(pid[2], kids[2].id, { kind: 'parent' }); pp.addTie(pid[1], pid[2], { kind: 'partner' });
