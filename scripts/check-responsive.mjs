@@ -226,7 +226,8 @@ const STATES = [
       if (String(u).startsWith('/api/providers') && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); if (Array.isArray(j)) return new Response(JSON.stringify(j.filter((x) => x.id !== 'openrouter').map((x) => ({ ...x, connected: false, models: 0 })))); }
       return r; }; S.models = null;`, js: "await T.click('Sign in with ChatGPT', 'button', 1200); T.openAll();" },
   { name: 'usage', hash: 'usage' },
-  { name: 'agent-model-smart', hash: 'agents/office/model' }, // 088: Smart model choice: light and strong, Self-check
+  { name: 'agent-model-smart', hash: 'agents/office/model' },
+  { name: 'agent-lessons', hash: 'agents/carpool/lessons', wait: 1500 }, // 089: lessons to approve, saved lessons, join-in // 088: Smart model choice: light and strong, Self-check
   { name: 'usage-models', hash: 'usage', js: "await T.click('Models', '.seg button', 300);" }, // 073: breakdown rows with prices and ⋯
   { name: 'usage-set-price', hash: 'usage', js: "await T.click('Models', '.seg button', 300); document.querySelector('.urows details.menu').open = true; await T.click('Set price', 'button', 600);" },
   { name: 'server', hash: 'server', wait: 2000, js: 'T.openAll();' },

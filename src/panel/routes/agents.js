@@ -18,6 +18,7 @@ import { builtinAnswer, todayText } from '../../core/quick.js';
 import { stripTriggers } from '../../core/router.js';
 import { handleConfirmCommand, runAgent } from '../../core/runner.js';
 import { listAnswers, rateAnswer, reviewCounts } from '../../core/review.js';
+import { joinFeedback, judgedOf, lessonFromThumbsDown, proposedCount } from '../../core/lessons.js';
 import { runSchedule } from '../../core/scheduler.js';
 import { interpolate } from '../../core/store.js';
 import { oauthClientOf, organizerConnection } from '../../core/tools.js';
@@ -50,7 +51,7 @@ export function agentRoutes(route, { channel } = {}) {
     return [201, { ...agentView(agent), warnings }];
   });
   route('POST', '/api/agents/reload', async () => { await loadAgents(); await resetMcpPool(); activity('system', { summary: 'Agents reloaded' }); return listAgents().map(agentView); });
-  route('GET', '/api/agents/:id', async (req, res, body, q, p) => { const b = getAgent(p.id); return b ? { ...agentView(b), ...(isBuiltin(p.id) ? {} : { review: reviewCounts(p.id) }) } : [404, { error: 'Not found' }]; });
+  route('GET', '/api/agents/:id', async (req, res, body, q, p) => { const b = getAgent(p.id); return b ? { ...agentView(b), ...(isBuiltin(p.id) ? {} : { review: reviewCounts(p.id), lessonsToApprove: proposedCount(p.id) }) } : [404, { error: 'Not found' }]; });
   // 070: Review & teach. The agent's answers with the message that asked (admins, like stored messages; private chats
   // left out); the first page of a look is recorded in Activity. Ratings: 1, -1 or 0 (clear).
   route('GET', '/api/agents/:id/review', async (req, res, body, q, p, user) => {
@@ -59,15 +60,22 @@ export function agentRoutes(route, { channel } = {}) {
     const rows = listAnswers(p.id, { before: q.get('before'), only: q.get('only') || '', limit: 21 });
     const names = await chatLabels(rows.map((r) => r.chat), channel);
     if (!q.get('before')) activity('config', { agent: p.id, summary: `Answers of ${b.name} reviewed by ${user.username}` });
+    const judged = judgedOf(rows.map((r) => r.id)); // 089: answers to messages it judged by itself
     return {
       counts: reviewCounts(p.id), more: rows.length > 20,
-      answers: rows.slice(0, 20).map(({ question: qn, ...r }) => ({ ...r, chatName: names.get(r.chat),
+      answers: rows.slice(0, 20).map(({ question: qn, ...r }) => ({ ...r, chatName: names.get(r.chat), ...(judged.has(r.id) ? { judged: true } : {}),
         question: qn && { text: qn.text, ts: qn.ts, name: personInfo({ phone: qn.sender, jid: qn.senderJid, fallbackName: qn.name }).label } })),
     };
   }, { role: 'admin' });
   route('PUT', '/api/agents/:id/review/:msg', async (req, res, body, q, p, user) => {
-    if (!getAgent(p.id) || isBuiltin(p.id)) return [404, { error: 'Not found' }];
-    return { ...rateAnswer(p.id, p.msg, body.rating, user.username), counts: reviewCounts(p.id) };
+    const agent = getAgent(p.id);
+    if (!agent || isBuiltin(p.id)) return [404, { error: 'Not found' }];
+    const r = rateAnswer(p.id, p.msg, body.rating, user.username);
+    // 089: a 👎 proposes a lesson (in the background); 👍 on an answer to a judged message counts as good join-in feedback
+    const ans = r.rating ? listAnswers(p.id, { before: r.id + 1, limit: 1 })[0] : null;
+    if (ans && r.rating < 0) lessonFromThumbsDown(agent, { msg: ans.id, chat: ans.chat, question: ans.question?.text || '', answer: ans.text, by: user.username })?.catch(() => {});
+    if (ans && r.rating > 0 && judgedOf([ans.id]).has(ans.id)) joinFeedback(agent, { chat: ans.chat, kind: 'good', msg: ans.id, by: user.username });
+    return { ...r, counts: reviewCounts(p.id), ...(r.rating < 0 && agent.lessons?.enabled !== false ? { proposing: true } : {}) };
   }, { role: 'admin' });
   route('PUT', '/api/agents/:id', async (req, res, body, q, p, user) => {
     const before = getAgent(p.id);

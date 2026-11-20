@@ -74,6 +74,7 @@ context…" (edit under **Settings → Privacy notice**).
 | **Chats that are off** | the id, time and sender id of the newest message only (no text, no names), to ask the phone for history later |
 | **Activity log** | minimal, normal or verbose, by category and per chat, with retention. Errors, confirmations, configuration changes and channel status are always recorded |
 | **Summaries** | the weekly summary and *Why agents stayed quiet* keep counts only |
+| **Lessons** | short rules per agent (and optionally per chat) that you approve, proposed from your 👎 and corrections; the proposal call sends the question and answer (or your correction) to your background model. Join-in feedback keeps counts per chat. Delete any lesson on the agent's **Lessons**; erasing a chat's memory deletes its lessons and feedback ([Lessons](intelligence.md#lessons)) |
 | **Smarter agents** | [Smart model choice](intelligence.md#smart-model-choice) keeps per answer the tier, a short reason and the cost (never text); its classifier sends the message alone (≤ 400 characters) to your light model. [Self-check](intelligence.md#self-check) compares figures in code and keeps counts only |
 | **Welcomes** | a hash of the group and the new member's id, so each person is welcomed once (no names or numbers); the activity log says how many were welcomed |
 | **Personal details** | agents don't post phone numbers, emails, health or payment details in groups |

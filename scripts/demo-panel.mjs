@@ -355,6 +355,12 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   // 070: Review — one answer rated good, one wrong (shows Teach)
   const review = await imp('src/core/review.js');
   review.rateAnswer('carpool', answers[0], 1, 'admin'); review.rateAnswer('carpool', answers[1], -1, 'admin');
+  // 089: lessons — one waiting for the owner's OK (from the 👎 above), two saved (one about when to join in)
+  const lesson = (l) => db.db.prepare('INSERT INTO lessons (agent, chat, kind, text, status, source, msg, by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('carpool', l.chat || '', l.kind || 'answer', l.text, l.status, l.source, l.msg || null, 'admin', now - l.ago, now - l.ago);
+  lesson({ text: 'Mia only drives back from Cornavin on Thursdays; do not offer her seats on other days.', status: 'proposed', source: 'thumbs', msg: answers[1], chat: G(3), ago: 3 * 3600000 });
+  lesson({ text: 'Rides to Geneva on Fridays leave from Morges station, never from Lausanne.', status: 'active', source: 'correction', msg: answers[0], ago: 4 * 86400000 });
+  lesson({ text: 'Stay out of chatter about parking between Marc and Luca unless they ask for a ride.', kind: 'join', chat: G(3), status: 'active', source: 'needless', ago: 2 * 86400000 });
   db.setChatMemory(G(3), 'Regular rides: Marc (Mon/Wed/Fri 07:40 Morges station → Geneva), Luca (Tue/Thu 07:15). Mia returns from Cornavin around 18:10. Lea needs Friday mornings.', lastId);
   for (const [text, author] of [['Fri 21 Nov — Marc, 07:40 Morges station → Geneva, seats: Lea + 1 free', 'Marc'], ['Thu 20 Nov — Mia, 18:10 Geneva Cornavin → Morges, seats: Sophie', 'Mia'], ['Sophie needs a ride back on Thursdays (Cornavin → Morges)', 'Sophie']]) {
     db.addNote({ chat: G(3), agent: 'carpool', text, author, role: 'participant' });

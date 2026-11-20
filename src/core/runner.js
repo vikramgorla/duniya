@@ -7,6 +7,7 @@ import { chat as modelChat, effectiveFallback, refCost } from './providers/index
 import { SMART, chooseTier, tierModels, strongRef } from './smart-model.js';
 import { checkFacts } from './fact-check.js';
 import { recordSmartTurn } from './usage.js';
+import { lessonsContext, joinLessonsNote } from './lessons.js';
 import { REASON_TEXT } from './providers/errors.js';
 import { modelName, toolPhrase } from '../panel/public/app/names.js';
 import { getChatPrefs } from './chat-prefs.js';
@@ -152,7 +153,10 @@ export async function runAgent(ctx) {
   const notes = [ctx.mediaNote, plan.note].filter(Boolean).join('\n');
   // #163: the panel test console sends its conversation so far (it is not stored as chat history)
   const thread = Array.isArray(ctx.thread) && ctx.thread.length ? `Earlier in this test conversation:\n${ctx.thread.map((t) => `${t.from === 'agent' ? 'You' : senderName}: ${t.text}`).join('\n')}\n\n` : '';
-  const turnText = `${memory ? `${memory}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${card ? `${card}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}${ctx.unaddressed ? `\n\n${JUDGE_NOTE}` : ''}${ctx.turnNote ? `\n\n${ctx.turnNote}` : ''}`;
+  // 089: lessons the owner approved, the most relevant to this message first (small budget); join-in lessons for judged turns
+  const lessons = agent.lessons?.enabled === false ? '' : lessonsContext(agent, ctx.contextChat || chat, text);
+  const joinNote = ctx.unaddressed && agent.lessons?.enabled !== false ? joinLessonsNote(agent, ctx.contextChat || chat) : '';
+  const turnText = `${memory ? `${memory}\n\n` : ''}${lessons ? `${lessons}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${card ? `${card}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}${ctx.unaddressed ? `\n\n${JUDGE_NOTE}${joinNote ? `\n${joinNote}` : ''}` : ''}${ctx.turnNote ? `\n\n${ctx.turnNote}` : ''}`;
   const messages = [{
     role: 'user',
     content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText,

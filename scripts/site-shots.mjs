@@ -108,6 +108,7 @@ const CARDS = [
   ['card-usage-breakdown', 'usage', '', 'box:Breakdown', 900], // 073: Usage breakdown rows
   ['card-usage-smart', 'usage', '', 'box:Smart model choice', 900], // 088: light vs strong answers and what it saved
   ['card-agent-model', 'agents/office/model', '', '.ap-sec', 600], // 088: Auto: light or strong, Self-check
+  ['card-lessons', 'agents/carpool/lessons', "await T.until('.lessons li'); await T.wait(300);", '.ap-sec', 600], // 089: lessons to approve and saved lessons
   ['card-updates', 'settings/updates', '', 'box:Updates', 900], // 073: Settings → Updates
   ['card-assistants', 'settings/assistants', '', 'box:Connected AI assistants', 900],
   ['card-logging', 'settings/logging', '', 'box:Activity log', 600],

@@ -12,6 +12,7 @@ import { historyLoadCount, historyStatus, loadChatHistory } from '../../core/his
 import { memberTag, personView, tagsInChat } from '../../core/member-tags.js';
 import { eraseChatMemory, forgetChanged, maybeSummarize, memoryView } from '../../core/memory.js';
 import { ratingsOf } from '../../core/review.js';
+import { judgedOf } from '../../core/lessons.js';
 import { visibleChats } from '../../core/owner-assistant.js';
 import { maybePostNotice, noticePostedAt, setChatNoticeOff } from '../../core/privacy-notice.js';
 import { chatToolCatalog, editOwnMessage, editWindow } from '../../core/chat-tools.js';
@@ -108,8 +109,9 @@ export function chatRoutes(route, { channel } = {}) {
     const rated = ratingsOf(list.filter((m) => m.fromAgent).map((m) => m.id));
     const rateable = !isChatPrivate(chat);
     const jids = new Map(list.map((m) => [m.id, m.senderJid]));
-    const edits = editsOf(list.map((m) => m.id)); // 087: edited messages say so; agent answers say whether they can still be edited
-    const rows = list.map(({ senderJid: _jid, ...m }) => ({ ...m, ...(edits.has(m.id) ? { edited: edits.get(m.id).ts } : {}) })).map((m) => (m.fromAgent ? { ...m, rating: rated.get(m.id) || 0, rateable: rateable && !!m.agent && m.id > 0, editable: editWindow(chat, m.ts).open && m.id > 0 }
+    const edits = editsOf(list.map((m) => m.id));
+    const judged = judgedOf(list.filter((m) => m.fromAgent).map((m) => m.id)); // 089: answers it gave by itself (feedback on joining in) // 087: edited messages say so; agent answers say whether they can still be edited
+    const rows = list.map(({ senderJid: _jid, ...m }) => ({ ...m, ...(edits.has(m.id) ? { edited: edits.get(m.id).ts } : {}) })).map((m) => (m.fromAgent ? { ...m, rating: rated.get(m.id) || 0, rateable: rateable && !!m.agent && m.id > 0, editable: editWindow(chat, m.ts).open && m.id > 0, ...(judged.has(m.id) ? { judged: true } : {}) }
       : { ...m, name: personInfo({ phone: m.sender, jid: jids.get(m.id), fallbackName: m.name }).label, ...(memberTag(chat, { phone: m.sender, jid: jids.get(m.id) }, tags) ? { tag: memberTag(chat, { phone: m.sender, jid: jids.get(m.id) }, tags) } : {}) }));
     if (!q.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${q.get('q') ? ` (search “${String(q.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;

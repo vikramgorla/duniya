@@ -16,6 +16,7 @@ export const AGENT_DEFAULTS = Object.freeze({
   // 088: with model "smart": its own light / strong models ('' = Settings → Models → Smart choice)
   modelTiers: { light: '', strong: '' },
   selfCheck: true, // 088: amounts, dates and counts from People and modules are checked before an answer goes out
+  lessons: { enabled: true, autoApprove: false }, // 089: lessons from the owner's corrections; saved after the owner's OK
   historySize: 30,
   prompt: 'You are a helpful assistant in a WhatsApp group.',
   triggers: [],
@@ -170,6 +171,8 @@ export function validateAgentConfig(input) {
     out.modelTiers[k] = v === 'auto' ? '' : v;
   }
   out.selfCheck = c.selfCheck !== false;
+  const ls = c.lessons && typeof c.lessons === 'object' ? c.lessons : {};
+  out.lessons = { enabled: ls.enabled !== false, autoApprove: !!ls.autoApprove };
   out.maxTokens = int(c.maxTokens, 'maxTokens', 64, 8192);
   try { out.fallback = cleanOverride(c.fallback, 'fallback'); } catch (e) { fail(e.field || 'fallback', e.message); }
   out.historySize = int(c.historySize, 'historySize', 0, 200);

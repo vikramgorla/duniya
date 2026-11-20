@@ -9,7 +9,7 @@ import { capsOf, isGroup } from '../channels/index.js';
 import { getSetting } from './store.js';
 import { listAgents as allAgents, getAgent, agentForChat, roleIn, isBuiltin, updateAgent } from './agents.js';
 import { runAgent, handleConfirmCommand } from './runner.js';
-import { logMessage, messageByMsgId, deleteMessageByMsgId, saveReaction, savePollVote, pollTally, setMessageText, moveChatData, editStoredMessage, agentAnsweredAfter } from './db.js';
+import { lastAgentMessage, logMessage, messageByMsgId, deleteMessageByMsgId, saveReaction, savePollVote, pollTally, setMessageText, moveChatData, editStoredMessage, agentAnsweredAfter } from './db.js';
 import { activity } from './events.js';
 import { maybeSummarize, forgetChanged } from './memory.js';
 import { setChatChannel } from './chat-tools.js';
@@ -29,6 +29,7 @@ import { inRole, notePersonChat } from './people-access.js';
 import { interceptMessage } from '../modules/index.js';
 import { drainReads, paceReply, queueRead, readWhenDue } from './pace.js';
 import { claimTurn, releaseTurn, isDuplicate, noteSent, similarity } from './turns.js';
+import { lessonFromCorrection, noteJudgedAnswer } from './lessons.js';
 
 // 059: the built-in owner assistant is reached through the owner hand-off only, never by routing.
 const listAgents = () => allAgents().filter((b) => !isBuiltin(b));
@@ -331,6 +332,11 @@ export function createRouter(channel) {
 
     const role = await resolveRole(agent, msg, channel);
     const isConfirm = /^(confirm|cancel)\s+[a-z0-9]{4}$/i.test(lower);
+    // 089: the owner corrects the agent right after its answer here ("no, it's Chary who…"): a lesson is proposed
+    if (!isConfirm && userForPhone(msg.phone)?.role === 'owner') {
+      const last = lastAgentMessage(msg.chat);
+      if (last?.agent === agent.id && Date.now() - last.ts < 15 * 60000) lessonFromCorrection(agent, { chat: msg.chat, text: wake, answer: last.text, msg: last.id })?.catch(() => {});
+    }
     const addressed = !msg.isGroup
       || (agent.respondToMentions && (msg.mentioned || msg.replyToAgent))
       || !!findTrigger(agent, lower);
@@ -461,7 +467,7 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
       countStat('reply', { agent: agent.id });
       const id = logMessage({ channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
       activity('message.out', { agent: agent.id, chat: msg.chat, summary: `🔊 ${text}`, detail: { voice: v.by, ...(id ? { msg: id } : {}) } });
-      return;
+      return id;
     }
   } else if (!voiceNow && wantsVoice(agent, { voiceIn, text })) {
     // A text turn whose answer should be spoken: the voice note is made in the media queue (falls back to text).
@@ -480,6 +486,7 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
   });
   // 072: the stored answer's id, so Activity can show and change its rating and open it in the chat
   activity('message.out', { agent: agent.id, chat: msg.chat, summary: text, ...(id ? { detail: { msg: id } } : {}) });
+  return id;
 }
 
 /** One agent turn for a routed message (inline for text; from the media queue for photos and voice notes). */
@@ -540,7 +547,10 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
       if (ctx.modelError) quiet('model_error', agent.id);
       else if (!out) quiet('no_reply', agent.id);
     }
-    if (out) await deliver(channel, msg, agent, out, { voiceIn, voiceNow: queued, typingSince });
+    if (out) {
+      const id = await deliver(channel, msg, agent, out, { voiceIn, voiceNow: queued, typingSince });
+      if (judge && msg.isGroup) noteJudgedAnswer(id, agent.id, msg.chat); // 089: feedback on it teaches when to join in
+    }
   } finally {
     media?.cleanup?.();
   }

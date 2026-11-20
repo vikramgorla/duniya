@@ -790,3 +790,9 @@ button.lrow { width: 100%; border: 0; background: none; font: inherit; text-alig
 /* #178: a stored message's Delete shows on hover or after tapping the message */
 .msgs .msg-acts { display: none; margin-top: 6px; gap: 6px; flex-wrap: wrap; }
 .msgs [data-msg]:hover .msg-acts, .msgs [data-msg]:focus-within .msg-acts { display: flex; }
+/* 089: lessons — the text, a muted line (kind, source, when), then the actions */
+.lessons { list-style: none; margin: 0; padding: 0; }
+.lessons li { padding: 10px 0; display: grid; gap: 4px; }
+.lessons li + li { border-top: 1px solid var(--line); }
+.lesson-text { overflow-wrap: anywhere; }
+.lessons select { width: auto; max-width: 100%; min-height: 32px; padding: 2px 8px; }
