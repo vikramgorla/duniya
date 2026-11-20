@@ -42,6 +42,11 @@ the right in its agent's colour, with the agent's avatar and name (a link to the
   latest** goes back to the newest.
 - Answers in a chat that is **Private to members** are shown here but not rated, as in Review.
 - Each look is recorded in Activity (who looked, never the text).
+- **Edit an answer:** tap an agent's answer → **Edit**. Everyone in the chat sees the new text, marked edited, and
+  the agent remembers the new text (the chat's summary is rebuilt). WhatsApp allows this for **15 minutes** after
+  sending (Telegram 48 hours); later the button is **Send a correction**: a new message from the agent that quotes the
+  original. Messages people edited themselves show *edited* too. Admin MCP: `edit_chat_message` (asks for
+  confirmation; `correction: true` sends a correction).
 - **Delete a message:** tap it → **Delete**. It is gone from the stored messages and the agent forgets it (the chat's
   summary is rebuilt without it). Nothing changes in WhatsApp. A message deleted *for everyone* in WhatsApp is removed
   here by itself. Admin MCP: `delete_chat_message`.

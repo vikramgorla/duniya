@@ -141,7 +141,7 @@ export async function runAgent(ctx) {
   const notes = [ctx.mediaNote, plan.note].filter(Boolean).join('\n');
   // #163: the panel test console sends its conversation so far (it is not stored as chat history)
   const thread = Array.isArray(ctx.thread) && ctx.thread.length ? `Earlier in this test conversation:\n${ctx.thread.map((t) => `${t.from === 'agent' ? 'You' : senderName}: ${t.text}`).join('\n')}\n\n` : '';
-  const turnText = `${memory ? `${memory}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${card ? `${card}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}${ctx.unaddressed ? `\n\n${JUDGE_NOTE}` : ''}`;
+  const turnText = `${memory ? `${memory}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${card ? `${card}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}${ctx.unaddressed ? `\n\n${JUDGE_NOTE}` : ''}${ctx.turnNote ? `\n\n${ctx.turnNote}` : ''}`;
   const messages = [{
     role: 'user',
     content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText,

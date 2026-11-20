@@ -81,6 +81,29 @@ Admin MCP: `test_agent`.
 Messages it read and left alone show in *Why quiet* as **not for it**. Admin MCP: `update_agent` with `groupReplies`
 (`followups`, `wake`, `auto`).
 
+### One answer at a time
+
+An agent works on **one message at a time in each chat**. Messages that arrive while it is answering wait; when its
+answer is out, it reads all of them together in **one** follow-up turn that sees the answer it just gave, and answers,
+acts or stays quiet. So two people writing at the same moment ("No gif?" and "Well said raju") get one reply, not
+two. Waiting is in memory and bounded (at most 8 messages per chat); there are no timers.
+
+Before anything goes out, the agent checks it against what it sent in the same chat **since the message it is
+answering arrived**: the same or nearly the same text, a second GIF or sticker, the same reaction on the same message.
+A repeat is dropped and counted in *Why quiet* as **already answered**. Asking the same question again later still
+gets an answer.
+
+### Corrections and edits
+
+- **The agent corrects itself:** when someone corrects it right after an answer ("no, it's Chary"), it changes that
+  answer with the `edit_my_last_message` action instead of posting a second message. Only its own last message in that
+  chat, only while the app still allows edits (WhatsApp 15 minutes, Telegram 48 hours); otherwise it answers again.
+  Participants and organizers have it by default (Tools → WhatsApp actions).
+- **People edit their messages:** the stored copy is updated and marked *edited* (chats that are on only). When the
+  agent already answered that message and the edit changes its meaning, the agent reads it once more and corrects
+  itself or stays quiet; fixing a typo changes nothing.
+- **You edit an answer:** see [Chats → Messages](chats.md#messages-and-memory).
+
 > [!NOTE]
 > **The Owner assistant is an agent too** (built in, always there): your own agent in your own WhatsApp chat. Its
 > page has the sections that apply to it — character, model, tools, photos & voice, memory, alerts and scheduled
@@ -221,8 +244,8 @@ unless allowed.
 
 ## WhatsApp actions
 
-23 actions, chosen per role: send images, documents, voice notes, locations and contact cards, react, run polls and
-read votes, and (organizers) manage the group: name, description, picture, settings, invite link, members. Every
+24 actions, chosen per role: send images, documents, voice notes, locations and contact cards, react, correct its last
+message, run polls and read votes, and (organizers) manage the group: name, description, picture, settings, invite link, members. Every
 action is logged (`whatsapp.action`). Admins get the same group tools on a group's page → **WhatsApp group** ([Chats](chats.md#whatsapp-group-tools)).
 
 ![WhatsApp card of a group](site/img/card-wa-group.webp)

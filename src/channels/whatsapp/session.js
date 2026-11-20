@@ -435,10 +435,12 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
     const ts = Number(msg.messageTimestamp || 0) * 1000 || Date.now();
     const base = { channel: 'whatsapp', raw: msg, chat, isGroup, phone, senderJid, fromMe, msgId: msg.key.id || null, ts,
       senderName: fromMe ? 'Assistant' : msg.pushName || phone || 'someone' };
-    // "Delete for everyone": the stored copy goes too (#178). Other protocol messages carry nothing to store.
+    // "Delete for everyone": the stored copy goes too (#178); 087: an edit changes it. Other protocol messages carry nothing to store.
     if (c.protocolMessage) {
       const pm = c.protocolMessage;
-      return pm.type === proto.Message.ProtocolMessage.Type.REVOKE && pm.key?.id ? { ...base, kind: 'deleted', text: '', target: pm.key.id } : null;
+      if (pm.type === proto.Message.ProtocolMessage.Type.REVOKE && pm.key?.id) return { ...base, kind: 'deleted', text: '', target: pm.key.id };
+      const edited = pm.type === proto.Message.ProtocolMessage.Type.MESSAGE_EDIT && pm.key?.id ? textOf(normalizeMessageContent(pm.editedMessage)) : '';
+      return edited && !fromMe ? { ...base, kind: 'edited', text: String(edited), target: pm.key.id } : null;
     }
     // Reactions and poll votes are events about another message: stored, never answered.
     if (c.reactionMessage) {

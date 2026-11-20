@@ -16,10 +16,10 @@ after(() => t.close());
 const ORG = '41790000001';
 const PART = '41790000002';
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-const ALL = ['add_participants', 'block', 'create_poll', 'delete_message', 'demote', 'edit_message', 'group_info', 'group_invite_link', 'poll_results',
+const ALL = ['add_participants', 'block', 'create_poll', 'delete_message', 'demote', 'edit_message', 'edit_my_last_message', 'group_info', 'group_invite_link', 'poll_results',
   'profile_info', 'promote', 'react', 'remove_participants', 'reply', 'revoke_invite_link', 'send_contact', 'send_location', 'send_media',
   'set_group_description', 'set_group_picture', 'set_group_settings', 'set_group_subject', 'unblock'];
-const PART_DEFAULT = ['create_poll', 'group_info', 'poll_results', 'profile_info', 'react', 'reply', 'send_location', 'send_media'];
+const PART_DEFAULT = ['create_poll', 'edit_my_last_message', 'group_info', 'poll_results', 'profile_info', 'react', 'reply', 'send_location', 'send_media'];
 const wa = (names) => names.map((n) => `whatsapp__${n}`).sort();
 const waNames = (i) => t.toolNames(i).filter((n) => n.startsWith('whatsapp__'));
 

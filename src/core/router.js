@@ -9,9 +9,9 @@ import { capsOf, isGroup } from '../channels/index.js';
 import { getSetting } from './store.js';
 import { listAgents as allAgents, getAgent, agentForChat, roleIn, isBuiltin, updateAgent } from './agents.js';
 import { runAgent, handleConfirmCommand } from './runner.js';
-import { logMessage, messageByMsgId, deleteMessageByMsgId, saveReaction, savePollVote, pollTally, setMessageText, moveChatData } from './db.js';
+import { logMessage, messageByMsgId, deleteMessageByMsgId, saveReaction, savePollVote, pollTally, setMessageText, moveChatData, editStoredMessage, agentAnsweredAfter } from './db.js';
 import { activity } from './events.js';
-import { maybeSummarize, forgetDeleted } from './memory.js';
+import { maybeSummarize, forgetChanged } from './memory.js';
 import { setChatChannel } from './chat-tools.js';
 import { countStat } from './stats.js';
 import { silenceReason } from './silences.js';
@@ -28,6 +28,7 @@ import { notePerson } from './people.js';
 import { inRole, notePersonChat } from './people-access.js';
 import { interceptMessage } from '../modules/index.js';
 import { drainReads, paceReply, queueRead, readWhenDue } from './pace.js';
+import { claimTurn, releaseTurn, isDuplicate, noteSent, similarity } from './turns.js';
 
 // 059: the built-in owner assistant is reached through the owner hand-off only, never by routing.
 const listAgents = () => allAgents().filter((b) => !isBuiltin(b));
@@ -190,7 +191,7 @@ function recordEvent(msg) {
   const who = msg.phone || msg.senderJid || 'someone';
   const agent = agentForChat(msg.chat);
   if (msg.kind === 'deleted') { // #178: deleted for everyone in WhatsApp → gone from Duniya's stored messages too
-    if (deleteMessageByMsgId(msg.chat, msg.target)) forgetDeleted(msg.chat), activity('memory.history', { agent: agent?.id || '', chat: msg.chat, summary: 'A message deleted in WhatsApp was removed from the stored messages' });
+    if (deleteMessageByMsgId(msg.chat, msg.target)) forgetChanged(msg.chat), activity('memory.history', { agent: agent?.id || '', chat: msg.chat, summary: 'A message deleted in WhatsApp was removed from the stored messages' });
     return;
   }
   if (msg.kind === 'reaction') {
@@ -237,12 +238,15 @@ export function createRouter(channel) {
   async function route(incoming) {
     // 049 (#92): a direct message from a prepared person may arrive from their LID; use the prepared chat id.
     const msg = resolveDirectChat(incoming);
+    msg.arrived ??= Date.now(); // 087: sends after this moment that repeat each other are duplicates
     drainReads(channel).catch(() => {}); // 080: read receipts that are due go out on every incoming message (and the upkeep tick)
     // #91: newest message key per chat (metadata only, also while the chat is off) to load history when it goes on.
     if (msg.msgId && (!msg.kind || msg.kind === 'text')) {
       try { noteLatestKeys([{ chat: msg.chat, number: msg.number, isGroup: msg.isGroup, msgId: msg.msgId, fromMe: !!msg.fromMe, participant: msg.isGroup && !msg.fromMe ? msg.senderJid : '', ts: msg.ts }]); } catch { /* best effort */ }
       try { historyChatActive(msg.chat); } catch { /* best effort */ } // 057: a load that had no anchor starts now
     }
+    // 087: someone edited a message: the stored copy changes; an answer it got may need a correction
+    if (msg.kind === 'edited') { if (isChatEnabled(msg.chat)) await onEdited(channel, msg); return; }
     // Reactions and poll votes: recorded only for chats that are on (#10).
     if (msg.kind && msg.kind !== 'text') { if (isChatEnabled(msg.chat)) recordEvent(msg); return; }
     // Owner assistant (044): link codes and linked panel users' direct messages (unless they start with an agent trigger).
@@ -371,8 +375,49 @@ export function createRouter(channel) {
       }
       return;
     }
-    await runTurn(channel, msg, { agent, role, addressed, rowId, quiet, judge });
+    await serialTurn(channel, msg, { agent, role, addressed, rowId, quiet, judge, solo: isConfirm });
   }
+}
+
+// 087: one turn at a time per agent and chat. Messages that arrive while the agent works here wait (turns.js); when the
+// turn ends they are handled together in one follow-up turn that sees the reply just sent and may stay quiet.
+const WAITED_NOTE = 'These messages arrived while you were answering; your answer is already in the conversation above. Do not repeat it or send the same thing again. Answer or act only if something new needs you; otherwise answer exactly [quiet].';
+async function serialTurn(channel, msg, opts) {
+  const key = `${opts.agent.id}|${msg.chat}`;
+  if (!claimTurn(key, { msg, opts })) return; // handled when the running turn ends
+  try { await runTurn(channel, msg, opts); } finally {
+    const waiting = releaseTurn(key);
+    // "confirm ABCD" stays its own turn; the other messages that waited become one
+    for (const w of waiting.filter((x) => x.opts.solo)) await serialTurn(channel, w.msg, w.opts);
+    const rest = waiting.filter((x) => !x.opts.solo);
+    if (rest.length) {
+      const last = rest.at(-1);
+      const text = rest.length === 1 ? last.msg.text : rest.map((w) => `${whoOf(w.msg)}: ${w.msg.text}`).join('\n');
+      const role = rest.every((w) => w.opts.role === 'organizer') ? 'organizer' : 'participant'; // the least of the senders
+      await serialTurn(channel, { ...last.msg, text, caption: '', arrived: Math.min(...rest.map((w) => w.msg.arrived || Date.now())) }, { ...last.opts, role, addressed: rest.some((w) => w.opts.addressed), judge: false,
+        note: WAITED_NOTE, mayStayQuiet: true });
+    }
+  }
+}
+
+/**
+ * 087: a person edited their message. The stored copy changes (marked edited; the summary is rebuilt if needed). When
+ * the agent already answered it and the meaning changed, the agent gets one follow-up turn to correct itself (with
+ * edit_my_last_message) or stay quiet.
+ */
+async function onEdited(channel, msg) {
+  const before = editStoredMessage(msg.chat, msg.target, msg.text, 'sender');
+  if (!before || before.from_agent) return;
+  forgetChanged(msg.chat);
+  const agent = msg.isGroup ? agentForChat(msg.chat) : agentForChat(msg.chat) || (before.agent ? getAgent(before.agent) : null);
+  activity('memory.history', { agent: agent?.id || '', chat: msg.chat, summary: `${whoOf(msg)} edited a message; the stored copy was updated` });
+  if (!agent?.enabled || getSetting('paused', false)) return;
+  if (!agentAnsweredAfter(msg.chat, before.id, agent.id, before.ts + 30 * 60000) || similarity(before.text, msg.text) >= 0.8) return; // not answered, or only a typo fixed
+  const role = await resolveRole(agent, msg, channel);
+  const quiet = (reason, agentId = agent.id) => silenceReason(reason, { chat: msg.chat, agent: agentId, sender: whoOf(msg) });
+  msg.personId = notePerson(msg);
+  await serialTurn(channel, { ...msg, kind: 'text', msgId: msg.target }, { agent, role, addressed: true, rowId: before.id, quiet, judge: false, mayStayQuiet: true,
+    note: `${whoOf(msg)} edited the message you answered. Before: "${clip(before.text, 300)}". Now: "${clip(msg.text, 300)}". If your answer is now wrong, correct it with edit_my_last_message (or answer again if you cannot edit). If it is still right, answer exactly [quiet].` });
 }
 
 // 069: graceful shutdown — new messages are left for after the restart; turns already running may finish.
@@ -400,7 +445,11 @@ export function createJoinHandler(channel) {
 const overloadedAt = new Map();
 
 /** Send a reply (as a voice note when the agent's setting asks for it) and remember it. */
-async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false, textOnly = false, typingSince = null } = {}) {
+async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false, textOnly = false, typingSince = null, again = false, since = msg.arrived || Date.now() } = {}) {
+  // 087: the same answer it just gave here (two turns raced, or it repeats itself) is not sent again. Built-in answers
+  // are commands people ask for; `again`: the second leg of a voice answer (already checked).
+  if (!textOnly && !again && isDuplicate(msg.chat, agent.id, { kind: 'text', text }, since)) { silenceReason('already_answered', { chat: msg.chat, agent: agent.id, sender: whoOf(msg) }); return; }
+  if (!textOnly && !again) noteSent(msg.chat, agent.id, { kind: 'text', text });
   if (msg.isGroup) agentSpoke(msg.chat, agent.id); // 076: replies right after this may be follow-ups
   if (textOnly) { /* built-in answers (054): always text */ } else if (voiceNow && wantsVoice(agent, { voiceIn, text })) {
     const v = await speak(text, { agent, chat: msg.chat }).catch(() => null);
@@ -434,7 +483,7 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
 }
 
 /** One agent turn for a routed message (inline for text; from the media queue for photos and voice notes). */
-async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, queued = false, judge = false }) {
+async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, queued = false, judge = false, note = '', mayStayQuiet = false }) {
   let media = null;
   /** @type {Promise<number>|null} */ let typingSince = null;
   try {
@@ -448,18 +497,19 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
     const base = voiceIn ? media.transcript : msg.caption ? `${msg.text.replace(/:.*$/s, ']')} ${stripTriggers(agent, msg.caption)}`.trim() : stripTriggers(agent, msg.text);
     const text = voiceIn ? stripTriggers(agent, base) || base : base;
     let out = await handleConfirmCommand({ agent, text, role, chat: msg.chat });
-    if (out === undefined && !addressed && !judge) return; // looked like "cancel ABCD" but isn't ours
+    const judged = judge || mayStayQuiet; // 087: it may stay quiet: logged and counted only when it answers
+    if (out === undefined && !addressed && !judged) return; // looked like "cancel ABCD" but isn't ours
     const logIn = () => activity('message.in', {
       agent: agent.id, chat: msg.chat,
       summary: `${whoOf(msg)} (${role}): ${voiceIn ? `🎤 ${text}` : text}`,
       detail: { phone: msg.phone, isGroup: msg.isGroup, quoted: msg.quoted || undefined, ...(judge ? { judged: true } : {}), ...(media?.blocks?.length ? { attachments: media.blocks.map((b) => b.type) } : {}) },
     });
-    if (!judge) { countStat('handled', { agent: agent.id }); logIn(); } // 076: a judged message is logged only when answered
+    if (!judged) { countStat('handled', { agent: agent.id }); logIn(); } // 076: a judged message is logged only when answered
 
     if (out === undefined) {
       if (!text) return;
       // 080: the message is read after its read delay, then "typing…" shows; the model works meanwhile
-      if (!judge) typingSince = readWhenDue(channel, msg).then(async () => { await channel.typing?.(msg.chat); return Date.now(); });
+      if (!judged) typingSince = readWhenDue(channel, msg).then(async () => { await channel.typing?.(msg.chat); return Date.now(); });
       const ctx = {
         // #113: the name the owner knows them by (phone contact name unless switched off on the Contacts page)
         agent, role, chat: msg.chat, senderName: agentName({ phone: msg.phone, jid: msg.senderJid, fallbackName: msg.senderName }) || msg.senderName, requester: msg.phone,
@@ -469,7 +519,7 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
         senderTag: msg.isGroup ? memberTag(msg.chat, { phone: msg.phone, jid: msg.senderJid }) : '',
         text, isGroup: msg.isGroup, source: msg.channel, msgRowId: rowId, msgId: msg.msgId, senderJid: msg.senderJid,
         chatName: msg.isGroup ? await channel.chatName?.(msg.chat) : '',
-        attachments: media?.blocks || [], mediaNote: media?.note || '', unaddressed: judge,
+        attachments: media?.blocks || [], mediaNote: media?.note || '', unaddressed: judge, turnNote: note, since: msg.arrived || Date.now(),
       };
       // 074: an agent app waiting for its turn on a small server: ⏳ on the message, taken back when the answer is out
       const mref = msg.msgId ? { msgId: msg.msgId, fromMe: false, participant: msg.senderJid || undefined } : null;
@@ -480,13 +530,13 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
       } catch (e) {
         activity('error', { agent: agent.id, chat: msg.chat, summary: `Agent failed: ${e.message}` });
         quiet('model_error', agent.id);
-        out = judge ? '' : 'Sorry, I hit an error. Please try again in a minute.'; // nobody asked it: no error message
+        out = judged ? '' : 'Sorry, I hit an error. Please try again in a minute.'; // nobody asked it: no error message
       }
       if (waited) channel.react?.(msg.chat, mref, '')?.catch?.(() => {});
-      const v = judge ? verdictOf(out) : null;
+      const v = verdictOf(out); // [quiet] / [done] are never sent (087: also after it corrected itself with an edit)
       if (v) { if (v === 'done') closeFollowups(msg.chat); quiet('not_for_me', agent.id); return; }
-      if (judge && ctx.modelError) out = '';
-      if (judge && out) { countStat('handled', { agent: agent.id }); logIn(); }
+      if (judged && ctx.modelError) out = '';
+      if (judged && out) { countStat('handled', { agent: agent.id }); logIn(); }
       if (ctx.modelError) quiet('model_error', agent.id);
       else if (!out) quiet('no_reply', agent.id);
     }
@@ -530,12 +580,12 @@ function registerMediaHandlers(channel) {
     async stale(p) { if (p.imageFile) rmSync(p.imageFile, { force: true }); await channel.send(p.chat, 'Sorry, I couldn’t make that picture in time. Ask me again if you still want it.').catch(() => {}); },
     async failed(p, job, e) { if (p.imageFile) rmSync(p.imageFile, { force: true }); await channel.send(p.chat, `Sorry, I couldn’t make that picture${e?.permanent ? ` (${e.message})` : ''}.`).catch(() => {}); },
   });
-  const voiceText = async (p) => { const agent = getAgent(p.agent) || { id: p.agent, media: { voiceReply: 'never' } }; await deliver(channel, unpackMsg(channel, p.msg), agent, p.text); };
+  const voiceText = async (p) => { const agent = getAgent(p.agent) || { id: p.agent, media: { voiceReply: 'never' } }; await deliver(channel, unpackMsg(channel, p.msg), agent, p.text, { again: true }); };
   registerJobHandler('voice', {
     async run(p) {
       const agent = getAgent(p.agent);
       if (!agent) return;
-      await deliver(channel, unpackMsg(channel, p.msg), agent, p.text, { voiceIn: true, voiceNow: true });
+      await deliver(channel, unpackMsg(channel, p.msg), agent, p.text, { voiceIn: true, voiceNow: true, again: true });
     },
     stale: voiceText, // the answer itself is never dropped: sent as text
     failed: voiceText,

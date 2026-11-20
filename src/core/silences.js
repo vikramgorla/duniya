@@ -29,6 +29,7 @@ export const SILENCE_REASONS = Object.freeze({
   no_reply: { label: 'empty answer', explain: 'The model returned an empty answer.', fix: 'models' },
   budget: { label: 'budget cap reached', explain: 'The usage cap for this agent or chat is reached.', fix: 'usage' },
   overloaded: { label: 'server busy', explain: 'Too many photos and voice notes were waiting; the sender was asked to send it again in a few minutes.', fix: 'server' },
+  already_answered: { label: 'already answered', explain: 'The agent was about to send the same thing it had just sent here (the same text, a second GIF or sticker, the same reaction), so it was not sent again.', fix: '' },
   stale: { label: 'waited too long', explain: 'A photo or voice note waited longer than 15 minutes in the queue; the sender got a short apology instead of a late answer.', fix: 'server' },
 });
 

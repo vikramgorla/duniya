@@ -5,16 +5,17 @@ import { agentForChat, bindChat, listAgents } from '../../core/agents.js';
 import { allChatPrefs, ignoredCounts, isChatEnabled, isChatPrivate, seenChats, setChatPrefs } from '../../core/chat-prefs.js';
 import { personInfo } from '../../core/contacts.js';
 import { chatLabel, chatLabels } from '../../core/chat-names.js';
-import { listMessages, namesInChat, searchStored, deleteStoredMessage } from '../../core/db.js';
+import { listMessages, namesInChat, searchStored, deleteStoredMessage, editsOf, logMessage } from '../../core/db.js';
 import { isChatAlias, listDirectChats } from '../../core/direct-chats.js';
 import { activity } from '../../core/events.js';
 import { historyLoadCount, historyStatus, loadChatHistory } from '../../core/history-load.js';
 import { memberTag, personView, tagsInChat } from '../../core/member-tags.js';
-import { eraseChatMemory, forgetDeleted, maybeSummarize, memoryView } from '../../core/memory.js';
+import { eraseChatMemory, forgetChanged, maybeSummarize, memoryView } from '../../core/memory.js';
 import { ratingsOf } from '../../core/review.js';
 import { visibleChats } from '../../core/owner-assistant.js';
 import { maybePostNotice, noticePostedAt, setChatNoticeOff } from '../../core/privacy-notice.js';
-import { chatToolCatalog } from '../../core/chat-tools.js';
+import { chatToolCatalog, editOwnMessage, editWindow } from '../../core/chat-tools.js';
+import { db } from '../../core/db.js';
 import { channelInfo, channelOf, isGroup, personOfChat, splitChatId } from '../../channels/index.js';
 
 /** Leave out empty values and settings at their default. */
@@ -106,8 +107,10 @@ export function chatRoutes(route, { channel } = {}) {
     const list = listMessages(chat, { before: q.get('before'), limit: q.get('limit'), q: q.get('q') || '', around: q.get('around') });
     const rated = ratingsOf(list.filter((m) => m.fromAgent).map((m) => m.id));
     const rateable = !isChatPrivate(chat);
-    const rows = list.map(({ senderJid, ...m }) => (m.fromAgent ? { ...m, rating: rated.get(m.id) || 0, rateable: rateable && !!m.agent && m.id > 0 }
-      : { ...m, name: personInfo({ phone: m.sender, jid: senderJid, fallbackName: m.name }).label, ...(memberTag(chat, { phone: m.sender, jid: senderJid }, tags) ? { tag: memberTag(chat, { phone: m.sender, jid: senderJid }, tags) } : {}) }));
+    const jids = new Map(list.map((m) => [m.id, m.senderJid]));
+    const edits = editsOf(list.map((m) => m.id)); // 087: edited messages say so; agent answers say whether they can still be edited
+    const rows = list.map(({ senderJid: _jid, ...m }) => ({ ...m, ...(edits.has(m.id) ? { edited: edits.get(m.id).ts } : {}) })).map((m) => (m.fromAgent ? { ...m, rating: rated.get(m.id) || 0, rateable: rateable && !!m.agent && m.id > 0, editable: editWindow(chat, m.ts).open && m.id > 0 }
+      : { ...m, name: personInfo({ phone: m.sender, jid: jids.get(m.id), fallbackName: m.name }).label, ...(memberTag(chat, { phone: m.sender, jid: jids.get(m.id) }, tags) ? { tag: memberTag(chat, { phone: m.sender, jid: jids.get(m.id) }, tags) } : {}) }));
     if (!q.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${q.get('q') ? ` (search “${String(q.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;
   }, { role: 'admin' });
@@ -115,9 +118,37 @@ export function chatRoutes(route, { channel } = {}) {
   route('DELETE', '/api/chats/:chat/messages/:id', async (req, res, body, q, p, user) => {
     const chat = decodeURIComponent(p.chat);
     if (!deleteStoredMessage(chat, Number(p.id))) throw Object.assign(new Error('Message not found'), { status: 404 });
-    forgetDeleted(chat);
+    forgetChanged(chat);
     activity('config', { chat, summary: `A stored message was deleted by ${user.username}` });
     return { ok: true };
+  }, { role: 'admin' });
+  // 087: the owner edits one of an agent's sent messages (within the channel's edit window: WhatsApp 15 minutes). The
+  // stored copy changes and is marked edited; the summary is rebuilt. After the window: 409 code edit_window.
+  route('PUT', '/api/chats/:chat/messages/:id', async (req, res, body, q, p, user) => {
+    const chat = decodeURIComponent(p.chat);
+    const text = String(body.text ?? '').trim();
+    if (!text) throw fail('Write the new text', 400, { field: 'text' });
+    if (text.length > 4000) throw fail('At most 4000 characters', 400, { field: 'text' });
+    const row = db.prepare('SELECT * FROM messages WHERE chat = ? AND id = ?').get(chat, Number(p.id));
+    if (!row) throw fail('Message not found', 404);
+    if (!row.from_agent) throw fail('Only messages an agent sent can be edited', 400);
+    try { await editOwnMessage(chat, row, text, user.username); } catch (e) { throw fail(e.message, e.status || 502, e.code ? { code: e.code } : {}); }
+    activity('whatsapp.action', { agent: row.agent || '', chat, summary: `An agent's message was edited in the chat (panel, ${user.username})`, detail: { tool: 'edit_message', by: user.username, source: 'panel', msg: row.id } });
+    return { ok: true, id: row.id, text };
+  }, { role: 'admin' });
+  // 087: after the edit window: a correction goes out as a new message that quotes the original, from the chat's agent.
+  route('POST', '/api/chats/:chat/messages/:id/correction', async (req, res, body, q, p, user) => {
+    const chat = decodeURIComponent(p.chat);
+    const text = String(body.text ?? '').trim();
+    if (!text) throw fail('Write the correction', 400, { field: 'text' });
+    if (text.length > 4000) throw fail('At most 4000 characters', 400, { field: 'text' });
+    const row = db.prepare('SELECT * FROM messages WHERE chat = ? AND id = ?').get(chat, Number(p.id));
+    if (!row?.from_agent) throw fail('Message not found', 404);
+    if (!isChatEnabled(chat)) throw fail('This chat is off; switch it on first', 409);
+    const sent = await channel.send(chat, text, row.msg_id ? { quote: { msgId: row.msg_id, fromMe: true, text: row.text } } : {});
+    const id = logMessage({ chat, agent: row.agent || '', msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, quoted: row.text, fromAgent: true });
+    activity('message.out', { agent: row.agent || '', chat, summary: `Correction sent from the panel (${user.username}): ${text}`, detail: { msg: id, source: 'panel' } });
+    return { ok: true, id };
   }, { role: 'admin' });
   // 070: Search messages across chats. Owner only; the chats the owner assistant may read (on, not private to
   // members); newest first, 30 at a time (`before` = the last id). Each search is recorded like a look at messages.
