@@ -40,8 +40,8 @@ function commitmentRows(list, after, { who = true, agent = false, empty = 'No op
     can('admin') ? h('div', { class: 'row fx' }, c.status === 'open'
       ? h('button', { class: 'btn small', type: 'button', onclick: () => put(c, { status: 'done' }, 'Marked done') }, 'Done')
       : h('button', { class: 'btn small', type: 'button', onclick: () => put(c, { status: 'open' }, 'Reopened') }, 'Reopen'),
-    menu(`More for “${c.what}”`, item('Due date…', () => editDue(c)), item('Edit…', () => editWhat(c)),
-      c.status === 'open' ? item('Drop (no reminder)', () => put(c, { status: 'dropped' }, 'Dropped')) : null, h('button', { class: 'btn small danger', type: 'button', onclick: () => remove(c) }, 'Delete…'))) : null)));
+    Object.assign(menu(`More for “${c.what}”`, item('Due date…', () => editDue(c)), item('Edit…', () => editWhat(c)),
+      c.status === 'open' ? item('Drop (no reminder)', () => put(c, { status: 'dropped' }, 'Dropped')) : null, h('button', { class: 'btn small danger', type: 'button', onclick: () => remove(c) }, 'Delete…')), { style: 'margin-left:auto' })) : null)));
 }
 
 // ---------- People → Promises (092) ----------
@@ -61,7 +61,7 @@ export async function renderPromises(pre = '') {
     [...opts].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => h('option', { value: id, selected: F[key] === id }, name)));
   const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Show' }, [['open', 'Open'], ['overdue', 'Overdue'], ['done', 'Done'], ['all', 'All']]
     .map(([val, l]) => h('button', { type: 'button', class: F.status === val ? 'on' : '', 'aria-pressed': String(F.status === val), onclick: () => { F.status = val; redraw(); } }, l)));
-  const tools = h('div', { class: 'pfilters' }, seg, pick('person', 'Person', 'Everyone', seen.person), agents.length > 1 || F.agent ? pick('agent', 'Agent', 'All agents', agents.map((a) => [a.id, a.name])) : null,
+  const tools = h('div', { class: 'row', style: 'margin:8px 0 6px' }, seg, pick('person', 'Person', 'Everyone', seen.person), agents.length > 1 || F.agent ? pick('agent', 'Agent', 'All agents', agents.map((a) => [a.id, a.name])) : null,
     pick('chat', 'Chat', 'All chats', seen.chat));
   const filtered = F.person || F.agent || F.chat;
   const words = { open: 'open', overdue: 'overdue', done: 'done', all: '' }[F.status];

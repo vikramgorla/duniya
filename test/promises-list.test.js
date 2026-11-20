@@ -11,7 +11,7 @@ const ANU = '41790000012'; const RAVI = '41790000013'; const ORG = '41790000014'
 const jid = (p) => `${p}@s.whatsapp.net`;
 const day = (n) => config.localParts(config.env.timezone, Date.now() + n * 86400000).date;
 const list = async (q = '') => (await t.api(owner, 'GET', `/api/commitments${q ? `?${q}` : ''}`)).body;
-let ids = {};
+const ids = {};
 
 before(async () => {
   t = await setup({ env: { RATE_LIMIT_PER_MIN: '1000' } }); owner = await t.login(); config = t.config;

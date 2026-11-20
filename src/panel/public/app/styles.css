@@ -394,7 +394,6 @@ a.choice { text-decoration: none; color: var(--ink) !important; }
 .u-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .u-name { font-weight: 600; overflow-wrap: anywhere; } .u-name a { color: var(--ink) !important; text-decoration: none; } .u-name a:hover { text-decoration: underline; }
 .u-cost { font-weight: 600; white-space: nowrap; }
-.fbar { display: block; height: 4px; margin-top: 5px; border-radius: 2px; background: var(--bg-2); overflow: hidden; } .fbar i { display: block; height: 100%; background: var(--ink); border-radius: 2px; } /* 092: Cost per feature */
 /* 073: Server — Logs start as one row; Health details behind a disclosure */
 .card details.logs { margin: 0; } .card details.logs > summary { color: var(--ink); padding: 8px 0; min-height: 44px; }
 .install-hint { margin-bottom: var(--s3); }
@@ -803,6 +802,3 @@ button.lrow { width: 100%; border: 0; background: none; font: inherit; text-alig
 .sug + .sug { border-top: 1px solid var(--line); }
 .catchup { white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0; }
 .brief-secs { display: grid; gap: 2px; margin: 6px 0; }
-/* 092: People → Promises — the status seg, then person · agent · chat filters; they wrap on phones */
-.pfilters { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; margin: 8px 0 6px; }
-.pfilters .seg { flex: none; } .pfilters select { flex: 1 1 150px; min-width: 0; width: auto; }

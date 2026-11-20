@@ -1,6 +1,20 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.53.0": {
+      "breaking": false,
+      "title": "Every promise in one list, more languages, and the cost of each feature",
+      "summary": "People → Promises shows what people promised across all your agents, overdue first, and lets you finish, reopen, re-date or delete them. Agents now recognise Indian, Arabic, Cyrillic, Greek and East Asian languages, and Telugu or Hindi typed in Latin letters. Usage shows what each feature costs.",
+      "changes": [
+        { "type": "new", "text": "People → Promises: every agent's promises in one list (open, overdue, done), filtered by person, agent or chat, with links to the person and the message they came from. Mark done, reopen, change the due date, edit or delete." },
+        { "type": "new", "text": "Organizers can ask their agent what is still promised in their chats and mark promises done, reopen them or change the date; others can mark their own done." },
+        { "type": "new", "text": "People's language now includes Telugu, Hindi, Tamil, Kannada, Malayalam, Bengali, Gujarati, Punjabi, Urdu, Arabic, Russian, Ukrainian, Greek, Hebrew, Thai, Chinese, Japanese and Korean, and Telugu or Hindi typed in Latin letters (\"ela unnaru\"), so agents answer the way people write." },
+        { "type": "improved", "text": "A learned language changes only after several messages, mixed Telugu and English messages follow what a person mostly writes, and a language you set is never changed." },
+        { "type": "new", "text": "Usage → Cost per feature: tokens and cost of agent answers (light and strong), judged group messages, summaries, promises, lessons, self-check, catch-ups, voice and pictures, sending, surveys, the AI helper and the owner assistant, one line each." },
+        { "type": "fixed", "text": "A person's WhatsApp messages were counted twice when learning their language and usual hours." },
+        { "type": "removed", "text": "The Kind tab under Usage → Breakdown: Cost per feature replaces it." }
+      ]
+    },
     "2.52.0": {
       "breaking": false,
       "title": "Promises kept, family ties suggested, and each person's language and hours",

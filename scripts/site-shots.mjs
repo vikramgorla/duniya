@@ -107,11 +107,12 @@ const CARDS = [
   ['card-household', 'people', "const r = await (await fetch('/api/households')).json(); location.hash = 'people/households/' + r[0].id; await T.until('.person-page .lgroup'); await T.wait(300);", '.person-page', 600], // 078: a household with kids without an app
   ['card-usage-breakdown', 'usage', '', 'box:Breakdown', 900], // 073: Usage breakdown rows
   ['card-usage-smart', 'usage', '', 'box:Smart model choice', 900], // 088: light vs strong answers and what it saved
+  ['card-usage-features', 'usage', '', 'box:Cost per feature', 900], // 092: Cost per feature
   ['card-agent-model', 'agents/office/model', '', '.ap-sec', 600], // 088: Auto: light or strong, Self-check
   ['card-suggested', 'overview', "await T.until('#ov-suggested .sug'); await T.wait(300);", '#ov-suggested', 900], // 090: Suggested next steps on Overview
   ['card-brief', 'settings/owner-assistant', "await T.until('#morning-brief'); await T.click('Preview', '#morning-brief button', 800);", '#morning-brief', 900], // 090: Morning brief settings and preview
   ['card-promises', 'agents/carpool/promises', "await T.until('.lessons li'); await T.wait(300);", '.ap-sec', 600], // 091: Promises & people
-  ['card-people-suggestions', 'people', "await T.until('#people-suggestions'); await T.wait(200);", '#people-suggestions', 600], // 091: a family tie to add or reject
+  ['card-promises-list', 'people/promises', "await T.until('.promises li'); await T.wait(300);", '#main .card', 600], // 092: People → Promises across agents
   ['card-lessons', 'agents/carpool/lessons', "await T.until('.lessons li'); await T.wait(300);", '.ap-sec', 600], // 089: lessons to approve and saved lessons
   ['card-updates', 'settings/updates', '', 'box:Updates', 900], // 073: Settings → Updates
   ['card-assistants', 'settings/assistants', '', 'box:Connected AI assistants', 900],

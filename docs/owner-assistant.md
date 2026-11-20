@@ -145,7 +145,7 @@ shows it as it would go out now.
 |---|---|
 | Payments | open orders overdue or due in the next 3 days, per event: how many, how much is left, the first names (Orders module) |
 | Questions for you | messages of the last 24 hours in chats that are on that name you, ask something, and that you have not answered in that chat since |
-| Commitments due | promises people made in chats (when commitments tracking is on) |
+| Commitments due | promises people made in chats (when commitments tracking is on); ask *"which promises are overdue?"* or *"mark Ravi's hall booking done"* any time ([People → Promises](people.md#promises)) |
 | Birthdays | people whose birthday is today or tomorrow (People) |
 | Needs a look | answers that failed on a model error, changes waiting for a confirm code, an update, paused sends |
 | New people | people new since yesterday in chats that are on |

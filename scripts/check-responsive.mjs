@@ -188,6 +188,9 @@ const STATES = [
   { name: 'people-households', hash: 'people/households', wait: 1200 },
   { name: 'people-household', hash: 'people', js: "const r = await (await fetch('/api/households')).json(); location.hash = 'people/households/' + r[0].id; await T.until('.person-page .lgroup'); await T.wait(300);" },
   { name: 'people-lists', hash: 'people/lists', wait: 1200 },
+  { name: 'people-promises', hash: 'people/promises', wait: 1200 }, // 092: People → Promises across agents
+  { name: 'people-promises-overdue', hash: 'people/promises', wait: 1200, js: "await T.click('Overdue', 'button', 800);" },
+  { name: 'people-promises-menu', hash: 'people/promises', wait: 1200, js: "document.querySelector('#main .promises details.menu summary').click(); await T.wait(300);" },
   { name: 'people-list', hash: 'people', js: "const r = await (await fetch('/api/lists')).json(); location.hash = 'people/lists/' + r[0].id; await T.until('.person-page .lgroup'); await T.wait(300);" },
   { name: 'models', hash: 'models', js: 'T.openAll();' },
   // 064: list → page: a provider's page, the Add page, Backups → Restore, Settings sections
@@ -226,6 +229,7 @@ const STATES = [
       if (String(u).startsWith('/api/providers') && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); if (Array.isArray(j)) return new Response(JSON.stringify(j.filter((x) => x.id !== 'openrouter').map((x) => ({ ...x, connected: false, models: 0 })))); }
       return r; }; S.models = null;`, js: "await T.click('Sign in with ChatGPT', 'button', 1200); T.openAll();" },
   { name: 'usage', hash: 'usage' },
+  { name: 'usage-features', hash: 'usage', wait: 1200, js: "document.querySelector('[data-jump=features]').scrollIntoView(); await T.click('Show all', 'button', 400);" }, // 092: Cost per feature
   { name: 'agent-model-smart', hash: 'agents/office/model' },
   { name: 'agent-lessons', hash: 'agents/carpool/lessons', wait: 1500 },
   { name: 'agent-promises', hash: 'agents/carpool/promises', wait: 1500 }, // 091: Promises & people with open promises

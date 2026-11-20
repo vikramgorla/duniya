@@ -112,8 +112,14 @@ lesson is used. At most 20 proposals per agent per day; each counts in Usage as 
    you said you'd bring the speakers (by 2026-11-21). All set? Just reply here."*
 3. **Done**: when someone writes that it is done ("brought them ✅", "paid"), the model checks it against the open
    promises of that chat and marks it done. **Done** / **Drop** on any row corrects it.
+4. **All of them**: [People → Promises](people.md#promises) lists the promises of every agent: overdue first, filters by
+   person, agent and chat; **Done**, **Reopen**, and **⋯ Due date**, **Edit**, **Drop**, **Delete**. Reopening or a new
+   due date lets the reminder go out again when it is due.
+5. **In the chat**: the agent's organizers ask *"what is still open?"* or *"Marc brought the seat, mark it done"* — the
+   agent lists and changes the promises of its chats (done, reopen, new date, drop). Anyone else sees only their own
+   promises and can mark them done. Decided in code, not by the prompt.
 
-At most 50 model calls per agent per day (Usage → Kind: *commitments*); other messages are never sent for this.
+At most 50 model calls per agent per day (Usage → Cost per feature: *Promises*); other messages are never sent for this.
 
 ## When to join in
 

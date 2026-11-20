@@ -127,7 +127,7 @@ function featureCard(rows, cost) {
   const top = Math.max(...sorted.map((r) => r.input + r.output), 1);
   const li = (r) => h('li', {}, h('div', { class: 'u-main' }, h('span', { class: 'u-name' }, r.label),
     h('span', { class: 'small muted' }, r.line), h('span', { class: 'small muted num' }, `${plural(r.calls, 'call')} · ${fmtTok(r.input + r.output)} tokens`),
-    h('span', { class: 'fbar', 'aria-hidden': 'true' }, h('i', { style: `width:${Math.max(2, Math.round(((r.input + r.output) / top) * 100))}%` }))), h('span', { class: 'u-cost num' }, cost(r)));
+    h('div', { class: 'meter', 'aria-hidden': 'true' }, h('i', { style: `width:${Math.max(2, Math.round(((r.input + r.output) / top) * 100))}%` }))), h('span', { class: 'u-cost num' }, cost(r)));
   const list = h('ul', { class: 'urows' }, sorted.slice(0, 6).map(li));
   const all = sorted.length > 6 ? h('button', { class: 'btn small', type: 'button', onclick: () => { list.replaceChildren(...sorted.map(li)); all.remove(); } }, `Show all ${sorted.length}`) : null;
   return h('div', { class: 'card', style: 'margin-top:16px', 'data-jump': 'features' }, h('h2', {}, 'Cost per feature'),
