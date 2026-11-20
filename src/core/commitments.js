@@ -69,7 +69,7 @@ export function listCommitments({ agent = '', person = '', chat = '', chats = nu
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY ${order} LIMIT ?`).all(...args, Math.min(Math.max(Number(limit) || 200, 1), 200)).map((r) => view(r, day));
 }
 /** One commitment (or null). */
-export const getCommitment = (id) => { const r = one(id); return r ? view(r) : null; };
+const getCommitment = (id) => { const r = one(id); return r ? view(r) : null; };
 /**
  * Correct one: status (open | done | dropped), what, due. Reopening, or a new due date, lets the gentle follow-up go
  * out again when it falls due.
