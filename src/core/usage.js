@@ -14,6 +14,12 @@ db.exec(`
     account TEXT, fallback TEXT -- the account that answered and why the call switched (042)
   );
   CREATE INDEX IF NOT EXISTS usage_ts ON usage(ts);
+  -- 088: one row per answer of an agent on Smart model choice: the tier, why (a short reason, never text), what the
+  -- answer cost and what the strong model would have cost (null when a price is missing). Pruned with usage detail.
+  CREATE TABLE IF NOT EXISTS smart_turns (
+    id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, agent TEXT, chat TEXT, tier TEXT NOT NULL, reason TEXT, cost REAL, strong_cost REAL
+  );
+  CREATE INDEX IF NOT EXISTS smart_turns_ts ON smart_turns(ts);
 `);
 export const PLAN_PROVIDERS = { chatgpt: 'ChatGPT plan', copilot: 'Copilot allowance', claudecode: 'Claude subscription', codex: 'ChatGPT plan' };
 const priceSetting = () => getSetting('modelPrices', {}) || {};
@@ -55,6 +61,31 @@ export function recordUsage({ agent = '', chat = '', provider, account = '', mod
   const price = fixed ? null : priceFor(provider, model, published);
   const cost = fixed ? Number(known) : price ? (input * price.in + output * price.out) / 1e6 : null;
   ins.run(Date.now(), agent || '', chat || '', provider, model, kind, input | 0, output | 0, cost, fixed ? (priced || 'provider') : price?.source || null, account || provider, String(fallback || '').slice(0, 300));
+  return cost;
+}
+
+const insTurn = db.prepare('INSERT INTO smart_turns (ts, agent, chat, tier, reason, cost, strong_cost) VALUES (?, ?, ?, ?, ?, ?, ?)');
+/** 088: one answer on Smart model choice. */
+export function recordSmartTurn({ agent, chat = '', tier, reason = '', cost = null, strongCost = null }) {
+  insTurn.run(Date.now(), agent, chat, tier, String(reason).slice(0, 60), cost, strongCost);
+}
+/**
+ * 088: Smart model choice in a period: answers per tier, cost per answer, and what the same answers would have cost on
+ * the strong model ("saved"; only answers with known prices count). { tiers: { light, strong }, reasons, saved, … }.
+ */
+export function smartReport({ from = 0, to = Date.now(), agent = '' } = {}) {
+  const where = ['ts >= ?', 'ts <= ?'];
+  /** @type {(string|number)[]} */
+  const args = [Number(from) || 0, Number(to) || Date.now()];
+  if (agent) { where.push('agent = ?'); args.push(agent); }
+  const w = where.join(' AND ');
+  const tiers = Object.fromEntries(db.prepare(`SELECT tier, COUNT(*) AS answers, SUM(cost) AS cost, SUM(cost IS NOT NULL) AS priced FROM smart_turns WHERE ${w} GROUP BY tier`).all(...args)
+    .map((r) => [r.tier, { answers: r.answers, cost: r.cost, perAnswer: r.priced ? r.cost / r.priced : null }]));
+  const reasons = db.prepare(`SELECT tier, reason, COUNT(*) AS n FROM smart_turns WHERE ${w} GROUP BY 1, 2 ORDER BY n DESC LIMIT 12`).all(...args);
+  const both = db.prepare(`SELECT COUNT(*) AS n, SUM(cost) AS cost, SUM(strong_cost) AS strong FROM smart_turns WHERE ${w} AND cost IS NOT NULL AND strong_cost IS NOT NULL`).get(...args);
+  const answers = (tiers.light?.answers || 0) + (tiers.strong?.answers || 0);
+  return { answers, tiers, reasons, compared: both.n || 0, perAnswer: both.n ? both.cost / both.n : null, perAnswerStrong: both.n ? both.strong / both.n : null,
+    saved: both.n ? Math.max(0, both.strong - both.cost) : null };
 }
 
 const GROUPS = { agent: 'agent', chat: 'chat', provider: 'provider', account: "COALESCE(account, provider)", model: "COALESCE(account, provider) || ':' || model", kind: 'kind',

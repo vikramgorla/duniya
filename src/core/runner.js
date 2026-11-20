@@ -3,7 +3,10 @@ import { JUDGE_NOTE } from './group-replies.js';
 import { randomInt } from 'node:crypto';
 import { env } from './config.js';
 import { addPending, takePending, peekPending, dropPending } from './db.js';
-import { chat as modelChat, effectiveFallback } from './providers/index.js';
+import { chat as modelChat, effectiveFallback, refCost } from './providers/index.js';
+import { SMART, chooseTier, tierModels, strongRef } from './smart-model.js';
+import { checkFacts } from './fact-check.js';
+import { recordSmartTurn } from './usage.js';
 import { REASON_TEXT } from './providers/errors.js';
 import { modelName, toolPhrase } from '../panel/public/app/names.js';
 import { getChatPrefs } from './chat-prefs.js';
@@ -131,6 +134,14 @@ export async function runAgent(ctx) {
   for (const err of meta.get('__errors') || []) activity('error', { agent: agent.id, chat, summary: err });
 
   const memory = buildContext({ agent, chat: ctx.contextChat || chat, excludeId: ctx.msgRowId || 0 });
+  // 088: Smart model choice — light for simple messages, strong when needed (rules first, a tiny classifier when unsure)
+  let smart = null;
+  if (model === SMART) {
+    smart = await chooseTier(agent, { text, ownerTurn: !!ctx.ownerTurn, attachments: (ctx.attachments || []).length > 0, source: ctx.source,
+      unaddressed: !!ctx.unaddressed, hasTools: defs.length > 0, contextChars: memory.length }, { chat });
+    model = smart.model;
+    ctx.tier = { tier: smart.tier, reason: smart.reason };
+  }
   // #91: say exactly what history is stored (WhatsApp turns, and panel tests that use a real chat's memory). In the
   // user turn, not the system prompt, so the system prompt stays the same between turns.
   const historyLine = ctx.source === 'whatsapp' || ctx.contextChat ? historyNote(ctx.contextChat || chat, { excludeId: ctx.contextChat ? 0 : ctx.msgRowId || 0, tz: agent.timezone || env.timezone }) : '';
@@ -151,7 +162,12 @@ export async function runAgent(ctx) {
   const usage = { input: 0, output: 0 };
   // Fallback (042): per model call, keeping this turn's messages, so tools that already ran never run again and
   // nothing is sent before the turn ends. The account that answered stays first for the rest of the turn.
-  const fallback = effectiveFallback({ agent, chatPrefs: getChatPrefs(ctx.contextChat || chat) });
+  let fallback = effectiveFallback({ agent, chatPrefs: getChatPrefs(ctx.contextChat || chat) });
+  // 088: a light answer does not fall back to other light models; if it fails, the strong model answers (with fallback)
+  const strongFallback = fallback;
+  if (smart?.tier === 'light') fallback = { ...fallback, enabled: false, chain: [] };
+  let cost = 0; let priced = true;
+  const sources = card ? [card] : []; // 088: what People and the modules said in this turn (for the self-check)
   const turn = { ref: '' };
   const failed = [];
   // #67: while the turn carries photos / files, fallback only moves to models that can see them (then the vision
@@ -166,6 +182,13 @@ export async function runAgent(ctx) {
         system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName, chat, requester: ctx.requester }), tools: defs, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
       });
     } catch (e) {
+      if (smart?.tier === 'light' && e.code !== 'aborted') { // 088: the light model failed: the strong one answers
+        smart = { ...smart, tier: 'strong', reason: 'the light model failed' };
+        ctx.tier = { tier: 'strong', reason: smart.reason };
+        model = tierModels(agent).strong; fallback = strongFallback; turn.ref = '';
+        round--;
+        continue;
+      }
       if (vision && e.skipped?.length) {
         vision = null;
         messages[0] = { role: 'user', content: `${turnText}\n${noVisionNote(plan.attachments)}` };
@@ -186,6 +209,7 @@ export async function runAgent(ctx) {
     if (failed.length) ctx.fallback = { answeredBy: ctx.answeredBy, model: res.model, failed };
     usage.input += res.usage?.input_tokens || 0;
     usage.output += res.usage?.output_tokens || 0;
+    if (res.cost == null) priced = false; else cost += res.cost;
     reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
     const calls = res.content.filter((b) => b.type === 'tool_use');
     if (res.stop_reason !== 'tool_use' || !calls.length) break;
@@ -218,19 +242,62 @@ export async function runAgent(ctx) {
           activity('confirm.created', { agent: agent.id, chat, summary: `${code}: ${m.fq}`, detail: { input: call.input } });
         }
       }
+      if (!out.isError && /^(people|events|orders|surveys|sending):/.test(m?.fq || '')) sources.push(content);
       results.push({ type: 'tool_result', tool_use_id: call.id, is_error: out.isError, content });
     }
     messages.push({ role: 'user', content: results });
   }
 
+  // 088: self-check — amounts, dates and counts from People and the modules are compared with this turn's records
+  if (reply && sources.length > (card ? 1 : 0) && agent.selfCheck !== false) {
+    const checked = await selfCheck({ agent, chat, ctx, reply, sources, model, fallback, turn, usage, text });
+    reply = checked.reply;
+    if (checked.cost == null) priced = false; else cost += checked.cost;
+  }
   for (const code of codes) {
     reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm?.ttlMinutes || 9} min).`;
   }
   ctx.usage = usage;
+  if (smart && ctx.source !== 'panel') {
+    const strong = smart.tier === 'strong' ? (priced ? cost : null) : refCost(strongRef(agent), usage.input, usage.output);
+    try { recordSmartTurn({ agent: agent.id, chat, tier: smart.tier, reason: smart.reason, cost: priced ? cost : null, strongCost: strong }); } catch { /* bookkeeping */ }
+  }
   const via = failed.length ? ` (after ${failed.map((f) => `${f.name}: ${REASON_TEXT[f.reason] || f.reason}`).join(', ')})` : '';
   // 072: the model as people know it ("Claude Haiku 5.5"), not its id
-  activity('model.usage', { agent: agent.id, chat, summary: `${modelName(String(ctx.model || agent.model).replace(/^[\w-]+:(?=.)/, ''))}: ${usage.input} in / ${usage.output} out${via}`, detail: failed.length ? { fallback: failed } : undefined });
+  const tierText = smart ? ` · ${smart.tier}: ${smart.reason}` : '';
+  const detail = { ...(failed.length ? { fallback: failed } : {}), ...(smart ? { tier: smart.tier, reason: smart.reason } : {}), ...(ctx.check ? { check: ctx.check } : {}) };
+  activity('model.usage', { agent: agent.id, chat, summary: `${modelName(String(ctx.model || agent.model).replace(/^[\w-]+:(?=.)/, ''))}: ${usage.input} in / ${usage.output} out${via}${tierText}`, detail: Object.keys(detail).length ? detail : undefined });
   return reply.trim() || null;
+}
+
+const FIX_NOTE = (wrong, hint) => `Fact check: these values in your answer are not in the records you looked up: ${wrong.join(', ')}.${hint ? ` The records say: ${hint}.` : ''} Rewrite your answer using only values from the tool results. Reply with the corrected answer only.`;
+const PLAIN = 'I want to give you exact figures, but I could not double-check them against the records just now, so I won’t guess. Please ask me again in a moment, or ask an organizer.';
+const keyOf = (d) => `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+/**
+ * 088: check the facts of an answer; if one is wrong, the model rewrites it once (no tools); still wrong → a plain answer
+ * that states no figures. Never sends a known-wrong amount or date. Sets ctx.check = { facts, ok, rewritten, plain }.
+ */
+async function selfCheck({ agent, chat, ctx, reply, sources, model, fallback, turn, usage, text }) {
+  const now = Date.now();
+  const today = [keyOf(new Date(now)), keyOf(new Date(now + 86400000))];
+  const first = checkFacts(reply, sources, { extra: [text], today });
+  if (!first.checked) return { reply, cost: 0 };
+  if (!first.wrong.length) { ctx.check = { facts: first.checked, ok: true }; return { reply, cost: 0 }; }
+  let out = ''; let cost = 0;
+  try {
+    const res = await modelChat({ model, purpose: 'agent', maxTokens: agent.maxTokens, usage: { agent: agent.id, chat, kind: 'self-check' }, fallback, turn,
+      system: 'You correct an answer so it states only facts from the records. Keep its language and tone.',
+      messages: [{ role: 'user', content: `Message: ${text}\n\nRecords looked up for it:\n${sources.map((x) => x.slice(0, 4000)).join('\n---\n')}` },
+        { role: 'assistant', content: reply }, { role: 'user', content: FIX_NOTE(first.wrong, first.hint) }] });
+    out = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+    usage.input += res.usage?.input_tokens || 0; usage.output += res.usage?.output_tokens || 0;
+    cost = res.cost ?? null;
+  } catch { /* the rewrite failed: the plain answer goes out */ }
+  const second = out ? checkFacts(out, sources, { extra: [text], today }) : null;
+  const ok = !!out && !second.wrong.length;
+  ctx.check = { facts: first.checked, ok: false, wrong: first.wrong.length, rewritten: ok, plain: !ok };
+  activity('error', { agent: agent.id, chat, summary: `Self-check: ${first.wrong.length} of ${first.checked} facts did not match the records; ${ok ? 'the answer was rewritten' : 'a plain answer was sent instead'}` });
+  return { reply: ok ? out : PLAIN, cost };
 }
 
 /** "confirm ABCD" / "cancel ABCD". Returns reply text, or undefined when it isn't for us. */

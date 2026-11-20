@@ -1,6 +1,33 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.49.0": {
+      "breaking": false,
+      "title": "Cheaper answers for simple messages, and figures that are checked",
+      "summary": "Choose \"Auto: light for simple, strong when needed\" on an agent's Model page: a light (cheap or free) model answers greetings and short questions, the strong model everything that matters. Usage shows what it saves.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Agents can use a light model for simple messages and a strong one when needed: the owner, photos, changes, long questions and anything about your records."
+        },
+        {
+          "type": "new",
+          "text": "Settings → Models → Smart choice sets the light and strong models (a free OpenRouter model makes a good light one); each agent can have its own."
+        },
+        {
+          "type": "new",
+          "text": "Usage shows how many answers were light, the cost per answer, and what the strong model alone would have cost."
+        },
+        {
+          "type": "new",
+          "text": "Self-check: amounts, dates and counts from People, events, orders, sending and surveys are checked before an answer goes out; a wrong figure is corrected, never sent."
+        },
+        {
+          "type": "improved",
+          "text": "Activity says which model answered and why, and whether the answer's figures were checked."
+        }
+      ]
+    },
     "2.48.0": {
       "breaking": false,
       "title": "One answer at a time, and messages you can edit",

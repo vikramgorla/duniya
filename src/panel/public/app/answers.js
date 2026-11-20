@@ -44,6 +44,11 @@ export function entryOpen(a, chatName, agentName) {
   const links = [msg && admin ? h('a', { class: 'btn small', href: `#chats/${chat}/messages/${msg}` }, 'See in messages') : null,
     chat ? h('a', { class: 'btn small ghost', href: `#chats/${chat}` }, `Open ${chatName}`) : null,
     agent ? h('a', { class: 'btn small ghost', href: `#agents/${agent}` }, `Open ${agentName}`) : null].filter(Boolean);
+  // 088: which model tier answered and why, and the self-check of its figures, in words
+  const d = a.detail || {}; const c = d.check;
+  const notes = [d.tier ? `${d.tier === 'light' ? 'Light' : 'Strong'} model: ${d.reason}.` : '',
+    c ? (c.ok ? `Checked: ${c.facts} ${c.facts === 1 ? 'fact matches' : 'facts match'} the records.` : `Checked: ${c.wrong} of ${c.facts} did not match the records; ${c.rewritten ? 'rewritten' : 'a plain answer went out'}.`) : ''].filter(Boolean);
   return [msg && agent && admin ? answerActions({ id: msg, agent: a.agent, rating: a.rating || 0, text: a.summary }) : null, links.length ? h('div', { class: 'row fx' }, links) : null,
+    notes.length ? h('p', { class: 'small' }, notes.join(' ')) : null,
     h('details', {}, h('summary', { class: 'small muted' }, 'Details'), h('pre', {}, JSON.stringify({ type: a.type, ...(a.detail ? { detail: a.detail } : {}) }, null, 2)))].filter(Boolean);
 }

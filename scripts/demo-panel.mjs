@@ -312,7 +312,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     faq: { items: [{ questions: ['Where do we meet in Geneva?', 'Where is the pick-up point?'], keywords: ['meeting point', 'pick-up'], answer: 'Pick-up in Geneva is at Cornavin, Rue de Lausanne exit, next to the taxi rank.' }], strictness: 'normal', wholeGroup: false },
     welcome: { enabled: true, text: 'Welcome {name} to {group}! 🚗 Type !rides to see how to offer or find a seat.', rules: 'Be on time, and cancel your seat as soon as plans change.' },
   });
-  await mk('office', 'office-colleagues.json', { chats: [G(4)], model: 'auto' });
+  await mk('office', 'office-colleagues.json', { chats: [G(4)], model: 'smart' }); // 088: light for simple, strong when needed
   await mk('football', 'event-planning.json', { name: 'U11 football', description: 'Match days, lifts and snack rota for the U11 team.', triggers: ['!coach'], chats: [`club#${G(8)}`], model: 'openrouter:deepseek/deepseek-v4:free' });
   await mk('neighbours', 'neighbours.json', { enabled: false, chats: [] });
   globalMcp.saveGlobalServer('weather', { url: weatherUrl, defaults: { organizer: ['*'], participant: ['forecast'] } }, 'admin');
@@ -446,7 +446,8 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     [40 * MIN, 'whatsapp.vote', 'school', G(1), 'Lea voted “I can drive (3 seats)”'],
     [24 * MIN, 'message.in', 'carpool', G(3), 'Luca: @Car pooling who drives tomorrow?'],
     [23 * MIN, 'tool.call', 'carpool', G(3), 'transport:connections — Morges → Geneva, Thu 07:15'],
-    [23 * MIN - 9000, 'model.usage', 'carpool', G(3), 'Claude Haiku 5.5: 2310 in / 71 out'],
+    [23 * MIN - 9000, 'model.usage', 'carpool', G(3), 'Claude Haiku 5.5: 2310 in / 71 out', { check: { facts: 2, ok: true } }],
+    [12 * MIN, 'model.usage', 'office', G(4), 'Claude Haiku 5.5: 1180 in / 42 out · light: a greeting or thanks', { tier: 'light', reason: 'a greeting or thanks' }],
     // 072: the reply points at the stored answer (its rating shows in Activity, See in messages opens it)
     [23 * MIN - 8000, 'message.out', 'carpool', G(3), 'Tomorrow (Thu 20 Nov): Luca 07:15 from Morges (full), Mia back from Cornavin at 18:10 (1 seat). Sophie, Mia could take you.', { msg: answers[1] }],
     [22 * MIN, 'whatsapp.reaction', 'carpool', G(3), 'Mia reacted 👍 to the agent'],
@@ -482,6 +483,15 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     }
   }
   store.updateSettings({ modelPrices: { 'anthropic:claude-haiku-5-5': { in: 1, out: 5 }, 'anthropic:claude-sonnet-5-5': { in: 3, out: 15 } } });
+  // 088: the office agent on Smart model choice: most answers light, the rest strong, with what strong-only would cost
+  const turnIns = db.db.prepare('INSERT INTO smart_turns (ts, agent, chat, tier, reason, cost, strong_cost) VALUES (?, ?, ?, ?, ?, ?, ?)');
+  const why = [['light', 'a greeting or thanks'], ['light', 'a short question'], ['light', 'judged simple'], ['strong', 'needs the records'], ['strong', 'a long or multi-step message'], ['light', 'a short question'], ['strong', 'asks for a change']];
+  for (let i = 0; i < 140; i++) {
+    const [tier, reason] = why[Math.floor(rnd() * why.length)];
+    const input = Math.round(900 + rnd() * 2600); const output = Math.round(40 + rnd() * 220);
+    const strong = (input * 3 + output * 15) / 1e6;
+    turnIns.run(now - Math.round(rnd() * 29 * D), 'office', G(4), tier, reason, tier === 'light' ? (input + output * 5) / 1e6 : strong, strong);
+  }
   // 069: one clean-up as the upkeep tick does it, so Server → Health shows its last run
   const retention = await imp('src/core/retention.js');
   retention.retentionTick();

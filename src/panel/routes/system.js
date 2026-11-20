@@ -13,7 +13,7 @@ import { referencedSecrets } from '../../core/schema.js';
 import { CHANNELS } from '../../channels/index.js';
 import { getSetting, listSecrets, setSecret, updateSettings } from '../../core/store.js';
 import { logs as sysLogs, metricsHistory, opsStatus, osUpdates, requestOp, snapshot as sysSnapshot } from '../../core/system.js';
-import { PLAN_PROVIDERS, listPrices, setPrice, usageReport } from '../../core/usage.js';
+import { PLAN_PROVIDERS, listPrices, setPrice, smartReport, usageReport } from '../../core/usage.js';
 
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
 export function systemRoutes(route, { channel } = {}) {
@@ -53,6 +53,8 @@ export function systemRoutes(route, { channel } = {}) {
     const r = usageReport({ from: periodFrom(q.get('period')), groupBy, agent: q.get('agent') || '', chat: q.get('chat') || '' });
     return groupBy === 'chat' ? { ...r, rows: await withChatNames(r.rows, channel, 'key') } : r; // 073: chat names, never ids
   });
+  // 088: Smart model choice: answers per tier, cost per answer, and what the strong model alone would have cost
+  route('GET', '/api/usage/smart', async (req, res, body, q) => smartReport({ from: periodFrom(q.get('period')), agent: q.get('agent') || '' }));
   route('GET', '/api/usage/summary', async (req, res, body, q) => {
     const from = periodFrom(q.get('period'));
     const by = (g) => Object.fromEntries(usageReport({ from, groupBy: g }).rows.map((r) => [r.key, r]));

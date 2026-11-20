@@ -236,7 +236,7 @@ export function agentRoutes(route, { channel } = {}) {
       contextChat: pick, chatName, thread };
     const reply = await runAgent(ctx);
     activity('message.out', { agent: agent.id, chat, summary: reply || '(no reply)' });
-    return { reply, path: 'model', usage: ctx.usage, model: ctx.model, answeredBy: ctx.answeredBy || '', fallback: ctx.fallback || null, role, chat: pick || 'new', ...(pick ? { chatOn: isChatEnabled(pick) } : {}) };
+    return { reply, path: 'model', usage: ctx.usage, model: ctx.model, answeredBy: ctx.answeredBy || '', fallback: ctx.fallback || null, ...(ctx.tier ? { tier: ctx.tier } : {}), ...(ctx.check ? { check: ctx.check } : {}), role, chat: pick || 'new', ...(pick ? { chatOn: isChatEnabled(pick) } : {}) };
   });
   route('POST', '/api/agents/:id/schedules/:sid/run', async (req, res, body, q, p) => {
     const agent = getAgent(p.id);

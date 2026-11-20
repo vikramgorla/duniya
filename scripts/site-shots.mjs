@@ -106,6 +106,8 @@ const CARDS = [
   ['card-people-list', 'people', '', '#main .card', 600], // 078: People — search, filters, rows with apps and last contact
   ['card-household', 'people', "const r = await (await fetch('/api/households')).json(); location.hash = 'people/households/' + r[0].id; await T.until('.person-page .lgroup'); await T.wait(300);", '.person-page', 600], // 078: a household with kids without an app
   ['card-usage-breakdown', 'usage', '', 'box:Breakdown', 900], // 073: Usage breakdown rows
+  ['card-usage-smart', 'usage', '', 'box:Smart model choice', 900], // 088: light vs strong answers and what it saved
+  ['card-agent-model', 'agents/office/model', '', '.ap-sec', 600], // 088: Auto: light or strong, Self-check
   ['card-updates', 'settings/updates', '', 'box:Updates', 900], // 073: Settings → Updates
   ['card-assistants', 'settings/assistants', '', 'box:Connected AI assistants', 900],
   ['card-logging', 'settings/logging', '', 'box:Activity log', 600],

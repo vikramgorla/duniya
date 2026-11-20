@@ -3,13 +3,16 @@ import { $, S, api, h } from './core.js';
 export const loadModels = async (refresh) => (S.models = !refresh && S.models ? S.models : await api('GET', `/api/models${refresh ? '?refresh=1' : ''}`));
 /** Model picker: Auto (any provider), "<provider> · Auto", or a specific model, grouped by provider.
  *  withInherit adds "Same as the agent" (per chat). */
-export function modelSelect(models, value, { withInherit = false, autoLabel = 'Auto (best connected model)', ...attrs } = {}) {
+/** 088: `smart` adds "Auto: light or strong per message" (agents and chats). */
+const SMART_LABEL = 'Auto: light for simple, strong when needed';
+export function modelSelect(models, value, { withInherit = false, autoLabel = 'Auto (best connected model)', smart = false, ...attrs } = {}) {
   const groups = new Map();
   for (const m of models.models) { if (!groups.has(m.provider)) groups.set(m.provider, []); groups.get(m.provider).push(m); }
-  const known = new Set(['inherit', 'auto', ...models.models.map((m) => m.ref), ...[...groups.keys()].map((p) => `${p}:auto`)]);
+  const known = new Set(['inherit', 'auto', ...(smart ? ['smart'] : []), ...models.models.map((m) => m.ref), ...[...groups.keys()].map((p) => `${p}:auto`)]);
   return h('select', attrs,
     withInherit ? h('option', { value: 'inherit', selected: value === 'inherit' }, 'Same as the agent') : null,
     h('option', { value: 'auto', selected: value === 'auto' }, autoLabel),
+    smart ? h('option', { value: 'smart', selected: value === 'smart' }, SMART_LABEL) : null,
     [...groups].map(([prov, list]) => h('optgroup', { label: list[0].label.split(' · ')[0] },
       h('option', { value: `${prov}:auto`, selected: value === `${prov}:auto` }, `${list[0].label.split(' · ')[0]} · Auto`),
       list.map((m) => h('option', { value: m.ref, selected: value === m.ref }, m.label.split(' · ').slice(1).join(' · ') || m.ref)))),
@@ -76,6 +79,7 @@ export const SMALL_MODE_LINK = () => h('a', { href: '#settings', onclick: () => 
 export function openAgent(id) { location.hash = `agents/${encodeURIComponent(id)}`; }
 export function modelLabel(ref, models) {
   if (!ref || ref === 'auto') return 'Auto (default model)';
+  if (ref === 'smart') return 'Auto: light or strong';
   const m = (models?.models || []).find((x) => x.ref === ref); if (m) return m.label;
   const i = String(ref).indexOf(':'); const p = ref.slice(0, i); const id = ref.slice(i + 1);
   const pm = (models?.models || []).find((x) => x.provider === p); const pl = pm ? pm.label.split(' · ')[0] : p;

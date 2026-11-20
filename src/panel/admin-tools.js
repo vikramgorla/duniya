@@ -106,7 +106,7 @@ export const TOOLS = [
     input: { id: str('New agent id (lowercase letters, digits, -). Optional: derived from the name'), template: str('Template id (optional)'), config: obj('Configuration fields (optional, override the template)') },
     run: (a, x) => x.call('POST', '/api/agents', { id: a.id, template: a.template, config: a.config || {} }) },
   { name: 'update_agent', calls: [['PUT', '/api/agents/x']],
-    description: 'Change fields of an agent (only the fields given change), e.g. { "prompt": "…", "triggers": ["silku", "!help"], "model": "auto" } or { "groupReplies": "followups" | "wake" | "auto" } (in groups: when woken and replies right after it speaks, only when woken, or whenever a message is for it) or { "fallback": { "mode": "off" } } (model fallback: inherit | on | off, optional "chain") or { "peopleAccess": "own" | "everyone" | "off", "peopleLists": ["l_…"] } (which people its People tools and sender cards may see: its own chats plus shared lists, everyone in People, or nobody) or { "organizers": [phone, "p_…" person, "l_…" list] } (roles follow a person on every app). Returns the agent and any warnings. For owner-assistant, how it is reached and its permissions are fixed in code (chats, triggers, people, confirm, quick answers are ignored); alerts: { to: "+41…" } sets where owner alerts go (owner only).',
+    description: 'Change fields of an agent (only the fields given change), e.g. { "prompt": "…", "triggers": ["silku", "!help"], "model": "auto" } or { "groupReplies": "followups" | "wake" | "auto" } (in groups: when woken and replies right after it speaks, only when woken, or whenever a message is for it) or { "fallback": { "mode": "off" } } (model fallback: inherit | on | off, optional "chain") or { "model": "smart", "modelTiers": { "light": "", "strong": "" } } (Auto: light for simple, strong when needed; empty tiers = Settings → Models) or { "selfCheck": false } (stop checking amounts, dates and counts against People and modules before sending) or { "peopleAccess": "own" | "everyone" | "off", "peopleLists": ["l_…"] } (which people its People tools and sender cards may see: its own chats plus shared lists, everyone in People, or nobody) or { "organizers": [phone, "p_…" person, "l_…" list] } (roles follow a person on every app). Returns the agent and any warnings. For owner-assistant, how it is reached and its permissions are fixed in code (chats, triggers, people, confirm, quick answers are ignored); alerts: { to: "+41…" } sets where owner alerts go (owner only).',
     input: { agent_id: str('Agent id'), changes: obj('Fields to change') }, required: ['agent_id', 'changes'],
     run: (a, x) => x.call('PUT', `/api/agents/${enc(a.agent_id)}`, a.changes || {}) },
   // 054: built-in answers without AI (quick replies, !help, welcome, FAQ).
@@ -279,9 +279,13 @@ export const TOOLS = [
     input: { agent_id: str('Agent id'), answer_id: int('Answer id from list_agent_answers'), rating: int('1, -1 or 0', { minimum: -1, maximum: 1 }) }, required: ['agent_id', 'answer_id', 'rating'],
     run: (a, x) => x.call('PUT', `/api/agents/${enc(a.agent_id)}/review/${Number(a.answer_id)}`, { rating: a.rating }) },
   { name: 'get_usage', readOnly: true, calls: [['GET', '/api/usage']],
-    description: 'Tokens and estimated cost of model calls, grouped by agent, chat, provider, model, kind (reply, summary, scheduled, ai-helper, test) or day. period: 1d, 7d, 30d (default), 90d, all. Costs only where a price is set or published; ChatGPT plan / Copilot calls are "included".',
+    description: 'Tokens and estimated cost of model calls, grouped by agent, chat, provider, model, kind (reply, summary, scheduled, ai-helper, test, model-choice, self-check) or day. period: 1d, 7d, 30d (default), 90d, all. Costs only where a price is set or published; ChatGPT plan / Copilot calls are "included".',
     input: { group_by: str('agent | chat | provider | model | kind | day'), period: str('1d | 7d | 30d | 90d | all'), agent_id: str('Only this agent (optional)'), chat: str('Only this chat (optional)') },
     run: (a, x) => x.call('GET', `/api/usage?groupBy=${enc(a.group_by || 'agent')}&period=${enc(a.period || '30d')}${a.agent_id ? `&agent=${enc(a.agent_id)}` : ''}${a.chat ? `&chat=${enc(a.chat)}` : ''}`) },
+  { name: 'get_smart_model_savings', readOnly: true, calls: [['GET', '/api/usage/smart']],
+    description: 'Agents on Smart model choice ("smart": a light model for simple messages, a strong one when needed): answers per tier, the most common reasons, cost per answer now and if the strong model had answered all, and what it saved (only answers with known prices). period: 1d, 7d, 30d (default), 90d, all.',
+    input: { period: str('1d | 7d | 30d | 90d | all'), agent_id: str('Only this agent (optional)') },
+    run: (a, x) => x.call('GET', `/api/usage/smart?period=${enc(a.period || '30d')}${a.agent_id ? `&agent=${enc(a.agent_id)}` : ''}`) },
   { name: 'set_model_price', calls: [['PUT', '/api/usage/prices']],
     description: 'Set the price of a model in USD per million tokens (input and output) so usage shows costs. Empty values remove the price.',
     input: { model: str('provider:model'), input_per_million: { type: 'number' }, output_per_million: { type: 'number' } }, required: ['model'],
@@ -569,12 +573,14 @@ export const TOOLS = [
     description: 'Send a tiny test prompt through one connected account (anthropic, openai, chatgpt, copilot, openrouter, another account id such as openai-work, or an endpoint id) and return the reply and response time. No fallback.',
     input: { provider: str('Account id') }, required: ['provider'],
     run: (a, x) => x.call('POST', `/api/providers/${enc(a.provider)}/test`, {}) },
-  { name: 'set_default_models', destructive: true, idempotent: true, calls: [['POST', '/api/models/defaults']], description: 'Set the default model for agents and/or the background model (summaries). Values: "auto" or provider:model.',
-    input: { default_model: str('Default model (optional)'), background_model: str('Background model (optional)') },
+  { name: 'set_default_models', destructive: true, idempotent: true, calls: [['POST', '/api/models/defaults']], description: 'Set the default model for agents, the background model (summaries) and/or Smart choice: the light and strong models of agents on "smart" ("auto" light = the background model, "auto" strong = the default model) and whether a tiny classifier call may decide when the rules are unsure. Values: "auto" or provider:model.',
+    input: { default_model: str('Default model (optional)'), background_model: str('Background model (optional)'), light_model: str('Smart choice: light model (optional)'), strong_model: str('Smart choice: strong model (optional)'),
+      smart_classifier: { type: 'boolean', description: 'Smart choice: ask the light model when the rules are unsure (optional)' } },
     run: (a, x) => {
       const b = {};
       if (a.default_model !== undefined) b.defaultModel = a.default_model;
       if (a.background_model !== undefined) b.backgroundModel = a.background_model;
+      if (a.light_model !== undefined || a.strong_model !== undefined || a.smart_classifier !== undefined) b.smart = { light: a.light_model, strong: a.strong_model, classifier: a.smart_classifier };
       return x.call('POST', '/api/models/defaults', b);
     } },
 

@@ -201,7 +201,7 @@ function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
       h('div', { class: 'sblock' }, field('Agent', agentSel), agentLink),
       h('div', { class: 'lgroup' }, h('ul', {}, rows)),
       h('div', { class: 'sblock' }, h('h3', {}, 'Settings'), h('div', { class: 'grid2' },
-        field('Model', modelSelect(models, c.model, { withInherit: true, autoLabel: 'Auto (any provider)', disabled: !admin, onchange: (e) => savePrefs({ model: e.target.value }) }),
+        field('Model', modelSelect(models, c.model, { withInherit: true, smart: true, autoLabel: 'Auto (any provider)', disabled: !admin, onchange: (e) => savePrefs({ model: e.target.value }) }),
           h('div', { class: 'row', style: 'gap:6px;margin-top:6px' }, fbLine, h('button', { class: 'btn small', type: 'button', 'aria-label': `Model fallback for ${name}`, onclick: () => openFallback(c) }, admin ? 'Fallback…' : 'Fallback'))),
         sel('Activity log', [['inherit', 'Default'], ['off', 'Off'], ['minimal', 'Minimal'], ['normal', 'Normal'], ['verbose', 'Verbose']], c.logging || 'inherit', 'logging'),
         // 054: "Welcome new members" for this group: the agent setting, or always on / off here

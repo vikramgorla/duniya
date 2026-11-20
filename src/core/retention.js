@@ -125,6 +125,7 @@ function prune(now) {
   const edge = db.prepare('SELECT id FROM activity WHERE id <= (SELECT MAX(id) FROM activity) - ? ORDER BY id DESC LIMIT 1').get(Math.max(100, log.maxEntries));
   if (edge) removed.activity += del('DELETE FROM activity WHERE id IN (SELECT id FROM activity WHERE id <= ? ORDER BY id LIMIT ?)', edge.id, BATCH);
   removed.usage += del('DELETE FROM usage WHERE id IN (SELECT id FROM usage WHERE ts < ? LIMIT ?)', now - r.usageDays * DAY, BATCH);
+  removed.usage += del('DELETE FROM smart_turns WHERE id IN (SELECT id FROM smart_turns WHERE ts < ? LIMIT ?)', now - r.usageDays * DAY, BATCH); // 088
   left ||= removed.activity >= BATCH || removed.usage >= BATCH;
   // small bookkeeping tables
   removed.other += del('DELETE FROM silences WHERE last_ts < ?', now - 90 * DAY);

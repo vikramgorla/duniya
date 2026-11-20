@@ -9,6 +9,9 @@
   row each (name · calls and tokens · cost), and how many calls a fallback model answered.
 - Prices are yours, published, plans ("included") or free: never guessed.
 - Caps: one alert at 80 %; quiet (or a cheaper model) at 100 %.
+- Agents on [Smart model choice](intelligence.md#smart-model-choice): **Usage → Smart model choice** shows how many
+  answers a light model gave, the cost per answer and what it saved. *Kind* lists the classifier (*Choosing light or
+  strong*) and *Self-check rewrites* separately.
 
 ![Usage page](site/img/usage-desktop.webp)
 

@@ -57,10 +57,10 @@ export async function renderUsage() {
   const [byDay, byAgent, byChat, byModel, byKind, byAcct, byFb, sum, agents, provList] = await Promise.all(['day', 'agent', 'chat', 'model', 'kind', 'account', 'fallback']
     .map((g) => api('GET', `/api/usage?period=${usagePeriod}&groupBy=${g}`)).concat([usageSummary(), api('GET', '/api/agents').catch(() => []), api('GET', '/api/providers').catch(() => [])]));
   const acctName = Object.fromEntries(provList.map((p) => [p.id, p.name]));
-  const caps = await api('GET', '/api/budget').catch(() => null);
+  const [caps, smart] = await Promise.all([api('GET', '/api/budget').catch(() => null), api('GET', `/api/usage/smart?period=${usagePeriod}`).catch(() => null)]);
   const t = byDay.total;
   const agentName = Object.fromEntries(agents.map((b) => [b.id, b.name]));
-  const KIND = { reply: 'Replies', summary: 'Memory summaries', scheduled: 'Scheduled posts', 'ai-helper': 'AI helper', test: 'Tests' };
+  const KIND = { reply: 'Replies', summary: 'Memory summaries', scheduled: 'Scheduled posts', 'ai-helper': 'AI helper', test: 'Tests', 'model-choice': 'Choosing light or strong', 'self-check': 'Self-check rewrites' };
   const seg = h('div', { class: 'seg' }, [['1d', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['90d', '90 days'], ['all', 'All']].map(([v, l]) => h('button', { class: usagePeriod === v ? 'on' : '', onclick: () => { usagePeriod = v; renderUsage(); } }, l)));
   const tile = (eyebrow, stat, sub) => h('div', { class: 'card' }, h('div', { class: 'eyebrow' }, eyebrow), h('div', { class: 'stat' }, stat), sub ? h('div', { class: 'small muted' }, sub) : null);
   // daily bars
@@ -115,8 +115,21 @@ export async function renderUsage() {
       caps.caps.length ? h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px' }, caps.caps.map((c) => capBar(c)))
         : h('p', { class: 'small muted' }, 'No caps yet. Set one on an agent’s page (Monthly spending cap) or for a chat under Chats → Spending cap.'),
       caps.caps.length && !caps.alertsTo ? h('div', { class: 'note warn', style: 'margin-top:10px' }, 'Cap alerts can’t reach you on WhatsApp yet: add your number under Agents → Owner assistant → Alerts.') : null) : null,
+    smartCard(smart),
     h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Per day'), days.length ? chart : h('p', { class: 'small muted' }, 'Nothing in this period.')),
     h('div', { class: 'card', style: 'margin-top:16px', 'data-jump': 'breakdown' }, h('h2', {}, 'Breakdown'), h('div', { style: 'overflow-x:auto;margin-bottom:6px' }, bySeg), list,
       fb ? h('p', { class: 'small muted' }, `${plural(fb.calls, 'call')} answered by a fallback model (${cost(fb)}).`) : null,
       h('p', { class: 'small muted', style: 'margin-bottom:0' }, 'Costs are estimates from the prices you set (or the provider publishes). ChatGPT plan and Copilot calls are included in those plans; your provider’s bill is the source of truth.')));
+}
+
+/** 088: agents on "Auto: light or strong": how the answers split and what it saved. */
+function smartCard(r) {
+  if (!r?.answers) return null;
+  const light = r.tiers.light?.answers || 0; const per = (v) => (v == null ? 'price not set' : fmtCost(v));
+  return h('div', { class: 'card', style: 'margin-top:16px', 'data-jump': 'smart' }, h('h2', {}, 'Smart model choice'),
+    meter(Math.round((light / r.answers) * 100)),
+    h('p', { class: 'small num' }, `${plural(r.answers, 'answer')}: ${light} light, ${r.answers - light} strong.`),
+    r.compared ? h('p', { class: 'small num' }, `Cost per answer ${per(r.perAnswer)} — ${per(r.perAnswerStrong)} if the strong model had answered all; ${fmtCost(r.saved)} saved.`)
+      : h('p', { class: 'small muted' }, 'Set the prices of the light and strong models to see what it saves.'),
+    h('ul', { class: 'urows' }, r.reasons.map((x) => h('li', {}, h('div', { class: 'u-main' }, h('span', { class: 'u-name' }, x.reason), h('span', { class: 'small muted' }, x.tier)), h('span', { class: 'u-cost num' }, String(x.n))))));
 }
