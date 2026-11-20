@@ -18,6 +18,7 @@ import { sendOwnerAlert } from './owner-alerts.js';
 import { personInfo } from './contacts.js';
 import { chatLabels } from './chat-names.js';
 import { env, digits, clip, iso, fail } from './config.js';
+import { usageTag } from './usage.js';
 import { isGroup, phoneOf, phoneChat } from '../channels/index.js';
 import { getUser, onUserDeleted, TENANT } from './store.js';
 import { listAgents, agentForChat, getAgent, OWNER_AGENT_ID } from './agents.js';
@@ -525,7 +526,7 @@ export async function ask({ user, text, source, surface, onEvent = null, dm = {}
     emit({ type: 'step', step: 'thinking', round });
     try {
       res = await modelChat({ model, purpose: 'agent', maxTokens: rec.maxTokens, system: systemPrompt(user, source), tools: defs, messages, fallback, turn,
-        usage: { agent: OWNER_AGENT, chat: '', kind: 'owner' }, ...streaming, ...(vision || {}), signal });
+        usage: usageTag('owner', { agent: OWNER_AGENT }), ...streaming, ...(vision || {}), signal });
     } catch (e) {
       if (e.code === 'aborted' || signal?.aborted) { stopped = true; reply = partial.trim(); break; }
       if (vision && e.skipped?.length) { // no model that sees photos could answer: ask again without them (#67)

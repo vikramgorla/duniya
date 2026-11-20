@@ -8,6 +8,7 @@
 // provider gets sensible picks and OpenRouter's free models work. A light answer that fails moves to the strong model.
 import { getSetting, updateSettings } from './store.js';
 import { bad, clip } from './config.js';
+import { usageTag } from './usage.js';
 import { chat as modelChat, resolveModel, REF_RE } from './providers/index.js';
 
 export const SMART = 'smart';
@@ -89,7 +90,7 @@ export async function chooseTier(agent, turn, { chat = '' } = {}) {
     if (smartSettings().classifier) {
       try {
         const res = await modelChat({ model: models.light, purpose: 'background', maxTokens: 4, fallback: { enabled: false, chain: [] },
-          usage: { agent: agent.id, chat, kind: 'model-choice' }, system: CLASSIFY, messages: [{ role: 'user', content: clip(turn.text, 400) }] });
+          usage: usageTag('model-choice', { agent: agent.id, chat }), system: CLASSIFY, messages: [{ role: 'user', content: clip(turn.text, 400) }] });
         const word = res.content.filter((b) => b.type === 'text').map((b) => b.text).join(' ');
         pick = /light/i.test(word) && !/strong/i.test(word) ? { tier: 'light', reason: 'judged simple' } : { tier: 'strong', reason: 'judged complex' };
       } catch { /* the classifier failed: strong, to be safe */ }

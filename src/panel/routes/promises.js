@@ -1,7 +1,9 @@
 // @ts-check
 // Panel routes (091): commitments people made in chats, people's preferences, and suggested family ties. Admins.
+// 092: People → Promises: every agent's promises with filters, names and links; change or delete one.
 import { chatLabels } from '../../core/chat-names.js';
-import { listCommitments, updateCommitment } from '../../core/commitments.js';
+import { deleteCommitment, listCommitments, updateCommitment } from '../../core/commitments.js';
+import { isBuiltin, listAgents } from '../../core/agents.js';
 import { decideTie, prefsOf, setPrefs, tieSuggestions } from '../../core/person-insights.js';
 import { personByRef } from '../../core/people.js';
 import { activity } from '../../core/events.js';
@@ -13,9 +15,11 @@ export function promiseRoutes(route, { channel } = {}) {
   route('GET', '/api/commitments', async (req, res, body, q) => {
     const list = listCommitments({ agent: q.get('agent') || '', person: q.get('person') || '', chat: q.get('chat') || '', status: q.get('status') || 'open' });
     const names = await chatLabels([...new Set(list.map((c) => c.chat))], channel);
-    return list.map((c) => ({ ...c, chatName: names.get(c.chat) }));
+    const agents = new Map(listAgents().filter((a) => !isBuiltin(a)).map((a) => [a.id, a.name]));
+    return list.map((c) => ({ ...c, chatName: names.get(c.chat), agentName: agents.get(c.agent) || c.agent }));
   }, admin);
   route('PUT', '/api/commitments/:id', async (req, res, body, q, p, user) => updateCommitment(p.id, body || {}, user.username), admin);
+  route('DELETE', '/api/commitments/:id', async (req, res, body, q, p, user) => deleteCommitment(p.id, user.username), admin);
   route('GET', '/api/people/:ref/prefs', async (req, res, body, q, p) => prefsOf(person(p.ref).id), admin);
   route('PUT', '/api/people/:ref/prefs', async (req, res, body, q, p, user) => {
     const x = person(p.ref);

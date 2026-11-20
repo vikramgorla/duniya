@@ -47,7 +47,7 @@ test('073: activity (API and live stream), pending changes and usage by chat car
   assert.equal((await tool('list_activity', { chat: GROUP }))[0].chatName, 'Morges rides');
   t.db.addPending({ code: 'ABC123', agent: 'panduga', server: 'panduga', confirmTool: 'confirm', confirmId: 'x', tool: 'panduga:agenda_create_preview', chat: GROUP, requester: '', summary: 'add', expires: Date.now() + 60000 });
   assert.equal((await t.api(owner, 'GET', '/api/pending')).body.find((p) => p.code === 'ABC123').chatName, 'Morges rides');
-  recordUsage({ agent: 'panduga', chat: GROUP, provider: 'anthropic', model: 'claude-haiku-5-5', input: 10, output: 5 });
+  recordUsage({ agent: 'panduga', chat: GROUP, provider: 'anthropic', model: 'claude-haiku-5-5', feature: 'reply', input: 10, output: 5 });
   const u = (await t.api(owner, 'GET', '/api/usage?groupBy=chat&period=1d')).body.rows.find((r) => r.key === GROUP);
   assert.equal(u.chatName, 'Morges rides');
   // live: the event stream names the chat too

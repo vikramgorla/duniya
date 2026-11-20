@@ -12,6 +12,7 @@ import { chatToolsFor, chatToolRules, chatChannel } from './chat-tools.js';
 import { capsOf } from '../channels/index.js';
 import { mediaTools, imageToolAllowed } from './media-ai.js';
 import { liveModules, moduleRules } from '../modules/index.js';
+import { promiseTools } from './commitments.js';
 
 /** "panduga:*_preview" style globs. */
 function globToRegex(glob) {
@@ -146,6 +147,9 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
 
   // Modules (081): each module that is on, by the role's "<module>:" rules (organizers all, participants the defaults)
   for (const m of liveModules()) addLocal(m.id, m.tools, moduleRules(agent, role, m));
+
+  // Promises (092): agents that track promises; organizers see and change those of its chats, participants their own (decided in the tools)
+  if (agent.promises?.track) addLocal('promises', promiseTools, null);
 
   // Chat actions (026, 075 by capability): role defaults unless the role has explicit whatsapp: rules; organizer-only
   // tools never reach participants (t.roles), and the deny list always wins.

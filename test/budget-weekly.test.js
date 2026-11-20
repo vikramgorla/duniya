@@ -14,7 +14,7 @@ const weekly = await import('../src/core/weekly.js');
 const stats = await import('../src/core/stats.js');
 after(() => t.close());
 
-const spend = (o) => usage.recordUsage({ provider: 'anthropic', model: 'claude-sonnet-5-5', kind: 'reply', ...o });
+const spend = (o) => usage.recordUsage({ provider: 'anthropic', model: 'claude-sonnet-5-5', feature: 'reply', ...o });
 const toOwner = () => t.sent.filter((m) => m.chat === '41791112233@s.whatsapp.net');
 
 test('040: months follow the server timezone', () => {

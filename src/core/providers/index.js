@@ -7,7 +7,7 @@
 // with the same base URL count as accounts of one provider.
 import { getSecret, getSetting, updateSettings, setSecret, onSecretChange } from '../store.js';
 import * as anthropic from './anthropic.js';
-import { recordUsage, priceFor } from '../usage.js';
+import { recordUsage, priceFor, usageTag } from '../usage.js';
 import * as chatgpt from './chatgpt.js';
 import * as copilot from './copilot.js';
 import * as claudeCode from './claude-code.js';
@@ -515,7 +515,7 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
       let cost = null;
       try { // usage & cost (023): the account and model that actually answered, and why it switched (042)
         const published = modelCache.get(p.id)?.models?.find((m) => m.id === modelId)?.price || null;
-        cost = recordUsage({ ...usage, kind: usage.kind || (purpose === 'background' ? 'summary' : 'reply'), provider: p.type === 'compatible' ? p.id : p.type, account: p.id, model: modelId,
+        cost = recordUsage({ ...usage, provider: p.type === 'compatible' ? p.id : p.type, account: p.id, model: modelId,
           input: res.usage?.input_tokens || 0, output: res.usage?.output_tokens || 0, published, fallback: fbText });
       } catch { /* never fail a reply because of bookkeeping */ }
       const firstFail = failed.find((f) => f.account !== p.id);
@@ -556,7 +556,7 @@ export async function testProvider(id, model) {
   const started = Date.now();
   try {
     if (!model) await providerModels(p);
-    const res = await chat({ model: model ? `${id}:${model}` : `${id}:auto`, purpose: 'background', maxTokens: 60, usage: { kind: 'test' }, direct: true,
+    const res = await chat({ model: model ? `${id}:${model}` : `${id}:auto`, purpose: 'background', maxTokens: 60, usage: usageTag('test'), direct: true,
       system: 'You are checking a connection. Answer in one short friendly sentence.', messages: [{ role: 'user', content: 'Say hi' }] });
     const reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
     return { ok: true, model: res.model, reply: reply.slice(0, 500) || '(empty reply)', ms: Date.now() - started };

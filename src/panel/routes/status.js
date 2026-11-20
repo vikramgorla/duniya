@@ -36,7 +36,7 @@ export const statusFor = async (user, channel) => ({
   server: { ...serverSize(), smallMode: smallServerMode() }, // small-server guardrails (043, 055): size, RAM, CPUs, switch
   mediaQueue: queueStats(),
   node: process.version,
-  agents: listAgents().filter((b) => !isBuiltin(b)).map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length })), // 059: chat agents
+  agents: listAgents().filter((b) => !isBuiltin(b)).map((b) => ({ id: b.id, name: b.name, enabled: b.enabled, chats: b.chats.length, promises: !!b.promises?.track })), // 059: chat agents (092: tracking promises)
   pending: listPending().length,
   whatsNew: whatsNew(user), // 065: { from, to } once after an update, until this user opened or hid it
   // #96: Server tab badge — only updates that will install now (from the last check; never runs apt here)

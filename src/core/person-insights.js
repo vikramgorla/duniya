@@ -27,7 +27,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS tie_suggestions_status ON tie_suggestions(status, created_at);
 `);
 
-const LANGUAGES = { en: 'English', fr: 'French', de: 'German', es: 'Spanish', it: 'Italian', pt: 'Portuguese', nl: 'Dutch' };
+// 092: the languages Duniya tells apart. Latin-script ones by stop words; the others by their Unicode script (in code,
+// no dependency); Telugu and Hindi written in Latin letters ("ela unnaru", "kya haal hai") by a short word list.
+const LANGUAGES = { en: 'English', fr: 'French', de: 'German', es: 'Spanish', it: 'Italian', pt: 'Portuguese', nl: 'Dutch',
+  te: 'Telugu', hi: 'Hindi', ta: 'Tamil', kn: 'Kannada', ml: 'Malayalam', bn: 'Bengali', gu: 'Gujarati', pa: 'Punjabi', ur: 'Urdu', ar: 'Arabic',
+  ru: 'Russian', uk: 'Ukrainian', el: 'Greek', he: 'Hebrew', th: 'Thai', zh: 'Chinese', ja: 'Japanese', ko: 'Korean',
+  'te-Latn': 'Telugu in Latin letters', 'hi-Latn': 'Hindi in Latin letters' };
 const STOP = {
   en: 'the and you are is it to of for in on with this that what when where will can have not my we our'.split(' '),
   fr: 'le la les et est je tu vous nous pour dans avec ce que qui une un des pas mais où quand demain merci'.split(' '),
@@ -36,14 +41,54 @@ const STOP = {
   it: 'il lo la gli le e è io tu voi noi per con che una un del ma quando dove grazie domani'.split(' '),
   pt: 'o a os as e é eu você nós para com que uma um do da mas quando onde obrigado amanhã'.split(' '),
   nl: 'de het en is ik jij je wij niet een met voor op wanneer waar dank morgen'.split(' '),
+  // romanized: words that are not English (or another language above)
+  'te-Latn': 'garu gaaru ela unnaru unnavu unnav bagunnara bagunnava bagunnanu bagundi emi enti endi emiti cheppu cheppandi chesanu chestanu chesava chesara ledu leda ledhu undi unnadi kaadu avunu sare ippudu ekkada enduku inka naku naaku meeku manam memu vastanu vasta vellu velli randi cheyyi chala chaala baga baaga tinnava tinnara annayya nenu nuvvu meeru kavali kaavali telusu teliyadu eppudu'.split(' '),
+  'hi-Latn': 'kya hai hain haan nahi nahin kaise kaisa kaisi haal aap aapka tum tumhara mera meri mujhe kyun kyon kab kahan accha acha theek thik bhai yaar karo karna raha rahi rahe hoon tha thi gaya gayi abhi bahut bohot kuch chalo dekho bolo matlab shukriya dhanyavad namaste'.split(' '),
 };
 const STOPSETS = Object.fromEntries(Object.entries(STOP).map(([k, v]) => [k, new Set(v)]));
-/** The language of some texts by stop words ('' when unclear: fewer than 6 hits or no clear winner). */
-function detectLanguage(texts) {
-  const score = Object.fromEntries(Object.keys(STOP).map((k) => [k, 0]));
-  for (const t of texts) for (const w of String(t).toLowerCase().match(/\p{L}+/gu) || []) for (const k in STOPSETS) if (STOPSETS[k].has(w)) score[k]++;
+// [script, language]; Arabic letters → Urdu when Urdu-only letters appear, Cyrillic → Ukrainian on і ї є ґ, Han → Japanese with kana
+/** @type {[RegExp, string][]} */
+const SCRIPTS = [[/\p{Script=Telugu}/gu, 'te'], [/\p{Script=Devanagari}/gu, 'hi'], [/\p{Script=Tamil}/gu, 'ta'], [/\p{Script=Kannada}/gu, 'kn'], [/\p{Script=Malayalam}/gu, 'ml'],
+  [/\p{Script=Bengali}/gu, 'bn'], [/\p{Script=Gujarati}/gu, 'gu'], [/\p{Script=Gurmukhi}/gu, 'pa'], [/\p{Script=Arabic}/gu, 'ar'], [/\p{Script=Cyrillic}/gu, 'ru'],
+  [/\p{Script=Greek}/gu, 'el'], [/\p{Script=Hebrew}/gu, 'he'], [/\p{Script=Thai}/gu, 'th'], [/\p{Script=Hangul}/gu, 'ko'], [/[\p{Script=Hiragana}\p{Script=Katakana}]/gu, 'ja'], [/\p{Script=Han}/gu, 'zh']];
+const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}]/u; const URDU = /[ٹڈڑںھہے]/u; const UKRAINIAN = /[іїєґІЇЄҐ]/u;
+const MIN_MESSAGES = 3; // a language is learned (or changed) only after this many of their recent messages show it
+
+/** The language of Latin-script words: stop words or a romanized word list, '' when fewer than 2 hits or no clear winner. */
+function latinLanguage(text) {
+  const score = {};
+  for (const w of String(text).toLowerCase().match(/\p{L}+/gu) || []) for (const k in STOPSETS) if (STOPSETS[k].has(w)) score[k] = (score[k] || 0) + 1;
   const [best, second] = Object.entries(score).sort((a, b) => b[1] - a[1]);
-  return best[1] >= 6 && best[1] >= second[1] * 1.5 ? best[0] : '';
+  return best && best[1] >= 2 && best[1] >= (second?.[1] || 0) * 1.5 ? best[0] : '';
+}
+/**
+ * One message's language: { lang, alt } — `alt` is the Latin-letter language of a mixed message (Telugu words with
+ * English ones), decided later by the person's majority; null when the message does not tell.
+ */
+function messageLanguage(text) {
+  const t = String(text || '');
+  const latin = (t.match(/\p{Script=Latin}/gu) || []).length;
+  let lang = ''; let n = 0;
+  for (const [re, code] of SCRIPTS) { const c = (t.match(re) || []).length; if (c > n) { n = c; lang = code; } }
+  if (lang === 'zh' && KANA.test(t)) lang = 'ja';
+  if (lang === 'ar' && URDU.test(t)) lang = 'ur';
+  if (lang === 'ru' && UKRAINIAN.test(t)) lang = 'uk';
+  if (n >= 2) return { lang, alt: latin >= 6 && latin >= (n + latin) * 0.3 ? latinLanguage(t) || 'en' : '' };
+  const l = latinLanguage(t);
+  return l ? { lang: l, alt: '' } : null;
+}
+/**
+ * The language of a person's recent messages (newest first): each message votes; a mixed message votes for the
+ * person's majority when it is one of its two languages, else for its script. At least MIN_MESSAGES votes and a clear
+ * winner, else `current` stays (so one message in another language changes nothing).
+ */
+function detectLanguage(texts, current = '') {
+  const votes = {}; const mixed = [];
+  for (const t of texts) { const r = messageLanguage(t); if (r?.alt) mixed.push(r); else if (r) votes[r.lang] = (votes[r.lang] || 0) + 1; }
+  const lead = Object.entries(votes).sort((a, b) => b[1] - a[1])[0]?.[0];
+  for (const m of mixed) { const k = lead && (lead === m.alt || lead === m.lang) ? lead : m.lang; votes[k] = (votes[k] || 0) + 1; }
+  const [best, second] = Object.entries(votes).sort((a, b) => b[1] - a[1]);
+  return best && best[1] >= MIN_MESSAGES && best[1] >= (second?.[1] || 0) * 1.5 ? best[0] : current;
 }
 
 // ---------- preferences ----------
@@ -65,7 +110,7 @@ function messagesOf(person) {
 function compute(person, now = Date.now()) {
   const msgs = messagesOf(person);
   const cur = db.prepare('SELECT * FROM person_prefs WHERE person = ?').get(person) || {};
-  const lang = cur.lang_set ? cur.lang : detectLanguage(msgs.slice(0, 20).map((m) => m.text)); // their 20 latest: a switch shows soon
+  const lang = cur.lang_set ? cur.lang : detectLanguage(msgs.slice(0, 20).map((m) => m.text), cur.lang || ''); // their 20 latest: a switch shows soon, one message does not
   let from = cur.hours_from ?? null; let to = cur.hours_to ?? null;
   if (!cur.hours_set) {
     from = null; to = null;
@@ -92,12 +137,12 @@ export function prefsTick(now = Date.now(), max = 10) {
   for (const p of pending) { pending.delete(p); try { compute(p, now); n++; } catch { /* the person may be gone */ } if (n >= max) break; }
   return n;
 }
-/** A person's preferences: { language, languageName, auto: { language, hours, app }, hours: { from, to } | null, app }. */
+/** A person's preferences: { language, languageName, auto: { language, hours, app }, hours: { from, to } | null, app, languages (code → name) }. */
 export function prefsOf(person) {
   const r = db.prepare('SELECT * FROM person_prefs WHERE person = ?').get(String(person || ''));
-  if (!r) return { language: '', languageName: '', hours: null, app: '', auto: { language: true, hours: true, app: true } };
+  if (!r) return { language: '', languageName: '', hours: null, app: '', auto: { language: true, hours: true, app: true }, languages: LANGUAGES };
   return { language: r.lang, languageName: LANGUAGES[r.lang] || '', hours: r.hours_from != null && r.hours_to != null ? { from: r.hours_from, to: r.hours_to } : null, app: r.app,
-    auto: { language: !r.lang_set, hours: !r.hours_set, app: !r.app_set }, computedAt: r.computed_at || null };
+    auto: { language: !r.lang_set, hours: !r.hours_set, app: !r.app_set }, computedAt: r.computed_at || null, languages: LANGUAGES };
 }
 /**
  * The owner sets (or, with 'auto', gives back to the computation) a preference.
@@ -131,7 +176,12 @@ export function inPersonHours(person, now = Date.now()) {
   return hour >= h.from && hour < h.to;
 }
 /** The sender card's line: the language to answer in. */
-export const prefsLine = (person) => { const p = prefsOf(person); return p.languageName ? `Writes in ${p.languageName}: answer in ${p.languageName} unless they write otherwise.` : ''; };
+export const prefsLine = (person) => {
+  const p = prefsOf(person);
+  if (!p.languageName) return '';
+  if (p.language.endsWith('-Latn')) { const name = LANGUAGES[p.language.slice(0, 2)]; return `Writes ${name} in Latin letters: answer in ${name} written in Latin letters, the way they write, unless they write otherwise.`; }
+  return `Writes in ${p.languageName}: answer in ${p.languageName} unless they write otherwise.`;
+};
 
 // ---------- relationship cues ----------
 const WORDS = { wife: 'partner', husband: 'partner', partner: 'partner', daughter: 'child', son: 'child', kid: 'child', child: 'child',
