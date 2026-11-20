@@ -74,6 +74,7 @@ context…" (edit under **Settings → Privacy notice**).
 | **Chats that are off** | the id, time and sender id of the newest message only (no text, no names), to ask the phone for history later |
 | **Activity log** | minimal, normal or verbose, by category and per chat, with retention. Errors, confirmations, configuration changes and channel status are always recorded |
 | **Summaries** | the weekly summary and *Why agents stayed quiet* keep counts only |
+| **Smarter agents** | [Smart model choice](intelligence.md#smart-model-choice) keeps per answer the tier, a short reason and the cost (never text); its classifier sends the message alone (≤ 400 characters) to your light model. [Self-check](intelligence.md#self-check) compares figures in code and keeps counts only |
 | **Welcomes** | a hash of the group and the new member's id, so each person is welcomed once (no names or numbers); the activity log says how many were welcomed |
 | **Personal details** | agents don't post phone numbers, emails, health or payment details in groups |
 | **Keys and passwords** | never through a chat or a model: entered on one-time panel links; a key pasted to the owner assistant is not read, stored or logged ([Owner assistant](owner-assistant.md#what-it-may-do-decided-in-code)) |

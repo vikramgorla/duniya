@@ -23,7 +23,7 @@ const cents = (s) => {
 const md = (m, d) => (m >= 1 && m <= 12 && d >= 1 && d <= 31 ? `${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : null);
 
 /** Amounts (in cents) stated in a text. */
-export function amountsIn(text) {
+function amountsIn(text) {
   const out = [];
   for (const m of String(text).matchAll(MONEY)) { const c = cents(m[1] ?? m[2]); if (c != null) out.push(c); }
   return out;

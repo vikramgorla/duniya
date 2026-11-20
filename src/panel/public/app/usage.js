@@ -125,11 +125,11 @@ export async function renderUsage() {
 /** 088: agents on "Auto: light or strong": how the answers split and what it saved. */
 function smartCard(r) {
   if (!r?.answers) return null;
-  const light = r.tiers.light?.answers || 0; const per = (v) => (v == null ? 'price not set' : fmtCost(v));
+  const light = r.tiers.light?.answers || 0; const per = (v) => (v == null ? 'price not set' : fmtCost(v * 100)); // per 100 answers: readable sums
   return h('div', { class: 'card', style: 'margin-top:16px', 'data-jump': 'smart' }, h('h2', {}, 'Smart model choice'),
     meter(Math.round((light / r.answers) * 100)),
     h('p', { class: 'small num' }, `${plural(r.answers, 'answer')}: ${light} light, ${r.answers - light} strong.`),
-    r.compared ? h('p', { class: 'small num' }, `Cost per answer ${per(r.perAnswer)} — ${per(r.perAnswerStrong)} if the strong model had answered all; ${fmtCost(r.saved)} saved.`)
+    r.compared ? h('p', { class: 'small num' }, `${per(r.perAnswer)} per 100 answers — ${per(r.perAnswerStrong)} if the strong model had answered all; ${fmtCost(r.saved)} saved.`)
       : h('p', { class: 'small muted' }, 'Set the prices of the light and strong models to see what it saves.'),
     h('ul', { class: 'urows' }, r.reasons.map((x) => h('li', {}, h('div', { class: 'u-main' }, h('span', { class: 'u-name' }, x.reason), h('span', { class: 'small muted' }, x.tier)), h('span', { class: 'u-cost num' }, String(x.n))))));
 }

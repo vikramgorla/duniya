@@ -259,10 +259,11 @@ function buildModel(x) {
   const fb = fallbackPicker(x.models, x.c.fallback, { what: 'agent' });
   // 088: Smart choice — its own light / strong models (empty: Settings → Models), shown while "smart" is chosen
   const sm = x.models.smart || {};
-  const tier = (k, now) => modelSelect(x.models, x.c.modelTiers?.[k] || 'auto', { autoLabel: `Same as Models${now ? ` (now ${now})` : ''}`, 'aria-label': `${k} model` });
-  F['modelTiers.light'] = tier('light', sm.resolvedLight); F['modelTiers.strong'] = tier('strong', sm.resolvedStrong);
+  const tier = (k) => modelSelect(x.models, x.c.modelTiers?.[k] || 'auto', { autoLabel: 'Same as Models', 'aria-label': `${k} model` });
+  const now = (ref) => (ref ? `Models: ${modelLabel(ref, x.models)}` : '');
+  F['modelTiers.light'] = tier('light'); F['modelTiers.strong'] = tier('strong');
   const tiers = block('Light and strong', h('p', { class: 'small muted' }, 'Simple messages (greetings, thanks, short questions) go to the light model; the owner, photos, changes, long or multi-step messages and looking things up go to the strong one. Activity says which answered and why. ', helpLink('models.md#smart-choice')),
-    h('div', { class: 'grid2' }, field('Light model', F['modelTiers.light']), field('Strong model', F['modelTiers.strong'])));
+    h('div', { class: 'grid2' }, field('Light model', F['modelTiers.light'], now(sm.resolvedLight)), field('Strong model', F['modelTiers.strong'], now(sm.resolvedStrong))));
   const showTiers = () => tiers.classList.toggle('hide', F.model.value !== 'smart');
   F.model.addEventListener('change', showTiers); showTiers();
   F.selfCheck = check(x.c.selfCheck !== false);
