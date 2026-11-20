@@ -795,4 +795,4 @@ button.lrow { width: 100%; border: 0; background: none; font: inherit; text-alig
 .lessons li { padding: 10px 0; display: grid; gap: 4px; }
 .lessons li + li { border-top: 1px solid var(--line); }
 .lesson-text { overflow-wrap: anywhere; }
-.lessons select { width: auto; max-width: 100%; min-height: 32px; padding: 2px 8px; }
+.lessons select { width: auto; max-width: 100%; }

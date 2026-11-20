@@ -133,7 +133,7 @@ const proposalsToday = (agent) => db.prepare("SELECT COUNT(*) AS n FROM lessons 
 async function propose({ agent, chat, kind, source, msg = null, input, by = '' }) {
   if (agent.lessons?.enabled === false || proposalsToday(agent.id) >= MAX_PROPOSALS_PER_DAY) return null;
   try {
-    const res = await modelChat({ model: 'auto', purpose: 'background', maxTokens: 120, usage: { agent: agent.id, chat, kind: 'lessons' },
+    const res = await modelChat({ model: 'auto', purpose: 'background', maxTokens: 120, fallback: undefined, usage: { agent: agent.id, chat, kind: 'lessons' },
       system: kind === 'join' ? JOIN : PROPOSE, messages: [{ role: 'user', content: clip(input, 3000) }] });
     const out = res.content.filter((b) => b.type === 'text').map((b) => b.text).join(' ').trim();
     if (!out || /^NONE\b/i.test(out)) return null;
