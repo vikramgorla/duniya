@@ -20,7 +20,8 @@
 
 ## The People screen
 
-- **People · Households · Lists** (and **Events · Orders** when those [modules](modules.md) are on) sit at the top; each is a list, and a row opens its page (`#people/<id>`,
+- **People · Households · Lists** (**Promises** when an agent tracks them, and **Events · Orders** when those
+  [modules](modules.md) are on) sit at the top; each is a list, and a row opens its page (`#people/<id>`,
   `#people/households/<id>`, `#people/lists/<id>`).
 - **People (N)** counts everyone (hidden people aside); with a search or a filter it says how many match, e.g.
   *People (12 of 640)*.
@@ -115,13 +116,35 @@ adds Vedika when nobody in People has exactly that name); **No** rejects it for 
 Only family words count (wife, husband, partner, daughter, son, kid, child, mother, mum, mom, father, dad, brother,
 sister); nothing else about a person is inferred. Admin MCP: `list_tie_suggestions`, `decide_tie_suggestion`.
 
+## Promises
+
+**People → Promises** (shown when an agent has *Track promises* on, [Smarter agents](intelligence.md#commitments)):
+every promise people made in your chats, across agents.
+
+- **Open · Overdue · Done · All**, then **Everyone** (a person), **All agents** and **All chats**. Open ones come
+  overdue first (*Overdue since 17 Nov*), then by due date, undated last.
+- Each row: the person (→ their page), what they promised, when it is due, the chat (→ the chat) and **the message ›**
+  it came from, and the agent.
+- **Done** / **Reopen**; **⋯ → Due date…**, **Edit…**, **Drop (no reminder)**, **Delete…**. A new due date or reopening
+  lets the agent's one gentle reminder go out again when it is due.
+- Owners and admins change them here; an agent's organizers change those of its chats from the chat.
+- Admin MCP and the owner assistant: `list_commitments` (status *overdue* too, by person, agent or chat),
+  `update_commitment`, `delete_commitment` (asks to confirm).
+
 ## Preferences
 
 A person's page → **Preferences**: the **language** they write in (from their latest messages), the **hours** they
 usually write (in your time zone; once they wrote at least 20 messages over 5 days, at least 6 hours wide) and the **app** they answer on when they use both WhatsApp and Telegram. Learned from
 messages in chats that are on, a few people per upkeep tick; each can be set by you (*Automatic* gives it back).
 
-- Agents answer them in that language (the card about the sender says so).
+- **Languages**: English, French, German, Spanish, Italian, Portuguese and Dutch by their common words; Telugu, Hindi,
+  Tamil, Kannada, Malayalam, Bengali, Gujarati, Punjabi, Urdu, Arabic, Russian, Ukrainian, Greek, Hebrew, Thai,
+  Chinese, Japanese and Korean by their alphabet; Telugu and Hindi written in Latin letters (*Sare Vikram garu*,
+  *kya haal hai*) by a short word list — agents then answer the same way. A language is learned from at least three
+  of their recent messages and changes only when most of their recent messages are in another one; a message mixing
+  Telugu and English counts for the language they mostly write. Messages that say nothing (*ok*, 👍) change nothing.
+- Agents answer them in that language (the card about the sender says so); when a message is in another language,
+  they follow the message.
 - [Lists and sending](sending.md#the-pace) sends to them inside their hours (and always inside your sending hours) and
   on their app.
 

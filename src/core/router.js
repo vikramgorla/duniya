@@ -22,7 +22,7 @@ import { inboundKind, prepareInbound, wantsVoice, speak, createImage } from './m
 import { enqueue, registerJobHandler, setQueueChannel, startQueue, packMsg, unpackMsg, quoteOf } from './media-queue.js';
 import { readFileSync, rmSync } from 'node:fs';
 import { builtinAnswer, todayText, fillPlaceholders } from './quick.js';
-import { recordUsage } from './usage.js';
+import { recordUsage, usageTag } from './usage.js';
 import { noteJoin } from './welcome.js';
 import { notePerson } from './people.js';
 import { inRole, notePersonChat } from './people-access.js';
@@ -362,7 +362,7 @@ export function createRouter(channel) {
         activity('message.in', { agent: agent.id, chat: msg.chat, summary: `${whoOf(msg)} (${role}): ${stripped || wake}`, detail: { answeredBy: ans.label } });
         await deliver(channel, msg, agent, ans.text, { textOnly: true });
         const kind = ans.kind === 'faq' ? 'faq' : 'quick reply';
-        recordUsage({ agent: agent.id, chat: msg.chat, provider: 'built-in', model: kind, kind, cost: 0, priced: 'free' });
+        recordUsage({ ...usageTag(kind, { agent: agent.id, chat: msg.chat }), provider: 'built-in', model: kind, cost: 0, priced: 'free' });
         return;
       }
     }

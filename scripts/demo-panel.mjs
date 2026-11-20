@@ -303,7 +303,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const mk = (id, file, patch) => agents.createAgent({ id, config: { ...tpl(file), enabled: true, ...patch }, by: 'admin' });
   await mk('school', 'school-friends.json', { chats: [G(1)], model: 'auto' });
   const TG = (n) => `tg:${bot.bot.id}#-10017000000${n}`; // 077: Telegram groups of the demo bot
-  await mk('family', 'family.json', { chats: [G(2), `${P(4)}@s.whatsapp.net`, TG(1)], model: 'chatgpt:gpt-5.5', organizers: [`+${P(4)}`] });
+  await mk('family', 'family.json', { chats: [G(2), `${P(4)}@s.whatsapp.net`, TG(1)], model: 'chatgpt:gpt-5.5', organizers: [`+${P(4)}`], promises: { track: true, followUp: 'dm' } }); // 092: a second agent tracking promises
   await mk('carpool', 'carpool.json', {
     chats: [G(3)], model: 'anthropic:claude-haiku-5-5', organizers: [`+${P(2)}`], promises: { track: true, followUp: 'chat' }, cues: true, // 091
     mcpServers: { transport: { type: 'local', package: 'mcp-swiss@latest', args: [], env: {} }, calendar: { url: 'https://calendar.example.org/mcp', auth: 'oauth' } },
@@ -347,9 +347,9 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     [0, 'Car pooling', 'Tomorrow (Thu 20 Nov): Luca 07:15 from Morges (full), Mia back from Cornavin at 18:10 (1 seat). Sophie, Mia could take you.', false, true],
     [9, 'Mia', 'Yes Sophie, meet at Cornavin 18:10 👍', false, false],
   ];
-  let lastId = 0; const answers = [];
+  let lastId = 0; const answers = []; const convIds = [];
   conv.forEach(([p, name, text, addressed, fromAgent], i) => {
-    lastId = db.logMessage({ chat: G(3), agent: fromAgent ? 'carpool' : '', msgId: `m${i}`, sender: fromAgent ? '' : P(p), name, text, addressed, fromAgent, ts: now - (conv.length - i) * 23 * MIN });
+    convIds[i] = lastId = db.logMessage({ chat: G(3), agent: fromAgent ? 'carpool' : '', msgId: `m${i}`, sender: fromAgent ? '' : P(p), name, text, addressed, fromAgent, ts: now - (conv.length - i) * 23 * MIN });
     if (fromAgent) answers.push(lastId);
   });
   // 070: Review — one answer rated good, one wrong (shows Teach)
@@ -392,10 +392,18 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   // 091: promises people made in the rides group, a family tie heard there, and one person's preferences
   const dayIn = (d) => new Date(now + d * 86400000).toISOString().slice(0, 10);
   const promise = db.db.prepare('INSERT INTO commitments (agent, chat, person, who, what, due, msg, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
-  promise.run('carpool', G(3), pid[0], 'Marc', 'bring the child seat for Lea on Friday', dayIn(1), null, now - 5 * 3600000, now - 5 * 3600000);
-  promise.run('carpool', G(3), pid[2], 'Lea', 'pay Marc the CHF 12 for petrol', dayIn(0), null, now - 26 * 3600000, now - 26 * 3600000);
+  promise.run('carpool', G(3), pid[1], 'Marc', 'bring the child seat for Lea on Friday', dayIn(1), convIds[0], now - 5 * 3600000, now - 5 * 3600000);
+  promise.run('carpool', G(3), pid[2], 'Lea', 'pay Marc the CHF 12 for petrol', dayIn(0), convIds[1], now - 26 * 3600000, now - 26 * 3600000);
+  // 092: People → Promises across agents — overdue, undated and done ones too
+  promise.run('family', G(2), pid[3], 'Ravi', 'book the community hall for Diwali', dayIn(-3), null, now - 6 * D, now - 6 * D);
+  promise.run('family', G(2), pid[0], 'Anu', 'ask Grandma about the menu', '', null, now - 2 * D, now - 2 * D);
+  promise.run('carpool', G(3), pid[8], 'Mia', 'take Sophie back from Cornavin at 18:10', dayIn(-1), convIds[6], now - 30 * H, now - 30 * H);
+  db.db.prepare("UPDATE commitments SET status = 'done', by = 'chat' WHERE what LIKE 'take Sophie%'").run();
+  promise.run('family', G(2), pid[6], 'Priya', 'send the photos from the picnic', dayIn(2), null, now - 3 * H, now - 3 * H);
   db.db.prepare("INSERT OR IGNORE INTO tie_suggestions (key, person, kind, name, word, agent, chat, status, created_at) VALUES (?, ?, 'child', 'Mira', 'daughter', 'carpool', ?, 'proposed', ?)").run(`${pid[0]}|child|mira`, pid[0], G(3), now - 2 * 3600000);
   db.db.prepare("INSERT OR REPLACE INTO person_prefs (person, lang, hours_from, hours_to, app, computed_at) VALUES (?, 'fr', 7, 21, 'whatsapp', ?)").run(pid[0], now);
+  db.db.prepare("INSERT OR REPLACE INTO person_prefs (person, lang, computed_at) VALUES (?, 'te', ?)").run(pid[3], now); // 092: Ravi writes Telugu
+  db.db.prepare("INSERT OR REPLACE INTO person_prefs (person, lang, computed_at) VALUES (?, 'te-Latn', ?)").run(pid[6], now); // Priya: Telugu in Latin letters
   for (const k of [kids[0], kids[1]]) { pp.addTie(pid[0], k.id, { kind: 'parent' }); pp.addTie(pid[3], k.id, { kind: 'parent' }); }
   pp.addTie(kids[0].id, kids[1].id, { kind: 'sibling' });
   pp.addTie(pid[2], kids[2].id, { kind: 'parent' }); pp.addTie(pid[1], pid[2], { kind: 'partner' });
@@ -484,14 +492,19 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     ['office', G(4), 'anthropic', 'claude-sonnet-5-5', 4, 3.0, 15.0, 'set'],
     ['football', `club#${G(8)}`, 'openrouter', 'deepseek/deepseek-v4:free', 5, 0, 0, 'free'],
     ['family', G(2), 'chatgpt', 'gpt-5.5', 2, 0, 0, 'plan', 'chatgpt-sam', 'after ChatGPT plan (usage limit reached)'],
+    ['', '', 'anthropic', 'claude-sonnet-5-5', 2, 3.0, 15.0, 'set'], // the owner assistant
   ];
+  // 092: what each call was for (Cost per feature)
+  const featureOf = (agent, r) => (!agent ? (r < 0.2 ? 'catch-up' : 'owner') : r < 0.1 ? 'summary' : agent === 'office' ? (r < 0.65 ? 'reply-light' : r < 0.72 ? 'model-choice' : r < 0.77 ? 'self-check' : 'reply-strong')
+    : agent === 'carpool' ? (r < 0.3 ? 'judge' : r < 0.38 ? 'commitments' : 'reply') : agent === 'family' ? (r < 0.18 ? 'transcribe' : r < 0.26 ? 'sending' : r < 0.3 ? 'commitments' : 'reply')
+      : agent === 'school' ? (r < 0.18 ? 'lessons' : 'reply') : 'reply');
   let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   for (let day = 29; day >= 0; day--) {
     for (const [agent, chat, prov, model, perDay, pin, pout, priced, account = prov, fallback = ''] of plan) {
       const n = Math.max(1, Math.round(perDay * (0.5 + rnd() * (day < 10 ? 1.4 : 0.9))));
       for (let k = 0; k < n; k++) {
         const input = Math.round(900 + rnd() * 2600); const output = Math.round(40 + rnd() * 220);
-        ins.run(day === 0 ? now - Math.round(rnd() * todaySpan) : now - day * D - Math.round(rnd() * 20 * H), agent, chat, prov, model, rnd() < 0.12 ? 'summary' : 'reply', input, output, (input * pin + output * pout) / 1e6, priced, account, fallback);
+        ins.run(day === 0 ? now - Math.round(rnd() * todaySpan) : now - day * D - Math.round(rnd() * 20 * H), agent, chat, prov, model, featureOf(agent, rnd()), input, output, (input * pin + output * pout) / 1e6, priced, account, fallback);
       }
     }
   }

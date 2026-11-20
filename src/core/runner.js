@@ -6,7 +6,7 @@ import { addPending, takePending, peekPending, dropPending } from './db.js';
 import { chat as modelChat, effectiveFallback, refCost } from './providers/index.js';
 import { SMART, chooseTier, tierModels, strongRef } from './smart-model.js';
 import { checkFacts } from './fact-check.js';
-import { recordSmartTurn } from './usage.js';
+import { recordSmartTurn, usageTag } from './usage.js';
 import { lessonsContext, joinLessonsNote } from './lessons.js';
 import { REASON_TEXT } from './providers/errors.js';
 import { modelName, toolPhrase } from '../panel/public/app/names.js';
@@ -28,6 +28,8 @@ import { applyPeopleAction } from './people-tools.js';
 import { applyModuleAction } from '../modules/index.js';
 
 const MAX_TOOL_ROUNDS = 8;
+/** 092: the feature an agent turn's model calls count under on Usage: a test, a scheduled post, a judged group message, or an answer (light / strong). */
+const turnFeature = (ctx, smart) => (ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : ctx.unaddressed ? 'judge' : smart ? `reply-${smart.tier}` : 'reply');
 
 // Test console (#37): WhatsApp actions are never carried out from the panel. Read-only ones look at the chat being
 // tested; every other one returns what it would have done.
@@ -182,7 +184,7 @@ export async function runAgent(ctx) {
     let res;
     try {
       res = await modelChat({
-        model, purpose: 'agent', maxTokens: agent.maxTokens, usage: { agent: agent.id, chat, kind: ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : 'reply' },
+        model, purpose: 'agent', maxTokens: agent.maxTokens, usage: usageTag(turnFeature(ctx, smart), { agent: agent.id, chat }),
         system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName, chat, requester: ctx.requester }), tools: defs, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
       });
     } catch (e) {
@@ -289,7 +291,7 @@ async function selfCheck({ agent, chat, ctx, reply, sources, model, fallback, tu
   if (!first.wrong.length) { ctx.check = { facts: first.checked, ok: true }; return { reply, cost: 0 }; }
   let out = ''; let cost = 0;
   try {
-    const res = await modelChat({ model, purpose: 'agent', maxTokens: agent.maxTokens, usage: { agent: agent.id, chat, kind: 'self-check' }, fallback, turn,
+    const res = await modelChat({ model, purpose: 'agent', maxTokens: agent.maxTokens, usage: usageTag('self-check', { agent: agent.id, chat }), fallback, turn,
       system: 'You correct an answer so it states only facts from the records. Keep its language and tone.',
       messages: [{ role: 'user', content: `Message: ${text}\n\nRecords looked up for it:\n${sources.map((x) => x.slice(0, 4000)).join('\n---\n')}` },
         { role: 'assistant', content: reply }, { role: 'user', content: FIX_NOTE(first.wrong, first.hint) }] });

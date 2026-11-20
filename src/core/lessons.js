@@ -11,6 +11,7 @@
 // decided here. Lessons are per agent, optionally per chat; a chat's memory erase removes its lessons.
 import { db } from './db.js';
 import { clip, fail } from './config.js';
+import { usageTag } from './usage.js';
 import { activity, bus } from './events.js';
 import { chat as modelChat } from './providers/index.js';
 
@@ -133,7 +134,7 @@ const proposalsToday = (agent) => db.prepare("SELECT COUNT(*) AS n FROM lessons 
 async function propose({ agent, chat, kind, source, msg = null, input, by = '' }) {
   if (agent.lessons?.enabled === false || proposalsToday(agent.id) >= MAX_PROPOSALS_PER_DAY) return null;
   try {
-    const res = await modelChat({ model: 'auto', purpose: 'background', maxTokens: 120, fallback: undefined, usage: { agent: agent.id, chat, kind: 'lessons' },
+    const res = await modelChat({ model: 'auto', purpose: 'background', maxTokens: 120, fallback: undefined, usage: usageTag('lessons', { agent: agent.id, chat }),
       system: kind === 'join' ? JOIN : PROPOSE, messages: [{ role: 'user', content: clip(input, 3000) }] });
     const out = res.content.filter((b) => b.type === 'text').map((b) => b.text).join(' ').trim();
     if (!out || /^NONE\b/i.test(out)) return null;

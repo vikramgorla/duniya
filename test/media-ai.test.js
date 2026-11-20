@@ -178,7 +178,7 @@ test('voice notes: transcribed by OpenAI, handled as text, stored as 🎤 transc
   assert.match(textOf(userContent(agentReqs()[n])), /see you at the station at nine/);
   assert.equal(t.db.messageByMsgId(DM, m.msgId).text, '🎤 see you at the station at nine');
   assert.ok(t.db.listActivity({ limit: 50 }).some((a) => a.type === 'media.voice' && a.summary.startsWith('🎤')));
-  assert.ok(usage.usageReport({ groupBy: 'kind' }).rows.some((r) => r.key === 'transcribe'));
+  assert.ok(usage.usageReport({ groupBy: 'feature' }).rows.some((r) => r.key === 'transcribe'));
 });
 
 test('transcription fallback order: OpenAI → OpenRouter → on-server engine → polite "please type"', async () => {
@@ -259,7 +259,7 @@ test('create_image: edit of the last photo; spending cap reached refuses; OpenRo
   assert.equal(oa.media.at(-1).body.hasImage, true);
   // cap reached: the tool refuses, nothing is created
   budget.setCap('agent', 'panduga', { cost: 0.01 });
-  usage.recordUsage({ agent: 'panduga', chat: 'g1@g.us', provider: 'openai', model: 'gpt-image-1', kind: 'image', cost: 0.5 });
+  usage.recordUsage({ agent: 'panduga', chat: 'g1@g.us', provider: 'openai', model: 'gpt-image-1', feature: 'image', cost: 0.5 });
   const before = oa.media.length;
   t.script.push([{ type: 'tool_use', id: 'img3', name: 'media__create_image', input: { prompt: 'x' } }], [{ type: 'text', text: 'Cannot.' }]);
   await t.route(t.msg({ text: '!panduga picture please', phone: ORG }));

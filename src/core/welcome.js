@@ -11,7 +11,7 @@ import { agentForChat } from './agents.js';
 import { noticeDecision, maybePostNotice } from './privacy-notice.js';
 import { activity } from './events.js';
 import { countStat } from './stats.js';
-import { recordUsage } from './usage.js';
+import { recordUsage, usageTag } from './usage.js';
 import { fillPlaceholders, todayText, DEFAULT_WELCOME } from './quick.js';
 import { channelOf, isGroup } from '../channels/index.js';
 
@@ -100,6 +100,6 @@ async function flush(channel, chat) {
   for (const [key] of people) ins.run(TENANT, key, Date.now());
   logMessage({ channel: channelOf(chat), chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
   countStat('reply', { agent: agent.id });
-  recordUsage({ agent: agent.id, chat, provider: 'built-in', model: 'welcome', kind: 'welcome', cost: 0, priced: 'free' });
+  recordUsage({ ...usageTag('welcome', { agent: agent.id, chat }), provider: 'built-in', model: 'welcome', cost: 0, priced: 'free' });
   activity('message.out', { agent: agent.id, chat, summary: `Welcome posted for ${people.length} new member${people.length === 1 ? '' : 's'}` });
 }

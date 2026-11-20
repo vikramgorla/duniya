@@ -18,6 +18,7 @@
 import { randomBytes } from 'node:crypto';
 import { db, kvGet, kvSet, logMessage } from '../../core/db.js';
 import { clip, fail, plural } from '../../core/config.js';
+import { usageTag } from '../../core/usage.js';
 import { TENANT } from '../../core/store.js';
 import { activity, bus } from '../../core/events.js';
 import { personRow } from '../../core/people.js';
@@ -100,11 +101,11 @@ function agentOf(id) {
 // ---------- per-person wording ----------
 const WRITE_SYSTEM = 'You rewrite one short message for one person. Keep its language, meaning and tone, and keep every fact in <keep> exactly as written (names, amounts, dates, places). Change the wording a little so it does not read like a copy sent to many people. Add nothing new: no facts, links, promises or questions that are not in the message. Reply with the message only.';
 /** The message for one recipient: the model's rewording when it kept every fact, else the filled template. */
-async function personalise(template, facts, agent) {
+async function personalise(template, facts, agent, feature = 'sending') {
   const base = fill(template, facts);
   const keep = usedFacts(template, facts);
   try {
-    const res = await modelChat({ model: 'auto', purpose: 'background', usage: { agent: agent || '', kind: 'sending' }, fallback: undefined, maxTokens: 700, system: WRITE_SYSTEM,
+    const res = await modelChat({ model: 'auto', purpose: 'background', usage: usageTag(feature, { agent }), fallback: undefined, maxTokens: 700, system: WRITE_SYSTEM,
       messages: [{ role: 'user', content: `<message>\n${base}\n</message>\n<keep>${keep.join(' | ')}</keep>` }] });
     const out = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
     return out && out.length <= base.length * 2 + 200 && keep.every((k) => out.includes(k)) ? out : base;
@@ -155,7 +156,7 @@ export async function preview(body = {}, by = 'panel', source = 'panel', { visib
   const going = rows.filter((r) => r.status === 'waiting');
   const samples = [];
   const svFacts = sv ? { survey: sv.title, survey_link: `${surveysApi().linkBase()}/s/…` } : {};
-  for (const r of going.slice(0, 3)) samples.push({ to: r.name, channel: r.channel, text: await personalise(template, { ...r.facts, ...svFacts }, agent.id) });
+  for (const r of going.slice(0, 3)) samples.push({ to: r.name, channel: r.channel, text: await personalise(template, { ...r.facts, ...svFacts }, agent.id, sv ? 'surveys' : 'sending') });
   const wa = going.filter((r) => r.channel === 'whatsapp');
   const est = listEstimate(wa.length + wa.filter((r) => !r.known).length); // people who never wrote wait twice as long
   const out = { run: runView(runRow(id)), samples,
@@ -315,7 +316,7 @@ async function step(now) {
     if (r.mode === 'direct') await openChat(x.chat, r.agent, r.by || 'sending');
     const sv = db.prepare('SELECT survey FROM snd_run_surveys WHERE tenant_id = ? AND run = ?').get(TENANT, r.id)?.survey;
     const facts = { ...JSON.parse(x.facts || '{}'), ...(sv && r.mode === 'direct' ? surveysApi().invite(sv, x.person) : {}) }; // 083: their own survey link
-    let text = await personalise(r.template, facts, r.agent);
+    let text = await personalise(r.template, facts, r.agent, sv ? 'surveys' : 'sending');
     const notice = r.mode === 'direct' ? dmNoticeOnce(phoneOf(x.chat) || x.chat) : ''; // the privacy line, once per person
     if (notice) text = `${text}\n\n_${notice}_`;
     await typeBefore(ch, x.chat, text);

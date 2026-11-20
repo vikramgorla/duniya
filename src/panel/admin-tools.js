@@ -300,9 +300,13 @@ export const TOOLS = [
     input: { agent_id: str('Agent id'), answer_id: int('Answer id from list_agent_answers'), rating: int('1, -1 or 0', { minimum: -1, maximum: 1 }) }, required: ['agent_id', 'answer_id', 'rating'],
     run: (a, x) => x.call('PUT', `/api/agents/${enc(a.agent_id)}/review/${Number(a.answer_id)}`, { rating: a.rating }) },
   { name: 'get_usage', readOnly: true, calls: [['GET', '/api/usage']],
-    description: 'Tokens and estimated cost of model calls, grouped by agent, chat, provider, model, kind (reply, summary, scheduled, ai-helper, test, model-choice, self-check) or day. period: 1d, 7d, 30d (default), 90d, all. Costs only where a price is set or published; ChatGPT plan / Copilot calls are "included".',
-    input: { group_by: str('agent | chat | provider | model | kind | day'), period: str('1d | 7d | 30d | 90d | all'), agent_id: str('Only this agent (optional)'), chat: str('Only this chat (optional)') },
-    run: (a, x) => x.call('GET', `/api/usage?groupBy=${enc(a.group_by || 'agent')}&period=${enc(a.period || '30d')}${a.agent_id ? `&agent=${enc(a.agent_id)}` : ''}${a.chat ? `&chat=${enc(a.chat)}` : ''}`) },
+    description: 'Tokens and estimated cost of model calls, grouped by agent, chat, provider, model, feature or day. period: 1d, 7d, 30d (default), 90d, all. Costs only where a price is set or published; ChatGPT plan / Copilot calls are "included". The answer always carries `features`: the cost per feature (agent answers light / strong, judged group messages, self-check, lessons, promises, catch-ups, summaries, voice and pictures, sending, surveys, AI helper, owner assistant …) with a label and one line each, the most expensive first.',
+    input: { group_by: str('agent | chat | provider | model | feature | day'), period: str('1d | 7d | 30d | 90d | all'), agent_id: str('Only this agent (optional)'), chat: str('Only this chat (optional)') },
+    run: async (a, x) => {
+      const q = `period=${enc(a.period || '30d')}${a.agent_id ? `&agent=${enc(a.agent_id)}` : ''}${a.chat ? `&chat=${enc(a.chat)}` : ''}`;
+      const [r, f] = await Promise.all([x.call('GET', `/api/usage?groupBy=${enc(a.group_by || 'agent')}&${q}`), x.call('GET', `/api/usage?groupBy=feature&${q}`)]);
+      return { ...r, features: f.rows.sort((m, n) => (n.cost || 0) - (m.cost || 0) || n.input + n.output - (m.input + m.output)) }; // 092
+    } },
   { name: 'get_smart_model_savings', readOnly: true, calls: [['GET', '/api/usage/smart']],
     description: 'Agents on Smart model choice ("smart": a light model for simple messages, a strong one when needed): answers per tier, the most common reasons, cost per answer now and if the strong model had answered all, and what it saved (only answers with known prices). period: 1d, 7d, 30d (default), 90d, all.',
     input: { period: str('1d | 7d | 30d | 90d | all'), agent_id: str('Only this agent (optional)') },
@@ -350,13 +354,18 @@ export const TOOLS = [
     input: { chat: str('Chat id') }, required: ['chat'], run: (a, x) => x.call('POST', `/api/chats/${enc(a.chat)}/catch-up`, {}) },
   // 091: commitments, people's preferences, suggested family ties
   { name: 'list_commitments', readOnly: true, calls: [['GET', '/api/commitments']],
-    description: 'Promises people made in chats that are on (agents with "Track promises"): who, what, due date, the chat, whether a reminder went out. Filter by agent_id, person (id) or chat; status open (default), done, dropped or all.',
-    input: { agent_id: str('Agent id (optional)'), person: str('Person id (optional)'), chat: str('Chat id (optional)'), status: { type: 'string', enum: ['open', 'done', 'dropped', 'all'] } },
+    description: 'Promises people made in chats that are on (agents with "Track promises"), as on People → Promises: id, who (person), what, due date, overdue, status, the chat (chatName) and the message (msg), the agent (agentName), whether a reminder went out. Filter by agent_id, person (id) or chat; status open (default: overdue first, then by due date), overdue, done, dropped or all.',
+    input: { agent_id: str('Agent id (optional)'), person: str('Person id (optional)'), chat: str('Chat id (optional)'), status: { type: 'string', enum: ['open', 'overdue', 'done', 'dropped', 'all'] } },
     run: (a, x) => x.call('GET', `/api/commitments?status=${enc(a.status || 'open')}${a.agent_id ? `&agent=${enc(a.agent_id)}` : ''}${a.person ? `&person=${enc(a.person)}` : ''}${a.chat ? `&chat=${enc(a.chat)}` : ''}`) },
   { name: 'update_commitment', calls: [['PUT', '/api/commitments/1']],
-    description: 'Correct a commitment (id from list_commitments): status open | done | dropped, what, due (YYYY-MM-DD or empty).',
+    description: 'Correct a promise (id from list_commitments): mark it done, reopen it (open), drop it, change what or the due date (YYYY-MM-DD or empty). Reopening or a new due date lets the agent\'s gentle reminder go out again when it is due.',
     input: { commitment_id: { type: 'integer' }, status: { type: 'string', enum: ['open', 'done', 'dropped'] }, what: str('What was promised (optional)'), due: str('Due date (optional)') }, required: ['commitment_id'],
     run: (a, x) => x.call('PUT', `/api/commitments/${Number(a.commitment_id)}`, { ...(a.status ? { status: a.status } : {}), ...(a.what !== undefined ? { what: a.what } : {}), ...(a.due !== undefined ? { due: a.due } : {}) }) },
+  { name: 'delete_commitment', risky: true, calls: [['DELETE', '/api/commitments/1']],
+    description: 'Delete a promise (id from list_commitments) for good, e.g. one noticed by mistake. To keep it but stop reminders, use update_commitment with status dropped. Needs confirm_action.',
+    input: { commitment_id: { type: 'integer' } }, required: ['commitment_id'],
+    preview: async (a, x) => { const c = (await x.call('GET', '/api/commitments?status=all')).find((r) => r.id === Number(a.commitment_id)); return c ? `Delete the promise "${c.who ? `${c.who}: ` : ''}${c.what}"${c.chatName ? ` (${c.chatName})` : ''}. This cannot be undone.` : `Delete promise ${a.commitment_id} (not found).`; },
+    run: (a, x) => x.call('DELETE', `/api/commitments/${Number(a.commitment_id)}`) },
   { name: 'get_person_preferences', readOnly: true, calls: [['GET', '/api/people/x/prefs']],
     description: 'A person\'s preferences learned from their messages (or set by the owner): language, usual hours (owner\'s time zone), preferred app; auto says which are automatic.',
     input: { person: str('Person id, number or name') }, required: ['person'], run: (a, x) => x.call('GET', `/api/people/${enc(a.person)}/prefs`) },

@@ -2,6 +2,7 @@
 // The model only PROPOSES; the result is validated with the same schema as the editor and shown as a diff — an
 // admin applies it (constitution IV/VIII). Group bindings and local tool services are never changed by the helper.
 import { fail } from './config.js';
+import { usageTag } from './usage.js';
 import { chat as modelChat } from './providers/index.js';
 import { validateAgentConfig, AGENT_DEFAULTS } from './schema.js';
 import { listTemplates } from './agents.js';
@@ -85,7 +86,7 @@ export async function draftAgent({ agent = null, request, model = 'auto', people
   const messages = [{ role: 'user', content: `Context (JSON):\n${JSON.stringify(context, null, 1)}\n\nAdmin's request:\n${text}` }];
   let lastError = '';
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await modelChat({ model, purpose: 'agent', system: GUIDE, messages, tools: [TOOL], maxTokens: 4000, usage: { agent: agent?.id || '', kind: 'ai-helper' } });
+    const res = await modelChat({ model, purpose: 'agent', system: GUIDE, messages, tools: [TOOL], maxTokens: 4000, usage: usageTag('ai-helper', { agent: agent?.id }) });
     const call = res.content.find((b) => b.type === 'tool_use' && b.name === TOOL.name);
     let input = call?.input;
     if (!input) { // models without tool use: accept JSON in text

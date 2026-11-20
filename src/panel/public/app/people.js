@@ -31,10 +31,10 @@ const appsLine = (p) => [p.apps.map((a) => APPS[a] || a).join(' · ') || 'No app
 /** One person row: avatar · name · apps and last contact · chevron (calm rows, 073). `end`: a control next to the row. */
 export const personRow = (p, sub = appsLine(p), end = null) => h('li', { class: end ? 'has-end' : null }, h('a', { class: 'lrow', href: personHref(p.id || p.person) }, avatar(p.who || p.name, p.id || p.person, 's'),
   h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, p.name), sub ? h('span', { class: 'lrow-sub' }, sub) : null), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')), end);
-/** People · Households · Lists, and Events · Orders · Sending · Surveys when their module is on (081–083). */
+/** People · Households · Lists, Promises when an agent tracks them (092), and Events · Orders · Sending · Surveys when their module is on (081–083). */
 const modsOn = () => S.status?.settings?.modulesOn || [];
 export const peopleNav = (on) => h('nav', { class: 'seg pnav', 'aria-label': 'People, households, lists and modules', style: 'margin-bottom:10px' },
-  [['people', 'People'], ['people/households', 'Households'], ['people/lists', 'Lists'], modsOn().includes('events') && ['people/events', 'Events'], modsOn().includes('orders') && ['people/orders', 'Orders'], modsOn().includes('sending') && ['people/sending', 'Sending'], modsOn().includes('surveys') && ['people/surveys', 'Surveys']].filter(Boolean).map(([href, l]) => h('a', { href: `#${href}`, class: href === on ? 'on' : null, 'aria-current': href === on ? 'page' : null }, l)));
+  [['people', 'People'], ['people/households', 'Households'], ['people/lists', 'Lists'], (S.status?.agents || []).some((a) => a.promises) && ['people/promises', 'Promises'], modsOn().includes('events') && ['people/events', 'Events'], modsOn().includes('orders') && ['people/orders', 'Orders'], modsOn().includes('sending') && ['people/sending', 'Sending'], modsOn().includes('surveys') && ['people/surveys', 'Surveys']].filter(Boolean).map(([href, l]) => h('a', { href: `#${href}`, class: href === on ? 'on' : null, 'aria-current': href === on ? 'page' : null }, l)));
 
 /** Pick a person by typing a name: a search field with up to six matches. Returns { el, value() }. */
 export function pickPerson(label, exclude = '') {
@@ -57,6 +57,7 @@ export async function renderPeople() {
   if (a === 'events' || a?.startsWith('orders')) return import('./events.js').then((m) => m.renderModule(a, b || '')); // 081
   if (a === 'sending') return import('./sending.js').then((m) => m.renderSending(location.hash.slice(1).split('/').slice(2).join('/'))); // 082
   if (a === 'surveys') return import('./surveys.js').then((m) => m.renderSurveys(b || '')); // 083
+  if (a === 'promises') return import('./promises.js').then((m) => m.renderPromises(b || '')); // 092
   if (a) return renderPerson(a);
   const [k, v] = filter.split(':');
   const page = (offset) => api('GET', `/api/people?q=${enc(query)}&${k ? `${k}=${enc(v)}&` : ''}limit=${PAGE}&offset=${offset}`);

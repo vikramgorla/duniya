@@ -1,6 +1,7 @@
 // Group memory (feature 004): stored messages, rolling summary, notes, memory tools.
 import { optionalPaused } from './resources.js';
 import { env, clip } from './config.js';
+import { usageTag } from './usage.js';
 import {
   history, messagesAfter, getChatMemory, setChatMemory, addNote, listNotes, deleteNote, getNote, updateNote, searchNotes,
   searchMessages, messageCount, eraseChat, recentReactions, recentPolls, pollTally, storedSpan, countBetween,
@@ -110,7 +111,7 @@ async function summarize(chat, agent, { current, note, messages, upto, what }) {
   running.add(chat);
   try {
     const res = await modelChat({
-      model: 'auto', purpose: 'background', usage: { agent: agent?.id || '', chat, kind: 'summary' }, maxTokens: 1200, system: SUMMARY_SYSTEM,
+      model: 'auto', purpose: 'background', usage: usageTag('summary', { agent: agent?.id, chat }), maxTokens: 1200, system: SUMMARY_SYSTEM,
       messages: [{ role: 'user', content: `<current_summary>\n${current}\n</current_summary>\n<new_messages${note}>\n${messages.join('\n')}\n</new_messages>` }],
     });
     const summary = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();

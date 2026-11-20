@@ -51,16 +51,15 @@ export async function capEditor(scope, id, models) {
 }
 
 let usageBy = 'agent';
-/** Usage (073): totals, caps and the day chart, then one Breakdown card — a seg (Agents · Chats · Models · Accounts ·
- *  Kind) over compact rows (name · calls and tokens muted · cost); a model's price is set from its ⋯. */
+/** Usage (073): totals, caps, Smart model choice, Cost per feature (092) and the day chart, then one Breakdown card — a
+ *  seg (Agents · Chats · Models · Accounts) over compact rows (name · calls and tokens muted · cost); a model's price is set from its ⋯. */
 export async function renderUsage() {
-  const [byDay, byAgent, byChat, byModel, byKind, byAcct, byFb, sum, agents, provList] = await Promise.all(['day', 'agent', 'chat', 'model', 'kind', 'account', 'fallback']
+  const [byDay, byAgent, byChat, byModel, byFeature, byAcct, byFb, sum, agents, provList] = await Promise.all(['day', 'agent', 'chat', 'model', 'feature', 'account', 'fallback']
     .map((g) => api('GET', `/api/usage?period=${usagePeriod}&groupBy=${g}`)).concat([usageSummary(), api('GET', '/api/agents').catch(() => []), api('GET', '/api/providers').catch(() => [])]));
   const acctName = Object.fromEntries(provList.map((p) => [p.id, p.name]));
   const [caps, smart] = await Promise.all([api('GET', '/api/budget').catch(() => null), api('GET', `/api/usage/smart?period=${usagePeriod}`).catch(() => null)]);
   const t = byDay.total;
   const agentName = Object.fromEntries(agents.map((b) => [b.id, b.name]));
-  const KIND = { reply: 'Replies', summary: 'Memory summaries', scheduled: 'Scheduled posts', 'ai-helper': 'AI helper', test: 'Tests', 'model-choice': 'Choosing light or strong', 'self-check': 'Self-check rewrites', lessons: 'Lessons proposed' };
   const seg = h('div', { class: 'seg' }, [['1d', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['90d', '90 days'], ['all', 'All']].map(([v, l]) => h('button', { class: usagePeriod === v ? 'on' : '', onclick: () => { usagePeriod = v; renderUsage(); } }, l)));
   const tile = (eyebrow, stat, sub) => h('div', { class: 'card' }, h('div', { class: 'eyebrow' }, eyebrow), h('div', { class: 'stat' }, stat), sub ? h('div', { class: 'small muted' }, sub) : null);
   // daily bars
@@ -96,7 +95,6 @@ export async function renderUsage() {
     model: ['Models', byModel, (r) => row(modelName(r.key.replace(/^[\w-]+:(?=.)/, '')), r, price(r.key, r),
       can('admin') && priceable(r.key, r) ? menu(`Price of ${r.key}`, h('button', { class: 'btn small', type: 'button', onclick: () => setPrice(r.key) }, 'Set price…')) : null)],
     account: ['Accounts', byAcct, (r) => row(acctName[r.key] || accountName(r.key), r)],
-    kind: ['Kind', byKind, (r) => row(KIND[r.key] || r.key, r)],
   };
   const list = h('ul', { class: 'urows' });
   const draw = () => { const [, rep, fn] = BY[usageBy]; list.replaceChildren(...(rep.rows.length ? rep.rows.map(fn) : [h('li', { class: 'muted small' }, 'Nothing in this period.')])); };
@@ -110,16 +108,30 @@ export async function renderUsage() {
       tile('Tokens in', fmtTok(t.input), 'what agents read'),
       tile('Tokens out', fmtTok(t.output), 'what agents wrote'),
       tile('Estimated cost', fmtCost(t.cost), t.unpriced ? `${plural(t.unpriced, 'call')} without a price` : t.plan ? `${plural(t.plan, 'call')} in your plans` : 'from the prices you set'),
-      tile('Model calls', String(t.calls || 0), `${(byKind.rows.find((r) => r.key === 'reply')?.calls) || 0} replies`)),
+      tile('Model calls', String(t.calls || 0), `${byFeature.rows.filter((r) => /^reply/.test(r.key)).reduce((n, r) => n + r.calls, 0)} answers`)),
     caps ? h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Monthly spending caps'),
       caps.caps.length ? h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px' }, caps.caps.map((c) => capBar(c)))
         : h('p', { class: 'small muted' }, 'No caps yet. Set one on an agent’s page (Monthly spending cap) or for a chat under Chats → Spending cap.'),
       caps.caps.length && !caps.alertsTo ? h('div', { class: 'note warn', style: 'margin-top:10px' }, 'Cap alerts can’t reach you on WhatsApp yet: add your number under Agents → Owner assistant → Alerts.') : null) : null,
-    smartCard(smart),
+    smartCard(smart), featureCard(byFeature.rows, cost),
     h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Per day'), days.length ? chart : h('p', { class: 'small muted' }, 'Nothing in this period.')),
     h('div', { class: 'card', style: 'margin-top:16px', 'data-jump': 'breakdown' }, h('h2', {}, 'Breakdown'), h('div', { style: 'overflow-x:auto;margin-bottom:6px' }, bySeg), list,
       fb ? h('p', { class: 'small muted' }, `${plural(fb.calls, 'call')} answered by a fallback model (${cost(fb)}).`) : null,
       h('p', { class: 'small muted', style: 'margin-bottom:0' }, 'Costs are estimates from the prices you set (or the provider publishes). ChatGPT plan and Copilot calls are included in those plans; your provider’s bill is the source of truth.')));
+}
+
+/** 092: Cost per feature: what each feature used in the period (most expensive first: cost, then tokens), one line each; the top 6, then all. */
+function featureCard(rows, cost) {
+  if (!rows.length) return null;
+  const sorted = [...rows].sort((a, b) => (b.cost || 0) - (a.cost || 0) || b.input + b.output - (a.input + a.output));
+  const top = Math.max(...sorted.map((r) => r.input + r.output), 1);
+  const li = (r) => h('li', {}, h('div', { class: 'u-main' }, h('span', { class: 'u-name' }, r.label),
+    h('span', { class: 'small muted' }, r.line), h('span', { class: 'small muted num' }, `${plural(r.calls, 'call')} · ${fmtTok(r.input + r.output)} tokens`),
+    h('div', { class: 'meter', 'aria-hidden': 'true' }, h('i', { style: `width:${Math.max(2, Math.round(((r.input + r.output) / top) * 100))}%` }))), h('span', { class: 'u-cost num' }, cost(r)));
+  const list = h('ul', { class: 'urows' }, sorted.slice(0, 6).map(li));
+  const all = sorted.length > 6 ? h('button', { class: 'btn small', type: 'button', onclick: () => { list.replaceChildren(...sorted.map(li)); all.remove(); } }, `Show all ${sorted.length}`) : null;
+  return h('div', { class: 'card', style: 'margin-top:16px', 'data-jump': 'features' }, h('h2', {}, 'Cost per feature'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'What each part of Duniya used in this period, the most expensive first.'), list, all);
 }
 
 /** 088: agents on "Auto: light or strong": how the answers split and what it saved. */

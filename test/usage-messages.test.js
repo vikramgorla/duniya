@@ -25,7 +25,7 @@ test('023: every model call is recorded per agent, chat, provider, model and kin
   assert.ok(m.cost > 0 && m.cost < 0.001, String(m.cost));
   const byChat = (await t.api(owner, 'GET', '/api/usage?groupBy=chat&period=1d')).body.rows;
   assert.ok(byChat.some((x) => x.key === 'g1@g.us'));
-  const kinds = (await t.api(owner, 'GET', '/api/usage?groupBy=kind&period=all')).body.rows.map((x) => x.key);
+  const kinds = (await t.api(owner, 'GET', '/api/usage?groupBy=feature&period=all')).body.rows.map((x) => x.key);
   assert.ok(kinds.includes('reply'));
   const sum = (await t.api(viewer, 'GET', '/api/usage/summary')).body;
   assert.ok(sum.agent.panduga && sum.provider.anthropic && sum.model['anthropic:claude-sonnet-5-5']);

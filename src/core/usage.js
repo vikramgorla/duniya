@@ -1,6 +1,6 @@
 // @ts-check
-// Usage and cost (023). Every model call is recorded with tokens, agent, chat, provider, model and kind
-// (reply | summary | ai-helper | test). Costs come only from prices the owner set or the provider publishes
+// Usage and cost (023). Every model call is recorded with tokens, agent, chat, provider, model and the feature that
+// made it (092: FEATURES below, tagged at the call site with usageTag; stored in the `kind` column). Costs come only from prices the owner set or the provider publishes
 // (e.g. OpenRouter); plan-based providers (ChatGPT plan, GitHub Copilot) are "included", free models cost 0, and
 // anything else is reported as "price not set" — never guessed.
 import { fail } from './config.js';
@@ -22,6 +22,43 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS smart_turns_ts ON smart_turns(ts);
 `);
 export const PLAN_PROVIDERS = { chatgpt: 'ChatGPT plan', copilot: 'Copilot allowance', claudecode: 'Claude subscription', codex: 'ChatGPT plan' };
+
+/**
+ * 092: what made a model call, for Usage → Cost per feature: [label, one line]. Every call site tags its call with
+ * usageTag(feature, …); an unknown feature is a programming error. Keys of older rows (reply, summary …) stay valid.
+ */
+export const FEATURES = Object.freeze({
+  reply: ['Agent answers', 'Answers on one model (Smart model choice off)'],
+  'reply-light': ['Agent answers · light', 'Simple messages answered by the cheaper model'],
+  'reply-strong': ['Agent answers · strong', 'Messages answered by the strong model'],
+  judge: ['Judged group messages', 'Messages not addressed to an agent that it read to decide whether to answer (follow-ups, "when needed")'],
+  'model-choice': ['Choosing light or strong', 'The tiny call that picks the model when the rules are unsure'],
+  'self-check': ['Self-check rewrites', 'Answers rewritten because a figure did not match the records'],
+  scheduled: ['Scheduled posts', 'Posts agents write on a schedule'],
+  lessons: ['Lessons proposed', 'Turning a correction into a lesson to approve'],
+  commitments: ['Promises', 'Noticing promises in chats, and when they are done'],
+  'catch-up': ['Catch-ups', '“What did I miss?” on a chat'],
+  summary: ['Summaries & memory', 'Running chat summaries that keep agents’ memory short'],
+  transcribe: ['Voice notes in', 'Voice notes turned into text'],
+  speech: ['Voice replies', 'Answers spoken as voice notes'],
+  image: ['Pictures made', 'Pictures agents created'],
+  sending: ['Sending: per-person wording', 'Each person’s own wording of a message to a list or a campaign step'],
+  surveys: ['Surveys: invites', 'Each person’s own wording of a survey invite'],
+  'ai-helper': ['AI helper', 'Drafting and changing agents with AI'],
+  owner: ['Owner assistant', 'Your assistant on WhatsApp and the Ask box'],
+  test: ['Tests', 'The test console and model tests'],
+  faq: ['Built-in: FAQ', 'Answered from the FAQ, without AI (free)'],
+  'quick reply': ['Built-in: quick replies', 'Quick replies and !help, without AI (free)'],
+  welcome: ['Built-in: welcome', 'Welcome messages for new group members (free)'],
+});
+/**
+ * 092: the usage tag of one model call (pass as `usage` to the providers' chat, or to recordUsage).
+ * @param {string} feature a key of FEATURES @param {{ agent?: string, chat?: string }} [where]
+ */
+export function usageTag(feature, { agent = '', chat = '' } = {}) {
+  if (!FEATURES[feature]) throw new Error(`Unknown usage feature "${feature}"`);
+  return { agent: agent || '', chat: chat || '', feature };
+}
 const priceSetting = () => getSetting('modelPrices', {}) || {};
 
 /** Owner-set prices in USD per 1M tokens: { "provider:model": { in, out } }. Empty values remove the price. */
@@ -56,11 +93,12 @@ const ins = db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kin
  * Record one model call. Photos & voice (043): `cost` (USD) and `priced` record a cost known for the call itself —
  * reported by the provider (OpenRouter), an owner-set per-image price, or 0 for on-server engines.
  */
-export function recordUsage({ agent = '', chat = '', provider, account = '', model, kind = 'reply', input = 0, output = 0, published = null, fallback = '', cost: known, priced }) {
+export function recordUsage({ agent = '', chat = '', provider, account = '', model, feature, input = 0, output = 0, published = null, fallback = '', cost: known, priced }) {
   const fixed = known !== undefined && known !== null && Number.isFinite(Number(known));
   const price = fixed ? null : priceFor(provider, model, published);
   const cost = fixed ? Number(known) : price ? (input * price.in + output * price.out) / 1e6 : null;
-  ins.run(Date.now(), agent || '', chat || '', provider, model, kind, input | 0, output | 0, cost, fixed ? (priced || 'provider') : price?.source || null, account || provider, String(fallback || '').slice(0, 300));
+  if (!FEATURES[feature]) throw new Error(`Unknown usage feature "${feature}"`);
+  ins.run(Date.now(), agent || '', chat || '', provider, model, feature, input | 0, output | 0, cost, fixed ? (priced || 'provider') : price?.source || null, account || provider, String(fallback || '').slice(0, 300));
   return cost;
 }
 
@@ -88,7 +126,7 @@ export function smartReport({ from = 0, to = Date.now(), agent = '' } = {}) {
     saved: both.n ? Math.max(0, both.strong - both.cost) : null };
 }
 
-const GROUPS = { agent: 'agent', chat: 'chat', provider: 'provider', account: "COALESCE(account, provider)", model: "COALESCE(account, provider) || ':' || model", kind: 'kind',
+const GROUPS = { agent: 'agent', chat: 'chat', provider: 'provider', account: "COALESCE(account, provider)", model: "COALESCE(account, provider) || ':' || model", feature: 'kind',
   fallback: "CASE WHEN fallback IS NULL OR fallback = '' THEN 'first choice' ELSE 'fallback' END" };
 const DAY = 86400000;
 /**
@@ -111,7 +149,7 @@ function localDayKey(lo, hi) {
 
 /** Totals and breakdowns for a period. */
 export function usageReport({ from = 0, to = Date.now(), groupBy = 'agent', agent = '', chat = '' } = {}) {
-  if (!GROUPS[groupBy] && groupBy !== 'day') throw fail('groupBy must be one of agent, chat, provider, account, model, kind, fallback, day');
+  if (!GROUPS[groupBy] && groupBy !== 'day') throw fail('groupBy must be one of agent, chat, provider, account, model, feature, fallback, day');
   const where = ['ts >= ?', 'ts <= ?'];
   /** @type {(string|number)[]} */
   const args = [Number(from) || 0, Number(to) || Date.now()];
@@ -124,5 +162,6 @@ export function usageReport({ from = 0, to = Date.now(), groupBy = 'agent', agen
   const rows = db.prepare(`SELECT ${key} AS key, ${cols} FROM usage WHERE ${where.join(' AND ')} GROUP BY 1 ORDER BY ${groupBy === 'day' ? '1' : 'input + output DESC'} LIMIT 500`).all(...args);
   const clean = ({ lo: _lo, ...r }) => ({ ...r, ...(groupBy === 'day' && 'key' in r ? { key: new Date(r.key * DAY).toISOString().slice(0, 10) } : {}),
     input: r.input || 0, output: r.output || 0, cost: r.cost == null ? null : Math.round(r.cost * 1e6) / 1e6 });
-  return { from: args[0], to: args[1], groupBy, total: clean(total), rows: rows.map(clean) };
+  const named = (r) => (groupBy === 'feature' ? { ...r, label: FEATURES[r.key]?.[0] || r.key, line: FEATURES[r.key]?.[1] || '' } : r); // 092
+  return { from: args[0], to: args[1], groupBy, total: clean(total), rows: rows.map(clean).map(named) };
 }

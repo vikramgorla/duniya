@@ -16,7 +16,7 @@ import { randomUUID } from 'node:crypto';
 import { DATA_DIR, bad, clip } from './config.js';
 import { getSetting, updateSettings } from './store.js';
 import { providers, providerModels, resolveModel, parseRef, accountById, warmModels } from './providers/index.js';
-import { recordUsage, priceFor } from './usage.js';
+import { recordUsage, priceFor, usageTag } from './usage.js';
 import { checkBudget } from './budget.js';
 import { activity } from './events.js';
 import { MAX_MEDIA_BYTES, sniffType } from './media.js';
@@ -172,13 +172,13 @@ sweepTemp();
 setInterval(sweepTemp, 5 * 60000).unref?.();
 
 // ---------- usage ----------
-function usageRow({ agent, chat, p, model, kind, usage = {}, cost, perImage }) {
+function usageRow({ agent, chat, p, model, feature, usage = {}, cost, perImage }) {
   try {
     let known = cost;
     let priced = 'provider';
     if (known === undefined && perImage !== undefined) { known = perImage; priced = 'set'; }
     if (known === undefined && p?.type === 'local') { known = 0; priced = 'free'; }
-    recordUsage({ agent: agent?.id || '', chat: chat || '', provider: p.type === 'compatible' ? p.id : p.type, account: p.id, model, kind,
+    recordUsage({ ...usageTag(feature, { agent: agent?.id, chat }), provider: p.type === 'compatible' ? p.id : p.type, account: p.id, model,
       input: usage.input_tokens || 0, output: usage.output_tokens || 0, ...(known !== undefined ? { cost: known, priced } : {}) });
   } catch { /* never fail because of bookkeeping */ }
 }
@@ -208,11 +208,11 @@ export async function transcribe(buffer, mimetype, { agent, chat } = {}) {
     try {
       if (p.type === 'local') {
         const text = await transcribeLocal(buffer);
-        usageRow({ agent, chat, p, model, kind: 'transcribe' });
+        usageRow({ agent, chat, p, model, feature: 'transcribe' });
         return { text, by: 'on-server engine' };
       }
       const r = await runJob('Transcription', () => p.adapter.transcribe({ model, buffer, mimetype }), { timeoutMs: 120000 });
-      usageRow({ agent, chat, p, model, kind: 'transcribe', usage: r.usage, cost: r.cost });
+      usageRow({ agent, chat, p, model, feature: 'transcribe', usage: r.usage, cost: r.cost });
       return { text: r.text, by: `${p.name} · ${model}` };
     } catch (e) {
       errors.push(`${p.name}: ${e.message}`);
@@ -410,7 +410,7 @@ export async function createImage(input, { agent, chat, image = null }) {
       const ref = `${p.id}:${model}`;
       const perImage = mediaSettings().imagePrices[ref] ?? mediaSettings().imagePrices[`${p.type}:${model}`];
       const tokenPrice = priceFor(p.type, model);
-      usageRow({ agent, chat, p, model, kind: 'image', usage: r.usage, cost: r.cost, perImage: r.cost === undefined && perImage === undefined && tokenPrice ? undefined : perImage });
+      usageRow({ agent, chat, p, model, feature: 'image', usage: r.usage, cost: r.cost, perImage: r.cost === undefined && perImage === undefined && tokenPrice ? undefined : perImage });
       const caption = clip(input.caption || '', 300);
       const ch = chatChannel();
       if (!ch) throw new Error('WhatsApp is not available here');
@@ -454,12 +454,12 @@ export async function speak(text, { agent, chat } = {}) {
     try {
       if (p.type === 'local') {
         const buffer = await speakLocal(spoken);
-        usageRow({ agent, chat, p, model, kind: 'speech' });
+        usageRow({ agent, chat, p, model, feature: 'speech' });
         return { buffer, by: 'on-server engine' };
       }
       const r = await runJob('Voice reply', () => p.adapter.speak({ model, voice: mediaSettings().voice, text: spoken, format }), { timeoutMs: 90000 });
       const buffer = format === 'opus' ? r.buffer : await runJob('Audio conversion', () => convertAudio(r.buffer, 'ogg'), { timeoutMs: 90000 });
-      usageRow({ agent, chat, p, model, kind: 'speech', usage: { input_tokens: Math.ceil(spoken.length / 4) } });
+      usageRow({ agent, chat, p, model, feature: 'speech', usage: { input_tokens: Math.ceil(spoken.length / 4) } });
       return { buffer, by: `${p.name} · ${model}` };
     } catch (e) {
       activity('error', { agent: agent?.id || '', chat, summary: `Voice reply with ${p.name} failed: ${e.message}` });

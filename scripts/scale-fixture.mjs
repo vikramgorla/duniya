@@ -3,7 +3,7 @@
 // plans and time budgets). Plain inserts in one transaction; no network.
 //
 // Full size: 300 chats (20 on) over 3 numbers, 30 agents, 200k stored messages (80 days) written by 900 active people,
-// 50k activity rows, 20k usage rows, 5k people with 20k identities (WhatsApp number + LID, Telegram, a second Telegram
+// 50k activity rows, 20k usage rows (092: across features), 5k promises, 5k people with 20k identities (WhatsApp number + LID, Telegram, a second Telegram
 // account), phone contact names, 20k person notes and events, 10k tags, 1k households with 3k members, 20 lists with 4k
 // members, 2k ties, 5k chat notes, 5k reactions, 3k group member tags; 081: 20 events, 4k registrations, ~2.7k orders
 // with lines and payments, 200 duties.
@@ -52,7 +52,12 @@ export async function seedScale(t, N = FULL) {
     const types = ['message.in', 'message.out', 'tool.call', 'model.usage', 'silence', 'config'];
     for (let i = 0; i < N.activity; i++) act.run(now - Math.round((N.activity - i) / N.activity * 60 * DAY), types[i % types.length], `agent-${i % N.agents}`, chats[i % N.on], `Entry ${i}`, i % 3 ? '' : JSON.stringify({ text: 'x'.repeat(200) }));
     const use = db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kind, input, output, cost, priced, account, fallback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-    for (let i = 0; i < N.usage; i++) use.run(now - Math.round((N.usage - i) / N.usage * 300 * DAY), `agent-${i % N.agents}`, chats[i % N.on], 'anthropic', 'claude-sonnet-5-5', 'reply', 1200, 300, 0.0081, 'set', 'anthropic', '');
+    const FEAT = ['reply-light', 'reply-strong', 'reply-strong', 'judge', 'summary', 'model-choice', 'commitments', 'lessons', 'self-check', 'sending', 'owner', 'transcribe']; // 092
+    for (let i = 0; i < N.usage; i++) use.run(now - Math.round((N.usage - i) / N.usage * 300 * DAY), `agent-${i % N.agents}`, chats[i % N.on], 'anthropic', 'claude-sonnet-5-5', FEAT[i % FEAT.length], 1200, 300, 0.0081, 'set', 'anthropic', '');
+    // 092: promises people made (one per person; a fifth done, the rest open, every third without a date, some overdue)
+    const prom = db.prepare('INSERT INTO commitments (agent, chat, person, who, what, due, status, msg, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    for (let i = 0; i < N.people; i++) prom.run(`agent-${i % N.agents}`, chats[i % N.on], personId(i), `Contact ${i}`, `bring the speakers ${i}`, i % 3 ? new Date(now + ((i % 40) - 20) * DAY).toISOString().slice(0, 10) : '',
+      i % 5 ? 'open' : 'done', i * 10, now - i * 1000, now - i * 1000);
     // People: phone contact names; every person has a WhatsApp number + LID, every other one Telegram, every fourth two
     const con = db.prepare('INSERT OR REPLACE INTO contacts (tenant_id, phone, book_name, push_name, updated_at) VALUES (?, ?, ?, ?, ?)');
     const per = db.prepare('INSERT OR REPLACE INTO people (tenant_id, id, phone, created_at, name, nickname, shared) VALUES (?, ?, ?, ?, ?, ?, ?)');

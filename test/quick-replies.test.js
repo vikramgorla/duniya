@@ -80,7 +80,7 @@ test('FAQ: answers matching messages that wake the agent; strictness; no match g
 });
 
 test('built-in answers are counted as 0-cost usage (quick reply / faq)', async () => {
-  const u = (await t.api(owner, 'GET', '/api/usage?groupBy=kind&agent=rides')).body;
+  const u = (await t.api(owner, 'GET', '/api/usage?groupBy=feature&agent=rides')).body;
   const row = (k) => u.rows.find((x) => x.key === k);
   assert.ok(row('quick reply')?.calls >= 3); assert.equal(row('quick reply').cost, 0); assert.equal(row('quick reply').input, 0);
   assert.ok(row('faq')?.calls >= 2); assert.equal(row('faq').cost, 0);
@@ -181,7 +181,7 @@ test('welcome: the privacy notice comes first when the group was just switched o
 });
 
 test('welcome is counted as 0-cost usage and logged without names', async () => {
-  const u = (await t.api(owner, 'GET', '/api/usage?groupBy=kind&agent=rides')).body;
+  const u = (await t.api(owner, 'GET', '/api/usage?groupBy=feature&agent=rides')).body;
   assert.ok(u.rows.find((x) => x.key === 'welcome')?.calls >= 3);
   const w = t.db.listActivity({ agent: 'rides', limit: 200 }).filter((a) => /^Welcome posted/.test(a.summary));
   assert.ok(w.length >= 3);

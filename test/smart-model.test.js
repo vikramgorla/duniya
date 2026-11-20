@@ -39,10 +39,11 @@ test('unsure: one tiny classifier call on the light model decides; with it off, 
   assert.equal(reqs[0].max_tokens, 4, 'the classifier is bounded');
   assert.match(lastUsage().summary, /judged simple/);
   const kinds = t.db.db.prepare("SELECT kind FROM usage WHERE agent = 'mira' ORDER BY id DESC LIMIT 2").all().map((r) => r.kind);
-  assert.deepEqual(kinds, ['reply', 'model-choice'], 'the classifier shows as its own kind in Usage');
+  assert.deepEqual(kinds, ['reply-light', 'model-choice'], 'the classifier and the light answer show as their own features in Usage (092)');
   await t.api(owner, 'POST', '/api/models/defaults', { smart: { classifier: false } });
   reqs = await ask(text, 'Looks sunny.');
   assert.deepEqual(reqs.map((r) => r.model), [STRONG]);
+  assert.equal(t.db.db.prepare("SELECT kind FROM usage WHERE agent = 'mira' ORDER BY id DESC LIMIT 1").get().kind, 'reply-strong');
   await t.api(owner, 'POST', '/api/models/defaults', { smart: { classifier: true } });
 });
 

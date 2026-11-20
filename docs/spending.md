@@ -5,15 +5,37 @@
 **Do it:** agent page or **Chats → Spending cap** → set a monthly cap.
 
 **In 30 seconds**
-- **Usage**: the totals, your caps, a bar per day, then **Breakdown**: *Agents · Chats · Models · Accounts · Kind*, one
-  row each (name · calls and tokens · cost), and how many calls a fallback model answered.
+- **Usage**: the totals, your caps, **Cost per feature**, a bar per day, then **Breakdown**: *Agents · Chats · Models ·
+  Accounts*, one row each (name · calls and tokens · cost), and how many calls a fallback model answered.
 - Prices are yours, published, plans ("included") or free: never guessed.
 - Caps: one alert at 80 %; quiet (or a cheaper model) at 100 %.
 - Agents on [Smart model choice](intelligence.md#smart-model-choice): **Usage → Smart model choice** shows how many
-  answers a light model gave, the cost per answer and what it saved. *Kind* lists the classifier (*Choosing light or
-  strong*) and *Self-check rewrites* separately.
+  answers a light model gave, the cost per answer and what it saved. **Cost per feature** lists the classifier
+  (*Choosing light or strong*), the light and strong answers and *Self-check rewrites* separately.
 
 ![Usage page](site/img/usage-desktop.webp)
+
+## Cost per feature
+
+**Usage → Cost per feature**: what each part of Duniya used in the period, the most expensive first: one row per
+feature with a short line, calls, tokens, a bar and the cost; the top six, then **Show all**.
+
+![Usage → Cost per feature: owner assistant, summaries, light and strong answers, judged group messages … with calls, tokens and cost](site/img/card-usage-features.webp)
+
+| Feature | What it counts |
+|---|---|
+| Agent answers (· light, · strong) | answers to messages; *light* / *strong* for agents on Smart model choice |
+| Judged group messages | messages not addressed to an agent that it read to decide whether to answer (*follow-ups*, *when needed*) |
+| Choosing light or strong · Self-check rewrites · Lessons proposed | the [Smarter agents](intelligence.md) extras |
+| Promises | noticing promises, and when they are done |
+| Catch-ups · Summaries & memory | *What did I miss?*, and running chat summaries |
+| Voice notes in · Voice replies · Pictures made | [Photos & voice](models.md#photos--voice) |
+| Sending: per-person wording · Surveys: invites | each person's own wording of a message to a list, a campaign step or a survey invite |
+| AI helper · Owner assistant · Scheduled posts · Tests | the AI helper, your assistant (WhatsApp and the Ask box), schedules, the test console |
+| Built-in: FAQ, quick replies, welcome | answers without AI (free) |
+
+Every model call is tagged with its feature where it is made, so nothing is guessed. Admin MCP: `get_usage` (always with
+`features`, also `group_by: feature`).
 
 ## Prices
 
