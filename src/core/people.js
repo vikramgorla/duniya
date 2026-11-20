@@ -34,6 +34,9 @@ db.exec(`
 db.exec(`
   CREATE INDEX IF NOT EXISTS identities_phone ON identities (tenant_id, phone) WHERE phone <> '';
   CREATE INDEX IF NOT EXISTS people_source ON people (tenant_id, source);
+  -- 090: the morning brief: birthdays today / tomorrow and people who are new since yesterday (a few hundred kB at 5k people)
+  CREATE INDEX IF NOT EXISTS people_birthday ON people (tenant_id, substr(birthday, -5)) WHERE birthday <> '';
+  CREATE INDEX IF NOT EXISTS people_created ON people (tenant_id, created_at);
   CREATE INDEX IF NOT EXISTS people_hidden ON people (tenant_id, id) WHERE hidden = 1;
   CREATE TABLE IF NOT EXISTS person_ties (
     tenant_id TEXT NOT NULL, id TEXT NOT NULL, a TEXT NOT NULL, b TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL DEFAULT '',

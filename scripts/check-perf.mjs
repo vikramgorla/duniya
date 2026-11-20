@@ -29,6 +29,7 @@ const BUDGETS = {
   'router (stored, not addressed)': 2, // one group message through the router: allow-list, person, store, why-quiet; CI 0.3
   'agent context build': 3, // memory.buildContext for a busy group (recent messages, summary, notes); CI 0.6
   'sender card': 3, // 079: the People card of the sender each agent turn gets
+  'morning brief data': 60, // 090: briefData once a day (orders due, questions to the owner in 20 chats, birthdays, new people, stuck things)
   'lessons in a turn': 3, // 089: the most relevant lessons for one message (FTS over 1,000 lessons of the agent) and its join-in note
   'people tool: find (own chats)': 15, // 079: people__find_person for an agent that sees its own chats only
   'event page': 15, // 081: GET /api/module/events/:id (counts, ~200 registrations with names, duties, payments section)
@@ -109,6 +110,10 @@ await bench('agent context build', () => t.memory.buildContext({ agent, chat: on
 const access = await import('../src/core/people-access.js');
 const { peopleTools } = await import('../src/core/people-tools.js');
 await bench('sender card', () => access.senderCard(personId(5), access.peopleScope(agent), 'Contact 5'));
+// 090: the morning brief's data (once a day; its queries must use indexes all the same)
+const brief = await import('../src/core/brief.js');
+const oaMod = await import('../src/core/owner-assistant.js');
+await bench('morning brief data', () => brief.briefData(Date.now(), oaMod.visibleChats()));
 // 089: lessons — 1,000 saved lessons for this agent (more than an owner would keep), the context of one message
 const lessons = await import('../src/core/lessons.js');
 for (let i = 0; i < 1000; i++) lessons.addLesson(agent.id, { text: `Lesson ${i}: rides to ${['Geneva', 'Lausanne', 'Morges', 'Nyon'][i % 4]} on ${['Monday', 'Friday', 'Saturday'][i % 3]} leave at ${7 + (i % 5)}:${i % 6}0 from the station`, chat: i % 3 ? '' : onGroup, kind: i % 10 ? 'answer' : 'join' }, 'perf');

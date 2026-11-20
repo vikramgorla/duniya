@@ -7,7 +7,7 @@ import { listAgents, isBuiltin } from './agents.js';
 import { runAgent } from './runner.js';
 import { kvGet, kvSet, logMessage } from './db.js';
 import { activity } from './events.js';
-import { runOwnerSchedule } from './owner-assistant.js';
+import { runOwnerSchedule, runMorningBrief } from './owner-assistant.js';
 import { upkeepTick } from './upkeep.js';
 
 const dayMatches = (days, day) => !days || days === 'daily' || days.split(',').map((d) => d.trim().toLowerCase()).includes(day);
@@ -46,6 +46,7 @@ export async function runSchedule(agent, sched, channel, { force = false } = {})
 export function startScheduler(channel) {
   setInterval(async () => {
     upkeepTick(channel).catch(() => {}); // 057: names, member lists, history retries — bounded, never blocks schedules
+    runMorningBrief().catch((e) => activity('error', { summary: `Morning brief failed: ${e.message}` })); // 090: once a day, at its time
     const paused = getSetting('paused', false);
     for (const agent of listAgents()) {
       if (!agent.enabled || (paused && !isBuiltin(agent))) continue; // 059: the owner assistant's schedules run even while paused

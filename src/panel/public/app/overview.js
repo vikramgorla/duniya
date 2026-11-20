@@ -72,9 +72,11 @@ export async function renderOverview(soft) {
       led(st.enabledChats ? true : null, st.enabledChats ? `${plural(st.enabledChats, 'chat')} on` : 'No chat on'),
       led(st.pending ? null : true, st.pending ? `${st.pending} waiting for a confirm` : 'Nothing waiting')),
     st.enabledChats === 0 && open && st.agents.length && !checklistActive() ? h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'note warn', style: 'margin:0' }, 'For security, every chat starts Off. Open ', h('a', { href: '#chats' }, 'Chats'), ' and switch on the groups and people your agents should answer.')) : null);
+  const suggestedSlot = h('div', { id: 'ov-suggested-slot', style: 'grid-column:1/-1;display:none' }); // 090: filled by owner-brief.js
   const silencesSlot = h('div', { id: 'ov-silences-slot', 'data-jump': 'quiet', style: `grid-column:1/-1${S.silences?.length ? '' : ';display:none'}` }, S.silences?.length ? silencesCard(S.silences, refreshSilences) : null);
-  $('#main').replaceChildren(hero, whatsNewBox(), updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), checklistActive() && !open ? null : channelsCard, checklistActive() && !st.agents.length ? null : control, server, silencesSlot, recent));
+  $('#main').replaceChildren(hero, whatsNewBox(), updateBanner, checklistBox(), drawInstallHint(h('div', { id: 'ov-install' })), h('div', { class: 'grid' }, noModel ? null : askCard(), checklistActive() && !open ? null : channelsCard, checklistActive() && !st.agents.length ? null : control, server, suggestedSlot, silencesSlot, recent));
   refreshSilences();
+  if (can('admin') && !checklistActive()) import('./owner-brief.js').then((m) => m.fillSuggested(suggestedSlot)).catch(() => {});
   // the feed and the chat names it shows (064) load after the first paint
   Promise.resolve(S.feed.length ? S.feed : api('GET', '/api/activity?limit=50'))
     .then((rows) => { S.feed = rows; if (rows.length) { $('#recent')?.replaceWith(feedList('recent', rows.slice(0, 5))); $('#recent + .empty')?.remove(); } }).catch(() => {});

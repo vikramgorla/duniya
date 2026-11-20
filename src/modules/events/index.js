@@ -139,6 +139,23 @@ export const getRegistration = (id) => { const r = regRow(id); if (!r) throw fai
 export const registrationsOf = (event, status = '') => (status
   ? db.prepare('SELECT * FROM ev_registrations WHERE tenant_id = ? AND event = ? AND status = ? ORDER BY created_at').all(TENANT, event, status)
   : db.prepare('SELECT * FROM ev_registrations WHERE tenant_id = ? AND event = ? ORDER BY created_at').all(TENANT, event)).map(regView);
+/**
+ * 090 (ask your data): who came to (or registered for) one event but has no active registration for another — names
+ * of households and people, keyed the same way (a household that registered as a household, or a person).
+ */
+export function cameButNotRegistered(past, next, { attendedOnly = false } = {}) {
+  const key = (r) => (r.household ? `h:${r.household}` : `p:${r.person}`);
+  const now = new Set(db.prepare(`SELECT person, household FROM ev_registrations WHERE tenant_id = ? AND event = ? AND status IN ${ACTIVE}`).all(TENANT, next).map(key));
+  const then = db.prepare(`SELECT * FROM ev_registrations WHERE tenant_id = ? AND event = ? AND status IN ${attendedOnly ? "('registered')" : ACTIVE} ORDER BY created_at LIMIT 2000`).all(TENANT, past)
+    .filter((r) => !attendedOnly || r.attended);
+  return then.filter((r) => !now.has(key(r))).map(regView);
+}
+/** 090: who took duties whose task matches the words, across all events, most often first: [{ person, times, tasks }]. */
+export function dutyHistory(words) {
+  const like = `%${String(words || '').toLowerCase().replace(/[%_\\]/g, '')}%`;
+  return db.prepare(`SELECT p.person, COUNT(*) AS times, GROUP_CONCAT(DISTINCT d.task) AS tasks FROM ev_duty_people p JOIN ev_duties d ON d.tenant_id = p.tenant_id AND d.id = p.duty
+    WHERE p.tenant_id = ? AND lower(d.task) LIKE ? GROUP BY p.person ORDER BY times DESC LIMIT 20`).all(TENANT, like);
+}
 /** The persons a registration is about (the person, or every member of the household): for timelines. */
 const peopleOf = (r) => (r.household ? (() => { try { return getHousehold(r.household).members.map((m) => m.person); } catch { return []; } })() : [r.person].filter(Boolean));
 const note = (r, text) => { for (const p of peopleOf(r)) addEvent(p, text); };

@@ -796,3 +796,9 @@ button.lrow { width: 100%; border: 0; background: none; font: inherit; text-alig
 .lessons li + li { border-top: 1px solid var(--line); }
 .lesson-text { overflow-wrap: anywhere; }
 .lessons select { width: auto; max-width: 100%; }
+/* 090: Suggested next steps on Overview — one line of text, then Approve · Dismiss */
+.sug-list { list-style: none; margin: 0; padding: 0; }
+.sug { display: grid; gap: 6px; padding: 10px 0; }
+.sug + .sug { border-top: 1px solid var(--line); }
+.catchup { white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0; }
+.brief-secs { display: grid; gap: 2px; margin: 6px 0; }

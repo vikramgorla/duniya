@@ -137,6 +137,18 @@ const appOf = (c) => (c?.channel === 'telegram' ? 'Telegram' : 'WhatsApp');
 const titleOf = (s, c) => (s.id === 'group' ? `${appOf(c)} group` : s.title);
 const lineOf = (s, c) => (s.id === 'group' && c.channel === 'telegram' ? 'Changes happen in Telegram at once. The bot must be a group admin with the matching right.' : s.line);
 const hasSection = (s, c) => (!s.admin || can('admin')) && (!s.group || c.isGroup);
+/** 090: "What did I miss?" — decisions, open questions and what was asked of you since you last wrote here (or 24 h). */
+function catchUp(c) {
+  const enc = encodeURIComponent(c.id);
+  const out = h('div', {});
+  const btn = h('button', { class: 'btn small', type: 'button', onclick: async () => {
+    btn.disabled = true; out.replaceChildren(h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Reading what you missed…'));
+    const r = await tryApi(() => api('POST', `/api/chats/${enc}/catch-up`));
+    btn.disabled = false;
+    out.replaceChildren(...(r ? [h('div', { class: 'catchup' }, r.text), r.messages.length ? h('div', { class: 'row fx' }, r.messages.map((m) => h('a', { class: 'btn small ghost', href: `#chats/${enc}/messages/${m.id}` }, `#${m.id} ${m.from}`))) : null] : []));
+  } }, 'What did I miss?');
+  return h('div', { class: 'sblock' }, h('h3', {}, 'Catch up ', helpLink('owner-assistant.md#catch-up')), btn, out);
+}
 /** One chat's page (068, 072): a header (avatar, name, state, switch), why it stayed quiet, its agent, section rows
  *  (Messages, Memory, WhatsApp group, Activity), then the settings that save at once and the spending cap. */
 function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
@@ -200,6 +212,7 @@ function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
       quiet.length ? h('div', { class: 'sblock' }, h('h3', {}, 'Why it stayed quiet'), quiet.slice(0, 3).map((q) => quietReason(q, () => renderChats(), { onChats: true }))) : null,
       h('div', { class: 'sblock' }, field('Agent', agentSel), agentLink),
       h('div', { class: 'lgroup' }, h('ul', {}, rows)),
+      c.isGroup && c.enabled && !c.private && admin ? catchUp(c) : null,
       h('div', { class: 'sblock' }, h('h3', {}, 'Settings'), h('div', { class: 'grid2' },
         field('Model', modelSelect(models, c.model, { withInherit: true, smart: true, autoLabel: 'Auto (any provider)', disabled: !admin, onchange: (e) => savePrefs({ model: e.target.value }) }),
           h('div', { class: 'row', style: 'gap:6px;margin-top:6px' }, fbLine, h('button', { class: 'btn small', type: 'button', 'aria-label': `Model fallback for ${name}`, onclick: () => openFallback(c) }, admin ? 'Fallback…' : 'Fallback'))),

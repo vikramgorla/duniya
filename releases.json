@@ -1,6 +1,29 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.51.0": {
+      "breaking": false,
+      "title": "A morning brief, next steps to approve, and what you missed",
+      "summary": "Your owner assistant now sends a short brief each morning (only when there is something), suggests next steps you approve with one tap or code, answers questions across your events, and tells you what you missed in a group.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Morning brief in your WhatsApp: payments due, questions to you nobody answered, birthdays, things that are stuck, new people. Settings → Owner assistant → Morning brief."
+        },
+        {
+          "type": "new",
+          "text": "Suggested next steps on Overview and in the brief, such as sending payment reminders or resuming a paused send; nothing happens until you approve, and dismissed ones stay dismissed."
+        },
+        {
+          "type": "new",
+          "text": "Ask about your data across events: who came last time but has not registered, who usually volunteers for a duty."
+        },
+        {
+          "type": "new",
+          "text": "What did I miss? on a group's page, or ask your assistant: decisions, open questions and what was asked of you, with links."
+        }
+      ]
+    },
     "2.50.0": {
       "breaking": false,
       "title": "Agents learn from your corrections",

@@ -42,7 +42,7 @@ export const saveSecretKey = (name) => async (value) => { await api('PUT', '/api
 export const SETTINGS_SECTIONS = [
   ['whatsapp', 'WhatsApp', 'channels numbers qr code link phone pairing unlink add number memory switch off'],
   ['tool-services', 'Tool services for all agents', 'mcp tools weather calendar registry browse'],
-  ['owner-assistant', 'Owner assistant', 'my own chat alerts weekly summary character'],
+  ['owner-assistant', 'Owner assistant', 'my own chat alerts weekly summary character morning brief suggestions'],
   ['direct-messages', 'Chats & direct messages', 'dm default agent history load earlier messages phone'],
   ['privacy-notice', 'Privacy notice', 'notice group members opt-out'],
   ['photos-voice', 'Photos & voice', 'images voice notes transcription speech pictures'],
