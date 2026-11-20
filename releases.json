@@ -1,6 +1,32 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.48.0": {
+      "breaking": false,
+      "title": "One answer at a time, and messages you can edit",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "Two people writing at the same moment no longer get two answers (or two GIFs): an agent answers one message at a time per chat, then reads what arrived meanwhile in one go."
+        },
+        {
+          "type": "new",
+          "text": "Before anything goes out, an agent checks it is not the same text, GIF, sticker or reaction it just sent there; a repeat is dropped and shows in Why quiet as already answered."
+        },
+        {
+          "type": "new",
+          "text": "Edit an agent's answer from Chats → Messages while WhatsApp still allows it (15 minutes); later, send a correction that quotes it."
+        },
+        {
+          "type": "new",
+          "text": "Agents correct their last message when someone corrects them right away, instead of posting a second one."
+        },
+        {
+          "type": "improved",
+          "text": "When people edit a message, the stored copy is updated and marked edited; if the agent had answered and the meaning changed, it corrects itself or stays quiet."
+        }
+      ]
+    },
     "2.47.1": {
       "breaking": false,
       "title": "An easier first day for new owners",

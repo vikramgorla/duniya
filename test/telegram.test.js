@@ -199,3 +199,15 @@ test('077: a fresh install never loads the Telegram adapter; a stored token does
   assert.equal(r.before, 'not_set_up');
   assert.match(r.after, /TELEGRAM_IMPORTED/, 'the token is what imports the adapter');
 });
+
+test('087: an edited Telegram message updates the stored copy (marked edited); the bot edits its own with editMessageText', async () => {
+  const c = chat(-1009999); // the supergroup of the test above (on, bound)
+  fake.push({ message: { message_id: 4242, date: Math.floor(Date.now() / 1000), from: ANU, chat: { id: -1009999, type: 'supergroup', title: 'Book club' }, text: 'see you at 7' } });
+  assert.ok(await until(() => t.db.messageByMsgId(c, '4242')));
+  const id = t.db.messageByMsgId(c, '4242').id;
+  fake.push({ edited_message: { message_id: 4242, date: 1, edit_date: 2, from: ANU, chat: { id: -1009999, type: 'supergroup', title: 'Book club' }, text: 'see you at 8' } });
+  assert.ok(await until(() => t.db.messageByMsgId(c, '4242').text === 'see you at 8'));
+  assert.ok(t.db.editsOf([id]).has(id), 'marked edited');
+  await hub.editMessage(c, '77', 'fixed text');
+  assert.equal(fake.sent('editMessageText').at(-1).text, 'fixed text');
+});

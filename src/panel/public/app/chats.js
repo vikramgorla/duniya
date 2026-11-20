@@ -308,18 +308,36 @@ function messagesView(c, agents, q0 = '', at = 0) {
     if (!await ask({ title: 'Delete this message?', text: 'It is removed from the stored messages and the agent forgets it (the chat summary is rebuilt). Nothing changes in WhatsApp.', ok: 'Delete', danger: true })) return;
     if (await tryApi(() => api('DELETE', `/api/chats/${enc}/messages/${m.id}`))) { rows = rows.filter((r) => r.id !== m.id); log.querySelector(`[data-msg="${m.id}"]`)?.remove(); }
   } }, 'Delete') : null;
+  // 087: an agent's answer can be edited in the chat for a short while (WhatsApp: 15 minutes); later, a correction
+  // goes out as a new message that quotes it
+  const fix = (m) => (admin && m.fromAgent && m.id > 0 ? h('button', { class: 'btn small', type: 'button', onclick: async (e) => {
+    e.stopPropagation();
+    const box = h('textarea', { rows: 4, maxlength: 4000, 'aria-label': m.editable ? 'New text' : 'Correction' }, m.editable ? m.text : '');
+    const editIt = m.editable && await ask({ title: 'Edit this message in the chat?', text: 'Everyone in the chat sees the new text (marked edited). The agent remembers the new text.', ok: 'Save edit', body: box });
+    if (m.editable && !editIt) return;
+    if (editIt) {
+      try { await api('PUT', `/api/chats/${enc}/messages/${m.id}`, { text: box.value }); toast('Edited in the chat'); load(); return; } catch (err) {
+        if (err.data?.code !== 'edit_window') { toast(err.message, { bad: true }); return; }
+      }
+    }
+    const fixBox = h('textarea', { rows: 4, maxlength: 4000, 'aria-label': 'Correction' });
+    if (!await ask({ title: 'Send a correction?', text: 'It is too late to edit this message in the chat. A correction goes out as a new message that quotes it.', ok: 'Send correction', body: fixBox })) return;
+    if (await tryApi(() => api('POST', `/api/chats/${enc}/messages/${m.id}/correction`, { text: fixBox.value }), 'Correction sent')) load();
+  } }, m.editable ? 'Edit' : 'Send a correction') : null);
+  const acts = (m) => (admin ? h('span', { class: 'msg-acts' }, fix(m), del(m)) : null);
+  const edited = (m) => (m.edited ? h('span', { class: 'muted', title: `Edited ${time(m.edited)}` }, ' · edited') : null);
   function bubble(m, i) {
     const text = highlight(m.text, searchWords(shown));
     if (!m.fromAgent) {
       return h('div', { class: `bubble agent${m.id === at ? ' hit' : ''}`, 'data-msg': m.id, tabindex: admin ? '0' : null },
         h('div', { class: 'small msg-who' }, m.sender && can('admin') ? h('a', { href: `#people/${encodeURIComponent(m.sender)}` }, m.name || `+${m.sender}`) : m.name || (m.sender ? `+${m.sender}` : 'someone'), m.tag ? ` (${m.tag})` : '', ` · ${time(m.ts)}`, m.addressed ? ' · to the agent' : ''),
-        m.quoted ? h('div', { class: 'small msg-quote' }, m.quoted) : null, h('span', {}, text), del(m));
+        m.quoted ? h('div', { class: 'small msg-quote' }, m.quoted) : null, h('span', {}, text), edited(m), acts(m));
     }
     const name = agentOf(m.agent); const av = avatar(name, m.agent || 'agent', 's');
     return h('div', { class: `msg-ans ${[...av.classList].find((k) => /^c\d$/.test(k)) || ''}${m.id === at ? ' hit' : ''}`, 'data-msg': m.id, tabindex: admin ? '0' : null },
       h('div', { class: 'small msg-who' }, av, m.agent && !m.agent.startsWith('owner') ? h('a', { href: `#agents/${encodeURIComponent(m.agent)}` }, name) : name, ` · ${time(m.ts)}`),
-      h('div', { class: 'bubble ans' }, text),
-      admin && m.rateable ? answerActions({ id: m.id, agent: m.agent, rating: m.rating, text: m.text, question: questionOf(rows, i) }) : null, del(m));
+      h('div', { class: 'bubble ans' }, text, edited(m)),
+      admin && m.rateable ? answerActions({ id: m.id, agent: m.agent, rating: m.rating, text: m.text, question: questionOf(rows, i) }) : null, acts(m));
   }
   async function load(older) {
     const term = q.value.trim();

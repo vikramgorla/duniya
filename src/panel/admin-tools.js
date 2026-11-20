@@ -511,6 +511,12 @@ export const TOOLS = [
     input: { chat: str('Chat id'), message_id: { type: 'integer', description: 'Message id' } }, required: ['chat', 'message_id'],
     preview: async (a, x) => `Delete stored message ${a.message_id} in ${await chatName(x, a.chat)}. The agent forgets it; the chat summary is rebuilt.`,
     run: (a, x) => x.call('DELETE', `/api/chats/${enc(a.chat)}/messages/${Number(a.message_id)}`) },
+  { name: 'edit_chat_message', risky: true, openWorld: true, calls: [['PUT', '/api/chats/x/messages/1'], ['POST', '/api/chats/x/messages/1/correction']],
+    description: 'Edit a message an agent sent (id from list_chat_messages) in the chat itself: everyone sees the new text, marked edited. WhatsApp allows this for 15 minutes after sending (Telegram 48 hours); later, set correction=true to send the text as a new message that quotes the original. Needs confirm_action.',
+    input: { chat: str('Chat id'), message_id: { type: 'integer', description: 'Message id' }, text: str('The new text (or the correction)'), correction: { type: 'boolean', description: 'Send a new message that quotes the original instead of editing it' } }, required: ['chat', 'message_id', 'text'],
+    preview: async (a, x) => `${a.correction ? 'Send a correction to' : 'Edit'} message ${a.message_id} in ${await chatName(x, a.chat)}: “${String(a.text).slice(0, 300)}”. Everyone in the chat sees it.`,
+    run: (a, x) => (a.correction ? x.call('POST', `/api/chats/${enc(a.chat)}/messages/${Number(a.message_id)}/correction`, { text: a.text })
+      : x.call('PUT', `/api/chats/${enc(a.chat)}/messages/${Number(a.message_id)}`, { text: a.text })) },
   { name: 'erase_chat_memory', risky: true, calls: [['DELETE', '/api/chats/x/memory']], description: 'Erase everything the agents remember about a chat (history, summary, notes). Needs confirm_action.',
     input: { chat: str('Chat id') }, required: ['chat'],
     preview: async (a, x) => `Erase the memory of chat ${await chatName(x, a.chat)}: stored messages, summary and notes. The agent forgets the conversation. This cannot be undone.`,

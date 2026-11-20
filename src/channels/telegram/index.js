@@ -24,7 +24,7 @@ import { toEntities, chunks, reactionFor, SOME_REACTIONS } from './format.js';
 export const TOKEN = 'TELEGRAM_BOT_TOKEN';
 const API = 'https://api.telegram.org';
 const POLL_SECONDS = 50;
-const UPDATES = ['message', 'my_chat_member', 'message_reaction', 'poll_answer'];
+const UPDATES = ['message', 'edited_message', 'my_chat_member', 'message_reaction', 'poll_answer'];
 const DOWNLOAD_LIMIT = 20 * 1048576; // getFile: Telegram serves files up to 20 MB to bots
 const GROUP_TTL = 30 * 60000;
 const MAX_GROUPS = 300; const MAX_NAMES = 2000; const MAX_IN_FLIGHT = 20;
@@ -166,6 +166,11 @@ export function createTelegramAdapter({ fetch: doFetch = globalThis.fetch, token
 
   async function onUpdate(u) {
     if (u.message) return onTelegramMessage(u.message);
+    if (u.edited_message) { // 087: someone edited their message: the stored copy changes
+      const m = u.edited_message;
+      if (!m.from || m.from.is_bot || !textOf(m)) return;
+      return on.onMessage(base(m.chat, m.from, { msgId: '', ts: (m.edit_date || m.date) * 1000, kind: 'edited', text: textOf(m), target: String(m.message_id) }));
+    }
     if (u.my_chat_member) return onMembership(u.my_chat_member);
     if (u.message_reaction) {
       const r = u.message_reaction;

@@ -322,6 +322,30 @@ export const lastAgentMessage = (chat) => db.prepare('SELECT * FROM messages WHE
 export function setMessageText(chat, msgId, text) {
   db.prepare('UPDATE messages SET text = ? WHERE chat = ? AND msg_id = ?').run(String(text), chat, String(msgId));
 }
+// 087: messages edited after they were sent (by the agent, the owner in the panel, or the person who wrote them) keep a
+// marker: when and by whom. The row goes with its message (retention, erase memory, delete).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS message_edits (msg INTEGER PRIMARY KEY, ts INTEGER NOT NULL, by TEXT NOT NULL DEFAULT '');
+  CREATE TRIGGER IF NOT EXISTS message_edits_gone AFTER DELETE ON messages BEGIN
+    DELETE FROM message_edits WHERE msg = old.id;
+  END;
+`);
+/** A stored message got new text (an edit): the text changes and it is marked edited. Returns the row before, or null. */
+export function editStoredMessage(chat, msgId, text, by = '') {
+  const row = messageByMsgId(chat, msgId);
+  if (!row) return null;
+  db.prepare('UPDATE messages SET text = ? WHERE id = ?').run(String(text), row.id);
+  db.prepare('INSERT OR REPLACE INTO message_edits (msg, ts, by) VALUES (?, ?, ?)').run(row.id, Date.now(), String(by).slice(0, 60));
+  return row;
+}
+/** 087: did `agent` answer in `chat` after message row `id`, up to time `until`? */
+export const agentAnsweredAfter = (chat, id, agent, until) => !!db.prepare('SELECT 1 FROM messages WHERE chat = ? AND id > ? AND from_agent = 1 AND agent = ? AND ts <= ? LIMIT 1').get(chat, id, agent, until);
+/** Which of these message row ids were edited: Map id → { ts, by }. */
+export function editsOf(ids) {
+  const list = [...new Set(ids.map((i) => Math.trunc(Number(i))).filter(Boolean))].slice(0, 500);
+  if (!list.length) return new Map();
+  return new Map(db.prepare(`SELECT msg, ts, by FROM message_edits WHERE msg IN (${list.map(() => '?').join(',')})`).all(...list).map((r) => [r.msg, { ts: r.ts, by: r.by }]));
+}
 /** Store a reaction; an empty emoji removes the sender's reaction. */
 export function saveReaction({ chat, msgId, sender, name = '', emoji = '', ts = Date.now() }) {
   if (!emoji) { db.prepare('DELETE FROM wa_reactions WHERE chat = ? AND msg_id = ? AND sender = ?').run(chat, String(msgId), sender); return; }

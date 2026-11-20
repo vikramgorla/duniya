@@ -9,12 +9,15 @@
 import { digits, clip, fail } from './config.js';
 import { tagsInChat, memberTag } from './member-tags.js';
 import {
-  logMessage, messageByMsgId, lastAgentMessage, setMessageText, searchMessages, namesInChat, getPoll, latestPoll, recentPolls, pollTally,
+  logMessage, messageByMsgId, lastAgentMessage, setMessageText, editStoredMessage, searchMessages, namesInChat, getPoll, latestPoll, recentPolls, pollTally,
 } from './db.js';
 import { activity } from './events.js';
 import { inRole } from './people-access.js';
 import { capsOf, channelOf, isGroup, CHANNELS } from '../channels/index.js';
 import { toolPhrase } from '../panel/public/app/names.js';
+import { isDuplicate, noteSent } from './turns.js';
+import { silenceReason } from './silences.js';
+import { forgetChanged } from './memory.js';
 
 let channel = null;
 /** The channel hub the tools act through (set by the router and the panel at startup). */
@@ -22,8 +25,8 @@ export const setChatChannel = (ch) => { channel = ch; };
 export const chatChannel = () => channel;
 
 // 059: the actions the built-in owner assistant may ever use (messaging, no group administration).
-export const OWNER_CHAT_TOOLS = ['send_media', 'send_location', 'send_contact', 'react', 'reply', 'edit_message', 'delete_message', 'create_poll', 'poll_results', 'group_info', 'profile_info'];
-const WHATSAPP_PARTICIPANT_DEFAULT = ['send_media', 'send_location', 'react', 'reply', 'create_poll', 'poll_results', 'group_info', 'profile_info'];
+export const OWNER_CHAT_TOOLS = ['send_media', 'send_location', 'send_contact', 'react', 'reply', 'edit_message', 'edit_my_last_message', 'delete_message', 'create_poll', 'poll_results', 'group_info', 'profile_info'];
+const WHATSAPP_PARTICIPANT_DEFAULT = ['send_media', 'send_location', 'react', 'reply', 'edit_my_last_message', 'create_poll', 'poll_results', 'group_info', 'profile_info'];
 const WHATSAPP_DEFAULT_ALLOW = {
   organizer: ['whatsapp:*'],
   participant: WHATSAPP_PARTICIPANT_DEFAULT.map((n) => `whatsapp:${n}`),
@@ -69,6 +72,27 @@ async function pickChat(input, ctx) {
   throw fail('I can only act in this chat or in other chats this agent is in');
 }
 const needGroup = (chat) => { if (!isGroup(chat)) throw fail('This only works in a group'); };
+
+/** 087: a message can be edited only within its channel's window (WhatsApp: 15 minutes). */
+export function editWindow(chat, ts, now = Date.now()) {
+  const minutes = capsOf(chat)?.editMinutes || 0;
+  return { minutes, open: !!minutes && now - Number(ts || 0) < minutes * 60000 };
+}
+/** Edit one of the agent's own messages (stored row): within the window, on the channel, then the stored copy. */
+export async function editOwnMessage(chat, row, text, by) {
+  if (!row?.from_agent || !row.msg_id) throw fail('Only messages the assistant sent can be edited');
+  const w = editWindow(chat, row.ts);
+  if (!w.open) throw fail(w.minutes ? `${channelLabel(chat)} allows editing only within ${w.minutes >= 120 ? `${Math.round(w.minutes / 60)} hours` : `${w.minutes} minutes`} of sending; send a correction instead` : `${channelLabel(chat)} cannot edit messages`, 409, { code: 'edit_window' });
+  await need().editMessage(chat, row.msg_id, String(text));
+  editStoredMessage(chat, row.msg_id, String(text), by);
+  forgetChanged(chat);
+}
+/** 087: the agent is about to send what it just sent here: drop it (silence reason "already answered"). */
+function duplicate(ctx, chat, what) {
+  if (!isDuplicate(chat, ctx.agent.id, what, ctx.since || Date.now())) return null;
+  silenceReason('already_answered', { chat, agent: ctx.agent.id, sender: ctx.senderName || '' });
+  return { chat, result: { sent: false, duplicate: true, note: 'You already sent this here a moment ago, so it was not sent again. Do not try again.' }, summary: `Not sent again (already sent): ${what.kind}` };
+}
 
 /** A stored message → { msgId, fromMe, participant, text }. `message` = id or a few words of it (latest match). */
 function findMessage(chat, message, fallback) {
@@ -140,9 +164,12 @@ const DEFS = [
     }, required: ['kind'] },
     async run(input, ctx) {
       const chat = await targetChat(input, ctx, 'media');
+      const what = { kind: String(input.kind || ''), url: String(input.url || '') };
+      const dup = duplicate(ctx, chat, what); if (dup) return dup;
       const r = await need().sendMedia(chat, { kind: input.kind, url: input.url, base64: input.base64, mimetype: input.mimetype, caption: input.caption || '', fileName: input.file_name || '' });
       const label = `[${input.kind === 'audio' ? 'voice note' : input.kind}${input.caption ? `: ${clip(input.caption, 300)}` : ''}]`;
       remember(ctx, chat, r.msgId, label);
+      noteSent(chat, ctx.agent.id, what);
       return { chat, result: { sent: true, msgId: r.msgId, type: r.mimetype, ...(r.asStill ? { note: 'Sent as a still image (use an MP4 for a moving GIF)' } : {}) }, summary: `${label} ${r.bytes} bytes` };
     } },
   { name: 'send_location', cap: 'location', roles: ['organizer', 'participant'],
@@ -171,7 +198,10 @@ const DEFS = [
     async run(input, ctx) {
       const chat = await targetChat(input, ctx, 'reactions');
       const ref = findMessage(chat, input.message, current(chat, ctx));
+      const what = { kind: 'react', target: ref.msgId, emoji: input.emoji || '' };
+      const dup = duplicate(ctx, chat, what); if (dup) return dup;
       await need().react(chat, ref, input.emoji || '');
+      noteSent(chat, ctx.agent.id, what);
       return { chat, result: { ok: true }, summary: `${input.emoji ? `Reacted ${input.emoji}` : 'Removed reaction'} to "${clip(ref.text, 80)}"` };
     } },
   { name: 'reply', cap: 'quotes', roles: ['organizer', 'participant'],
@@ -180,8 +210,10 @@ const DEFS = [
     async run(input, ctx) {
       const chat = await targetChat(input, ctx, 'quotes');
       const ref = findMessage(chat, input.message, current(chat, ctx));
+      const dup = duplicate(ctx, chat, { kind: 'text', text: String(input.text) }); if (dup) return dup;
       const r = await need().send(chat, String(input.text), { quote: ref });
       remember(ctx, chat, r?.msgId, String(input.text), ref.text);
+      noteSent(chat, ctx.agent.id, { kind: 'text', text: String(input.text) });
       return { chat, result: { sent: true, msgId: r?.msgId || null }, summary: `Replied to "${clip(ref.text, 60)}": ${clip(input.text, 120)}` };
     } },
   { name: 'edit_message', cap: 'edit', roles: ['organizer', 'participant'],
@@ -190,10 +222,20 @@ const DEFS = [
     async run(input, ctx) {
       const chat = await targetChat(input, ctx, 'edit');
       const ref = findMessage(chat, input.message, () => lastAgentMessage(chat));
-      if (!ref.fromMe) throw fail('Only messages the assistant sent can be edited');
-      await need().editMessage(chat, ref.msgId, String(input.text));
-      setMessageText(chat, ref.msgId, String(input.text));
+      await editOwnMessage(chat, ref.row, input.text, ctx.agent.id);
       return { chat, result: { ok: true }, summary: `Edited "${clip(ref.text, 60)}" → "${clip(input.text, 80)}"` };
+    } },
+  // 087: correcting itself right after an answer ("no, it's Chary") changes that answer instead of posting another one
+  { name: 'edit_my_last_message', cap: 'edit', roles: ['organizer', 'participant'],
+    description: 'Correct your own last message in this chat (when someone corrects you right after your answer, e.g. "no, it\'s Chary"): its text is replaced, so nobody gets a second message. Only your last message here, only shortly after you sent it; otherwise just answer.',
+    input_schema: { type: 'object', properties: { text: str('The corrected full text of your last message', { maxLength: 4000 }) }, required: ['text'] },
+    async run(input, ctx) {
+      const chat = ctx.chat;
+      needCap(chat, 'edit');
+      const row = lastAgentMessage(chat);
+      if (!row || (row.agent && row.agent !== ctx.agent.id)) throw fail('You have not sent a message here that you could edit');
+      await editOwnMessage(chat, row, input.text, ctx.agent.id);
+      return { chat, result: { ok: true, edited: true, note: 'Your last message now has the corrected text. Do not send it again; if nothing else needs saying, answer exactly [quiet].' }, summary: `Corrected its last message → "${clip(input.text, 80)}"` };
     } },
   { name: 'delete_message', cap: 'delete', roles: ['organizer'],
     description: 'Delete a message for everyone: one the assistant sent (default: its last message), or someone else\'s in a group where the assistant is admin.',

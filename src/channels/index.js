@@ -14,19 +14,21 @@ import * as tg from './telegram/ids.js';
  * @typedef {{ groups: boolean, media: boolean, voiceNotes: boolean, location: boolean, contactCards: boolean,
  *   reactions: boolean, quotes: boolean, edit: boolean, delete: boolean, polls: boolean, groupInvite: boolean,
  *   groupMembers: boolean, groupAdmin: boolean, profile: boolean, block: boolean, history: boolean,
- *   memberTags: boolean, typing: boolean, readReceipts: boolean, phoneNumbers: boolean, markup: 'whatsapp'|'markdown'|'plain', maxText: number }} Capabilities
+ *   memberTags: boolean, typing: boolean, readReceipts: boolean, phoneNumbers: boolean, markup: 'whatsapp'|'markdown'|'plain', maxText: number,
+ *   editMinutes: number }} Capabilities
+ * `editMinutes` (087): how long after sending a message can still be edited.
  */
 
 /** @type {Capabilities} */
 const WHATSAPP_CAPS = { groups: true, media: true, voiceNotes: true, location: true, contactCards: true, reactions: true, quotes: true,
   edit: true, delete: true, polls: true, groupInvite: true, groupMembers: true, groupAdmin: true, profile: true, block: true,
-  history: true, memberTags: true, typing: true, readReceipts: true, phoneNumbers: true, markup: 'whatsapp', maxText: 65536 };
+  history: true, memberTags: true, typing: true, readReceipts: true, phoneNumbers: true, markup: 'whatsapp', maxText: 65536, editMinutes: 15 };
 
 /** 077: what a Telegram bot can do through the Bot API (no phone numbers, no history, no adding people by number). */
 /** @type {Capabilities} */
 const TELEGRAM_CAPS = { groups: true, media: true, voiceNotes: true, location: true, contactCards: true, reactions: true, quotes: true,
   edit: true, delete: true, polls: true, groupInvite: true, groupMembers: false, groupAdmin: true, profile: false, block: false,
-  history: false, memberTags: false, typing: true, readReceipts: false, phoneNumbers: false, markup: 'whatsapp', maxText: 4096 };
+  history: false, memberTags: false, typing: true, readReceipts: false, phoneNumbers: false, markup: 'whatsapp', maxText: 4096, editMinutes: 48 * 60 };
 
 /**
  * One entry per channel Duniya has. `prefix`: the chat id prefix ('' = unprefixed, WhatsApp only). `ids`: how its ids

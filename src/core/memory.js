@@ -271,11 +271,11 @@ export const memoryTools = [
   },
 ];
 
-// #178: a message was deleted (for everyone in WhatsApp, or by the owner in the panel). The running summary may still
-// mention it, so it is rebuilt from what is stored now: one chat per upkeep tick, retried on the next tick if the model fails.
+// #178: a message was deleted (for everyone in WhatsApp, or by the owner in the panel); 087: or edited. The running
+// summary may still mention the old text, so it is rebuilt from what is stored now: one chat per upkeep tick, retried on the next tick if the model fails.
 const stale = new Set();
-export function forgetDeleted(chat) { if (getChatMemory(chat)?.summary) stale.add(chat); }
-/** Upkeep tick: rebuild one summary that may mention a deleted message. */
+export function forgetChanged(chat) { if (getChatMemory(chat)?.summary) stale.add(chat); }
+/** Upkeep tick: rebuild one summary that may mention a deleted or edited message. */
 export async function rebuildStaleSummary(agentFor) {
   const chat = stale.values().next().value;
   if (!chat) return false;
@@ -283,8 +283,8 @@ export async function rebuildStaleSummary(agentFor) {
   const all = messagesAfter(chat, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER).slice(-400);
   if (!all.length) { setChatMemory(chat, '', 0); return true; }
   const agent = agentFor(chat);
-  const done = await summarize(chat, agent, { current: '(empty)', note: ' reason="rebuilt after a message was deleted"',
-    messages: all.map((m) => formatMessage(m, agent?.timezone || env.timezone)), upto: all.at(-1).id, what: `${all.length} messages (rebuilt after a deletion)` });
+  const done = await summarize(chat, agent, { current: '(empty)', note: ' reason="rebuilt after a message was deleted or edited"',
+    messages: all.map((m) => formatMessage(m, agent?.timezone || env.timezone)), upto: all.at(-1).id, what: `${all.length} messages (rebuilt after a deletion or an edit)` });
   if (!done) stale.add(chat);
   return true;
 }

@@ -153,9 +153,9 @@ test('075: agents only get the chat tools the chat\'s channel can do; acting on 
   const agent = t.agents.getAgent('panduga');
   const names = async (chat) => (await toolsFor(agent, 'organizer', { chat })).defs.map((d) => d.name).filter((n) => n.startsWith('whatsapp__')).sort();
   const onWa = await names('g1@g.us');
-  assert.equal(onWa.length, 23, 'a WhatsApp chat: every chat tool');
+  assert.equal(onWa.length, 24, 'a WhatsApp chat: every chat tool');
   assert.deepEqual(await names('fk:a#g1'), ['whatsapp__group_info', 'whatsapp__react', 'whatsapp__reply'], 'the fake channel: groups, reactions and quotes only');
-  assert.equal((await names('')).length, 23, 'the test console: what any channel can do');
+  assert.equal((await names('')).length, 24, 'the test console: what any channel can do');
   const media = async (chat) => (await toolsFor(agent, 'organizer', { chat })).defs.some((d) => d.name === 'media__create_image');
   assert.equal(await media('fk:a#g1'), false, 'no pictures where the channel cannot send media');
 
