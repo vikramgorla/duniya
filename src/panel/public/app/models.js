@@ -337,12 +337,20 @@ export async function renderModels() {
   // Defaults
   const def = modelSelect(models, models.defaultModel, { autoLabel: `Auto${models.resolvedDefault ? ` (now ${models.resolvedDefault})` : ''}` });
   const bg = modelSelect(models, models.backgroundModel, { autoLabel: `Auto${models.resolvedBackground ? ` (now ${models.resolvedBackground})` : ''}` });
+  // 088: Smart choice — the light and strong models of agents on "Auto: light or strong"
+  const sm = models.smart || { light: 'auto', strong: 'auto', classifier: true };
+  const light = modelSelect(models, sm.light, { autoLabel: 'Auto: the background model' });
+  const strong = modelSelect(models, sm.strong, { autoLabel: 'Auto: the default model' });
+  const judge = h('input', { type: 'checkbox', checked: sm.classifier !== false });
   const defaults = h('div', { class: 'card' }, h('h2', {}, 'Default models'),
     anyOn ? null : h('p', { class: 'small muted' }, 'Connect a provider above first.'),
     field('Default model (agents on Auto)', def, models.resolvedDefault ? `Auto currently means ${models.resolvedDefault}` : ''),
     field('Background model (memory summaries)', bg, models.resolvedBackground ? `Auto currently means ${models.resolvedBackground}` : ''),
+    h('h3', { id: 'smart' }, 'Smart choice'), h('p', { class: 'small muted' }, 'For agents on “Auto: light for simple, strong when needed”. A free model on OpenRouter makes a good light model. ', helpLink('models.md#smart-choice')),
+    h('div', { class: 'grid2' }, field('Light model', light, sm.resolvedLight ? `Now ${modelLabel(sm.resolvedLight, models)}` : ''), field('Strong model', strong, sm.resolvedStrong ? `Now ${modelLabel(sm.resolvedStrong, models)}` : '')),
+    h('label', { class: 'inline' }, judge, 'When the rules are unsure, ask the light model (a few tokens)'),
     h('div', { class: 'row', style: 'margin-top:12px' },
-      h('button', { class: 'btn primary mut', onclick: () => tryApi(async () => { await api('POST', '/api/models/defaults', { defaultModel: def.value, backgroundModel: bg.value }); S.models = null; renderModels(); }, 'Saved') }, 'Save'),
+      h('button', { class: 'btn primary mut', onclick: () => tryApi(async () => { await api('POST', '/api/models/defaults', { defaultModel: def.value, backgroundModel: bg.value, smart: { light: light.value, strong: strong.value, classifier: judge.checked } }); S.models = null; renderModels(); }, 'Saved') }, 'Save'),
       h('button', { class: 'btn', onclick: async () => { S.models = null; await api('GET', '/api/providers?refresh=1'); renderModels(); } }, 'Refresh model lists')));
 
   // When a model fails (042)

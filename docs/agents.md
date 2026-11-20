@@ -59,6 +59,8 @@ Admin MCP: `test_agent`.
 - **Links:** `#agents/<id>` opens an agent, `#agents/<id>/<section>` a section (e.g. `#agents/carpool/tools`); Find
   anything (`/`) lists every section ("Tools · Car pooling").
 - **Change with AI** opens the AI helper in a sheet: describe the change, review the visual diff, apply.
+- **Model** also offers **Auto: light for simple, strong when needed** and **Self-check** (amounts, dates and counts from
+  People and modules checked before sending): see [Smarter agents](intelligence.md).
 
 ![A section of an agent's page: Where it answers, with its chats, wake words and direct messages](site/img/agent-section-desktop.webp)
 

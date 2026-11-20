@@ -7,7 +7,7 @@
 // with the same base URL count as accounts of one provider.
 import { getSecret, getSetting, updateSettings, setSecret, onSecretChange } from '../store.js';
 import * as anthropic from './anthropic.js';
-import { recordUsage } from '../usage.js';
+import { recordUsage, priceFor } from '../usage.js';
 import * as chatgpt from './chatgpt.js';
 import * as copilot from './copilot.js';
 import * as claudeCode from './claude-code.js';
@@ -512,15 +512,16 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
       breaker.recordSuccess(p.id, { name: p.name });
       const failed = failures.filter((f) => f.reason !== 'unavailable' && !(f.paused && f.account === p.id));
       const fbText = failed.length ? `after ${describeFailures(failed)}` : '';
+      let cost = null;
       try { // usage & cost (023): the account and model that actually answered, and why it switched (042)
         const published = modelCache.get(p.id)?.models?.find((m) => m.id === modelId)?.price || null;
-        recordUsage({ ...usage, kind: usage.kind || (purpose === 'background' ? 'summary' : 'reply'), provider: p.type === 'compatible' ? p.id : p.type, account: p.id, model: modelId,
+        cost = recordUsage({ ...usage, kind: usage.kind || (purpose === 'background' ? 'summary' : 'reply'), provider: p.type === 'compatible' ? p.id : p.type, account: p.id, model: modelId,
           input: res.usage?.input_tokens || 0, output: res.usage?.output_tokens || 0, published, fallback: fbText });
       } catch { /* never fail a reply because of bookkeeping */ }
       const firstFail = failed.find((f) => f.account !== p.id);
       if (firstFail) breaker.noteSwitch({ from: firstFail.name, to: p.name, reason: firstFail.reason, agent: usage.agent, chat: usage.chat });
       if (turn) turn.ref = ref;
-      return { ...res, model: ref, account: p.id, answeredBy: p.name, failures: failed };
+      return { ...res, model: ref, account: p.id, answeredBy: p.name, failures: failed, cost };
     }
   }
   // Nothing answered.
@@ -537,6 +538,14 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
   if (lastErr) err.fallbackReason ??= classify(lastErr).reason;
   if (failed.length) breaker.allFailed(describeFailures(failed));
   throw err;
+}
+
+/** 088: what tokens would cost on a model ref ("account:model"), from its set or published price; null when unknown. */
+export function refCost(ref, input, output) {
+  const r = parseRef(ref); const p = r && providerById(r.provider);
+  if (!p) return null;
+  const pr = priceFor(p.type === 'compatible' ? p.id : p.type, r.model, modelCache.get(p.id)?.models?.find((m) => m.id === r.model)?.price || null);
+  return pr ? (input * pr.in + output * pr.out) / 1e6 : null;
 }
 
 /** Connection test (018): send "Say hi" to one account (its Auto model unless one is given); reply + latency. */

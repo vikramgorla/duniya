@@ -10,6 +10,7 @@ import { appsCheck } from '../../core/providers/apps.js';
 import { setSecret, getSecret, getSettings, updateSettings } from '../../core/store.js';
 import { REF_RE } from '../../core/providers/fallback-config.js';
 import { activity } from '../../core/events.js';
+import { setSmartSettings, smartSettings, tierModels } from '../../core/smart-model.js';
 
 export function providerRoutes(route) {
   route('GET', '/api/providers', async (req, res, body, q) => status({ refresh: q.get('refresh') === '1' }));
@@ -203,6 +204,9 @@ export function providerRoutes(route) {
     const out = { models: await allModels({ refresh: q.get('refresh') === '1' }), defaultModel: s.defaultModel || 'auto', backgroundModel: s.backgroundModel || 'auto', fallback: fallbackSettings() };
     try { out.resolvedDefault = resolveModel('auto', 'agent').ref; } catch (e) { out.problem = e.message; }
     try { out.resolvedBackground = resolveModel('auto', 'background').ref; } catch { /* same problem */ }
+    // 088: Smart choice: the light and strong models (settings) and what they mean right now
+    out.smart = smartSettings();
+    try { const t = tierModels(null); out.smart.resolvedLight = resolveModel(t.light, 'background').ref; out.smart.resolvedStrong = resolveModel(t.strong, 'agent').ref; } catch { /* no model yet */ }
     return out;
   });
   route('POST', '/api/models/defaults', async (req, res, body, q, p, user) => {
@@ -214,6 +218,7 @@ export function providerRoutes(route) {
         patch[k] = v;
       }
     }
+    if (body.smart && typeof body.smart === 'object') patch.smartModels = setSmartSettings(body.smart); // 088
     activity('system', { summary: `Model defaults by ${user.username}: ${JSON.stringify(patch)}` });
     return updateSettings(patch);
   });

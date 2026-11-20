@@ -27,7 +27,7 @@ export const WELCOME_MODES = ['inherit', 'on', 'off'];
 const parseFallback = (v) => { try { return v ? cleanOverride(JSON.parse(v)) : { mode: 'inherit', chain: [] }; } catch { return { mode: 'inherit', chain: [] }; } };
 
 export const LOGGING_LEVELS = ['inherit', 'off', 'minimal', 'normal', 'verbose'];
-const validModel = (v) => v === 'inherit' || v === 'auto' || REF_RE.test(v);
+const validModel = (v) => v === 'inherit' || v === 'auto' || v === 'smart' || REF_RE.test(v); // 088: smart = light or strong per message
 
 // 032 (issue #10): chats are OFF until an admin switches them on. Messages from chats that are off are never stored
 // or sent to a model (chat_prefs.enabled).
@@ -51,7 +51,7 @@ export function setChatPrefs(chat, { model, logging, enabled, fallback, private:
     fallback: fallback === undefined ? cur.fallback : cleanOverride(fallback, 'fallback'),
     private: priv === undefined ? cur.private : !!priv, noticeOff: noticeOff === undefined ? cur.noticeOff : !!noticeOff,
     welcome: welcome ?? cur.welcome };
-  if (!validModel(next.model)) throw fail('model must be inherit, auto, provider:auto or provider:model', 400, { field: 'model' });
+  if (!validModel(next.model)) throw fail('model must be inherit, auto, smart, provider:auto or provider:model', 400, { field: 'model' });
   if (!WELCOME_MODES.includes(next.welcome)) throw fail('welcome must be inherit, on or off', 400, { field: 'welcome' });
   if (!LOGGING_LEVELS.includes(next.logging)) throw fail(`logging must be one of ${LOGGING_LEVELS.join(', ')}`, 400, { field: 'logging' });
   const fb = next.fallback.mode === 'inherit' && !next.fallback.chain.length ? '' : JSON.stringify(next.fallback);

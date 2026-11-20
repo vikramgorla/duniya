@@ -49,7 +49,7 @@ const SECTIONS = [
   { group: 'What it does', id: 'schedules', icon: 'pending', c: 'c1', title: (x) => (x.bi ? 'Scheduled messages' : 'Schedules'), help: 'agents.md', line: (x) => (x.bi ? 'Sent to you in your own chat, even while agents are paused.' : 'Posts it writes by itself at set times.'),
     sub: (x) => { const s = x.c.schedules || []; return s.length ? `${plural(s.length, 'schedule')} · ${s.map((y) => y.at).join(', ')}` : 'None'; }, build: buildSchedules },
   { group: 'How it works', id: 'model', icon: 'models', c: 'c4', title: () => 'Model', help: 'models.md', line: () => 'Which model answers, and what happens when it is unavailable.',
-    sub: (x) => `${x.c.model === 'auto' ? 'Auto' : modelLabel(x.c.model, x.models)}${x.c.fallback?.mode === 'off' ? ' · no fallback' : ''}`, build: buildModel },
+    sub: (x) => `${x.c.model === 'auto' ? 'Auto' : modelLabel(x.c.model, x.models)}${x.c.fallback?.mode === 'off' ? ' · no fallback' : ''}${x.c.selfCheck === false ? ' · no self-check' : ''}`, build: buildModel },
   { group: 'How it works', id: 'tools', icon: 'settings', c: 'c0', title: () => 'Tools', help: 'agents.md#tool-services-mcp', line: () => 'Tool services and WhatsApp actions, allowed per role in code.',
     sub: (x) => { const t = [...Object.keys(x.c.mcpServers || {}), ...(x.b.globalTools || []).filter((g) => g.on).map((g) => g.name)]; return t.length ? t.join(', ') : 'None'; }, build: buildTools },
   { group: 'How it works', id: 'memory', icon: 'notes', c: 'c2', title: () => 'Memory', help: 'agents.md#memory', line: (x) => (x.bi ? 'Notes it saves when you ask, private to you.' : 'Chat memory and notes shared across its chats.'),
@@ -255,10 +255,21 @@ function buildPeople(x) {
     participants: F.participants?.values() || x.c.participants || [], peopleAccess: F.access.value, peopleLists: F.lists?.values() || x.c.peopleLists || [] }) };
 }
 function buildModel(x) {
-  const F = { model: modelSelect(x.models, x.c.model, { autoLabel: `Auto${x.models.resolvedDefault ? ` (now ${x.models.resolvedDefault})` : ''}` }) };
+  const F = { model: modelSelect(x.models, x.c.model, { smart: true, autoLabel: `Auto${x.models.resolvedDefault ? ` (now ${x.models.resolvedDefault})` : ''}` }) };
   const fb = fallbackPicker(x.models, x.c.fallback, { what: 'agent' });
-  return { F, el: h('div', {}, field('Model', F.model, x.models.problem || null), block('When the model is unavailable', fb.el)),
-    value: () => ({ model: F.model.value, fallback: fb.value() }) };
+  // 088: Smart choice — its own light / strong models (empty: Settings → Models), shown while "smart" is chosen
+  const sm = x.models.smart || {};
+  const tier = (k) => modelSelect(x.models, x.c.modelTiers?.[k] || 'auto', { autoLabel: 'Same as Models', 'aria-label': `${k} model` });
+  const now = (ref) => (ref ? `Models: ${modelLabel(ref, x.models)}` : '');
+  F['modelTiers.light'] = tier('light'); F['modelTiers.strong'] = tier('strong');
+  const tiers = block('Light and strong', h('p', { class: 'small muted' }, 'Simple messages (greetings, thanks, short questions) go to the light model; the owner, photos, changes, long or multi-step messages and looking things up go to the strong one. Activity says which answered and why. ', helpLink('models.md#smart-choice')),
+    h('div', { class: 'grid2' }, field('Light model', F['modelTiers.light'], now(sm.resolvedLight)), field('Strong model', F['modelTiers.strong'], now(sm.resolvedStrong))));
+  const showTiers = () => tiers.classList.toggle('hide', F.model.value !== 'smart');
+  F.model.addEventListener('change', showTiers); showTiers();
+  F.selfCheck = check(x.c.selfCheck !== false);
+  return { F, el: h('div', {}, field('Model', F.model, x.models.problem || null), tiers, block('When the model is unavailable', fb.el),
+    block('Self-check', tick(F.selfCheck, 'Check amounts, dates and counts against People, events and orders before sending'), h('p', { class: 'small muted' }, 'A wrong figure is corrected once; if it is still wrong, a plain answer without figures goes out. ', helpLink('intelligence.md#self-check')))),
+    value: () => ({ model: F.model.value, fallback: fb.value(), modelTiers: { light: F['modelTiers.light'].value, strong: F['modelTiers.strong'].value }, selfCheck: F.selfCheck.checked }) };
 }
 function buildCap(x) {
   const box = h('div', {});

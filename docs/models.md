@@ -93,6 +93,13 @@ Each app's page shows what it measured on *your* server (*about 200 MB while ans
 > - **GitHub Copilot:** requests count against your Copilot plan's allowance (premium requests).
 > - Never share one plan between several people's servers or use several accounts to get around limits.
 
+## Smart choice
+
+Agents can use a **light** model for simple messages and a **strong** one when it matters: **Settings → Models →
+Default models → Smart choice** sets the two models (Auto: the background and the default model), and an agent picks
+**Auto: light for simple, strong when needed** under **Model**. The rules, the classifier and the savings are in
+[Smarter agents](intelligence.md#smart-model-choice).
+
 ## Fallback and several accounts
 
 <p align="center"><img src="diagrams/model-fallback.svg" alt="Model fallback: if the agent model answers, it replies; on a limit, no credit, outage, timeout or expired sign-in that account is paused and the next model in the chain is tried; a refusal (400) does not switch; when none are left for 15 minutes the owner gets a WhatsApp alert" width="562"></p>

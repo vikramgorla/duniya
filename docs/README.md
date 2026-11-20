@@ -55,6 +55,7 @@ stop it at your limit.
 | <img src="img/thumb-telegram.webp" alt="" width="120"> | **[Connect Telegram](telegram.md)** | your groups are on Telegram too: add a bot, same agents, one person on both apps |
 | <img src="img/thumb-photos-voice.webp" alt="" width="120"> | **[Photos & voice](models.md#photos--voice)** | agents should see photos, hear voice notes or reply with voice |
 | <img src="img/thumb-usage.webp" alt="" width="120"> | **[Usage & spending caps](spending.md)** | you want to see or limit what it costs |
+| `AI` | **[Smarter agents](intelligence.md)** | agents should use a cheap model for simple messages and never send a wrong amount or date |
 | <img src="img/thumb-mcp.webp" alt="" width="120"> | **[Tool services (MCP)](agents.md#tool-services-mcp)** | agents need real tools: a calendar, a planner, GIFs |
 | <img src="img/thumb-assistants.webp" alt="" width="120"> | **[Manage from ChatGPT or Claude](admin-mcp.md)** | you want to run Duniya by chatting with an AI assistant |
 | <img src="img/thumb-pace.webp" alt="" width="120"> | **[Sending pace](sending-pace.md)** | messages should be read, answered and sent at a person's pace: read receipts, typing, new chats a day |

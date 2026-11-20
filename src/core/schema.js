@@ -13,6 +13,9 @@ export const AGENT_DEFAULTS = Object.freeze({
   model: 'auto',
   maxTokens: 1024,
   fallback: { mode: 'inherit', chain: [] }, // 042: inherit | on | off, and an own chain (empty = Models setting)
+  // 088: with model "smart": its own light / strong models ('' = Settings → Models → Smart choice)
+  modelTiers: { light: '', strong: '' },
+  selfCheck: true, // 088: amounts, dates and counts from People and modules are checked before an answer goes out
   historySize: 30,
   prompt: 'You are a helpful assistant in a WhatsApp group.',
   triggers: [],
@@ -158,7 +161,15 @@ export function validateAgentConfig(input) {
   out.description = str(c.description, 'description', { max: 500 });
   out.enabled = !!c.enabled;
   out.model = str(c.model || 'auto', 'model', { min: 1, max: 120 });
-  if (out.model !== 'auto' && !REF_RE.test(out.model)) fail('model', 'must be "auto" or "account:model"');
+  if (out.model !== 'auto' && out.model !== 'smart' && !REF_RE.test(out.model)) fail('model', 'must be "auto", "smart" or "account:model"');
+  const tiers = c.modelTiers && typeof c.modelTiers === 'object' ? c.modelTiers : {};
+  out.modelTiers = {};
+  for (const k of ['light', 'strong']) {
+    const v = String(tiers[k] || '').trim();
+    if (v && v !== 'auto' && !REF_RE.test(v)) fail(`modelTiers.${k}`, 'must be empty, "auto" or "account:model"');
+    out.modelTiers[k] = v === 'auto' ? '' : v;
+  }
+  out.selfCheck = c.selfCheck !== false;
   out.maxTokens = int(c.maxTokens, 'maxTokens', 64, 8192);
   try { out.fallback = cleanOverride(c.fallback, 'fallback'); } catch (e) { fail(e.field || 'fallback', e.message); }
   out.historySize = int(c.historySize, 'historySize', 0, 200);
