@@ -110,6 +110,8 @@ const CARDS = [
   ['card-agent-model', 'agents/office/model', '', '.ap-sec', 600], // 088: Auto: light or strong, Self-check
   ['card-suggested', 'overview', "await T.until('#ov-suggested .sug'); await T.wait(300);", '#ov-suggested', 900], // 090: Suggested next steps on Overview
   ['card-brief', 'settings/owner-assistant', "await T.until('#morning-brief'); await T.click('Preview', '#morning-brief button', 800);", '#morning-brief', 900], // 090: Morning brief settings and preview
+  ['card-promises', 'agents/carpool/promises', "await T.until('.lessons li'); await T.wait(300);", '.ap-sec', 600], // 091: Promises & people
+  ['card-people-suggestions', 'people', "await T.until('#people-suggestions'); await T.wait(200);", '#people-suggestions', 600], // 091: a family tie to add or reject
   ['card-lessons', 'agents/carpool/lessons', "await T.until('.lessons li'); await T.wait(300);", '.ap-sec', 600], // 089: lessons to approve and saved lessons
   ['card-updates', 'settings/updates', '', 'box:Updates', 900], // 073: Settings → Updates
   ['card-assistants', 'settings/assistants', '', 'box:Connected AI assistants', 900],

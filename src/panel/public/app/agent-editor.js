@@ -46,6 +46,8 @@ const SECTIONS = [
     sub: (x) => { const n = (x.c.quickReplies || []).length; const f = (x.c.faq?.items || []).length; return n || f ? [n ? plural(n, 'quick reply', 'quick replies') : '', f ? plural(f, 'question') : ''].filter(Boolean).join(' · ') : 'None'; }, build: buildQuick },
   { group: 'What it does', id: 'welcome', agent: true, icon: 'people', c: 'c3', title: () => 'Welcome', help: 'agents.md#quick-replies-welcome--faq', line: () => 'Greets people who join a group, once per person.',
     sub: (x) => (x.c.welcome?.enabled ? 'On' : 'Off'), build: buildWelcome },
+  { group: 'What it does', id: 'promises', agent: true, icon: 'people', c: 'c1', title: () => 'Promises & people', help: 'intelligence.md#commitments', line: () => 'Promises people make in its chats, reminders when due, and family ties it hears about.',
+    sub: (x) => [x.c.promises?.track ? `Tracks promises${x.c.promises.followUp === 'off' ? '' : `, reminds ${x.c.promises.followUp === 'dm' ? 'directly' : 'in the chat'}`}` : 'Promises not tracked', x.c.cues ? 'suggests ties' : ''].filter(Boolean).join(' · '), build: buildPromises },
   { group: 'What it does', id: 'schedules', icon: 'pending', c: 'c1', title: (x) => (x.bi ? 'Scheduled messages' : 'Schedules'), help: 'agents.md', line: (x) => (x.bi ? 'Sent to you in your own chat, even while agents are paused.' : 'Posts it writes by itself at set times.'),
     sub: (x) => { const s = x.c.schedules || []; return s.length ? `${plural(s.length, 'schedule')} · ${s.map((y) => y.at).join(', ')}` : 'None'; }, build: buildSchedules },
   { group: 'How it works', id: 'model', icon: 'models', c: 'c4', title: () => 'Model', help: 'models.md', line: () => 'Which model answers, and what happens when it is unavailable.',
@@ -175,6 +177,12 @@ export function agentPage(id, { onChange } = {}) {
 // ---------- sections ----------
 /** 070: "👍 3 · 👎 1 this week" on the Review row. */
 const reviewLine = (r) => (!r ? 'Rate its answers' : r.up || r.down ? `👍 ${r.up} · 👎 ${r.down} this week` : r.answers ? `${plural(r.answers, 'answer')} this week, none rated` : 'No answers this week');
+/** 091: Promises & people — loaded with the section (promises.js). */
+function buildPromises(x, { save }) {
+  const box = h('div', {}, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading…'));
+  import('./promises.js').then((m) => box.replaceChildren(m.promisesView(x, (patch) => save(patch, {}, { quiet: true }))));
+  return { el: box };
+}
 /** 089: Lessons — loaded with the section (lessons.js). */
 function buildLessons(x, { save }) {
   const box = h('div', {}, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading lessons…'));

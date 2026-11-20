@@ -107,6 +107,27 @@ word and its other side, e.g. *Godmother of* / *Goddaughter of*) → find the pe
 Each tie reads right from both pages: *Anu · Parent of Vedika* shows as *Child of Anu* on Vedika's page. **×** removes
 a tie from both.
 
+### Suggestions
+
+Agents with **Suggest family ties** on (agent → *Promises & people*) notice when someone in a chat that is on says *my
+daughter Vedika*, *my wife Rupa*, *my brother Kiran*. **People → Suggestions** lists them: **Add tie** makes the tie (and
+adds Vedika when nobody in People has exactly that name); **No** rejects it for good — it is never suggested again.
+Only family words count (wife, husband, partner, daughter, son, kid, child, mother, mum, mom, father, dad, brother,
+sister); nothing else about a person is inferred. Admin MCP: `list_tie_suggestions`, `decide_tie_suggestion`.
+
+## Preferences
+
+A person's page → **Preferences**: the **language** they write in (from their latest messages), the **hours** they
+usually write (in your time zone; once they wrote at least 20 messages over 5 days, at least 6 hours wide) and the **app** they answer on when they use both WhatsApp and Telegram. Learned from
+messages in chats that are on, a few people per upkeep tick; each can be set by you (*Automatic* gives it back).
+
+- Agents answer them in that language (the card about the sender says so).
+- [Lists and sending](sending.md#the-pace) sends to them inside their hours (and always inside your sending hours) and
+  on their app.
+
+Their **Commitments** (promises they made in chats, [Smarter agents](intelligence.md#commitments)) are on their page too.
+Admin MCP: `get_person_preferences`, `set_person_preferences`.
+
 ## Households
 
 1. **Households → + New** (e.g. *Chary family*, an address if you like), or **Add to a household** on a person's page.

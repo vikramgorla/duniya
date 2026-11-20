@@ -29,6 +29,8 @@ import { agentForChat } from './agents.js';
 import { channelOf } from '../channels/index.js';
 import { drainReads } from './pace.js';
 import { modulesUpkeep } from '../modules/index.js';
+import { commitmentsTick } from './commitments.js';
+import { prefsTick } from './person-insights.js';
 
 const GROUP_EVERY_MS = 12 * 3600000;
 const DOWN_ALERT_MS = 15 * 60000;
@@ -71,6 +73,8 @@ export async function upkeepTick(channel, now = Date.now()) {
     try { done.names = !!(await channel?.upkeep?.())?.ok; } catch { /* the channel reports its own failures */ }
     try { await rebuildStaleSummary(agentForChat); } catch { /* #178: retried next tick */ }
     try { await modulesUpkeep(now); } catch { /* 081: each module reports its own failures */ }
+    try { await commitmentsTick(now); } catch { /* 091: a few due follow-ups per tick; retried next tick */ }
+    try { prefsTick(now); } catch { /* 091: people's preferences, a few per tick */ }
     try { done.phonePeople = syncPhonePeople(); } catch (e) { activity('error', { summary: `Phone contacts to People failed: ${e.message}` }); }
     if (typeof channel?.groupMembers !== 'function') return done;
     const on = new Set(enabledChats().filter(isGroup));

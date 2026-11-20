@@ -30,6 +30,8 @@ import { interceptMessage } from '../modules/index.js';
 import { drainReads, paceReply, queueRead, readWhenDue } from './pace.js';
 import { claimTurn, releaseTurn, isDuplicate, noteSent, similarity } from './turns.js';
 import { lessonFromCorrection, noteJudgedAnswer } from './lessons.js';
+import { noteMessage as noteCommitments } from './commitments.js';
+import { noteCues, noteWriter } from './person-insights.js';
 
 // 059: the built-in owner assistant is reached through the owner hand-off only, never by routing.
 const listAgents = () => allAgents().filter((b) => !isBuiltin(b));
@@ -330,6 +332,10 @@ export function createRouter(channel) {
       });
     }
 
+    // 091: what people say teaches Duniya about them (stored chats only): preferences, promises, family ties (suggested)
+    noteWriter(msg.personId);
+    try { noteCues(agent, msg); } catch { /* a suggestion is optional */ }
+    noteCommitments(agent, msg, rowId).catch(() => {});
     const role = await resolveRole(agent, msg, channel);
     const isConfirm = /^(confirm|cancel)\s+[a-z0-9]{4}$/i.test(lower);
     // 089: the owner corrects the agent right after its answer here ("no, it's Chary who…"): a lesson is proposed

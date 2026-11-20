@@ -69,6 +69,9 @@ One message at a time, on the server's 30-second check (no extra timers), and it
 
 At Normal pace 100 people who wrote before take about four hours; people who never wrote, 40 a day.
 
+Each person's [usual hours](people.md#preferences) count too: a message waits (others go first) until their hours,
+inside your sending hours; a person who uses both apps gets it on the one they answer on.
+
 ## Stop signals
 
 A run **pauses** and you get an owner alert (and the run's page says why) when:

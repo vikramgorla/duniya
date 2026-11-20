@@ -17,6 +17,8 @@ export const AGENT_DEFAULTS = Object.freeze({
   modelTiers: { light: '', strong: '' },
   selfCheck: true, // 088: amounts, dates and counts from People and modules are checked before an answer goes out
   lessons: { enabled: true, autoApprove: false }, // 089: lessons from the owner's corrections; saved after the owner's OK
+  promises: { track: false, followUp: 'chat' }, // 091: notice promises in its chats; follow up when due: chat | dm | off
+  cues: false, // 091: suggest family ties in People from what people say ("my daughter Vedika"); never saved without the owner
   historySize: 30,
   prompt: 'You are a helpful assistant in a WhatsApp group.',
   triggers: [],
@@ -173,6 +175,10 @@ export function validateAgentConfig(input) {
   out.selfCheck = c.selfCheck !== false;
   const ls = c.lessons && typeof c.lessons === 'object' ? c.lessons : {};
   out.lessons = { enabled: ls.enabled !== false, autoApprove: !!ls.autoApprove };
+  const pr = c.promises && typeof c.promises === 'object' ? c.promises : {};
+  if (pr.followUp !== undefined && !['chat', 'dm', 'off'].includes(pr.followUp)) fail('promises.followUp', 'must be chat, dm or off');
+  out.promises = { track: !!pr.track, followUp: pr.followUp || 'chat' };
+  out.cues = !!c.cues;
   out.maxTokens = int(c.maxTokens, 'maxTokens', 64, 8192);
   try { out.fallback = cleanOverride(c.fallback, 'fallback'); } catch (e) { fail(e.field || 'fallback', e.message); }
   out.historySize = int(c.historySize, 'historySize', 0, 200);

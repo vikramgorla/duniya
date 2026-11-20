@@ -28,6 +28,7 @@ import { chatChannel } from '../../core/chat-tools.js';
 import { sendOwnerAlert } from '../../core/owner-alerts.js';
 import { dmNoticeOnce } from '../../core/privacy-notice.js';
 import { listEstimate, listGapMs, sendingHoursNow, takeListSend, typeBefore } from '../../core/pace.js';
+import { inPersonHours } from '../../core/person-insights.js';
 import { chat as modelChat } from '../../core/providers/index.js';
 import { isGroup, phoneOf, splitChatId } from '../../channels/index.js';
 import { changeOrHold, moduleApi } from '../index.js';
@@ -280,8 +281,11 @@ async function step(now) {
   if (!ch?.send) return;
   if (!sendingHoursNow(now)) return waitFor(r, 'hours', now + 10 * MIN);
   if (quietInARow(r, now)) return pauseFor(r, `${r.no_reply_limit} people in a row did not answer. Check the message is welcome before you go on`);
-  const x = db.prepare("SELECT * FROM snd_recipients WHERE tenant_id = ? AND run = ? AND status = 'waiting' ORDER BY n LIMIT 1").get(TENANT, r.id);
-  if (!x) return finish(r);
+  // 091: the next person whose usual hours include now (within the owner's sending hours); the others wait their turn
+  const next = db.prepare("SELECT * FROM snd_recipients WHERE tenant_id = ? AND run = ? AND status = 'waiting' ORDER BY n LIMIT 20").all(TENANT, r.id);
+  if (!next.length) return finish(r);
+  const x = next.find((y) => r.mode !== 'direct' || inPersonHours(y.person, now));
+  if (!x) return waitFor(r, 'hours', now + 10 * MIN);
   const skip = (reason) => db.prepare("UPDATE snd_recipients SET status = 'skipped', reason = ? WHERE tenant_id = ? AND run = ? AND person = ?").run(reason, TENANT, r.id, x.person);
   // consent and People are checked again right before the message
   if (r.mode === 'direct') {

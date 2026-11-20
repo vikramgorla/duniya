@@ -1,6 +1,8 @@
 // @ts-check
 // Panel routes: People (078, PRM core) — people, households, lists, and the names agents may see. Reading and editing
 // need an admin; merge, undo, export and erase need the owner. Replaces the Contacts routes (073).
+import { prefsOf } from '../../core/person-insights.js';
+import { listCommitments } from '../../core/commitments.js';
 import { contactNamesForAgents, contactSummary, setContactNamesForAgents } from '../../core/contacts.js';
 import { agentForChat, listAgents, isBuiltin } from '../../core/agents.js';
 import { agentsSeeing, chatsOfPerson, consentsOf, recordConsent, CONSENT_PURPOSES } from '../../core/people-access.js';
@@ -78,7 +80,8 @@ export function peopleRoutes(route, { channel } = {}) {
     }
     return { ...x, ...(await personChats(x, channel)), ties: tiesOf(x.id), households: householdsOf(x.id), reachVia: reachVia(x.id), timeline: timeline(x.id),
       tags: tagsOf(x.id), lists: listsOf(x.id), merges: mergesInto(x.id), suggestions: mergeSuggestions(x.id),
-      consents: consentsOf(x.id), agents: agentsSeeing(x.id, listAgents().filter((a) => !isBuiltin(a))), modules: moduleSections('person', x.id) };
+      consents: consentsOf(x.id), agents: agentsSeeing(x.id, listAgents().filter((a) => !isBuiltin(a))), modules: moduleSections('person', x.id),
+      prefs: prefsOf(x.id), commitments: listCommitments({ person: x.id }) }; // 091
   }, admin);
   route('PUT', '/api/people/:ref', async (req, res, body, q, p) => updatePerson(found(p.ref).id, body || {}), admin);
   // 079: the panel hides people; a true delete (privacy requests) is the admin MCP's erase_person, behind a confirm

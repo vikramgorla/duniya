@@ -89,6 +89,7 @@ export async function renderPeople() {
     h('div', { class: 'sec-head' }, h('h2', {}, `People (${count})`),
       h('button', { class: 'btn small primary', type: 'button', onclick: add }, '+ Add'), helpLink('people.md')),
     h('div', { class: 'ld-tools', style: 'margin-top:8px' }, search, pick),
+    query || filter ? null : suggestionsSlot(),
     list.length ? [ul, more, !query && !filter && total < 20 ? h('p', { class: 'small muted' }, WHERE) : null] : query || filter ? h('p', { class: 'muted' }, 'Nobody matches.')
       : emptyState('list', 'No people yet', `${WHERE} You can also add someone, a kid without a phone too.`, h('button', { class: 'btn primary', onclick: add }, 'Add a person')),
     sum ? h('label', { class: 'tick small muted', style: 'justify-content:flex-start;margin-top:14px' }, h('input', { type: 'checkbox', checked: sum.namesForAgents !== false, disabled: !can('owner'),
@@ -96,6 +97,17 @@ export async function renderPeople() {
       ' Agents may use the names from your phone contacts') : null));
 }
 
+/** 091: a person's Preferences and Commitments, and People → Suggestions (promises.js, loaded with them). */
+function prefsSlot(p) {
+  const slot = h('div', {});
+  import('./promises.js').then((m) => slot.replaceChildren(...m.personBlocks(p, () => renderPerson(p.id)).filter(Boolean))).catch(() => {});
+  return slot;
+}
+function suggestionsSlot() {
+  const slot = h('div', {});
+  import('./promises.js').then((m) => m.tieSuggestionsCard(() => renderPeople())).then((el) => { if (el) slot.replaceChildren(el); }).catch(() => {});
+  return slot;
+}
 /** 081: what the modules that are on add to a person's, household's or event's page: titled groups of link rows. */
 // 085: a row's line may be parts, days among them ({ day, before }), formatted here in the reader's locale
 const subLine = (sub) => (Array.isArray(sub) ? sub.map((x) => (typeof x === 'string' ? x : `${x.before ? `${x.before} ` : ''}${day(x.day, true)}`)).join(' · ') : sub);
@@ -224,6 +236,7 @@ async function renderPerson(ref) {
       x(`Take off ${l.name}`, () => act(p.id, () => api('DELETE', `/api/lists/${l.id}/members/${p.id}`), 'Taken off the list')))), rowBtn('Add to a list', '', addToList))),
     chats,
     moduleBlocks(p.modules),
+    prefsSlot(p),
     block('Consent', 'people.md#consent', h('ul', {}, p.consents.map(consentRow))),
     block('Agents that can see them', 'people.md#what-agents-see', p.agents.length ? h('ul', { class: 'mini-list' }, p.agents.map((a) => h('li', {}, h('a', { class: 'lrow', href: `#agents/${enc(a.id)}/people` },
       h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, a.name), h('span', { class: 'lrow-sub' }, a.why)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))))
