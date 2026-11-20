@@ -51,7 +51,7 @@ Admin MCP: `test_agent`.
 - **An agent's page:** a short header (avatar, name, state, switch, **⋯** with *Test*, *Change with AI*, *Duplicate*,
   *Export*, *Delete*), then its sections, each with its current value: **Character**, **Where it answers** (its chats,
   triggers, @mentions, direct messages), **People**, **Quick replies & FAQ**, **Welcome**, **Schedules**, **Model**,
-  **Tools**, **Memory**, **Photos & voice**, **Spending cap**, **Advanced**, **Review** and **Test**. Tap one to open
+  **Tools**, **Memory**, **Photos & voice**, **Spending cap**, **Advanced**, **Review**, **Lessons** and **Test**. Tap one to open
   it.
 - **Saving:** each section saves on its own. It says *All changes saved* until you change something; then **Save**
   stays at the bottom of the screen. After saving, the toast offers **Undo**. Leaving with unsaved changes asks first.
@@ -126,6 +126,9 @@ asked, the chat and the time.
 **In chat ›** next to an answer opens the chat's [Messages](chats.md#messages-and-memory) at that answer, so you see
 the conversation around it. The same 👍 / 👎 · **Teach…** row is under every answer in a chat's Messages and in an
 Activity reply: rate wherever you notice it, and it shows the same everywhere.
+
+A 👎 also **proposes a lesson** (a short rule from the question and the answer) under the agent's
+[Lessons](intelligence.md#lessons); it is used once you approve it.
 
 > [!NOTE]
 > Admins and the owner can review; viewers can't read answers. Answers in chats that are *Private to members* are

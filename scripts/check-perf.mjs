@@ -29,6 +29,7 @@ const BUDGETS = {
   'router (stored, not addressed)': 2, // one group message through the router: allow-list, person, store, why-quiet; CI 0.3
   'agent context build': 3, // memory.buildContext for a busy group (recent messages, summary, notes); CI 0.6
   'sender card': 3, // 079: the People card of the sender each agent turn gets
+  'lessons in a turn': 3, // 089: the most relevant lessons for one message (FTS over 1,000 lessons of the agent) and its join-in note
   'people tool: find (own chats)': 15, // 079: people__find_person for an agent that sees its own chats only
   'event page': 15, // 081: GET /api/module/events/:id (counts, ~200 registrations with names, duties, payments section)
   'registration list (agent tool)': 15, // 081: events__registration_list for one event
@@ -108,6 +109,10 @@ await bench('agent context build', () => t.memory.buildContext({ agent, chat: on
 const access = await import('../src/core/people-access.js');
 const { peopleTools } = await import('../src/core/people-tools.js');
 await bench('sender card', () => access.senderCard(personId(5), access.peopleScope(agent), 'Contact 5'));
+// 089: lessons — 1,000 saved lessons for this agent (more than an owner would keep), the context of one message
+const lessons = await import('../src/core/lessons.js');
+for (let i = 0; i < 1000; i++) lessons.addLesson(agent.id, { text: `Lesson ${i}: rides to ${['Geneva', 'Lausanne', 'Morges', 'Nyon'][i % 4]} on ${['Monday', 'Friday', 'Saturday'][i % 3]} leave at ${7 + (i % 5)}:${i % 6}0 from the station`, chat: i % 3 ? '' : onGroup, kind: i % 10 ? 'answer' : 'join' }, 'perf');
+await bench('lessons in a turn', () => { lessons.lessonsContext(agent, onGroup, 'who drives to Geneva on Friday morning from the station?'); lessons.joinLessonsNote(agent, onGroup); });
 const findTool = peopleTools.find((x) => x.name === 'find_person');
 await bench('people tool: find (own chats)', () => findTool.run({ query: 'contact 1' }, { agent, role: 'organizer' }));
 // 081: Events and Orders (the fixture switched both on)

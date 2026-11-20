@@ -13,7 +13,9 @@ function silenceFix(s, after, { onChats = false } = {}) {
     case 'chat_on': return act('Switch on', () => api('PUT', `/api/chats/${encodeURIComponent(s.chat)}/prefs`, { enabled: true }), 'On — agents may answer here');
     case 'agent_on': return s.agent ? act(`Switch ${s.agentName || 'agent'} on`, () => api('PUT', `/api/agents/${encodeURIComponent(s.agent)}`, { enabled: true }), 'Agent on') : null;
     case 'resume': return act('Resume agents', () => api('POST', '/api/settings', { paused: false }), 'Resumed');
-    case 'triggers': return s.agent ? link('Open triggers', agentHref('/triggers')) : null;
+    // 089: it read the message and stayed out; the owner says it should have answered (a join-in lesson)
+    case 'triggers': return s.reason === 'not_for_me' && s.agent ? h('button', { class: 'qfix', type: 'button', onclick: () => tryApi(() => api('POST', `/api/agents/${encodeURIComponent(s.agent)}/join-feedback`, { kind: 'missed', chat: s.chat }), 'Noted — a lesson on when to join in is proposed') }, 'It should have answered')
+      : s.agent ? link('Open triggers', agentHref('/triggers')) : null;
     case 'agent': return s.agent ? link('Who may message it', agentHref('/dm')) : null;
     case 'assign': return onChats ? null : link('Choose an agent', `#chats/${encodeURIComponent(s.chat)}`);
     case 'models': return link('Open Models', '#models');

@@ -27,6 +27,7 @@ import { directChatRoutes } from './routes/direct-chats.js';
 import { mediaRoutes } from './routes/media.js';
 import { paceRoutes } from './routes/pace.js';
 import { moduleRoutes } from './routes/modules.js';
+import { lessonRoutes } from './routes/lessons.js';
 
 const ROLE_RANK = { viewer: 1, admin: 2, owner: 3 };
 
@@ -64,6 +65,7 @@ export function startPanel({ channel, extend = [] }) {
   linkRoutes(route, { invoke }); // POST /api/users (with a password or a sign-up link), one-time links (060)
   statusRoutes(route, { channel }); // status, live stream, settings, activity and logging
   agentRoutes(route, { channel });
+  lessonRoutes(route, { channel }); // 089: lessons and join-in feedback
   chatRoutes(route, { channel });
   peopleRoutes(route, { channel }); // People (078): people, households, lists
   systemRoutes(route, { channel }); // pending, secrets, usage, server metrics & maintenance, WhatsApp numbers, restart

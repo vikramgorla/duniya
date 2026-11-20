@@ -230,6 +230,15 @@ one primary next step **Teach…** with the `AI` chip. Teach opens the AI helper
 answer:*; the result is the usual visual diff with *Apply & save* and Undo. Filters are a `seg` above the list (*All ·
 👎 · Not rated*); *Show older answers* is centred below it.
 
+## Lessons (089)
+
+Learned lessons read like Review: a list separated by hairlines, no cards. Each lesson: its text (normal size, wraps),
+one muted line (*When to join in* for join-in lessons · where it came from · when) with a text link to the message,
+then one row of actions — **Approve** (primary, only while it waits), the scope as a small select (*All its chats* or a
+chat by name), **Edit**, and **Dismiss** / **Delete** as a ghost button. Waiting lessons come first under *To approve
+(n)*; the agent's row says *2 lessons to approve*. Feedback that teaches (*Didn’t need to answer* under an answer, *It
+should have answered* on a Why quiet line) is a ghost button or a text link, never a second primary action.
+
 ## One object, one look (072)
 
 The same thing looks and behaves the same wherever it appears, and every place links to the others.

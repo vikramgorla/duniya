@@ -60,7 +60,7 @@ export async function renderUsage() {
   const [caps, smart] = await Promise.all([api('GET', '/api/budget').catch(() => null), api('GET', `/api/usage/smart?period=${usagePeriod}`).catch(() => null)]);
   const t = byDay.total;
   const agentName = Object.fromEntries(agents.map((b) => [b.id, b.name]));
-  const KIND = { reply: 'Replies', summary: 'Memory summaries', scheduled: 'Scheduled posts', 'ai-helper': 'AI helper', test: 'Tests', 'model-choice': 'Choosing light or strong', 'self-check': 'Self-check rewrites' };
+  const KIND = { reply: 'Replies', summary: 'Memory summaries', scheduled: 'Scheduled posts', 'ai-helper': 'AI helper', test: 'Tests', 'model-choice': 'Choosing light or strong', 'self-check': 'Self-check rewrites', lessons: 'Lessons proposed' };
   const seg = h('div', { class: 'seg' }, [['1d', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['90d', '90 days'], ['all', 'All']].map(([v, l]) => h('button', { class: usagePeriod === v ? 'on' : '', onclick: () => { usagePeriod = v; renderUsage(); } }, l)));
   const tile = (eyebrow, stat, sub) => h('div', { class: 'card' }, h('div', { class: 'eyebrow' }, eyebrow), h('div', { class: 'stat' }, stat), sub ? h('div', { class: 'small muted' }, sub) : null);
   // daily bars

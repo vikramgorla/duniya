@@ -1,7 +1,7 @@
 // One agent answer, the same everywhere (072): 👍 / 👎 and, on a 👎, Teach… — in the agent's Review, a chat's Messages and
 // an Activity reply. A rating is stored once (PUT /api/agents/<id>/review/<msg>); every copy on screen follows the change.
 // Module of the panel (063), loaded with the screens that show answers.
-import { api, can, dropCache, h, tryApi } from './core.js';
+import { api, can, dropCache, h, toast, tryApi } from './core.js';
 import { trunc } from './shared.js';
 
 /** The words Teach starts the AI helper with; the cursor waits after "Better answer:". */
@@ -27,11 +27,16 @@ export function answerActions(a, { teach = null, extra = null } = {}) {
   async function rate(v) {
     const r = await tryApi(() => api('PUT', `/api/agents/${encodeURIComponent(a.agent)}/review/${a.id}`, { rating: v }));
     if (!r) return;
+    if (r.proposing) toast('A lesson is proposed from this 👎 — approve it under the agent’s Lessons');
     dropCache(); // the agent's 👍 / 👎 counts changed
     for (const el of document.querySelectorAll(`[data-answer="${CSS.escape(String(a.id))}"]`)) el.dispatchEvent(new CustomEvent('rated', { detail: r, bubbles: true }));
   }
   row.addEventListener('rated', (e) => paint(/** @type {CustomEvent} */ (e).detail.rating));
-  row.append(up, down, teachBtn || '', extra || '');
+  // 089: an answer to a message it judged by itself: tell it that it did not need to answer (a join-in lesson)
+  const needless = admin && a.judged ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => tryApi(async () => {
+    await api('POST', `/api/agents/${encodeURIComponent(a.agent)}/join-feedback`, { kind: 'needless', msg: a.id }); needless.disabled = true;
+  }, 'Noted — a lesson on when to join in is proposed') }, 'Didn’t need to answer') : null;
+  row.append(up, down, teachBtn || '', needless || '', extra || '');
   paint(a.rating || 0);
   return row;
 }

@@ -64,6 +64,8 @@ const SECTIONS = [
     sub: (x) => [x.c.timezone || 'Server timezone', plural(x.c.historySize, 'message'), `${x.c.maxTokens} tokens`].join(' · '), build: buildAdvanced },
   { group: 'Try it', id: 'review', agent: true, icon: 'activity', c: 'c3', title: () => 'Review', help: 'agents.md#review-and-teach', line: () => 'Its recent answers. Rate them, and teach it where it went wrong.',
     sub: (x) => reviewLine(x.review), build: buildReview },
+  { group: 'Try it', id: 'lessons', agent: true, icon: 'notes', c: 'c2', title: () => 'Lessons', help: 'intelligence.md#lessons', line: () => 'What it learned from your corrections, and when to join in.',
+    sub: (x) => (x.c.lessons?.enabled === false ? 'Off' : x.b.lessonsToApprove ? `${plural(x.b.lessonsToApprove, 'lesson')} to approve` : 'From your 👎 and corrections'), build: buildLessons },
   { group: 'Try it', id: 'test', icon: 'send', c: 'c5', title: (x) => (x.bi ? 'Try it' : 'Test'), help: 'agents.md', line: (x) => (x.bi ? 'The same conversation as Ask on Overview.' : 'Real tools and saved settings; nothing is posted to WhatsApp.'),
     sub: (x) => (x.bi ? 'Ask it something' : 'Ask it as a participant or an organizer'), build: buildTest },
 ];
@@ -173,6 +175,12 @@ export function agentPage(id, { onChange } = {}) {
 // ---------- sections ----------
 /** 070: "👍 3 · 👎 1 this week" on the Review row. */
 const reviewLine = (r) => (!r ? 'Rate its answers' : r.up || r.down ? `👍 ${r.up} · 👎 ${r.down} this week` : r.answers ? `${plural(r.answers, 'answer')} this week, none rated` : 'No answers this week');
+/** 089: Lessons — loaded with the section (lessons.js). */
+function buildLessons(x, { save }) {
+  const box = h('div', {}, h('p', { class: 'small muted' }, h('span', { class: 'spinner' }), ' Loading lessons…'));
+  import('./lessons.js').then((m) => box.replaceChildren(m.lessonsView(x, (patch) => save(patch, {}, { quiet: true }))));
+  return { el: box };
+}
 /** 070: Review & teach — its answers with the question, 👍 / 👎, and Teach (the AI helper, pre-filled). */
 function buildReview(x, { teach }) {
   if (!can('admin')) return { el: h('p', { class: 'small muted' }, 'Admins and the owner can read and rate its answers.') };
