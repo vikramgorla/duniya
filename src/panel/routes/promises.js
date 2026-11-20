@@ -8,7 +8,7 @@ import { activity } from '../../core/events.js';
 
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
 export function promiseRoutes(route, { channel } = {}) {
-  const admin = { role: 'admin' };
+  const admin = /** @type {{ role: 'admin' }} */ ({ role: 'admin' });
   const person = (ref) => { const p = personByRef(decodeURIComponent(ref)); if (!p) throw Object.assign(new Error('No such person'), { status: 404 }); return p; };
   route('GET', '/api/commitments', async (req, res, body, q) => {
     const list = listCommitments({ agent: q.get('agent') || '', person: q.get('person') || '', chat: q.get('chat') || '', status: q.get('status') || 'open' });

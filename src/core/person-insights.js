@@ -27,7 +27,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS tie_suggestions_status ON tie_suggestions(status, created_at);
 `);
 
-export const LANGUAGES = { en: 'English', fr: 'French', de: 'German', es: 'Spanish', it: 'Italian', pt: 'Portuguese', nl: 'Dutch' };
+const LANGUAGES = { en: 'English', fr: 'French', de: 'German', es: 'Spanish', it: 'Italian', pt: 'Portuguese', nl: 'Dutch' };
 const STOP = {
   en: 'the and you are is it to of for in on with this that what when where will can have not my we our'.split(' '),
   fr: 'le la les et est je tu vous nous pour dans avec ce que qui une un des pas mais où quand demain merci'.split(' '),
@@ -39,7 +39,7 @@ const STOP = {
 };
 const STOPSETS = Object.fromEntries(Object.entries(STOP).map(([k, v]) => [k, new Set(v)]));
 /** The language of some texts by stop words ('' when unclear: fewer than 6 hits or no clear winner). */
-export function detectLanguage(texts) {
+function detectLanguage(texts) {
   const score = Object.fromEntries(Object.keys(STOP).map((k) => [k, 0]));
   for (const t of texts) for (const w of String(t).toLowerCase().match(/\p{L}+/gu) || []) for (const k in STOPSETS) if (STOPSETS[k].has(w)) score[k]++;
   const [best, second] = Object.entries(score).sort((a, b) => b[1] - a[1]);
@@ -69,10 +69,12 @@ function compute(person, now = Date.now()) {
   let from = cur.hours_from ?? null; let to = cur.hours_to ?? null;
   if (!cur.hours_set) {
     from = null; to = null;
-    if (msgs.length >= 8) { // the middle 80 % of the hours they write
-      const tz = ownerTz();
+    const tz = ownerTz();
+    const days = new Set(msgs.map((m) => localParts(tz, m.ts).date));
+    if (msgs.length >= 20 && days.size >= 5) { // enough to tell: the middle 80 % of the hours they write, an hour either side, at least 6 hours
       const hours = msgs.map((m) => Number(localParts(tz, m.ts).hhmm.slice(0, 2))).sort((a, b) => a - b);
-      from = hours[Math.floor(hours.length * 0.1)]; to = Math.min(24, hours[Math.ceil(hours.length * 0.9) - 1] + 1);
+      from = Math.max(0, hours[Math.floor(hours.length * 0.1)] - 1); to = Math.min(24, hours[Math.ceil(hours.length * 0.9) - 1] + 2);
+      if (to - from < 6) { const mid = Math.round((from + to) / 2); from = Math.max(0, mid - 3); to = Math.min(24, from + 6); }
     }
   }
   let app = cur.app_set ? cur.app : '';
@@ -97,7 +99,10 @@ export function prefsOf(person) {
   return { language: r.lang, languageName: LANGUAGES[r.lang] || '', hours: r.hours_from != null && r.hours_to != null ? { from: r.hours_from, to: r.hours_to } : null, app: r.app,
     auto: { language: !r.lang_set, hours: !r.hours_set, app: !r.app_set }, computedAt: r.computed_at || null };
 }
-/** The owner sets (or, with 'auto', gives back to the computation) a preference. */
+/**
+ * The owner sets (or, with 'auto', gives back to the computation) a preference.
+ * @param {string} person @param {{ language?: string, hoursFrom?: number|string, hoursTo?: number|string, app?: string }} [patch]
+ */
 export function setPrefs(person, { language, hoursFrom, hoursTo, app } = {}) {
   if (!personRow(person)) throw Object.assign(new Error('No such person'), { status: 404 });
   const cur = db.prepare('SELECT * FROM person_prefs WHERE person = ?').get(person) || { lang: '', lang_set: 0, hours_from: null, hours_to: null, hours_set: 0, app: '', app_set: 0 };

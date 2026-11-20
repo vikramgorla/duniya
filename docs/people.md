@@ -118,7 +118,7 @@ sister); nothing else about a person is inferred. Admin MCP: `list_tie_suggestio
 ## Preferences
 
 A person's page → **Preferences**: the **language** they write in (from their latest messages), the **hours** they
-usually write (in your time zone) and the **app** they answer on when they use both WhatsApp and Telegram. Learned from
+usually write (in your time zone; once they wrote at least 20 messages over 5 days, at least 6 hours wide) and the **app** they answer on when they use both WhatsApp and Telegram. Learned from
 messages in chats that are on, a few people per upkeep tick; each can be set by you (*Automatic* gives it back).
 
 - Agents answer them in that language (the card about the sender says so).

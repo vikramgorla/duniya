@@ -33,7 +33,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS commitments_chat ON commitments(chat, status);
 `);
 
-export const FOLLOW_UPS = ['chat', 'dm', 'off'];
 const MAX_PER_DAY = 50;
 const PER_TICK = 3;
 const PROMISE = /\b(i'?ll|i will|i can|i'?m going to|i am going to|i shall|let me|je vais|je peux|ich werde|ich bringe|voy a|lo hago|i'?ll do|on it)\b/i;
@@ -51,7 +50,10 @@ export function listCommitments({ agent = '', person = '', chat = '', status = '
   if (chat) { where.push('chat = ?'); args.push(chat); }
   return db.prepare(`SELECT * FROM commitments ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 200`).all(...args).map(view);
 }
-/** The owner corrects one: status (open | done | dropped), what, due. */
+/**
+ * The owner corrects one: status (open | done | dropped), what, due.
+ * @param {number|string} id @param {{ status?: string, what?: string, due?: string }} [patch] @param {string} [by]
+ */
 export function updateCommitment(id, { status, what, due } = {}, by = '') {
   const r = db.prepare('SELECT * FROM commitments WHERE id = ?').get(Math.trunc(Number(id)) || 0);
   if (!r) throw Object.assign(new Error('No such commitment'), { status: 404 });
