@@ -86,7 +86,7 @@ const SETTINGS_GROUPS = [['Agents & chats', ['tool-services', 'owner-assistant',
 const SECTION_ICON = { 'tool-services': ['models', 'c4'], 'owner-assistant': ['agents', 'c5'], 'direct-messages': ['chats', 'c3'], 'privacy-notice': ['shield', 'c3'], 'photos-voice': ['image', 'c2'], 'sending-pace': ['pending', 'c1'], modules: ['people', 'c2'],
   users: ['people', 'c4'], 'sign-in': ['lock', 'c0'], google: ['globe', 'c4'], assistants: ['agents', 'c1'], password: ['secrets', 'c0'], 'my-google': ['people', 'c0'],
   'web-access': ['globe', 'c3'], secrets: ['secrets', 'c1'], logging: ['activity', 'c0'], 'small-mode': ['server', 'c0'], updates: ['refresh', 'c5'], 'getting-started': ['overview', 'c5'], 'whatsapp-helpers': ['chats', 'c0'], 'release-notes': ['notes', 'c2'] };
-const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assistant': 'Your own chat, alerts, weekly summary', 'direct-messages': 'Direct messages, earlier messages',
+const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assistant': 'Your own chat, morning brief, alerts, weekly summary', 'direct-messages': 'Direct messages, earlier messages',
   'privacy-notice': 'What groups are told', 'photos-voice': 'Pictures, voice notes, speech', 'sending-pace': 'Read receipts, typing, new chats a day', modules: 'Events, orders and payments', users: 'Who can use this panel', 'sign-in': 'Passwords or Google only',
   google: 'Google sign-in client', assistants: 'ChatGPT, Claude and other MCP clients', password: 'Change your password', 'my-google': 'Link your Google account',
   'web-access': 'Domain, HTTPS, who may open the panel', secrets: 'Keys and tokens', logging: 'What is recorded, for how long', 'small-mode': 'Heavier features on a small server', updates: 'Version, automatic updates, last update',
@@ -183,8 +183,15 @@ function ownerAssistantCard(o) {
     h('p', { class: 'small muted' }, o.role === 'viewer' ? 'Your account is read-only: the assistant can look things up for you but not change anything or read messages.' : o.role === 'admin' ? 'As an admin, the assistant can do what you can do in the panel, except owner-only settings.' : 'As an owner, the assistant can do everything you can do here; tools that need keys or passwords stay in the panel.'),
     state, box,
     h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'btn', onclick: () => openAgent(o.agent) }, 'Character, tools, voice, schedules & alerts →')),
+    o.role !== 'viewer' ? briefSlot() : null,
     o.links?.length ? h('details', { style: 'margin-top:10px' }, h('summary', { class: 'small', style: 'cursor:pointer' }, `Linked people (${o.links.length})`),
       h('ul', { class: 'small' }, o.links.map((x) => h('li', {}, `${x.username} · +${x.phone} `, h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Unlink ${x.username} (+${x.phone})?`, text: 'The owner assistant stops answering this number.', ok: 'Unlink', danger: true })) && tryApi(async () => { await api('DELETE', `/api/owner-assistant/links/${x.userId}`); reload(); }, 'Unlinked') }, 'Unlink'))))) : null);
+}
+/** 090: the Morning brief block (owner-brief.js, loaded with it). */
+function briefSlot() {
+  const slot = h('div', {});
+  import('./owner-brief.js').then((m) => m.briefBlock()).then((el) => slot.replaceChildren(el)).catch(() => {});
+  return slot;
 }
 // ---------- Settings → Privacy notice (044) ----------
 function privacyNoticeCard(n) {

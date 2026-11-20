@@ -8,7 +8,7 @@
 import { clip, fail, money } from '../../core/config.js';
 import { householdsOf, listHouseholds, listPeople, personByRef, personRow } from '../../core/people.js';
 import { canSee, peopleScope } from '../../core/people-access.js';
-import { STATUS_WORD, change, counts, dutiesOf, findDuty, findEvent, getEvent, listEvents, registrationFor, registrationsOf } from './index.js';
+import { STATUS_WORD, cameButNotRegistered, change, counts, dutiesOf, dutyHistory, findDuty, findEvent, getEvent, listEvents, registrationFor, registrationsOf } from './index.js';
 
 const me = (ctx) => { if (!ctx.personId) throw fail('I do not know who you are on this app yet, so I cannot register you. Ask an organizer.'); return ctx.personId; };
 const organizer = (ctx) => ctx.role === 'organizer' || !!ctx.ownerTurn;
@@ -97,6 +97,27 @@ export const eventTools = [
       const e = findEvent(event);
       return { event: e.name, counts: counted(counts(e.id)),
         registrations: registrationsOf(e.id, status).slice(0, 200).map((r) => ({ who: r.person ? nameOf(r.person) : r.who, adults: r.adults, kids: r.kids, status: r.status, ...(r.notes ? { notes: r.notes } : {}) })) };
+    },
+  },
+  // 090: ask your data — questions across events (organizers and the owner assistant)
+  {
+    name: 'compare_events', roles: ['organizer'],
+    description: 'Who registered for (or came to) one event but has not registered for another (organizers), e.g. "which families came last year but haven\'t registered?". Names, with how many adults and kids they were.',
+    input_schema: { type: 'object', properties: { came_to: { ...ev, description: 'The earlier event (name, part of it, or id)' }, not_registered_for: { ...ev, description: 'The event they have not registered for' },
+      attended_only: { type: 'boolean', description: 'Only those marked as attended' } }, required: ['came_to', 'not_registered_for'] },
+    async run({ came_to: past, not_registered_for: next, attended_only: attended = false }) {
+      const a = findEvent(past); const b = findEvent(next);
+      const list = cameButNotRegistered(a.id, b.id, { attendedOnly: !!attended });
+      return { cameTo: a.name, notRegisteredFor: b.name, count: list.length, who: list.slice(0, 200).map((r) => ({ who: r.person ? nameOf(r.person) : r.who, adults: r.adults, kids: r.kids })) };
+    },
+  },
+  {
+    name: 'duty_history', roles: ['organizer'],
+    description: 'Who usually takes a kind of duty (organizers), e.g. "who usually volunteers for cooking?": people with how many times they took duties whose task matches the words, across all events, most first.',
+    input_schema: { type: 'object', properties: { task: { type: 'string', description: 'Words of the task, e.g. cooking' } }, required: ['task'] },
+    async run({ task }) {
+      const rows = dutyHistory(task);
+      return rows.length ? rows.map((r) => ({ who: nameOf(r.person), times: r.times, tasks: r.tasks })) : `Nobody has taken a duty matching "${clip(task, 40)}" yet.`;
     },
   },
   {

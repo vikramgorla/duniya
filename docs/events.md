@@ -54,6 +54,7 @@ follow up only with those who have not registered or paid.
 | `register` (myself or my household; pending when an organizer confirms; the deadline applies) | everyone | – |
 | `cancel_my_registration`, `take_duty` | everyone | – |
 | `registration_list` (names, adults, kids, notes, counts) | organizers | – |
+| `compare_events` (who came to one event but has not registered for another), `duty_history` (who usually takes a kind of duty) | organizers | – |
 | `register_someone`, `update_registration` (confirm, waiting list, cancel), `assign_duty` | organizers | `confirm CODE` |
 
 Agents name only people their [People access](people.md#what-agents-see) lets them see; hidden people never show.

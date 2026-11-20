@@ -42,7 +42,7 @@ const LIMITS = { gapMin: [5, 3600, 'Shortest gap'], gapMax: [5, 3600, 'Longest g
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** The pace in force: { preset, readReceipts, ...ranges }. */
-function paceSettings() {
+export function paceSettings() {
   const s = getSetting('sendingPace', null) || {};
   const preset = s.preset === 'custom' || PRESETS[s.preset] ? s.preset : 'normal';
   const ranges = preset === 'custom' ? { ...PRESETS.normal, ...(s.custom || {}) } : PRESETS[preset];

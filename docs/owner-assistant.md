@@ -12,7 +12,9 @@ character.
   replies, pictures, memory, schedules — set on the normal agent page.
 - Sees only chats that are on and not **Private to members**; never answers in groups.
 - Changes, and anything sent into another chat, need `confirm CODE` (valid 10 minutes, also across a restart).
-- Alerts and the weekly summary (counts only) are its messages too.
+- Alerts and the weekly summary (counts only) are its messages too, and the [morning brief](#morning-brief) with
+  [suggested next steps](#suggested-next-steps) you approve with one code. Ask it about your data across People,
+  events, orders, sending and surveys, or [what you missed](#catch-up) in a group.
 
 ![Ask box on Overview](site/img/card-ask.webp)
 
@@ -131,6 +133,55 @@ confirmation setup; its *Try it* section is the Ask box). It adds **Alerts**. Th
 **Breaking releases** (045): the alert number gets the release notes, and every owner linked to the owner assistant
 gets a code: `confirm ABCD` backs up, updates, restarts and reports the result; `cancel ABCD` reminds you in 7 days.
 Only owners can confirm. [Backups and updates](backups-and-updates.md#updates)
+
+## Morning brief
+
+**One short message each morning with what needs you; nothing to report, no message.** **Settings → Owner assistant →
+Morning brief**: on/off (on by default), the time (08:00 in the owner assistant's time zone) and the sections. A time
+outside your [sending hours](sending-pace.md) waits for their start (the panel says when it goes out). **Preview**
+shows it as it would go out now.
+
+| Section | What it lists |
+|---|---|
+| Payments | open orders overdue or due in the next 3 days, per event: how many, how much is left, the first names (Orders module) |
+| Questions for you | messages of the last 24 hours in chats that are on that name you, ask something, and that you have not answered in that chat since |
+| Commitments due | promises people made in chats (when commitments tracking is on) |
+| Birthdays | people whose birthday is today or tomorrow (People) |
+| Needs a look | answers that failed on a model error, changes waiting for a confirm code, an update, paused sends |
+| New people | people new since yesterday in chats that are on |
+
+It goes to linked owners and admins in their own chat, once a day, on the scheduler's tick (no timer of its own). The
+text is built in code from counts and names — no model call, nothing to pay.
+
+## Suggested next steps
+
+From the same data the server suggests steps: *2 people have not paid for Sankranti (due Friday) — send reminders?*, *a
+paused send — resume it?*, *update 2.51.0 is ready — install it?*. Nothing is ever sent or changed until you approve:
+
+- **In the brief:** each step ends with `reply *confirm ABCD*`: the usual confirm gate; reminders go out through Lists
+  and sending (consent, a person's pace, stop words).
+- **Overview → Suggested:** **Review and send** opens the send's preview as a draft (who, how many, a sample); you start
+  it there. **Approve** resumes a paused send; **Open** opens Updates. **Dismiss** hides a step for good (for that event
+  and due date, that version, that send).
+- **Ask / your chat:** the assistant sees the same steps (`list_suggestions`) and offers them; acting needs your code.
+
+## Ask your data
+
+Ask the assistant (WhatsApp or the **Ask** box) about People, events, orders, sending, surveys and your chats: *which
+families came last year but haven't registered?* (`compare_events`), *who usually volunteers for cooking?*
+(`duty_history`), *who still owes for Diwali?*, *what did people answer in the survey?*. It uses read tools only — never
+free-form database queries — and answers with names, amounts and dates. Agents' organizers get the same event tools
+(organizers only, decided in code).
+
+## Catch up
+
+**What did I miss in the school group?** — in your chat with the assistant (`catch_up`), or **Chats → a group → What
+did I miss?** in the panel: the messages since you last wrote there (or the last 24 hours; at most 120), in three short
+parts — *Decided*, *Open questions*, *For you* — with links to the messages. One background model call (≤ 600 tokens
+out). Not for chats that are off or private to members.
+
+Admin MCP: `get_morning_brief`, `set_morning_brief`, `list_suggested_steps`, `approve_suggested_step` (confirmed),
+`dismiss_suggested_step`, `catch_up_chat`.
 
 ---
 **Next:** [Agents](agents.md) · [Admin MCP](admin-mcp.md) · [Privacy](privacy.md) · [Docs index](README.md)

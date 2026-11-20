@@ -23,6 +23,10 @@ on.
 | [Smart model choice](#smart-model-choice) | agent → Model; Settings → Models → Smart choice | off (agents keep their model) | saves on simple messages; a classifier call is at most 400 characters in, 4 tokens out | the classifier sees the message only, never the chat |
 | [Self-check](#self-check) | agent → Model → Self-check | on | none when right; one extra call when a figure was wrong | nothing stored but counts |
 | [Lessons](#lessons) | agent → Lessons → *Learn from my corrections*, *Save lessons without asking me* | on, asks you first | one small background call per proposal (≤ 120 tokens out, at most 20 a day per agent); about 200 tokens of lessons per turn | lessons are short rules you approve; a chat's lessons go when you erase its memory |
+| [Morning brief](owner-assistant.md#morning-brief) | Settings → Owner assistant → Morning brief | on, 08:00 (inside sending hours) | none: built in code | counts and names to you only; nothing stored |
+| [Suggested next steps](owner-assistant.md#suggested-next-steps) | approve / dismiss each | on | none | nothing runs without your approval |
+| [Ask your data](owner-assistant.md#ask-your-data) | the owner assistant and organizers | on | the assistant's usual turn | read tools only; roles decided in code |
+| [Catch-up](owner-assistant.md#catch-up) | a button / a question | on demand | one background call, ≤ 600 tokens out | only chats that are on and not private |
 | [When to join in](#when-to-join-in) | the same switches; feedback buttons | on (follow-ups and *Whenever needed* agents) | as lessons; at most 5 short join-in lessons in a judged turn | counts per chat, no message text |
 
 ## Smart model choice
