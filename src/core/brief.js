@@ -52,11 +52,9 @@ export function briefTime(at = briefSettings().at) {
   return inside ? at : p.hoursFrom;
 }
 
-// ---------- hooks other features fill (PR 4: commitments) ----------
+// ---------- sections other features fill (commitments, 091) ----------
 /** @type {Map<string, (now: number) => Promise<{ lines: string[], suggestions?: any[] }> | { lines: string[], suggestions?: any[] }>} */
 const extra = new Map();
-/** A section other code adds (e.g. 'commitments'): fn(now) → { lines, suggestions? }. */
-export const registerBriefSection = (id, fn) => { extra.set(id, fn); };
 
 // ---------- the data ----------
 const day = (d) => new Date(d).toISOString().slice(0, 10);

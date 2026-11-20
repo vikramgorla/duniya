@@ -5,14 +5,14 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setup } from './harness.js';
 
-let t; let owner; let brief; let oa; let config;
+let t; let owner; let oa; let config;
 const G = 'g4@g.us';
 const OWNER_PHONE = '41790000005';
 const OWNER_CHAT = `${OWNER_PHONE}@s.whatsapp.net`;
 const day = (ms) => new Date(ms).toISOString().slice(0, 10);
 before(async () => {
   t = await setup({ env: { RATE_LIMIT_PER_MIN: '1000' } }); owner = await t.login();
-  brief = await import('../src/core/brief.js'); oa = await import('../src/core/owner-assistant.js'); config = t.config;
+  oa = await import('../src/core/owner-assistant.js'); config = t.config;
   t.db.db.prepare("INSERT OR REPLACE INTO owner_links (tenant_id, user_id, phone, status, linked_at) SELECT 'default', id, ?, 'linked', ? FROM users WHERE username = 'admin'").run(OWNER_PHONE, Date.now());
   await t.api(owner, 'POST', '/api/agents', { template: 'blank', config: { name: 'Raju', triggers: ['raju'], groupReplies: 'wake', organizers: ['+41 79 000 00 01'] } });
   await t.api(owner, 'POST', '/api/chats/bind', { chat: G, agent: 'raju' });
