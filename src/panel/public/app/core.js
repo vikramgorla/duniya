@@ -322,7 +322,7 @@ export const meterEl = () => { const i = h('i', { style: 'width:0%' }); const m 
 // ---------- state ----------
 // Shared screen state. models: the /api/models answer (null = load again); overviewBusy: someone types on Overview, so a
 // status push does not redraw it; dmPrefill (049): a person's page → "Set up a direct chat" opens Chats → "Add a direct chat" with it.
-export const S = { loadTimeout: 15000, tab: 'overview', user: null, status: null, feed: [], feedAgent: '', feedChat: '', es: null, editing: null, models: null, overviewBusy: false, dmPrefill: null };
+export const S = { loadTimeout: 15000, tab: 'overview', user: null, status: null, feed: [], feedAgent: '', feedChat: '', feedType: '', es: null, editing: null, models: null, overviewBusy: false, dmPrefill: null };
 const RANK = { viewer: 1, admin: 2, owner: 3 };
 export const can = (role) => S.user && RANK[S.user.role] >= RANK[role];
 // 062: everyday screens first; Pending only while something waits; Secrets live in Settings.
@@ -543,7 +543,7 @@ export function connectEvents() {
     dropCache();
     S.feed.unshift(a); S.feed.length = Math.min(S.feed.length, 500);
     S.onFeed?.(a); // a screen that follows live work (082: a run's page)
-    if (S.tab === 'activity' && (!S.feedAgent || a.agent === S.feedAgent) && (!S.feedChat || a.chat === S.feedChat)) { const f = $('#feed'); if (f) feedPrepend(f, a); }
+    if (S.tab === 'activity' && (!S.feedAgent || a.agent === S.feedAgent) && (!S.feedChat || a.chat === S.feedChat) && (!S.feedType || a.type === S.feedType)) { const f = $('#feed'); if (f) feedPrepend(f, a); }
     // People filled in the background (phone contacts, group members): redraw the list unless the owner is typing
     if (S.tab === 'people' && / People$/.test(a.summary || '') && /^#people\/?$/.test(location.hash) && !document.activeElement?.matches('input, textarea, select')) show('people');
     if (S.tab === 'overview') { const r = $('#recent'); if (r) { feedPrepend(r, a, 8); $('#recent + .empty')?.remove(); } livePulse(a); }

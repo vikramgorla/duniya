@@ -33,6 +33,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS activity_agent ON activity(agent, id);
   CREATE INDEX IF NOT EXISTS activity_chat ON activity(chat, id);
   CREATE INDEX IF NOT EXISTS activity_ts ON activity(ts);
+  CREATE INDEX IF NOT EXISTS activity_type ON activity(type, id);
   CREATE TABLE IF NOT EXISTS pending (
     code TEXT PRIMARY KEY, agent TEXT, server TEXT, confirm_tool TEXT, confirm_id TEXT,
     tool TEXT, chat TEXT, requester TEXT, summary TEXT, expires INTEGER
@@ -237,8 +238,8 @@ export function insertActivity(a) {
   const r = insAct.run(a.ts, a.type, a.agent || '', a.chat || '', a.summary || '', a.detail ? JSON.stringify(a.detail) : '');
   return Number(r.lastInsertRowid);
 }
-/** @param {{ limit?: number|string, agent?: string, chat?: string, before?: number }} [o]  limit: as sent (a query string is fine) */
-export function listActivity({ limit = 200, agent = '', chat = '', before = 0 } = {}) {
+/** @param {{ limit?: number|string, agent?: string, chat?: string, type?: string, before?: number }} [o]  limit: as sent (a query string is fine) */
+export function listActivity({ limit = 200, agent = '', chat = '', type = '', before = 0 } = {}) {
   const lim = Math.min(Number(limit) || 200, 1000);
   const where = []; // #174: an older page starts at its row id (no walk over the newer rows)
   /** @type {(string|number)[]} */
@@ -246,6 +247,7 @@ export function listActivity({ limit = 200, agent = '', chat = '', before = 0 } 
   if (Number(before)) { where.push('id < ?'); args.push(Number(before)); }
   if (agent) { where.push('agent = ?'); args.push(agent); }
   if (chat) { where.push('chat = ?'); args.push(chat); }
+  if (type) { where.push('type = ?'); args.push(type); } // 093: e.g. change.auto (changed without asking)
   const rows = db.prepare(`SELECT * FROM activity ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT ?`).all(...args, lim);
   return rows.map((r) => ({ ...r, detail: r.detail ? JSON.parse(r.detail) : null }));
 }

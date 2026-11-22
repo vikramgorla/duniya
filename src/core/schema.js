@@ -5,6 +5,7 @@ import { validPackageSpec } from './mcp-local.js';
 import { digits } from './config.js';
 import { cleanOverride, REF_RE } from './providers/fallback-config.js';
 import { QUICK_WHO, FAQ_STRICTNESS } from './quick.js';
+import { AUTONOMY } from './autonomy.js';
 
 export const AGENT_DEFAULTS = Object.freeze({
   name: '',
@@ -33,6 +34,8 @@ export const AGENT_DEFAULTS = Object.freeze({
   mcpServers: {},
   tools: { participant: [], organizer: [], deny: [] },
   confirm: null,
+  autonomy: 'clear', // 093: how sure before changing things: ask | clear (an organizer's clear request is the approval) | act
+  risk: { low: [], high: [] }, // 093: tool rules whose changes count as low / high risk (high wins); empty = the built-in table
   schedules: [],
   memory: { enabled: true },
   globalMcp: { disabled: [] },
@@ -216,6 +219,15 @@ export function validateAgentConfig(input) {
       ttlMinutes: int(confirm.ttlMinutes ?? 9, 'confirm.ttlMinutes', 1, 60),
     };
   } else out.confirm = null;
+
+  out.autonomy = c.autonomy ?? 'clear';
+  if (!AUTONOMY.includes(out.autonomy)) fail('autonomy', 'must be ask, clear or act');
+  out.risk = {};
+  for (const k of ['low', 'high']) {
+    const rules = list(c.risk?.[k], `risk.${k}`);
+    for (const r of rules) if (!RULE_RE.test(r)) fail(`risk.${k}`, `"${r}" must look like server:tool (globs * ? allowed)`);
+    out.risk[k] = [...new Set(rules)];
+  }
 
   out.tools = {};
   for (const role of ['participant', 'organizer', 'deny']) {

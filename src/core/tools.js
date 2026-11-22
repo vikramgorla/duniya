@@ -1,5 +1,6 @@
 // @ts-check
 import { interpolate } from './store.js';
+import { matchesAny } from './config.js';
 import { mcpConnection } from './mcp.js';
 import { localServiceCheck } from './mcp-local.js';
 import { activity } from './events.js';
@@ -13,13 +14,8 @@ import { capsOf } from '../channels/index.js';
 import { mediaTools, imageToolAllowed } from './media-ai.js';
 import { liveModules, moduleRules } from '../modules/index.js';
 import { promiseTools } from './commitments.js';
+import { changeTools } from './autonomy.js';
 
-/** "panduga:*_preview" style globs. */
-function globToRegex(glob) {
-  const esc = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
-  return new RegExp(`^${esc}$`);
-}
-export const matchesAny = (name, patterns = []) => patterns.some((p) => globToRegex(p).test(name));
 
 const exposedName = (server, tool) => `${server}__${tool}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
 
@@ -116,6 +112,7 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
       meta.set('__errors', [...(meta.get('__errors') || []), e.message]);
       continue;
     }
+    const pair = changeTools(agent, serverKey, tools.map((t) => t.name)); // 093: preview → confirm tools of this service
     for (const t of tools) {
       const fq = `${serverKey}:${t.name}`;
       if (!matchesAny(fq, sAllow) || matchesAny(fq, deny)) continue;
@@ -125,7 +122,8 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
         description: (t.description || '').slice(0, 1000),
         input_schema: t.inputSchema || { type: 'object', properties: {} },
       });
-      meta.set(name, { kind: 'mcp', server: serverKey, tool: t.name, fq, conn, global: !!srv.global, annotations: t.annotations || {} });
+      meta.set(name, { kind: 'mcp', server: serverKey, tool: t.name, fq, conn, global: !!srv.global, annotations: t.annotations || {},
+        change: t.name === pair.confirm ? 'confirm' : pair.preview(t.name) ? 'preview' : '', confirmTool: pair.confirm, undo: pair.undo ? `${serverKey}:${pair.undo}` : '' });
     }
   }
 

@@ -32,6 +32,7 @@ import { humanCode, sha256 } from './crypto.js';
 import { putTtl, getTtl, takeTtl } from './ttl-store.js';
 import { chatChannel, chatTools, OWNER_CHAT_TOOLS } from './chat-tools.js';
 import { toolsFor as agentToolsFor } from './tools.js';
+import { isConfirmTool } from './autonomy.js';
 import { WA_READ_ONLY } from './runner.js';
 import { inboundKind, prepareInbound, planAttachments, visionCallOptions, noVisionNote, wantsVoice, speak } from './media-ai.js';
 import { enqueue, registerJobHandler, packMsg, unpackMsg, quoteOf } from './media-queue.js';
@@ -323,7 +324,7 @@ async function agentTools(user, dm = {}) {
     out.push({ name: d.name, description: d.description, schema: d.input_schema, required: d.input_schema?.required, kind: 'agent',
       prepare: wa ? async (a) => (a.chat ? { ...a, chat: await resolveChat(a.chat, own, user) } : a) : null,
       confirmIf: (a) => (wa ? elsewhere(a) && !WA_READ_ONLY.has(m.fq)
-        : m.kind === 'mcp' && (m.annotations?.destructiveHint === true || /(^|_)confirm($|_)/i.test(m.tool))),
+        : m.kind === 'mcp' && (m.annotations?.destructiveHint === true || isConfirmTool(m.tool))),
       preview: async (a) => (wa ? sendPreview(a.chat, `${WA_VERB[m.tool.name] || m.tool.name}${previewArgs(a)}`) : `${m.fq}${previewArgs(a)}`),
       async run(a) {
         if (elsewhere(a) && !isVisible(a.chat)) throw fail('That chat is off or private to members now: nothing was sent.', 403);

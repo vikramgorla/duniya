@@ -66,6 +66,12 @@ export const money = (cents, cur) => {
 export const fail = (message, status = 400, extra = {}) => Object.assign(new Error(message), { status, ...extra });
 /** A 400-style error the panel shows next to `field`. */
 export const bad = (message, field, status = 400) => fail(message, status, field ? { field } : {});
+/** "panduga:*_preview" style globs (tool rules). */
+function globToRegex(glob) {
+  const esc = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp(`^${esc}$`);
+}
+export const matchesAny = (name, patterns = []) => patterns.some((p) => globToRegex(p).test(name));
 export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /** Date, time and weekday of a moment in a time zone: { date: 'YYYY-MM-DD', hhmm: 'HH:MM', day: 'mon' }. */
 export function localParts(tz, at = Date.now()) {

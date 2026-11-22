@@ -100,11 +100,10 @@ export function moduleRules(agent, role, m) {
   return role === 'organizer' ? [`${m.id}:*`] : m.tools.filter((t) => t.participantDefault).map((t) => `${m.id}:${t.name}`);
 }
 
-/** A change about the sender happens now; anything else waits for an organizer's "confirm XXXX" (runner's confirm gate). */
+/** A change about the sender happens now; anything else goes to the runner's confirm gate (093: low risk may apply at once). */
 export function changeOrHold(ctx, kind, action, summary, { self = false } = {}) {
   if (self || !ctx.hold) return live.get(kind)?.manifest.apply(action, ctx.agent);
-  ctx.hold({ kind, action, summary });
-  return `Held for an organizer's confirmation: ${summary}. The confirm code is added to your answer; say that it applies after confirm.`;
+  return ctx.hold({ kind, action, summary, tool: ctx.toolFq, input: ctx.toolInput });
 }
 /** Apply a held module change (runner, after "confirm XXXX"). */
 export function applyModuleAction(kind, action, agent) {

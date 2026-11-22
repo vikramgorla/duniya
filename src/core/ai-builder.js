@@ -12,7 +12,7 @@ import { GLOBAL_SCOPE } from './mcp-oauth.js';
 import { activity } from './events.js';
 
 const EDITABLE = ['name', 'description', 'prompt', 'triggers', 'respondToMentions', 'groupReplies', 'dm', 'organizers', 'participants',
-  'mcpServers', 'globalMcp', 'tools', 'confirm', 'schedules', 'memory', 'model', 'timezone', 'historySize', 'maxTokens', 'enabled', 'media',
+  'mcpServers', 'globalMcp', 'tools', 'confirm', 'autonomy', 'schedules', 'memory', 'model', 'timezone', 'historySize', 'maxTokens', 'enabled', 'media',
   'quickReplies', 'help', 'welcome', 'faq'];
 
 const TOOL = {
@@ -39,7 +39,8 @@ const GUIDE = `You configure WhatsApp assistant agents on a self-hosted platform
 - mcpServers: tool services {key: {type:"remote", url, auth:"oauth"|"token"|"none"}}. Never invent URLs; keep existing ones.
 - globalMcp: {disabled:[names]} — global tool services (listed under "global" in the tool inventory) are available to every agent unless named here. Their tools follow the same "server:tool" rules; without explicit rules for a global service its defaults apply ("server:-" = none for that role). Prefer a global service over adding a copy to mcpServers.
 - tools: {participant:[rules], organizer:[rules], deny:[rules]} with rules "server:tool" or globs "server:*", "server:*_list". Least privilege: participants read-only tools; organizers can also prepare changes. Built-in memory tools: "memory:remember", "memory:list_notes", "memory:search_history", "memory:forget" (organizers only).
-- confirm: {preview:"server:*_preview", tool:"server:confirm"} when a service uses preview/confirm for changes, else null.
+- confirm: {preview:"server:*_preview", tool:"server:confirm"} to hold changes of a preview/confirm service for an organizer's "confirm CODE", else null (Duniya detects *_preview + confirm tools by itself).
+- autonomy: how sure before changing things: "ask" (show the preview, wait for a yes), "clear" (default: an organizer's clear request is the approval; deletes and other people's money, registrations and duties still ask) or "act" (also reasonable inferred changes). The platform adds this to the instructions and enforces it in code: never write confirmation rules ("a request is not approval", "always ask before saving") into the prompt; change autonomy instead.
 - schedules: [{id, at:"HH:MM", days:"daily"|"mon,wed,…", prompt, enabled}] — the agent posts the result of prompt to its chats.
 - media: {photos, documents, stickers, voiceNotes: true|false, voiceReply: "never"|"voice"|"always", createImages: {organizer: bool, participant: bool}} — photos & voice (look at photos, read PDFs, listen to voice notes, answer with voice notes, who may ask for pictures).
 - Built-in answers (no AI, no tokens; prefer them for fixed information people ask again and again):
