@@ -472,6 +472,8 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     // 072: the reply points at the stored answer (its rating shows in Activity, See in messages opens it)
     [23 * MIN - 8000, 'message.out', 'carpool', G(3), 'Tomorrow (Thu 20 Nov): Luca 07:15 from Morges (full), Mia back from Cornavin at 18:10 (1 seat). Sophie, Mia could take you.', { msg: answers[1] }],
     [22 * MIN, 'whatsapp.reaction', 'carpool', G(3), 'Mia reacted 👍 to the agent'],
+    // 093: a change an organizer clearly asked for, made without an extra confirmation
+    [15 * MIN, 'change.auto', 'carpool', G(3), 'Changed without asking (clear request): Add note (people)', { tool: 'people:add_note', role: 'organizer' }],
     [8 * MIN, 'message.in', 'football', `club#${G(8)}`, 'Arjun: !coach who brings snacks Saturday?'],
     [8 * MIN - 6000, 'message.out', 'football', `club#${G(8)}`, 'Saturday snacks: the Meier family (oranges) and Priya (water). Kick-off 10:30 in Nyon.'],
   ];

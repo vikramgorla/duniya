@@ -321,7 +321,7 @@ async function selfCheck({ agent, chat, ctx, reply, sources, model, fallback, tu
 const applyLocal = (kind, action, agent) => (kind === 'people' ? applyPeopleAction(action, agent) : applyModuleAction(kind, action, agent));
 /** 093: Activity entry for a change made without an extra confirmation (the owner sees every one; never message text). */
 function changedWithoutAsking(ctx, fq, input, undo) {
-  activity('change.auto', { agent: ctx.agent.id, chat: ctx.chat, summary: `Changed without asking (clear request): ${toolPhrase(fq)}${undo ? ' · say undo to revert' : ''}`,
+  activity('change.auto', { agent: ctx.agent.id, chat: ctx.chat, summary: `Changed without asking (clear request): ${toolPhrase(fq.replace(/_preview$/, ''))}${undo ? ' · say undo to revert' : ''}`,
     detail: { tool: fq, input, role: ctx.role, ...(undo ? { undo } : {}) } });
 }
 /**

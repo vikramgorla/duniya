@@ -3,4 +3,6 @@ flowchart TD
   AL -- "no" --> N["Not offered"]
   AL -- "yes" --> CH{"Changes<br/>something?"}
   CH -- "no" --> R["Runs"]
-  CH -- "yes" --> P["Preview held"] --> C["Organizer replies<br/>confirm CODE"] --> R
+  CH -- "yes" --> LO{"Organizer's clear request<br/>and low risk?"}
+  LO -- "yes (Act on clear requests)" --> A["Applied now,<br/>in Activity"]
+  LO -- "no, or Ask first" --> P["Preview waits"] --> C["Organizer says yes<br/>or confirm CODE"] --> R

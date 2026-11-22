@@ -32,7 +32,7 @@ export const isConfirmTool = (name) => /(^|_)confirm($|_)/i.test(name);
  * high wins). Built-in held changes use the table; remote previews their name; anything that names a delete is high.
  * @returns {'low'|'high'}
  */
-export function riskOf(fq, input = {}, agent = null) {
+function riskOf(fq, input = {}, agent = null) {
   if (matchesAny(fq, agent?.risk?.high || [])) return 'high';
   // an input that asks for a delete ({ op: "delete" }, { delete: true }) is high whatever the tool is called
   if (Object.entries(input || {}).some(([k, v]) => (typeof v === 'string' && DESTRUCTIVE_INPUT.test(v.trim())) || (/^(delete|remove)$/i.test(k) && v))) return 'high';
@@ -55,7 +55,7 @@ export function changeTools(agent, server, names) {
 }
 
 /** The agent's setting (the built-in owner assistant keeps its own confirmations). */
-export const autonomyOf = (agent) => (AUTONOMY.includes(agent?.autonomy) ? agent.autonomy : 'clear');
+const autonomyOf = (agent) => (AUTONOMY.includes(agent?.autonomy) ? agent.autonomy : 'clear');
 
 /**
  * May this change happen without an extra confirmation? Only for an organizer (or the owner) on a live turn addressed

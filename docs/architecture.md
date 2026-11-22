@@ -23,7 +23,7 @@ tools out, a panel on top.**
 3. Allow-list: chats that are off are dropped.
 4. Router: triggers, roles and rate limits; owner DMs go to the owner assistant; a quick-reply command or a clear FAQ match is answered right away from the owner's text (no AI, no tokens).
 5. The agent (stored in the app) uses a model provider with fallback, MCP tools with per-role allow lists, chat actions (only those the chat's channel can do), memory (messages, summary, notes, search).
-6. Preview tools go through the confirm gate: an organizer replies `confirm CODE`.
+6. Changes go through the confirm gate: a low-risk change an organizer clearly asked for is applied at once (agent setting *How sure before changing things*, logged in Activity); everything else waits for an organizer's yes or `confirm CODE`.
 7. The agent, the panel and the admin MCP use SQLite with encrypted secrets and backups.
 
 </details>

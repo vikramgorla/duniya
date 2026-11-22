@@ -26,6 +26,7 @@ const BUDGETS = {
   'chat page (messages)': 5, // GET /api/chats/:chat/messages?limit=50; CI 1.0
   'search messages': 25, // GET /api/search/messages?q=… (full-text index, a word in every message); CI 10.5
   'activity (one chat)': 5, // GET /api/activity?chat=…; CI 1.4
+  'activity (one type)': 5, // 093: GET /api/activity?type=change.auto (Changed without asking; index activity(type, id))
   'router (stored, not addressed)': 2, // one group message through the router: allow-list, person, store, why-quiet; CI 0.3
   'agent context build': 3, // memory.buildContext for a busy group (recent messages, summary, notes); CI 0.6
   'sender card': 3, // 079: the People card of the sender each agent turn gets
@@ -109,6 +110,7 @@ await bench('people search', () => get(`/api/people?q=${enc('contact 12')}`));
 await bench('chat page (messages)', () => get(`/api/chats/${enc(onGroup)}/messages?limit=50`));
 await bench('search messages', () => get(`/api/search/messages?q=${enc('station nine')}`));
 await bench('activity (one chat)', () => get(`/api/activity?limit=200&chat=${enc(onGroup)}`));
+await bench('activity (one type)', () => get('/api/activity?limit=200&type=change.auto'));
 await bench('router (stored, not addressed)', () => t.route(t.msg({ chat: onGroup, phone: phoneOf(seq % 300), senderJid: `${phoneOf(seq % 300)}@s.whatsapp.net`, text: `just chatting ${seq++}`, msgId: `perf-${seq}` })));
 await bench('agent context build', () => t.memory.buildContext({ agent, chat: onGroup }));
 const access = await import('../src/core/people-access.js');
