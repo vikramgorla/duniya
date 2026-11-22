@@ -18,7 +18,7 @@ import { FIRST_SCREEN, staticClosure } from '../src/panel/module-graph.js';
 // the first visit to its screen. A budget is raised only with its reason in the PR; every earlier raise and its reason
 // is in the history of these two lines (git log -L '/^const FIRST_BUDGET/,+1:scripts/check-panel.mjs').
 const FIRST_BUDGET = 63_700; // 095: 1.1 KB lower, the update dialog and the watch of a running update load on demand (update-flow.js)
-const TOTAL_BUDGET = 227_850; // 095: +1.05 KB, the rolled-back note on Updates (0.2 KB), update-flow.js as its own module (0.55 KB, off the first screen) and its watch as small steps (0.3 KB)
+const TOTAL_BUDGET = 227_950; // #287: +0.1 KB, a duty can be changed (Edit… in its menu: the add dialog, filled in)
 
 const PUBLIC = resolve(import.meta.dirname, '../src/panel/public');
 const APP = resolve(PUBLIC, 'app');

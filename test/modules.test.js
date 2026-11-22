@@ -141,6 +141,8 @@ test('organizer confirmation: self-registration is pending until an organizer co
   const past = (await api('POST', '/api/module/events', { name: 'Picnic', starts: '2027-06-01', per: 'household', deadline: '2020-01-01' })).event;
   const closed = await toolTurn(ANU, 'events__register', { event: 'picnic' });
   assert.match(closed.result, /closed on 2020-01-01/);
+  const seen = JSON.parse((await toolTurn(ANU, 'events__list_events', {})).result);
+  assert.deepEqual(['Picnic', 'Diwali 2027'].map((n) => seen.find((e) => e.name === n).registrationClosed), [true, false], 'agents read whether registration is closed');
   const org = await toolTurn(ORG, 'events__register_someone', { event: 'picnic', who: 'Rao family', notes: 'vegetarian' });
   assert.match(org.result, /Held/);
   const code = t.sent.at(-1).text.match(/confirm ([A-Z0-9]{4})/)[1];
@@ -160,6 +162,21 @@ test('duties: anyone takes one with room left; organizers assign (held); attenda
   assert.match(full.result, /already has the 1 person/);
   const page = await api('GET', `/api/module/events/${sankranti.id}`);
   assert.deepEqual(page.duties[0].people.map((p) => p.name), ['Anu']);
+  // a duty is changed in place: what is not sent stays, and so does who took it
+  const duty = page.duties[0];
+  const more = await api('PUT', `/api/module/duties/${duty.id}`, { needed: 2 });
+  assert.deepEqual([more[0].task, more[0].at, more[0].needed, more[0].open, more[0].people.map((p) => p.name)], ['Set up chairs', '09:00', 2, 1, ['Anu']]);
+  const renamed = await tool('save_event_duty').run({ duty: duty.id, task: 'Set up the chairs' }, x);
+  assert.deepEqual([renamed[0].task, renamed[0].at, renamed[0].needed], ['Set up the chairs', '09:00', 2], 'the admin tool changes only the task');
+  await api('PUT', `/api/module/duties/${duty.id}`, { at: '' });
+  assert.equal((await api('GET', `/api/module/events/${sankranti.id}`)).duties[0].at, '', 'a time can be taken away');
+  await api('PUT', `/api/module/duties/${duty.id}/people/${ravi.id}`, { on: true });
+  const fewer = await t.api(owner, 'PUT', `/api/module/duties/${duty.id}`, { needed: 1 });
+  assert.deepEqual([fewer.status, fewer.body.field], [400, 'needed']);
+  assert.match(fewer.body.error, /2 people have taken "Set up the chairs": take someone off/);
+  assert.equal((await t.api(owner, 'PUT', '/api/module/duties/d_missing', { needed: 3 })).status, 404);
+  await api('PUT', `/api/module/duties/${duty.id}/people/${ravi.id}`, { on: false });
+  await api('PUT', `/api/module/duties/${duty.id}`, { task: 'Set up chairs', at: '09:00', needed: 1 });
   const reg = page.registrations.find((r) => r.household === chary.id);
   await api('PUT', `/api/module/registrations/${reg.id}`, { attended: true, notes: '=HYPERLINK("x")' });
   const r = await fetch(`${t.base}/api/module/events/${sankranti.id}/csv`, { headers: { cookie: owner } });
@@ -214,12 +231,16 @@ test('the owner\'s day, not the UTC day: a deadline closes at the owner\'s midni
     const mela = (await api('POST', '/api/module/events', { name: 'Mela 2027', starts: '2027-02-01', per: 'person', deadline: '2027-01-10' })).event;
     tt.mock.timers.enable({ apis: ['Date'], now: Date.parse('2027-01-10T18:00:00Z') }); // 23:30 on the 10th for the owner
     assert.equal(ev.register({ event: mela.id, person: hari.id }, { by: 'Hari', organizer: false }).status, 'registered');
+    assert.equal(ev.eventPage(mela.id).event.registrationClosed, false, 'open until the owner\'s day ends');
     tt.mock.timers.setTime(Date.parse('2027-01-10T20:00:00Z')); // 01:30 on the 11th for the owner; still the 10th in UTC
     assert.throws(() => ev.register({ event: mela.id, person: gita.id }, { by: 'Gita', organizer: false }), /closed on 2027-01-10/);
+    assert.equal(ev.eventPage(mela.id).event.registrationClosed, true, 'the page says what the server does');
     const ord = await import('../src/modules/orders/index.js');
     const o = ord.createOrder({ person: gita.id, lines: [{ item: 'Sweets', qty: 1, price: 5 }] });
     assert.equal(ord.addPayment(o.id, {}).payments[0].at, '2027-01-11', 'paid on the 11th where the owner lives');
   } finally { tt.mock.timers.reset(); await t.agents.updateAgent('owner-assistant', { timezone: '' }); }
+  const anyOrder = (await api('GET', '/api/orders?status=all')).orders[0];
+  assert.equal((await api('GET', `/api/orders/${anyOrder.id}`)).today, ownerNow().date, 'the payment dialog starts at the owner\'s day');
 });
 
 test('tool rules: none for participants removes the tools; switching a module off removes its tools and keeps its data', async () => {

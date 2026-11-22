@@ -108,9 +108,6 @@
  "src/core/webaccess.js": {
   "complexity": 2
  },
- "src/modules/events/index.js": {
-  "complexity": 1
- },
  "src/modules/orders/index.js": {
   "complexity": 1
  },

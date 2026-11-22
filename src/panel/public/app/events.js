@@ -103,13 +103,17 @@ async function eventPage(id) {
       r.status === 'registered' ? h('button', { class: 'btn small', type: 'button', onclick: () => set(r, { attended: !r.attended }, 'Saved') }, r.attended ? 'Did not come' : 'Came') : null,
       r.status !== 'cancelled' ? h('button', { class: 'btn small danger', type: 'button', onclick: () => set(r, { status: 'cancelled' }, 'Cancelled') }, 'Cancel registration') : null) : null });
   const by = (s) => g.registrations.filter((r) => r.status === s);
-  const addDuty = async () => {
-    const task = h('input', { placeholder: 'e.g. Set up chairs', autocomplete: 'off' }); const at = h('input', { placeholder: 'e.g. 09:00', autocomplete: 'off' }); const needed = h('input', { type: 'number', min: 1, value: 2 });
-    if (await ask({ title: 'Add a duty', ok: 'Add duty', body: [field('Task', task), h('div', { class: 'grid2' }, field('When', at), field('People needed', needed))] })) tryApi(() => api('POST', `/api/module/events/${e.id}/duties`, { task: task.value, at: at.value, needed: Number(needed.value) }), 'Duty added').then(done(redraw));
+  /** Add a duty, or change one (`d`): the same three fields. */
+  const editDuty = async (d = { task: '', at: '', needed: 2 }) => {
+    const task = h('input', { placeholder: 'e.g. Set up chairs', autocomplete: 'off', value: d.task }); const at = h('input', { placeholder: 'e.g. 09:00', autocomplete: 'off', value: d.at }); const needed = h('input', { type: 'number', min: 1, value: d.needed });
+    if (!await ask({ title: d.task || 'Add a duty', ok: d.id ? 'Save' : 'Add duty', body: [field('Task', task), h('div', { class: 'grid2' }, field('When', at), field('People needed', needed))] })) return;
+    const body = { task: task.value, at: at.value, needed: Number(needed.value) };
+    tryApi(() => (d.id ? api('PUT', `/api/module/duties/${d.id}`, body) : api('POST', `/api/module/events/${e.id}/duties`, body)), d.id ? 'Saved' : 'Duty added').then(done(redraw));
   };
   const give = async (d) => { const pk = pickPerson('Who'); if (await ask({ title: d.task, ok: 'Give the duty', body: pk.el })) tryApi(() => api('PUT', `/api/module/duties/${d.id}/people/${pk.value()}`, { on: true }), 'Saved').then(done(redraw)); };
   const dutyRow = (d) => row(`${d.task}${d.at ? ` · ${d.at}` : ''}`, `${d.people.map((p) => p.name).join(', ') || 'Nobody yet'} · ${d.open ? `${d.open} of ${d.needed} open` : 'full'}`, {
     end: can('admin') ? menu(`More for ${d.task}`, d.open ? h('button', { class: 'btn small', type: 'button', onclick: () => give(d) }, 'Give to…') : null,
+      h('button', { class: 'btn small', type: 'button', onclick: () => editDuty(d) }, 'Edit…'),
       d.people.map((p) => h('button', { class: 'btn small', type: 'button', onclick: () => tryApi(() => api('PUT', `/api/module/duties/${d.id}/people/${p.id}`, { on: false }), 'Saved').then(done(redraw)) }, `Take ${p.name} off`)),
       h('button', { class: 'btn small danger', type: 'button', onclick: () => tryApi(() => api('DELETE', `/api/module/duties/${d.id}`), 'Duty removed').then(done(redraw)) }, 'Remove duty')) : null });
   const remove = async () => (await ask({ title: `Delete ${e.name}?`, danger: true, ok: 'Delete event', text: `Its ${plural(g.registrations.length, 'registration')} and duties go too; unpaid orders are cancelled. This cannot be undone.` }))
@@ -117,7 +121,6 @@ async function eventPage(id) {
   const prices = e.prices.adult || e.prices.kid ? `${money(e.prices.adult, e.currency)} an adult, ${money(e.prices.kid, e.currency)} a kid${e.prices.freeUnder ? ` (under ${e.prices.freeUnder} free)` : ''}` : '';
   const cancelled = by('cancelled');
   const came = by('registered').filter((r) => r.attended).length;
-  const today = new Date().toISOString().slice(0, 10);
   const sent = await sentBlock((x) => ['event', 'orders'].includes(x.audience?.kind) && x.audience.event === e.id, `people/sending/new?kind=event&event=${enc(e.id)}&title=${enc(e.name)}`, 'Message the registered people');
   $('#main').replaceChildren(h('div', { class: 'card person-page' }, bk,
     h('div', { class: 'ap-head' }, dateMark(e.starts),
@@ -126,12 +129,12 @@ async function eventPage(id) {
         sendingOn() && modOn('orders') ? h('button', { class: 'btn small', type: 'button', onclick: () => autoReminders(e) }, 'Automatic payment reminders…') : null,
         h('a', { class: 'btn small', href: `/api/module/events/${e.id}/csv`, download: '' }, 'Download CSV'), h('button', { class: 'btn small danger', type: 'button', onclick: remove }, 'Delete…')) : null),
     h('p', { class: 'small', style: 'margin:8px 0 0' }, [countsLine(c), came ? `${came} came` : ''].filter(Boolean).join(' · ')),
-    h('p', { class: 'small muted', style: 'margin:4px 0 0' }, [e.deadline ? `Registration ${e.deadline < today ? 'closed' : 'closes'} ${day(e.deadline, true)}` : 'Registration open',
+    h('p', { class: 'small muted', style: 'margin:4px 0 0' }, [e.deadline ? `Registration ${e.registrationClosed ? 'closed' : 'closes'} ${day(e.deadline, true)}` : 'Registration open',
       e.per === 'household' ? 'per household' : 'per person', e.confirm === 'organizer' ? 'an organizer confirms' : '', prices].filter(Boolean).join(' · ')),
     by('pending').length ? group('To confirm', h('ul', {}, by('pending').map(regRow))) : null,
     group('Registered', h('ul', {}, by('registered').map(regRow), addRow('Register someone', 'A person or a household', register))),
     by('waiting').length ? group('Waiting list', h('ul', {}, by('waiting').map(regRow)), h('p', { class: 'small muted lempty' }, 'They get a place by themselves, in order, when one opens up.')) : null,
-    group('Duties', h('ul', {}, g.duties.map(dutyRow), addRow('Add a duty', 'A task, when, how many people', addDuty))),
+    group('Duties', h('ul', {}, g.duties.map(dutyRow), addRow('Add a duty', 'A task, when, how many people', () => editDuty()))),
     moduleBlocks(g.modules),
     sent,
     cancelled.length ? h('details', { class: 'sblock' }, h('summary', {}, `Cancelled (${cancelled.length})`), h('ul', { class: 'mini-list' }, cancelled.map(regRow))) : null));
@@ -189,7 +192,7 @@ async function orderPage(id) {
   const methods = o.methods || [];
   const pay = async (refund = false) => {
     const amount = h('input', { type: 'number', min: 0, step: '0.05', value: ((refund ? o.paid : o.left) / 100).toFixed(2) });
-    const method = h('select', {}, methods.map((m) => h('option', { value: m }, m))); const at = h('input', { type: 'date', value: new Date().toISOString().slice(0, 10) });
+    const method = h('select', {}, methods.map((m) => h('option', { value: m }, m))); const at = h('input', { type: 'date', value: o.today });
     if (await ask({ title: refund ? 'Record a refund' : 'Record a payment', ok: refund ? 'Record refund' : 'Record payment', text: 'Duniya records it; no money moves.',
       body: [h('div', { class: 'grid2' }, field(`Amount (${o.currency})`, amount), field('Date', at)), field('How', method)] })) tryApi(() => api('POST', `/api/orders/${o.id}/payments`, { amount: amount.value, method: method.value, at: at.value, refund }), 'Recorded').then(done(redraw));
   };

@@ -227,6 +227,7 @@ const STATES = [
   { name: 'events', hash: 'people/events', wait: 2000 }, // 081: People → Events
   { name: 'event-page', hash: 'people/events', wait: 2000, js: "document.querySelector('.people-list a').click(); await T.until('.person-page'); await T.wait(300);" }, // 081: an event's page
   { name: 'event-edit', hash: 'people/events', wait: 2000, js: "document.querySelector('.people-list a').click(); await T.until('.person-page'); await T.wait(300); document.querySelector('.ap-head details.menu summary').click(); await T.click('Edit…', 'button', 600);" }, // 081: the event dialog
+  { name: 'event-duty-edit', hash: 'people/events', wait: 2000, js: "document.querySelector('.people-list a').click(); await T.until('.person-page'); await T.wait(300); document.querySelector('summary[aria-label=\"More for Set up chairs\"]').click(); await T.click('Edit…', 'button', 600);" }, // 081: a duty's dialog, filled in
   { name: 'event-pending', hash: 'people/events', wait: 2000, js: "[...document.querySelectorAll('.people-list a')].find((a) => a.textContent.includes('picnic')).click(); await T.until('.person-page'); await T.wait(300);" }, // 081: to confirm and waiting list
   { name: 'sending', hash: 'people/sending', wait: 2000 }, // 082: People → Sending (history, saved audiences)
   { name: 'sending-run', hash: 'people/sending', wait: 2000, js: "[...document.querySelectorAll('a.lrow')].find((a) => a.textContent.includes('Payment')).click(); await T.until('.person-page'); await T.wait(300);" }, // 082: a run's page
