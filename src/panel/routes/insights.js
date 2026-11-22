@@ -47,14 +47,14 @@ async function checklist(channel) {
 
 export function insightRoutes(route, { channel }) {
   // ---------- why agents stayed silent (#34) ----------
-  route('GET', '/api/silences', async (req, res, body, q) => {
-    const rows = listSilences({ chat: q.get('chat') || '', agent: q.get('agent') || '', reason: q.get('reason') || '', days: q.get('days') || 7, limit: q.get('limit') || 200 });
+  route('GET', '/api/silences', async ({ query }) => {
+    const rows = listSilences({ chat: query.get('chat') || '', agent: query.get('agent') || '', reason: query.get('reason') || '', days: query.get('days') || 7, limit: query.get('limit') || 200 });
     // 073: names from the one chat-name resolver, never ids
     const agentNames = new Map(listAgents().map((a) => [a.id, a.name]));
     return { reasons: SILENCE_REASONS, silences: withChatNames(rows).map((r) => ({ ...r, agentName: agentNames.get(r.agent) || '' })) };
   });
-  route('DELETE', '/api/silences', async (req, res, body, q, p, user) => {
-    const f = { chat: q.get('chat') || '', agent: q.get('agent') || '', reason: q.get('reason') || '' };
+  route('DELETE', '/api/silences', async ({ query, user }) => {
+    const f = { chat: query.get('chat') || '', agent: query.get('agent') || '', reason: query.get('reason') || '' };
     if (f.reason && !SILENCE_REASONS[f.reason]) return [400, { error: 'Unknown reason', field: 'reason' }];
     const removed = clearSilences(f);
     if (removed) activity('config', { chat: f.chat, agent: f.agent, summary: `Cleared ${removed} silence record(s)${f.reason ? ` (${SILENCE_REASONS[f.reason].label})` : ''} (${user.username})` });
@@ -63,7 +63,7 @@ export function insightRoutes(route, { channel }) {
 
   // ---------- first-run checklist (#36) ----------
   route('GET', '/api/checklist', async () => checklist(channel));
-  route('PUT', '/api/checklist', async (req, res, body) => {
+  route('PUT', '/api/checklist', async ({ body }) => {
     if ('dismissed' in body) updateSettings({ checklistDismissed: !!body.dismissed });
     if (body.skip !== undefined || body.unskip !== undefined) { // 062: a step can be skipped (and brought back)
       const id = String(body.skip ?? body.unskip);
@@ -76,10 +76,10 @@ export function insightRoutes(route, { channel }) {
   });
 
   // ---------- test console: the tools a role gets (#37) ----------
-  route('GET', '/api/agents/:id/test-tools', async (req, res, body, q, p) => {
-    const agent = getAgent(p.id);
+  route('GET', '/api/agents/:id/test-tools', async ({ query, params }) => {
+    const agent = getAgent(params.id);
     if (!agent) return [404, { error: 'Not found' }];
-    const role = q.get('role') === 'organizer' ? 'organizer' : 'participant';
+    const role = query.get('role') === 'organizer' ? 'organizer' : 'participant';
     const { defs, meta } = await toolsFor(agent, role);
     const groups = new Map();
     for (const d of defs) {

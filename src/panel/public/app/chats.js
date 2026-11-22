@@ -191,13 +191,13 @@ function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
     const intro = !c.isGroup && admin && c.enabled && c.agent ? h('button', { class: 'btn small', type: 'button', onclick: () => open(introCard(c, { onClose: () => extra.replaceChildren(), onSent: () => extra.replaceChildren() })) }, c.introAt ? 'Send another intro…' : 'Send intro…') : null;
     // 072: section rows, their current value filled in when the chat's memory arrives
     const subs = {};
-    const row = (id, title, ic, col, href, sub, onclick) => h('li', {}, h('a', { class: 'lrow', href, onclick },
-      h('span', { class: `lmark ${col}`, 'aria-hidden': 'true' }, icon(ic)),
+    const row = ({ id, title, icon: ic, color, href, sub, onclick = null }) => h('li', {}, h('a', { class: 'lrow', href, onclick },
+      h('span', { class: `lmark ${color}`, 'aria-hidden': 'true' }, icon(ic)),
       h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, title), (subs[id] = h('span', { class: 'lrow-sub' }, sub))), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')));
     const firstSub = { messages: c.history?.state === 'loading' ? 'Loading recent messages from your phone…' : c.lastAt ? `Last message ${ago(c.lastAt)} ago` : 'Stored while the chat is on',
       memory: 'Summary and notes', group: 'Name, settings, invite link, members' };
-    const rows = CHAT_SECTIONS.filter((s) => hasSection(s, c)).map((s) => row(s.id, titleOf(s, c), s.icon, s.c, `#chats/${enc}/${s.id}`, firstSub[s.id], (e) => { e.preventDefault(); go(s.id); }));
-    rows.push(row('activity', 'Activity', 'activity', 'c0', `#activity/chat=${enc}`, 'Everything that happened here, newest first'));
+    const rows = CHAT_SECTIONS.filter((s) => hasSection(s, c)).map((s) => row({ id: s.id, title: titleOf(s, c), icon: s.icon, color: s.c, href: `#chats/${enc}/${s.id}`, sub: firstSub[s.id], onclick: (e) => { e.preventDefault(); go(s.id); } }));
+    rows.push(row({ id: 'activity', title: 'Activity', icon: 'activity', color: 'c0', href: `#activity/chat=${enc}`, sub: 'Everything that happened here, newest first' }));
     api('GET', `/api/chats/${enc}/memory`).then((m) => {
       if (subs.messages && c.history?.state !== 'loading') subs.messages.textContent = [plural(m.messageCount, 'stored message'), c.lastAt ? `last ${ago(c.lastAt)} ago` : ''].filter(Boolean).join(' · ');
       subs.memory.textContent = [m.summary ? 'Summary' : 'No summary yet', plural(m.notes.length, 'note')].join(' · ');

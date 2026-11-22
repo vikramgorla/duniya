@@ -136,7 +136,7 @@ export function createAdminMcp({ invoke, routeRole }) {
 
   // Where the browser goes after the form (CSP form-action also covers the redirect that follows the POST).
   const formTarget = (uri) => new URL(uri).origin;
-  function consentPage(req, res, p, chk, user, sessionToken) {
+  function consentPage({ req, res, p, chk, user, sessionToken }) {
     const abilities = ROLE_ABILITIES[user.role] || ROLE_ABILITIES.viewer;
     const host = new URL(chk.redirectUri).host;
     page(res, 200, { title: `Connect ${chk.client.name}`, formTo: formTarget(chk.redirectUri), body: `
@@ -172,7 +172,7 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
     if (chk.error) { res.writeHead(302, { location: redirectTo(chk.redirectUri, { error: chk.error, error_description: chk.description, state: p.state, iss: baseUrl(req) }) }); return res.end(); }
     let token = cookie(req, 'duniya_session');
     let user = sessionUser(token);
-    if (req.method === 'GET') return user ? consentPage(req, res, p, chk, user, token) : loginPage(res, p, chk, { bounce: p._s !== '1' });
+    if (req.method === 'GET') return user ? consentPage({ req, res, p, chk, user, sessionToken: token }) : loginPage(res, p, chk, { bounce: p._s !== '1' });
 
     if (p.action === 'deny') {
       res.writeHead(302, { location: redirectTo(chk.redirectUri, { error: 'access_denied', error_description: 'The user denied access', state: p.state, iss: baseUrl(req) }) });
@@ -188,7 +188,7 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
       token = s.token;
       res.setHeader('set-cookie', `duniya_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${s.maxAge}${isHttps(req) ? '; Secure' : ''}`);
       activity('system', { summary: `Panel login: ${user.username} from ${ip} (AI assistant sign-in)` });
-      return consentPage(req, res, p, chk, user, token);
+      return consentPage({ req, res, p, chk, user, sessionToken: token });
     }
     if (p.action === 'approve') {
       if (!user) return loginPage(res, p, chk, { error: 'Your session ended. Sign in again.' });
@@ -199,7 +199,7 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
       res.writeHead(302, { location: redirectTo(chk.redirectUri, { code, state: p.state, iss: baseUrl(req) }) });
       return res.end();
     }
-    return user ? consentPage(req, res, p, chk, user, token) : loginPage(res, p, chk);
+    return user ? consentPage({ req, res, p, chk, user, sessionToken: token }) : loginPage(res, p, chk);
   }
 
   async function token(req, res) {
@@ -350,7 +350,7 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
 
   // ---------- panel: Settings → Connected AI assistants ----------
   function panelRoutes(route) {
-    route('GET', '/api/assistants', async (req, res, body, q, p, user) => {
+    route('GET', '/api/assistants', async ({ req, user }) => {
       const base = baseUrl(req);
       return {
         mcpUrl: `${base}/mcp`, https: base.startsWith('https://'), publicUrlSet: !!process.env.PUBLIC_URL,
@@ -358,12 +358,12 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
       };
     }, { role: 'viewer' });
     // Anyone can disconnect their own assistants; owners can disconnect anyone's.
-    route('DELETE', '/api/assistants/:userId/:clientId', async (req, res, body, q, p, user) => {
-      const uid = Number(p.userId);
+    route('DELETE', '/api/assistants/:userId/:clientId', async ({ params, user }) => {
+      const uid = Number(params.userId);
       if (uid !== user.id && user.role !== 'owner') return [403, { error: 'Only owners can disconnect other people\'s assistants' }];
-      const g = listGrants({ userId: uid }).find((x) => x.clientId === p.clientId);
-      if (!revokeGrant(uid, p.clientId)) return [404, { error: 'Not connected' }];
-      activity('config', { summary: `AI assistant "${g?.clientName || p.clientId}" of ${g?.username || `user #${uid}`} disconnected by ${user.username}` });
+      const g = listGrants({ userId: uid }).find((x) => x.clientId === params.clientId);
+      if (!revokeGrant(uid, params.clientId)) return [404, { error: 'Not connected' }];
+      activity('config', { summary: `AI assistant "${g?.clientName || params.clientId}" of ${g?.username || `user #${uid}`} disconnected by ${user.username}` });
       return { ok: true };
     }, { role: 'viewer' });
   }

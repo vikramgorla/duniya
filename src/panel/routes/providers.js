@@ -13,36 +13,36 @@ import { activity } from '../../core/events.js';
 import { setSmartSettings, smartSettings, tierModels } from '../../core/smart-model.js';
 
 export function providerRoutes(route) {
-  route('GET', '/api/providers', async (req, res, body, q) => status({ refresh: q.get('refresh') === '1' }));
+  route('GET', '/api/providers', async ({ query }) => status({ refresh: query.get('refresh') === '1' }));
 
-  route('POST', '/api/providers/compatible', async (req, res, body, q, p, user) => {
+  route('POST', '/api/providers/compatible', async ({ body, user }) => {
     const prov = addCompatible({ id: body.id, name: body.name, baseUrl: body.baseUrl, key: body.key });
     activity('system', { summary: `Model provider "${prov.id}" saved by ${user.username}` });
     return prov;
   });
-  route('DELETE', '/api/providers/compatible/:id', async (req, res, body, q, p, user) => {
-    removeCompatible(p.id);
-    activity('system', { summary: `Model provider "${p.id}" removed by ${user.username}` });
+  route('DELETE', '/api/providers/compatible/:id', async ({ params, user }) => {
+    removeCompatible(params.id);
+    activity('system', { summary: `Model provider "${params.id}" removed by ${user.username}` });
     return { ok: true };
   });
 
   // OpenRouter preset (018): one tap, key stored as a secret, "Free models only" switch.
-  route('POST', '/api/providers/openrouter', async (req, res, body, q, p, user) => {
+  route('POST', '/api/providers/openrouter', async ({ body, user }) => {
     const prov = addOpenRouter({ key: body.key, freeOnly: body.freeOnly, label: body.label });
     activity('system', { summary: `OpenRouter${prov.label ? ` — ${prov.label}` : ''} ${body.key ? 'connected' : 'updated'} by ${user.username} (free models only: ${prov.freeOnly ? 'on' : 'off'})` });
     const [row] = (await status({ refresh: true })).filter((x) => x.id === (prov.id || OPENROUTER_ID));
     return row;
   });
-  route('POST', '/api/providers/compatible/:id/free-only', async (req, res, body, q, p, user) => {
-    const prov = setFreeOnly(p.id, !!body.on);
+  route('POST', '/api/providers/compatible/:id/free-only', async ({ body, params, user }) => {
+    const prov = setFreeOnly(params.id, !!body.on);
     if (!prov) return [404, { error: 'No such endpoint' }];
-    activity('system', { summary: `Free models only ${prov.freeOnly ? 'on' : 'off'} for "${p.id}" by ${user.username}` });
+    activity('system', { summary: `Free models only ${prov.freeOnly ? 'on' : 'off'} for "${params.id}" by ${user.username}` });
     return prov;
   });
 
   // GitHub Copilot via the official SDK (018): owner pastes a fine-grained token; checked before it is kept.
   // body.label (042): connect another Copilot account with its own token; body.account: replace that account's token.
-  route('POST', '/api/providers/copilot', async (req, res, body, q, p, user) => {
+  route('POST', '/api/providers/copilot', async ({ body, user }) => {
     const token = copilot.checkToken(body.token);
     // 074: an agent app — on small servers only with Small server mode; downloaded now when it is not there yet.
     const gate = appsCheck(); if (!gate.ok) return [400, { error: gate.reason, field: 'token' }];
@@ -68,7 +68,7 @@ export function providerRoutes(route) {
     const [row] = (await status()).filter((x) => x.id === id);
     return row;
   }, { role: 'owner' });
-  route('DELETE', '/api/providers/copilot', async (req, res, body, q, p, user) => {
+  route('DELETE', '/api/providers/copilot', async ({ user }) => {
     copilot.disconnect();
     clearModelCache('copilot'); clearCopilotExtras('copilot');
     activity('system', { summary: `GitHub Copilot disconnected by ${user.username}` });
@@ -77,7 +77,7 @@ export function providerRoutes(route) {
 
   // ---------- agent apps (074): Claude Code and Codex, downloaded on connect ----------
   // Claude Code: the owner pastes the token from `claude setup-token`; checked with one tiny turn before it is kept.
-  route('POST', '/api/providers/claudecode', async (req, res, body, q, p, user) => {
+  route('POST', '/api/providers/claudecode', async ({ body, user }) => {
     const token = claudeCode.checkToken(body.token);
     const gate = appsCheck(); if (!gate.ok) return [400, { error: gate.reason, field: 'token' }];
     await claudeCode.install();
@@ -90,7 +90,7 @@ export function providerRoutes(route) {
     const [row] = (await status({ refresh: true })).filter((x) => x.id === 'claudecode');
     return row;
   }, { role: 'owner' });
-  route('DELETE', '/api/providers/claudecode', async (req, res, body, q, p, user) => {
+  route('DELETE', '/api/providers/claudecode', async ({ user }) => {
     claudeCode.disconnect();
     clearModelCache('claudecode');
     activity('system', { summary: `Claude Code disconnected by ${user.username}` });
@@ -98,7 +98,7 @@ export function providerRoutes(route) {
   }, { role: 'owner' });
   // Codex: its own device sign-in. Start shows the link and code; the end arrives as an activity entry
   // (detail.signin = 'codex'), which the open Models page listens for — no polling.
-  route('POST', '/api/providers/codex/start', async (req, res, body, q, p, user) => {
+  route('POST', '/api/providers/codex/start', async ({ user }) => {
     const gate = appsCheck(); if (!gate.ok) return [400, { error: gate.reason }];
     await codex.install();
     return codex.startLogin((ok, why) => {
@@ -107,7 +107,7 @@ export function providerRoutes(route) {
       else activity('error', { summary: `Codex sign-in did not finish${why ? `: ${why}` : ''}`, detail: { signin: 'codex', ok: false } });
     });
   }, { role: 'owner' });
-  route('DELETE', '/api/providers/codex', async (req, res, body, q, p, user) => {
+  route('DELETE', '/api/providers/codex', async ({ user }) => {
     await codex.disconnect();
     clearModelCache('codex');
     activity('system', { summary: `Codex disconnected by ${user.username}` });
@@ -115,21 +115,21 @@ export function providerRoutes(route) {
   }, { role: 'owner' });
 
   // "Test" button: sends "Say hi" and shows the reply and how long it took.
-  route('POST', '/api/providers/:id/test', async (req, res, body, q, p, user) => {
-    const r = await testProvider(p.id, body.model ? String(body.model) : '');
-    activity(r.ok ? 'system' : 'error', { summary: `Model test ${r.model || p.id} by ${user.username}: ${r.ok ? `ok in ${r.ms} ms` : r.error}` });
+  route('POST', '/api/providers/:id/test', async ({ body, params, user }) => {
+    const r = await testProvider(params.id, body.model ? String(body.model) : '');
+    activity(r.ok ? 'system' : 'error', { summary: `Model test ${r.model || params.id} by ${user.username}: ${r.ok ? `ok in ${r.ms} ms` : r.error}` });
     return r;
   });
 
   // body.label (042): sign in another ChatGPT account; body.account: sign that account in again (reconnect).
-  route('POST', '/api/providers/chatgpt/start', async (req, res, body) => {
+  route('POST', '/api/providers/chatgpt/start', async ({ body }) => {
     const existing = body?.account ? accountById(String(body.account)) : null;
     if (body?.account && existing?.type !== 'chatgpt') return [404, { error: 'No such ChatGPT account' }];
     const label = String(body?.label || '').trim().slice(0, 40);
     const id = existing ? existing.id : label ? newAccountId('chatgpt', label) : 'chatgpt';
     return chatgpt.startSignIn({ secret: secretFor('chatgpt', id), meta: { id, label: existing ? '' : label } });
   }, { role: 'owner' });
-  route('POST', '/api/providers/chatgpt/complete', async (req, res, body, q, p, user) => {
+  route('POST', '/api/providers/chatgpt/complete', async ({ body, user }) => {
     const { email, meta = {} } = await chatgpt.completeSignIn(body.callbackUrl);
     const id = meta.id || 'chatgpt';
     if (id !== 'chatgpt' && meta.label && !accountById(id)?.label) addAccount({ type: 'chatgpt', label: meta.label, id });
@@ -139,7 +139,7 @@ export function providerRoutes(route) {
     const models = (await allModels({ refresh: true })).filter((m) => m.provider === id).length;
     return { ok: true, email, models, account: id };
   }, { role: 'owner' });
-  route('DELETE', '/api/providers/chatgpt', async (req, res, body, q, p, user) => {
+  route('DELETE', '/api/providers/chatgpt', async ({ user }) => {
     await chatgpt.disconnect();
     clearModelCache('chatgpt');
     activity('system', { summary: `ChatGPT plan disconnected by ${user.username}` });
@@ -148,7 +148,7 @@ export function providerRoutes(route) {
 
   // ---------- accounts (042) ----------
   // Another API-key account of Anthropic or OpenAI (Copilot, ChatGPT and OpenRouter use their own routes with a label).
-  route('POST', '/api/accounts', async (req, res, body, q, p, user) => {
+  route('POST', '/api/accounts', async ({ body, user }) => {
     const type = String(body.type || '');
     if (!['anthropic', 'openai'].includes(type)) return [400, { error: 'Use the ChatGPT, Copilot or OpenRouter buttons for those accounts', field: 'type' }];
     if (!String(body.key || '').trim()) return [400, { error: 'Paste the API key of the other account', field: 'key' }];
@@ -157,13 +157,13 @@ export function providerRoutes(route) {
     const [row] = (await status({ refresh: true })).filter((x) => x.id === acc.id);
     return row || acc;
   });
-  route('PUT', '/api/accounts/:id', async (req, res, body, q, p, user) => {
-    const acc = renameAccount(p.id, body.label);
-    activity('system', { summary: `Model account ${p.id} renamed to “${acc.name}” by ${user.username}` });
+  route('PUT', '/api/accounts/:id', async ({ body, params, user }) => {
+    const acc = renameAccount(params.id, body.label);
+    activity('system', { summary: `Model account ${params.id} renamed to “${acc.name}” by ${user.username}` });
     return { id: acc.id, name: acc.name, label: acc.label };
   });
-  route('PUT', '/api/accounts/:id/key', async (req, res, body, q, p, user) => {
-    const acc = accountById(p.id);
+  route('PUT', '/api/accounts/:id/key', async ({ body, params, user }) => {
+    const acc = accountById(params.id);
     if (!acc || !['anthropic', 'openai', 'openrouter', 'compatible'].includes(acc.type)) return [404, { error: 'No such API-key account' }];
     if (!String(body.key || '').trim()) return [400, { error: 'Paste the key first', field: 'key' }];
     setSecret(acc.secret, String(body.key).trim());
@@ -172,14 +172,14 @@ export function providerRoutes(route) {
     const [row] = (await status({ refresh: true })).filter((x) => x.id === acc.id);
     return row;
   });
-  route('DELETE', '/api/accounts/:id', async (req, res, body, q, p, user) => {
-    const acc = accountById(p.id);
-    await removeAccount(p.id);
-    activity('system', { summary: `Model account “${acc?.name || p.id}” removed by ${user.username}` });
+  route('DELETE', '/api/accounts/:id', async ({ params, user }) => {
+    const acc = accountById(params.id);
+    await removeAccount(params.id);
+    activity('system', { summary: `Model account “${acc?.name || params.id}” removed by ${user.username}` });
     return { ok: true };
   }, { role: 'owner' });
-  route('POST', '/api/accounts/:id/retry', async (req, res, body, q, p, user) => {
-    const acc = accountById(p.id);
+  route('POST', '/api/accounts/:id/retry', async ({ params, user }) => {
+    const acc = accountById(params.id);
     if (!acc) return [404, { error: 'No such account' }];
     breaker.reset(acc.id);
     activity('system', { summary: `${acc.name}: pause cleared by ${user.username}; it is tried again on the next message` });
@@ -188,20 +188,20 @@ export function providerRoutes(route) {
 
   // ---------- fallback (042) ----------
   route('GET', '/api/fallback', async () => ({ ...fallbackSettings(), strategies: strategies(), health: breaker.allStates() }));
-  route('PUT', '/api/fallback', async (req, res, body, q, p, user) => {
+  route('PUT', '/api/fallback', async ({ body, user }) => {
     const out = setFallbackSettings({ enabled: body.enabled, chain: body.chain });
     activity('config', { summary: `Fallback ${out.enabled ? 'on' : 'off'}${out.chain.length ? `: ${out.chain.join(' → ')}` : ' (any other connected provider)'} (${user.username})` });
     return { ...out, strategies: strategies() };
   });
-  route('PUT', '/api/fallback/strategy', async (req, res, body, q, p, user) => {
+  route('PUT', '/api/fallback/strategy', async ({ body, user }) => {
     const out = setStrategy(String(body.group || ''), String(body.strategy || ''));
     activity('config', { summary: `Accounts of ${body.group}: ${body.strategy === 'spread' ? 'spread across accounts' : 'in order'} (${user.username})` });
     return { strategies: out };
   });
 
-  route('GET', '/api/models', async (req, res, body, q) => {
+  route('GET', '/api/models', async ({ query }) => {
     const s = getSettings();
-    const out = { models: await allModels({ refresh: q.get('refresh') === '1' }), defaultModel: s.defaultModel || 'auto', backgroundModel: s.backgroundModel || 'auto', fallback: fallbackSettings() };
+    const out = { models: await allModels({ refresh: query.get('refresh') === '1' }), defaultModel: s.defaultModel || 'auto', backgroundModel: s.backgroundModel || 'auto', fallback: fallbackSettings() };
     try { out.resolvedDefault = resolveModel('auto', 'agent').ref; } catch (e) { out.problem = e.message; }
     try { out.resolvedBackground = resolveModel('auto', 'background').ref; } catch { /* same problem */ }
     // 088: Smart choice: the light and strong models (settings) and what they mean right now
@@ -209,7 +209,7 @@ export function providerRoutes(route) {
     try { const t = tierModels(null); out.smart.resolvedLight = resolveModel(t.light, 'background').ref; out.smart.resolvedStrong = resolveModel(t.strong, 'agent').ref; } catch { /* no model yet */ }
     return out;
   });
-  route('POST', '/api/models/defaults', async (req, res, body, q, p, user) => {
+  route('POST', '/api/models/defaults', async ({ body, user }) => {
     const patch = {};
     for (const k of ['defaultModel', 'backgroundModel']) {
       if (k in body) {

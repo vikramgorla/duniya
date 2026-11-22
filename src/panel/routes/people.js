@@ -43,8 +43,8 @@ const found = (ref) => { const p = personByRef(decodeURIComponent(ref)); if (!p)
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
 export function peopleRoutes(route, { channel } = {}) {
   const admin = { role: /** @type {'admin'} */ ('admin') }; const owner = { role: /** @type {'owner'} */ ('owner') };
-  route('GET', '/api/people', async (req, res, body, q) => listPeople({ q: q.get('q') || '', tag: q.get('tag') || '', list: q.get('list') || '', household: q.get('household') || '',
-    app: q.get('app') || '', source: q.get('source') || '', hidden: q.get('hidden') === '1', limit: Number(q.get('limit')) || 100, offset: Number(q.get('offset')) || 0 }), admin);
+  route('GET', '/api/people', async ({ query }) => listPeople({ q: query.get('q') || '', tag: query.get('tag') || '', list: query.get('list') || '', household: query.get('household') || '',
+    app: query.get('app') || '', source: query.get('source') || '', hidden: query.get('hidden') === '1', limit: Number(query.get('limit')) || 100, offset: Number(query.get('offset')) || 0 }), admin);
   // counts, tags in use, households and lists for the filters, names from the phone and when they were refreshed
   route('GET', '/api/people/summary', async () => {
     const numbers = ((await channel?.status?.())?.numbers || [{ id: 'main' }]).map((n) => n.id);
@@ -52,26 +52,26 @@ export function peopleRoutes(route, { channel } = {}) {
     return { ...peopleCounts(), households: listHouseholds(), lists: listLists(), names: contactSummary(), refreshedAt: at.length ? Math.max(...at) : null,
       namesForAgents: contactNamesForAgents(), tieKinds: Object.keys(TIE_KINDS), consentPurposes: CONSENT_PURPOSES };
   }, admin);
-  route('POST', '/api/people', async (req, res, body, q, p, user) => createPerson(body || {}, user.username), admin);
+  route('POST', '/api/people', async ({ body, user }) => createPerson(body || {}, user.username), admin);
   // #113: may agents see the names from the owner's phone contacts? (default yes; profile names are often incomplete)
-  route('PUT', '/api/people/agent-names', async (req, res, body, q, p, user) => {
+  route('PUT', '/api/people/agent-names', async ({ body, user }) => {
     if (typeof body.enabled !== 'boolean') return [400, { error: 'enabled must be true or false', field: 'enabled' }];
     const on = setContactNamesForAgents(body.enabled);
     activity('config', { summary: `Phone contact names for agents ${on ? 'on' : 'off'} by ${user.username}` });
     return { namesForAgents: on };
   }, owner);
   // Optional extra: refresh names now (the server also does it by itself). At most every 10 minutes per number.
-  route('POST', '/api/people/refresh-names', async (req, res, body, q, p, user) => {
+  route('POST', '/api/people/refresh-names', async ({ user }) => {
     if (typeof channel?.refreshNames !== 'function') return [501, { error: 'Not available' }];
     const r = await channel.refreshNames();
     activity('config', { summary: `Names refreshed from WhatsApp (${user.username})` });
     return { numbers: r, ...contactSummary() };
   }, admin);
-  route('POST', '/api/people/merges/:id/undo', async (req, res, body, q, p, user) => undoMerge(p.id, user.username), owner);
+  route('POST', '/api/people/merges/:id/undo', async ({ params, user }) => undoMerge(params.id, user.username), owner);
 
   // a person's page: by id, or by number (someone with a chat who is not in People yet still has a page)
-  route('GET', '/api/people/:ref', async (req, res, body, q, p) => {
-    const ref = decodeURIComponent(p.ref);
+  route('GET', '/api/people/:ref', async ({ params }) => {
+    const ref = decodeURIComponent(params.ref);
     const x = personByRef(ref);
     if (!x) {
       const phone = digits(ref);
@@ -83,45 +83,45 @@ export function peopleRoutes(route, { channel } = {}) {
       consents: consentsOf(x.id), agents: agentsSeeing(x.id, listAgents().filter((a) => !isBuiltin(a))), modules: moduleSections('person', x.id),
       prefs: prefsOf(x.id), commitments: listCommitments({ person: x.id }) }; // 091
   }, admin);
-  route('PUT', '/api/people/:ref', async (req, res, body, q, p) => updatePerson(found(p.ref).id, body || {}), admin);
+  route('PUT', '/api/people/:ref', async ({ body, params }) => updatePerson(found(params.ref).id, body || {}), admin);
   // 079: the panel hides people; a true delete (privacy requests) is the admin MCP's erase_person, behind a confirm
-  route('DELETE', '/api/people/:ref', async (req, res, body, q, p, user) => erasePerson(found(p.ref).id, user.username), owner);
-  route('PUT', '/api/people/:ref/hidden', async (req, res, body, q, p, user) => {
+  route('DELETE', '/api/people/:ref', async ({ params, user }) => erasePerson(found(params.ref).id, user.username), owner);
+  route('PUT', '/api/people/:ref/hidden', async ({ body, params, user }) => {
     if (typeof body.hidden !== 'boolean') return [400, { error: 'hidden must be true or false', field: 'hidden' }];
-    return setHidden(found(p.ref).id, body.hidden, user.username);
+    return setHidden(found(params.ref).id, body.hidden, user.username);
   }, admin);
-  route('PUT', '/api/people/:ref/consents', async (req, res, body, q, p, user) => {
-    const id = found(p.ref).id;
+  route('PUT', '/api/people/:ref/consents', async ({ body, params, user }) => {
+    const id = found(params.ref).id;
     recordConsent(id, String(body.purpose || ''), String(body.value || ''), `Set by ${user.username}`);
     return { consents: consentsOf(id) };
   }, admin);
-  route('GET', '/api/people/:ref/export', async (req, res, body, q, p) => exportPerson(found(p.ref).id), owner);
-  route('POST', '/api/people/:ref/merge', async (req, res, body, q, p, user) => mergePeople(found(p.ref).id, String(body.other || ''), user.username), owner);
-  route('POST', '/api/people/:ref/notes', async (req, res, body, q, p, user) => addNote(found(p.ref).id, { text: body.text, by: body.by || 'owner', author: user.username }), admin);
-  route('DELETE', '/api/people/:ref/notes/:note', async (req, res, body, q, p) => (removeNote(found(p.ref).id, p.note) ? { ok: true } : [404, { error: 'No such note' }]), admin);
-  route('POST', '/api/people/:ref/ties', async (req, res, body, q, p) => {
-    const me = found(p.ref).id; const other = found(String(body.other || '')).id;
+  route('GET', '/api/people/:ref/export', async ({ params }) => exportPerson(found(params.ref).id), owner);
+  route('POST', '/api/people/:ref/merge', async ({ body, params, user }) => mergePeople(found(params.ref).id, String(body.other || ''), user.username), owner);
+  route('POST', '/api/people/:ref/notes', async ({ body, params, user }) => addNote(found(params.ref).id, { text: body.text, by: body.by || 'owner', author: user.username }), admin);
+  route('DELETE', '/api/people/:ref/notes/:note', async ({ params }) => (removeNote(found(params.ref).id, params.note) ? { ok: true } : [404, { error: 'No such note' }]), admin);
+  route('POST', '/api/people/:ref/ties', async ({ body, params }) => {
+    const me = found(params.ref).id; const other = found(String(body.other || '')).id;
     const id = body.reverse ? addTie(other, me, body) : addTie(me, other, body);
     return { id, ties: tiesOf(me) };
   }, admin);
-  route('DELETE', '/api/people/:ref/ties/:tie', async (req, res, body, q, p) => (removeTie(p.tie) ? { ties: tiesOf(found(p.ref).id) } : [404, { error: 'No such tie' }]), admin);
-  route('PUT', '/api/people/:ref/tags', async (req, res, body, q, p) => ({ tags: setTags(found(p.ref).id, body.tags) }), admin);
+  route('DELETE', '/api/people/:ref/ties/:tie', async ({ params }) => (removeTie(params.tie) ? { ties: tiesOf(found(params.ref).id) } : [404, { error: 'No such tie' }]), admin);
+  route('PUT', '/api/people/:ref/tags', async ({ body, params }) => ({ tags: setTags(found(params.ref).id, body.tags) }), admin);
 
   // ---------- households ----------
   route('GET', '/api/households', async () => listHouseholds(), admin);
-  route('POST', '/api/households', async (req, res, body) => saveHousehold({ name: body.name, address: body.address }), admin);
-  route('GET', '/api/households/:id', async (req, res, body, q, p) => ({ ...getHousehold(p.id), modules: moduleSections('household', p.id) }), admin);
-  route('PUT', '/api/households/:id', async (req, res, body, q, p) => saveHousehold({ id: p.id, name: body.name, address: body.address }), admin);
-  route('DELETE', '/api/households/:id', async (req, res, body, q, p) => ({ ok: deleteHousehold(p.id) }), admin);
-  route('PUT', '/api/households/:id/members/:person', async (req, res, body, q, p) => setHouseholdMember(p.id, found(p.person).id, body.role || 'adult'), admin);
-  route('DELETE', '/api/households/:id/members/:person', async (req, res, body, q, p) => removeHouseholdMember(p.id, found(p.person).id), admin);
+  route('POST', '/api/households', async ({ body }) => saveHousehold({ name: body.name, address: body.address }), admin);
+  route('GET', '/api/households/:id', async ({ params }) => ({ ...getHousehold(params.id), modules: moduleSections('household', params.id) }), admin);
+  route('PUT', '/api/households/:id', async ({ body, params }) => saveHousehold({ id: params.id, name: body.name, address: body.address }), admin);
+  route('DELETE', '/api/households/:id', async ({ params }) => ({ ok: deleteHousehold(params.id) }), admin);
+  route('PUT', '/api/households/:id/members/:person', async ({ body, params }) => setHouseholdMember(params.id, found(params.person).id, body.role || 'adult'), admin);
+  route('DELETE', '/api/households/:id/members/:person', async ({ params }) => removeHouseholdMember(params.id, found(params.person).id), admin);
 
   // ---------- lists ----------
   route('GET', '/api/lists', async () => listLists(), admin);
-  route('POST', '/api/lists', async (req, res, body) => saveList({ name: body.name }), admin);
-  route('GET', '/api/lists/:id', async (req, res, body, q, p) => getList(p.id), admin);
-  route('PUT', '/api/lists/:id', async (req, res, body, q, p) => saveList({ id: p.id, name: body.name }), admin);
-  route('DELETE', '/api/lists/:id', async (req, res, body, q, p) => ({ ok: deleteList(p.id) }), admin);
-  route('PUT', '/api/lists/:id/members/:person', async (req, res, body, q, p) => setListMember(p.id, found(p.person).id, true), admin);
-  route('DELETE', '/api/lists/:id/members/:person', async (req, res, body, q, p) => setListMember(p.id, found(p.person).id, false), admin);
+  route('POST', '/api/lists', async ({ body }) => saveList({ name: body.name }), admin);
+  route('GET', '/api/lists/:id', async ({ params }) => getList(params.id), admin);
+  route('PUT', '/api/lists/:id', async ({ body, params }) => saveList({ id: params.id, name: body.name }), admin);
+  route('DELETE', '/api/lists/:id', async ({ params }) => ({ ok: deleteList(params.id) }), admin);
+  route('PUT', '/api/lists/:id/members/:person', async ({ params }) => setListMember(params.id, found(params.person).id, true), admin);
+  route('DELETE', '/api/lists/:id/members/:person', async ({ params }) => setListMember(params.id, found(params.person).id, false), admin);
 }

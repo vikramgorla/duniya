@@ -13,20 +13,20 @@ export function lessonRoutes(route, { channel } = {}) {
     if (!a || isBuiltin(p.id)) throw Object.assign(new Error('Not found'), { status: 404 });
     return a;
   };
-  route('GET', '/api/agents/:id/lessons', async (req, res, body, q, p) => {
-    const a = agentOf(p);
+  route('GET', '/api/agents/:id/lessons', async ({ params }) => {
+    const a = agentOf(params);
     const r = listLessons(a.id);
     const names = chatLabels([...new Set([...r.proposed, ...r.active, ...r.feedback].map((l) => l.chat).filter(Boolean))]);
     const named = (l) => ({ ...l, ...(l.chat ? { chatName: names.get(l.chat) } : {}) });
     return { settings: a.lessons, chats: a.chats.map((c) => ({ id: c, name: chatLabel(c) })),
       proposed: r.proposed.map(named), active: r.active.map(named), feedback: r.feedback.map(named) };
   }, { role: 'admin' });
-  route('POST', '/api/agents/:id/lessons', async (req, res, body, q, p, user) => [201, addLesson(agentOf(p).id, body, user.username)], { role: 'admin' });
-  route('PUT', '/api/agents/:id/lessons/:lid', async (req, res, body, q, p, user) => updateLesson(agentOf(p).id, p.lid, body, user.username), { role: 'admin' });
-  route('DELETE', '/api/agents/:id/lessons/:lid', async (req, res, body, q, p) => deleteLesson(agentOf(p).id, p.lid), { role: 'admin' });
+  route('POST', '/api/agents/:id/lessons', async ({ body, params, user }) => [201, addLesson(agentOf(params).id, body, user.username)], { role: 'admin' });
+  route('PUT', '/api/agents/:id/lessons/:lid', async ({ body, params, user }) => updateLesson(agentOf(params).id, params.lid, body, user.username), { role: 'admin' });
+  route('DELETE', '/api/agents/:id/lessons/:lid', async ({ params }) => deleteLesson(agentOf(params).id, params.lid), { role: 'admin' });
   // Feedback on joining in: needless (an answer `msg` it gave by itself), missed (it stayed out in `chat`), good.
-  route('POST', '/api/agents/:id/join-feedback', async (req, res, body, q, p, user) => {
-    const a = agentOf(p);
+  route('POST', '/api/agents/:id/join-feedback', async ({ body, params, user }) => {
+    const a = agentOf(params);
     const kind = String(body.kind || '');
     let chat = String(body.chat || ''); let message = ''; let answer = ''; let msg = null;
     if (kind === 'needless' || kind === 'good') {

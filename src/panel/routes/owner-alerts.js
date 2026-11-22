@@ -13,17 +13,17 @@ export function ownerAlertRoutes(route, { channel } = {}) {
     const agents = new Map(listAgents().map((a) => [a.id, a.name]));
     return { ...budgetOverview({ agentName: (id) => agents.get(id) || `${id} (deleted)`, chatName: (id) => chats.get(id) }), alertsTo: ownerNumber() };
   });
-  route('GET', '/api/budget/:scope/:id', async (req, res, body, q, p) => {
-    if (!SCOPES.includes(p.scope)) return [404, { error: 'Not found' }];
-    const cap = getCap(p.scope, decodeURIComponent(p.id));
+  route('GET', '/api/budget/:scope/:id', async ({ params }) => {
+    if (!SCOPES.includes(params.scope)) return [404, { error: 'Not found' }];
+    const cap = getCap(params.scope, decodeURIComponent(params.id));
     return { currency: CURRENCY, cap: cap ? capStatus(cap) : null };
   });
-  route('PUT', '/api/budget/:scope/:id', async (req, res, body, q, p, user) => {
-    const id = decodeURIComponent(p.id);
-    if (p.scope === 'agent' && !getAgent(id)) return [404, { error: 'Agent not found' }];
-    const cap = setCap(p.scope, id, { cost: body.cost, tokens: body.tokens, fallback: body.fallback });
-    const what = p.scope === 'agent' ? `agent ${id}` : `chat ${id}`;
-    activity('config', { agent: p.scope === 'agent' ? id : '', chat: p.scope === 'chat' ? id : '',
+  route('PUT', '/api/budget/:scope/:id', async ({ body, params, user }) => {
+    const id = decodeURIComponent(params.id);
+    if (params.scope === 'agent' && !getAgent(id)) return [404, { error: 'Agent not found' }];
+    const cap = setCap(params.scope, id, { cost: body.cost, tokens: body.tokens, fallback: body.fallback });
+    const what = params.scope === 'agent' ? `agent ${id}` : `chat ${id}`;
+    activity('config', { agent: params.scope === 'agent' ? id : '', chat: params.scope === 'chat' ? id : '',
       summary: cap ? `Monthly cap for ${what}: ${[cap.cost ? `$${cap.cost}` : '', cap.tokens ? `${cap.tokens} tokens` : ''].filter(Boolean).join(' / ')}${cap.fallback ? `, then ${cap.fallback}` : ', then quiet'} (${user.username})` : `Monthly cap for ${what} removed (${user.username})` });
     return { currency: CURRENCY, cap: cap ? capStatus(cap) : null };
   });

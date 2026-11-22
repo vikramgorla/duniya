@@ -1,6 +1,16 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.58.13": {
+      "breaking": false,
+      "title": "Tidier inside",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Internal clean-up of the panel’s server code. Nothing changes in how the app looks or works."
+        }
+      ]
+    },
     "2.58.12": {
       "breaking": false,
       "title": "Backups and restore you can rely on",

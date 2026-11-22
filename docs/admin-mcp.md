@@ -92,7 +92,8 @@ rotation). Spec: [`specs/017-admin-mcp/`](../specs/017-admin-mcp/spec.md).
 | Server | updates (`get_update_status` with the notes of every release in between, incl. breaking releases: `apply_update` with `breaking: true`, `snooze_update_decision`; the update source: `source` in `get_update_status`,
 `set_update_source` to a fork or back to the project, confirm required), release notes (`get_release_notes`: what each installed version brought, any range), metrics (with hosting), OS updates (`list_os_updates`: will install / rolling out gradually / held back; `run_maintenance` `os-update` or `os-update-all` to include gradual updates; restart-needed status), the root maintenance helper (`get_maintenance_status` → `helperOutdated`, `helperSelfUpdate`; `run_maintenance` `update-helper`), Small server mode (`set_small_server_mode`, confirm required), health and retention (`get_server_health`: database size, oldest kept data, last clean-up, disk, queue, clock; `set_retention`, confirm required), restart, backups |
 
-The list is in `src/panel/admin-tools.js`; a feature that adds panel functionality adds its tool there
+The list is in `src/panel/admin-tools.js`, one file per area in `src/panel/admin-tools/`; a feature that adds panel
+functionality adds its tool there
 ([AGENTS.md](../AGENTS.md)). The [owner assistant](owner-assistant.md) uses the same tools from WhatsApp.
 
 ---

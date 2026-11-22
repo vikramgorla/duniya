@@ -14,7 +14,7 @@ export function mediaRoutes(route) {
   const view = async () => ({ ...(await capabilities()), voices: VOICES, server: serverSize(), localAllowed: localEngineCheck({ forEnable: true }),
     localMinMb: LOCAL_MIN_TOTAL_MB, queue: { ...queueStats(), calls: queueState() } });
   route('GET', '/api/media', async () => view());
-  route('PUT', '/api/media/settings', async (req, res, body, q, p, user) => {
+  route('PUT', '/api/media/settings', async ({ body, user }) => {
     const before = mediaSettings();
     if (body.local && (body.local.listen || body.local.speak)) { // switching an on-server engine on: small servers refuse
       if (user.role !== 'owner') return [403, { error: 'Only the owner can switch on on-server engines' }];
@@ -26,18 +26,18 @@ export function mediaRoutes(route) {
     if (changed.length) activity('config', { summary: `Photos & voice settings changed: ${changed.join(', ')} (${user.username})` });
     return view();
   }, ADMIN);
-  route('POST', '/api/media/local/:kind/install', async (req, res, body, q, p, user) => {
-    if (!ENGINES[p.kind]) return [404, { error: 'Unknown engine' }];
-    const st = installEngine(p.kind);
-    activity('config', { summary: `On-server ${p.kind === 'stt' ? 'listening' : 'speaking'} engine: download started (${user.username})` });
+  route('POST', '/api/media/local/:kind/install', async ({ params, user }) => {
+    if (!ENGINES[params.kind]) return [404, { error: 'Unknown engine' }];
+    const st = installEngine(params.kind);
+    activity('config', { summary: `On-server ${params.kind === 'stt' ? 'listening' : 'speaking'} engine: download started (${user.username})` });
     return st;
   }, OWNER);
-  route('DELETE', '/api/media/local/:kind', async (req, res, body, q, p, user) => {
-    if (!ENGINES[p.kind]) return [404, { error: 'Unknown engine' }];
-    const key = p.kind === 'stt' ? 'listen' : 'speak';
+  route('DELETE', '/api/media/local/:kind', async ({ params, user }) => {
+    if (!ENGINES[params.kind]) return [404, { error: 'Unknown engine' }];
+    const key = params.kind === 'stt' ? 'listen' : 'speak';
     setMediaSettings({ local: { [key]: false } });
-    const st = removeEngine(p.kind);
-    activity('config', { summary: `On-server ${p.kind === 'stt' ? 'listening' : 'speaking'} engine removed (${user.username})` });
+    const st = removeEngine(params.kind);
+    activity('config', { summary: `On-server ${params.kind === 'stt' ? 'listening' : 'speaking'} engine removed (${user.username})` });
     return st;
   }, OWNER);
   route('GET', '/api/media/local', async () => localStatus());

@@ -50,16 +50,16 @@ const frameOf = (a) => { let f = frames.get(a); if (!f) { f = `data: ${JSON.stri
 
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
 export function statusRoutes(route, { channel } = {}) {
-  route('GET', '/api/status', async (req, res, body, q, p, user) => statusFor(user, channel));
+  route('GET', '/api/status', async ({ user }) => statusFor(user, channel));
   // 055: Small server mode — one server-wide switch for heavier features on a small server (owner only).
   route('GET', '/api/server/small-mode', async () => smallModeView());
-  route('PUT', '/api/server/small-mode', async (req, res, body, q, p, user) => {
+  route('PUT', '/api/server/small-mode', async ({ body, user }) => {
     if (typeof body.enabled !== 'boolean') return [400, { error: 'enabled must be true or false', field: 'enabled' }];
     setSmallServerMode(body.enabled);
     activity('config', { summary: `Small server mode ${body.enabled ? 'on' : 'off'} by ${user.username}` });
     return smallModeView();
   }, { role: 'owner' });
-  route('POST', '/api/settings', async (req, res, body, q, p, user) => {
+  route('POST', '/api/settings', async ({ body, user }) => {
     const patch = {};
     if ('paused' in body) patch.paused = !!body.paused;
     if ('defaultDmAgent' in body) patch.defaultDmAgent = String(body.defaultDmAgent || '');
@@ -71,15 +71,15 @@ export function statusRoutes(route, { channel } = {}) {
 
   // ---------- activity ----------
   // 072: a reply carries its rating (detail.msg is the stored answer), the same as in Review and the chat's messages
-  route('GET', '/api/activity', async (req, res, body, q) => {
-    const rows = listActivity({ limit: q.get('limit'), agent: q.get('agent') || '', chat: q.get('chat') || '', type: q.get('type') || '', before: Number(q.get('before') || 0) });
+  route('GET', '/api/activity', async ({ query }) => {
+    const rows = listActivity({ limit: query.get('limit'), agent: query.get('agent') || '', chat: query.get('chat') || '', type: query.get('type') || '', before: Number(query.get('before') || 0) });
     const rated = ratingsOf(rows.filter((r) => r.type === 'message.out' && r.detail?.msg).map((r) => r.detail.msg));
     return withChatNames(rated.size ? rows.map((r) => (r.type === 'message.out' && rated.has(r.detail?.msg) ? { ...r, rating: rated.get(r.detail.msg) } : r)) : rows);
   });
   // Live panel (058): activity entries as plain messages, and the status (what GET /api/status returns) as `status`
   // events: shortly after anything changed (activity or a channel state change such as a new QR) and with the
   // keep-alive every 25 s (uptime, memory). Unchanged status is not sent again, except with the keep-alive.
-  route('GET', '/api/events', async (req, res, body, q, p, user) => {
+  route('GET', '/api/events', async ({ req, res, user }) => {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive', 'x-accel-buffering': 'no' });
     res.write('retry: 3000\n\n');
     let last = ''; let soon = null; let closed = false;
@@ -103,7 +103,7 @@ export function statusRoutes(route, { channel } = {}) {
   });
   // ---------- activity logging settings (011) ----------
   route('GET', '/api/logging', async () => ({ settings: loggingSettings(), categories: LOG_CATEGORIES }));
-  route('PUT', '/api/logging', async (req, res, body, q, p, user) => {
+  route('PUT', '/api/logging', async ({ body, user }) => {
     const cur = loggingSettings();
     const next = {
       level: ['minimal', 'normal', 'verbose'].includes(body.level) ? body.level : cur.level,
