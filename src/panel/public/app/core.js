@@ -388,8 +388,11 @@ function markTabs() {
     if (b.dataset.tab === S.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   }
 }
+// The server was updated while this page was open: the next screen change loads the new app (old files don't fit it).
+const noteNewVersion = (v) => { if (v && S.status?.version && v !== S.status.version) S.staleApp = true; };
 function applyStatus(next) {
   const pendingWas = S.status?.pending;
+  noteNewVersion(next.version);
   S.status = next;
   if (pendingWas !== next.pending && $('header nav')) { $('header nav').dataset.sig = ''; drawNav(); }
   const st = S.status.channel.status;
@@ -429,6 +432,9 @@ const sheet = (open) => deadline(import('./find.js'), S.loadTimeout, 'screen').t
   toast('Part of the app did not arrive. Reloading…', { bad: true }); setTimeout(() => location.reload(), 1200);
 });
 export function show(tab) {
+  if (S.staleApp) location.reload(); else drawScreen(tab);
+}
+function drawScreen(tab) {
   if (!TABS().some(([id]) => id === tab) && !(tab === 'pending' && can('viewer'))) tab = 'overview';
   const from = S.tab; S.tab = tab;
   document.title = `${LABEL[tab] || 'Duniya'}${LABEL[tab] ? ' · Duniya' : ''}`;
@@ -459,7 +465,7 @@ export function show(tab) {
     if (S.renderSeq !== seq || !main || e?.message === 'Please sign in') return;
     // A screen module that is missing (the app was updated while this page was open: new file names) → load the new app
     // once; a second failure within a minute shows Retry instead of looping.
-    const missing = /dynamically imported module|importing a module script failed|module script/i.test(e?.message || '');
+    const missing = /dynamically imported module|importing a module script failed|module script|does not provide an export/i.test(e?.message || '');
     if (missing && Date.now() - Number(sessionStorage.getItem('duniya.reloadedAt') || 0) > 60000) { sessionStorage.setItem('duniya.reloadedAt', String(Date.now())); location.reload(); return; }
     main.replaceChildren(loadFailed(e, () => show(S.tab)));
   }).finally(() => {
