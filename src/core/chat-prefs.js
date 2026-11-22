@@ -60,10 +60,23 @@ export function setChatPrefs(chat, { model, logging, enabled, fallback, private:
   cache.set(chat, next);
   return next;
 }
-/** 077: a chat's settings (on/off, model, private…), its Chats entry and its privacy-notice record move to a new id. */
-export function moveChatPrefs(from, to) {
-  for (const t of ['chat_prefs', 'chats_seen', 'privacy_notices']) {
-    try { db.prepare(`UPDATE OR REPLACE ${t} SET chat = ? WHERE tenant_id = ? AND chat = ?`).run(to, TENANT, from); } catch { /* table not created in this process */ }
+/**
+ * A chat's settings, Chats entry and privacy-notice record join another id (the same chat under a new id). Settings
+ * combine field by field: what `to` set wins, `from` fills the rest, and on, private and the notice opt-out stay on
+ * when either had them (the stricter choice is kept). `from` is gone afterwards.
+ */
+export function mergeChatPrefs(from, to) {
+  const has = (chat) => !!db.prepare('SELECT 1 FROM chat_prefs WHERE tenant_id = ? AND chat = ?').get(TENANT, chat);
+  if (has(from)) {
+    const a = getChatPrefs(from); const b = has(to) ? getChatPrefs(to) : null;
+    const pick = (k, dflt) => (b && b[k] !== dflt ? b[k] : a[k]);
+    const fb = b && (b.fallback.mode !== 'inherit' || b.fallback.chain.length) ? b.fallback : a.fallback;
+    setChatPrefs(to, { model: pick('model', 'inherit'), logging: pick('logging', 'inherit'), welcome: pick('welcome', 'inherit'), fallback: fb,
+      enabled: a.enabled || !!b?.enabled, private: a.private || !!b?.private, noticeOff: a.noticeOff || !!b?.noticeOff });
+    db.prepare('DELETE FROM chat_prefs WHERE tenant_id = ? AND chat = ?').run(TENANT, from);
+  }
+  for (const t of ['chats_seen', 'privacy_notices']) {
+    try { db.prepare(`UPDATE OR IGNORE ${t} SET chat = ? WHERE tenant_id = ? AND chat = ?`).run(to, TENANT, from); db.prepare(`DELETE FROM ${t} WHERE tenant_id = ? AND chat = ?`).run(TENANT, from); } catch { /* table not created in this process */ }
   }
   cache.delete(from); cache.delete(to);
 }

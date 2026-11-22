@@ -1,6 +1,14 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.57.2": {
+      "breaking": false,
+      "title": "One chat per person",
+      "changes": [
+        { "type": "fixed", "text": "A direct chat set up under a phone number now answers the person's first message even when WhatsApp sends it from its private id; the two no longer show as separate chats." },
+        { "type": "fixed", "text": "Chats that already appear twice become one with the person's next message: the agent, on/off, private and memory stay together (private is kept if either had it)." }
+      ]
+    },
     "2.57.1": {
       "breaking": false,
       "title": "The AI picks the moment for a GIF",

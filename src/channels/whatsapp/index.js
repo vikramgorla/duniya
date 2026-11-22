@@ -7,7 +7,6 @@ import { resolve } from 'node:path';
 import { DATA_DIR, fail } from '../../core/config.js';
 import { getSetting, updateSettings } from '../../core/store.js';
 import { activity } from '../../core/events.js';
-import { resolveDirectChat } from '../../core/direct-chats.js';
 import { MAIN, chatKey, splitChat } from './ids.js';
 import { createWhatsAppSession } from './session.js';
 
@@ -37,7 +36,7 @@ export function createWhatsAppAdapter({ factory = createWhatsAppSession } = {}) 
     if (!on) return ch;
     const wrap = wrapMsg(n);
     // 049: a prepared person's LID chat arrives under the prepared chat id
-    await ch.start(async (m) => on.onMessage(resolveDirectChat(wrap(m))), { onHistory: async (msgs, meta = {}) => on.onHistory?.(msgs.map(wrap), { ...meta, // #91: keys and chats in app chat ids
+    await ch.start(async (m) => on.onMessage(wrap(m)), { onHistory: async (msgs, meta = {}) => on.onHistory?.(msgs.map(wrap), { ...meta, // #91: keys and chats in app chat ids
       keys: (meta.keys || []).map((k) => ({ ...k, chat: chatKey(n.id, k.chat), number: n.id })), chats: (meta.chats || []).map((c) => chatKey(n.id, c)) }),
     onJoin: async (ev) => on.onJoin?.({ ...ev, chat: chatKey(n.id, ev.chat) }), // 054: welcome
     onMemberTag: async (ev) => on.onMemberTag?.({ ...ev, chat: chatKey(n.id, ev.chat) }), // 057: member tags

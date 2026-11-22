@@ -20,10 +20,12 @@ before(async () => {
 after(() => t.close());
 
 /** The next moment (from now, minute by minute) when the owner's clock shows hh:mm. */
+/** `hhmm` today in the owner assistant's time zone (never tomorrow, whatever time the test runs). */
 function momentAt(hhmm) {
   const tz = t.agents.getAgent('owner-assistant').timezone || config.env.timezone;
-  let at = Date.now() - (Date.now() % 60000) + 1000;
-  for (let i = 0; i < 1500 && config.localParts(tz, at).hhmm !== hhmm; i++) at += 60000;
+  const today = config.localParts(tz).date;
+  let at = Date.now() - (Date.now() % 60000) - 86400000 + 1000;
+  for (let i = 0; i < 3000 && !(config.localParts(tz, at).date === today && config.localParts(tz, at).hhmm === hhmm); i++) at += 60000;
   return at;
 }
 

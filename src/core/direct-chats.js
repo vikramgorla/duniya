@@ -1,13 +1,14 @@
 // Prepared direct chats (049, issue #92). The owner sets up a 1:1 chat — agent, on/off, private, model, logging,
-// fallback, spending cap — for a phone number before that person has written. The chat id is the phone form
-// `<digits>@s.whatsapp.net` (prefixed `<number>#` on other WhatsApp numbers, src/channels/whatsapp/ids.js).
-// WhatsApp may deliver that person's first message from their LID (`…@lid`): resolveDirectChat() maps it to the
-// prepared chat by phone (or by the LID WhatsApp told us when the chat was prepared) and keeps an alias, so replies,
-// memory and later lookups all use one chat id. Only settings are stored here, never message text.
+// fallback, spending cap — for a phone number before that person has written. The chat id is the one WhatsApp uses:
+// their private id (`…@lid`) when it is known, else the phone form `<digits>@s.whatsapp.net` (prefixed `<number>#` on
+// other WhatsApp numbers, src/channels/whatsapp/ids.js). When WhatsApp later delivers their messages from the LID, a
+// phone-form chat with settings or an agent (prepared here or set up on its chat page) joins the LID chat
+// (chat-merge.js) and stays as an alias, so there is one chat per person. Only settings are stored here, never text.
 import { db, logMessage } from './db.js';
 import { digits, bad } from './config.js';
 import { TENANT, getSetting } from './store.js';
 import { getAgent, bindChat, agentForChat } from './agents.js';
+import { mergeChats } from './chat-merge.js';
 import { getChatPrefs, setChatPrefs, seenChats } from './chat-prefs.js';
 import { setCap } from './budget.js';
 import { personInfo } from './contacts.js';
@@ -69,40 +70,52 @@ const reload = () => { cache = null; return load(); };
 /** Does this chat id have settings or an agent of its own? (Then it is never aliased to another chat.) */
 const hasOwnEntry = (chat) => !!db.prepare('SELECT 1 FROM chat_prefs WHERE tenant_id = ? AND chat = ?').get(TENANT, chat) || !!agentForChat(chat);
 
-function addAlias(alias, chat, why) {
+function addAlias(alias, chat) {
   if (!alias || alias === chat) return;
   db.prepare('INSERT OR REPLACE INTO chat_aliases (tenant_id, alias, chat, created_at) VALUES (?, ?, ?, ?)').run(TENANT, alias, chat, Date.now());
   load().aliases.set(alias, chat);
-  activity('config', { chat, summary: `Direct chat: WhatsApp's private id for this person now maps to the prepared chat (${why})` });
 }
 
 export const isChatAlias = (chat) => load().aliases.has(chat);
 
+/** The phone-form chat of a direct message from a LID, when it has settings, an agent or a prepared entry: '' else. */
+function phoneTwin(msg) {
+  const { number, jid } = splitChat(msg.chat);
+  const phone = digits(msg.phone);
+  if (!isLidJid(jid) || !phone) return '';
+  const twin = chatKey(number, pnJid(phone));
+  return twin !== msg.chat && (load().prepared.has(twin) || hasOwnEntry(twin)) ? twin : '';
+}
+
+/** The phone-form chat joins the LID chat WhatsApp uses: settings, agent, cap and memory; the prepared entry moves too. */
+async function adoptTwin(twin, chat, phone) {
+  await mergeChats(twin, chat, `Direct chat with +${phone}: WhatsApp now writes from its private id`);
+  db.prepare('UPDATE OR REPLACE direct_chats SET chat = ?, lid = ? WHERE tenant_id = ? AND chat = ?').run(chat, splitChat(chat).jid, TENANT, twin);
+  reload();
+  addAlias(twin, chat);
+}
+
+/** The first message of a prepared chat: noted once (the panel stops showing it as waiting). */
+function noteFirstMessage(chat) {
+  const row = load().prepared.get(chat);
+  if (!row || row.first_at) return;
+  row.first_at = Date.now();
+  db.prepare('UPDATE direct_chats SET first_at = ? WHERE tenant_id = ? AND chat = ?').run(row.first_at, TENANT, chat);
+  activity('config', { chat, summary: 'Prepared direct chat: first message arrived' });
+}
+
 /**
- * Router entry: a direct message whose chat is a known alias, or a LID chat of a prepared phone, is given the
- * prepared chat id (and the phone, when WhatsApp hid it). Groups and other chats pass unchanged. Never throws.
+ * Router entry: a direct message from a known alias gets its chat id; one from a LID whose phone-form chat was set up
+ * first makes the two one chat (under the LID). Groups and other chats pass unchanged. Never throws.
  */
-export function resolveDirectChat(msg) {
+export async function resolveDirectChat(msg) {
   if (!msg || msg.isGroup || !msg.chat) return msg;
   try {
-    const c = load();
-    let chat = c.aliases.get(msg.chat) || '';
-    if (!chat) {
-      const { number, jid } = splitChat(msg.chat);
-      const phone = digits(msg.phone);
-      if (isLidJid(jid) && phone) {
-        const target = chatKey(number, pnJid(phone));
-        if (c.prepared.has(target) && !hasOwnEntry(msg.chat)) { chat = target; addAlias(msg.chat, target, 'first message'); }
-      }
-    }
-    const out = chat ? { ...msg, chat, phone: msg.phone || c.prepared.get(chat)?.phone || '', viaAlias: msg.chat } : msg;
-    const row = c.prepared.get(out.chat);
-    if (row && !row.first_at) {
-      row.first_at = Date.now();
-      const lid = out.viaAlias ? splitChat(out.viaAlias).jid : row.lid;
-      db.prepare('UPDATE direct_chats SET first_at = ?, lid = ? WHERE tenant_id = ? AND chat = ?').run(row.first_at, lid || '', TENANT, out.chat);
-      activity('config', { chat: out.chat, summary: 'Prepared direct chat: first message arrived' });
-    }
+    const aliased = load().aliases.get(msg.chat);
+    const out = aliased ? { ...msg, chat: aliased, phone: msg.phone || load().prepared.get(aliased)?.phone || '', viaAlias: msg.chat } : msg;
+    const twin = aliased ? '' : phoneTwin(msg);
+    if (twin) await adoptTwin(twin, msg.chat, digits(msg.phone));
+    noteFirstMessage(out.chat);
     return out;
   } catch { return msg; }
 }
@@ -126,7 +139,7 @@ export async function checkDirectNumber({ phone, number } = {}, { channel } = {}
   const d = normalizePhone(phone);
   const n = resolveNumber(number);
   const look = await lookup(channel, n.id, d);
-  const chat = targetChat(n.id, d);
+  const chat = targetChat(n.id, d, look.lid);
   return { phone: d, number: n.id, chat, name: personInfo({ phone: d }).name, onWhatsApp: look.onWhatsApp, existing: getDirectChat(chat), warning: lookWarning(look) };
 }
 
@@ -140,13 +153,15 @@ async function lookup(channel, number, phone) {
 const lookWarning = (look) => (look.onWhatsApp === false ? 'This number does not seem to be on WhatsApp. The chat is set up anyway and starts when they write.'
   : look.onWhatsApp === null ? 'WhatsApp is not connected, so the number could not be checked. The chat is set up anyway.' : '');
 
-/** The chat id to prepare: an existing LID chat of this phone that has its own settings, else the phone form. */
-function targetChat(number, phone) {
+/** The chat id to prepare: the one WhatsApp uses for this person — an alias, their LID (told by the number check, or a
+ *  chat seen from it) — else the phone form. */
+function targetChat(number, phone, lid = '') {
   const pn = chatKey(number, pnJid(phone));
   const alias = load().aliases.get(pn);
   if (alias) return alias;
+  if (lid) return chatKey(number, lid);
   const seenLid = seenChats({ groups: false }).find((c) => c.number === number && c.phone === phone && c.id !== pn && isLidJid(splitChat(c.id).jid));
-  return seenLid && hasOwnEntry(seenLid.id) && !hasOwnEntry(pn) ? seenLid.id : pn;
+  return seenLid ? seenLid.id : pn;
 }
 
 function checkCap(cap) {
@@ -169,7 +184,9 @@ export async function prepareDirectChat(input = {}, { channel, by = '' } = {}) {
   if (agentId && !getAgent(agentId)) throw bad(`Unknown agent "${agentId}"`, 'agent', 404);
   const cap = checkCap(input.cap);
   const look = await lookup(channel, n.id, d);
-  const chat = targetChat(n.id, d);
+  const chat = targetChat(n.id, d, look.lid);
+  const pn = chatKey(n.id, pnJid(d));
+  if (chat !== pn && (load().prepared.has(pn) || hasOwnEntry(pn))) await adoptTwin(pn, chat, d); // set up under the phone before
   const isNew = !hasOwnEntry(chat);
 
   // Settings first (validated before anything is written), then the cap, then the agent.
@@ -184,15 +201,7 @@ export async function prepareDirectChat(input = {}, { channel, by = '' } = {}) {
     ON CONFLICT (tenant_id, chat) DO UPDATE SET on_whatsapp = excluded.on_whatsapp, lid = CASE WHEN excluded.lid <> '' THEN excluded.lid ELSE direct_chats.lid END`)
     .run(TENANT, chat, n.id, d, look.lid, look.onWhatsApp == null ? null : look.onWhatsApp ? 1 : 0, String(by).slice(0, 60), Date.now(), seen?.lastAt || null);
   reload();
-  // WhatsApp told us this person's private id (LID): their first message from it maps here straight away.
-  if (look.lid) {
-    const lidChat = chatKey(n.id, look.lid);
-    if (lidChat !== chat && !hasOwnEntry(lidChat)) addAlias(lidChat, chat, 'number check');
-  }
-  // A LID chat seen earlier for this phone without settings of its own: same person, same chat from now on.
-  for (const c of seenChats({ groups: false })) {
-    if (c.number === n.id && c.phone === d && c.id !== chat && isLidJid(splitChat(c.id).jid) && !hasOwnEntry(c.id)) addAlias(c.id, chat, 'seen before');
-  }
+  if (chat !== pn) addAlias(pn, chat); // their phone-form id (a send by number, a message without the LID) finds this chat
   const prefs = getChatPrefs(chat);
   const agent = agentForChat(chat);
   activity('config', { chat, agent: agent?.id || '', summary: `Direct chat set up for +${d}${n.id !== MAIN ? ` on ${n.label || n.id}` : ''}: ${agent ? `agent ${agent.name}` : 'no agent'}, ${prefs.enabled ? 'on' : 'off'}${prefs.private ? ', private to members' : ''}${look.onWhatsApp === false ? ' (not on WhatsApp?)' : ''} (${by || 'panel'})` });
