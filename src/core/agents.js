@@ -10,7 +10,7 @@ import {
 } from './store.js';
 import { activity } from './events.js';
 import { deleteAgentConnections } from './mcp-oauth.js';
-import { globalServers, listGlobalRows, saveGlobalServer } from './global-mcp.js';
+import { globalServers } from './global-mcp.js';
 import { guardLocalSmall } from './mcp-local.js';
 
 // ---------- the built-in owner assistant (059) ----------
@@ -41,29 +41,8 @@ function toRuntime(row) {
 }
 
 // ---------- registry ----------
-// 2.57 (one-time, remove in 2.58): "Share … on its own" became part of "When to use it" (sometimes → proactive,
-// often → often). Database only, at once.
-function whenFromShare(b) {
-  if (!b || b.share === undefined) return null;
-  const { share, ...rest } = b;
-  const when = share === 'often' ? 'often' : share === 'sometimes' && rest.when !== 'often' ? 'proactive' : rest.when;
-  return { ...rest, ...(when ? { when } : {}) };
-}
-function liftShare() {
-  for (const row of listAgentRows()) {
-    const sv = row.config.services || {};
-    const lifted = Object.entries(sv).map(([k, b]) => [k, whenFromShare(b)]);
-    if (lifted.some(([, b]) => b)) saveAgentRow(row.id, { ...row.config, services: Object.fromEntries(lifted.map(([k, b]) => [k, b || sv[k]])) }, 'system');
-  }
-  for (const g of listGlobalRows()) {
-    const b = whenFromShare(g.config.behaviour);
-    if (b) saveGlobalServer(g.name, { ...g.config, behaviour: b }, 'system');
-  }
-}
-
 export function loadAgents() {
   ensureOwnerAgent();
-  liftShare();
   const next = new Map();
   for (const row of listAgentRows()) next.set(row.id, toRuntime(row));
   agents = next;

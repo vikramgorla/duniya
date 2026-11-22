@@ -98,9 +98,9 @@ good news counts — Diwali, Eid, an exam passed, a joke that landed — with no
 - **Who.** Everyone in the chat, once it is set to *Proactively* or *Often*: participants need neither the service's
   tools (a service added from the Registry gives them none) nor *send media*; only its read-only media tool is used,
   and the agent's deny list still wins.
-- Which tools qualify: read-only (`readOnlyHint: true`), with media in its results (media fields such as `mp4Url` or
-  `imageUrl` in its output schema, or pictures and GIF/MP4/WebP links in a result seen before) and a free-text input
-  (`query`, `q`, `search`, …).
+- Which tools qualify: read-only (`readOnlyHint: true`), returning schema.org `ImageObject`s whose `encodingFormat`
+  the output schema declares ([For service authors](#for-service-authors)), with a free-text input (`query`, `q`,
+  `search`, …).
 
 > [!NOTE]
 > Only mood and style words go to the service, never names, phone numbers or message text: names people use in the
@@ -123,8 +123,7 @@ Declare your tools and Duniya does the right thing without settings:
   `contentUrl`, `encodingFormat` (declare it in the output schema, e.g. `const: "image/gif"`: that is how Duniya knows
   what the tool returns), `encoding` for other formats of the same item (`MediaObject`s; an MP4 of a GIF is what chat
   apps send), `thumbnailUrl`, `contentSize`, `creator`, `license`, `provider` and, when a credit is needed,
-  `creditText` (IPTC *Credit Line*): the credit without the item's title or link. Older shapes (`id` with `mp4Url`,
-  `gifUrl`, `webpUrl`, `imageUrl` or `url`) still work. Give every result the same text for a platform credit (*Powered by
+  `creditText` (IPTC *Credit Line*): the credit without the item's title or link. Give every result the same text for a platform credit (*Powered by
   …*): Duniya shows it in its panel, never in messages. A work's own credit (author, license) differs per result:
   Duniya then does not post that result on its own, since the credit would have to go with it.
 

@@ -43,7 +43,7 @@ export function toolServiceRoutes(route) {
   route('GET', '/api/tool-services/media', async () => Object.fromEntries(await Promise.all(listGlobalRows().map(async (r) => {
     const conn = serverConnection(r.config, { scope: GLOBAL_SCOPE, key: r.name, role: 'organizer', where: 'Settings → Tool services' });
     // a local service is not started just to show this page
-    return [r.name, r.config.type === 'local' && !conn.tools ? '' : await serviceMedia(r.name, conn)];
+    return [r.name, r.config.type === 'local' && !conn.tools ? '' : await serviceMedia(conn)];
   }))));
 
   route('PUT', '/api/tool-services/:name', async (req, res, body, q, p, user) => {
@@ -76,13 +76,13 @@ export function toolServiceRoutes(route) {
   route('POST', '/api/tool-services/discover', async (req, res, body) => {
     const saved = body.server ? getGlobalServer(String(body.server)) : null;
     if (saved && (body.auth === 'oauth' || body.type === 'local' || !body.url)) {
-      return describeTools(body.server, serverConnection(saved, { scope: GLOBAL_SCOPE, key: body.server, role: 'organizer', where: 'Settings → Tool services' }), { fresh: true });
+      return describeTools(serverConnection(saved, { scope: GLOBAL_SCOPE, key: body.server, role: 'organizer', where: 'Settings → Tool services' }), { fresh: true });
     }
     if (body.auth === 'oauth' || body.type === 'local') return [400, { error: 'Save the tool service first' }];
     const url = interpolate(String(body.url || ''));
     if (!url) return [400, { error: 'URL is empty (is its secret set?)' }];
     const headers = interpolate(body.headers && typeof body.headers === 'object' ? body.headers : {});
-    return describeTools(String(body.server || ''), mcpConnection(url, { token: interpolate(String(body.token || '')), headers }), { fresh: true });
+    return describeTools(mcpConnection(url, { token: interpolate(String(body.token || '')), headers }), { fresh: true });
   });
 
   route('GET', '/api/tool-services/local', async () => listGlobalRows().filter((r) => r.config.type === 'local').map(({ name, config }) => {

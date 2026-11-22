@@ -1,8 +1,8 @@
 // @ts-check
 // Share results on its own (094): a tool service with a read-only tool that returns media (GIFs, stickers, pictures)
 // can be used by an agent on its own — off | sometimes | often, with style words (tool-behaviour.js). Nothing here
-// knows a service by name: the tool is found by what it declares (readOnlyHint, media in its output schema or in its
-// results) and a free-text input.
+// knows a service by name: the tool is found by what it declares (readOnlyHint, and schema.org ImageObject results
+// whose encodingFormat its output schema states) and a free-text input.
 //
 // - The model decides, every turn: it ends its answer with [share: two to four mood words] or [share: none] — a choice
 //   it must make, not an optional extra it skips. It reads the whole conversation, so any culture, language or kind of
@@ -30,44 +30,30 @@ const KEEP_IDS = 30; // results not picked again in a chat
 const RANK = { off: 0, sometimes: 1, often: 2 };
 const SHARED = ['gif', 'sticker', 'image', 'share'];
 
-// ---------- which tools return media ----------
-const MEDIA_URL = /https:\/\/[^\s)"'<>]+\.(mp4|gif|webp|png|jpe?g)(\?[^\s)"'<>]*)?/gi;
-const kindOfUrl = (u) => (/\.(mp4|gif)(\?|$)/i.test(u) ? 'gif' : /\.webp(\?|$)/i.test(u) ? 'sticker' : 'image');
-const MEDIA_PROP = /(gif|mp4|webp|image|img|sticker|thumbnail|preview)/i;
-/** Media property names in an output schema (results of any depth): the media kind they suggest, or ''. */
+// ---------- which tools return media: schema.org ImageObjects (MediaObjects) ----------
+// `encodingFormat` says what a result is (declared in the tool's output schema), `contentUrl` where it is, `encoding`
+// the same item in other formats (an MP4 of a GIF is what chat apps send), `identifier` which one, `creditText` its credit.
+const kindOfFormat = (f) => (/gif|^video\//i.test(f) ? 'gif' : /webp/i.test(f) ? 'sticker' : /^image\//i.test(f) ? 'image' : '');
+/** The media kind an output schema's results declare in `encodingFormat` (const, or the first of an enum), or ''. */
 function schemaKind(schema, depth = 0) {
   if (!schema || typeof schema !== 'object' || depth > 4) return '';
-  const declared = formatKind(schema.properties?.encodingFormat); // schema.org: the format a result declares
-  if (declared) return declared;
-  const props = Object.keys(schema.properties || {});
-  const media = props.filter((p) => MEDIA_PROP.test(p));
-  if (media.length) return media.some((p) => /gif|mp4/i.test(p)) ? 'gif' : media.some((p) => /sticker/i.test(p)) ? 'sticker' : 'image';
+  const f = schema.properties?.encodingFormat;
+  const declared = f?.const ?? f?.enum?.[0];
+  if (declared) return kindOfFormat(String(declared));
   for (const v of [...Object.values(schema.properties || {}), schema.items].filter(Boolean)) { const k = schemaKind(v, depth + 1); if (k) return k; }
   return '';
 }
-// schema.org media (ImageObject, MediaObject): `encodingFormat` says what a result is, `contentUrl` where it is,
-// `encoding` lists the same item in other formats (an MP4 of a GIF is what chat apps send)
-const kindOfFormat = (f) => (/gif|^video\//i.test(f) ? 'gif' : /webp/i.test(f) ? 'sticker' : /^image\//i.test(f) ? 'image' : '');
-/** The media kind an output schema's encodingFormat declares (const, or the first of an enum), or ''. */
-function formatKind(prop) { const v = prop?.const ?? prop?.enum?.[0]; return v ? kindOfFormat(String(v)) : ''; }
-const learnedKey = (key, tool) => `media:${key}:${tool}`;
-/** Remember that a read-only tool returned media (from a normal call's result), so it can be shared on its own. */
-export function noteToolOutput(key, tool, text) {
-  const urls = String(text || '').match(MEDIA_URL);
-  const kind = /"type":"image"/.test(String(text || '')) ? 'image' : urls ? kindOfUrl(urls[0]) : '';
-  if (kind && kvGet(learnedKey(key, tool)) !== kind) kvSet(learnedKey(key, tool), kind);
-}
 const QUERY_PROP = /^(q|query|search|keywords?|text|terms?|prompt|topic|mood)$/i;
 /**
- * A service's tool that can be shared on its own: read-only (readOnlyHint), returns media (by its output schema or
- * a result seen before) and takes free text. { tool, kind, query, limit } (argument names), or null.
+ * A service's tool that can be shared on its own: read-only (readOnlyHint), returns media (the encodingFormat its
+ * output schema declares) and takes free text. { tool, kind, query, limit } (argument names), or null.
  */
-export function mediaTool(key, tools) {
+export function mediaTool(tools) {
   for (const t of tools) {
     if (t.annotations?.readOnlyHint !== true) continue;
     const props = t.inputSchema?.properties || {};
     const query = Object.keys(props).find((p) => QUERY_PROP.test(p) && props[p]?.type === 'string');
-    const kind = schemaKind(t.outputSchema) || kvGet(learnedKey(key, t.name)) || '';
+    const kind = schemaKind(t.outputSchema);
     if (query && kind) return { tool: t.name, kind, query, limit: props.limit ? 'limit' : '' };
   }
   return null;
@@ -162,35 +148,26 @@ export function shareAfterReply(ctx, plan, { reply, hint }) {
 const recentKey = (chat, svc) => `shared:${svc}:${chat}`;
 const recentIds = (chat, svc) => { try { return JSON.parse(kvGet(recentKey(chat, svc)) || '[]'); } catch { return []; } };
 /** Results of a search: the structured list when the tool gives one, else media URLs found in its text. */
+/** The results of a search: its structured list (`results`, `items`, or the list itself). */
 function resultsOf(res) {
   const d = res?.data;
-  const list = Array.isArray(d) ? d : Array.isArray(d?.results) ? d.results : Array.isArray(d?.items) ? d.items : null;
-  if (list) return list.filter((r) => r && typeof r === 'object');
-  return [...new Set(String(res?.text || '').match(MEDIA_URL) || [])].map((url) => ({ id: url, url }));
+  const list = Array.isArray(d) ? d : Array.isArray(d?.results) ? d.results : Array.isArray(d?.items) ? d.items : [];
+  return list.filter((r) => r && typeof r === 'object');
 }
 const MAX_BYTES = 15 * 1024 * 1024;
 const UNIT = { b: 1, kb: 1e3, mb: 1e6, gb: 1e9 };
-/** Bytes of a result: its size field, or a schema.org contentSize such as "6.3 MB" (0 when unknown). */
+/** Bytes of a result from its schema.org contentSize ("6.3 MB"; 0 when unknown). */
 function sizeOf(r) {
-  if (r.fileSizeBytes) return Number(r.fileSizeBytes);
   const m = String(r.contentSize || '').match(/([\d.]+)\s*(b|kb|mb|gb)\b/i);
   return m ? Number(m[1]) * UNIT[m[2].toLowerCase()] : 0;
 }
-/** schema.org: the rendition of the wanted kind from `encoding`, else `contentUrl` (unless too big), else ''. */
-function schemaOrgUrl(r, kind) {
+/** The URL to post: the rendition of the wanted kind in `encoding` (an MP4 for a GIF), else `contentUrl` unless too big. */
+function urlFor(r, kind) {
   const want = kind === 'gif' ? /^video\/mp4/i : kind === 'sticker' ? /webp/i : /^image\/(png|jpe?g)/i;
   const alt = (Array.isArray(r.encoding) ? r.encoding : []).find((e) => want.test(e?.encodingFormat || '') && /^https:\/\//.test(e?.contentUrl || ''));
-  return alt?.contentUrl || (sizeOf(r) > MAX_BYTES ? '' : r.contentUrl);
+  if (alt) return alt.contentUrl;
+  return /^https:\/\//.test(r.contentUrl || '') && sizeOf(r) <= MAX_BYTES ? r.contentUrl : '';
 }
-/** The URL to post: for GIFs the MP4 (what chat apps send) when given, for stickers the WebP; any media field else. */
-function urlFor(r, kind) {
-  if (typeof r.contentUrl === 'string' && /^https:\/\//.test(r.contentUrl)) return schemaOrgUrl(r, kind);
-  const fields = Object.entries(r).filter(([k, v]) => typeof v === 'string' && /^https:\/\//.test(v) && (MEDIA_PROP.test(k) || k === 'url') && !/preview|thumb/i.test(k));
-  const by = (re) => fields.find(([k, v]) => re.test(k) || re.test(v))?.[1];
-  const url = kind === 'gif' ? by(/mp4/i) || (sizeOf(r) > MAX_BYTES ? '' : by(/gif/i)) : kind === 'sticker' ? by(/webp|sticker/i) : by(/png|jpe?g|image|img/i);
-  return url || (sizeOf(r) > MAX_BYTES ? '' : r.url) || '';
-}
-/** A result's id (schema.org: identifier), else its URL: what is not picked again in a chat. */
 const idOf = (r, kind) => String(r.id || r.identifier || urlFor(r, kind));
 
 /**

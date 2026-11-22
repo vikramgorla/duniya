@@ -113,10 +113,10 @@ const PLACE = { type: 'object', properties: { place: { type: 'string' } } };
 const READ = { readOnlyHint: true };
 const weatherService = () => fakeToolService('weather', [['forecast', 'Weather forecast for a place and day (temperature, rain, wind).'], ['alerts', 'Official weather warnings for a region.'], ['sunrise', 'Sunrise and sunset times for a place.']]
   .map(([name, description]) => ({ name, description, inputSchema: PLACE, annotations: READ })), 'Morges: 9 °C, light rain until 10:00, then dry.');
-// 094: a GIF search (read-only, media in its output): agents can share GIFs on their own
+// 094: a GIF search (read-only, schema.org ImageObjects of GIFs): agents can share GIFs on their own
 const gifService = () => fakeToolService('gifs', [{ name: 'search_gifs', description: 'Search reaction GIFs by keywords.', annotations: READ,
   inputSchema: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer' } }, required: ['query'] },
-  outputSchema: { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, mp4Url: { type: 'string' }, attribution: { type: 'string' } } } } } } }], 'No GIFs in the demo.');
+  outputSchema: { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: { '@type': { const: 'ImageObject' }, identifier: { type: 'string' }, contentUrl: { type: 'string' }, encodingFormat: { const: 'image/gif' }, creditText: { type: 'string' } } } } } } }], 'No GIFs in the demo.');
 
 /** Local stand-in for the MCP Registry (052): a few fictional entries, the same API (v0.1), no network. */
 async function fakeRegistry(weatherUrl) {
