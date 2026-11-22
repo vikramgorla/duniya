@@ -162,7 +162,9 @@ CI enforces the measurable ones (`npm run check:clean`, also in `node scripts/ci
   otherwise look for the branch `repo-sync/<owner>-<name>` and open the PR from it via REST
   (`gh api -X POST repos/{o}/{r}/pulls -f head=repo-sync/<owner>-<name> -f base=main …`).
 - **Dependencies:** runtime deps are limited (Baileys, Anthropic SDK, MCP SDK, pino, qrcode); a new one needs a stated
-  reason in the plan. Other providers use `fetch`.
+  reason in the plan. Other providers use `fetch`. Dependabot comes weekly and grouped (`.github/dependabot.yml`:
+  GitHub Actions together, minor and patch updates of the development tools together); `@types/node` stays on the
+  major of the Node the app runs on (`engines` in `package.json`).
 - **Commits:** clear messages. No attribution trailers or footers in commits and PRs (no Co-Authored-By, session links
   or 'Generated with' lines). Commits are authored by the repository owner's identity; no AI co-author trailers or
   signatures; squash merges use an explicit message: `gh api -X PUT repos/{o}/{r}/pulls/N/merge -f merge_method=squash

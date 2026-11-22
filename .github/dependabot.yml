@@ -1,11 +1,25 @@
 version: 2
+# One pull request a week per group instead of one per package. Runtime libraries and major versions of the
+# development tools come on their own: each of those is looked at.
 updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }
     open-pull-requests-limit: 5
     labels: ["type: dependencies", "area: build"]
+    groups:
+      development-tools:
+        dependency-type: development
+        update-types: ["minor", "patch"]
+    ignore:
+      # The types follow the Node the app runs on (package.json "engines", the installer): a newer major would let
+      # code use APIs the server does not have. Raise it together with the Node version.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
     labels: ["type: dependencies", "area: build"]
+    groups:
+      actions:
+        patterns: ["*"]

@@ -1,6 +1,16 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.60.3": {
+      "breaking": false,
+      "title": "Up-to-date libraries",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "The library that talks to Anthropic’s models and the tools that check the code are up to date. Nothing looks or works differently."
+        }
+      ]
+    },
     "2.60.2": {
       "breaking": false,
       "title": "An agent keeps what it knew when a chat’s two ids become one",

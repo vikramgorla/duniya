@@ -52,7 +52,7 @@ jobs:
           shellcheck -S warning install.sh deploy/*.sh deploy/duniya deploy/ops/duniya-ops infra/oci/bootstrap.sh infra/gcp/deploy.sh
       - name: Installer dry run
         run: bash install.sh --dry-run --yes --domain agents.example.com
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.17.2"
       - name: Terraform (OCI stack)
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - uses: docker/build-push-action@v7
         with:
           context: .
