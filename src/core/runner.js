@@ -128,7 +128,7 @@ export async function runAgent(ctx) {
   const uses = new Map(); ctx.uses = uses;
   const codes = [];
   // 079: a people change about someone other than the sender waits for an organizer's confirm code (like previews);
-  // 093: 094: a change (not destructive, by its annotations) an organizer clearly asked for applies at once in clear / act (logged as changed without asking)
+  // 093 / 094: a change (not destructive, by its annotations) an organizer clearly asked for applies at once in clear / act (logged as changed without asking)
   ctx.hold = ({ kind, action, summary, tool = '', input = {}, risk = 'change', mode = '' }) => {
     if (mayChangeWithoutAsking(ctx, risk, mode)) {
       const text = applyLocal(kind, action, agent);
