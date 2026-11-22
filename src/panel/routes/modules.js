@@ -3,6 +3,7 @@
 // 082: Lists and sending (runs with a preview, pause / resume / stop, saved audiences) and payment reminders.
 // The module code loads with import() only when it is on (need() answers 409 with the reason when it is off).
 import { MODULES, moduleRows, moduleSections, need, setModuleOn, liveModules } from '../../modules/index.js';
+import { ownerDay } from '../../core/owner-clock.js';
 import { PAGE_CSP, clientIp, esc, limiter, pageHead, send } from '../http.js';
 import { baseUrl } from '../http-util.js';
 
@@ -45,7 +46,7 @@ export function moduleRoutes(route) {
   route('GET', '/api/orders', async ({ query }) => (await ord()).ordersPage(filter(query)), admin);
   route('GET', '/api/orders/csv', async ({ res, query }) => sendCsv(res, `orders-${filter(query).status}`, (await ord()).csvRows(filter(query))), admin);
   route('POST', '/api/orders', async ({ body, user }) => [201, (await ord()).createOrder(body, user.username)], admin);
-  route('GET', '/api/orders/:id', async ({ params }) => { const m = await ord(); return { ...m.getOrder(params.id), methods: m.paymentMethods() }; }, admin);
+  route('GET', '/api/orders/:id', async ({ params }) => { const m = await ord(); return { ...m.getOrder(params.id), methods: m.paymentMethods(), today: ownerDay() }; }, admin);
   route('PUT', '/api/orders/:id', async ({ body, params, user }) => (await ord()).updateOrder(params.id, body, user.username), admin);
   route('DELETE', '/api/orders/:id', async ({ params, user }) => (await ord()).deleteOrder(params.id, user.username), admin);
   route('POST', '/api/orders/:id/payments', async ({ body, params, user }) => [201, (await ord()).addPayment(params.id, body, user.username)], admin);

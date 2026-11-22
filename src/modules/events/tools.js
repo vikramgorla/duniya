@@ -37,13 +37,13 @@ const ev = { type: 'string', description: 'Event name (or part of it) or id' };
 export const eventTools = [
   {
     name: 'list_events', annotations: { readOnlyHint: true }, roles: ['organizer', 'participant'], participantDefault: true,
-    description: 'Upcoming events: name, dates, place, places left, registration deadline, whether an organizer confirms registrations, and prices.',
+    description: 'Upcoming events: name, dates, place, places left, registration deadline (and whether registration is closed), whether an organizer confirms registrations, and prices.',
     input_schema: { type: 'object', properties: {} },
     async run() {
       const list = listEvents();
       if (!list.length) return 'No upcoming events.';
       return list.map((e) => ({ id: e.id, name: e.name, starts: e.starts, ...(e.ends ? { ends: e.ends } : {}), ...(e.place ? { place: e.place } : {}), registration: e.per,
-        ...(e.capacity ? { placesLeft: e.counts.left } : {}), ...(e.deadline ? { deadline: e.deadline } : {}), organizerConfirms: e.confirm === 'organizer',
+        ...(e.capacity ? { placesLeft: e.counts.left } : {}), ...(e.deadline ? { deadline: e.deadline, registrationClosed: e.registrationClosed } : {}), organizerConfirms: e.confirm === 'organizer',
         ...(e.prices.adult || e.prices.kid ? { prices: { adult: money(e.prices.adult, e.currency), kid: money(e.prices.kid, e.currency), ...(e.prices.freeUnder ? { freeUnderAge: e.prices.freeUnder } : {}) } } : {}) }));
     },
   },

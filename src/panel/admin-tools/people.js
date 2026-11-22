@@ -100,11 +100,15 @@ export const PEOPLE_TOOLS = [
     description: 'Change a registration (id from get_event): status registered (confirms a pending one; full → waiting list), waiting or cancelled (a place opens for the waiting list), attended, adults, kids, notes.',
     input: { registration: str('Registration id'), status: str('registered, waiting or cancelled', { enum: ['registered', 'waiting', 'cancelled'] }), attended: bool('Came to the event'), adults: int('Adults'), kids: int('Kids'), notes: str('Notes') }, required: ['registration'],
     run: (a, x) => { const { registration, ...body } = a; return x.call('PUT', `/api/module/registrations/${enc(registration)}`, body); } },
-  { name: 'save_event_duty', calls: [['GET', '/api/module/events'], ['POST', '/api/module/events/x/duties'], ['PUT', '/api/module/duties/x/people/x']],
-    description: 'Add a duty to an event (task, at, needed = how many people), or give an existing duty (duty id from get_event) to a person (person id).',
-    input: { event: str('Event name or id'), task: str('Task, e.g. Set up chairs'), at: str('When, e.g. 09:00'), needed: int('How many people'), duty: str('Duty id (to give it to a person)'), person: str('Person id') }, required: ['event'],
-    run: async (a, x) => (a.duty && a.person ? x.call('PUT', `/api/module/duties/${enc(a.duty)}/people/${enc(a.person)}`, { on: true })
-      : x.call('POST', `/api/module/events/${enc(await eventIdOf(x, a.event))}/duties`, { task: a.task, at: a.at, needed: a.needed })) },
+  { name: 'save_event_duty', calls: [['GET', '/api/module/events'], ['POST', '/api/module/events/x/duties'], ['PUT', '/api/module/duties/x'], ['PUT', '/api/module/duties/x/people/x']],
+    description: 'Add a duty to an event (event, task, at, needed = how many people); change an existing duty (duty id from get_event, with the task, at or needed that change: the rest and the people who took it stay); or give an existing duty to a person (duty id and person id).',
+    input: { event: str('Event name or id (to add a duty)'), task: str('Task, e.g. Set up chairs'), at: str('When, e.g. 09:00'), needed: int('How many people'), duty: str('Duty id (to change it or to give it to a person)'), person: str('Person id (to give the duty to)') },
+    run: async (a, x) => {
+      const fields = { task: a.task, at: a.at, needed: a.needed };
+      if (a.duty && a.person) return x.call('PUT', `/api/module/duties/${enc(a.duty)}/people/${enc(a.person)}`, { on: true });
+      if (a.duty) return x.call('PUT', `/api/module/duties/${enc(a.duty)}`, fields);
+      return x.call('POST', `/api/module/events/${enc(await eventIdOf(x, a.event))}/duties`, fields);
+    } },
   { name: 'list_orders', readOnly: true, calls: [['GET', '/api/module/events'], ['GET', '/api/orders']],
     description: 'Orders (Orders module) by status: open (not fully paid — "who hasn\'t paid?"), overdue, paid, refunded, cancelled or all; optionally of one event (name or id). Each with who, what for, total, paid, left, due; plus totals per event (total, collected, open) and the payment methods. Amounts are in cents.',
     input: { status: str('open, overdue, paid, refunded, cancelled or all', { enum: ['open', 'overdue', 'paid', 'refunded', 'cancelled', 'all'] }), event: str('Event name or id (optional)') },

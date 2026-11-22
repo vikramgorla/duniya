@@ -12,6 +12,7 @@
 - Full → **waiting list**. When someone cancels or a party gets smaller, the first waiting registrations that fit get
   the place by themselves. The deadline ends with its day where you live (the owner assistant's time zone).
 - **Duties**: a task, a time, how many people; anyone takes one (*"I'll do the chairs"*), organizers assign.
+  Change a duty with **⋯ → Edit…**: the people who took it stay.
 - With [Orders and payments](orders.md) on, a registration on an event with prices becomes an order by itself.
 
 ![An event's page: counts, registrations with adults and kids, duties and payments](site/img/card-event.webp)
@@ -64,7 +65,7 @@ Tick tools per role on the agent's page ([Modules](modules.md#agent-tools)).
 ## AI assistants and the owner assistant
 
 Admin MCP: `list_events`, `get_event`, `save_event`, `delete_event`*, `register_for_event`, `update_registration`,
-`save_event_duty` (* needs `confirm_action`).
+`save_event_duty` (add a duty, change one, or give one to a person) (* needs `confirm_action`).
 
 ---
 **Next:** [Orders and payments](orders.md) · [Lists and sending](sending.md) · [Modules](modules.md) · [People](people.md) · [Docs index](README.md)

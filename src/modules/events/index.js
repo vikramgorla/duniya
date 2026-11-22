@@ -55,8 +55,10 @@ const today = () => ownerDay(); // deadlines and "upcoming" go by the owner's da
 
 // ---------- events ----------
 const row = (id) => db.prepare('SELECT * FROM ev_events WHERE tenant_id = ? AND id = ?').get(TENANT, String(id || ''));
-const view = (r) => ({ id: r.id, name: r.name, starts: r.starts, ends: r.ends, place: r.place, capacity: r.capacity, deadline: r.deadline, currency: r.currency,
-  per: r.per, confirm: r.confirm, prices: JSON.parse(r.prices || '{}'), payBy: r.pay_by, createdAt: r.created_at });
+/** Registration closes with the deadline's day where the owner lives; organizers can still add people after it. */
+const isClosed = (deadline) => !!deadline && today() > deadline.slice(0, 10);
+const view = (r) => ({ id: r.id, name: r.name, starts: r.starts, ends: r.ends, place: r.place, capacity: r.capacity, deadline: r.deadline, registrationClosed: isClosed(r.deadline),
+  currency: r.currency, per: r.per, confirm: r.confirm, prices: JSON.parse(r.prices || '{}'), payBy: r.pay_by, createdAt: r.created_at });
 export function getEvent(id) { const r = row(id); if (!r) throw fail('No such event', 404); return view(r); }
 /** An event by id or by (part of) its name; the soonest upcoming one when several names match. */
 export function findEvent(ref) {
@@ -252,7 +254,7 @@ function addRegistration(e, { hh, person, a, k, notes }, { by, organizer }) {
 export function register({ event, person = '', household = '', adults, kids, notes = '' }, { by = 'panel', organizer = true } = {}) {
   const e = getEvent(event);
   const hh = householdOf(person, household);
-  if (!organizer && e.deadline && today() > e.deadline.slice(0, 10)) throw fail(`Registration for ${e.name} closed on ${e.deadline}. An organizer can still add you.`);
+  if (!organizer && e.registrationClosed) throw fail(`Registration for ${e.name} closed on ${e.deadline}. An organizer can still add you.`);
   const members = (role) => (hh ? hh.members.filter((m) => m.role === role).length : role === 'adult' ? 1 : 0);
   const { a, k } = headcount(given(adults) ? adults : Math.max(1, members('adult')), given(kids) ? kids : members('kid'));
   const existing = db.prepare(`SELECT * FROM ev_registrations WHERE tenant_id = ? AND event = ? AND ${hh ? 'household' : 'person'} = ? AND status IN ${ACTIVE} ORDER BY created_at DESC LIMIT 1`).get(TENANT, e.id, hh ? hh.id : person);
@@ -291,34 +293,51 @@ export function registrationFor(event, person) {
 }
 
 // ---------- duties ----------
-export function saveDuty({ id = '', event, task, at = '', needed = 1 }, by = 'panel') {
-  const cur = id ? db.prepare('SELECT * FROM ev_duties WHERE tenant_id = ? AND id = ?').get(TENANT, id) : null;
-  if (id && !cur) throw fail('No such duty', 404);
-  const ev = getEvent(cur?.event || event);
+const NEEDED_MAX = 500; // people one duty can ask for
+const dutyRow = (id) => db.prepare('SELECT * FROM ev_duties WHERE tenant_id = ? AND id = ?').get(TENANT, String(id || ''));
+/** The people who took a duty, first come first. */
+const takenBy = (duty) => db.prepare('SELECT person FROM ev_duty_people WHERE tenant_id = ? AND duty = ? ORDER BY at').all(TENANT, duty).map((x) => x.person);
+/**
+ * A duty's task, time and number of people, checked. What is not given stays as it is (a new duty: no time, one person).
+ * @param {{ task: string, at: string, needed: number } | null} cur  @param {{ task?: string, at?: string, needed?: number }} given
+ */
+function dutyFields(cur, { task, at, needed }) {
   const t = clean(task ?? cur?.task, 100);
   if (!t) throw fail('Name the task, e.g. "Set up chairs"', 400, { field: 'task' });
   const n = Number(needed ?? cur?.needed ?? 1);
-  if (!Number.isInteger(n) || n < 1 || n > 500) throw fail('How many people: 1 to 500', 400, { field: 'needed' });
-  const when = clean(at ?? cur?.at, 40);
-  if (cur) db.prepare('UPDATE ev_duties SET task = ?, at = ?, needed = ? WHERE tenant_id = ? AND id = ?').run(t, when, n, TENANT, cur.id);
-  else db.prepare('INSERT INTO ev_duties (tenant_id, id, event, task, at, needed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(TENANT, rid('d'), ev.id, t, when, n, Date.now());
-  activity('config', { summary: `Duty for ${ev.name}: ${t} (${by})` });
+  if (!Number.isInteger(n) || n < 1 || n > NEEDED_MAX) throw fail(`How many people: 1 to ${NEEDED_MAX}`, 400, { field: 'needed' });
+  return { task: t, at: clean(at ?? cur?.at, 40), needed: n };
+}
+/**
+ * Add a duty to an event, or change one (with its id): the people who took it stay.
+ * @param {{ id?: string, event?: string, task?: string, at?: string, needed?: number }} duty  @param {string} [by]
+ */
+export function saveDuty({ id = '', event, ...given }, by = 'panel') {
+  const cur = id ? dutyRow(id) : null;
+  if (id && !cur) throw fail('No such duty', 404);
+  const ev = getEvent(cur?.event || event);
+  const d = dutyFields(cur, given);
+  const taken = cur ? takenBy(cur.id).length : 0;
+  if (d.needed < taken) throw fail(`${plural(taken, 'person has', 'people have')} taken "${cur.task}": take someone off before you ask for fewer`, 400, { field: 'needed' });
+  if (cur) db.prepare('UPDATE ev_duties SET task = ?, at = ?, needed = ? WHERE tenant_id = ? AND id = ?').run(d.task, d.at, d.needed, TENANT, cur.id);
+  else db.prepare('INSERT INTO ev_duties (tenant_id, id, event, task, at, needed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(TENANT, rid('d'), ev.id, d.task, d.at, d.needed, Date.now());
+  activity('config', { summary: `Duty ${cur ? 'changed' : 'added'} for ${ev.name}: ${d.task} (${by})` });
   return dutiesOf(ev.id);
 }
 export function deleteDuty(id) {
-  const d = db.prepare('SELECT * FROM ev_duties WHERE tenant_id = ? AND id = ?').get(TENANT, String(id || ''));
+  const d = dutyRow(id);
   if (!d) throw fail('No such duty', 404);
   db.prepare('DELETE FROM ev_duty_people WHERE tenant_id = ? AND duty = ?').run(TENANT, d.id);
   db.prepare('DELETE FROM ev_duties WHERE tenant_id = ? AND id = ?').run(TENANT, d.id);
   return dutiesOf(d.event);
 }
 export const dutiesOf = (event) => db.prepare('SELECT * FROM ev_duties WHERE tenant_id = ? AND event = ? ORDER BY at, created_at').all(TENANT, event).map((d) => {
-  const people = db.prepare('SELECT person FROM ev_duty_people WHERE tenant_id = ? AND duty = ? ORDER BY at').all(TENANT, d.id).map((x) => ({ id: x.person, name: personRow(x.person)?.name || 'Someone' }));
+  const people = takenBy(d.id).map((id) => ({ id, name: personRow(id)?.name || 'Someone' }));
   return { id: d.id, task: d.task, at: d.at, needed: d.needed, people, open: Math.max(0, d.needed - people.length) };
 });
 /** Someone takes a duty (or is assigned to it); refused when it is full. */
 export function takeDuty(duty, person, by = 'panel', on = true) {
-  const d = db.prepare('SELECT * FROM ev_duties WHERE tenant_id = ? AND id = ?').get(TENANT, String(duty || ''));
+  const d = dutyRow(duty);
   if (!d) throw fail('No such duty', 404);
   if (!personRow(person)) throw fail('No such person', 404);
   const e = row(d.event);
@@ -326,7 +345,7 @@ export function takeDuty(duty, person, by = 'panel', on = true) {
     if (db.prepare('DELETE FROM ev_duty_people WHERE tenant_id = ? AND duty = ? AND person = ?').run(TENANT, d.id, person).changes) addEvent(person, `Left the duty "${d.task}" at ${e.name}`);
     return dutiesOf(d.event);
   }
-  const taken = db.prepare('SELECT person FROM ev_duty_people WHERE tenant_id = ? AND duty = ?').all(TENANT, d.id).map((x) => x.person);
+  const taken = takenBy(d.id);
   if (taken.includes(person)) return dutiesOf(d.event);
   if (taken.length >= d.needed) throw fail(`"${d.task}" already has the ${plural(d.needed, 'person', 'people')} it needs`);
   db.prepare('INSERT INTO ev_duty_people (tenant_id, duty, person, at) VALUES (?, ?, ?, ?)').run(TENANT, d.id, person, Date.now());
