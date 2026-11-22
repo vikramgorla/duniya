@@ -80,10 +80,14 @@ function globToRegex(glob) {
 }
 export const matchesAny = (name, patterns = []) => patterns.some((p) => globToRegex(p).test(name));
 export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const partsFormats = new Map(); // time zone → its formatter: building one costs far more than using it, and lists ask per row
+function partsFormat(tz) {
+  if (!partsFormats.has(tz)) partsFormats.set(tz, new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short' }));
+  return partsFormats.get(tz);
+}
 /** Date, time and weekday of a moment in a time zone: { date: 'YYYY-MM-DD', hhmm: 'HH:MM', day: 'mon' }. */
 export function localParts(tz, at = Date.now()) {
-  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short' });
-  const p = Object.fromEntries(fmt.formatToParts(new Date(at)).map((x) => [x.type, x.value]));
+  const p = Object.fromEntries(partsFormat(tz).formatToParts(new Date(at)).map((x) => [x.type, x.value]));
   return { date: `${p.year}-${p.month}-${p.day}`, hhmm: `${p.hour === '24' ? '00' : p.hour}:${p.minute}`, day: p.weekday.slice(0, 3).toLowerCase() };
 }
 /** 2.56: is a daily time due at `hhmm` — its minute or up to 30 minutes after (a restart or an update in that minute

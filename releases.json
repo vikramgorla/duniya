@@ -16,6 +16,10 @@
         {
           "type": "fixed",
           "text": "The owner assistant says so when a question needs more steps than it takes in one go, after what it found. It used to answer “I have no answer for that.”"
+        },
+        {
+          "type": "improved",
+          "text": "The Orders list and “who hasn’t paid?” are put together about three times faster on the server."
         }
       ]
     },
