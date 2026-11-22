@@ -42,10 +42,9 @@ test('viewers can open the page but not save a section', async () => {
   assert.equal((await get()).prompt, 'Be brief.');
 });
 
-test('the agent page keeps every section reachable, and old deep links land in the right one', () => {
+test('the agent page keeps every section reachable', () => {
   const src = readFileSync(new URL('../src/panel/public/app/agent-editor.js', import.meta.url), 'utf8');
   for (const id of ['character', 'where', 'people', 'quick', 'welcome', 'schedules', 'model', 'tools', 'memory', 'media', 'cap', 'alerts', 'advanced', 'test']) assert.match(src, new RegExp(`id: '${id}'`), id);
-  assert.match(src, /const OLD = \{ triggers: \['where', 'triggers'\], dm: \['where', 'dm'\] \}/);
   const find = readFileSync(new URL('../src/panel/public/app/find.js', import.meta.url), 'utf8');
   assert.match(find, /AGENT_SECTIONS/, 'Find anything lists the sections');
 });

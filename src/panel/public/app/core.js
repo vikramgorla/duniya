@@ -328,8 +328,6 @@ export const can = (role) => S.user && RANK[S.user.role] >= RANK[role];
 // 062: everyday screens first; Pending only while something waits; Secrets live in Settings.
 export const TABS = () => [['overview', 'Overview'], ['chats', 'Chats'], ['agents', 'Agents'], ['activity', 'Activity'], ['usage', 'Usage'], ['models', 'Models'], can('admin') && ['people', 'People'],
   S.status?.pending ? ['pending', 'Pending'] : null, ['server', 'Server'], can('owner') && ['backups', 'Backups'], ['settings', 'Settings']].filter(Boolean);
-/** Old addresses that moved (062): #secrets is a section of Settings now. */
-const MOVED = { secrets: 'settings/secrets', contacts: 'people' }; // 078: Contacts moved into People
 
 // ---------- shell ----------
 let statusTimer = null; // slow fallback poll, only while the live stream is down
@@ -431,7 +429,6 @@ const sheet = (open) => deadline(import('./find.js'), S.loadTimeout, 'screen').t
   toast('Part of the app did not arrive. Reloading…', { bad: true }); setTimeout(() => location.reload(), 1200);
 });
 export function show(tab) {
-  if (Object.hasOwn(MOVED, tab)) { const rest = location.hash.split('/').slice(1).join('/'); history.replaceState(null, '', `#${MOVED[tab]}${rest && !MOVED[tab].includes('/') ? `/${rest}` : ''}`); tab = MOVED[tab].split('/')[0]; }
   if (!TABS().some(([id]) => id === tab) && !(tab === 'pending' && can('viewer'))) tab = 'overview';
   const from = S.tab; S.tab = tab;
   document.title = `${LABEL[tab] || 'Duniya'}${LABEL[tab] ? ' · Duniya' : ''}`;
