@@ -60,7 +60,7 @@ export function agentRoutes(route, { channel } = {}) {
     if (!b || isBuiltin(params.id)) return [404, { error: 'Not found' }];
     const rows = listAnswers(params.id, { before: query.get('before'), only: query.get('only') || '', limit: 21 });
     const names = chatLabels(rows.map((r) => r.chat));
-    if (!query.get('before')) activity('config', { agent: params.id, summary: `Answers of ${b.name} reviewed by ${user.username}` });
+    if (!query.get('before')) activity('access', { agent: params.id, summary: `Answers of ${b.name} reviewed by ${user.username}` });
     const judged = judgedOf(rows.map((r) => r.id)); // 089: answers to messages it judged by itself
     return {
       counts: reviewCounts(params.id), more: rows.length > 20,

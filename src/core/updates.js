@@ -7,7 +7,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { APP_VERSION, DATA_DIR, REPO, ROOT, bad, fail } from './config.js';
+import { APP_VERSION, DATA_DIR, REPO, ROOT, bad, clip, fail } from './config.js';
 import { parseRepo, repoLinks, sameRepo } from './repo.js';
 import { getSetting, updateSettings, getSecret } from './store.js';
 import { kvGet, kvSet } from './db.js';
@@ -205,12 +205,13 @@ export function applyUpdate({ root = appRoot, target, backup = true, by = '' } =
     state.phase = 'install';
     const before = own ? await installedAt(root) : null;
     const r = await runUpdate({ root, target });
+    const why = r.code === 0 ? '' : clip(r.log.trim().split('\n').at(-1), WHY_MAX); // the updater's last line says why
     if (own) {
       if (r.code === 0) await noteInstalled({ root, target, before, backup: made?.file || null }).catch(recordFailure('The note for the start guard (the update is installed, but not guarded)'));
-      saveResult({ ok: r.code === 0, target, log: r.log, backup: made?.file || null });
-      activity(r.code === 0 ? 'system' : 'error', { summary: r.code === 0 ? `Updated to ${target || 'latest'}${made ? ` (backup ${made.file} first)` : ''}${by ? ` by ${by}` : ''}` : 'Update failed (previous version kept)', detail: r.log.slice(-2000) });
+      saveResult({ ok: r.code === 0, target, log: r.log, backup: made?.file || null, why });
+      activity(r.code === 0 ? 'system' : 'error', { summary: r.code === 0 ? `Updated to ${target || 'latest'}${made ? ` (backup ${made.file} first)` : ''}${by ? ` by ${by}` : ''}` : ['Update failed (previous version kept)', why].filter(Boolean).join(': '), detail: r.log.slice(-2000) });
     }
-    return { ...r, backup: made?.file || null };
+    return { ...r, why, backup: made?.file || null };
   })().finally(() => { if (own) inflight = null; });
   if (own) inflight = Object.assign(state, { promise });
   return promise;
@@ -265,12 +266,13 @@ export function isRolledBack(target, st) {
   return st.channel === 'main' ? !!st.latest && String(r.commit).startsWith(st.latest) : target === r.target;
 }
 
-function saveResult({ ok, target, log, backup }) {
+function saveResult({ ok, target, log, backup, why = '' }) {
   const st = savedStatus() || {};
-  kvSet('updates:status', JSON.stringify({ ...st, lastResult: { at: Date.now(), ok, target: target || 'latest', from: runningVersion(), backup, log: String(log).slice(-1000) } }));
+  kvSet('updates:status', JSON.stringify({ ...st, lastResult: { at: Date.now(), ok, target: target || 'latest', from: runningVersion(), backup, why, log: String(log).slice(-1000) } }));
 }
 
 const UPDATE_MAX = 20 * 60 * 1000; // ms for fetching the release and installing its dependencies on a slow server
+const WHY_MAX = 200; // characters of the updater's last line that Activity and the Updates page show
 function runUpdate({ root, target }) {
   return new Promise((r) => {
     const p = spawn('bash', [resolve(root, 'deploy/update.sh'), ...(target ? [target] : [])], { cwd: root });

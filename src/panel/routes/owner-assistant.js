@@ -98,7 +98,7 @@ export function ownerAssistantRoutes(route, { channel }) {
       messages: [{ role: 'user', content: JSON.stringify(m) }] });
     const text = res2.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
     const ids = new Set([...text.matchAll(/\[#(\d+)\]/g)].map((x) => Number(x[1])));
-    activity('config', { chat, summary: `Catch-up read by ${user.username} (${m.messages.length} messages)` });
+    activity('access', { chat, summary: `Catch-up read by ${user.username} (${m.messages.length} messages)` });
     return { text, messages: m.messages.filter((x) => ids.has(x.id)).map((x) => ({ id: x.id, from: x.from, at: x.at })) };
   }, { role: 'admin' });
 

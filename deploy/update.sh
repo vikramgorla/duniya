@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Update the installation in place to TARGET (a release tag like v1.2.0, or a branch name; default: current branch).
 # Called by the admin panel; the app restarts itself afterwards. Rolls back the code if dependencies fail to install.
+# When it fails, its last line says why in plain words: the panel and Activity show that line.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 TARGET="${1:-}"
@@ -47,6 +48,7 @@ if [ "$OLD_LOCK" != "$(lock_hash)" ] && [ -f package-lock.json ]; then
     echo "Dependency install failed; rolling back to $PREV" >&2
     git checkout -q "$PREV"
     npm ci --omit=dev --no-audit --no-fund --loglevel=error || true
+    echo "The packages this release needs could not be installed: not installed, the previous version stays" >&2
     exit 1
   fi
 fi

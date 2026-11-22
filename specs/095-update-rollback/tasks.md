@@ -90,3 +90,17 @@ MVP: Phases 1–3 (the server heals). Then US2 (the owner knows) and US3 (no loo
 - [X] T035 Drop the note and start normally when the checkout is already on the noted commit after three failed starts (no rollback, no exit, no notice), with a test in `test/update-rollback.test.js` per spec Edge Cases: put back by hand (partial)
 - [X] T036 Test that `duniya status` names a rollback in `test/cli.test.js` per plan: command line (partial)
 - [X] T037 Name the `scripts/cdp.mjs` change in the PR: Chrome is stopped when the script is stopped from outside (unrequested)
+
+## Phase 8: Rehearsal under a restart loop (#299)
+
+The rollback was rehearsed with a real checkout, a local git remote and a shell loop that restarts the app like the
+service manager (`Restart=always`): a release that throws while starting, a release that ends 15 seconds after it
+started and changed its dependencies (installed by the automatic round, since it was newer than the one rolled back),
+and a release whose start guard does not load. The first two were put back by themselves (15 s and 65 s after the
+update); the third looped for ever, which FR-011 closes.
+
+- [X] T038 `deploy/update.sh`: refuse a release whose `src/index.js` or `src/core/update-guard.js` does not load, before dependencies are installed; keep the previous code (FR-011)
+- [X] T039 `deploy/update.sh`: the last line of a failed update says why in plain words; `src/core/updates.js` keeps it as `why` in the result and shows it in Activity; `src/panel/public/app/settings.js` shows it under Updates (FR-012)
+- [X] T040 Tests in `test/updates.test.js`: a broken guard and a broken entry are refused with the reason and the code stays; the next good release installs
+- [X] T041 Docs: `docs/backups-and-updates.md` (what is never installed, what the watch does not see), `docs/troubleshooting.md`
+

@@ -17,7 +17,8 @@ const trim = (v, n = 4000) => {
 /**
  * Record an activity entry.
  * type: message.in | message.out | tool.call | tool.error | confirm.created | confirm.applied |
- *       confirm.cancelled | change.auto (093: changed without asking) | limit (094: a tool service limit stopped a use) | channel.status | agent.updated | schedule.run | error | system
+ *       confirm.cancelled | change.auto (093: changed without asking) | limit (094: a tool service limit stopped a use) | channel.status | agent.updated | schedule.run | error | system |
+ *       config (something was changed or set up) | access (a panel user looked at stored messages or answers)
  */
 // ---------- what gets logged (011) ----------
 export const LOG_CATEGORIES = {
@@ -25,8 +26,8 @@ export const LOG_CATEGORIES = {
   schedules: 'Scheduled posts', backups: 'Backups', system: 'System (start, updates, maintenance)', mcp: 'AI assistants (MCP)',
   whatsapp: 'Chat actions (polls, reactions, group changes)', media: 'Photos & voice (transcripts, created pictures)', silences: 'Why agents stayed silent (at most hourly per chat)',
 };
-// Always recorded, whatever the settings: errors, confirmations of changes, configuration changes, channel status, and
-// the owner assistant's audit trail (044: every question and action).
+// Always recorded, whatever the settings: errors, confirmations of changes, configuration changes and who looked at
+// stored messages, channel status, and the owner assistant's audit trail (044: every question and action).
 const ALWAYS = new Set(['errors', 'confirmations', 'config', 'channel', 'owner']);
 export const LOGGING_DEFAULTS = Object.freeze({ level: 'normal', categories: Object.fromEntries(Object.keys(LOG_CATEGORIES).map((k) => [k, true])), retentionDays: 30, maxEntries: 5000 });
 
@@ -40,7 +41,7 @@ export function categoryOf(type) {
   if (type.startsWith('memory.')) return 'memory';
   if (type.startsWith('schedule.')) return 'schedules';
   if (type === 'channel.status') return 'channel';
-  if (type.startsWith('agent.') || type === 'config' || type === 'backup.settings') return 'config';
+  if (type.startsWith('agent.') || type === 'config' || type === 'access' || type === 'backup.settings') return 'config';
   if (type.startsWith('backup.')) return 'backups';
   if (type.startsWith('mcp.')) return 'mcp';
   if (type === 'whatsapp.action') return 'whatsapp';

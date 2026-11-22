@@ -95,6 +95,11 @@ version; with a newer version available it installs that one; a manual update in
 - The new release changed the database before it failed: the data stays as it is; additive changes do not disturb the
   previous release. The backup made before the update (when backups are set up) is named in the message.
 - Docker and development checkouts: nothing is noted, counted or rolled back.
+- The new release's own entry or start guard does not load (found by the rehearsal, #299): no start could be counted
+  and nothing could put the release back, so the update refuses it before the restart and the previous version keeps
+  running.
+- The new release starts, stays up for a minute and then misbehaves in another way: the update holds. Out of scope
+  (the guard watches the start, not the behaviour); the docs say so.
 
 ## Requirements *(mandatory)*
 
@@ -121,6 +126,11 @@ version; with a newer version available it installs that one; a manual update in
 - **FR-009**: The rollback notice MUST stay visible in the update status until a later update holds.
 - **FR-010**: Nothing to configure; no new background timer besides the single one-minute check of a start after an
   update; no new dependency.
+- **FR-011**: An update MUST NOT install a release whose entry or start guard does not load: checked right after the
+  new code is fetched, before its dependencies are installed and before any restart; the previous code is put back
+  and the update is reported as failed.
+- **FR-012**: A failed update MUST say why in plain words: the updater's last line is the reason, and Activity and the
+  Updates page show it.
 
 ### Key Entities
 

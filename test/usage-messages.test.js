@@ -72,5 +72,5 @@ test('024: admins can read stored messages (search, paging); viewers cannot; eac
   assert.ok(found.body.some((m) => m.name === 'Anu'));
   assert.ok(r.body.length && (await t.api(owner, 'GET', `/api/chats/${encodeURIComponent('g1@g.us')}/messages`)).body.some((m) => m.fromAgent), 'agent replies are included');
   assert.equal((await t.api(viewer, 'GET', `/api/chats/${encodeURIComponent('g1@g.us')}/messages`)).status, 403);
-  assert.ok(t.db.listActivity({ limit: 50 }).some((a) => /Stored messages viewed by admin/.test(a.summary)));
+  assert.ok(t.db.listActivity({ limit: 50 }).some((a) => a.type === 'access' && /Stored messages viewed by admin/.test(a.summary)), 'who looked is recorded as such');
 });

@@ -17,8 +17,8 @@ import { FIRST_SCREEN, staticClosure } from '../src/panel/module-graph.js';
 // Budgets in brotli bytes. The first screen is what a phone downloads before Overview shows; everything else loads on
 // the first visit to its screen. A budget is raised only with its reason in the PR; every earlier raise and its reason
 // is in the history of these two lines (git log -L '/^const FIRST_BUDGET/,+1:scripts/check-panel.mjs').
-const FIRST_BUDGET = 64_050; // +0.35 KB: Overview shows the accounts of every channel (a Telegram bot next to the WhatsApp numbers) and counts them in its headline (0.17); a folded section shows a chevron (0.07); a row's second line wraps once in a card's list instead of hiding its end, and a link's chevron stays with its last word (0.1)
-const TOTAL_BUDGET = 228_500; // +0.35 KB: see FIRST_BUDGET (the changes are on the first screen)
+const FIRST_BUDGET = 64_400; // +0.7 KB: Overview shows the accounts of every channel (a Telegram bot next to the WhatsApp numbers) and counts them in its headline (0.17), and its one long function became nine short ones (0.35); a folded section shows a chevron (0.07); a row's second line wraps once in a card's list instead of hiding its end, and a link's chevron stays with its last word (0.1)
+const TOTAL_BUDGET = 228_900; // +0.75 KB: see FIRST_BUDGET (those changes are on the first screen); Activity tells who looked at stored messages from what was changed, and the Updates page says why an update failed (0.05)
 
 const PUBLIC = resolve(import.meta.dirname, '../src/panel/public');
 const APP = resolve(PUBLIC, 'app');

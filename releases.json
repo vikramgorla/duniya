@@ -3,7 +3,7 @@
   "versions": {
     "2.60.6": {
       "breaking": false,
-      "title": "Overview shows every channel, and lists no longer cut off what matters",
+      "title": "Overview for every channel, lists that show what matters, updates that say why",
       "changes": [
         {
           "type": "improved",
@@ -19,7 +19,11 @@
         },
         {
           "type": "improved",
-          "text": "What agents do in a chat (polls, reactions, group changes) is called “Chat actions” everywhere, as it works on Telegram too. In Activity, a payment, a send or a change in People is labelled “Change”; it said “Settings”."
+          "text": "What agents do in a chat (polls, reactions, group changes) is called “Chat actions” everywhere, as it works on Telegram too. Activity marks a payment, a send or a change in People as “Change” (it said “Settings”) and a look at stored messages as “Looked at”."
+        },
+        {
+          "type": "improved",
+          "text": "An update that fails says why, in Settings → Updates and in Activity. A release that could not be rolled back if it did not start (found by rehearsing a failed update) is not installed at all; your version keeps running."
         },
         {
           "type": "fixed",

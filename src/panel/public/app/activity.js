@@ -9,7 +9,7 @@ const EVENTS = {
   'change.auto': ['Changed without asking', 'info', 'pending'], limit: ['Limit reached', 'warn', 'pending'], // 094: a tool service's limit stopped a use
   'channel.status': ['WhatsApp', 'info', 'chats'], 'whatsapp.action': ['Chat action', '', 'chats'], 'whatsapp.vote': ['Poll vote', '', 'chats'], 'whatsapp.reaction': ['Reaction', '', 'chats'],
   'schedule.run': ['Scheduled post', 'info', 'activity'], 'agent.updated': ['Agent changed', '', 'agents'], 'agent.created': ['Agent created', 'ok', 'agents'], 'agent.deleted': ['Agent deleted', 'warn', 'agents'],
-  config: ['Change', '', 'settings'], system: ['System', '', 'server'], silence: ['Stayed quiet', '', 'chats'], 'memory.summary': ['Summary', 'info', 'chats'], 'memory.history': ['Earlier messages', '', 'chats'],
+  config: ['Change', '', 'settings'], access: ['Looked at', '', 'search'], system: ['System', '', 'server'], silence: ['Stayed quiet', '', 'chats'], 'memory.summary': ['Summary', 'info', 'chats'], 'memory.history': ['Earlier messages', '', 'chats'],
   'memory.note.added': ['Note added', 'ok', 'chats'], 'memory.note.removed': ['Note removed', 'warn', 'chats'], 'memory.erased': ['Memory erased', 'bad', 'chats'],
   'model.usage': ['Model', '', 'models'], 'model.provider': ['Model', '', 'models'], 'model.fallback': ['Fallback model', 'warn', 'models'], 'media.voice': ['Voice note', '', 'chats'], 'media.image': ['Photo', '', 'image'],
   'backup.done': ['Backup', 'ok', 'backups'], 'backup.restore': ['Restore', 'warn', 'backups'], 'backup.settings': ['Backups', '', 'backups'], 'mcp.call': ['Tool service', 'info', 'settings'], 'mcp.register': ['Tool service', '', 'settings'],

@@ -113,7 +113,7 @@ export function chatRoutes(route, { channel } = {}) {
     const judged = judgedOf(list.filter((m) => m.fromAgent).map((m) => m.id)); // 089: answers it gave by itself (feedback on joining in) // 087: edited messages say so; agent answers say whether they can still be edited
     const rows = list.map(({ senderJid: _jid, ...m }) => ({ ...m, ...(edits.has(m.id) ? { edited: edits.get(m.id).ts } : {}) })).map((m) => (m.fromAgent ? { ...m, rating: rated.get(m.id) || 0, rateable: rateable && !!m.agent && m.id > 0, editable: editWindow(chat, m.ts).open && m.id > 0, ...(judged.has(m.id) ? { judged: true } : {}) }
       : { ...m, name: personInfo({ phone: m.sender, jid: jids.get(m.id), fallbackName: m.name }).label, ...(memberTag(chat, { phone: m.sender, jid: jids.get(m.id) }, tags) ? { tag: memberTag(chat, { phone: m.sender, jid: jids.get(m.id) }, tags) } : {}) }));
-    if (!query.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${query.get('q') ? ` (search “${String(query.get('q')).slice(0, 40)}”)` : ''}` });
+    if (!query.get('before')) activity('access', { chat, summary: `Stored messages viewed by ${user.username}${query.get('q') ? ` (search “${String(query.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;
   }, { role: 'admin' });
   // #178: delete one stored message (admins and owners); the agent forgets it (the chat summary is rebuilt). WhatsApp is unchanged.
@@ -160,7 +160,7 @@ export function chatRoutes(route, { channel } = {}) {
     const chats = visibleChats();
     const rows = searchStored({ chats, query: words, before: query.get('before'), limit: 31 });
     const names = chatLabels(rows.slice(0, 30).map((m) => m.chat));
-    if (!query.get('before')) activity('config', { summary: `Messages searched by ${user.username} (“${words.slice(0, 40)}”, ${rows.length > 30 ? '30+' : rows.length} found in ${chats.length} chats)` });
+    if (!query.get('before')) activity('access', { summary: `Messages searched by ${user.username} (“${words.slice(0, 40)}”, ${rows.length > 30 ? '30+' : rows.length} found in ${chats.length} chats)` });
     return {
       chats: chats.length, more: rows.length > 30,
       results: rows.slice(0, 30).map((m) => ({ id: m.id, chat: m.chat, chatName: names.get(m.chat), ts: m.ts, agent: m.agent || '', fromAgent: !!m.from_agent,

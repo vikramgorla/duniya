@@ -111,8 +111,8 @@ runs it again. Nothing for you to do, and no terminal.
 - *Install automatically* does not install that version again. The next release is installed as usual, and **Update**
   still installs it when you choose so.
 - A release that could not be put back (the small part of it that watches the start does not load) is not installed
-  at all: the update stops before anything restarts, the version you have keeps running and **Settings → Updates**
-  says the update failed.
+  at all: the update stops before anything restarts, the version you have keeps running, and **Settings → Updates**
+  and Activity say that the update failed and why.
 
 The watch ends when the new release has run for a minute. A release that starts and then misbehaves in another way
 holds: the next release fixes it, and the backup made before the update is under **Backups**.
