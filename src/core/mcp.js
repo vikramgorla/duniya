@@ -9,6 +9,10 @@ import { onGlobalMcpChange } from './global-mcp.js';
 import { maxLocalServices, serverSize, onMemoryPressure } from './resources.js';
 import { activity } from './events.js';
 
+const TOOLS_TTL = 10 * 60 * 1000;
+const FAIL_TTL = 60 * 1000;
+const LIST_TIMEOUT = 20 * 1000; // one listing attempt (the SDK default is 60 s)
+
 /** Pool of MCP connections keyed by url + credential (token, or an OAuth sign-in identity). */
 class McpConnection {
   constructor(url, token, authProvider = null, { headers = {}, local = null } = {}) {
@@ -21,6 +25,8 @@ class McpConnection {
     this.client = null;
     this.tools = null;
     this.toolsAt = 0;
+    this.listing = null; // the listing in progress
+    this.failed = null; // { error, at } of the last failed listing
   }
 
   async connect() {
@@ -41,22 +47,44 @@ class McpConnection {
 
   touch() { this.usedAt = Date.now(); }
 
-  async listTools() {
+  /**
+   * The service's tools: cached 10 min; one listing at a time; a failure is remembered for a minute (a down service
+   * costs one wait, not one per message or page). `within` (ms): give up waiting after that long (the listing goes on
+   * and fills the cache for next time); a stale list is used at once while a fresh one loads.
+   * `fresh`: an owner asked (Discover, Check): try again even after a recent failure.
+   * @param {{ within?: number, fresh?: boolean }} [o]
+   */
+  async listTools({ within = 0, fresh = false } = {}) {
     this.touch();
-    if (this.tools && Date.now() - this.toolsAt < 10 * 60 * 1000) return this.tools;
+    if (this.tools && Date.now() - this.toolsAt < TOOLS_TTL) return this.tools;
+    if (this.failed && !fresh && Date.now() - this.failed.at < FAIL_TTL) throw this.failed.error;
+    this.listing ||= this.fetchTools().finally(() => { this.listing = null; });
+    if (this.tools) return this.tools; // stale: use it now, the fresh list replaces it when it comes
+    if (!within) return this.listing;
+    let timer;
+    const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('The tool service did not answer in time')), within); });
+    try { return await Promise.race([this.listing, late]); } finally { clearTimeout(timer); }
+  }
+
+  async fetchTools() {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         if (!this.client) await this.connect();
-        const { tools } = await this.client.listTools();
+        const { tools } = await this.client.listTools(undefined, { timeout: LIST_TIMEOUT });
         this.tools = tools;
         this.toolsAt = Date.now();
+        this.failed = null;
         return tools;
       } catch (e) {
         this.client = null;
         await this.close();
         const where = this.local ? `local tool service ${this.local.spec}` : `MCP ${this.url}`;
         const tail = this.local && this.stderr ? ` (${this.stderr.trim().split('\n').slice(-3).join(' | ')})` : '';
-        if (e.reconnect || attempt === 1) throw new Error(e.reconnect ? e.message : `${where}: ${e.message}${tail}`, { cause: e });
+        if (e.reconnect || attempt === 1) {
+          const error = new Error(e.reconnect ? e.message : `${where}: ${e.message}${tail}`, { cause: e });
+          if (!e.reconnect) this.failed = { error, at: Date.now() };
+          throw error;
+        }
       }
     }
   }

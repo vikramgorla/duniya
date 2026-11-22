@@ -1,7 +1,7 @@
 // Browse tool services (052): the MCP Registry sheet. Module of the panel (063).
 // ---------- Browse tool services (052): search the MCP Registry, add in one step ----------
 import { S, api, can, field, h, toast, tryApi } from './core.js';
-import { renderSettings } from './settings.js';
+import { reloadSection } from './settings.js';
 const safeHref = (u) => (/^https?:\/\//i.test(String(u || '')) ? u : null);
 const TRUST_PILL = { good: ['ok', 'Verified publisher · source linked'], ok: ['info', 'Verified publisher'], warn: ['warn', 'Check before adding'] };
 /**
@@ -167,6 +167,6 @@ export function registrySettingsBox(st) {
   return h('details', { style: 'margin-top:10px' }, h('summary', {}, `MCP Registry: ${st.enabled ? (st.official ? 'official registry' : st.baseUrl) : 'off'}`),
     h('label', { class: 'check' }, on, 'Allow browsing the MCP Registry to add tool services'),
     field('Registry address', url, 'Leave empty for the official registry. A company registry with the same API also works (https).'),
-    isOwner ? h('button', { class: 'btn small', style: 'margin-top:8px', onclick: () => tryApi(async () => { await api('PUT', '/api/tool-services/registry/settings', { enabled: on.checked, baseUrl: url.value.trim() }); renderSettings(); }, 'Saved') }, 'Save') : h('p', { class: 'small muted' }, 'Only the owner can change this.'));
+    isOwner ? h('button', { class: 'btn small', style: 'margin-top:8px', onclick: () => tryApi(async () => { await api('PUT', '/api/tool-services/registry/settings', { enabled: on.checked, baseUrl: url.value.trim() }); reloadSection(); }, 'Saved') }, 'Save') : h('p', { class: 'small muted' }, 'Only the owner can change this.'));
 }
 

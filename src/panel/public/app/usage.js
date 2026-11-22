@@ -1,5 +1,5 @@
 // Usage screen and spending caps (040). Module of the panel (063).
-import { $, api, ask, can, field, h, menu, tryApi } from './core.js';
+import { $, api, ask, can, field, h, menu, partFailed, tryApi } from './core.js';
 import { fmtCost, fmtTok, meter, plural } from './shared.js';
 import { accountName, modelName } from './names.js';
 let usageCache = null;
@@ -57,7 +57,8 @@ export async function renderUsage() {
   const [byDay, byAgent, byChat, byModel, byFeature, byAcct, byFb, sum, agents, provList] = await Promise.all(['day', 'agent', 'chat', 'model', 'feature', 'account', 'fallback']
     .map((g) => api('GET', `/api/usage?period=${usagePeriod}&groupBy=${g}`)).concat([usageSummary(), api('GET', '/api/agents').catch(() => []), api('GET', '/api/providers').catch(() => [])]));
   const acctName = Object.fromEntries(provList.map((p) => [p.id, p.name]));
-  const [caps, smart] = await Promise.all([api('GET', '/api/budget').catch(() => null), api('GET', `/api/usage/smart?period=${usagePeriod}`).catch(() => null)]);
+  const failed = (e) => ({ failed: e }); // a part that did not load says so with Retry instead of disappearing
+  const [caps, smart] = await Promise.all([api('GET', '/api/budget').catch(failed), api('GET', `/api/usage/smart?period=${usagePeriod}`).catch(failed)]);
   const t = byDay.total;
   const agentName = Object.fromEntries(agents.map((b) => [b.id, b.name]));
   const seg = h('div', { class: 'seg' }, [['1d', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['90d', '90 days'], ['all', 'All']].map(([v, l]) => h('button', { class: usagePeriod === v ? 'on' : '', onclick: () => { usagePeriod = v; renderUsage(); } }, l)));
@@ -109,10 +110,10 @@ export async function renderUsage() {
       tile('Tokens out', fmtTok(t.output), 'what agents wrote'),
       tile('Estimated cost', fmtCost(t.cost), t.unpriced ? `${plural(t.unpriced, 'call')} without a price` : t.plan ? `${plural(t.plan, 'call')} in your plans` : 'from the prices you set'),
       tile('Model calls', String(t.calls || 0), `${byFeature.rows.filter((r) => /^reply/.test(r.key)).reduce((n, r) => n + r.calls, 0)} answers`)),
-    caps ? h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Monthly spending caps'),
+    caps.failed ? h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Monthly spending caps'), partFailed(caps.failed, '', renderUsage)) : h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Monthly spending caps'),
       caps.caps.length ? h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px' }, caps.caps.map((c) => capBar(c)))
         : h('p', { class: 'small muted' }, 'No caps yet. Set one on an agent’s page (Monthly spending cap) or for a chat under Chats → Spending cap.'),
-      caps.caps.length && !caps.alertsTo ? h('div', { class: 'note warn', style: 'margin-top:10px' }, 'Cap alerts can’t reach you on WhatsApp yet: add your number under Agents → Owner assistant → Alerts.') : null) : null,
+      caps.caps.length && !caps.alertsTo ? h('div', { class: 'note warn', style: 'margin-top:10px' }, 'Cap alerts can’t reach you on WhatsApp yet: add your number under Agents → Owner assistant → Alerts.') : null),
     smartCard(smart), featureCard(byFeature.rows, cost),
     h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Per day'), days.length ? chart : h('p', { class: 'small muted' }, 'Nothing in this period.')),
     h('div', { class: 'card', style: 'margin-top:16px', 'data-jump': 'breakdown' }, h('h2', {}, 'Breakdown'), h('div', { style: 'overflow-x:auto;margin-bottom:6px' }, bySeg), list,
@@ -136,6 +137,7 @@ function featureCard(rows, cost) {
 
 /** 088: agents on "Auto: light or strong": how the answers split and what it saved. */
 function smartCard(r) {
+  if (r?.failed) return h('div', { class: 'card', style: 'margin-top:16px' }, h('h2', {}, 'Smart model choice'), partFailed(r.failed, '', renderUsage));
   if (!r?.answers) return null;
   const light = r.tiers.light?.answers || 0; const per = (v) => (v == null ? 'price not set' : fmtCost(v * 100)); // per 100 answers: readable sums
   return h('div', { class: 'card', style: 'margin-top:16px', 'data-jump': 'smart' }, h('h2', {}, 'Smart model choice'),

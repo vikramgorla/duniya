@@ -79,7 +79,7 @@ export function mergePeople(keep, other, by = 'panel') {
     run('INSERT INTO person_merges (tenant_id, id, kept, merged, snapshot, at) VALUES (?, ?, ?, ?, ?, ?)', id, k.id, o.id, JSON.stringify(snap), Date.now());
   });
   forgetPeopleCache();
-  void loadAgents(); // 079: roles that named the merged person (runs at once: no await inside)
+  loadAgents(); // 079: roles that named the merged person
   addEvent(k.id, `Merged with ${otherName} (${by}); undo possible for 30 days`);
   activity('config', { summary: `Merged two people in People (${by})` });
   return { merge: id, undoUntil: Date.now() + UNDO_MS, person: personRow(k.id) };

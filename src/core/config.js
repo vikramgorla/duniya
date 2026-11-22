@@ -79,6 +79,13 @@ export function localParts(tz, at = Date.now()) {
   const p = Object.fromEntries(fmt.formatToParts(new Date(at)).map((x) => [x.type, x.value]));
   return { date: `${p.year}-${p.month}-${p.day}`, hhmm: `${p.hour === '24' ? '00' : p.hour}:${p.minute}`, day: p.weekday.slice(0, 3).toLowerCase() };
 }
+/** 2.56: is a daily time due at `hhmm` — its minute or up to 30 minutes after (a restart or an update in that minute
+ *  must not skip it; each run is still once a day, by its own key)? Both 'HH:MM'. */
+export function dueAt(at, hhmm, late = 30) {
+  const m = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const d = m(hhmm) - m(at);
+  return d >= 0 && d <= late;
+}
 export const iso = (ts) => (ts ? new Date(ts).toISOString() : null);
 /** 069: restart the app after `ms` through the graceful shutdown (src/index.js); systemd or Docker starts it again. */
 export const restartSoon = (ms = 500) => setTimeout(() => process.kill(process.pid, 'SIGTERM'), ms);

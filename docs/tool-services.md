@@ -30,6 +30,10 @@ agent's page → **Tools** → the card **How it uses it** right under the servi
 On an agent's page every choice starts with **Default (…)**: what the service says. Pick another choice to differ;
 pick **Default** again to follow the service.
 
+> [!NOTE]
+> A service that does not answer never holds an agent up: services are asked at once, each for a few seconds, and one
+> that failed is left out for a minute before it is tried again. The agent answers with the tools it has.
+
 > [!TIP]
 > Long prompt paragraphs about tools ("use the GIF search for celebrations, then send_media with the URL, credit
 > KLIPY…", "always ask before saving") are no longer needed: set the service instead, and trim the prompt so the two
@@ -79,7 +83,9 @@ Duniya reads them:
 - **Not up to the model alone.** Duniya spots the moment itself and asks for one in that turn; with *Often*, when a
   model (often a light one) answers with text only, Duniya posts one anyway.
 - **One per moment.** At most one per answer, and none when one went out in that chat in the last few minutes.
-- **Who.** Every role that may use the service; participants don't need *send media*.
+- **Who.** Everyone in the chat, once you switch sharing on: participants need neither the service's tools (a service
+  added from the Registry gives them none) nor *send media*; only its read-only media tool is used, and the agent's deny
+  list still wins.
 - Which tools qualify: read-only (`readOnlyHint: true`), with media in its results (media fields such as `mp4Url` or
   `imageUrl` in its output schema, or pictures and GIF/MP4/WebP links in a result seen before) and a free-text input
   (`query`, `q`, `search`, …).

@@ -60,7 +60,7 @@ async function toolInventory(agent) {
     const label = srv.global ? `${key} (global; defaults: organizers ${srv.defaults?.organizer?.join(',') || 'none'}, participants ${srv.defaults?.participant?.join(',') || 'none'})` : key;
     try {
       const conn = agent ? organizerConnection(agent, key) : serverConnection(srv, { scope: GLOBAL_SCOPE, key, role: 'organizer', where: 'Settings → Tool services' });
-      const tools = await Promise.race([conn.listTools(), new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 8000))]);
+      const tools = await conn.listTools({ within: 8000 });
       out[label] = tools.map((t) => `${t.name}: ${(t.description || '').slice(0, 120)}`);
     } catch (e) { out[label] = [`(could not list tools: ${e.message})`]; }
   }

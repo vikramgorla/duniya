@@ -150,7 +150,8 @@ shows it as it would go out now.
 | Needs a look | answers that failed on a model error, changes waiting for a confirm code, an update, paused sends |
 | New people | people new since yesterday in chats that are on |
 
-It goes to linked owners and admins in their own chat, once a day, on the scheduler's tick (no timer of its own). The
+It goes to linked owners and admins in their own chat, once a day, on the scheduler's tick (no timer of its own); a
+restart or an update at that minute only delays it (it still goes out within 30 minutes). The
 text is built in code from counts and names — no model call, nothing to pay.
 
 ## Suggested next steps

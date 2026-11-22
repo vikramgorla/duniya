@@ -34,15 +34,14 @@ function globalView(row, agents = listAgents()) {
 
 export function toolServiceRoutes(route) {
   registryRoutes(route); // 052: browse the MCP Registry and add from it
-  // 094: `media`: the kind of media a read-only tool of it returns ('' = none), so it can be shared on its own
-  route('GET', '/api/tool-services', async () => {
-    const agents = listAgents();
-    return Promise.all(listGlobalRows().map(async (r) => ({ ...globalView(r, agents),
-      media: await serviceMedia(r.name, { listTools: () => { // a local service is not started just to show this page
-        const conn = serverConnection(r.config, { scope: GLOBAL_SCOPE, key: r.name, role: 'organizer', where: 'Settings → Tool services' });
-        return r.config.type === 'local' && !conn.tools ? [] : conn.listTools();
-      } }) })));
-  });
+  route('GET', '/api/tool-services', async () => { const agents = listAgents(); return listGlobalRows().map((r) => globalView(r, agents)); });
+  // 094: per service, the kind of media a read-only tool of it returns ('' = none), so it can be shared on its own;
+  // apart from the list, so a slow service never holds up Settings
+  route('GET', '/api/tool-services/media', async () => Object.fromEntries(await Promise.all(listGlobalRows().map(async (r) => {
+    const conn = serverConnection(r.config, { scope: GLOBAL_SCOPE, key: r.name, role: 'organizer', where: 'Settings → Tool services' });
+    // a local service is not started just to show this page
+    return [r.name, r.config.type === 'local' && !conn.tools ? '' : await serviceMedia(r.name, conn)];
+  }))));
 
   route('PUT', '/api/tool-services/:name', async (req, res, body, q, p, user) => {
     const before = getGlobalServer(p.name);
@@ -74,13 +73,13 @@ export function toolServiceRoutes(route) {
   route('POST', '/api/tool-services/discover', async (req, res, body) => {
     const saved = body.server ? getGlobalServer(String(body.server)) : null;
     if (saved && (body.auth === 'oauth' || body.type === 'local' || !body.url)) {
-      return describeTools(body.server, serverConnection(saved, { scope: GLOBAL_SCOPE, key: body.server, role: 'organizer', where: 'Settings → Tool services' }));
+      return describeTools(body.server, serverConnection(saved, { scope: GLOBAL_SCOPE, key: body.server, role: 'organizer', where: 'Settings → Tool services' }), { fresh: true });
     }
     if (body.auth === 'oauth' || body.type === 'local') return [400, { error: 'Save the tool service first' }];
     const url = interpolate(String(body.url || ''));
     if (!url) return [400, { error: 'URL is empty (is its secret set?)' }];
     const headers = interpolate(body.headers && typeof body.headers === 'object' ? body.headers : {});
-    return describeTools(String(body.server || ''), mcpConnection(url, { token: interpolate(String(body.token || '')), headers }));
+    return describeTools(String(body.server || ''), mcpConnection(url, { token: interpolate(String(body.token || '')), headers }), { fresh: true });
   });
 
   route('GET', '/api/tool-services/local', async () => listGlobalRows().filter((r) => r.config.type === 'local').map(({ name, config }) => {

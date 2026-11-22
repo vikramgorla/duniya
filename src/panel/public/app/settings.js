@@ -1,6 +1,6 @@
 // Settings screen: every section (tool services, owner assistant, users, sign-in, web access, logging, …). Module of the panel (063).
 // ---------- secrets ----------
-import { $, S, ago, api, ask, can, copyBtn, copyRow, extLink, field, fieldError, gLogo, h, icon, refreshStatus, splitLines, time, toast, toggle, tryApi } from './core.js';
+import { $, S, ago, api, part, ask, can, copyBtn, copyRow, extLink, field, fieldError, gLogo, h, icon, refreshStatus, splitLines, time, toast, toggle, tryApi } from './core.js';
 import { browseButton, registrySettingsBox } from './registry.js';
 import { channelItems, channelPage } from './channels.js';
 import { listDetail } from './listdetail.js';
@@ -24,61 +24,72 @@ async function secretsCard() {
   return card;
 }
 
+/** Redraw only the open section (a change there): never the whole screen, so other edits are kept. */
+let reloadPart = () => {};
+export const reloadSection = () => reloadPart();
+// 2.56: each section loads its own data when it is opened: a slow or failing one never holds up (or hides) the rest
+const SECTIONS = {
+  'tool-services': () => toolServicesCard(),
+  'owner-assistant': () => api('GET', '/api/owner-assistant').then(ownerAssistantCard),
+  // 068: chat-wide settings live here, not above the Chats list
+  'direct-messages': () => api('GET', '/api/agents').then(directMessagesCard),
+  'privacy-notice': () => api('GET', '/api/privacy-notice').then(privacyNoticeCard),
+  'photos-voice': () => photosVoiceCard(),
+  'sending-pace': () => api('GET', '/api/pace').then(paceCard),
+  modules: () => api('GET', '/api/modules').then(modulesCard),
+  secrets: () => secretsCard(),
+  users: () => Promise.all([api('GET', '/api/users'), api('GET', '/api/invites'), api('GET', '/api/auth/signin').catch(() => null)]).then(([u, i, si]) => usersCard(u, i, si)),
+  'sign-in': () => api('GET', '/api/auth/signin').then(signinCard),
+  google: () => api('GET', '/api/auth/google').then(googleSetupCard),
+  'web-access': () => api('GET', '/api/web').then(webAccessCard),
+  assistants: () => api('GET', '/api/assistants').then(assistantsCard),
+  password: () => session().then(passwordCard),
+  'my-google': () => session().then(myGoogleCard),
+  logging: () => api('GET', '/api/logging').then(loggingCard),
+  'small-mode': () => smallModeCard(S.status?.server),
+  // 073: the whole update story (Overview shows one calm row)
+  updates: () => updatesPage(),
+  'getting-started': () => (S.checklist ? Promise.resolve(S.checklist) : api('GET', '/api/checklist')).then(checklistCard),
+  'whatsapp-helpers': () => h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any agent can send:'),
+    h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups'))),
+  // 065: what every version brought, newest first (the installed version's own notes)
+  'release-notes': () => api('GET', '/api/releases').then((notes) => h('div', { class: 'card' }, h('h2', {}, 'Release notes'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, `You are running ${notes.running}. What each version brought, newest first.`), releaseList(notes.versions, { open: 1 }))),
+};
+/** The signed-in user as the server has it now (a link or password change shows at once). */
+const session = () => api('GET', '/api/session').then((r) => { if (r?.user) { S.user = r.user; S.google = !!r.google; } return S.user; });
+/** Who sees a section (the server checks again). */
+const SHOWN = { secrets: () => can('admin'), users: () => can('owner'), 'sign-in': () => can('owner'), google: () => can('owner'), 'web-access': () => can('owner'),
+  updates: () => can('owner'), 'getting-started': () => can('admin'), 'my-google': () => !!(S.google || S.user?.google) };
+
 export async function renderSettings() {
-  const [agents, lg, ai, sess] = await Promise.all([api('GET', '/api/agents'), api('GET', '/api/logging').catch(() => null), api('GET', '/api/assistants').catch(() => null), api('GET', '/api/session').catch(() => null)]);
-  const [oa, notice] = await Promise.all([api('GET', '/api/owner-assistant').catch(() => null), api('GET', '/api/privacy-notice').catch(() => null)]);
-  if (sess?.user) { S.user = sess.user; S.google = !!sess.google; }
-  const me = S.user;
-  const cur = h('input', { type: 'password', placeholder: 'current', autocomplete: 'current-password' });
-  const next = h('input', { type: 'password', placeholder: 'new (12+ characters)', autocomplete: 'new-password' });
-  const loadErr = (title) => (e) => h('div', { class: 'card' }, h('h2', {}, title), h('p', { class: 'small muted' }, `Could not load: ${e.message}`));
-  const owner = can('owner') ? await Promise.all([api('GET', '/api/users'), api('GET', '/api/invites'), api('GET', '/api/auth/google'), api('GET', '/api/auth/signin').catch(() => null), api('GET', '/api/web').catch(() => null)]) : null;
-  const [users, inv, gcfg, signin, web] = owner || [];
-  const checklist = S.checklist || await api('GET', '/api/checklist').catch(() => null);
-  const notes = await api('GET', '/api/releases').catch(() => null);
-  const by = {
-    'tool-services': await toolServicesCard().catch(loadErr('Tool services for all agents')),
-    'owner-assistant': oa ? ownerAssistantCard(oa) : null,
-    // 068: chat-wide settings live here, not above the Chats list
-    'direct-messages': h('div', { class: 'card' }, h('h2', {}, 'Chats & direct messages'),
-      field('Default agent for direct messages', h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmAgent: e.target.value }), 'Saved') },
-        h('option', { value: '' }, 'The first agent that accepts the sender'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmAgent === b.id }, b.name))), 'For direct messages without a trigger.'),
-      field('When a chat is switched on, load its last', h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/settings', { historyLoadCount: Number(e.target.value) }); refreshStatus(); }, 'Saved') },
-        [0, 25, 50, 100, 200].map((n) => h('option', { value: n, selected: Number(S.status?.settings?.historyLoadCount ?? 50) === n }, n ? `${n} messages` : 'Nothing'))), 'Asked from your phone, which must be online.')),
-    'privacy-notice': notice ? privacyNoticeCard(notice) : null,
-    'photos-voice': await photosVoiceCard().catch(loadErr('Photos & voice')),
-    'sending-pace': await api('GET', '/api/pace').then(paceCard, loadErr('Sending pace')),
-    modules: await api('GET', '/api/modules').then(modulesCard, loadErr('Modules')),
-    secrets: can('admin') ? await secretsCard().catch(loadErr('Secrets')) : null,
-    users: owner ? usersCard(users, inv, signin) : null,
-    'sign-in': owner && signin ? signinCard(signin) : null,
-    google: owner ? googleSetupCard(gcfg) : null,
-    'web-access': owner && web ? webAccessCard(web) : null,
-    assistants: ai ? assistantsCard(ai) : null,
-    password: h('div', { class: 'card' }, h('h2', {}, me.hasPassword ? 'Your password' : 'Add a password'),
-      me.hasPassword ? [cur, h('div', { style: 'height:8px' })] : h('p', { class: 'small muted', style: 'margin-top:0' }, 'You sign in with Google. A password is a fallback for when Google sign-in is off.'), next,
-      h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => tryApi(async () => { await api('POST', '/api/password', { current: cur.value, next: next.value }); cur.value = next.value = ''; renderSettings(); }, me.hasPassword ? 'Password changed' : 'Password added') }, me.hasPassword ? 'Change password' : 'Add password')),
-    'my-google': S.google || me.google ? myGoogleCard(me) : null,
-    logging: lg ? loggingCard(lg) : null,
-    'small-mode': smallModeCard(S.status?.server),
-    // 073: the whole update story (Overview shows one calm row)
-    updates: can('owner') ? updatesPage() : null,
-    'getting-started': can('admin') && checklist ? h('div', { class: 'card' }, h('h2', {}, 'Getting started'),
-      h('p', { class: 'small muted', style: 'margin-top:0' }, checklist.complete ? `All ${checklist.total} steps are done.` : checklist.dismissed ? `Hidden from Overview, ${checklist.done} of ${checklist.total} steps done.` : `On Overview, ${checklist.done} of ${checklist.total} steps done.`),
-      checklist.dismissed && !checklist.complete ? h('button', { class: 'btn', onclick: () => tryApi(async () => { S.checklist = await api('PUT', '/api/checklist', { dismissed: false }); location.hash = 'overview'; }) }, 'Show on Overview again') : null) : null,
-    'whatsapp-helpers': h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any agent can send:'),
-      h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups'))),
-    // 065: what every version brought, newest first (the installed version's own notes)
-    'release-notes': notes ? h('div', { class: 'card' }, h('h2', {}, 'Release notes'),
-      h('p', { class: 'small muted', style: 'margin-top:0' }, `You are running ${notes.running}. What each version brought, newest first.`), releaseList(notes.versions, { open: 1 })) : null,
-  };
   // 064: grouped sections (icon · name · one line) → the section's page; two panes on wide screens, list → page on phones
   const title = Object.fromEntries(SETTINGS_SECTIONS.map(([id, t]) => [id, t]));
+  const by = Object.fromEntries(Object.keys(SECTIONS).filter((id) => SHOWN[id]?.() ?? true).map((id) => [id, () => { const p = part(SECTIONS[id], title[id]); reloadPart = p.reload; return p; }]));
   // 075: Channels first — one row per channel this server has, each with its page
   const channels = channelItems(S.status);
-  for (const c of channels) by[c.id] = channelPage(c.id);
-  $('#main').replaceChildren(listDetail({ screen: 'settings', title: 'Settings', page: (id) => by[id],
+  for (const c of channels) by[c.id] = () => channelPage(c.id);
+  $('#main').replaceChildren(listDetail({ screen: 'settings', title: 'Settings', page: (id) => by[id]?.(),
     groups: [{ title: 'Channels', items: channels }, ...SETTINGS_GROUPS.map(([g, ids]) => ({ title: g, items: ids.filter((id) => by[id]).map((id) => ({ id, name: title[id], sub: SECTION_SUB[id], mark: h('span', { class: `lmark ${SECTION_ICON[id][1]}`, 'aria-hidden': 'true' }, icon(SECTION_ICON[id][0])) })) }))] }));
+}
+function directMessagesCard(agents) {
+  return h('div', { class: 'card' }, h('h2', {}, 'Chats & direct messages'),
+    field('Default agent for direct messages', h('select', { disabled: !can('admin'), onchange: (e) => tryApi(() => api('POST', '/api/settings', { defaultDmAgent: e.target.value }), 'Saved') },
+      h('option', { value: '' }, 'The first agent that accepts the sender'), agents.filter((b) => !b.builtin).map((b) => h('option', { value: b.id, selected: S.status?.settings?.defaultDmAgent === b.id }, b.name))), 'For direct messages without a trigger.'),
+    field('When a chat is switched on, load its last', h('select', { disabled: !can('admin'), onchange: (e) => tryApi(async () => { await api('POST', '/api/settings', { historyLoadCount: Number(e.target.value) }); refreshStatus(); }, 'Saved') },
+      [0, 25, 50, 100, 200].map((n) => h('option', { value: n, selected: Number(S.status?.settings?.historyLoadCount ?? 50) === n }, n ? `${n} messages` : 'Nothing'))), 'Asked from your phone, which must be online.'));
+}
+function passwordCard(me) {
+  const cur = h('input', { type: 'password', placeholder: 'current', autocomplete: 'current-password' });
+  const next = h('input', { type: 'password', placeholder: 'new (12+ characters)', autocomplete: 'new-password' });
+  return h('div', { class: 'card' }, h('h2', {}, me.hasPassword ? 'Your password' : 'Add a password'),
+    me.hasPassword ? [cur, h('div', { style: 'height:8px' })] : h('p', { class: 'small muted', style: 'margin-top:0' }, 'You sign in with Google. A password is a fallback for when Google sign-in is off.'), next,
+    h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => tryApi(async () => { await api('POST', '/api/password', { current: cur.value, next: next.value }); reloadSection(); }, me.hasPassword ? 'Password changed' : 'Password added') }, me.hasPassword ? 'Change password' : 'Add password'));
+}
+function checklistCard(checklist) {
+  return h('div', { class: 'card' }, h('h2', {}, 'Getting started'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, checklist.complete ? `All ${checklist.total} steps are done.` : checklist.dismissed ? `Hidden from Overview, ${checklist.done} of ${checklist.total} steps done.` : `On Overview, ${checklist.done} of ${checklist.total} steps done.`),
+    checklist.dismissed && !checklist.complete ? h('button', { class: 'btn', onclick: () => tryApi(async () => { S.checklist = await api('PUT', '/api/checklist', { dismissed: false }); location.hash = 'overview'; }) }, 'Show on Overview again') : null);
 }
 const SETTINGS_GROUPS = [['Agents & chats', ['tool-services', 'owner-assistant', 'direct-messages', 'privacy-notice', 'photos-voice', 'sending-pace', 'modules']],
   ['People & sign-in', ['users', 'sign-in', 'google', 'assistants', 'password', 'my-google']], ['Server', ['updates', 'web-access', 'secrets', 'logging', 'small-mode']],
@@ -127,7 +138,7 @@ function sourceBlock(src) {
   const save = async (repo) => {
     if (!repo || repo === src.repo) return;
     if (!await ask({ title: `Update from ${repo}?`, text: `Future updates install the releases of ${repo} instead of ${src.repo || src.url}. Its releases are read first; nothing changes if that fails.`, ok: 'Change source' })) return;
-    if (await tryApi(() => api('PUT', '/api/updates/source', { repo }), `Updates now come from ${repo}`)) renderSettings();
+    if (await tryApi(() => api('PUT', '/api/updates/source', { repo }), `Updates now come from ${repo}`)) reloadSection();
   };
   return h('div', { class: 'sblock' }, h('h3', {}, 'Update source'),
     h('p', { class: 'small' }, 'Updates come from ', where, src.official ? ' (the project).' : ` · not the project (${src.project}).`),
@@ -142,7 +153,7 @@ function smallModeCard(sv) {
   const on = !!sv.smallMode;
   const small = sv.size === 'small';
   const ram = sv.effectiveMb >= 1024 ? `${(sv.effectiveMb / 1024).toFixed(1)} GB` : `${sv.effectiveMb} MB`;
-  const flip = (v) => tryApi(async () => { await api('PUT', '/api/server/small-mode', { enabled: v }); S.status = await api('GET', '/api/status'); renderSettings(); }, v ? 'Small server mode on' : 'Small server mode off');
+  const flip = (v) => tryApi(async () => { await api('PUT', '/api/server/small-mode', { enabled: v }); S.status = await api('GET', '/api/status'); reloadSection(); }, v ? 'Small server mode on' : 'Small server mode off');
   return h('div', { class: 'card', id: 'small-mode' }, h('h2', {}, 'Server size'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, `${SIZE_LABEL[sv.size]}: ${ram} memory, ${sv.cpus} CPU${sv.cpus > 1 ? 's' : ''}.`),
     h('label', { class: 'inline' }, toggle(on, flip, !can('owner')), h('b', {}, 'Small server mode: allow heavier features on this server')),
@@ -155,7 +166,7 @@ function smallModeCard(sv) {
 function ownerAssistantCard(o) {
   const l = o.link;
   const box = h('div', {});
-  const reload = () => renderSettings();
+  const reload = () => reloadSection();
   const sendTo = o.sendTo.length ? o.sendTo.map((n) => `+${n.phone}`).join(' or ') : 'an agent number';
   let state;
   if (l.status === 'linked') {
@@ -197,7 +208,7 @@ function briefSlot() {
 function privacyNoticeCard(n) {
   const text = h('textarea', { value: n.text, maxlength: 500, style: 'min-height:70px', 'aria-label': 'Group notice', disabled: !can('admin') });
   const dmText = h('textarea', { value: n.dmText, maxlength: 500, style: 'min-height:56px', 'aria-label': 'Direct message notice', disabled: !can('admin') });
-  const save = (body, msg) => tryApi(async () => { await api('PUT', '/api/privacy-notice', body); renderSettings(); }, msg);
+  const save = (body, msg) => tryApi(() => api('PUT', '/api/privacy-notice', body), msg); // a switch or the texts: nothing else redraws
   return h('div', { class: 'card' }, h('h2', {}, 'Privacy notice'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, 'Posted once when a group is switched on. A group can opt out on its chat page.'),
     h('div', { class: 'row', style: 'gap:10px' }, h('label', { class: 'inline' }, toggle(n.enabled, (v) => save({ enabled: v }, v ? 'Notice on' : 'Notice off')), 'Post in groups when switched on')),
@@ -272,6 +283,15 @@ async function toolServicesCard() {
     api('GET', '/api/tool-services/registry/settings').catch(() => null)]);
   const isOwner = S.user?.role === 'owner';
   const items = list.map((g) => ({ s: serverState(g.name, g.config), g }));
+  // 094: what each service can share comes later (it asks the services): only the How it uses it cards update then
+  const media = {};
+  const bhSlot = (it) => {
+    const box = h('div', {});
+    it.fillBh = () => box.replaceChildren(behaviourEditor(it.s.behaviour, { media: media[it.s.key] || '', open: !!it.open, onToggle: (o) => { it.open = o; } }));
+    it.fillBh();
+    return box;
+  };
+  api('GET', '/api/tool-services/media').then((m) => { Object.assign(media, m); for (const it of items) if (media[it.s.key]) it.fillBh?.(); }).catch(() => {});
   const box = h('div', {});
   const card = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Tool services for all agents'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, 'Every agent can use these; each agent can switch one off. Ticks are the defaults per role.'),
@@ -311,9 +331,9 @@ async function toolServicesCard() {
         const risk = { get: (n) => it.s.behaviour.tools?.[n], set: (n, v) => { const t = { ...(it.s.behaviour.tools || {}) }; if (v === 'auto') delete t[n]; else t[n] = v; it.s.behaviour.tools = t; } };
         return toolServiceEditor(it.s, { base: '/api/tool-services', conns, locals, isOwner, save: () => saveOne(it), saveHint: 'Save to connect', rules: defaultsRules(it.s), risk,
           redraw: draw, remove: () => removeOne(it), keyLocked: !it.s.isNew, extra,
-          top: behaviourEditor(it.s.behaviour, { media: g?.media || '' }) }); // 094: how every agent uses it unless an agent says otherwise
+          top: bhSlot(it) }); // 094: how every agent uses it unless an agent says otherwise
       }),
-      can('admin') ? h('div', { class: 'row', style: 'margin-top:8px' }, browseButton({ target: 'all', targetName: 'all agents', onAdded: () => renderSettings() }, reg),
+      can('admin') ? h('div', { class: 'row', style: 'margin-top:8px' }, browseButton({ target: 'all', targetName: 'all agents', onAdded: () => reloadSection() }, reg),
         h('button', { class: 'btn small mut', onclick: () => { items.push({ s: serverState('', {}), g: null }); draw(); } }, '+ Add tool service for all agents')) : null,
       reg ? registrySettingsBox(reg) : null);
   }
@@ -332,7 +352,7 @@ function assistantsCard(a) {
   const steps = (title, items) => h('details', {}, h('summary', { style: 'cursor:pointer;font-weight:600;margin:10px 0 4px' }, title), h('ol', { class: 'small', style: 'margin:6px 0 0;padding-left:20px' }, items.map((x) => h('li', { style: 'margin:3px 0' }, x))));
   const others = a.grants.some((g) => g.userId !== a.you);
   const revoke = async (g) => (await ask({ title: `Disconnect ${g.clientName}${g.userId !== a.you ? ` (${g.username})` : ''}?`, text: 'It stops working right away. You can connect it again later.', ok: 'Disconnect', danger: true }))
-    && tryApi(async () => { await api('DELETE', `/api/assistants/${g.userId}/${encodeURIComponent(g.clientId)}`); renderSettings(); }, 'Disconnected');
+    && tryApi(async () => { await api('DELETE', `/api/assistants/${g.userId}/${encodeURIComponent(g.clientId)}`); reloadSection(); }, 'Disconnected');
   return h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Connected AI assistants'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, 'Manage this app by chatting with ChatGPT or Claude. They sign in as you.'),
     a.https ? null : h('div', { class: 'note warn' }, 'This address only works on this network. ChatGPT and Claude need the public https address of this app: set up internet access first (Caddy or Cloudflare, see the install guide), then open the panel at that address and come back here.'),
@@ -354,7 +374,7 @@ function myGoogleCard(me) {
   return h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', {}, 'Your Google account'), h('span', { class: `pill ${me.google ? 'ok' : ''}` }, me.google ? 'linked' : 'not linked')),
     me.google
       ? [h('p', { class: 'small muted', style: 'margin-top:0' }, 'You can use “Sign in with Google” on the sign-in page.'),
-        me.hasPassword ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: 'Unlink your Google account?', text: 'You then sign in with your password only.', ok: 'Unlink Google', danger: true })) && tryApi(async () => { await api('DELETE', '/api/me/google'); renderSettings(); }, 'Unlinked') }, 'Unlink')
+        me.hasPassword ? h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: 'Unlink your Google account?', text: 'You then sign in with your password only.', ok: 'Unlink Google', danger: true })) && tryApi(async () => { await api('DELETE', '/api/me/google'); reloadSection(); }, 'Unlinked') }, 'Unlink')
           : h('p', { class: 'small muted' }, 'To unlink Google, add a password first.')]
       : [h('p', { class: 'small muted', style: 'margin-top:0' }, 'Link your Google account to sign in with one click instead of your password.'),
         h('a', { class: 'btn google', href: '/auth/google/start?mode=link' }, gLogo(), 'Link my Google account')]);
@@ -369,9 +389,9 @@ function inviteMessage(i, panelUrl) {
 function signinCard(st) {
   const busy = h('span', { class: 'small muted' });
   const set = async (v) => {
-    if (v && !await ask({ title: 'Switch off password sign-in?', text: `Everyone must use Sign in with Google from now on.${st.withoutGoogle.length ? `\n\nThese accounts have no Google link and can no longer sign in: ${st.withoutGoogle.join(', ')}.` : ''}\n\nIf Google ever stops working, run “sudo duniya enable-password-login” on the server.`, ok: 'Switch off passwords', danger: true })) return renderSettings();
+    if (v && !await ask({ title: 'Switch off password sign-in?', text: `Everyone must use Sign in with Google from now on.${st.withoutGoogle.length ? `\n\nThese accounts have no Google link and can no longer sign in: ${st.withoutGoogle.join(', ')}.` : ''}\n\nIf Google ever stops working, run “sudo duniya enable-password-login” on the server.`, ok: 'Switch off passwords', danger: true })) return reloadSection();
     await tryApi(() => api('PUT', '/api/auth/signin', { googleOnly: v }), v ? 'Only Google sign-in from now on' : 'Password sign-in is back on');
-    renderSettings();
+    reloadSection();
   };
   const sw = toggle(st.on, set, !st.on && !st.canEnable);
   return h('div', { class: 'card' }, h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'Sign-in'),
@@ -388,37 +408,37 @@ function usersCard(users, inv, signin) {
   const un = h('input', { placeholder: 'username' }); const ue = h('input', { placeholder: 'email (optional, lets them use Google)' });
   const roleSel = (val) => h('select', { 'aria-label': 'Role' }, h('option', { value: 'admin', selected: val === 'admin' }, 'Admin'), h('option', { value: 'viewer', selected: val === 'viewer' }, 'Viewer (read-only)'), h('option', { value: 'owner', selected: val === 'owner' }, 'Owner'));
   const ur = roleSel('admin'); const up = h('input', { type: 'password', placeholder: 'password (12+), or empty for a sign-up link', autocomplete: 'new-password' });
-  const signup = (r) => { S.signupLink = r; renderSettings(); };
+  const signup = (r) => { S.signupLink = r; reloadSection(); };
   const ie = h('input', { type: 'email', placeholder: 'their.name@gmail.com', autocomplete: 'off' }); const ir = roleSel('admin');
   const mail = (i) => `mailto:${encodeURIComponent(i.email)}?subject=${encodeURIComponent('Your invite to the Duniya admin panel')}&body=${encodeURIComponent(inviteMessage(i, inv.panelUrl))}`;
   const days = (ts) => Math.max(0, Math.ceil((ts - Date.now()) / 86400000));
   const sl = S.signupLink;
   return h('div', { class: 'card', style: 'grid-column:1/-1' }, h('h2', {}, 'Users'),
     h('p', { class: 'small muted' }, 'Owners: everything. Admins: agents, chats, models, memory. Viewers: look only.'),
-    sl ? h('div', { class: 'note' }, `Send this to ${sl.username} only: they set their own password (works once, 48 hours). `, h('code', { class: 'small', style: 'word-break:break-all' }, sl.link), ' ', copyBtn(sl.link), ' ', h('button', { class: 'btn small', onclick: () => { S.signupLink = null; renderSettings(); } }, 'Done')) : null,
+    sl ? h('div', { class: 'note' }, `Send this to ${sl.username} only: they set their own password (works once, 48 hours). `, h('code', { class: 'small', style: 'word-break:break-all' }, sl.link), ' ', copyBtn(sl.link), ' ', h('button', { class: 'btn small', onclick: () => { S.signupLink = null; reloadSection(); } }, 'Done')) : null,
     h('div', { class: 'tscroll' }, h('table', { class: 'stack' }, h('tbody', {}, users.map((u) => h('tr', {},
       h('td', { 'data-label': '' }, h('b', {}, u.username), ' ', u.google ? h('span', { class: 'pill info', title: 'Signs in with Google' }, gLogo(), 'Google') : null,
         h('div', { class: 'small muted' }, [u.email, !u.hasPassword ? (u.google ? 'no password' : 'waiting for sign-up') : ''].filter(Boolean).join(' · '))),
-      h('td', { 'data-label': 'Role' }, h('select', { style: 'min-width:110px', 'aria-label': `Role of ${u.username}`, onchange: (e) => tryApi(() => api('PUT', `/api/users/${u.id}`, { role: e.target.value }), 'Role changed').then((r) => r || renderSettings()) },
+      h('td', { 'data-label': 'Role' }, h('select', { style: 'min-width:110px', 'aria-label': `Role of ${u.username}`, onchange: (e) => tryApi(() => api('PUT', `/api/users/${u.id}`, { role: e.target.value }), 'Role changed').then((r) => r || reloadSection()) },
         ['owner', 'admin', 'viewer'].map((r) => h('option', { value: r, selected: u.role === r }, r)))),
       h('td', { style: 'white-space:nowrap;text-align:right', 'data-label': '' }, u.id === S.user.id ? h('span', { class: 'small muted' }, 'you') : [
-        u.google && u.hasPassword ? h('button', { class: 'btn small', onclick: async () => (await ask({ title: `Unlink Google from ${u.username}?`, text: 'They then sign in with their password.', ok: 'Unlink Google', danger: true })) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}/google`); renderSettings(); }, 'Unlinked') }, 'Unlink Google') : null, ' ',
+        u.google && u.hasPassword ? h('button', { class: 'btn small', onclick: async () => (await ask({ title: `Unlink Google from ${u.username}?`, text: 'They then sign in with their password.', ok: 'Unlink Google', danger: true })) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}/google`); reloadSection(); }, 'Unlinked') }, 'Unlink Google') : null, ' ',
         signin?.active ? null : h('button', { class: 'btn small', title: 'A one-time link (48 h) where they set their own password', onclick: async () => (u.hasPassword ? await ask({ title: `Make a password link for ${u.username}?`, text: 'A one-time link (48 h) where they set a new password. Send it to them only.', ok: 'Make link' }) : true) && tryApi(() => api('POST', `/api/users/${u.id}/signup-link`)).then((r) => r && signup(r)) }, u.hasPassword ? 'Password link' : 'Sign-up link'), ' ',
-        h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Remove ${u.username}?`, text: 'They can no longer sign in.', ok: 'Remove user', danger: true })) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}`); renderSettings(); }, 'Removed') }, 'Remove')])))))),
+        h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Remove ${u.username}?`, text: 'They can no longer sign in.', ok: 'Remove user', danger: true })) && tryApi(async () => { await api('DELETE', `/api/users/${u.id}`); reloadSection(); }, 'Removed') }, 'Remove')])))))),
     h('h3', {}, 'Invite someone with Google'),
     inv.googleReady
       ? h('p', { class: 'small muted', style: 'margin-top:0' }, 'They sign in with their Google account the first time — no password to share. Send them the invite by email or copy it into WhatsApp.')
       : h('div', { class: 'note' }, 'Set up ', h('a', { href: '#settings/google' }, 'Sign in with Google'), ' first. Invites only work once Google sign-in is ready.'),
-    h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); const i = await tryApi(() => api('POST', '/api/invites', { email: ie.value, role: ir.value }), 'Invite created — now send it'); if (i) renderSettings(); } },
+    h('form', { class: 'row', onsubmit: async (e) => { e.preventDefault(); const i = await tryApi(() => api('POST', '/api/invites', { email: ie.value, role: ir.value }), 'Invite created — now send it'); if (i) reloadSection(); } },
       ie, ir, h('button', { class: 'btn primary', disabled: !inv.googleReady }, 'Invite')),
     inv.invites.length ? h('div', { style: 'margin-top:6px' }, inv.invites.map((i) => h('div', { class: 'list-row' },
       h('div', { class: 'grow' }, h('b', {}, i.email), h('div', { class: 'small muted' }, `${i.role} · invited by ${i.invitedBy || '?'}`)),
       h('span', { class: `pill ${i.expired ? 'bad' : 'warn'}` }, i.expired ? 'invite expired' : `invite pending · ${days(i.expiresAt)} days left`),
       h('div', { class: 'row', style: 'flex:0 0 auto' },
-        h('a', { class: 'btn small', href: mail(i), onclick: () => api('POST', `/api/invites/${i.id}/renew`).then(() => setTimeout(renderSettings, 500)).catch(() => {}) }, i.expired ? 'Renew & email' : 'Email'),
+        h('a', { class: 'btn small', href: mail(i), onclick: () => api('POST', `/api/invites/${i.id}/renew`).then(() => setTimeout(reloadSection, 500)).catch(() => {}) }, i.expired ? 'Renew & email' : 'Email'),
         copyBtn(() => inviteMessage(i, inv.panelUrl), 'Copy message'),
-        h('button', { class: 'btn small', title: 'Give them 14 more days', onclick: () => tryApi(async () => { await api('POST', `/api/invites/${i.id}/renew`); renderSettings(); }, 'Invite renewed for 14 days') }, 'Resend'),
-        h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Revoke the invite for ${i.email}?`, text: 'They can no longer sign in with it.', ok: 'Revoke invite', danger: true })) && tryApi(async () => { await api('DELETE', `/api/invites/${i.id}`); renderSettings(); }, 'Invite revoked') }, 'Revoke'))))) : null,
+        h('button', { class: 'btn small', title: 'Give them 14 more days', onclick: () => tryApi(async () => { await api('POST', `/api/invites/${i.id}/renew`); reloadSection(); }, 'Invite renewed for 14 days') }, 'Resend'),
+        h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: `Revoke the invite for ${i.email}?`, text: 'They can no longer sign in with it.', ok: 'Revoke invite', danger: true })) && tryApi(async () => { await api('DELETE', `/api/invites/${i.id}`); reloadSection(); }, 'Invite revoked') }, 'Revoke'))))) : null,
     signin?.active ? null : h('details', { style: 'margin-top:12px' }, h('summary', { class: 'small muted' }, 'Add a user with a password or a sign-up link instead'),
       h('form', { class: 'row', style: 'margin-top:10px', onsubmit: async (e) => { e.preventDefault(); const r = await tryApi(() => api('POST', '/api/users', { username: un.value, email: ue.value, role: ur.value, password: up.value }), 'User added'); if (r) signup(r.signup || null); } },
         un, ue, ur, up, h('button', { class: 'btn primary' }, 'Add user'))));
@@ -455,7 +475,7 @@ function googleSetupCard(g) {
       h('div', { class: 'row', style: 'margin-top:10px' },
         h('button', { class: 'btn primary', onclick: async (e) => {
           const r = await tryApi(() => api('PUT', '/api/auth/google', { clientId: cid.value.trim(), ...(sec.value ? { clientSecret: sec.value.trim() } : {}) }), 'Saved');
-          if (r?.ready) { const t = await tryApi(() => api('POST', '/api/auth/google/test')); if (t) g.lastTest = t; renderSettings(); }
+          if (r?.ready) { const t = await tryApi(() => api('POST', '/api/auth/google/test')); if (t) g.lastTest = t; reloadSection(); }
         } }, 'Save and test'))));
   return h('div', { class: 'card', style: 'grid-column:1/-1' },
     h('div', { class: 'row spread' }, h('h2', {}, 'Sign in with Google'),
@@ -464,10 +484,10 @@ function googleSetupCard(g) {
     saved ? [
       h('div', { class: 'row', style: 'margin-bottom:6px' },
         h('button', { class: 'btn', onclick: (e) => runTest(e.currentTarget) }, 'Test'),
-        h('label', { class: 'inline', style: 'margin-left:auto' }, toggle(g.enabled, (v) => tryApi(async () => { await api('PUT', '/api/auth/google', { enabled: v }); renderSettings(); }, v ? 'Google sign-in on' : 'Google sign-in off')), 'Show on the sign-in page')),
+        h('label', { class: 'inline', style: 'margin-left:auto' }, toggle(g.enabled, (v) => tryApi(async () => { await api('PUT', '/api/auth/google', { enabled: v }); reloadSection(); }, v ? 'Google sign-in on' : 'Google sign-in off')), 'Show on the sign-in page')),
       result,
       h('details', {}, h('summary', { class: 'small muted' }, 'Setup steps and addresses'), steps,
-        h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: 'Remove Google sign-in?', text: 'People who only use Google cannot sign in until you set it up again. Accounts and links are kept.', ok: 'Remove Google sign-in', danger: true })) && tryApi(async () => { await api('DELETE', '/api/auth/google'); renderSettings(); }, 'Removed') }, 'Remove Google sign-in'))]
+        h('button', { class: 'btn small danger', onclick: async () => (await ask({ title: 'Remove Google sign-in?', text: 'People who only use Google cannot sign in until you set it up again. Accounts and links are kept.', ok: 'Remove Google sign-in', danger: true })) && tryApi(async () => { await api('DELETE', '/api/auth/google'); reloadSection(); }, 'Removed') }, 'Remove Google sign-in'))]
       : [steps, result]);
 }
 

@@ -1,5 +1,5 @@
 // Server screen: metrics, health, OS updates, maintenance helper, logs, hosting. Module of the panel (063).
-import { $, S, ago, api, ask, can, field, h, serverBadge, time, tryApi } from './core.js';
+import { $, S, ago, api, ask, can, field, h, partFailed, serverBadge, time, tryApi } from './core.js';
 import { docsUrl, SIZE_LABEL, bytes, meter, pct, plural } from './shared.js';
 function spark(values, max) {
   const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg');
@@ -88,7 +88,8 @@ export async function renderServer() {
   $('#main').replaceChildren(tilesBox, h('div', { class: 'grid', style: 'margin-top:16px' }, infoBox, healthBox, opsBox, hostBox), can('admin') ? logBox : null);
   async function tiles() {
     if (S.tab !== 'server') return clearInterval(serverTimer);
-    const [x, hist] = await Promise.all([api('GET', '/api/system'), api('GET', '/api/system/history')]).catch(() => [null, []]);
+    // the graphs are extras: the tiles show without them; a failure says so with Retry
+    const [x, hist] = await Promise.all([api('GET', '/api/system').catch((e) => { if (!lastSys) tilesBox.replaceChildren(partFailed(e, 'Server', tiles)); return null; }), api('GET', '/api/system/history').catch(() => [])]);
     if (!x) return;
     lastSys = x;
     if (!hostBox.childElementCount) hostBox.append(hostingCard(x.hosting));
@@ -111,7 +112,8 @@ export async function renderServer() {
   async function opsCard() {
     if (S.tab !== 'server') return;
     if (!can('admin')) { opsBox.replaceChildren(h('h2', {}, 'Maintenance'), h('p', { class: 'small muted' }, 'Admins can see OS updates; owners can run maintenance.')); return; }
-    const [upd, ops] = await Promise.all([api('GET', '/api/system/os-updates').catch(() => null), can('owner') ? api('GET', '/api/system/ops').catch(() => null) : null]);
+    let failed = null;
+    const [upd, ops] = await Promise.all([api('GET', '/api/system/os-updates').catch((e) => { failed = e; return null; }), can('owner') ? api('GET', '/api/system/ops').catch((e) => { failed = e; return null; }) : null]);
     if (S.tab !== 'server') return;
     const run = ops?.status?.state === 'running' ? ops.status : null;
     // 064: each action asks in the panel's own dialog (q: title, text, optional body with the details), named on its button
@@ -156,7 +158,7 @@ export async function renderServer() {
           ' on the server once; after that it updates itself from here. No SSH access (for example an Oracle server created without an SSH key)? Reinstall instead: ', helperDoc, ' (your data comes back from a backup).');
     opsBox.replaceChildren(h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'OS updates & maintenance'),
       h('button', { class: 'btn small', onclick: async (e) => { e.target.disabled = true; await api('GET', '/api/system/os-updates?refresh=1').catch(() => {}); opsCard(); } }, 'Check')),
-      restartBanner, updates,
+      failed ? partFailed(failed, '', opsCard) : null, restartBanner, updates,
       can('owner') ? (ops?.available ? h('div', {},
         run ? h('div', { class: 'note' }, h('span', { class: 'spinner' }), h('b', {}, ` ${ops.actions[run.action] || run.action}…`), ` started ${ago(run.startedAt)} ago`) : null,
         lastLine,
@@ -186,7 +188,8 @@ export async function renderServer() {
     logBox.replaceChildren(h('details', { class: 'logs', ontoggle: (e) => { if (e.target.open) logsCard(); } }, h('summary', {}, h('h2', { style: 'margin:0;display:inline' }, 'Logs'), h('span', { class: 'small muted' }, ' · app, web server, tunnel, maintenance'))));
   }
   const health = (x) => { if (x) healthBox.replaceChildren(healthCard(x, health)); };
-  await tiles(); api('GET', '/api/server/health').then(health).catch(() => {}); opsCard(); if (can('admin')) drawLogsRow();
+  const loadHealth = () => api('GET', '/api/server/health').then(health, (e) => healthBox.replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Health & data kept'), partFailed(e, '', loadHealth))));
+  await tiles(); loadHealth(); opsCard(); if (can('admin')) drawLogsRow();
   serverTimer = setInterval(tiles, 10000);
 }
 

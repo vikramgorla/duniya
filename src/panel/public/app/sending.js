@@ -2,7 +2,7 @@
 // got what), and New message: audience, purpose, who replies, the message → the preview (who, how many, which app,
 // how long, who is skipped and why, three samples) → Start sending. Orders (Send reminders) and an event page (Message
 // registered people) open New message prefilled. Loaded from people.js; every text from people or models is a text node.
-import { $, S, api, ask, avatar, can, emptyState, field, h, menu, meterEl, time, toggle, tryApi } from './core.js';
+import { $, api, ask, avatar, can, emptyState, field, h, menu, meterEl, S, time, toggle, tryApi, unless404 } from './core.js';
 import { helpLink, plural } from './shared.js';
 import { day, peopleNav } from './people.js';
 import { back, group, row, runPill } from './events.js';
@@ -119,7 +119,7 @@ async function newMessage(q) {
 }
 
 async function runPage(id) {
-  const g = await api('GET', `/api/sending/runs/${enc(id)}`).catch(() => null);
+  const g = await api('GET', `/api/sending/runs/${enc(id)}`).catch(unless404);
   const bk = back('#people/sending', 'Sending');
   if (!g) { $('#main').replaceChildren(h('div', { class: 'card' }, bk, h('p', { class: 'muted' }, 'This message is gone.'))); return; }
   const { run: r, recipients } = g;
@@ -197,7 +197,7 @@ async function newCampaign() {
 }
 
 async function campaignPage(id) {
-  const c = await api('GET', `/api/sending/campaigns/${enc(id)}`).catch(() => null);
+  const c = await api('GET', `/api/sending/campaigns/${enc(id)}`).catch(unless404);
   const bk = back('#people/sending', 'Sending');
   if (!c) { $('#main').replaceChildren(h('div', { class: 'card' }, bk, h('p', { class: 'muted' }, 'This campaign is gone.'))); return; }
   document.title = `${c.title} · Duniya`;

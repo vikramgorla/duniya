@@ -1,6 +1,6 @@
 // @ts-check
 import { isChatEnabled } from './chat-prefs.js';
-import { env, localParts } from './config.js';
+import { dueAt, env, localParts } from './config.js';
 import { isGroup } from '../channels/index.js';
 import { getSetting } from './store.js';
 import { listAgents, isBuiltin } from './agents.js';
@@ -20,9 +20,12 @@ export async function runSchedule(agent, sched, channel, { force = false } = {})
   const results = [];
   for (const chat of chats) {
     if (!isChatEnabled(chat)) continue; // #10: never post into chats that are off
+    // once a day per chat; a failed run is tried again on the next ticks, at most 3 times
     const key = `sched:${agent.id}:${sched.id}:${chat}:${date}`;
-    if (!force && kvGet(key)) continue;
-    kvSet(key, '1');
+    const was = kvGet(key) || '';
+    const fails = Number(was.match(/^fail:(\d)$/)?.[1] || 0);
+    if (!force && was && !(fails && fails < 3)) continue;
+    kvSet(key, 'running');
     try {
       const reply = await runAgent({
         agent, role: 'participant', chat, senderName: 'scheduler', requester: 'scheduler',
@@ -34,9 +37,11 @@ export async function runSchedule(agent, sched, channel, { force = false } = {})
         const sent = await channel.send(chat, reply);
         logMessage({ chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text: reply, fromAgent: true });
       }
+      kvSet(key, '1');
       activity('schedule.run', { agent: agent.id, chat, summary: `${sched.id}: ${skip ? 'skipped' : 'posted'}`, detail: { reply } });
       results.push({ chat, reply: skip ? null : reply });
     } catch (e) {
+      kvSet(key, `fail:${fails + 1}`);
       activity('error', { agent: agent.id, chat, summary: `Schedule ${sched.id} failed: ${e.message}` });
     }
   }
@@ -52,7 +57,7 @@ export function startScheduler(channel) {
       if (!agent.enabled || (paused && !isBuiltin(agent))) continue; // 059: the owner assistant's schedules run even while paused
       const { hhmm, day } = localParts(agent.timezone || env.timezone);
       for (const s of agent.schedules || []) {
-        if (s.enabled === false || s.at !== hhmm || !dayMatches(s.days, day)) continue;
+        if (s.enabled === false || !dueAt(s.at, hhmm) || !dayMatches(s.days, day)) continue; // 2.56: or up to 30 min late (a restart that minute)
         await runSchedule(agent, s, channel);
       }
     }

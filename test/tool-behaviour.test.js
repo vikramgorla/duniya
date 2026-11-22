@@ -65,8 +65,7 @@ const text = (s) => [{ type: 'text', text: s }];
 const setRaju = (services) => t.api(owner, 'PUT', '/api/agents/raju', { services });
 
 test('the panel sees each tool\'s risk from its annotations and which tool returns media', async () => {
-  const list = await t.api(owner, 'GET', '/api/tool-services');
-  assert.equal(list.body.find((g) => g.name === 'clips').media, 'gif');
+  assert.equal((await t.api(owner, 'GET', '/api/tool-services/media')).body.clips, 'gif');
   const mine = await t.api(owner, 'GET', '/api/agents/raju/services');
   const c = mine.body.find((x) => x.service === 'clips');
   assert.deepEqual(c.tools.map((x) => [x.name, x.risk, x.annotated, x.media || '']), [['find', 'read', true, 'gif'], ['save_clip', 'change', false, ''], ['drop_clip', 'destructive', true, '']]);
@@ -89,6 +88,18 @@ test('a celebration with "often": the text, then exactly one GIF with the tool\'
   assert.equal(queries.at(-1), 'party dance telugu movie', 'mood words + style words');
   const act = t.db.listActivity({ type: 'whatsapp.action' })[0];
   assert.match(act.summary, /Shared a GIF \(party dance\) from clips, chosen by the model/);
+});
+
+test('sharing on its own works for participants who have no tools of the service (a Registry add): only share_media', async () => {
+  await t.api(owner, 'PUT', '/api/tool-services/clips', { url: url(clips), auth: 'none', defaults: { organizer: ['*'], participant: [] } });
+  const chat = CHATS[15]; const n = t.claudeReqs.length;
+  t.script.push([share({ mood: 'cheer' })], text('Yay!'));
+  await say(chat, 'raju we won the match!! 🎉');
+  const names = t.toolNames(n);
+  assert.ok(names.includes('whatsapp__share_media'), 'the owner chose sharing: every sender');
+  assert.ok(!names.some((x) => x.startsWith('clips__')), 'none of the service\'s own tools for this role');
+  assert.deepEqual(shape(chat), ['Yay!', 'gif']);
+  await t.api(owner, 'PUT', '/api/tool-services/clips', { url: url(clips), auth: 'none', defaults: { organizer: ['*'], participant: ['*'] } });
 });
 
 test('a text-only reply on a clear moment (light tier): code shares one after the text', async () => {
@@ -162,7 +173,7 @@ test('"sometimes" only on strong moments; "off" never; not offered for a tool th
   await say(chat, 'raju congrats!! 🎉');
   assert.ok(!t.toolNames(n).includes('whatsapp__share_media'));
   assert.equal(media(chat).length, 0);
-  assert.equal((await t.api(owner, 'GET', '/api/tool-services')).body.find((g) => g.name === 'drawer').media, '');
+  assert.equal((await t.api(owner, 'GET', '/api/tool-services/media')).body.drawer, '');
   await t.api(owner, 'DELETE', '/api/tool-services/drawer');
 });
 
@@ -229,12 +240,24 @@ test('admin MCP: get and set how a service is used, per agent and as the default
   assert.equal((await get.run({ agent_id: 'raju' }, x)).find((s) => s.service === 'clips').media, 'gif');
 });
 
-test('one-time: an agent whose instructions ask for GIFs and that can use a media service shares on its own', async () => {
-  const { saveAgentRow, getAgentRow } = t.store;
-  const { services, ...old } = getAgentRow('raju').config; void services;
-  saveAgentRow('silk', { ...old, name: 'Silk', chats: [], prompt: 'Use Telugu or Tamil cinema reactions as GIFs often when people celebrate.' }, 'test');
-  saveAgentRow('plain', { ...old, name: 'Plain', chats: [], prompt: 'No moving pictures.' }, 'test');
-  await t.agents.loadAgents();
-  assert.deepEqual(t.agents.getAgent('silk').services, { clips: { when: 'proactive', share: 'often', style: 'Telugu or Tamil cinema reactions' } });
-  assert.equal(t.agents.getAgent('plain').services, undefined);
+test('a tool service that never answers holds up a reply at most a few seconds, once (services are asked at once; a failure is remembered)', async () => {
+  const stuck = () => http.createServer(() => {}).listen(0); // accepts, never answers
+  const a = stuck(); const b = stuck();
+  for (const [k, srv] of [['stuck1', a], ['stuck2', b]]) await t.api(owner, 'PUT', `/api/tool-services/${k}`, { url: url(srv), auth: 'none', defaults: { organizer: ['*'], participant: ['*'] } });
+  const chat = CHATS[14];
+  t.script.push(text('Here.'));
+  const t0 = Date.now();
+  await say(chat, 'raju are you there?');
+  const took = Date.now() - t0;
+  assert.ok(took < 12000, `two silent services in parallel, each within its wait (took ${took} ms)`);
+  assert.deepEqual(shape(chat).slice(-1), ['Here.']);
+  for (const k of ['stuck1', 'stuck2']) await t.api(owner, 'DELETE', `/api/tool-services/${k}`);
+  a.closeAllConnections(); b.closeAllConnections(); a.close(); b.close();
+});
+
+test('a service that cannot be reached is explained in plain words (502), not as "fetch failed"', async () => {
+  const r = await t.api(owner, 'POST', '/api/tool-services/discover', { server: 'nobody', url: 'http://127.0.0.1:9/mcp' });
+  assert.equal(r.status, 502);
+  assert.match(r.body.error, /refused the connection|Could not reach/);
+  assert.doesNotMatch(r.body.error, /fetch failed|MCP http/);
 });
