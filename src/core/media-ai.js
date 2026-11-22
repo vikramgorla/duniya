@@ -348,7 +348,7 @@ export async function imageToolAllowed(agent, role) {
 const SIZES = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
 
 export const mediaTools = [
-  { name: 'create_image', roles: ['organizer', 'participant'],
+  { name: 'create_image', annotations: { readOnlyHint: false, destructiveHint: false }, roles: ['organizer', 'participant'],
     description: 'Create a picture from a description and send it to this chat as a WhatsApp image with a caption. To change a photo someone just sent, set edit_of to "last_photo". Only when someone asks for a picture.',
     input_schema: { type: 'object', properties: {
       prompt: { type: 'string', description: 'What the picture should show, in detail', maxLength: 4000 },

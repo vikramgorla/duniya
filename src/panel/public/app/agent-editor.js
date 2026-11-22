@@ -9,7 +9,7 @@ import { S, api, ask, avatar, can, field, fieldError, h, icon, lines, menu, spli
 import { fallbackLine, fallbackPicker } from './fallback.js';
 import { browseButton } from './registry.js';
 import { helpLink, loadModels, modelLabel, modelSelect, openAgent, plural, trunc, usageLine } from './shared.js';
-import { ROLE_LABEL, globRe, markSaved, serverConfig, serverState, toolGrid, toolServiceEditor } from './tool-editor.js';
+import { ROLE_LABEL, behaviourEditor, globRe, markSaved, seg, serverConfig, serverState, toolGrid, toolServiceEditor } from './tool-editor.js';
 import { capEditor, usageSummary } from './usage.js';
 
 const DM_LABEL = { members: 'Members of its groups', organizers: 'Organizers only', anyone: 'Anyone', none: 'Nobody' };
@@ -24,12 +24,6 @@ const autonomyLabel = (v) => (AUTONOMY.find((a) => a[0] === v) || AUTONOMY[1])[1
 const GROUP_REPLIES = { followups: 'When woken + follow-ups', wake: 'Only when woken', auto: 'Whenever needed' };
 const tick = (input, label) => h('label', { class: 'tick' }, input, ` ${label}`);
 const check = (on, disabled = !can('admin')) => h('input', { type: 'checkbox', checked: !!on, disabled });
-const seg = (label, options, value, onPick) => {
-  const el = h('div', { class: 'seg', role: 'group', 'aria-label': label }, options.map(([v, l]) => h('button', {
-    type: 'button', class: value === v ? 'on' : '', 'aria-pressed': String(value === v), disabled: !can('admin'),
-    onclick: (e) => { onPick(v); el.querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === e.currentTarget); x.setAttribute('aria-pressed', String(x === e.currentTarget)); }); } }, l)));
-  return el;
-};
 /** A titled block inside a section page: hairline above, no box in a box. */
 const block = (title, ...kids) => h('div', { class: 'sblock' }, title ? h('h3', {}, title) : null, kids);
 
@@ -369,17 +363,32 @@ function buildTools(x, { save }) {
   const globalOff = new Set(c.globalMcp?.disabled || []);
   const confirm = { on: !!c.confirm, preview: c.confirm?.preview || '', tool: c.confirm?.tool || '', idField: c.confirm?.idField || 'confirm_id', ttl: c.confirm?.ttlMinutes || 9 };
   let autonomy = c.autonomy || 'clear';
+  // 094: how it uses each service (only what differs from the service's default); the services' tools and defaults load with the page
+  const services = structuredClone(c.services || {}); let sinfo = [];
+  const states = {}; // one editable object per service, put into `services` while it sets something
+  const stateOf = (key) => (states[key] ||= services[key] || {});
+  const commit = (key) => {
+    const st = states[key];
+    if (st.tools && !Object.keys(st.tools).length) delete st.tools;
+    if (Object.keys(st).length) services[key] = st; else delete services[key];
+  };
+  const behaviourBox = (key) => {
+    const i = sinfo.find((x) => x.service === key);
+    return bi || !i ? null : behaviourEditor(stateOf(key), { dflt: i.default, media: i.media, onChange: () => commit(key) });
+  };
+  const riskOf = (key) => ({ get: (name) => stateOf(key).tools?.[name],
+    set: (name, v) => { const st = stateOf(key); st.tools = { ...(st.tools || {}) }; if (v === 'auto') delete st.tools[name]; else st.tools[name] = v; commit(key); } });
   const value = () => ({
     mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, serverConfig(s)])), globalMcp: { disabled: [...globalOff] },
     tools: { participant: splitLines(rulesBox.participant.value), organizer: splitLines(rulesBox.organizer.value), deny: splitLines(rulesBox.deny.value) },
-    ...(bi ? {} : { autonomy, confirm: confirm.on ? { preview: confirm.preview.trim(), tool: confirm.tool.trim(), idField: confirm.idField.trim(), ttlMinutes: Number(confirm.ttl) } : null }),
+    ...(bi ? {} : { autonomy, services, confirm: confirm.on ? { preview: confirm.preview.trim(), tool: confirm.tool.trim(), idField: confirm.idField.trim(), ttlMinutes: Number(confirm.ttl) } : null }),
   });
   const saveAll = async () => { const ok = await save(value()); if (ok) for (const sv of servers) markSaved(sv); return ok; };
   const srvList = h('div', {}); const globalBox = h('div', {}); const waBox = h('div', {});
   let conns = []; let locals = []; let waTools = []; let registry = null;
   function drawServers() {
     srvList.replaceChildren(...servers.map((s, i) => toolServiceEditor(s, { base: `/api/agents/${x.enc}`, conns, locals, isOwner: S.user?.role === 'owner', save: saveAll, saveHint: 'Save to connect',
-      rules: { has: (role, name) => allowed(role, `${s.key}:${name}`), write: (role, names, tools) => writeRules(s.key, role, names, tools) }, redraw: drawServers, remove: () => { servers.splice(i, 1); drawServers(); } })),
+      rules: { has: (role, name) => allowed(role, `${s.key}:${name}`), write: (role, names, tools) => writeRules(s.key, role, names, tools) }, redraw: drawServers, extra: behaviourBox(s.key), risk: bi ? null : riskOf(s.key), remove: () => { servers.splice(i, 1); drawServers(); } })),
     servers.length ? null : h('p', { class: 'small muted' }, 'No tool service of its own.'));
   }
   function drawGlobals() {
@@ -394,8 +403,9 @@ function buildTools(x, { save }) {
       use.onchange = () => { if (use.checked) globalOff.delete(g.name); else globalOff.add(g.name); drawGlobals(); };
       return h('li', {}, h('div', { class: 'row spread nowrap' }, h('span', {}, h('b', {}, g.name), h('span', { class: 'small muted' }, custom ? ' · own tool choices' : ` · ${g.type === 'local' ? 'local' : 'remote'}`)),
         replaced ? h('span', { class: 'small muted' }, 'replaced by its own') : h('label', { class: 'tick' }, use)),
+      !replaced && !globalOff.has(g.name) ? behaviourBox(g.name) : null,
       !replaced && !globalOff.has(g.name) ? h('div', { class: 'row', style: 'gap:6px' },
-        h('button', { class: 'btn small', type: 'button', onclick: async () => { const tools = await tryApi(() => api('POST', '/api/tool-services/discover', { server: g.name })); if (tools) toolGrid(grid, tools, rules); } }, 'Choose tools'),
+        h('button', { class: 'btn small', type: 'button', onclick: async () => { const tools = await tryApi(() => api('POST', '/api/tool-services/discover', { server: g.name })); if (tools) toolGrid(grid, tools, rules, bi ? null : riskOf(g.name)); } }, 'Choose tools'),
         custom ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { for (const role of ['organizer', 'participant']) rulesBox[role].value = splitLines(rulesBox[role].value).filter((r) => !r.startsWith(`${g.name}:`)).join('\n'); drawGlobals(); } }, 'Use the defaults') : null) : null, grid);
     })));
   }
@@ -418,6 +428,8 @@ function buildTools(x, { save }) {
   const ready = Promise.all([api('GET', `/api/agents/${x.enc}/connections`).catch(() => []), api('GET', `/api/agents/${x.enc}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => []),
     can('admin') ? api('GET', '/api/tool-services/registry/settings').catch(() => null) : null, bi ? [] : api('GET', '/api/modules/tools').catch(() => [])]).then(([cn, lo, wa, reg, mods]) => {
     conns = cn; locals = lo; waTools = bi ? wa.filter((t) => t.owner) : wa; registry = reg;
+    // 094: how it uses each service needs the services' tools (a slow service must not hold up the page): drawn when they arrive
+    if (!bi) api('GET', `/api/agents/${x.enc}/services`).then((sv) => { sinfo = sv; drawServers(); drawGlobals(); }, () => {});
     drawServers(); drawGlobals(); drawB(waBox, 'whatsapp', waTools);
     modBox.replaceChildren(...mods.map((m) => { const box = h('div', {}); drawB(box, m.id, m.tools); return block(m.label, h('p', { class: 'small muted' }, 'A module (Settings → Modules). Registrations, duties, payments and sends for someone else wait for an organizer\'s confirm code.'), box); }));
     addRow.replaceChildren(browseButton({ target: x.id, targetName: c.name || x.id, onAdded: () => location.reload() }, registry),
@@ -436,7 +448,7 @@ function buildTools(x, { save }) {
   const pick = bi ? null : h('div', { class: 'choices autonomy', role: 'group', 'aria-label': 'How sure before changing things' }, AUTONOMY.map(([v, label, line]) => h('button', {
     type: 'button', class: 'choice', 'aria-pressed': String(autonomy === v), disabled: !can('admin'),
     onclick: (e) => { autonomy = v; pick.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); } }, h('b', {}, label), h('span', {}, line))));
-  const sure = bi ? null : block('How sure before changing things', pick, h('p', { class: 'small muted' }, 'Deletes, payments, sends and changes to someone else’s registration or duty always ask; participants never change things. ',
+  const sure = bi ? null : block('How sure before changing things', pick, h('p', { class: 'small muted' }, 'Tools that declare themselves destructive always ask, read-only ones never do; each service can differ (How it uses it). Participants never change things. ',
     helpLink('agents.md#how-sure-before-changing-things'), ' ', h('a', { href: '#activity/type=change.auto' }, 'Changes made without asking ›')));
   return { ready, value, el: h('div', {},
     sure,

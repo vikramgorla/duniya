@@ -4,13 +4,13 @@
 //   organizers    who_has_not_paid (with totals), and — held for an organizer's "confirm XXXX" — mark_paid, refund
 // Duniya records payments; it never takes money. Hidden people are left out of names agents see.
 import { clip, fail, money } from '../../core/config.js';
-import { listHouseholds, listPeople, personByRef, personRow } from '../../core/people.js';
+import { listHouseholds, listPeople, personByRef, personName, personRow } from '../../core/people.js';
 import { canSee, peopleScope } from '../../core/people-access.js';
 import { findEvent } from '../events/index.js';
 import { STATUS_WORD, change, eventTotals, listOrders, openOrdersOf, paymentMethods } from './index.js';
 
 const ev = { type: 'string', description: 'Event name (or part of it) or id (optional)' };
-const shown = (o) => ({ who: o.person && personRow(o.person)?.hidden ? '(hidden)' : o.who, for: o.title, total: money(o.total, o.currency), paid: money(o.paid, o.currency),
+const shown = (o) => ({ who: o.person && personName(o.person)?.hidden ? '(hidden)' : o.who, for: o.title, total: money(o.total, o.currency), paid: money(o.paid, o.currency),
   left: money(o.left, o.currency), status: STATUS_WORD[o.status], ...(o.due ? { due: o.due } : {}), ...(o.overdue ? { overdue: true } : {}) });
 
 /** The open order of a person or household an organizer names (for an event when given). */
@@ -36,7 +36,7 @@ function orderOf(who, event, ctx, { refund = false } = {}) {
 
 export const orderTools = [
   {
-    name: 'what_do_i_owe', roles: ['organizer', 'participant'], participantDefault: true,
+    name: 'what_do_i_owe', annotations: { readOnlyHint: true }, roles: ['organizer', 'participant'], participantDefault: true,
     description: 'The sender\'s open orders (their own and their household\'s): what for, total, paid, left, due date, and the ways to pay.',
     input_schema: { type: 'object', properties: {} },
     async run(args, ctx) {
@@ -46,7 +46,7 @@ export const orderTools = [
     },
   },
   {
-    name: 'who_has_not_paid', roles: ['organizer'],
+    name: 'who_has_not_paid', annotations: { readOnlyHint: true }, roles: ['organizer'],
     description: 'Orders not fully paid (organizers), for one event or all, with who, how much is left, due dates, and the totals (collected, open).',
     input_schema: { type: 'object', properties: { event: ev } },
     async run({ event }) {
@@ -58,7 +58,7 @@ export const orderTools = [
     },
   },
   {
-    name: 'mark_paid', roles: ['organizer'],
+    name: 'mark_paid', annotations: { readOnlyHint: false, destructiveHint: true }, roles: ['organizer'],
     description: 'Record a payment for a person\'s or household\'s open order (organizers): amount (default: all that is left) and method (one of the owner\'s payment methods). Waits for an organizer\'s confirm code. Duniya records payments; it never takes money.',
     input_schema: { type: 'object', properties: { who: { type: 'string', description: 'Person or household name' }, event: ev, amount: { type: 'number', minimum: 0.01 }, method: { type: 'string' } }, required: ['who'] },
     async run({ who, event, amount, method = '' }, ctx) {
@@ -69,7 +69,7 @@ export const orderTools = [
     },
   },
   {
-    name: 'refund', roles: ['organizer'],
+    name: 'refund', annotations: { readOnlyHint: false, destructiveHint: true }, roles: ['organizer'],
     description: 'Record money given back for a person\'s or household\'s order (organizers): amount (default: all that was paid). Waits for an organizer\'s confirm code.',
     input_schema: { type: 'object', properties: { who: { type: 'string' }, event: ev, amount: { type: 'number', minimum: 0.01 }, method: { type: 'string' } }, required: ['who'] },
     async run({ who, event, amount, method = '' }, ctx) {

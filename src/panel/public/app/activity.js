@@ -6,7 +6,7 @@ import { toolPhrase } from './names.js';
 const EVENTS = {
   'message.in': ['Message', 'info', 'chats'], 'message.out': ['Reply', 'ok', 'chats'], 'tool.call': ['Tool', '', 'settings'], 'tool.error': ['Tool failed', 'bad', 'settings'], error: ['Error', 'bad', 'shield'],
   'confirm.created': ['Needs confirm', 'warn', 'pending'], 'confirm.applied': ['Confirmed', 'ok', 'pending'], 'confirm.cancelled': ['Cancelled', 'warn', 'pending'],
-  'change.auto': ['Changed without asking', 'info', 'pending'],
+  'change.auto': ['Changed without asking', 'info', 'pending'], limit: ['Limit reached', 'warn', 'pending'], // 094: a tool service's limit stopped a use
   'channel.status': ['WhatsApp', 'info', 'chats'], 'whatsapp.action': ['WhatsApp', '', 'chats'], 'whatsapp.vote': ['Poll vote', '', 'chats'], 'whatsapp.reaction': ['Reaction', '', 'chats'],
   'schedule.run': ['Scheduled post', 'info', 'activity'], 'agent.updated': ['Agent changed', '', 'agents'], 'agent.created': ['Agent created', 'ok', 'agents'], 'agent.deleted': ['Agent deleted', 'warn', 'agents'],
   config: ['Settings', '', 'settings'], system: ['System', '', 'server'], silence: ['Stayed quiet', '', 'chats'], 'memory.summary': ['Summary', 'info', 'chats'], 'memory.history': ['Earlier messages', '', 'chats'],

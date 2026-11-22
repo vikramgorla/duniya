@@ -17,7 +17,7 @@ import { db, kvGet, kvSet } from '../../core/db.js';
 import { fail, money, plural } from '../../core/config.js';
 import { TENANT, getSetting, updateSettings } from '../../core/store.js';
 import { activity } from '../../core/events.js';
-import { addEvent, getHousehold, householdsOf, personRow } from '../../core/people.js';
+import { addEvent, getHousehold, householdsOf, personName, personRow } from '../../core/people.js';
 import { sendOwnerAlert } from '../../core/owner-alerts.js';
 import { changeOrHold, moduleApi } from '../index.js';
 import { getEvent } from '../events/index.js';
@@ -70,7 +70,7 @@ const methodOf = (m) => { const want = clean(m, 40).toLowerCase(); const l = pay
 // ---------- orders ----------
 const row = (id) => db.prepare('SELECT * FROM ord_orders WHERE tenant_id = ? AND id = ?').get(TENANT, String(id || ''));
 const hhName = (id) => db.prepare('SELECT name FROM households WHERE tenant_id = ? AND id = ?').get(TENANT, id)?.name || 'A household';
-const whoOf = (o) => (o.household ? hhName(o.household) : personRow(o.person)?.name || 'Someone');
+const whoOf = (o) => (o.household ? hhName(o.household) : personName(o.person)?.name || 'Someone');
 const eventName = (id) => (id ? db.prepare('SELECT name FROM ev_events WHERE tenant_id = ? AND id = ?').get(TENANT, id)?.name || '' : '');
 const linesOf = (id) => db.prepare('SELECT item, qty, price FROM ord_lines WHERE tenant_id = ? AND ord = ? ORDER BY n').all(TENANT, id);
 const view = (o, full = false) => ({ id: o.id, person: o.person, household: o.household, who: whoOf(o), event: o.event, eventName: eventName(o.event), title: o.title || eventName(o.event) || 'Order',

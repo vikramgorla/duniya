@@ -9,8 +9,9 @@ tools it uses.**
 - Start from a template or a sentence; every change comes back as a visual diff before it is saved.
 - People wake it with a wake word (`silku`, `!rides`; any case, no `!` needed), an @mention, a reply or a direct
   message. After it speaks, the group can just carry on: it reads the replies and answers the ones meant for it.
-- Tools are allowed per role **in code**. An organizer's clear request is the go-ahead for small changes; deletes,
-  money, sends and other people's registrations wait for a yes ([How sure before changing things](#how-sure-before-changing-things)).
+- Tools are allowed per role **in code**. An organizer's clear request is the go-ahead for changes; tools that declare
+  themselves destructive wait for a yes ([How sure before changing things](#how-sure-before-changing-things)). Each
+  tool service can say when to use it, share GIFs on its own and set limits ([Tool services](tool-services.md)).
 - **Test** it before the group does; **Review** its real answers afterwards and teach it in two taps.
 
 ![Agents: one row per agent; Car pooling's page beside it](site/img/agents-desktop.webp)
@@ -198,8 +199,8 @@ tools: [People → What agents see](people.md#what-agents-see).
   can undo. A follow-up tweak ("quantity 3× adults") is applied without asking again.
 - **Ask first**: it shows the specific change and waits for a yes in a later message.
 - **Act and report**: like *Act on clear requests*, and it also makes changes that clearly follow from what was asked.
-- Whatever you pick: deletes, payments and refunds, sends to lists and changes to someone else's registration, duty or
-  money always wait for a yes; participants never change things; a schedule and the **Test** console never change
+- Whatever you pick: tools that declare themselves destructive (deletes, payments and refunds, sends to lists, someone
+  else's registration or duty) always wait for a yes; participants never change things; a schedule and the **Test** console never change
   anything without a yes. Follow-ups without the wake word ("should go to the shopping list", "yes") count as part of
   the conversation.
 
@@ -215,15 +216,15 @@ tools: [People → What agents see](people.md#what-agents-see).
 
 1. The setting adds one short paragraph to the agent's instructions. Your own prompt no longer needs wording like
    "a request is not approval" or "always ask before saving"; remove it so the two don't disagree.
-2. Every change has a **risk**. Duniya's own changes use a table: notes, tags and lists for someone else are *low*;
-   registering someone else, updating a registration, assigning a duty, marking paid, refunds and sending to a list
-   are *high*. A tool service's change is judged by its tool name: names with *delete, remove, cancel, refund, pay,
-   bill, assign, register, decision, import, send, invite…* are high; *create, add, update, item, line, dish, row,
-   note, agenda, shopping…* are low; anything else is high. A change whose input asks to delete is high.
-3. Low risk + an organizer (or you) + a live message to the agent + *Act on clear requests* or *Act and report*:
-   the change happens at once. For a tool service that previews changes (`*_preview` tools next to a `confirm` tool,
-   like panduga.ch), Duniya confirms the preview itself in the same turn, so the service's "do not confirm unless the
-   user agrees" note does not cause a second question.
+2. Every tool call has a **risk**, from what the tool declares ([Risk from annotations](tool-services.md#risk-from-annotations)):
+   *read-only* never asks, *destructive* always asks, anything else (or nothing declared) is a *change*. A call whose
+   input asks to delete is destructive. Duniya's own tools declare theirs the same way: notes, tags and lists are
+   changes; registering someone else, updating a registration, assigning a duty, marking paid, refunds and sending to a
+   list are destructive.
+3. A change + an organizer (or you) + a live message to the agent + *Act on clear requests* or *Act and report*
+   (or the service's own **Changes it makes**): it happens at once. For a tool service that previews changes (a result
+   with a confirm id next to a `confirm` tool, like panduga.ch), Duniya confirms the preview itself in the same turn,
+   so the service's "do not confirm unless the user agrees" note does not cause a second question.
 4. Everything else waits: a held Duniya change gets `confirm CODE`; for a tool service, a confirm in the same turn is
    **blocked in code** and only goes through after an organizer clearly agrees (*yes, ok, go ahead, do it, 👍, oui,
    ja, haan …*) in a later message.
@@ -232,24 +233,24 @@ tools: [People → What agents see](people.md#what-agents-see).
    (`#activity/type=change.auto`).
 
 > [!TIP]
-> A tool the name rules get wrong? Set `risk` in the agent's file (**⋯ → Export**, edit, import) or with the admin
-> MCP: `update_agent` with `{ "risk": { "low": ["panduga:row_preview"], "high": ["panduga:menu_link_preview"] } }`.
-> High wins when both match.
+> A tool that declares itself wrongly? **Discover tools** → its **Risk** column → *Read*, *Change* or *Destructive
+> (override)*: in **Settings → Tool services** for every agent, on an agent's **Tools** for that agent. Admin MCP:
+> `set_tool_behaviour` with `tools: { "row_preview": "change" }`.
 
 Admin MCP and the owner assistant: `update_agent` with `{ "autonomy": "ask" | "clear" | "act" }`; `list_activity`
 with `type: "change.auto"` lists the changes made without asking.
 
 ## Tool services (MCP)
 
-<p align="center"><img src="diagrams/tool-permissions.svg" alt="Tool permissions: a tool not allowed for the role is never offered; a tool that changes nothing runs; a change an organizer clearly asked for that is low risk is applied now and logged in Activity; any other change waits as a preview until an organizer says yes or replies confirm CODE" width="442"></p>
+<p align="center"><img src="diagrams/tool-permissions.svg" alt="Tool permissions: a tool not allowed for the role is never offered; a read-only tool runs; a change an organizer clearly asked for that is not destructive is applied now and logged in Activity; any other change waits as a preview until an organizer says yes or replies confirm CODE" width="442"></p>
 
 <details><summary>Diagram as text</summary>
 
 1. The model wants to use a tool.
 2. Is the tool allowed for this role? If not, it is not offered at all.
-3. Does it change something? If not, it runs.
-4. If it does: is it an organizer's clear request and low risk (and the agent is set to act on clear requests)? Then
-   it is applied now and logged in Activity.
+3. Does it change something (it is not read-only)? If not, it runs.
+4. If it does: is it an organizer's clear request and a change, not a destructive one (and the agent or the service is
+   set to act on clear requests)? Then it is applied now and logged in Activity.
 5. Otherwise the preview waits until an organizer says yes in a later message or replies `confirm CODE`; then it runs.
 
 </details>
@@ -259,6 +260,8 @@ with `type: "change.auto"` lists the changes made without asking.
 3. **Discover tools** → tick what participants and organizers may use → save. **All: Participants** / **All: Organizers**
    tick all or none; **Everyone: all tools** gives both roles every tool (confirming still follows
    [How sure before changing things](#how-sure-before-changing-things)). WhatsApp tools have the same *All* ticks.
+4. **How it uses it** under the service: when to use it, changes it makes, sharing GIFs on its own, limits; each tool's
+   **Risk** comes from what it declares ([Tool services](tool-services.md)).
 
 Or skip the URL hunting: **Browse tool services** (below).
 
@@ -273,7 +276,7 @@ Or skip the URL hunting: **Browse tool services** (below).
    link to its source code.
 3. **Add** → fill in what it asks for (keys are stored as secrets and never shown again) → the tools are listed with
    **organizers on, participants off**; tools that change things are marked. A service that previews changes
-   (`*_preview` + `confirm`) follows [How sure before changing things](#how-sure-before-changing-things).
+   (a confirm id in a result + a `confirm` tool) follows [How sure before changing things](#how-sure-before-changing-things).
 4. Sign-in services (OAuth) get a **Connect** button; local packages an **Install and list tools** button.
 
 | Badge | Meaning |

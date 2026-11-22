@@ -1,72 +1,56 @@
 // @ts-check
 // 093: "How sure before changing things" — one place for an agent's autonomy setting: the system-instruction text, the
-// risk of each change (Duniya's own held changes by a table; remote preview → confirm tools by their names) and what may
-// happen without an extra confirmation. The runner enforces it in code; the prompt only explains it.
+// risk of each change (094: from the tool's own annotations, the same for Duniya's tools and remote ones, with the
+// owner's per-tool override) and what may happen without an extra confirmation. The runner enforces it in code.
 import { matchesAny } from './config.js';
 
 /** ask = preview and wait for a yes; clear = an organizer's clear request is the approval; act = also reasonable inferred changes. */
 export const AUTONOMY = ['ask', 'clear', 'act'];
 
-/**
- * Duniya's own changes that can be held for "confirm CODE" (People, modules), by risk. low = reversible, about
- * non-personal data or a note; high = someone else's registration, duty, money or a send. Unknown tools are high.
- */
-const RISK = {
-  'people:add_note': 'low', 'people:tag_person': 'low', 'people:add_to_list': 'low',
-  'events:register_someone': 'high', 'events:update_registration': 'high', 'events:assign_duty': 'high',
-  'orders:mark_paid': 'high', 'orders:refund': 'high',
-  'sending:send_to_list': 'high',
-};
-// Remote tools (preview → confirm): words in the tool name. High wins; a name with neither is high.
-const HIGH_WORDS = /delete|remove|reset|clear|wipe|purge|cancel|refund|pay|bill|receipt|decision|approve|reject|assign|register|registration|import|bulk|send|broadcast|role|permission|invite|member|user/i;
-const LOW_WORDS = /create|add|update|edit|set|item|line|dish|row|note|menu|agenda|shopping|estimate|performance|prefill|link|undo/i;
-const BUILT_IN = ['people', 'events', 'orders', 'sending', 'surveys', 'whatsapp', 'memory', 'media', 'promises'];
-const DESTRUCTIVE_INPUT =/^(delete|remove|destroy|drop|cancel)$/i;
-
-const isPreviewTool = (name) => /(^|_)preview$|^preview_/i.test(name);
+const DESTRUCTIVE_INPUT = /^(delete|remove|destroy|drop|cancel)$/i;
 /** A tool that confirms a previewed change (remote services; also the owner assistant's hold). */
 export const isConfirmTool = (name) => /(^|_)confirm($|_)/i.test(name);
+export const RISKS = ['read', 'change', 'destructive'];
 
 /**
- * The risk of a change: `fq` (server:tool), its input, the agent's overrides ({ risk: { low: [globs], high: [globs] } };
- * high wins). Built-in held changes use the table; remote previews their name; anything that names a delete is high.
- * @returns {'low'|'high'}
+ * The risk of a tool call, from what the tool declares (MCP annotations; Duniya's own tools carry the same ones):
+ * readOnlyHint → read (never asks), destructiveHint → destructive (always asks), anything else → change (follows the
+ * "Changes it makes" setting). An input that asks for a delete ({ op: "delete" }, { delete: true }) is destructive
+ * whatever the tool says. `override`: the owner's per-tool choice (read | change | destructive) wins over the tool.
+ * @returns {'read'|'change'|'destructive'}
  */
-function riskOf(fq, input = {}, agent = null) {
-  if (matchesAny(fq, agent?.risk?.high || [])) return 'high';
-  // an input that asks for a delete ({ op: "delete" }, { delete: true }) is high whatever the tool is called
-  if (Object.entries(input || {}).some(([k, v]) => (typeof v === 'string' && DESTRUCTIVE_INPUT.test(v.trim())) || (/^(delete|remove)$/i.test(k) && v))) return 'high';
-  if (matchesAny(fq, agent?.risk?.low || [])) return 'low';
-  if (RISK[fq]) return /** @type {'low'|'high'} */ (RISK[fq]);
-  const [server, tool = ''] = fq.split(':');
-  if (BUILT_IN.includes(server)) return 'high';
-  return HIGH_WORDS.test(tool) || !LOW_WORDS.test(tool) ? 'high' : 'low';
+export function riskOf(annotations = {}, input = {}, override = '') {
+  if (Object.entries(input || {}).some(([k, v]) => (typeof v === 'string' && DESTRUCTIVE_INPUT.test(v.trim())) || (/^(delete|remove)$/i.test(k) && v))) return 'destructive';
+  if (RISKS.includes(override)) return /** @type {any} */ (override);
+  if (annotations?.readOnlyHint === true) return 'read';
+  return annotations?.destructiveHint === true ? 'destructive' : 'change';
 }
 
 /**
- * A remote service's preview → confirm tools (093): the agent's own confirm settings for that service when it has them,
- * otherwise by name — tools ending in _preview next to a `confirm` tool. `undo`: its undo tool, if any.
+ * A service's preview → confirm pattern: the agent's own confirm settings for that service when it has them, otherwise
+ * a sibling confirm tool — then any other tool's result that carries a confirm id is a preview. `undo`: its undo tool.
  * @returns {{ confirm: string, preview: (name: string) => boolean, undo: string }}
  */
 export function changeTools(agent, server, names) {
   const own = agent.confirm?.tool?.startsWith(`${server}:`) ? agent.confirm : null;
-  const confirm = own ? own.tool.slice(server.length + 1) : names.some(isPreviewTool) ? names.find(isConfirmTool) || '' : '';
-  return { confirm, preview: (name) => !!confirm && (own ? matchesAny(`${server}:${name}`, [own.preview]) : isPreviewTool(name)), undo: confirm ? names.find((n) => /undo/i.test(n) && !isConfirmTool(n)) || '' : '' };
+  const confirm = own ? own.tool.slice(server.length + 1) : names.find(isConfirmTool) || '';
+  return { confirm, preview: (name) => !!confirm && name !== confirm && (own ? matchesAny(`${server}:${name}`, [own.preview]) : true), undo: confirm ? names.find((n) => /undo/i.test(n) && !isConfirmTool(n)) || '' : '' };
 }
 
 /** The agent's setting (the built-in owner assistant keeps its own confirmations). */
-const autonomyOf = (agent) => (AUTONOMY.includes(agent?.autonomy) ? agent.autonomy : 'clear');
+export const autonomyOf = (agent) => (AUTONOMY.includes(agent?.autonomy) ? agent.autonomy : 'clear');
 
 /**
  * May this change happen without an extra confirmation? Only for an organizer (or the owner) on a live message (also a
- * follow-up without the wake word; never the test console or a schedule), in clear / act, and a low-risk change.
+ * follow-up without the wake word; never the test console or a schedule), a change (never a destructive one), and the
+ * service's "Changes it makes" (default: the agent's setting) is clear or act. A read never needs one.
  */
-export function mayChangeWithoutAsking(ctx, fq, input) {
-  if (autonomyOf(ctx.agent) === 'ask') return false;
+export function mayChangeWithoutAsking(ctx, risk, mode) {
+  if (risk === 'read') return true;
+  if (risk !== 'change' || (mode || autonomyOf(ctx.agent)) === 'ask') return false;
   if (ctx.role !== 'organizer' && !ctx.ownerTurn) return false;
   // a follow-up without the wake word ("should go to the shopping list", "yes") counts: the model judged it is for it
-  if (['panel', 'schedule'].includes(ctx.source)) return false;
-  return riskOf(fq, input, ctx.agent) === 'low';
+  return !['panel', 'schedule'].includes(ctx.source);
 }
 
 // A later message that agrees: "yes", "ok", "go ahead", "do it", 👍, "oui", "ja", "haan" … (the start of the message)

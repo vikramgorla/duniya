@@ -79,3 +79,7 @@ export function noteSent(chat, agent, what, now = Date.now()) {
   list.push({ agent, ts: now, kind: what.kind, key, ...(what.kind === 'text' ? { words: wordsOf(what.text) } : {}) });
   sent.set(chat, list.slice(-KEEP));
 }
+/** 094: did the agent send one of these kinds here in the last `ms` (at most the guard's window)? */
+export function sentWithin(chat, agent, kinds, ms = WINDOW_MS, now = Date.now()) {
+  return recent(chat, now).some((s) => s.agent === agent && kinds.includes(s.kind) && now - s.ts < ms);
+}

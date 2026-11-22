@@ -1,6 +1,19 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.55.0": {
+      "breaking": false,
+      "title": "Tell agents how to use each tool, and GIFs at the right moments by themselves",
+      "summary": "Every tool service now has a short How it uses it section (Settings, Tool services, for all agents; an agent's Tools page for just that agent): when to use it, how carefully it changes things, whether it shares GIFs or stickers on its own, and limits. How risky a tool is now comes from what the tool itself says it does, so read-only tools never ask and deletes always do. Agents whose instructions asked for GIFs now share them on their own; you can shorten those instructions.",
+      "changes": [
+        { "type": "new", "text": "How it uses it, per tool service: when to use it (only when asked, when useful, proactively) with a note, how carefully it changes things, and limits per reply, per day and direct messages only. Set it once for all agents and change it for one agent." },
+        { "type": "new", "text": "Share GIFs or stickers on its own (sometimes or often, with style words like \"Telugu movie reactions\"): one fitting GIF after the answer at celebrations, thank-yous and jokes, even with a cheap model. Never on serious topics, no repeats; only mood words are searched, never names." },
+        { "type": "improved", "text": "Whether a change asks first now follows what each tool declares (read-only, change or destructive), the same for the app's own tools; you can correct a tool in the tool list." },
+        { "type": "improved", "text": "Agents whose instructions asked for GIFs now share them on their own, set to often." },
+        { "type": "improved", "text": "Registration and order lists (pages and agent answers) load faster." },
+        { "type": "removed", "text": "The old risk rules based on tool names, and the per-agent risk lists in agent files." }
+      ]
+    },
     "2.54.1": {
       "breaking": false,
       "title": "Follow-ups without the wake word work with Act on clear requests",

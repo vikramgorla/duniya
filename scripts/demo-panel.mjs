@@ -92,17 +92,16 @@ async function fakeModels() {
 }
 
 /** Local stand-in for a remote tool service (MCP) with a few weather tools. */
-async function fakeToolService() {
+/** A local tool service (no network): `tools` are MCP tool definitions (094: with their annotations), every call answers `text`. */
+async function fakeToolService(name, tools, text) {
   const { Server } = await import('@modelcontextprotocol/sdk/server/index.js');
   const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
   const { ListToolsRequestSchema, CallToolRequestSchema } = await import('@modelcontextprotocol/sdk/types.js');
-  const tools = [['forecast', 'Weather forecast for a place and day (temperature, rain, wind).'], ['alerts', 'Official weather warnings for a region.'], ['sunrise', 'Sunrise and sunset times for a place.']]
-    .map(([name, description]) => ({ name, description, inputSchema: { type: 'object', properties: { place: { type: 'string' } } } }));
   const server = http.createServer(async (req, res) => {
     let d = ''; for await (const c of req) d += c;
-    const s = new Server({ name: 'weather', version: '1' }, { capabilities: { tools: {} } });
+    const s = new Server({ name, version: '1' }, { capabilities: { tools: {} } });
     s.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
-    s.setRequestHandler(CallToolRequestSchema, async () => ({ content: [{ type: 'text', text: 'Morges: 9 °C, light rain until 10:00, then dry.' }] }));
+    s.setRequestHandler(CallToolRequestSchema, async () => ({ content: [{ type: 'text', text }] }));
     const tr = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     await s.connect(tr);
     await tr.handleRequest(req, res, d ? JSON.parse(d) : undefined);
@@ -110,6 +109,14 @@ async function fakeToolService() {
   await new Promise((r) => server.once('listening', r));
   return `http://127.0.0.1:${server.address().port}/mcp`;
 }
+const PLACE = { type: 'object', properties: { place: { type: 'string' } } };
+const READ = { readOnlyHint: true };
+const weatherService = () => fakeToolService('weather', [['forecast', 'Weather forecast for a place and day (temperature, rain, wind).'], ['alerts', 'Official weather warnings for a region.'], ['sunrise', 'Sunrise and sunset times for a place.']]
+  .map(([name, description]) => ({ name, description, inputSchema: PLACE, annotations: READ })), 'Morges: 9 °C, light rain until 10:00, then dry.');
+// 094: a GIF search (read-only, media in its output): agents can share GIFs on their own
+const gifService = () => fakeToolService('gifs', [{ name: 'search_gifs', description: 'Search reaction GIFs by keywords.', annotations: READ,
+  inputSchema: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer' } }, required: ['query'] },
+  outputSchema: { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, mp4Url: { type: 'string' }, attribution: { type: 'string' } } } } } } }], 'No GIFs in the demo.');
 
 /** Local stand-in for the MCP Registry (052): a few fictional entries, the same API (v0.1), no network. */
 async function fakeRegistry(weatherUrl) {
@@ -175,7 +182,7 @@ export const PANEL = "const { S, show, openFind } = await import('/app/core.js')
 /** `small: true` pretends to run on a 1 GB / 1 CPU VM (the free-tier size), so the small-server guardrails show. */
 export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(), 'duniya-demo-')), small = !!process.env.DEMO_SMALL, empty = !!process.env.DEMO_EMPTY } = {}) {
   const F = await fakeModels();
-  const weatherUrl = await fakeToolService();
+  const weatherUrl = await weatherService(); const gifsUrl = await gifService();
   const registryUrl = await fakeRegistry(weatherUrl);
   const data = join(dataDir, 'data'); const ops = join(dataDir, 'ops');
   for (const d of [data, join(ops, 'req'), join(ops, 'state')]) mkdirSync(d, { recursive: true });
@@ -316,6 +323,9 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   await mk('football', 'event-planning.json', { name: 'U11 football', description: 'Match days, lifts and snack rota for the U11 team.', triggers: ['!coach'], chats: [`club#${G(8)}`], model: 'openrouter:deepseek/deepseek-v4:free' });
   await mk('neighbours', 'neighbours.json', { enabled: false, chats: [] });
   globalMcp.saveGlobalServer('weather', { url: weatherUrl, defaults: { organizer: ['*'], participant: ['forecast'] } }, 'admin');
+  // 094: a GIF search for every agent; Car pooling shares GIFs on its own, often, in its own style
+  globalMcp.saveGlobalServer('gifs', { url: gifsUrl, auth: 'none', defaults: { organizer: ['*'], participant: ['*'] }, behaviour: { share: 'sometimes' } }, 'admin');
+  await agents.updateAgent('carpool', { services: { gifs: { when: 'proactive', share: 'often', style: 'Telugu movie reactions' }, weather: { perDay: 20 } } }, 'admin');
 
   // chats: on/off (silent by default), direct chats seen
   for (const c of [G(1), G(2), G(3), G(4), `club#${G(8)}`, `${P(4)}@s.whatsapp.net`, TG(1)]) prefs.setChatPrefs(c, { enabled: true });

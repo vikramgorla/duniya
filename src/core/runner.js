@@ -26,7 +26,9 @@ import { faqContext } from './quick.js';
 import { peopleScope, senderCard } from './people-access.js';
 import { applyPeopleAction } from './people-tools.js';
 import { applyModuleAction } from '../modules/index.js';
-import { BLOCKED, WAIT_NOTE, appliedNote, autonomyNote, isAgreement, mayChangeWithoutAsking } from './autonomy.js';
+import { sharePlan, sharingNote, takeShareTag, shareAfterReply, noteToolOutput } from './sharing.js';
+import { servicesNote, limitStop } from './tool-behaviour.js';
+import { BLOCKED, WAIT_NOTE, appliedNote, autonomyNote, isAgreement, mayChangeWithoutAsking, riskOf } from './autonomy.js';
 
 const MAX_TOOL_ROUNDS = 8;
 /** 092: the feature an agent turn's model calls count under on Usage: a test, a scheduled post, a judged group message, or an answer (light / strong). */
@@ -48,7 +50,7 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 // Confirm codes guard risky actions, so they come from a cryptographic source.
 const newCode = () => Array.from({ length: 4 }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
 
-function systemPrompt({ agent, role, isGroup, chatName, chat, requester, held }) {
+function systemPrompt({ agent, role, isGroup, chatName, chat, requester, held, services, sharing }) {
   const app = channelInfo(channelOf(chat))?.label || 'WhatsApp'; // 077: the test console and Ask box read as WhatsApp
   // 077: on a channel without phone numbers, someone who has not linked theirs is a participant until they do
   const unlinked = !requester && capsOf(chat) && !capsOf(chat).phoneNumbers
@@ -61,6 +63,8 @@ function systemPrompt({ agent, role, isGroup, chatName, chat, requester, held })
     autonomyNote(agent, role, { held }), // 093: how sure before changing things (the agent's setting; enforced in code)
     unlinked,
     `Write for ${app}: short plain text, *bold* sparingly, simple "-" lists, no markdown headings or tables.`,
+    servicesNote(agent, services || []), // 094: when to use each tool service (and changes that differ), one line each
+    sharingNote(sharing || []), // 094: media results shared on their own (GIFs, stickers)
     faqContext(agent), // 054: the owner's FAQ as small, capped reference context
   ].filter(Boolean).join('\n\n');
 }
@@ -117,12 +121,16 @@ export async function runAgent(ctx) {
     }
     if (budget.action === 'fallback') model = budget.model;
   }
-  const { defs, run, meta } = await toolsFor(agent, role, { chat, owner: !!ctx.ownerTurn });
+  const { defs, run, meta, services, sharing } = await toolsFor(agent, role, { chat, owner: !!ctx.ownerTurn });
+  // 094: sharing on its own — the message's moment in code; a line for this turn when one fits. Uses per service (limits).
+  const splan = sharePlan(ctx, sharing);
+  ctx.sharePlan = splan;
+  const uses = new Map(); ctx.uses = uses;
   const codes = [];
   // 079: a people change about someone other than the sender waits for an organizer's confirm code (like previews);
-  // 093: a low-risk one an organizer clearly asked for applies at once in clear / act (logged as changed without asking)
-  ctx.hold = ({ kind, action, summary, tool = '', input = {} }) => {
-    if (mayChangeWithoutAsking(ctx, tool, input)) {
+  // 093 / 094: a change (not destructive, by its annotations) an organizer clearly asked for applies at once in clear / act (logged as changed without asking)
+  ctx.hold = ({ kind, action, summary, tool = '', input = {}, risk = 'change', mode = '' }) => {
+    if (mayChangeWithoutAsking(ctx, risk, mode)) {
       const text = applyLocal(kind, action, agent);
       changedWithoutAsking(ctx, tool || `${kind}:${action.op}`, input, '');
       return `Done (the organizer's clear request is their approval; no confirm code needed): ${text}`;
@@ -162,7 +170,7 @@ export async function runAgent(ctx) {
   // 089: lessons the owner approved, the most relevant to this message first (small budget); join-in lessons for judged turns
   const lessons = agent.lessons?.enabled === false ? '' : lessonsContext(agent, ctx.contextChat || chat, text);
   const joinNote = ctx.unaddressed && agent.lessons?.enabled !== false ? joinLessonsNote(agent, ctx.contextChat || chat) : '';
-  const turnText = `${memory ? `${memory}\n\n` : ''}${lessons ? `${lessons}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${card ? `${card}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}${ctx.unaddressed ? `\n\n${JUDGE_NOTE}${joinNote ? `\n${joinNote}` : ''}` : ''}${ctx.turnNote ? `\n\n${ctx.turnNote}` : ''}`;
+  const turnText = `${memory ? `${memory}\n\n` : ''}${lessons ? `${lessons}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${card ? `${card}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}${ctx.unaddressed ? `\n\n${JUDGE_NOTE}${joinNote ? `\n${joinNote}` : ''}` : ''}${ctx.turnNote ? `\n\n${ctx.turnNote}` : ''}${splan?.note ? `\n\n${splan.note}` : ''}`;
   const messages = [{
     role: 'user',
     content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText,
@@ -189,7 +197,7 @@ export async function runAgent(ctx) {
     try {
       res = await modelChat({
         model, purpose: 'agent', maxTokens: agent.maxTokens, usage: usageTag(turnFeature(ctx, smart), { agent: agent.id, chat }),
-        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName, chat, requester: ctx.requester, held: !!agent.confirm || defs.some((d) => /^(people|events|orders|sending)__/.test(d.name)) }), tools: defs, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
+        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName, chat, requester: ctx.requester, held: !!agent.confirm || defs.some((d) => /^(people|events|orders|sending)__/.test(d.name)), services, sharing }), tools: defs, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
       });
     } catch (e) {
       if (smart?.tier === 'light' && e.code !== 'aborted') { // 088: the light model failed: the strong one answers
@@ -229,7 +237,12 @@ export async function runAgent(ctx) {
     for (const call of calls) {
       const m = meta.get(call.name);
       const started = Date.now();
-      const out = (m?.change === 'confirm' && confirmGate(ctx, call.input, applied, waiting)) || await runTool(run, m, call, ctx);
+      // 094: the risk of this call from the tool's annotations (or the owner's override); limits stop a call in code
+      const risk = riskOf(m?.annotations, call.input, m?.override);
+      const why = m?.kind === 'mcp' ? limitStop(ctx, m.server, m.behaviour, uses) : '';
+      const out = why ? { isError: true, text: `Not used: ${m.server} has a limit (${why}). Answer without it.` }
+        : (m?.change === 'confirm' && confirmGate(ctx, call.input, applied, waiting)) || await runTool(run, m, call, { ...ctx, toolRisk: risk, toolMode: m?.behaviour?.changes || '' });
+      if (!out.isError && m?.kind === 'mcp' && m.annotations?.readOnlyHint === true) noteToolOutput(m.server, m.tool, out.text);
       let content = String(out.text ?? '').slice(0, 12000);
       activity(out.isError ? 'tool.error' : 'tool.call', {
         agent: agent.id, chat,
@@ -238,7 +251,8 @@ export async function runAgent(ctx) {
       });
 
       const confirmId = !out.isError && m?.change === 'preview' ? extractConfirmId(out.text, agent.confirm?.idField || 'confirm_id') : null;
-      if (confirmId && mayChangeWithoutAsking(ctx, m.fq, call.input)) {
+      // the preview's risk is the risk of the tool that made it (a read-only preview still prepares a change)
+      if (confirmId && mayChangeWithoutAsking(ctx, risk === 'read' ? 'change' : risk, m.behaviour?.changes)) {
         // 093: a clear request from an organizer is the approval: Duniya confirms it now (the model never has to)
         const done = await m.conn.call(m.confirmTool, { [agent.confirm?.idField || 'confirm_id']: confirmId });
         if (done.isError) content += `\n\nDuniya: applying it failed: ${done.text.slice(0, 300)}`;
@@ -271,6 +285,10 @@ export async function runAgent(ctx) {
     reply = checked.reply;
     if (checked.cost == null) priced = false; else cost += checked.cost;
   }
+  // 094: [share: mood] tags never reach the chat; what is shared (asked for, or a moment's) goes out after the text
+  const tag = takeShareTag(reply);
+  reply = tag.text;
+  ctx.share = ctx.source === 'panel' ? null : shareAfterReply(ctx, splan, { reply, hint: tag.hint });
   for (const code of codes) {
     reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm?.ttlMinutes || 9} min).`;
   }
@@ -317,7 +335,7 @@ async function selfCheck({ agent, chat, ctx, reply, sources, model, fallback, tu
   return { reply: ok ? out : PLAIN, cost };
 }
 
-/** A held People or module change, carried out (after "confirm XXXX", or at once for a clear low-risk request). */
+/** A held People or module change, carried out (after "confirm XXXX", or at once for a clear request for a change that is not destructive). */
 const applyLocal = (kind, action, agent) => (kind === 'people' ? applyPeopleAction(action, agent) : applyModuleAction(kind, action, agent));
 /** 093: Activity entry for a change made without an extra confirmation (the owner sees every one; never message text). */
 function changedWithoutAsking(ctx, fq, input, undo) {
@@ -327,7 +345,7 @@ function changedWithoutAsking(ctx, fq, input, undo) {
 /**
  * 093: the model calls a service's confirm tool itself. Allowed only for a preview shown in an earlier message that the
  * sender now clearly agrees to ("yes", "ok", "go ahead" …) on a live message (a "yes" without the wake word too); a preview from this same turn waits (ask
- * mode, high risk, not an organizer). Returns the refusal, or null when the call may run.
+ * mode, destructive, not an organizer). Returns the refusal, or null when the call may run.
  */
 function confirmGate(ctx, input, applied, waiting) {
   const ids = Object.values(input || {}).filter((v) => typeof v === 'string');

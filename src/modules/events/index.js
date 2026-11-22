@@ -14,7 +14,7 @@ import { db } from '../../core/db.js';
 import { clip, fail, plural } from '../../core/config.js';
 import { TENANT } from '../../core/store.js';
 import { activity } from '../../core/events.js';
-import { addEvent, getHousehold, householdsOf, personRow } from '../../core/people.js';
+import { addEvent, getHousehold, householdsOf, personName, personRow } from '../../core/people.js';
 import { changeOrHold, emit } from '../index.js';
 import { eventTools } from './tools.js';
 
@@ -131,9 +131,13 @@ export function listEvents({ past = false } = {}) {
 
 // ---------- registrations ----------
 const regRow = (id) => db.prepare('SELECT * FROM ev_registrations WHERE tenant_id = ? AND id = ?').get(TENANT, String(id || ''));
-const whoOf = (r) => (r.household ? db.prepare('SELECT name FROM households WHERE tenant_id = ? AND id = ?').get(TENANT, r.household)?.name || 'A household' : personRow(r.person)?.name || 'Someone');
-const regView = (r) => ({ id: r.id, event: r.event, person: r.person, household: r.household, who: whoOf(r), adults: r.adults, kids: r.kids, people: r.adults + r.kids,
-  notes: r.notes, status: r.status, attended: !!r.attended, by: r.by, createdAt: r.created_at, updatedAt: r.updated_at });
+// one person lookup per registration (its name and whether the person is hidden; agent tools show hidden people as such)
+const regView = (r) => {
+  const p = r.household ? null : personName(r.person);
+  const who = r.household ? db.prepare('SELECT name FROM households WHERE tenant_id = ? AND id = ?').get(TENANT, r.household)?.name || 'A household' : p?.name || 'Someone';
+  return { id: r.id, event: r.event, person: r.person, household: r.household, who, ...(p?.hidden ? { hidden: true } : {}), adults: r.adults, kids: r.kids, people: r.adults + r.kids,
+    notes: r.notes, status: r.status, attended: !!r.attended, by: r.by, createdAt: r.created_at, updatedAt: r.updated_at };
+};
 export const getRegistration = (id) => { const r = regRow(id); if (!r) throw fail('No such registration', 404); return regView(r); };
 /** Registrations of an event (status filter optional), oldest first. */
 export const registrationsOf = (event, status = '') => (status

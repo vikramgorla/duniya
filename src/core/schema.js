@@ -5,7 +5,13 @@ import { validPackageSpec } from './mcp-local.js';
 import { digits } from './config.js';
 import { cleanOverride, REF_RE } from './providers/fallback-config.js';
 import { QUICK_WHO, FAQ_STRICTNESS } from './quick.js';
-import { AUTONOMY } from './autonomy.js';
+import { AUTONOMY, RISKS } from './autonomy.js';
+
+// 094: how an agent uses each tool service (a service's default in Settings → Tool services, overridable per agent)
+const WHEN = ['asked', 'useful', 'proactive']; // when to use it: only when asked | the agent decides | looks for chances
+const SHARE_MODES = ['off', 'sometimes', 'often']; // share media results on its own
+const WHERE = ['all', 'dm']; // where results may be posted: groups and direct messages | direct messages only
+export const SERVICE_DEFAULTS = Object.freeze({ when: 'useful', note: '', changes: '', share: 'off', style: '', perReply: 0, perDay: 0, where: 'all', tools: {} });
 
 export const AGENT_DEFAULTS = Object.freeze({
   name: '',
@@ -35,10 +41,10 @@ export const AGENT_DEFAULTS = Object.freeze({
   tools: { participant: [], organizer: [], deny: [] },
   confirm: null,
   autonomy: 'clear', // 093: how sure before changing things: ask | clear (an organizer's clear request is the approval) | act
-  risk: { low: [], high: [] }, // 093: tool rules whose changes count as low / high risk (high wins); empty = the built-in table
   schedules: [],
   memory: { enabled: true },
   globalMcp: { disabled: [] },
+  services: {}, // 094: per tool service, what differs from the service's default: when, note, changes, share, style, perReply, perDay, where, tools
   timezone: '',
   // Photos & voice (043): what the agent does with photos, PDFs and voice notes, and when it answers with voice.
   media: { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', createImages: { organizer: true, participant: false } },
@@ -122,6 +128,40 @@ function tokenRef(v, field) {
   return s;
 }
 
+const TOOL_NAME_RE = /^[\w.-]{1,64}$/;
+/**
+ * 094: how a tool service is used (see SERVICE_DEFAULTS). `inherit` (an agent's override): "inherit" or a missing field
+ * means the service's default; a service keeps only what differs from the defaults.
+ */
+function behaviour(v, f, inherit) {
+  const b = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  const out = {};
+  const pick = (k, allowed) => {
+    const x = b[k];
+    if (x === undefined || x === '' || x === null || (inherit && x === 'inherit')) return;
+    if (!allowed.includes(x)) fail(`${f}.${k}`, `must be ${[...(inherit ? ['inherit'] : []), ...allowed].join(', ')}`);
+    if (inherit || x !== SERVICE_DEFAULTS[k]) out[k] = x;
+  };
+  pick('when', WHEN); pick('changes', AUTONOMY); pick('share', SHARE_MODES); pick('where', WHERE);
+  for (const k of ['note', 'style']) { const t = str(b[k], `${f}.${k}`, { max: k === 'note' ? 200 : 120 }); if (t) out[k] = t; }
+  for (const k of ['perReply', 'perDay']) {
+    if (b[k] === undefined || b[k] === null || b[k] === '') continue;
+    const n = int(b[k], `${f}.${k}`, 0, 1000);
+    if (inherit || n) out[k] = n;
+  }
+  const tools = b.tools && typeof b.tools === 'object' && !Array.isArray(b.tools) ? Object.entries(b.tools) : [];
+  if (tools.length > 100) fail(`${f}.tools`, 'at most 100 tools');
+  for (const [name, risk] of tools) {
+    if (!risk || risk === 'auto') continue;
+    if (!TOOL_NAME_RE.test(name)) fail(`${f}.tools`, `"${name}" is not a tool name`);
+    if (!RISKS.includes(risk)) fail(`${f}.tools.${name}`, 'must be read, change or destructive');
+    (out.tools ||= {})[name] = risk;
+  }
+  return out;
+}
+/** A service's own default behaviour, to spread into its config ({} when all defaults). */
+const serviceBehaviour = (v, f) => { const bh = behaviour(v, `${f}.behaviour`, false); return Object.keys(bh).length ? { behaviour: bh } : {}; };
+
 /** Validate one tool service (MCP server) definition: remote (URL + token/OAuth/none) or local (npm/GitHub package). */
 function validateServer(key, srv, f = key) {
   if (!SERVER_KEY_RE.test(key)) fail(f, 'name must be lowercase letters, digits or _');
@@ -138,12 +178,14 @@ function validateServer(key, srv, f = key) {
     if (!validPackageSpec(spec)) fail(`${f}.package`, 'must look like name, name@version, @scope/name or github:owner/repo#ref');
     const args = list(srv?.args ?? [], `${f}.args`).map((a) => str(a, `${f}.args`, { max: 500 }));
     if (args.length > 30) fail(`${f}.args`, 'at most 30 arguments');
-    return { type, package: spec, args, env: kvMap(srv?.env, `${f}.env`, ENV_NAME_RE, ['PATH', 'HOME']), allowScripts: !!srv?.allowScripts };
+    return { type, package: spec, args, env: kvMap(srv?.env, `${f}.env`, ENV_NAME_RE, ['PATH', 'HOME']), allowScripts: !!srv?.allowScripts, ...serviceBehaviour(srv?.behaviour, f) };
   }
   const authMode = srv?.auth ?? (t.organizer || t.participant ? 'token' : 'none');
   if (!['oauth', 'token', 'none'].includes(authMode)) fail(`${f}.auth`, 'must be oauth, token or none');
+  /** @type {Record<string, any>} */
   const entry = { type, url: urlOrRef(srv?.url, `${f}.url`), auth: authMode, tokens: authMode === 'token' ? t : { organizer: '', participant: '' },
-    headers: kvMap(srv?.headers, `${f}.headers`, HEADER_NAME_RE, ['host', 'content-length', 'content-type', 'accept', 'authorization', 'mcp-session-id', 'mcp-protocol-version']) };
+    headers: kvMap(srv?.headers, `${f}.headers`, HEADER_NAME_RE, ['host', 'content-length', 'content-type', 'accept', 'authorization', 'mcp-session-id', 'mcp-protocol-version']),
+    ...serviceBehaviour(srv?.behaviour, f) };
   const oc = srv?.oauthClient;
   if (authMode === 'oauth' && oc && (oc.id || oc.secret)) {
     entry.oauthClient = { id: str(oc.id, `${f}.oauthClient.id`, { min: 1, max: 300 }).trim(), secret: tokenRef(oc.secret, `${f}.oauthClient.secret`) };
@@ -222,13 +264,6 @@ export function validateAgentConfig(input) {
 
   out.autonomy = c.autonomy ?? 'clear';
   if (!AUTONOMY.includes(out.autonomy)) fail('autonomy', 'must be ask, clear or act');
-  out.risk = {};
-  for (const k of ['low', 'high']) {
-    const rules = list(c.risk?.[k], `risk.${k}`);
-    for (const r of rules) if (!RULE_RE.test(r)) fail(`risk.${k}`, `"${r}" must look like server:tool (globs * ? allowed)`);
-    out.risk[k] = [...new Set(rules)];
-  }
-
   out.tools = {};
   for (const role of ['participant', 'organizer', 'deny']) {
     const rules = list(c.tools?.[role], `tools.${role}`);
@@ -266,6 +301,14 @@ export function validateAgentConfig(input) {
   const off = list(c.globalMcp?.disabled, 'globalMcp.disabled');
   for (const k of off) if (!SERVER_KEY_RE.test(k)) fail('globalMcp.disabled', `"${k}" is not a tool service name`);
   out.globalMcp = { disabled: [...new Set(off)] };
+  const sv = c.services && typeof c.services === 'object' && !Array.isArray(c.services) ? c.services : {};
+  if (Object.keys(sv).length > 30) fail('services', 'at most 30 tool services');
+  out.services = {};
+  for (const [k, v] of Object.entries(sv)) {
+    if (!SERVER_KEY_RE.test(k) && !RESERVED_SERVER_KEYS.includes(k)) fail('services', `"${k}" is not a tool service name`);
+    const bh = behaviour(v, `services.${k}`, true);
+    if (Object.keys(bh).length) out.services[k] = bh;
+  }
   const md = c.media && typeof c.media === 'object' ? c.media : {};
   const mdef = AGENT_DEFAULTS.media;
   const flag = (k) => (md[k] === undefined ? mdef[k] : !!md[k]);

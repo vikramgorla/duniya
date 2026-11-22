@@ -1,7 +1,7 @@
 // 093: "How sure before changing things" — an agent's autonomy (ask | clear | act), enforced in code. The Killi
 // conversation from the owner's server replayed with a fake preview → confirm tool service: an organizer's clear request
 // is applied in the same turn (one reply, no "Shall I save?"), a tweak too; deletes, participants and Ask first wait for a
-// later yes (a same-turn confirm is blocked in code); Duniya's own held changes follow the risk table; Activity lists
+// later yes (a same-turn confirm is blocked in code); the risk of every change comes from what the tool declares (annotations), Duniya's own tools included; Activity lists
 // every change made without asking; the panel, admin MCP and validation know the setting.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +11,7 @@ import { setup, serveFakeMcp } from './harness.js';
 const calls = []; let seq = 0;
 const tracker = http.createServer(async (req, res) => {
   let d = ''; for await (const c of req) d += c;
-  return serveFakeMcp(req, res, d, { name: 'tracker', tools: ['shopping_list', 'shopping_item_preview', 'agenda_delete_preview', 'confirm', 'undo_list', 'undo_preview'],
+  return serveFakeMcp(req, res, d, { name: 'tracker', tools: [{ name: 'shopping_list', annotations: { readOnlyHint: true } }, 'shopping_item_preview', { name: 'agenda_delete_preview', annotations: { destructiveHint: true } }, 'confirm', 'undo_list', 'undo_preview'],
     call: (name, args) => {
       calls.push({ name, args });
       if (name.endsWith('_preview')) return JSON.stringify({ preview: `${name}: ${JSON.stringify(args)}`, confirm_id: `cf_${++seq}`, note: 'If the user does not clearly agree, do not confirm.' });
@@ -159,23 +159,23 @@ test('the test console never applies without asking', async () => {
   assert.equal(confirms().length, 0);
 });
 
-test('the agent\'s own confirm settings: high-risk previews keep "confirm CODE"; a low-risk override applies at once', async () => {
+test('the agent\'s own confirm settings: a destructive preview keeps "confirm CODE"; the owner\'s per-tool override (change) applies at once', async () => {
   fresh();
   t.script.push([{ type: 'tool_use', id: 'r1', name: 'panduga__room_assign_preview', input: { family: 'Rao' } }], [{ type: 'text', text: 'Preview: Rao -> Room 4.' }]);
   await t.route(t.msg({ phone: ORG, senderName: 'Vik', text: '!panduga put Rao in room 4' }));
-  assert.match(t.sent.at(-1).text, /confirm [A-Z0-9]{4}/, 'assigning someone is high risk');
+  assert.match(t.sent.at(-1).text, /confirm [A-Z0-9]{4}/, 'the tool declares itself destructive');
   assert.ok(!t.mcpCalls.some((c) => c.name === 'confirm' && t.sent.length === 1));
-  await t.agents.updateAgent('panduga', { risk: { low: ['panduga:room_assign_preview'], high: [] } });
+  await t.agents.updateAgent('panduga', { services: { panduga: { tools: { room_assign_preview: 'change' } } } });
   const before = t.mcpCalls.filter((c) => c.name === 'confirm').length;
   t.script.push([{ type: 'tool_use', id: 'r2', name: 'panduga__room_assign_preview', input: { family: 'Rao' } }], [{ type: 'text', text: 'Rao is in room 4.' }]);
   await t.route(t.msg({ phone: ORG, senderName: 'Vik', text: '!panduga put Rao in room 4' }));
   assert.equal(t.mcpCalls.filter((c) => c.name === 'confirm').length, before + 1);
   assert.doesNotMatch(t.sent.at(-1).text, /confirm [A-Z0-9]{4}/);
-  assert.equal((await t.api(owner, 'PUT', '/api/agents/panduga', { risk: { low: [], high: ['bad rule'] } })).status, 400);
-  await t.agents.updateAgent('panduga', { risk: { low: [], high: [] } });
+  assert.equal((await t.api(owner, 'PUT', '/api/agents/panduga', { services: { panduga: { tools: { room_assign_preview: 'low' } } } })).status, 400);
+  await t.agents.updateAgent('panduga', { services: {} });
 });
 
-test('Duniya\'s own changes by risk: registering someone else stays behind the confirm code in clear mode', async () => {
+test('Duniya\'s own tools declare their risk the same way: registering someone else (destructive) stays behind the confirm code', async () => {
   await t.api(owner, 'PUT', '/api/modules/events', { on: true });
   await t.api(owner, 'POST', '/api/module/events', { name: 'Picnic 2027', starts: '2027-06-01', per: 'household' });
   await t.api(owner, 'POST', '/api/households', { name: 'Rao family' });
