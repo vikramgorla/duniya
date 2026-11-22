@@ -15,13 +15,13 @@
 //     twice the gap), people who wrote may get three times as many.
 // Random values are bell-shaped (mean of three uniform draws), never fixed intervals.
 // PACE_TIME_SCALE scales every wait (tests run with 0 or a small fraction; 1 in production).
-import { bad, env, localParts, plural } from './config.js';
+import { bad, plural } from './config.js';
 import { getSetting, updateSettings } from './store.js';
 import { kvGet, kvSet } from './db.js';
 import { activity } from './events.js';
 import { capsOf, isGroup } from '../channels/index.js';
 import { isChatEnabled } from './chat-prefs.js';
-import { getAgent, OWNER_AGENT_ID } from './agents.js';
+import { ownerDay, ownerNow, ownerTz } from './owner-clock.js';
 
 const SCALE = Math.max(0, Number(process.env.PACE_TIME_SCALE ?? 1));
 const MAX_TYPING_MS = 8000;
@@ -130,11 +130,10 @@ export async function paceReply(channel, msg, text, since = 0) {
 }
 
 // ---------- new 1:1 chats: daily cap, warm-up, sending hours (intros now, list sending in step 4) ----------
-const ownerTz = () => getAgent(OWNER_AGENT_ID)?.timezone || env.timezone;
 const minutes = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
 /** Is it within the sending hours (owner's time zone)? Windows may cross midnight. */
 function inHours(p, now) {
-  const t = minutes(localParts(ownerTz(), now).hhmm); const a = minutes(p.hoursFrom); const b = minutes(p.hoursTo);
+  const t = minutes(ownerNow(now).hhmm); const a = minutes(p.hoursFrom); const b = minutes(p.hoursTo);
   return a < b ? t >= a && t < b : t >= a || t < b;
 }
 /** A number linked on this server in the last week sends fewer new chats (warm-up). */
@@ -144,7 +143,7 @@ function capFor(number, p, now) {
   const days = at ? Math.floor((now - at) / 86400000) : WARMUP_DAYS;
   return days >= WARMUP_DAYS ? { cap: p.dailyNew, warmup: false } : { cap: Math.max(3, Math.round((p.dailyNew * (days + 1)) / (WARMUP_DAYS + 1))), warmup: true };
 }
-const usedToday = (number, now) => { const [d, n] = String(kvGet(`paceNew:${number}`) || '').split('|'); return d === localParts(ownerTz(), now).date ? Number(n) || 0 : 0; };
+const usedToday = (number, now) => { const [d, n] = String(kvGet(`paceNew:${number}`) || '').split('|'); return d === ownerDay(now) ? Number(n) || 0 : 0; };
 
 /** Today's allowance of new 1:1 chats for a number: { cap, used, left, warmup }. */
 function newChats(number = 'main', now = Date.now()) {
@@ -156,7 +155,7 @@ function newChats(number = 'main', now = Date.now()) {
 export function takeNewChat(number = 'main', now = Date.now()) {
   const n = newChats(number, now);
   if (!n.left) throw bad(`Today's limit of ${plural(n.cap, 'new chat')} is reached${n.warmup ? ' (a newly linked number starts lower and grows over a week)' : ''}. It resets tomorrow; change it under Settings → Sending pace.`, null, 429);
-  kvSet(`paceNew:${number}`, `${localParts(ownerTz(), now).date}|${n.used + 1}`);
+  kvSet(`paceNew:${number}`, `${ownerDay(now)}|${n.used + 1}`);
   return { ...n, used: n.used + 1, left: n.left - 1 };
 }
 
@@ -177,7 +176,7 @@ export function takeListSend(number = 'main', known = false, now = Date.now()) {
   if (!known) return takeNewChat(number, now);
   const { cap } = capFor(number, paceSettings(), now);
   const [d, n] = String(kvGet(`paceKnown:${number}`) || '').split('|');
-  const today = localParts(ownerTz(), now).date;
+  const today = ownerDay(now);
   const used = d === today ? Number(n) || 0 : 0;
   if (used >= cap * KNOWN_FACTOR) throw bad(`Today's limit of ${plural(cap * KNOWN_FACTOR, 'list message')} to people who wrote before is reached. It resets tomorrow.`, null, 429);
   kvSet(`paceKnown:${number}`, `${today}|${used + 1}`);

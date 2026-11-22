@@ -57,8 +57,9 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 - [ ] Delete before you add: search for what the change replaces (functions, settings, wording, tests) and remove it.
 - [ ] No compatibility layers or one-time migrations kept after the release that needed them; schema lives in
       `CREATE TABLE` and a fresh install works.
-- [ ] One way to do each thing: reuse the resolvers (models, names), the scheduler tick, the small-server switch and
-      the shared helpers in `src/core/config.js` instead of a local copy.
+- [ ] One way to do each thing: reuse the resolvers (models, names), the scheduler tick, the small-server switch, the
+      owner's clock (`src/core/owner-clock.js`: dates the owner enters and once-a-day work, never the UTC day) and the
+      shared helpers in `src/core/config.js` instead of a local copy.
 - [ ] `node scripts/ci-checks.mjs` passes: knip (no unused files, exports or dependencies), jscpd (no duplication over
       its threshold), the panel budgets in `scripts/check-panel.mjs` (first screen and total; raise one only with a
       reason in the PR), `tsc` over the `// @ts-check` files.
@@ -180,7 +181,7 @@ CI enforces the measurable ones (`npm run check:clean`, also in `node scripts/ci
 | `src/core/providers/` | Anthropic, ChatGPT sign-in, Copilot, OpenAI-compatible; `breaker.js` + `fallback-config.js` (fallback, accounts) |
 | `src/core/media*.js`, `speech-*.js`, `resources.js` | Photos & voice, media queue, on-server speech, small-server guardrails |
 | `src/core/memory.js`, `contacts.js`, `people.js`, `chat-prefs.js` | Chat and shared memory, contacts, people across channels (identities joined by phone), per-chat settings (on/off, private) |
-| `src/core/owner-assistant.js`, `privacy-notice.js`, `owner-alerts.js`, `weekly.js`, `budget.js`, `silences.js` | Owner assistant, privacy notice, alerts, weekly summary, spending caps, why-quiet |
+| `src/core/owner-assistant.js`, `owner-clock.js`, `privacy-notice.js`, `owner-alerts.js`, `weekly.js`, `budget.js`, `silences.js` | Owner assistant, the owner's date and time of day, privacy notice, alerts, weekly summary, spending caps, why-quiet |
 | `src/core/backup/`, `updates.js`, `update-decision.js`, `update-guard.js`, `system.js`, `webaccess.js` | Backups (GitHub, S3), updates (breaking releases, rollback of a release that does not start), server metrics, domains & access |
 | `src/core/store.js`, `db.js` | Settings, users, secrets; SQLite (`node:sqlite`) |
 | `src/panel/server.js`, `http.js`, `routes/` | Panel HTTP API: `server.js` is the router (role gates, CSRF guard) and registers `routes/<area>.js` (`auth`, `status`, `agents`, `chats`, `contacts`, `system`, one per feature) |

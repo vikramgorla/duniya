@@ -9,11 +9,11 @@
 //     become suggestions in People → Suggestions (accept creates the tie, and the person if needed; reject is final).
 //     Only family words; nothing else is inferred. Never saved without the owner's tap.
 import { db } from './db.js';
-import { clip, env, localParts } from './config.js';
+import { clip, localParts } from './config.js';
 import { activity, bus } from './events.js';
 import { TENANT } from './store.js';
 import { addTie, createPerson, listPeople, personRow } from './people.js';
-import { getAgent, OWNER_AGENT_ID } from './agents.js';
+import { ownerNow, ownerTz } from './owner-clock.js';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS person_prefs (
@@ -96,7 +96,6 @@ const pending = new Set(); // people who wrote since the last tick (bounded)
 /** Router: a person wrote in a chat that is on; their preferences are recomputed on a coming tick. */
 export function noteWriter(person) { if (person && pending.size < 500) pending.add(person); }
 
-const ownerTz = () => getAgent(OWNER_AGENT_ID)?.timezone || env.timezone;
 /** Their last 100 messages (WhatsApp by phone, other apps by their ids): { text, ts, channel }. */
 function messagesOf(person) {
   const p = personRow(person);
@@ -173,7 +172,7 @@ export function setPrefs(person, { language, hoursFrom, hoursTo, app } = {}) {
 export function inPersonHours(person, now = Date.now()) {
   const h = prefsOf(person).hours;
   if (!h) return true;
-  const hour = Number(localParts(ownerTz(), now).hhmm.slice(0, 2));
+  const hour = Number(ownerNow(now).hhmm.slice(0, 2));
   return hour >= h.from && hour < h.to;
 }
 /** The sender card's line: the language to answer in. */

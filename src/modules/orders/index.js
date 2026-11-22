@@ -17,6 +17,8 @@ import { db, kvGet, kvSet } from '../../core/db.js';
 import { fail, money, plural } from '../../core/config.js';
 import { TENANT, getSetting, updateSettings } from '../../core/store.js';
 import { activity } from '../../core/events.js';
+import { ownerDay } from '../../core/owner-clock.js';
+import { sendingHoursNow } from '../../core/pace.js';
 import { addEvent, getHousehold, householdsOf, personName, personRow } from '../../core/people.js';
 import { sendOwnerAlert } from '../../core/owner-alerts.js';
 import { changeOrHold, moduleApi } from '../index.js';
@@ -46,7 +48,7 @@ db.exec(`
 
 const rid = (p) => `${p}_${randomBytes(6).toString('hex')}`;
 const clean = (v, n = 120) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => ownerDay(); // due dates and payment dates go by the owner's date, not the UTC day
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 export const STATUS_WORD = { open: 'open', part: 'part paid', paid: 'paid', refunded: 'refunded', cancelled: 'cancelled' };
 const cents = (v, field) => {
@@ -296,7 +298,7 @@ export function setAutoReminders(event, { on = true, days = 3, agent = '', templ
 async function autoRemind(now) {
   const api = moduleApi('sending');
   if (!api) return;
-  const today = new Date(now).toISOString().slice(0, 10);
+  const today = ownerDay(now);
   for (const [event, r] of Object.entries(autoReminders())) {
     const due = db.prepare("SELECT MIN(due) AS due FROM ord_orders WHERE tenant_id = ? AND event = ? AND status IN ('open', 'part') AND due <> ''").get(TENANT, event)?.due;
     if (!due || due < today || kvGet(`orders.autoReminded:${event}`) === due) continue;
@@ -311,13 +313,17 @@ async function autoRemind(now) {
   }
 }
 
-/** Once a day: the owner gets the open orders due within three days or overdue (bounded). */
+const SOON_MS = 3 * 86400000; // an open order is "due soon" three days ahead
+/**
+ * Once a day: the owner gets the open orders due within three days or overdue (bounded). It happens at the first tick
+ * of the owner's day that lies in the sending hours, so nobody is written to at night.
+ */
 async function upkeep(now = Date.now()) {
-  const day = new Date(now).toISOString().slice(0, 10);
-  if (kvGet('orders.remindedOn') === day) return;
+  const day = ownerDay(now);
+  if (kvGet('orders.remindedOn') === day || !sendingHoursNow(now)) return;
   kvSet('orders.remindedOn', day);
   await autoRemind(now);
-  const soon = new Date(now + 3 * 86400000).toISOString().slice(0, 10);
+  const soon = ownerDay(now + SOON_MS);
   const list = db.prepare(`SELECT * FROM ord_orders WHERE tenant_id = ? AND ${STATUS_SQL.open} AND due <> '' AND due <= ? ORDER BY due LIMIT 30`).all(TENANT, soon).map((o) => view(o));
   if (!list.length) return;
   const lines = list.slice(0, 15).map((o) => `• ${o.who}: ${money(o.left, o.currency)} for ${o.title}, ${o.overdue ? `overdue since ${o.due}` : `due ${o.due}`}`);

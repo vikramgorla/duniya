@@ -14,6 +14,7 @@ import { db } from '../../core/db.js';
 import { clip, fail, plural } from '../../core/config.js';
 import { TENANT } from '../../core/store.js';
 import { activity } from '../../core/events.js';
+import { ownerDay } from '../../core/owner-clock.js';
 import { addEvent, getHousehold, householdsOf, personName, personRow } from '../../core/people.js';
 import { changeOrHold, emit } from '../index.js';
 import { eventTools } from './tools.js';
@@ -50,7 +51,7 @@ export const STATUSES = ['registered', 'waiting', 'pending', 'cancelled'];
 const ACTIVE = "('registered', 'waiting', 'pending')";
 const STATUS_WORD = { registered: 'registered', waiting: 'on the waiting list', pending: 'waiting for an organizer to confirm', cancelled: 'cancelled' };
 const money = (v) => Math.max(0, Math.round(Number(v || 0) * 100));
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => ownerDay(); // deadlines and "upcoming" go by the owner's date, not the UTC day
 
 // ---------- events ----------
 const row = (id) => db.prepare('SELECT * FROM ev_events WHERE tenant_id = ? AND id = ?').get(TENANT, String(id || ''));
@@ -186,6 +187,30 @@ function setStatusRow(r, status, by, text) {
   return regView(next);
 }
 
+const HEADS_MAX = 50; // adults or kids of one registration
+/** Adults and kids of a registration as whole numbers (at least one person), or a 400 for the form. */
+function headcount(adults, kids) {
+  const a = Number(adults); const k = Number(kids);
+  const whole = (n) => Number.isInteger(n) && n >= 0 && n <= HEADS_MAX;
+  if (!whole(a) || !whole(k) || a + k < 1) throw fail('Adults and kids: whole numbers, at least one person', 400, { field: 'adults' });
+  return { a, k };
+}
+const given = (v) => v !== undefined && v !== null && v !== '';
+
+/**
+ * New numbers (and notes) for one registration. A registered party that no longer fits goes to the waiting list, and
+ * the places that opened (a smaller party, or one that left the list of the registered) go to those who wait.
+ */
+function resize(e, r, { a, k, notes }, by) {
+  const status = r.status === 'registered' && !fits(e.id, a + k, r.id) ? 'waiting' : r.status;
+  db.prepare('UPDATE ev_registrations SET adults = ?, kids = ?, notes = ?, status = ?, updated_at = ? WHERE tenant_id = ? AND id = ?').run(a, k, notes, status, Date.now(), TENANT, r.id);
+  note(regRow(r.id), `Registration for ${e.name} changed: ${a} adult(s), ${k} kid(s)`);
+  if (status !== 'cancelled') fillFromWaitingList(e.id, by);
+  const next = regView(regRow(r.id));
+  emit('registration', next);
+  return next;
+}
+
 /**
  * Register a person or a household for an event. `organizer`: an organizer (or the owner) registers: the deadline and
  * organizer confirmation do not hold them back. Re-registering updates the active registration. Household: adults
@@ -198,25 +223,13 @@ export function register({ event, person = '', household = '', adults, kids, not
   if (household) hh = getHousehold(household);
   else if (!personRow(person)) throw fail('No such person', 404);
   if (!organizer && e.deadline && today() > e.deadline.slice(0, 10)) throw fail(`Registration for ${e.name} closed on ${e.deadline}. An organizer can still add you.`);
-  const memberAdults = hh ? hh.members.filter((m) => m.role === 'adult').length : 1;
-  const memberKids = hh ? hh.members.filter((m) => m.role === 'kid').length : 0;
-  const a = adults === undefined || adults === null || adults === '' ? Math.max(1, memberAdults) : Number(adults);
-  const k = kids === undefined || kids === null || kids === '' ? memberKids : Number(kids);
-  if (!Number.isInteger(a) || a < 0 || a > 50 || !Number.isInteger(k) || k < 0 || k > 50 || a + k < 1) throw fail('Adults and kids: whole numbers, at least one person', 400, { field: 'adults' });
+  const members = (role) => (hh ? hh.members.filter((m) => m.role === role).length : role === 'adult' ? 1 : 0);
+  const { a, k } = headcount(given(adults) ? adults : Math.max(1, members('adult')), given(kids) ? kids : members('kid'));
   const existing = db.prepare(`SELECT * FROM ev_registrations WHERE tenant_id = ? AND event = ? AND ${hh ? 'household' : 'person'} = ? AND status IN ${ACTIVE} ORDER BY created_at DESC LIMIT 1`).get(TENANT, e.id, hh ? hh.id : person);
   const n = clean(notes, 300);
-  const now = Date.now();
-  if (existing) {
-    const status = existing.status === 'registered' && !fits(e.id, a + k, existing.id) ? 'waiting' : existing.status;
-    db.prepare('UPDATE ev_registrations SET adults = ?, kids = ?, notes = CASE WHEN ? <> \'\' THEN ? ELSE notes END, status = ?, updated_at = ? WHERE tenant_id = ? AND id = ?').run(a, k, n, n, status, now, TENANT, existing.id);
-    const r = regRow(existing.id);
-    note(r, `Registration for ${e.name} changed: ${a} adult(s), ${k} kid(s)`);
-    if (existing.status === 'registered' && status === 'waiting') fillFromWaitingList(e.id, by);
-    emit('registration', regView(r));
-    return regView(r);
-  }
+  if (existing) return resize(e, existing, { a, k, notes: n || existing.notes }, by);
   const status = e.confirm === 'organizer' && !organizer ? 'pending' : fits(e.id, a + k) ? 'registered' : 'waiting';
-  const id = rid('r');
+  const id = rid('r'); const now = Date.now();
   db.prepare('INSERT INTO ev_registrations (tenant_id, id, event, person, household, adults, kids, notes, status, by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .run(TENANT, id, e.id, hh ? '' : person, hh ? hh.id : '', a, k, n, status, clean(by, 60), now, now);
   const r = regRow(id);
@@ -226,18 +239,19 @@ export function register({ event, person = '', household = '', adults, kids, not
   return regView(r);
 }
 
-/** Change a registration's status (confirm a pending one, waiting list, cancel) or attendance.
+/** Change a registration's status (confirm a pending one, waiting list, cancel), its numbers and notes, or attendance.
  * @param {string} id @param {{ status?: string, attended?: boolean, adults?: number, kids?: number, notes?: string }} [changes] @param {string} [by] */
 export function updateRegistration(id, { status, attended, adults, kids, notes } = {}, by = 'panel') {
-  const r = regRow(id); if (!r) throw fail('No such registration', 404);
-  const e = row(r.event);
+  let r = regRow(id); if (!r) throw fail('No such registration', 404);
+  const e = getEvent(r.event);
+  if (status !== undefined && !STATUSES.includes(status)) throw fail('Status: registered, waiting, pending or cancelled', 400, { field: 'status' });
+  // this registration itself changes (also a cancelled one: it never becomes a second registration)
   if (adults !== undefined || kids !== undefined || notes !== undefined) {
-    register({ event: r.event, person: r.person, household: r.household, adults: adults ?? r.adults, kids: kids ?? r.kids, notes: notes ?? '' }, { by });
-    if (notes === '') db.prepare("UPDATE ev_registrations SET notes = '' WHERE tenant_id = ? AND id = ?").run(TENANT, r.id);
+    resize(e, r, { ...headcount(adults ?? r.adults, kids ?? r.kids), notes: notes === undefined ? r.notes : clean(notes, 300) }, by);
+    r = regRow(id);
   }
   if (attended !== undefined) db.prepare('UPDATE ev_registrations SET attended = ?, updated_at = ? WHERE tenant_id = ? AND id = ?').run(attended ? 1 : 0, Date.now(), TENANT, r.id);
   if (status !== undefined && status !== r.status) {
-    if (!STATUSES.includes(status)) throw fail('Status: registered, waiting, pending or cancelled', 400, { field: 'status' });
     // confirming (or moving off the waiting list) still respects the capacity: full → waiting list
     const next = status === 'registered' && !fits(r.event, r.adults + r.kids, r.id) ? 'waiting' : status;
     setStatusRow(r, next, by, next === 'cancelled' ? `Registration for ${e.name} cancelled` : `Now ${STATUS_WORD[next]} for ${e.name}`);

@@ -22,6 +22,7 @@ import { usageTag } from './usage.js';
 import { isGroup, phoneOf, phoneChat } from '../channels/index.js';
 import { getUser, onUserDeleted, TENANT } from './store.js';
 import { listAgents, agentForChat, getAgent, OWNER_AGENT_ID } from './agents.js';
+import { ownerTz } from './owner-clock.js';
 import { getChatPrefs, enabledChats, privateChats } from './chat-prefs.js';
 import { activity, recordFailure } from './events.js';
 import { toolPhrase } from '../panel/public/app/names.js';
@@ -439,7 +440,7 @@ export const ownerHistory = (userId, source, limit = 20) => db.prepare('SELECT r
   .all(TENANT, userId, source, Math.min(Number(limit) || 20, 100));
 
 function systemPrompt(user, source) {
-  const tz = record()?.timezone || env.timezone;
+  const tz = ownerTz();
   const now = new Date().toLocaleString('en-GB', { timeZone: tz });
   const can = user.role === 'viewer' ? 'They have a read-only (viewer) account: you can look things up but not change anything, and you cannot read message contents.'
     : `They are ${user.role === 'owner' ? 'an owner' : 'an admin'}: you can look things up and prepare changes.`;

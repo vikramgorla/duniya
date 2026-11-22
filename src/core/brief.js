@@ -13,10 +13,10 @@
 // action it names) or in WhatsApp with the owner assistant's confirm code — and nothing is sent or changed before that.
 // A dismissed suggestion never comes back for the same thing (its key).
 import { db, getChatMemory, kvGet, kvSet, listPending } from './db.js';
-import { clip, dueAt, env, localParts, money, plural } from './config.js';
+import { clip, dueAt, money, plural } from './config.js';
 import { activity } from './events.js';
 import { getSetting, updateSettings, TENANT } from './store.js';
-import { getAgent, OWNER_AGENT_ID } from './agents.js';
+import { ownerDay, ownerNow } from './owner-clock.js';
 import { moduleRows, need } from '../modules/index.js';
 import { updateStatus } from './updates.js';
 import { paceSettings } from './pace.js';
@@ -42,7 +42,6 @@ export function setBriefSettings(patch = {}) {
   updateSettings({ morningBrief: next });
   return next;
 }
-const ownerTz = () => getAgent(OWNER_AGENT_ID)?.timezone || env.timezone;
 const mins = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
 /** The time the brief goes out: its own, or the start of the sending hours when it falls outside them. */
 export function briefTime(at = briefSettings().at) {
@@ -58,7 +57,6 @@ const extra = new Map();
 export const registerBriefSection = (id, fn) => { extra.set(id, fn); };
 
 // ---------- the data ----------
-const day = (d) => new Date(d).toISOString().slice(0, 10);
 /** A due date as people read it: "Fri 14 Nov". */
 const nice = (ymd) => (/^\d{4}-\d{2}-\d{2}/.test(ymd || '') ? new Date(`${ymd.slice(0, 10)}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : ymd);
 const on = (id) => moduleRows().some((m) => m.id === id && m.on);
@@ -80,7 +78,7 @@ export async function briefData(now = Date.now(), chats = []) {
   const out = { payments: null, questions: [], birthdays: [], stuck: [], people: [], extra: {} };
   if (on('orders')) {
     const ord = await need('orders');
-    const soon = day(now + 3 * DAY); const today = day(now);
+    const soon = ownerDay(now + 3 * DAY); const today = ownerDay(now);
     const open = ord.listOrders({ status: 'open' }).filter((o) => o.due && o.due <= soon);
     if (open.length) {
       const byEvent = new Map();
@@ -105,7 +103,7 @@ export async function briefData(now = Date.now(), chats = []) {
     }
     out.questions = out.questions.slice(0, 8);
   }
-  const keys = [day(now).slice(5), day(now + DAY).slice(5)];
+  const keys = [ownerDay(now).slice(5), ownerDay(now + DAY).slice(5)]; // today and tomorrow where the owner lives
   out.birthdays = db.prepare("SELECT id, name, birthday FROM people WHERE tenant_id = ? AND birthday <> '' AND substr(birthday, -5) IN (?, ?) AND hidden = 0 LIMIT 20").all(TENANT, ...keys)
     .map((p) => ({ id: p.id, name: personRow(p.id)?.name || p.name, when: p.birthday.slice(-5) === keys[0] ? 'today' : 'tomorrow' }));
   // stuck things
@@ -200,7 +198,7 @@ export function setSuggestionStatus(key, status, by = '') {
 export function briefDue(now = Date.now()) {
   const s = briefSettings();
   if (!s.enabled) return null;
-  const { hhmm, date } = localParts(ownerTz(), now);
+  const { hhmm, date } = ownerNow(now);
   if (!dueAt(briefTime(s.at), hhmm) || kvGet(`brief:${date}`)) return null;
   kvSet(`brief:${date}`, '1');
   return { date, sections: s.sections };
