@@ -18,7 +18,7 @@ import { FIRST_SCREEN, staticClosure } from '../src/panel/module-graph.js';
 // the first visit to its screen. A budget is raised only with its reason in the PR; every earlier raise and its reason
 // is in the history of these two lines (git log -L '/^const FIRST_BUDGET/,+1:scripts/check-panel.mjs').
 const FIRST_BUDGET = 63_700; // 095: 1.1 KB lower, the update dialog and the watch of a running update load on demand (update-flow.js)
-const TOTAL_BUDGET = 227_950; // #287: +0.1 KB, a duty can be changed (Edit… in its menu: the add dialog, filled in)
+const TOTAL_BUDGET = 228_150; // +0.2 KB: "Your time zone" on the owner assistant says what goes by it, an agent's empty field says whose zone it uses, and zones are suggested while typing
 
 const PUBLIC = resolve(import.meta.dirname, '../src/panel/public');
 const APP = resolve(PUBLIC, 'app');

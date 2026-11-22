@@ -13,6 +13,7 @@ import { clip, fail, plural } from '../../core/config.js';
 import { TENANT } from '../../core/store.js';
 import { activity } from '../../core/events.js';
 import { addEvent, personRow } from '../../core/people.js';
+import { ownerDay } from '../../core/owner-clock.js';
 import { current as webHost } from '../../core/webaccess.js';
 import { surveyTools } from './tools.js';
 
@@ -202,7 +203,7 @@ export function results(id) {
 }
 const cell = (v) => (v === null || v === undefined ? '' : Array.isArray(v) ? v.join('; ') : String(v));
 export const csvRows = (id) => { const r = results(id); return [['Person', 'Finished', 'Via', ...r.survey.questions.map((q) => q.text)],
-  ...r.people.map((p) => [p.name, p.doneAt ? new Date(p.doneAt).toISOString().slice(0, 10) : '', p.via, ...r.survey.questions.map((q) => cell(p.answers[q.id]))])]; };
+  ...r.people.map((p) => [p.name, p.doneAt ? ownerDay(p.doneAt) : '', p.via, ...r.survey.questions.map((q) => cell(p.answers[q.id]))])]; };
 
 // ---------- pages, the sender card ----------
 function personSections(person) {

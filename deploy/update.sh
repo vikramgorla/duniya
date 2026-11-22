@@ -5,7 +5,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 TARGET="${1:-}"
 PREV="$(git rev-parse HEAD)"
-lock_hash() { [ -f package-lock.json ] && sha1sum package-lock.json | cut -d' ' -f1 || echo none; }
+# What is installed: the packages the app runs on (src/core/update-guard.js: the app's own version and the development
+# tools do not count, so most updates install nothing). If that cannot be asked, any change of the lockfile counts.
+lock_hash() {
+  [ -f package-lock.json ] || { echo none; return; }
+  node -e 'import("./src/core/update-guard.js").then((m) => { const k = m.depsKey("."); if (!k) process.exit(1); console.log(k); })' 2>/dev/null \
+    || sha1sum package-lock.json | cut -d' ' -f1
+}
 OLD_LOCK="$(lock_hash)"
 
 echo "Current: $(git describe --tags --always 2>/dev/null) $(git log -1 --format='%s')"

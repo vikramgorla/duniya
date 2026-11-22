@@ -6,6 +6,7 @@ import { isChatEnabled } from '../../core/chat-prefs.js';
 import { chatLabel, chatLabels } from '../../core/chat-names.js';
 import { personInfo } from '../../core/contacts.js';
 import { digits, fail } from '../../core/config.js';
+import { ownerTz, serverTz } from '../../core/owner-clock.js';
 import { deleteNote, getNote, listNotes, namesInChat } from '../../core/db.js';
 import { activity, recordFailure } from '../../core/events.js';
 import { installPackage, installedInfo, localServiceCheck } from '../../core/mcp-local.js';
@@ -51,7 +52,7 @@ export function agentRoutes(route, { channel } = {}) {
     return [201, { ...agentView(agent), warnings }];
   });
   route('POST', '/api/agents/reload', async () => { await loadAgents(); await resetMcpPool(); activity('system', { summary: 'Agents reloaded' }); return listAgents().map(agentView); });
-  route('GET', '/api/agents/:id', async ({ params }) => { const b = getAgent(params.id); return b ? { ...agentView(b), ...(isBuiltin(params.id) ? {} : { review: reviewCounts(params.id), lessonsToApprove: proposedCount(params.id) }) } : [404, { error: 'Not found' }]; });
+  route('GET', '/api/agents/:id', async ({ params }) => { const b = getAgent(params.id); return b ? { ...agentView(b), clock: { yours: ownerTz(), server: serverTz() }, ...(isBuiltin(params.id) ? {} : { review: reviewCounts(params.id), lessonsToApprove: proposedCount(params.id) }) } : [404, { error: 'Not found' }]; });
   // 070: Review & teach. The agent's answers with the message that asked (admins, like stored messages; private chats
   // left out); the first page of a look is recorded in Activity. Ratings: 1, -1 or 0 (clear).
   route('GET', '/api/agents/:id/review', async ({ query, params, user }) => {

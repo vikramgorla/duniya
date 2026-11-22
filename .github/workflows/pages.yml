@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.again.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/configure-pages@v5
@@ -30,4 +30,12 @@ jobs:
         with:
           path: docs/site
       - id: deployment
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+      # Now and then GitHub does not list the artifact that was just uploaded ("No artifacts named github-pages were
+      # found"): the site then stayed as it was until someone ran the job again. One more try after a minute.
+      - if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+      - id: again
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5

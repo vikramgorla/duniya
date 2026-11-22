@@ -2,7 +2,8 @@
 // Backups (007): settings, run, retention per destination, schedule, list, restore staging.
 import { readdirSync, readFileSync, rmSync, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { DATA_DIR, env, fail } from '../config.js';
+import { DATA_DIR, fail } from '../config.js';
+import { ownerTz } from '../owner-clock.js';
 import { getSecret, setSecret, getSetting, updateSettings } from '../store.js';
 import { kvGet, kvSet } from '../db.js';
 import { activity } from '../events.js';
@@ -236,7 +237,7 @@ function parts(date, tz) {
 }
 
 /** The schedule slot `date` falls in, or null if no backup is due in it yet (pure; tested). */
-export function slotFor(s, date = new Date(), tz = env.timezone) {
+export function slotFor(s, date = new Date(), tz = ownerTz()) {
   const p = parts(date, tz);
   if (s.schedule === 'hourly') return `${p.date}T${String(p.hour).padStart(2, '0')}`;
   if (s.schedule === '6h') return `${p.date}/${Math.floor(p.hour / 6)}`;

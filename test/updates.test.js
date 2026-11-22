@@ -46,6 +46,8 @@ test('stable and main channels update a real checkout; failed dependency install
   execFileSync('git', ['init', '-q', '-b', 'main', work]);
   mkdirSync(join(work, 'deploy'));
   copyFileSync(resolve(import.meta.dirname, '../deploy/update.sh'), join(work, 'deploy', 'update.sh'));
+  mkdirSync(join(work, 'src', 'core'), { recursive: true }); // update.sh asks the app what is installed
+  copyFileSync(resolve(import.meta.dirname, '../src/core/update-guard.js'), join(work, 'src', 'core', 'update-guard.js'));
   const pkg = (v) => writeFileSync(join(work, 'package.json'), JSON.stringify({ name: 'x', version: v, private: true }));
   pkg('1.0.0');
   writeFileSync(join(work, 'package-lock.json'), JSON.stringify({ name: 'x', version: '1.0.0', lockfileVersion: 3, requires: true, packages: { '': { name: 'x', version: '1.0.0' } } }));
@@ -71,14 +73,24 @@ test('stable and main channels update a real checkout; failed dependency install
   assert.equal(r.code, 0, r.log);
   assert.equal(git(app, 'rev-parse', 'HEAD'), git(work, 'rev-parse', 'HEAD'));
 
-  // A release whose lockfile doesn't match package.json → npm ci fails → code is rolled back
+  // A release that changes only its own version and a development tool installs nothing (every release changes the lockfile)
+  pkg('1.1.5');
+  writeFileSync(join(work, 'package-lock.json'), JSON.stringify({ name: 'x', version: '1.1.5', lockfileVersion: 3, requires: true,
+    packages: { '': { name: 'x', version: '1.1.5', devDependencies: { tool: '^2.0.0' } }, 'node_modules/tool': { version: '2.0.0', dev: true } } }));
+  git(work, 'commit', '-qam', 'v1.1.5'); git(work, 'push', '-q', 'origin', 'main');
+  r = await u.applyUpdate({ root: app, target: 'main' });
+  assert.equal(r.code, 0, r.log);
+  assert.doesNotMatch(r.log, /Dependencies changed/, 'the packages the app runs on are the same');
+  assert.equal(JSON.parse(readFileSync(join(app, 'package.json'), 'utf8')).version, '1.1.5');
+
+  // A release with a new package the app runs on installs; its lockfile lacks the package → npm ci fails → code is rolled back
   const before = git(app, 'rev-parse', 'HEAD');
   writeFileSync(join(work, 'package.json'), JSON.stringify({ name: 'x', version: '1.2.0', private: true, dependencies: { 'left-pad': '1.0.0' } }));
-  writeFileSync(join(work, 'package-lock.json'), JSON.stringify({ name: 'x', version: '1.2.0', lockfileVersion: 3, requires: true, packages: { '': { name: 'x', version: '1.2.0' } } }));
+  writeFileSync(join(work, 'package-lock.json'), JSON.stringify({ name: 'x', version: '1.2.0', lockfileVersion: 3, requires: true, packages: { '': { name: 'x', version: '1.2.0', dependencies: { 'left-pad': '1.0.0' } } } }));
   git(work, 'commit', '-qam', 'broken deps'); git(work, 'push', '-q', 'origin', 'main');
   r = await u.applyUpdate({ root: app, target: 'main' });
   assert.equal(r.code, 1);
-  assert.match(r.log, /rolling back/);
+  assert.match(r.log, /Dependencies changed, installing…[\s\S]*rolling back/);
   assert.equal(git(app, 'rev-parse', 'HEAD'), before);
 });
 

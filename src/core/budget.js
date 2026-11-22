@@ -5,7 +5,8 @@
 // alert. Months follow the server's timezone; alerts are remembered per scope and month, so they reset monthly.
 import { db, kvGet, kvSet } from './db.js';
 import './usage.js'; // creates the usage table this module indexes
-import { env, bad } from './config.js';
+import { bad, localParts, zoneOffset } from './config.js';
+import { ownerTz } from './owner-clock.js';
 import { activity } from './events.js';
 import { sendOwnerAlert } from './owner-alerts.js';
 import { chatLabel } from './chat-names.js';
@@ -25,22 +26,15 @@ export const SCOPES = ['agent', 'chat'];
 export const ALERT_AT = 0.8;
 const MODEL_RE = /^[a-z][a-z0-9-]{1,30}:[A-Za-z0-9._:/@+-]{1,120}$/;
 
-// ---------- months in the server's timezone ----------
-function zoneParts(ts, tz) {
-  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-    .formatToParts(new Date(ts)).map((x) => [x.type, x.value]));
-  return { y: +p.year, m: +p.month, d: +p.day, h: p.hour === '24' ? 0 : +p.hour, mi: +p.minute, s: +p.second };
-}
+// ---------- months on the owner's clock ----------
 /** Epoch ms of local midnight on y-m-d in tz. */
-export function zonedMidnight(y, m, d, tz = env.timezone) {
+export function zonedMidnight(y, m, d, tz = ownerTz()) {
   const guess = Date.UTC(y, m - 1, d);
-  const p = zoneParts(guess, tz);
-  const offset = Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi, p.s) - guess;
-  return guess - offset;
+  return guess - zoneOffset(tz, guess);
 }
 /** { key: 'YYYY-MM', from, to, resetsAt } for the month containing ts. */
-export function monthOf(ts = Date.now(), tz = env.timezone) {
-  const { y, m } = zoneParts(ts, tz);
+export function monthOf(ts = Date.now(), tz = ownerTz()) {
+  const [y, m] = localParts(tz, ts).date.split('-').map(Number);
   const from = zonedMidnight(y, m, 1, tz);
   const next = m === 12 ? zonedMidnight(y + 1, 1, 1, tz) : zonedMidnight(y, m + 1, 1, tz);
   return { key: `${y}-${String(m).padStart(2, '0')}`, from, to: next, resetsAt: next };
@@ -109,7 +103,7 @@ async function alertOnce(st, level, label) {
   const key = `budget:alert:${st.scope}:${st.id}:${st.month}:${level}`;
   if (kvGet(key)) return false;
   kvSet(key, String(Date.now()));
-  const resets = new Date(st.resetsAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: env.timezone });
+  const resets = new Date(st.resetsAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: ownerTz() });
   const text = level === 100
     ? `Duniya: monthly cap reached for ${label} (${describe(st)}). ${st.fallback ? `It now uses the cheaper model ${st.fallback}` : 'It stays quiet'} until ${resets}. Raise the cap in the panel to change this.`
     : `Duniya: ${label} has used ${Math.round(st.used * 100)}% of its monthly cap (${describe(st)}). At 100% it ${st.fallback ? `switches to ${st.fallback}` : 'stays quiet'} until ${resets}.`;

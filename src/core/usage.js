@@ -3,7 +3,8 @@
 // made it (092: FEATURES below, tagged at the call site with usageTag; stored in the `kind` column). Costs come only from prices the owner set or the provider publishes
 // (e.g. OpenRouter); plan-based providers (ChatGPT plan, GitHub Copilot) are "included", free models cost 0, and
 // anything else is reported as "price not set" — never guessed.
-import { fail } from './config.js';
+import { fail, zoneOffset } from './config.js';
+import { ownerTz } from './owner-clock.js';
 import { db } from './db.js';
 import { getSetting, updateSettings } from './store.js';
 
@@ -131,12 +132,13 @@ const GROUPS = { agent: 'agent', chat: 'chat', provider: 'provider', account: "C
   fallback: "CASE WHEN fallback IS NULL OR fallback = '' THEN 'first choice' ELSE 'fallback' END" };
 const DAY = 86400000;
 /**
- * 070: the local day of a row as integer math. The server's UTC offset is constant between daylight-saving changes,
+ * 070: the owner's day of a row as integer math. The owner's UTC offset is constant between daylight-saving changes,
  * so the offset is a short CASE over the changes in [lo, hi] (found here, to the second); a strftime(…'localtime')
  * per row cost twice as much. The key is the local day number: key * DAY as a UTC date is the local date.
  */
 function localDayKey(lo, hi) {
-  const off = (t) => -new Date(t).getTimezoneOffset() * 60000;
+  const tz = ownerTz();
+  const off = (t) => zoneOffset(tz, t);
   const segs = []; let cur = off(lo);
   for (let t = lo + DAY; t < hi + DAY; t += DAY) {
     const at = Math.min(t, hi); const o = off(at);

@@ -5,7 +5,7 @@ import { loadModels, modelLabel, modelSelect, plural, trunc } from './shared.js'
 // ---------- AI helper (016) ----------
 const FIELD_LABEL = { name: 'Name', description: 'Description', prompt: 'Instructions', triggers: 'Triggers', respondToMentions: 'Reply when @mentioned', groupReplies: 'In groups', dm: 'Who may message it directly',
   organizers: 'Organizers', participants: 'Extra participants', mcpServers: 'Tool services', globalMcp: 'Global tool services', tools: 'Tool rules', confirm: 'Confirmation', schedules: 'Schedules', memory: 'Memory',
-  model: 'Model', timezone: 'Timezone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', enabled: 'Enabled', media: 'Photos & voice',
+  model: 'Model', timezone: 'Time zone', historySize: 'Recent messages in context', maxTokens: 'Max reply tokens', enabled: 'Enabled', media: 'Photos & voice',
   quickReplies: 'Quick replies', help: '!help list', welcome: 'Welcome message', faq: 'FAQ auto-answers' };
 // The agent page's sections (068), in its order: the review groups changes the same way.
 const AI_SECTIONS = [['Character', ['name', 'description', 'prompt']], ['Where it answers', ['enabled', 'triggers', 'respondToMentions', 'groupReplies', 'dm']], ['People', ['organizers', 'participants']],

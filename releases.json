@@ -1,6 +1,28 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.60.4": {
+      "breaking": false,
+      "title": "One clock for the whole server: yours. Updates take seconds",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Everything goes by your time zone now: the months of spending caps, the time of automatic updates and backups, daily limits, the bars per day on Usage, and every agent that has no time zone of its own. Set it once: Agents → Owner assistant → Advanced → Your time zone."
+        },
+        {
+          "type": "improved",
+          "text": "The time zone field suggests zones while you type and shows whose zone an empty field means."
+        },
+        {
+          "type": "improved",
+          "text": "An update installs packages only when one the app runs on changed. Most releases change none, so most updates take a few seconds and do not need the package registry."
+        },
+        {
+          "type": "fixed",
+          "text": "An agent in a time zone behind UTC that named today’s date in the evening had its answer rewritten as if the date were wrong."
+        }
+      ]
+    },
     "2.60.3": {
       "breaking": false,
       "title": "Up-to-date libraries",

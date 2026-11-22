@@ -8,7 +8,7 @@
 import { activity } from '../events.js';
 import { putTtl, deleteTtl, clearTtl, listTtl } from '../ttl-store.js';
 import { sendOwnerAlert } from '../owner-alerts.js';
-import { env } from '../config.js';
+import { ownerNow } from '../owner-clock.js';
 import { REASON_TEXT } from './errors.js';
 
 export const BASE_MS = 60000;
@@ -37,7 +37,7 @@ export function loadStored() {
 }
 loadStored();
 
-const hhmm = (ts) => new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: env.timezone });
+const hhmm = (ts) => ownerNow(ts).hhmm;
 
 /** Why it failed, in plain words ("usage limit reached"). */
 const why = (s) => REASON_TEXT[s.reason] || s.reason;

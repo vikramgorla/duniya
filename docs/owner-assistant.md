@@ -46,7 +46,7 @@ confirmation setup; its *Try it* section is the Ask box). It adds **Alerts**. Th
 | Section | What it does |
 |---|---|
 | **Character** | Tone, language and habits ("call me Vik, short answers"). Added to the built-in instructions; it never widens what the assistant may do |
-| **Model** | Model and fallback, recent turns in context, max reply tokens, timezone (Advanced) |
+| **Model** | Model and fallback, recent turns in context, max reply tokens; **Your time zone** (Advanced, see [below](#your-time-zone)) |
 | **Memory** | Notes it saves when you ask ("remember Vedika likes ILLIT"): per person, never in a chat's memory |
 | **Tool services** | Global services are on by default (switch one off here); it can have its own services too. Each service's role defaults decide its tools |
 | **WhatsApp actions** | Send pictures, GIFs, files, locations, contact cards, polls, reactions, replies. Group administration stays with the admin tools |
@@ -155,6 +155,17 @@ shows it as it would go out now.
 It goes to linked owners and admins in their own chat, once a day, on the scheduler's tick (no timer of its own); a
 restart or an update at that minute only delays it (it still goes out within 30 minutes). The
 text is built in code from counts and names — no model call, nothing to pay.
+
+## Your time zone
+
+The server has one clock: yours. Set it once on the owner assistant: **Agents → Owner assistant → Advanced → Your
+time zone** (start typing a city: `Asia/Kolkata`, `Europe/Zurich`). Until you do, it is the server's default
+(`TZ_DEFAULT`, Europe/Zurich).
+
+What goes by it: your day (deadlines, due dates, the morning brief, sending hours), the months of
+[spending caps](spending.md), the bars per day on Usage, the times of automatic [updates and backups](backups-and-updates.md),
+daily limits, and every agent that has no time zone of its own. An agent for people elsewhere gets its own under
+**Advanced → Time zone**; then its schedules and "today" follow that.
 
 ## Suggested next steps
 

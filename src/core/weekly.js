@@ -1,7 +1,8 @@
 // Weekly summary (041, issue #38): the text of the owner assistant's "weekly-summary" schedule (059: day, time and
 // on/off are that schedule in the agent editor; owner-assistant.js sends it). Counts and costs only — never message
 // contents.
-import { env, plural } from './config.js';
+import { plural } from './config.js';
+import { ownerTz } from './owner-clock.js';
 import { db, listPending } from './db.js';
 import { listAgents } from './agents.js';
 import { statsBetween, dayOf } from './stats.js';
@@ -48,7 +49,7 @@ export function weeklyData(now = Date.now()) {
 
 /** Short WhatsApp text from weeklyData. */
 export function weeklyText(d = weeklyData()) {
-  const day = (ts) => new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: env.timezone });
+  const day = (ts) => new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: ownerTz() });
   const lines = [`*Duniya — your week* (${day(d.from)} – ${day(d.to)})`, ''];
   const active = d.agents.filter((a) => a.handled || a.replies || a.cost?.calls);
   for (const a of active) {

@@ -12,7 +12,7 @@ import { parseRepo, repoLinks, sameRepo } from './repo.js';
 import { getSetting, updateSettings, getSecret } from './store.js';
 import { kvGet, kvSet } from './db.js';
 import { activity, recordFailure } from './events.js';
-import { GUARDED_INSTALL, noteUpdate, takeRollbackResult } from './update-guard.js';
+import { GUARDED_INSTALL, depsKey, noteUpdate, takeRollbackResult } from './update-guard.js';
 import { parseVersion, compareVersions, analyzeJump, readReleasesAt, normalizeReleases, releaseRange } from './releases.js';
 import { runBackup } from './backup/index.js';
 
@@ -217,17 +217,16 @@ export function applyUpdate({ root = appRoot, target, backup = true, by = '' } =
 }
 
 // ---------------------------------------------------------------- the start guard (095)
-const lockOf = (root) => { try { return readFileSync(resolve(root, 'package-lock.json'), 'utf8'); } catch { return ''; /* no lockfile: nothing to install */ } };
 const versionAt = (root) => { try { return `v${JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).version}`; } catch { return ''; /* shown as "the new release" */ } };
-/** The commit and lockfile of a checkout (before an update); null when it cannot be told. */
-const installedAt = async (root) => { const commit = await git(['rev-parse', 'HEAD'], root).catch(() => ''); return commit ? { commit, lock: lockOf(root) } : null; };
+/** The commit and the installed packages of a checkout (before an update); null when it cannot be told. */
+const installedAt = async (root) => { const commit = await git(['rev-parse', 'HEAD'], root).catch(() => ''); return commit ? { commit, deps: depsKey(root) } : null; };
 
 /** An update was installed: what the start guard needs to put the previous release back. Nothing when the code is the same. */
 async function noteInstalled({ root, target, before, backup }) {
   if (installKind() !== GUARDED_INSTALL || !before) return;
   const commit = await git(['rev-parse', 'HEAD'], root);
   if (commit === before.commit) return; // already up to date
-  noteUpdate(DATA_DIR, { from: before.commit, fromVersion: runningVersion(), to: versionAt(root), target: target || 'latest', commit, deps: lockOf(root) !== before.lock, backup });
+  noteUpdate(DATA_DIR, { from: before.commit, fromVersion: runningVersion(), to: versionAt(root), target: target || 'latest', commit, deps: depsKey(root) !== before.deps, backup });
 }
 
 const savedRollback = () => { try { return JSON.parse(kvGet('updates:rolledBack') || 'null'); } catch { return null; /* unreadable: as if nothing was rolled back */ } };
