@@ -34,7 +34,7 @@ jobs:
         with:
           sparse-checkout: .github/security
       - name: Dismiss reviewed alerts (listed in .github/security/dismissals.json)
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -52,7 +52,7 @@ jobs:
               core.info(`Dismissed #${a.number} ${a.rule?.id} in ${path}: ${d.reason}`);
             }
       - name: Update the alerts issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { owner, repo } = context.repo;
