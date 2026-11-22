@@ -158,19 +158,26 @@ export function deleteOrder(id, by = 'panel') {
 export function addPayment(id, { amount, at = '', method = '', note = '', refund = false } = {}, by = 'panel') {
   const o = row(id); if (!o) throw fail('No such order', 404);
   if (o.status === 'cancelled') throw fail('This order is cancelled');
-  const value = amount === undefined || amount === '' || amount === null ? (refund ? o.paid : o.total - o.paid) : cents(amount, 'amount');
+  const { value, m, day } = paymentOf(o, { amount, at, method, refund });
+  db.prepare('INSERT INTO ord_payments (tenant_id, id, ord, amount, at, method, note, by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(TENANT, rid('pay'), o.id, refund ? -value : value, day, m, clean(note, 200), clean(by, 60), Date.now());
+  const next = restatus(o.id);
+  const kind = refund ? 'Refund' : 'Payment';
+  notePeople(next, `${kind} of ${money(value, o.currency)} (${m}) for ${view(next).title}: now ${STATUS_WORD[next.status]}`);
+  activity('config', { summary: `${kind} recorded: ${money(value, o.currency)}, ${m} (${by})` });
+  return getOrder(o.id);
+}
+/** What to record for an order: the amount in cents (by default what is left, or what was paid), the method, the day. */
+function paymentOf(o, { amount, at, method, refund }) {
+  const unsaid = amount === undefined || amount === '' || amount === null;
+  const value = !unsaid ? cents(amount, 'amount') : refund ? o.paid : o.total - o.paid;
   if (value <= 0) throw fail(refund ? 'Nothing was paid, so nothing to refund' : 'Nothing is left to pay', 400, { field: 'amount' });
   if (refund && value > o.paid) throw fail(`At most ${money(o.paid, o.currency)} was paid`, 400, { field: 'amount' });
   const m = methodOf(method);
   if (!m) throw fail(`Payment method: one of ${paymentMethods().join(', ')}`, 400, { field: 'method' });
   const day = clean(at, 10) || today();
   if (!DATE.test(day)) throw fail('Date like 2027-01-10', 400, { field: 'at' });
-  db.prepare('INSERT INTO ord_payments (tenant_id, id, ord, amount, at, method, note, by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(TENANT, rid('pay'), o.id, refund ? -value : value, day, m, clean(note, 200), clean(by, 60), Date.now());
-  const next = restatus(o.id);
-  notePeople(next, `${refund ? 'Refund' : 'Payment'} of ${money(value, o.currency)} (${m}) for ${view(next).title}: now ${STATUS_WORD[next.status]}`);
-  activity('config', { summary: `${refund ? 'Refund' : 'Payment'} recorded: ${money(value, o.currency)}, ${m} (${by})` });
-  return getOrder(o.id);
+  return { value, m, day };
 }
 export function removePayment(id, payment, by = 'panel') {
   const o = row(id); if (!o) throw fail('No such order', 404);

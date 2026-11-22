@@ -13,22 +13,28 @@ const ev = { type: 'string', description: 'Event name (or part of it) or id (opt
 const shown = (o) => ({ who: o.person && personName(o.person)?.hidden ? '(hidden)' : o.who, for: o.title, total: money(o.total, o.currency), paid: money(o.paid, o.currency),
   left: money(o.left, o.currency), status: STATUS_WORD[o.status], ...(o.due ? { due: o.due } : {}), ...(o.overdue ? { overdue: true } : {}) });
 
+/** The person an organizer names, when this agent may see them (and the name fits one person only). */
+function personNamed(r, ctx) {
+  const scope = peopleScope(ctx.agent, { owner: !!ctx.ownerTurn });
+  let p = personByRef(r);
+  if (!p && scope) {
+    const hits = listPeople({ q: r, scope, limit: 3 });
+    if (hits.length > 1) throw fail(`More than one person matches "${clip(r, 40)}": ${hits.map((x) => x.name).join(', ')}`);
+    p = hits[0] ? personByRef(hits[0].id) : null;
+  }
+  if (!p || !canSee(scope, p.id)) throw fail(`No person or household "${clip(r, 40)}" that this agent may see`);
+  return p.id;
+}
+/** The orders a payment can go to (open) or a refund can come from (paid, or open with something paid). */
+const payable = (refund, event) => [...listOrders({ status: refund ? 'paid' : 'open', event }), ...(refund ? listOrders({ status: 'open', event }).filter((o) => o.paid > 0) : [])];
 /** The open order of a person or household an organizer names (for an event when given). */
 function orderOf(who, event, ctx, { refund = false } = {}) {
   const r = String(who || '').trim();
   if (!r) throw fail('Whose order? (person or household name)');
   const e = event ? findEvent(event) : null;
   const hh = listHouseholds().find((h) => h.name.toLowerCase() === r.toLowerCase() || h.id === r);
-  let person = '';
-  if (!hh) {
-    const scope = peopleScope(ctx.agent, { owner: !!ctx.ownerTurn });
-    let p = personByRef(r);
-    if (!p && scope) { const hits = listPeople({ q: r, scope, limit: 3 }); if (hits.length > 1) throw fail(`More than one person matches "${clip(r, 40)}": ${hits.map((x) => x.name).join(', ')}`); p = hits[0] ? personByRef(hits[0].id) : null; }
-    if (!p || !canSee(scope, p.id)) throw fail(`No person or household "${clip(r, 40)}" that this agent may see`);
-    person = p.id;
-  }
-  const list = [...listOrders({ status: refund ? 'paid' : 'open', event: e?.id || '' }), ...(refund ? listOrders({ status: 'open', event: e?.id || '' }).filter((o) => o.paid > 0) : [])]
-    .filter((o) => (hh ? o.household === hh.id : o.person === person));
+  const person = hh ? '' : personNamed(r, ctx);
+  const list = payable(refund, e?.id || '').filter((o) => (hh ? o.household === hh.id : o.person === person));
   if (!list.length) throw fail(`${hh ? hh.name : personRow(person)?.name} has no ${refund ? 'paid' : 'open'} order${e ? ` for ${e.name}` : ''}`);
   if (list.length > 1 && !e) throw fail(`${list.length} orders: say which event (${list.map((o) => o.title).join(', ')})`);
   return list[0];

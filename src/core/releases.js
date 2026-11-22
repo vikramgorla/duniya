@@ -61,6 +61,10 @@ export function releaseRange(releases, from, to) {
  * versions: every release tag the remote has (any order, with or without "v"); releases: normalized releases.json.
  * Returns { breaking, steps: [{ version, title, summary, actions, data, docs, major }], safeTarget, decisionVersion }.
  */
+/** A release the owner decides on: its entry, or (a major version without one) what to say instead. */
+const stepOf = (v, e, major) => ({ version: v, title: e?.title || `Version ${parseVersion(v)[0]} (new major version)`,
+  summary: e?.summary || 'A new major version can change things in ways that need your attention. Read the release notes before updating.',
+  actions: e?.actions || [], data: e?.data || '', docs: e?.docs || '', major, ...(e ? {} : { unlisted: true }) });
 export function analyzeJump({ current, target, versions = [], releases = {} }) {
   const none = { breaking: false, steps: [], safeTarget: null, decisionVersion: null };
   if (!parseVersion(current) || !parseVersion(target) || compareVersions(current, target) >= 0) return none;
@@ -75,12 +79,7 @@ export function analyzeJump({ current, target, versions = [], releases = {} }) {
     const e = releases[v];
     const newMajor = parseVersion(v)[0] > cur[0] && !majors.has(parseVersion(v)[0]);
     if (newMajor) majors.add(parseVersion(v)[0]);
-    if (e?.breaking || newMajor) {
-      steps.push({ version: v, title: e?.title || `Version ${parseVersion(v)[0]} (new major version)`,
-        summary: e?.summary || 'A new major version can change things in ways that need your attention. Read the release notes before updating.',
-        actions: e?.actions || [], data: e?.data || '', docs: e?.docs || '', major: newMajor, ...(e ? {} : { unlisted: true }) });
-      blocked = true;
-    }
+    if (e?.breaking || newMajor) { steps.push(stepOf(v, e, newMajor)); blocked = true; }
     if (!blocked && versions.map(bare).includes(v)) safeTarget = `v${v}`;
   }
   return { breaking: steps.length > 0, steps, safeTarget, decisionVersion: steps.length ? steps.at(-1).version : null };
@@ -111,18 +110,18 @@ export function releaseNotes(releases, version, repo) {
  * an entry with a title and changes. previous: the latest release tag (e.g. "v2.8.2") or ''. Returns { errors: [], warnings: [] }.
  */
 export function releaseCheck({ version, previous = '', releases = {} }) {
-  const errors = []; const warnings = [];
   const e = releases[bare(version)];
   const cur = parseVersion(version); const prev = parseVersion(previous);
-  if (!cur) return { errors: [`package.json version ${version} is not X.Y.Z`], warnings };
-  if (prev && cur[0] > prev[0]) {
-    if (!e?.breaking) errors.push(`Version ${bare(version)} is a new major version (previous release ${previous}) but releases.json has no entry for it with "breaking": true. Add one with title, summary and actions (AGENTS.md, Definition of Done), or consider a migration instead.`);
-    else if (!e.actions.length) errors.push(`releases.json entry ${bare(version)} is breaking but lists no actions: say what the owner must do.`);
-  } else if (!e && (!prev || compareVersions(version, previous) > 0)) {
-    errors.push(`releases.json has no entry for ${bare(version)}. Every version gets one: at least { "breaking": false, "title": "…", "changes": [{ "type": "new", "text": "…" }] } (AGENTS.md, Definition of Done).`);
-  }
+  if (!cur) return { errors: [`package.json version ${version} is not X.Y.Z`], warnings: [] };
+  const newer = !prev || compareVersions(version, previous) > 0;
+  const errors = prev && cur[0] > prev[0] ? majorErrors(e, version, previous) : !e && newer ? [`releases.json has no entry for ${bare(version)}. Every version gets one: at least { "breaking": false, "title": "…", "changes": [{ "type": "new", "text": "…" }] } (AGENTS.md, Definition of Done).`] : [];
   if (e && !e.title) errors.push(`releases.json entry ${bare(version)} has no title: add a one-line title.`);
   if (e && !e.changes.length) errors.push(`releases.json entry ${bare(version)} has no changes: list what is new, improved, fixed or removed as short bullets for owners ("changes": [{ "type": "new", "text": "…" }]).`);
-  if (e?.breaking && prev && cur[0] === prev[0] && compareVersions(version, previous) > 0) warnings.push(`releases.json marks ${bare(version)} as breaking without a major version bump: breaking changes should bump the major version.`);
+  const warnings = e?.breaking && prev && cur[0] === prev[0] && newer ? [`releases.json marks ${bare(version)} as breaking without a major version bump: breaking changes should bump the major version.`] : [];
   return { errors, warnings };
+}
+/** A new major version needs an entry that is marked breaking and says what the owner must do. */
+function majorErrors(e, version, previous) {
+  if (!e?.breaking) return [`Version ${bare(version)} is a new major version (previous release ${previous}) but releases.json has no entry for it with "breaking": true. Add one with title, summary and actions (AGENTS.md, Definition of Done), or consider a migration instead.`];
+  return e.actions.length ? [] : [`releases.json entry ${bare(version)} is breaking but lists no actions: say what the owner must do.`];
 }

@@ -9,11 +9,12 @@
 //     become suggestions in People → Suggestions (accept creates the tie, and the person if needed; reject is final).
 //     Only family words; nothing else is inferred. Never saved without the owner's tap.
 import { db } from './db.js';
-import { clip, localParts } from './config.js';
+import { bad, clip, fail, localParts } from './config.js';
 import { activity, bus } from './events.js';
 import { TENANT } from './store.js';
 import { addTie, createPerson, listPeople, personRow } from './people.js';
 import { ownerNow, ownerTz } from './owner-clock.js';
+import { CHANNELS } from '../channels/index.js';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS person_prefs (
@@ -149,24 +150,35 @@ export function prefsOf(person) {
  * @param {string} person @param {{ language?: string, hoursFrom?: number|string, hoursTo?: number|string, app?: string }} [patch]
  */
 export function setPrefs(person, { language, hoursFrom, hoursTo, app } = {}) {
-  if (!personRow(person)) throw Object.assign(new Error('No such person'), { status: 404 });
+  if (!personRow(person)) throw fail('No such person', 404);
   const cur = db.prepare('SELECT * FROM person_prefs WHERE person = ?').get(person) || { lang: '', lang_set: 0, hours_from: null, hours_to: null, hours_set: 0, app: '', app_set: 0 };
   const next = { ...cur };
-  if (language !== undefined) { if (language === 'auto') next.lang_set = 0; else { if (language && !LANGUAGES[language]) throw Object.assign(new Error(`language: ${Object.keys(LANGUAGES).join(', ')} or auto`), { status: 400, field: 'language' }); next.lang = language; next.lang_set = 1; } }
-  if (hoursFrom !== undefined || hoursTo !== undefined) {
-    if (hoursFrom === 'auto') next.hours_set = 0;
-    else {
-      const a = Number(hoursFrom); const b = Number(hoursTo);
-      if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b > 24 || a >= b) throw Object.assign(new Error('Hours: from 0–23, to 1–24, from before to'), { status: 400, field: 'hoursFrom' });
-      next.hours_from = a; next.hours_to = b; next.hours_set = 1;
-    }
-  }
-  if (app !== undefined) { if (app === 'auto') next.app_set = 0; else { if (!['', 'whatsapp', 'telegram'].includes(app)) throw Object.assign(new Error('app: whatsapp, telegram or auto'), { status: 400, field: 'app' }); next.app = app; next.app_set = 1; } }
+  if (language !== undefined) Object.assign(next, languagePref(language));
+  if (hoursFrom !== undefined || hoursTo !== undefined) Object.assign(next, hoursPref(hoursFrom, hoursTo));
+  if (app !== undefined) Object.assign(next, appPref(app));
   db.prepare(`INSERT INTO person_prefs (person, lang, lang_set, hours_from, hours_to, hours_set, app, app_set, computed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (person) DO UPDATE SET lang = excluded.lang, lang_set = excluded.lang_set, hours_from = excluded.hours_from, hours_to = excluded.hours_to, hours_set = excluded.hours_set, app = excluded.app, app_set = excluded.app_set`)
     .run(person, next.lang, next.lang_set, next.hours_from, next.hours_to, next.hours_set, next.app, next.app_set, cur.computed_at ?? null);
   if (!next.lang_set || !next.hours_set || !next.app_set) compute(person);
   return prefsOf(person);
+}
+// One preference the owner sets, as the columns it changes; 'auto' gives it back to the computation.
+function languagePref(language) {
+  if (language === 'auto') return { lang_set: 0 };
+  if (language && !LANGUAGES[language]) throw bad(`language: ${Object.keys(LANGUAGES).join(', ')} or auto`, 'language');
+  return { lang: language, lang_set: 1 };
+}
+function hoursPref(from, to) {
+  if (from === 'auto') return { hours_set: 0 };
+  const a = Number(from); const b = Number(to);
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b > 24 || a >= b) throw bad('Hours: from 0–23, to 1–24, from before to', 'hoursFrom');
+  return { hours_from: a, hours_to: b, hours_set: 1 };
+}
+function appPref(app) {
+  if (app === 'auto') return { app_set: 0 };
+  const apps = CHANNELS.map((c) => c.id); // every channel the server has, not a list of names kept here
+  if (app !== '' && !apps.includes(app)) throw bad(`app: ${apps.join(', ')} or auto`, 'app');
+  return { app, app_set: 1 };
 }
 /** Is it within a person's usual hours now (owner's time zone)? true when unknown. */
 export function inPersonHours(person, now = Date.now()) {

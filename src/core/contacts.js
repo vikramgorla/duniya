@@ -71,21 +71,24 @@ export function syncWhatsAppContacts(list = []) {
   let n = 0;
   db.exec('BEGIN');
   try {
-    for (const c of list) {
-      const id = bareJid(c?.id);
-      const lid = [id, bareJid(c?.lid)].find(isLidJid) || '';
-      const phone = pnDigits(id) || pnDigits(bareJid(c?.phoneNumber)) || (lid ? lidPhone(lid) : '');
-      if (lid && phone) mapLid(lid, phone);
-      const names = { book: clean(c?.name), biz: clean(c?.verifiedName), push: clean(c?.notify) };
-      for (const [k, v] of Object.entries(names)) {
-        if (!v || /^\+?\d[\d\s]{5,}$/.test(v)) continue; // a "name" that is only a number adds nothing
-        if (phone.length >= 6) n += Number(upPhone[k].run(TENANT, phone, v, Date.now()).changes);
-        else if (lid) n += Number(upLid[k].run(TENANT, lid, v, Date.now()).changes);
-      }
-    }
+    for (const c of list) n += saveNames(c);
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
   if (n) try { syncPhonePeople(); } catch { /* 079: the upkeep tick does the rest */ }
+  return n;
+}
+/** One contact: its private id is tied to its number, and each kind of name is stored under the number (else the id). Returns the changes. */
+function saveNames(c) {
+  const id = bareJid(c?.id);
+  const lid = [id, bareJid(c?.lid)].find(isLidJid) || '';
+  const phone = pnDigits(id) || pnDigits(bareJid(c?.phoneNumber)) || (lid ? lidPhone(lid) : '');
+  if (lid && phone) mapLid(lid, phone);
+  let n = 0;
+  for (const [k, v] of Object.entries({ book: clean(c?.name), biz: clean(c?.verifiedName), push: clean(c?.notify) })) {
+    if (!v || /^\+?\d[\d\s]{5,}$/.test(v)) continue; // a "name" that is only a number adds nothing
+    if (phone.length >= 6) n += Number(upPhone[k].run(TENANT, phone, v, Date.now()).changes);
+    else if (lid) n += Number(upLid[k].run(TENANT, lid, v, Date.now()).changes);
+  }
   return n;
 }
 /** LIDs with names but no phone yet (the channel asks Baileys for their mapping). */
@@ -100,15 +103,17 @@ export const unmappedLids = (limit = 500) => db.prepare("SELECT lid FROM contact
 export function personInfo({ phone = '', jid = '', fallbackName = '' } = {}) {
   const j = bareJid(jid);
   const p = digits(phone) || pnDigits(j) || lidPhone(j);
-  const r = p ? getRow.get(TENANT, p) : null;
-  const own = p ? ownNameOf(p) : '';
-  const l = isLidJid(j) ? getLid.get(TENANT, j) : null;
   const fb = clean(fallbackName);
   const seen = fb && digits(fb) !== fb.replace(/[\s+]/g, '') ? fb : ''; // a fallback that is only the number is no name
-  const pick = [['own', own], ['book', r?.book_name || l?.book_name], ['business', r?.biz_name || l?.biz_name], ['profile', r?.push_name || l?.push_name], ['seen', seen]]
-    .find(([, v]) => v);
+  const pick = Object.entries({ ...storedNames(p, j), seen }).find(([, v]) => v);
   const name = pick?.[1] || '';
   return { phone: p, name, label: name || (p ? `+${p}` : HIDDEN_NUMBER), source: pick?.[0] || '', hidden: !p };
+}
+/** The names stored for a number and a private id, by source, in the order they are preferred. */
+function storedNames(phone, jid) {
+  const r = phone ? getRow.get(TENANT, phone) : null;
+  const l = isLidJid(jid) ? getLid.get(TENANT, jid) : null;
+  return { own: phone ? ownNameOf(phone) : '', book: r?.book_name || l?.book_name, business: r?.biz_name || l?.biz_name, profile: r?.push_name || l?.push_name };
 }
 /**
  * The name an agent sees for a person (#113). By default the same choice as the panel (own > phone contact > business >
@@ -120,10 +125,8 @@ export function setContactNamesForAgents(on) { updateSettings({ contactNamesForA
 export function agentName({ phone = '', jid = '', fallbackName = '' } = {}) {
   const info = personInfo({ phone, jid, fallbackName });
   if (info.source !== 'book' || contactNamesForAgents()) return info.name || clean(fallbackName);
-  const j = bareJid(jid);
-  const r = info.phone ? getRow.get(TENANT, info.phone) : null;
-  const l = isLidJid(j) ? getLid.get(TENANT, j) : null;
-  return r?.biz_name || l?.biz_name || r?.push_name || l?.push_name || clean(fallbackName);
+  const stored = storedNames(info.phone, bareJid(jid));
+  return stored.business || stored.profile || clean(fallbackName);
 }
 
 /** Counts for People: how many names of each kind, and people WhatsApp shows only by a hidden number. */
