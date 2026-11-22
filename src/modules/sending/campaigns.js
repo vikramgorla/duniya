@@ -129,7 +129,7 @@ export async function campaignsTick(now = Date.now()) {
       }
       // a message step: the audience again (with today's facts), without the people the stop rules took out
       const p = await preview({ title: `${c.title}: step ${c.step + 1}`, audience: JSON.parse(c.audience), purpose: c.purpose, agent: c.agent, template: s.template, survey: s.survey, noReplyLimit: c.no_reply_limit },
-        c.by || 'campaign', 'campaign', { drop: stopped(c) });
+        c.by || 'campaign', 'campaign', { drop: stopped(c), now });
       db.prepare('INSERT INTO snd_campaign_runs (tenant_id, campaign, step, run) VALUES (?, ?, ?, ?)').run(TENANT, c.id, c.step, p.run.id);
       if (p.to.total) startRun(p.run.id, c.by || 'campaign'); else advance(c, now);
     } catch (e) {

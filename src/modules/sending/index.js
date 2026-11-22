@@ -116,9 +116,10 @@ async function personalise(template, facts, agent, feature = 'sending') {
 /**
  * A draft run with its recipients and the preview: { run, recipients: [...skipped first 200, then waiting], samples,
  * estimate, chatsToSwitchOn }. `visible` (agent tools): people the agent may not see are skipped; `drop` (campaigns, 083):
- * people and households the campaign's stop rules took out. body: { title, audience, purpose, mode: direct | group, group, agent, template, noReplyLimit }.
+ * people and households the campaign's stop rules took out; `now`: the caller's clock (a campaign's tick), so a draft is as old as the tick that
+ * made it. body: { title, audience, purpose, mode: direct | group, group, agent, template, noReplyLimit }.
  */
-export async function preview(body = {}, by = 'panel', source = 'panel', { visible = null, drop = null } = {}) {
+export async function preview(body = {}, by = 'panel', source = 'panel', { visible = null, drop = null, now = Date.now() } = {}) {
   const title = clip(body.title, 80) || 'Message';
   const purpose = String(body.purpose || 'updates');
   if (!PURPOSES[purpose]) throw fail('Purpose: updates or marketing', 400, { field: 'purpose' });
@@ -143,7 +144,7 @@ export async function preview(body = {}, by = 'panel', source = 'panel', { visib
       : visible && !visible(r.person) ? { ...r, status: 'skipped', reason: 'Not one of this agent\'s people', chat: '', channel: '' }
         : drop && (drop.has(r.person) || drop.has(r.household)) ? { ...r, status: 'skipped', reason: 'Taken out by the campaign\'s rules', chat: '', channel: '' } : r));
   }
-  const id = rid('run'); const now = Date.now();
+  const id = rid('run');
   db.exec('BEGIN');
   try {
     db.prepare('INSERT INTO snd_runs (tenant_id, id, title, purpose, mode, grp, agent, template, audience, source, by, no_reply_limit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -273,7 +274,7 @@ async function waState(ch, chat) {
   return n.status === 'open' ? 'open' : n.status === 'logged_out' || n.status === 'not_set_up' ? 'gone' : 'offline';
 }
 
-let busy = false;
+let working = null; // the campaign step and send in progress (they go on after the upkeep tick that started them)
 /** At most one message, of the run that is due first. Never two at once. */
 async function step(now) {
   const r = db.prepare("SELECT * FROM snd_runs WHERE tenant_id = ? AND status = 'running' AND next_at <= ? ORDER BY next_at, created_at LIMIT 1").get(TENANT, now);
@@ -341,10 +342,11 @@ async function upkeep(now = Date.now()) {
   for (const { id } of old) { db.prepare('DELETE FROM snd_recipients WHERE tenant_id = ? AND run = ?').run(TENANT, id); db.prepare('DELETE FROM snd_runs WHERE tenant_id = ? AND id = ?').run(TENANT, id); }
   // a message still "sending" after 10 minutes was cut off (a restart): marked failed, never sent twice
   db.prepare("UPDATE snd_recipients SET status = 'failed', reason = 'Interrupted by a restart; not sent again to be safe' WHERE tenant_id = ? AND run IN (SELECT id FROM snd_runs WHERE tenant_id = ? AND status IN ('running', 'paused')) AND status = 'sending' AND at < ?").run(TENANT, TENANT, now - 10 * MIN);
-  if (busy) return;
-  busy = true;
-  campaignsTick(now).then(() => step(now)).catch((e) => activity('error', { summary: `Sending: ${e.message}` })).finally(() => { busy = false; });
+  if (working) return;
+  working = campaignsTick(now).then(() => step(now)).catch((e) => activity('error', { summary: `Sending: ${e.message}` })).finally(() => { working = null; });
 }
+/** Resolves when no message is on its way (a stop of the app waits for it: a message cut off is never sent again). */
+const idle = () => working || Promise.resolve();
 
 // ---------- replies, stop and start ----------
 const STOP = /^(stop|stopp|stopper|stoppen|unsubscribe|unsub|opt ?out|arr[eê]te[rz]?|arr[eê]t|d[ée]sabonner|d[ée]sinscri(re|s|vez)|abmelden|abbestellen|basta|alto|para|pare|baja|cancelar|annulla|disiscrivi|afmelden|stoppa|бас|стоп|बंद|बंद करो|रुको|ఆపు|ఆపండి|நிறுத்து|ನಿಲ್ಲಿಸಿ)$/iu;
@@ -409,4 +411,4 @@ function apply(action, agent) {
 }
 export const hold = (ctx, p) => changeOrHold(ctx, 'sending', { op: 'start', run: p.run.id }, p.line);
 
-export const manifest = { id: 'sending', tools: sendingTools, apply, person: personSections, upkeep, intercept, api: { preview, startRun } };
+export const manifest = { id: 'sending', tools: sendingTools, apply, person: personSections, upkeep, idle, intercept, api: { preview, startRun } };

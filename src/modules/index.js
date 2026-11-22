@@ -12,6 +12,7 @@
 //   apply        apply(action, agent): a change an organizer confirmed ("confirm XXXX", the runner's confirm gate)
 //   person       person(id) / household(id) → page sections [{ title, rows: [{ name, sub?, href? }] }]
 //   upkeep       upkeep(now): a bounded amount of background work on the scheduler's tick
+//   idle         idle(): resolves when work an upkeep left running has finished (a stop of the app waits for it)
 //   on           { <signal>: fn } — signals other modules send (emit), e.g. events → orders: 'registration'
 //   intercept    intercept(msg, channel): a direct message from a person in a chat that is on, before the agent;
 //                true = answered here (082: replies to list messages, stop / start)
@@ -24,6 +25,7 @@ import { TENANT, getSetting, updateSettings } from '../core/store.js';
 import { activity, bus } from '../core/events.js';
 
 const MB = 1048576;
+const MODULES_IDLE_WAIT = 4000; // ms a stop of the app waits for a module's work in progress
 /** @type {Array<{ id: string, label: string, line: string, defaultOn?: boolean, refs: { person: string[][], household: string[][] }, children: string[][], load: () => Promise<any> }>} */
 export const MODULES = [
   { id: 'events', label: 'Events', line: 'Events with registrations, a waiting list and duties; agents register people',
@@ -127,6 +129,11 @@ export function moduleSections(kind, id) {
   return out;
 }
 /** Upkeep tick: each module that is on does its bounded work. */
+/** Work the modules left running after their upkeep (a list message on its way) has finished, or `ms` passed. */
+export async function modulesIdle(ms = MODULES_IDLE_WAIT) {
+  const pending = Promise.all(liveModules().map((m) => m.idle?.()));
+  await Promise.race([pending, new Promise((r) => { setTimeout(r, ms).unref(); })]);
+}
 export async function modulesUpkeep(now = Date.now()) {
   for (const m of liveModules()) { try { await m.upkeep?.(now); } catch (e) { activity('error', { summary: `${m.id} upkeep: ${e.message}` }); } }
 }

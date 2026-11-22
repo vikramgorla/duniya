@@ -1,6 +1,6 @@
 // @ts-check
 import { loadAgents, listAgents } from './core/agents.js';
-import { startModules } from './modules/index.js';
+import { modulesIdle, startModules } from './modules/index.js';
 import { createHub } from './channels/hub.js';
 import { createRouter, createHistoryHandler, createJoinHandler, createChatMoveHandler, closeRouter } from './core/router.js';
 import { startScheduler } from './core/scheduler.js';
@@ -60,6 +60,7 @@ async function shutdown(why, code = 0) {
   panel.close();
   stopQueue();
   const finished = await closeRouter(6000);
+  await modulesIdle(); // a list message on its way goes out (cut off, it would be marked failed and never sent again)
   if (!finished) console.error('Stopping with turns still running');
   await channels.stop().catch(() => {});
   try { db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); db.close(); } catch { /* already closed */ }
