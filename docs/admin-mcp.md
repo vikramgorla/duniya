@@ -54,7 +54,8 @@ The assistant never sees a key, password or passphrase (spec
 | `restore_backup` { `source`, `file` } | Uses the backup passphrase stored on this server; the preview opens the backup and shows its date. A backup that does not open with it (another server, an older passphrase) is refused with a link to **Backups → Restore** in the panel |
 
 > [!NOTE]
-> `get_overview` also lists the **Getting started** steps still open (link WhatsApp, connect a model, create an agent,
+> `get_overview` lists the accounts of every channel and whether each is connected (`accounts`: WhatsApp numbers, a
+> Telegram bot), and the **Getting started** steps still open (link WhatsApp, connect a model, create an agent,
 > switch a chat on, send a test), so an assistant can tell a new owner what is next. `assign_chat` takes
 > `switch_on: true` to switch an Off chat on in the same step, as choosing an agent does in the panel.
 

@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/site/img/overview-desktop.webp" alt="The Duniya panel: everything running, the Ask box with a recap of this week's chats, WhatsApp numbers, agents with on/off switches and the server." width="900">
+  <img src="docs/site/img/overview-desktop.webp" alt="The Duniya panel: everything running, the Ask box with a recap of this week's chats, the WhatsApp numbers and the Telegram bot, agents with on/off switches and the server." width="900">
 </p>
 
 Duniya links to a spare WhatsApp number and runs helpers in the chats you choose: a car-pool planner, a school-class
