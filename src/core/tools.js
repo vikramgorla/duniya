@@ -18,6 +18,7 @@ import { changeTools, riskOf } from './autonomy.js';
 import { behaviourOf } from './tool-behaviour.js';
 import { mediaTool } from './sharing.js';
 import { sharedCounts } from './stats.js';
+import { serviceCredits } from './credits.js';
 
 
 const exposedName = (server, tool) => `${server}__${tool}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
@@ -110,7 +111,7 @@ export async function agentServices(agent) {
       if (srv.type !== 'local' || conn.tools) tools = await describeTools(key, conn);
     } catch { /* shown as not reachable */ }
     const media = tools?.find((t) => t.media)?.media || '';
-    return { service: key, global: !!srv.global, own: agent.services?.[key] || {}, default: srv.behaviour || {}, tools, media, ...(media ? { shared: sharedCounts(agent.id) } : {}) };
+    return { service: key, global: !!srv.global, own: agent.services?.[key] || {}, default: srv.behaviour || {}, tools, media, ...(media ? { shared: sharedCounts(agent.id), credit: serviceCredits()[key] || '' } : {}) };
   }));
 }
 

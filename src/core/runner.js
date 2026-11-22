@@ -27,6 +27,7 @@ import { peopleScope, senderCard } from './people-access.js';
 import { applyPeopleAction } from './people-tools.js';
 import { applyModuleAction } from '../modules/index.js';
 import { sharePlan, sharingNote, takeShareTag, shareAfterReply, noteToolOutput } from './sharing.js';
+import { withoutMediaClutter } from './credits.js';
 import { servicesNote, limitStop } from './tool-behaviour.js';
 import { BLOCKED, WAIT_NOTE, appliedNote, autonomyNote, isAgreement, mayChangeWithoutAsking, riskOf } from './autonomy.js';
 
@@ -35,6 +36,8 @@ const MAX_TOOL_ROUNDS = 8;
 // 2.58: chat apps show links as they are: markdown links become "title (url)"; an answer from the web without a link
 // gets up to two of the pages its search cited
 const MAX_SOURCES = 2;
+/** Every link of a tool result that has a media link in it (the GIF's page and file alike), '' else. */
+const linksWithMedia = (text) => { const t = String(text || ''); return /https?:\/\/\S+\.(mp4|gif|webp)\b/i.test(t) ? t.match(/https?:\/\/[^\s)"'<>\\]+/g) || [] : []; };
 const plainLinks = (text) => text.replace(/\[([^\]\n]{1,200})\]\((https?:\/\/[^)\s]+)\)/g, (m, title, url) => (title === url ? url : `${title} (${url})`));
 function withSources(text, sources) {
   if (!text || !sources.length || /https?:\/\//.test(text)) return text;
@@ -201,6 +204,7 @@ export async function runAgent(ctx) {
   // fallback model). If none can answer, the turn is asked again without them and the model says so kindly.
   let vision = plan.attachments.length ? visionCallOptions() : null;
   const webSources = []; // 2.58: pages the provider's built-in web search cited
+  const mediaLinks = []; // 2.58.1: links in tool results that carry media: never pasted into the answer
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     let res;
@@ -255,7 +259,7 @@ export async function runAgent(ctx) {
       const why = m?.kind === 'mcp' ? limitStop(ctx, m.server, m.behaviour, uses) : '';
       const out = why ? { isError: true, text: `Not used: ${m.server} has a limit (${why}). Answer without it.` }
         : (m?.change === 'confirm' && confirmGate(ctx, call.input, applied, waiting)) || await runTool(run, m, call, { ...ctx, toolRisk: risk, toolMode: m?.behaviour?.changes || '' });
-      if (!out.isError && m?.kind === 'mcp' && m.annotations?.readOnlyHint === true) noteToolOutput(m.server, m.tool, out.text);
+      if (!out.isError && m?.kind === 'mcp' && m.annotations?.readOnlyHint === true) { noteToolOutput(m.server, m.tool, out.text); mediaLinks.push(...linksWithMedia(out.text)); }
       let content = String(out.text ?? '').slice(0, 12000);
       activity(out.isError ? 'tool.error' : 'tool.call', {
         agent: agent.id, chat,
@@ -300,7 +304,7 @@ export async function runAgent(ctx) {
   }
   // 094: [share: mood] tags never reach the chat; what is shared (asked for, or a moment's) goes out after the text
   const tag = takeShareTag(reply);
-  reply = withSources(plainLinks(tag.text), webSources);
+  reply = withSources(plainLinks(withoutMediaClutter(tag.text, mediaLinks)), webSources);
   ctx.share = ctx.source === 'panel' ? null : shareAfterReply(ctx, splan, { reply, hint: tag.hint });
   for (const code of codes) {
     reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm?.ttlMinutes || 9} min).`;

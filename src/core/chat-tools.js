@@ -18,6 +18,7 @@ import { toolPhrase } from '../panel/public/app/names.js';
 import { isDuplicate, noteSent } from './turns.js';
 import { silenceReason } from './silences.js';
 import { forgetChanged } from './memory.js';
+import { withoutMediaClutter } from './credits.js';
 
 let channel = null;
 /** The channel hub the tools act through (set by the router and the panel at startup). */
@@ -166,8 +167,10 @@ const DEFS = [
       const chat = await targetChat(input, ctx, 'media');
       const what = { kind: String(input.kind || ''), url: String(input.url || '') };
       const dup = duplicate(ctx, chat, what); if (dup) return dup;
-      const r = await need().sendMedia(chat, { kind: input.kind, url: input.url, base64: input.base64, mimetype: input.mimetype, caption: input.caption || '', fileName: input.file_name || '' });
-      const label = `[${input.kind === 'audio' ? 'voice note' : input.kind}${input.caption ? `: ${clip(input.caption, 300)}` : ''}]`;
+      // 2.58.1: no media links or service credits in a caption (the credit is shown in the panel)
+      const caption = withoutMediaClutter(input.caption || '', [String(input.url || '')]);
+      const r = await need().sendMedia(chat, { kind: input.kind, url: input.url, base64: input.base64, mimetype: input.mimetype, caption, fileName: input.file_name || '' });
+      const label = `[${input.kind === 'audio' ? 'voice note' : input.kind}${caption ? `: ${clip(caption, 300)}` : ''}]`;
       remember(ctx, chat, r.msgId, label);
       noteSent(chat, ctx.agent.id, what);
       return { chat, result: { sent: true, msgId: r.msgId, type: r.mimetype, ...(r.asStill ? { note: 'Sent as a still image (use an MP4 for a moving GIF)' } : {}) }, summary: `${label} ${r.bytes} bytes` };

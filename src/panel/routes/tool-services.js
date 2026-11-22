@@ -10,6 +10,7 @@ import { probeServer, startSignIn, listConnections, disconnect, deleteServerConn
 import { installPackage, installedInfo, localServiceCheck } from '../../core/mcp-local.js';
 import { resetMcpPool, mcpConnection } from '../../core/mcp.js';
 import { serverConnection, oauthClientOf, describeTools, serviceMedia } from '../../core/tools.js';
+import { serviceCredits } from '../../core/credits.js';
 import { referencedSecrets } from '../../core/schema.js';
 import { getSecret } from '../../core/store.js';
 import { isHttps } from '../http.js';
@@ -26,7 +27,7 @@ function globalView(row, agents = listAgents()) {
   const optedOut = agents.filter((a) => (a.globalMcp?.disabled || []).includes(row.name)).map((a) => a.id);
   const replacedBy = agents.filter((a) => a.mcpServers?.[row.name]).map((a) => a.id);
   return {
-    name: row.name, config: row.config, createdBy: row.createdBy, updatedAt: row.updatedAt, updatedBy: row.updatedBy,
+    name: row.name, config: row.config, credit: serviceCredits()[row.name] || '', createdBy: row.createdBy, updatedAt: row.updatedAt, updatedBy: row.updatedBy,
     needs: referencedSecrets({ mcpServers: { [row.name]: row.config } }).filter((s) => !getSecret(s)),
     agents: { using: agents.filter((a) => !optedOut.includes(a.id) && !replacedBy.includes(a.id)).map((a) => a.id), optedOut, replacedBy },
   };
@@ -34,6 +35,8 @@ function globalView(row, agents = listAgents()) {
 
 export function toolServiceRoutes(route) {
   registryRoutes(route); // 052: browse the MCP Registry and add from it
+  // 2.58.1: credits of media services (the part all their results share): shown in the panel, never in messages
+  route('GET', '/api/credits', async () => Object.entries(serviceCredits()).map(([service, credit]) => ({ service, credit })));
   route('GET', '/api/tool-services', async () => { const agents = listAgents(); return listGlobalRows().map((r) => globalView(r, agents)); });
   // 094: per service, the kind of media a read-only tool of it returns ('' = none), so it can be shared on its own;
   // apart from the list, so a slow service never holds up Settings
