@@ -7,7 +7,8 @@
 //   3. Changes it makes    — ask | clear | act for that service (default: the agent's "How sure before changing
 //                            things"); the risk of each call comes from the tool's annotations (autonomy.js riskOf),
 //                            with a per-tool override.
-//   4. Share on its own    — off | sometimes | often + style words, for read-only tools that return media (sharing.js).
+//   4. Share on its own    — off | sometimes | often + style words, for read-only tools that return media (sharing.js);
+//                            not set and "proactive": sometimes.
 //   5. Limits              — uses per reply and per day, and groups and direct messages | direct messages only;
 //                            enforced in code (limitStop), with an Activity line when a limit stops a call.
 import { kvGet, kvSet } from './db.js';
@@ -32,6 +33,9 @@ export function behaviourOf(agent, key, srv) {
   }
   out.tools = { ...(dflt.tools || {}), ...(own.tools || {}) };
   out.changes = out.changes || autonomyOf(agent);
+  // "Proactively" on a service that returns media means sharing it now and then, unless sharing was set either way
+  const set = (v) => v !== undefined && v !== '' && v !== 'inherit';
+  if (!set(own.share) && !set(dflt.share) && out.when === 'proactive') out.share = 'sometimes';
   return /** @type {typeof SERVICE_DEFAULTS & { changes: string }} */ (out);
 }
 

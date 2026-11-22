@@ -71,6 +71,10 @@ Duniya reads them:
    *Often*; add style words (e.g. *Telugu movie reactions, Brahmanandam*). Or set it per agent on its **Tools** page.
 2. That's it: no prompt text needed.
 
+> [!TIP]
+> **When to use it → Proactively** on such a service already shares *Sometimes* until you pick **Share … on its own**
+> yourself (an explicit *Off* keeps it off). The card's summary shows it: *Proactively · shares GIFs sometimes*.
+
 | | Sometimes | Often |
 |---|---|---|
 | Celebrations ("congrats!", 🎉), thanks said to the agent, "send a gif" | ✓ | ✓ |
