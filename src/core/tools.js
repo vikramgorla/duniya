@@ -119,7 +119,7 @@ export const organizerConnection = (agent, serverKey) => connectionFor(agent, se
 
 /**
  * Build the tool list for an agent + role, in a chat (075: chat tools only as far as the chat's channel can do them;
- * no chat = the test console). `owner` (079): the sender is the owner (People tools with owner-level access). Returns { defs: [Anthropic tool defs], run: (name, input, ctx) => {isError, text}, meta: Map, services: [{ key, behaviour }], sharing: [services that share media on their own: only in chats that take media] }
+ * no chat = the test console). `owner` (079): the sender is the owner (People tools with owner-level access). Returns { defs: [Anthropic tool defs], run: (name, input, ctx) => {isError, text}, meta: Map, services: [{ key, behaviour }], sharing: [services that share media on their own: only in chats that take media], natives: [tools the provider runs itself, e.g. 'web_search'] }
  */
 export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
   const allow = agent.tools[role] || [];
@@ -170,10 +170,12 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
   }
 
   // Built-in tools of one kind for this role: allowed by `allowRules` (null = no allow list) and never on the deny list.
+  const natives = new Set(); // 2.58: tools the AI provider runs itself (built-in web search), allowed for this role
   const addLocal = (kind, tools, allowRules) => {
     for (const t of tools) {
       const fq = `${kind}:${t.name}`;
       if (!t.roles.includes(role) || (allowRules && !matchesAny(fq, allowRules)) || matchesAny(fq, deny)) continue;
+      if (t.native) { natives.add(t.native); continue; } // never a function the model calls here: the provider runs it
       const name = exposedName(kind, t.name);
       defs.push({ name, description: t.description, input_schema: t.input_schema });
       const b = behaviourOf(agent, kind, null); // Duniya's own tools: the same risk path (their annotations, the agent's changes)
@@ -214,5 +216,5 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
   }
 
   const takesMedia = chatChannel() && (!capsOf(chat) || capsOf(chat).media); // 094: sharing only where media can go
-  return { defs, run, meta, services, sharing: takesMedia ? sharing : [] };
+  return { defs, run, meta, services, sharing: takesMedia ? sharing : [], natives: [...natives] };
 }

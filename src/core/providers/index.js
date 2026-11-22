@@ -424,6 +424,17 @@ export function planCandidates({ model = 'auto', purpose = 'agent', fallback = f
   return out;
 }
 
+const SERVER_BLOCKS = new Set(['server_tool_use', 'web_search_tool_result']);
+/** The conversation without blocks of tools a provider ran itself (another provider cannot read them). */
+const withoutServerBlocks = (messages) => messages.map((m) => (Array.isArray(m.content) && m.content.some((b) => SERVER_BLOCKS.has(b.type))
+  ? { ...m, content: m.content.filter((b) => !SERVER_BLOCKS.has(b.type)) } : m));
+/** 2.58: built-in web searches of one call, as their own Usage row (count in `input`, the adapter's price per search). */
+function recordSearches(p, modelId, usage, n) {
+  try {
+    recordUsage({ ...usage, feature: 'web-search', provider: p.type === 'compatible' ? p.id : p.type, account: p.id, model: modelId, input: n, output: 0,
+      cost: n * (p.adapter.searchPrice || 0), priced: p.adapter.searchPrice ? 'provider' : 'plan' });
+  } catch { /* never fail a reply because of bookkeeping */ }
+}
 const describeFailures = (failures) => failures.map((f) => `${f.name} (${f.paused ? 'paused: ' : ''}${REASON_TEXT[f.reason] || f.reason})`).join(', ');
 
 /**
@@ -442,7 +453,7 @@ const describeFailures = (failures) => failures.map((f) => `${f.name} (${f.pause
  * streaming, then the chain continues without streaming. Usage is recorded once, from the answer that is returned.
  * signal (066): an AbortSignal (Stop in the Ask box); it ends a streaming call, nothing falls back, the account is not blamed.
  */
-export async function chat({ model = 'auto', purpose = 'agent', system, messages, tools = [], maxTokens = 1024, usage = {}, fallback, turn = null, direct = false, accept = null, lastResort = [], onText = null, onRestart = null, signal = undefined, onWait = undefined }) {
+export async function chat({ model = 'auto', purpose = 'agent', system, messages, tools = [], natives = [], maxTokens = 1024, usage = {}, fallback, turn = null, direct = false, accept = null, lastResort = [], onText = null, onRestart = null, signal = undefined, onWait = undefined }) {
   let streamOn = typeof onText === 'function';
   if (!direct && (!parseRef(model) || parseRef(model).model === 'auto')) await warmModels();
   const fb = direct ? { enabled: false, chain: [] } : (fallback || fallbackSettings());
@@ -495,7 +506,10 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
       tried.add(ref);
       lastUsed.set(p.id, Date.now()); useOrder.set(p.id, ++useSeq);
       let res;
-      const args = { model: modelId, system, messages, tools, maxTokens, ...(onWait ? { onWait } : {}) }; // 074: onWait — an agent app waits for its turn
+      // 2.58: tools the provider runs itself (built-in web search) only where the adapter has them; blocks from them in
+      // the conversation so far are dropped for an adapter that cannot read them (a fallback mid-turn)
+      const own = natives.filter((n) => p.adapter.natives?.includes(n));
+      const args = { model: modelId, system, messages: p.adapter.natives?.length ? messages : withoutServerBlocks(messages), tools, maxTokens, ...(own.length ? { natives: own } : {}), ...(onWait ? { onWait } : {}) }; // 074: onWait — an agent app waits for its turn
       let started = false; // 047: this account already sent text to onText
       const streamed = streamOn && p.adapter.streams ? { ...args, signal, onText: (d) => { started = true; try { onText(d); } catch { /* a closed stream must not break the call */ } } } : null;
       try {
@@ -528,6 +542,7 @@ export async function chat({ model = 'auto', purpose = 'agent', system, messages
         cost = recordUsage({ ...usage, provider: p.type === 'compatible' ? p.id : p.type, account: p.id, model: modelId,
           input: res.usage?.input_tokens || 0, output: res.usage?.output_tokens || 0, published, fallback: fbText });
       } catch { /* never fail a reply because of bookkeeping */ }
+      if (res.usage?.web_searches) recordSearches(p, modelId, usage, res.usage.web_searches);
       const firstFail = failed.find((f) => f.account !== p.id);
       if (firstFail) breaker.noteSwitch({ from: firstFail.name, to: p.name, reason: firstFail.reason, agent: usage.agent, chat: usage.chat });
       if (turn) turn.ref = ref;

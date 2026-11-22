@@ -1,6 +1,6 @@
 # Modules
 
-**Switch on built-in features that hang off People: Events, Orders and payments, Lists and sending, and Surveys. Off keeps their data.**
+**Switch on built-in features: Events, Orders and payments, Lists and sending, Surveys and Web search (on by default). Off keeps their data.**
 
 **Do it:** panel → **Settings → Modules** → switch **Events** (and **Orders and payments**) on.
 
@@ -22,6 +22,7 @@
 | **Orders and payments** | what people owe and paid: orders (from a registration by itself, or by hand), part payments, refunds, your own ways to pay, a daily list of orders due | [Orders and payments](orders.md) |
 | **Lists and sending** | a message to a list, a tag, a household, an event's families or people who owe: consent checked per message, each person's own wording, the WhatsApp pace, stop signals, payment reminders | [Lists and sending](sending.md) · [Campaigns](campaigns.md) |
 | **Surveys** | short forms (choices, numbers, short text) people answer in chat or by their own link; results, CSV | [Surveys](surveys.md) |
+| **Web search** (on by default) | agents look up current facts with their AI provider's built-in search (Claude, ChatGPT) | [Web search](web-search.md) |
 
 ## Agent tools
 

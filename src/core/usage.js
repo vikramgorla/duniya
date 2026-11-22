@@ -42,6 +42,7 @@ export const FEATURES = Object.freeze({
   transcribe: ['Voice notes in', 'Voice notes turned into text'],
   speech: ['Voice replies', 'Answers spoken as voice notes'],
   image: ['Pictures made', 'Pictures agents created'],
+  'web-search': ['Web searches', 'Searches agents ran with their AI provider\'s built-in web search (the provider\'s price per search)'],
   sending: ['Sending: per-person wording', 'Each person’s own wording of a message to a list or a campaign step'],
   surveys: ['Surveys: invites', 'Each person’s own wording of a survey invite'],
   'ai-helper': ['AI helper', 'Drafting and changing agents with AI'],

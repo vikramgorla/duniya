@@ -40,9 +40,9 @@ const rao = await api('POST', '/api/households', { name: 'Rao family' });
 await api('PUT', `/api/households/${rao.id}/members/${gita.id}`, { role: 'adult' });
 let sankranti;
 
-test('modules are off by default: no pages, no agent tools; viewers cannot switch them; on keeps going after off', async () => {
+test('modules are off by default (Web search on): no pages, no agent tools; viewers cannot switch them; on keeps going after off', async () => {
   const m = await api('GET', '/api/modules');
-  assert.deepEqual(m.modules.map((r) => [r.id, r.on]), [['events', false], ['orders', false], ['sending', false], ['surveys', false]]);
+  assert.deepEqual(m.modules.map((r) => [r.id, r.on]), [['events', false], ['orders', false], ['sending', false], ['web', true], ['surveys', false]]);
   assert.equal((await t.api(owner, 'GET', '/api/module/events')).status, 409);
   assert.match((await t.api(owner, 'GET', '/api/orders')).body.error, /switched off/);
   t.script.push([{ type: 'text', text: 'hi' }]);
@@ -52,8 +52,8 @@ test('modules are off by default: no pages, no agent tools; viewers cannot switc
   for (const id of ['events', 'orders']) await api('PUT', `/api/modules/${id}`, { on: true });
   assert.deepEqual((await api('GET', '/api/modules')).methods, ['Cash', 'Bank transfer', 'Instant online payment']);
   const tools = await api('GET', '/api/modules/tools');
-  assert.deepEqual(tools.map((g) => g.id), ['events', 'orders']);
-  assert.equal(tools[0].tools.find((y) => y.name === 'register_someone').organizerOnly, true);
+  assert.deepEqual(tools.map((g) => g.id).sort(), ['events', 'orders', 'web']);
+  assert.equal(tools.find((g) => g.id === 'events').tools.find((y) => y.name === 'register_someone').organizerOnly, true);
 });
 
 test('an event is validated; household registration counts adults and kids from the household; the price list makes the order', async () => {

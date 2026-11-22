@@ -32,6 +32,15 @@ import { BLOCKED, WAIT_NOTE, appliedNote, autonomyNote, isAgreement, mayChangeWi
 
 const MAX_TOOL_ROUNDS = 8;
 /** 092: the feature an agent turn's model calls count under on Usage: a test, a scheduled post, a judged group message, or an answer (light / strong). */
+// 2.58: chat apps show links as they are: markdown links become "title (url)"; an answer from the web without a link
+// gets up to two of the pages its search cited
+const MAX_SOURCES = 2;
+const plainLinks = (text) => text.replace(/\[([^\]\n]{1,200})\]\((https?:\/\/[^)\s]+)\)/g, (m, title, url) => (title === url ? url : `${title} (${url})`));
+function withSources(text, sources) {
+  if (!text || !sources.length || /https?:\/\//.test(text)) return text;
+  const urls = [...new Set(sources.map((s) => s.url))].slice(0, MAX_SOURCES);
+  return `${text}\n\n${urls.join('\n')}`;
+}
 const turnFeature = (ctx, smart) => (ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : ctx.unaddressed ? 'judge' : smart ? `reply-${smart.tier}` : 'reply');
 
 // Test console (#37): WhatsApp actions are never carried out from the panel. Read-only ones look at the chat being
@@ -121,7 +130,7 @@ export async function runAgent(ctx) {
     }
     if (budget.action === 'fallback') model = budget.model;
   }
-  const { defs, run, meta, services, sharing } = await toolsFor(agent, role, { chat, owner: !!ctx.ownerTurn });
+  const { defs, run, meta, services, sharing, natives } = await toolsFor(agent, role, { chat, owner: !!ctx.ownerTurn });
   // 094: sharing on its own — the message's moment in code; a line for this turn when one fits. Uses per service (limits).
   const splan = sharePlan(ctx, sharing);
   ctx.sharePlan = splan;
@@ -191,13 +200,14 @@ export async function runAgent(ctx) {
   // #67: while the turn carries photos / files, fallback only moves to models that can see them (then the vision
   // fallback model). If none can answer, the turn is asked again without them and the model says so kindly.
   let vision = plan.attachments.length ? visionCallOptions() : null;
+  const webSources = []; // 2.58: pages the provider's built-in web search cited
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     let res;
     try {
       res = await modelChat({
         model, purpose: 'agent', maxTokens: agent.maxTokens, usage: usageTag(turnFeature(ctx, smart), { agent: agent.id, chat }),
-        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName, chat, requester: ctx.requester, held: !!agent.confirm || defs.some((d) => /^(people|events|orders|sending)__/.test(d.name)), services, sharing }), tools: defs, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
+        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName, chat, requester: ctx.requester, held: !!agent.confirm || defs.some((d) => /^(people|events|orders|sending)__/.test(d.name)), services, sharing }), tools: defs, natives, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
       });
     } catch (e) {
       if (smart?.tier === 'light' && e.code !== 'aborted') { // 088: the light model failed: the strong one answers
@@ -229,6 +239,9 @@ export async function runAgent(ctx) {
     usage.output += res.usage?.output_tokens || 0;
     if (res.cost == null) priced = false; else cost += res.cost;
     reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+    webSources.push(...(res.sources || []));
+    // 2.58: a long built-in web search paused the turn: hand the answer so far back and let the provider go on
+    if (res.stop_reason === 'pause_turn') { messages.push({ role: 'assistant', content: res.content }); continue; }
     const calls = res.content.filter((b) => b.type === 'tool_use');
     if (res.stop_reason !== 'tool_use' || !calls.length) break;
 
@@ -287,7 +300,7 @@ export async function runAgent(ctx) {
   }
   // 094: [share: mood] tags never reach the chat; what is shared (asked for, or a moment's) goes out after the text
   const tag = takeShareTag(reply);
-  reply = tag.text;
+  reply = withSources(plainLinks(tag.text), webSources);
   ctx.share = ctx.source === 'panel' ? null : shareAfterReply(ctx, splan, { reply, hint: tag.hint });
   for (const code of codes) {
     reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm?.ttlMinutes || 9} min).`;

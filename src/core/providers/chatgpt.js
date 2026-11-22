@@ -230,10 +230,12 @@ function fromOutputItems(items = []) {
   return content;
 }
 
-async function chatFor(secret, { model, system, messages, tools, onText = null, signal = undefined }) {
+async function chatFor(secret, { model, system, messages, tools, natives = [], onText = null, signal = undefined }) {
+  const fns = (tools || []).map((t) => ({ type: 'function', name: t.name, description: t.description || '', parameters: t.input_schema || { type: 'object', properties: {} }, strict: false }));
+  const all = natives.includes('web_search') ? [...fns, { type: 'web_search' }] : fns; // 2.58: OpenAI's built-in web search
   const body = {
     model, instructions: system, input: toResponsesInput(messages), store: false, stream: true,
-    ...(tools?.length ? { tools: tools.map((t) => ({ type: 'function', name: t.name, description: t.description || '', parameters: t.input_schema || { type: 'object', properties: {} }, strict: false })) } : {}),
+    ...(all.length ? { tools: all } : {}),
   };
   const res = await fetch(`${API_BASE()}/responses`, {
     method: 'POST', headers: { authorization: `Bearer ${await accessToken(secret)}`, 'content-type': 'application/json', accept: 'text/event-stream' },
@@ -243,6 +245,11 @@ async function chatFor(secret, { model, system, messages, tools, onText = null, 
     const json = await res.json().catch(() => ({}));
     throw httpError(res, json, `ChatGPT request failed (${res.status})`);
   }
+  return answerOf(await readStream(res, onText));
+}
+
+/** The Responses event stream: { items, completed } (text deltas go to onText as they arrive). */
+async function readStream(res, onText) {
   const items = [];
   let completed = null;
   let buf = '';
@@ -263,19 +270,28 @@ async function chatFor(secret, { model, system, messages, tools, onText = null, 
     let i;
     while ((i = buf.indexOf('\n\n')) >= 0) {
       const frame = buf.slice(0, i); buf = buf.slice(i + 2);
-      const data = frame.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trim()).join('\n');
-      handle(data);
+      handle(frame.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trim()).join('\n'));
     }
   }
   if (!completed) throw new Error('ChatGPT stream ended before completion');
-  const content = fromOutputItems(completed.output?.length ? completed.output : items);
+  return { items, completed };
+}
+
+/** Content blocks, stop reason, usage (with built-in web searches) and the pages the answer cited. */
+function answerOf({ items, completed }) {
+  const output = completed.output?.length ? completed.output : items;
+  const content = fromOutputItems(output);
   const stop = content.some((b) => b.type === 'tool_use') ? 'tool_use' : completed.incomplete ? 'max_tokens' : 'end_turn';
-  return { content, stop_reason: stop, usage: { input_tokens: completed.usage?.input_tokens || 0, output_tokens: completed.usage?.output_tokens || 0 } };
+  const sources = output.flatMap((it) => (it.type === 'message' ? (it.content || []).flatMap((c) => c.annotations || []) : []))
+    .filter((a) => a.type === 'url_citation' && a.url).map((a) => ({ url: a.url, title: a.title || '' }));
+  const searches = output.filter((it) => it.type === 'web_search_call').length;
+  return { content, stop_reason: stop, sources, usage: { input_tokens: completed.usage?.input_tokens || 0, output_tokens: completed.usage?.output_tokens || 0, ...(searches ? { web_searches: searches } : {}) } };
 }
 
 /** Adapter for one ChatGPT account (042). */
 export const chatgptAdapter = (secret = CRED) => ({
   streams: true,
+  natives: ['web_search'], // part of the ChatGPT plan: no price per search here
   configured: () => configured(secret),
   listModels: () => listModelsFor(secret),
   chat: (args) => chatFor(secret, args),
