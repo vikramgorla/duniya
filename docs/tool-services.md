@@ -85,9 +85,10 @@ good news counts — Diwali, Eid, an exam passed, a joke that landed — with no
   service with the mood and your style words and picks a result it did not post in that chat lately.
 - **One message.** A short answer (up to 500 characters) goes as the GIF's caption and nothing else: no title, credit
   or link. A longer answer, or a sticker, goes first and the GIF right after it.
-- **Credits live in the panel.** The credit a service asks for (the words all its results share, without their
-  titles and links, e.g. *Powered by KLIPY*) shows on its card in **Settings → Tool services** and in **Settings → Help → Credits**; Activity keeps each
-  GIF's own credit and link. Links to GIFs, videos and pictures, and those credits, are taken out of the agent's text
+- **Credits live in the panel.** Each result says what credit it needs in `creditText` (schema.org). One every result
+  shares, e.g. *Powered by KLIPY*, shows on the service's card in **Settings → Tool services** and in **Settings →
+  Help → Credits**; Activity keeps each GIF's own credit and link. A result that needs its own credit (an author and
+  license) is not shared on its own. Links to GIFs, videos and pictures, and those credits, are taken out of the agent's text
   and of captions it writes itself.
 - **Code keeps the limits.** Serious topics never get one, whatever the AI picks; at most one per answer and none
   shortly after another; the limits apply; only mood and style words are searched.
@@ -112,13 +113,16 @@ Declare your tools and Duniya does the right thing without settings:
 ```json
 { "name": "search_gifs", "annotations": { "readOnlyHint": true },
   "outputSchema": { "type": "object", "properties": { "results": { "type": "array", "items": { "type": "object",
-    "properties": { "id": { "type": "string" }, "mp4Url": { "type": "string" }, "attribution": { "type": "string" } } } } } } }
+    "properties": { "id": { "type": "string" }, "mp4Url": { "type": "string" }, "creditText": { "type": "string" } } } } } } }
 ```
 
 - `readOnlyHint: true` on tools that only read; `destructiveHint: true` on deletes, payments and anything that touches
   someone else's data.
 - Return media as `results` with an `id`, a media URL (`mp4Url`, `gifUrl`, `webpUrl`, `imageUrl` or `url`) and, when
-  you need credit, an `attribution` line.
+  a credit is needed, `creditText` — the [schema.org](https://schema.org/creditText) property (IPTC *Credit Line*):
+  the credit without the item's title or link. Give every result the same text for a platform credit (*Powered by
+  …*): Duniya shows it in its panel, never in messages. A work's own credit (author, license) differs per result:
+  Duniya then does not post that result on its own, since the credit would have to go with it.
 
 Admin MCP and the owner assistant: `get_tool_behaviour` (per agent or the defaults, with each tool's risk) and
 `set_tool_behaviour` (per agent with `agent_id`, or the service's default).

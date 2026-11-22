@@ -1,51 +1,33 @@
 // @ts-check
-// Credits of media services (2.58.1). A service whose results are media (GIFs, stickers, pictures) usually returns a
-// credit with each result ("<title> · Powered by …"). Messages carry none of it: the credit lives in the panel (the
-// service's card and Settings → Help → Credits), and links to media never reach the chat. Nothing here knows a service:
-// the credit is the longest run of words all results of one search share (the title and the link differ per result),
-// from the standard fields attribution / credit / credits.
-import { clip } from './config.js';
+// Credits of media services (2.58.3). A media result (a GIF, a sticker, a picture) says what credit it needs in the
+// schema.org property `creditText` (the IPTC "Credit Line"), without its title or link. Messages carry none of it: a
+// credit every result of a service shares (a platform credit, "Powered by …") is shown in the panel (the service's card
+// and Settings → Help → Credits); a result that needs its own credit (a work's author and license) is never posted on
+// its own, since that credit would have to go with it. Nothing here knows a service.
 import { kvGet, kvSet } from './db.js';
 
 const KEY = 'media-credits'; // { service: credit }
 const CREDIT_MAX = 120;
-const MIN_RESULTS = 2; // one result cannot tell its title from the credit
-const ANY_LINK = /https?:\/\/\S+/g;
 const MEDIA_LINK = /https?:\/\/[^\s)"'<>]+\.(?:mp4|gif|webp|png|jpe?g|webm|mov)(?:\?[^\s)"'<>]*)?/gi;
 const TRAILING = /[\s·•|—–-]+$/; // separators left at the end of a line
 const SEPARATORS_ONLY = /^[\s·•|:—–\-()[\]_*]+$/; // a line nothing is left of
-const EDGE = /^[\s·•|:—–\-"“”'.,]+|[\s·•|:—–\-"“”'.,]+$/g; // separators left at the ends of a common part
 
-/** The credit text one result carries ('' when none). */
-export const creditOf = (r) => String(r?.attribution || r?.credit || r?.credits || '').trim();
+/** The schema.org creditText of a result ('' when it needs none). */
+export const creditOf = (r) => String(r?.creditText || '').trim().slice(0, CREDIT_MAX);
 
 const read = () => { try { return JSON.parse(kvGet(KEY) || '{}'); } catch { return {}; } };
-/** { service: credit } of the media services that gave one. */
+/** { service: credit } of the media services whose results share a credit. */
 export const serviceCredits = () => read();
 
-/** The longest run of words every credit has (links taken out first: they differ per result), separators trimmed. */
-function commonPart(credits) {
-  const words = credits.map((c) => c.replace(ANY_LINK, ' ').split(/\s+/).filter(Boolean));
-  const has = (ws, run) => ws.some((_, i) => run.every((w, k) => ws[i + k] === w));
-  let best = [];
-  const [first, ...rest] = words;
-  for (let i = 0; i < first.length; i++) {
-    for (let j = first.length; j > i + best.length; j--) {
-      const run = first.slice(i, j);
-      if (rest.every((ws) => has(ws, run))) { best = run; break; }
-    }
-  }
-  return best.join(' ').replace(EDGE, '');
-}
-
-/** Learn a service's credit from the results of one search (kept when it changes). */
-export function learnCredit(service, results) {
-  const credits = results.map(creditOf).filter(Boolean);
-  if (credits.length < MIN_RESULTS) return;
-  const credit = clip(commonPart(credits), CREDIT_MAX);
-  const all = read();
-  if (!credit || all[service] === credit) return;
-  kvSet(KEY, JSON.stringify({ ...all, [service]: credit }));
+/**
+ * The results of one search that may be posted without a credit in the message: those that need none, and those whose
+ * credit all results share (kept for the panel). A result with its own credit stays out.
+ */
+export function postableResults(service, results) {
+  const credits = [...new Set(results.map(creditOf).filter(Boolean))];
+  const shared = credits.length === 1 ? credits[0] : '';
+  if (shared && read()[service] !== shared) kvSet(KEY, JSON.stringify({ ...read(), [service]: shared }));
+  return results.filter((r) => !creditOf(r) || creditOf(r) === shared);
 }
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
