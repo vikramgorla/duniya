@@ -24,7 +24,7 @@ import { TENANT, getSetting, updateSettings } from '../core/store.js';
 import { activity, bus } from '../core/events.js';
 
 const MB = 1048576;
-/** @type {Array<{ id: string, label: string, line: string, refs: { person: string[][], household: string[][] }, children: string[][], load: () => Promise<any> }>} */
+/** @type {Array<{ id: string, label: string, line: string, defaultOn?: boolean, refs: { person: string[][], household: string[][] }, children: string[][], load: () => Promise<any> }>} */
 export const MODULES = [
   { id: 'events', label: 'Events', line: 'Events with registrations, a waiting list and duties; agents register people',
     refs: { person: [['ev_registrations', 'person'], ['ev_duty_people', 'person'], ['ev_attendance', 'person']], household: [['ev_registrations', 'household']] },
@@ -34,6 +34,9 @@ export const MODULES = [
     children: [['ord_lines', 'ord', 'ord_orders'], ['ord_payments', 'ord', 'ord_orders']], load: () => import('./orders/index.js') },
   { id: 'sending', label: 'Lists and sending', line: 'Send a message to a list, an event or people who owe, one person at a time, with consent and a human pace',
     refs: { person: [['snd_recipients', 'person']], household: [] }, children: [], load: () => import('./sending/index.js') },
+  // 2.58: on by default (switch off in Settings → Modules); only for providers with built-in web search
+  { id: 'web', label: 'Web search', line: 'Agents look up current facts on the web with their AI provider\'s built-in search (Claude, ChatGPT)', defaultOn: true,
+    refs: { person: [], household: [] }, children: [], load: () => import('./web/index.js') },
   { id: 'surveys', label: 'Surveys', line: 'Short forms people answer in chat or by a link; results per person and in total',
     refs: { person: [['srv_people', 'person'], ['srv_answers', 'person']], household: [] }, children: [], load: () => import('./surveys/index.js') },
 ];
@@ -41,7 +44,9 @@ const info = (id) => MODULES.find((m) => m.id === id) || null;
 /** @type {Map<string, { manifest: any, costMb: number }>} */
 const live = new Map();
 
-const onList = () => { const l = getSetting('modulesOn', []); return Array.isArray(l) ? l.filter((id) => info(id)) : []; };
+const list = (key) => { const l = getSetting(key, []); return Array.isArray(l) ? l.filter((id) => info(id)) : []; };
+/** Modules that are on: those switched on, and those on by default unless switched off (modulesOff). */
+const onList = () => MODULES.filter((m) => (m.defaultOn ? !list('modulesOff').includes(m.id) : list('modulesOn').includes(m.id))).map((m) => m.id);
 /** The manifests of the modules that are on. */
 export const liveModules = () => [...live.values()].map((l) => l.manifest);
 
@@ -69,7 +74,9 @@ export const moduleRows = () => MODULES.map((m) => ({ id: m.id, label: m.label, 
 export async function setModuleOn(id, on, by = '') {
   const m = info(id);
   if (!m) throw fail('Unknown module', 404);
-  updateSettings({ modulesOn: on ? [...new Set([...onList(), id])] : onList().filter((x) => x !== id) });
+  const key = m.defaultOn ? 'modulesOff' : 'modulesOn';
+  const add = m.defaultOn ? !on : on;
+  updateSettings({ [key]: add ? [...new Set([...list(key), id])] : list(key).filter((x) => x !== id) });
   if (on) await load(id); else live.delete(id);
   activity('config', { summary: `${m.label} switched ${on ? 'on' : 'off'}${on ? '' : ' (data kept)'}${by ? ` (${by})` : ''}` });
   bus.emit('status');

@@ -232,11 +232,13 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
       const f = t.claudeFail.shift();
       if (f) return sendFailure(req, res, f, 'anthropic');
     }
-    const content = isSummary ? [{ type: 'text', text: t.summaryText }] : (t.script.shift() || [{ type: 'text', text: '(script empty)' }]);
+    // a script step is the content blocks, or { content, stop_reason, usage } for a whole answer (2.58: web search)
+    const step = isSummary ? [{ type: 'text', text: t.summaryText }] : (t.script.shift() || [{ type: 'text', text: '(script empty)' }]);
+    const content = Array.isArray(step) ? step : step.content;
     if (body.stream) { t.claudeStreams++; return sendAnthropicStream(req, res, content, { fail: t.claudeStreamFail.shift() }); }
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ id: 'm', type: 'message', role: 'assistant', model: 'f', usage: { input_tokens: 3, output_tokens: 2 },
-      stop_reason: content.some((b) => b.type === 'tool_use') ? 'tool_use' : 'end_turn', content }));
+    res.end(JSON.stringify({ id: 'm', type: 'message', role: 'assistant', model: 'f', usage: { input_tokens: 3, output_tokens: 2, ...(step.usage || {}) },
+      stop_reason: step.stop_reason || (content.some((b) => b.type === 'tool_use') ? 'tool_use' : 'end_turn'), content }));
   }).listen(0);
 
   let seq = 0;
@@ -320,6 +322,7 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
   t.db = await import('../src/core/db.js');
   t.events = await import('../src/core/events.js');
   await t.agents.loadAgents();
+  await (await import('../src/modules/index.js')).startModules(); // as at startup: modules on by default (Web search) are live
   // 044: the privacy notice is on by default; tests written before it switch it off (pass { privacyNotice: true }).
   if (!privacyNotice) t.store.updateSettings({ privacyNotice: { enabled: false } });
   // 080: read receipts are on by default; tests written before them switch them off (pass { readReceipts: true }).

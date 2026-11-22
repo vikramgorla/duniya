@@ -30,6 +30,7 @@ feature with a short line, calls, tokens, a bar and the cost; the top six, then 
 | Promises | noticing promises, and when they are done |
 | Catch-ups · Summaries & memory | *What did I miss?*, and running chat summaries |
 | Voice notes in · Voice replies · Pictures made | [Photos & voice](models.md#photos--voice) |
+| Web searches | searches agents ran with their AI provider's built-in web search ([Web search](web-search.md)) |
 | Sending: per-person wording · Surveys: invites | each person's own wording of a message to a list, a campaign step or a survey invite |
 | AI helper · Owner assistant · Scheduled posts · Tests | the AI helper, your assistant (WhatsApp and the Ask box), schedules, the test console |
 | Built-in: FAQ, quick replies, welcome | answers without AI (free) |

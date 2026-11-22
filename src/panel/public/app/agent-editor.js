@@ -443,7 +443,7 @@ function buildTools(x, { save }) {
     const drawWa = (w) => { if (w.failed) return waBox.replaceChildren(partFailed(w.failed, '', () => api('GET', '/api/whatsapp/tools').catch((e) => ({ failed: e })).then(drawWa)));
       waTools = bi ? w.filter((t) => t.owner) : w; drawB(waBox, 'whatsapp', waTools); };
     const drawMods = (ms) => (ms.failed ? modBox.replaceChildren(partFailed(ms.failed, 'Modules', () => api('GET', '/api/modules/tools').catch((e) => ({ failed: e })).then(drawMods)))
-      : modBox.replaceChildren(...ms.map((m) => { const box = h('div', {}); drawB(box, m.id, m.tools); return block(m.label, h('p', { class: 'small muted' }, 'A module (Settings → Modules). Registrations, duties, payments and sends for someone else wait for an organizer\'s confirm code.'), box); })));
+      : modBox.replaceChildren(...ms.map((m) => { const box = h('div', {}); drawB(box, m.id, m.tools); return block(m.label, h('p', { class: 'small muted' }, `${m.line} (Settings → Modules).${m.changes ? ' Changes for someone else wait for an organizer\'s confirm code.' : ''}`), box); })));
     drawWa(wa); drawMods(mods);
     addRow.replaceChildren(browseButton({ target: x.id, targetName: c.name || x.id, onAdded: () => location.reload() }, registry),
       can('admin') ? h('button', { class: 'btn small', type: 'button', onclick: () => { servers.push(serverState('', {})); drawServers(); } }, '+ Add by address') : null);

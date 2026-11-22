@@ -1,6 +1,15 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.58.0": {
+      "breaking": false,
+      "title": "Agents can search the web",
+      "changes": [
+        { "type": "new", "text": "Agents look up current facts on the web (opening hours, prices, train times, news) with the search built into Claude and ChatGPT. On by default; switch it off in Settings, Modules, or per role on an agent's Tools page." },
+        { "type": "improved", "text": "Links in answers show as plain addresses on WhatsApp, and an answer from the web carries the page it came from." },
+        { "type": "new", "text": "Usage shows web searches and their cost under Cost per feature." }
+      ]
+    },
     "2.57.2": {
       "breaking": false,
       "title": "One chat per person",
