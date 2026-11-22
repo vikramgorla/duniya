@@ -19,7 +19,13 @@ after(() => t.close());
 const say = (text, phone = ANU, name = 'Anu', chat = G) => t.route(t.msg({ chat, text, phone, senderJid: jid(phone), senderName: name, isGroup: chat.endsWith('@g.us') }));
 const open = async (q = 'agent=raju') => (await t.api(owner, 'GET', `/api/commitments?${q}`)).body;
 /** A moment at hh:mm in the owner's time zone, some days ahead (minute by minute). */
-const at = (hhmm, days = 1) => { const tz = config.env.timezone; let ts = Date.now() + days * 86400000; ts -= ts % 60000; for (let i = 0; i < 1500 && config.localParts(tz, ts).hhmm !== hhmm; i++) ts += 60000; return ts; };
+/** `hhmm` local time on the day `days` from today (from that day's midnight, so the result never depends on the time the test runs). */
+const at = (hhmm, days = 1) => {
+  const tz = config.env.timezone; const day = config.localParts(tz, Date.now() + days * 86400000).date;
+  let ts = Date.now() + (days - 1) * 86400000; ts -= ts % 60000;
+  for (let i = 0; i < 4000 && !(config.localParts(tz, ts).date === day && config.localParts(tz, ts).hhmm === hhmm); i++) ts += 60000;
+  return ts;
+};
 const today = (ts = Date.now()) => config.localParts(config.env.timezone, ts).date;
 
 test('a promise in a chat is noticed (one small call), shown on the person and the agent; off chats and other talk are not', async () => {

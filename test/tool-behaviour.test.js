@@ -41,7 +41,7 @@ const clips = fakeService([
 const drawer = fakeService([{ name: 'draw', description: 'Draws a picture (changes an album)', inputSchema: QUERY, outputSchema: OUT }]);
 const url = (srv) => `http://127.0.0.1:${srv.address().port}/mcp`;
 
-const CHATS = Array.from({ length: 19 }, (_, i) => `b${i + 1}@g.us`);
+const CHATS = Array.from({ length: 21 }, (_, i) => `b${i + 1}@g.us`);
 before(async () => {
   t = await setup({ env: { RATE_LIMIT_PER_MIN: '1000' } }); owner = await t.login();
   for (const c of [...CHATS, '41790000007@s.whatsapp.net']) t.chatPrefs.setChatPrefs(c, { enabled: true });
@@ -61,7 +61,6 @@ const media = (chat) => inChat(chat).filter((o) => o.media);
 const withText = (m) => { const p = String(m.caption || '').split('\n\n'); return p.length > 1 && p.at(-1).startsWith('_') ? `${p.slice(0, -1).join('\n\n')} + ${m.kind}` : m.kind; };
 const shape = (chat) => inChat(chat).map((o) => (o.media ? withText(o.media) : o.text));
 const say = (chat, text, o = {}) => t.route(t.msg({ chat, text, phone: '41790000007', senderName: 'Priya', ...o }));
-const share = (input, id = 's1') => ({ type: 'tool_use', id, name: 'whatsapp__share_media', input });
 const use = (name, input = {}) => ({ type: 'tool_use', id: `u${Math.random().toString(36).slice(2)}`, name: `clips__${name}`, input });
 const text = (s) => [{ type: 'text', text: s }];
 const setRaju = (services) => t.api(owner, 'PUT', '/api/agents/raju', { services });
@@ -74,15 +73,14 @@ test('the panel sees each tool\'s risk from its annotations and which tool retur
   assert.deepEqual(c.own, { when: 'often', style: 'telugu movie' });
 });
 
-test('a celebration with "often": one message, the GIF with the answer and the tool\'s credit as its caption; one call; a participant without send_media too', async () => {
+test('the AI picks the mood with a tag it must give every turn: one message, the GIF with the answer and the credit; no tool needed', async () => {
   const chat = CHATS[0]; const n = t.claudeReqs.length;
-  t.script.push([share({ mood: 'party dance' })], text('Congrats Chary, mission accomplished! 🎉'));
+  t.script.push(text('Congrats Chary, mission accomplished! 🎉\n[share: party dance]'));
   await say(chat, 'raju Chary got promoted, congrats!! 🎉');
   const names = t.toolNames(n);
-  assert.ok(names.includes('whatsapp__share_media'), 'the one-call action');
-  assert.ok(!names.includes('whatsapp__send_media'), 'this participant has no send_media');
-  assert.match(String(t.claudeReqs[n].system), /Sharing: you can add one fitting GIF/);
-  assert.match(JSON.stringify(t.userTurn(n)), /lighthearted moment: after your text, end with share_media\(\\"celebration\\"\)/);
+  assert.ok(!names.some((x) => /share_media|send_media/.test(x)), 'no tool: the tag is the choice');
+  assert.match(String(t.claudeReqs[n].system), /end every answer with one tag on its own line — \[share: /);
+  assert.match(JSON.stringify(t.userTurn(n)), /End with \[share: mood\] or \[share: none\]/);
   assert.deepEqual(shape(chat), ['Congrats Chary, mission accomplished! 🎉 + gif'], 'one message: the GIF, the answer as its caption');
   const m = media(chat)[0].media;
   assert.match(m.url, /\/\d\.mp4$/, 'the MP4, not the preview');
@@ -92,13 +90,13 @@ test('a celebration with "often": one message, the GIF with the answer and the t
   assert.match(act.summary, /Shared a GIF \(party dance\) from clips, chosen by the model/);
 });
 
-test('sharing on its own works for participants who have no tools of the service (a Registry add): only share_media', async () => {
+test('sharing on its own works for participants who have no tools of the service (a Registry add)', async () => {
   await t.api(owner, 'PUT', '/api/tool-services/clips', { url: url(clips), auth: 'none', defaults: { organizer: ['*'], participant: [] } });
   const chat = CHATS[15]; const n = t.claudeReqs.length;
-  t.script.push([share({ mood: 'cheer' })], text('Yay!'));
+  t.script.push(text('Yay! [share: cheer]'));
   await say(chat, 'raju we won the match!! 🎉');
   const names = t.toolNames(n);
-  assert.ok(names.includes('whatsapp__share_media'), 'the owner chose sharing: every sender');
+  assert.match(String(t.claudeReqs[n].system), /\[share: /, 'the owner chose sharing: every sender');
   assert.ok(!names.some((x) => x.startsWith('clips__')), 'none of the service\'s own tools for this role');
   assert.deepEqual(shape(chat), ['Yay! + gif']);
   await t.api(owner, 'PUT', '/api/tool-services/clips', { url: url(clips), auth: 'none', defaults: { organizer: ['*'], participant: ['*'] } });
@@ -107,13 +105,13 @@ test('sharing on its own works for participants who have no tools of the service
 test('a long answer goes first, the GIF right after it with only the credit; stored as two messages', async () => {
   const chat = CHATS[12];
   const long = `Congratulations! ${'What a day for everyone here, '.repeat(20)}`.trim();
-  t.script.push([share({ mood: 'party' })], text(long));
+  t.script.push(text(`${long} [share: party]`));
   await say(chat, 'raju we launched!! 🎉');
   assert.deepEqual(shape(chat), [long, 'gif']);
   assert.doesNotMatch(media(chat)[0].media.caption, /Congratulations/);
 });
 
-test('a text-only reply on a clear moment (light tier): code shares one after the text', async () => {
+test('no tag from the model (a light one): the fallback rules share on a clear moment', async () => {
   const chat = CHATS[1];
   await t.api(owner, 'PUT', '/api/agents/raju', { model: 'smart' });
   t.script.push(text('Anytime, squad!'));
@@ -132,22 +130,20 @@ test('a [share: …] tag is never shown; serious topics get none, even when aske
   chat = CHATS[3]; const n = t.claudeReqs.length;
   t.script.push(text('Take care, I will tell the others. [share: hug]'));
   await say(chat, 'raju sorry, accident on the highway, I will be late');
-  assert.doesNotMatch(JSON.stringify(t.userTurn(n)), /lighthearted moment/);
-  assert.deepEqual(shape(chat), ['Take care, I will tell the others.']);
+  assert.doesNotMatch(JSON.stringify(t.userTurn(n)), /End with \[share/, 'no reminder on a serious topic');
+  assert.deepEqual(shape(chat), ['Take care, I will tell the others.'], 'code vetoes the model on a serious topic');
   chat = CHATS[4];
-  t.script.push([share({ mood: 'happy' })], text('Hope you feel better soon.'));
+  t.script.push(text('Hope you feel better soon. [share: happy]'));
   await say(chat, 'raju I am sick today, no ride for me');
   assert.equal(media(chat).length, 0);
-  assert.match(JSON.stringify(t.claudeReqs.at(-1).messages.at(-1).content), /Not for this topic/);
 });
 
 test('two quick celebratory messages → one GIF; repeats avoided; names never searched', async () => {
   let chat = CHATS[5];
-  t.script.push(text('Woohoo! 🎉'), [share({ mood: 'party' })], text('Party time!'));
+  t.script.push(text('Woohoo! 🎉 [share: celebration]'), text('Party time! [share: party]'));
   await say(chat, 'raju we did it, yay!');
   await say(chat, 'raju congrats everyone 🎉🎉');
-  assert.equal(media(chat).length, 1);
-  assert.match(JSON.stringify(t.claudeReqs.at(-1).messages.at(-1).content), /a few minutes ago/);
+  assert.equal(media(chat).length, 1, 'none shortly after another, whatever the model asks');
   chat = CHATS[6]; const real = Date.now; let shift = 0; count = 3;
   Date.now = () => real() + shift;
   try {
@@ -156,7 +152,7 @@ test('two quick celebratory messages → one GIF; repeats avoided; names never s
   assert.equal(new Set(media(chat).map((m) => m.media.url)).size, 3, 'three different GIFs');
   chat = CHATS[7];
   t.db.logMessage({ chat, sender: '41790000003', name: 'Chary Rao', text: 'hello' });
-  t.script.push([share({ mood: 'party for Priya and Chary at 41790000003 priya@x.ch' })], text('Party!'));
+  t.script.push(text('Party! [share: party for Priya and Chary at 41790000003 priya@x.ch]'));
   await say(chat, 'raju happy birthday Chary! 🎂');
   assert.equal(queries.at(-1), 'party telugu movie');
 });
@@ -174,7 +170,6 @@ test('Proactively shares only on strong moments; When useful never; not offered 
   chat = CHATS[9]; let n = t.claudeReqs.length;
   t.script.push(text('Congrats! [share: party]'));
   await say(chat, 'raju congrats on the promotion!! 🎉');
-  assert.ok(!t.toolNames(n).includes('whatsapp__share_media'));
   assert.doesNotMatch(String(t.claudeReqs[n].system), /Sharing:/);
   assert.deepEqual(shape(chat), ['Congrats!']);
   // a service whose media tool changes something (no readOnlyHint): never shared on its own
@@ -182,7 +177,7 @@ test('Proactively shares only on strong moments; When useful never; not offered 
   chat = CHATS[10]; n = t.claudeReqs.length;
   t.script.push(text('Congrats!'));
   await say(chat, 'raju congrats!! 🎉');
-  assert.ok(!t.toolNames(n).includes('whatsapp__share_media'));
+  assert.doesNotMatch(String(t.claudeReqs[n].system), /Sharing:/);
   assert.equal(media(chat).length, 0);
   assert.equal((await t.api(owner, 'GET', '/api/tool-services/media')).body.drawer, '');
   await t.api(owner, 'DELETE', '/api/tool-services/drawer');
@@ -279,12 +274,12 @@ test('one setting: Proactively shares sometimes, Often often, When useful never 
   let n = t.claudeReqs.length;
   t.script.push(text('Congrats!'));
   await say(chat, 'raju we got the keys!! 🎉');
-  assert.ok(t.toolNames(n).includes('whatsapp__share_media'), 'proactive → sometimes');
+  assert.match(String(t.claudeReqs[n].system), /Share when one clearly adds warmth/, 'proactive → sometimes');
   await setRaju({ clips: { when: 'useful' } });
   n = t.claudeReqs.length;
   t.script.push(text('Congrats!'));
   await say(chat, 'raju and the car too!! 🎉');
-  assert.ok(!t.toolNames(n).includes('whatsapp__share_media'), 'when useful: the AI decides, nothing shared on its own');
+  assert.doesNotMatch(String(t.claudeReqs[n].system), /Sharing:/, 'when useful: nothing shared on its own');
   await setRaju({ clips: { when: 'often', style: 'telugu movie' } });
 });
 
@@ -311,5 +306,21 @@ test('festival greetings are celebrations ("happy Diwali", "happy Pongal"); "hap
   t.script.push(text('Glad to hear.'));
   await say(chat, 'raju happy to help anytime');
   assert.equal(media(chat).length, before, 'not a celebration');
+  await setRaju({ clips: { when: 'often', style: 'telugu movie' } });
+});
+
+test('the AI decides beyond any word list (good news in any words), and its [share: none] wins over the rules', async () => {
+  await setRaju({ clips: { when: 'proactive', style: 'telugu movie' } });
+  let chat = CHATS[19]; const before = media(chat).length;
+  t.script.push(text('That is wonderful news! [share: proud happy]'));
+  await say(chat, 'raju my daughter got into the university she wanted');
+  assert.equal(media(chat).length, before + 1, 'no rule word, the AI chose');
+  assert.equal(queries.at(-1), 'proud happy telugu movie');
+  chat = CHATS[20];
+  t.script.push(text('Congrats! [share: none]'));
+  await say(chat, 'raju congrats on the new job 🎉');
+  assert.equal(media(chat).length, 0, 'the AI said none: no fallback');
+  const agent = (await t.api(owner, 'GET', '/api/agents/raju/services')).body.find((x) => x.service === 'clips');
+  assert.ok(agent.shared.ai >= 1 && agent.shared.rule >= 1, 'the card counts who picked them');
   await setRaju({ clips: { when: 'often', style: 'telugu movie' } });
 });

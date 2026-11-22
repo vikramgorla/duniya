@@ -20,6 +20,12 @@ export function countStat(kind, { agent = '', chat = '' } = {}, ts = Date.now())
   } catch { /* ignore */ }
 }
 
+/** 094: media an agent shared on its own in the last `days` days: { ai: picked by the model, rule: by the fallback }. */
+export function sharedCounts(agent, days = 7, now = Date.now()) {
+  const rows = db.prepare("SELECT kind, SUM(n) AS n FROM daily_stats WHERE day >= ? AND kind IN ('shared_ai', 'shared_rule') AND agent = ? GROUP BY kind").all(dayOf(now) - days + 1, agent);
+  const n = (k) => Number(rows.find((r) => r.kind === k)?.n || 0);
+  return { ai: n('shared_ai'), rule: n('shared_rule') };
+}
 /** Rows { kind, agent, chat, n } summed over the days [fromDay, toDay) (day numbers from dayOf). */
 export function statsBetween(fromDay, toDay) {
   return db.prepare('SELECT kind, agent, chat, SUM(n) AS n FROM daily_stats WHERE day >= ? AND day < ? GROUP BY kind, agent, chat')

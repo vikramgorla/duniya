@@ -16,7 +16,8 @@ import { liveModules, moduleRules } from '../modules/index.js';
 import { promiseTools } from './commitments.js';
 import { changeTools, riskOf } from './autonomy.js';
 import { behaviourOf } from './tool-behaviour.js';
-import { mediaTool, shareToolDef } from './sharing.js';
+import { mediaTool } from './sharing.js';
+import { sharedCounts } from './stats.js';
 
 
 const exposedName = (server, tool) => `${server}__${tool}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
@@ -108,7 +109,8 @@ export async function agentServices(agent) {
       // a local service is never started just to show this page: only one that is running already lists its tools
       if (srv.type !== 'local' || conn.tools) tools = await describeTools(key, conn);
     } catch { /* shown as not reachable */ }
-    return { service: key, global: !!srv.global, own: agent.services?.[key] || {}, default: srv.behaviour || {}, tools, media: tools?.find((t) => t.media)?.media || '' };
+    const media = tools?.find((t) => t.media)?.media || '';
+    return { service: key, global: !!srv.global, own: agent.services?.[key] || {}, default: srv.behaviour || {}, tools, media, ...(media ? { shared: sharedCounts(agent.id) } : {}) };
   }));
 }
 
@@ -117,7 +119,7 @@ export const organizerConnection = (agent, serverKey) => connectionFor(agent, se
 
 /**
  * Build the tool list for an agent + role, in a chat (075: chat tools only as far as the chat's channel can do them;
- * no chat = the test console). `owner` (079): the sender is the owner (People tools with owner-level access). Returns { defs: [Anthropic tool defs], run: (name, input, ctx) => {isError, text}, meta: Map, services: [{ key, behaviour }], sharing: [services that share media on their own] }
+ * no chat = the test console). `owner` (079): the sender is the owner (People tools with owner-level access). Returns { defs: [Anthropic tool defs], run: (name, input, ctx) => {isError, text}, meta: Map, services: [{ key, behaviour }], sharing: [services that share media on their own: only in chats that take media] }
  */
 export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
   const allow = agent.tools[role] || [];
@@ -198,8 +200,6 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
   // this role (organizers on, participants off by default); the deny list always wins.
   if (chatChannel() && (!capsOf(chat) || capsOf(chat).media) && await imageToolAllowed(agent, role).catch(() => false)) addLocal('media', mediaTools, null);
 
-  // Share on its own (094): one call picks the mood; code searches the service and posts after the text (chats that take media)
-  if (sharing.length && chatChannel() && (!capsOf(chat) || capsOf(chat).media)) addLocal('whatsapp', [shareToolDef(sharing)], null);
 
   async function run(name, input, ctx) {
     const m = meta.get(name);
@@ -213,5 +213,6 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
     }
   }
 
-  return { defs, run, meta, services, sharing };
+  const takesMedia = chatChannel() && (!capsOf(chat) || capsOf(chat).media); // 094: sharing only where media can go
+  return { defs, run, meta, services, sharing: takesMedia ? sharing : [] };
 }

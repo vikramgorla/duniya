@@ -4,14 +4,15 @@
 // knows a service by name: the tool is found by what it declares (readOnlyHint, media in its output schema or in its
 // results) and a free-text input.
 //
-// - One call: the agent gets `share_media(mood)` (for the roles allowed to use that service). It only picks the mood;
-//   code searches with the mood words (names stripped) + style words, picks a fitting result it did not post in that
-//   chat lately and sends it with the answer as its caption (one message; a long answer or a sticker: right after it),
-//   with the credit text the tool returns.
-// - Moments in code: thanks, celebrations, welcomes, jokes, praise, settled plans and requests are found by cheap
-//   rules; "often" asks for one on such a moment and sends one itself when the model did not; "sometimes" only on
-//   strong moments (celebrations, thanks to the agent, requests). The model can also end its text with
-//   [share: mood] or [share: none]. Serious topics never get one, nor errors.
+// - The model decides, every turn: it ends its answer with [share: two to four mood words] or [share: none] — a choice
+//   it must make, not an optional extra it skips. It reads the whole conversation, so any culture, language or kind of
+//   good news counts; "sometimes" asks for one where it clearly adds warmth, "often" whenever the mood is light.
+// - Code keeps what a prompt cannot be trusted with: serious topics never get one (a cheap veto), at most one per
+//   answer and none shortly after another, the limits, mood words only (names stripped). Code searches with the mood
+//   + style words, picks a result it did not post in that chat lately and sends it with the answer as its caption (one
+//   message; a long answer or a sticker: right after it), with the credit text the tool returns.
+// - A model that forgets the tag falls back to cheap rules (celebrations, thanks, requests; "often" also jokes,
+//   welcomes, praise), so a weak model still behaves.
 // - One per moment: at most one per answer, none when one went out in that chat in the last few minutes.
 import { randomInt } from 'node:crypto';
 import { clip } from './config.js';
@@ -20,6 +21,7 @@ import { activity } from './events.js';
 import { noteSent, sentWithin } from './turns.js';
 import { chatChannel } from './chat-tools.js';
 import { limitStop } from './tool-behaviour.js';
+import { countStat } from './stats.js';
 
 const GAP_MS = 3 * 60000; // none when one went out in the chat this recently (the duplicate guard's window)
 const KEEP_IDS = 30; // results not picked again in a chat
@@ -107,24 +109,26 @@ const namesOf = (ctx) => [...Object.values(namesInChat(ctx.chat)), ctx.senderNam
 // ---------- the agent's instructions ----------
 const KIND_WORD = { gif: 'GIF', sticker: 'sticker', image: 'picture' };
 const kindWords = (services) => [...new Set(services.map((s) => KIND_WORD[s.kind]))].join(' or ');
-/** For the system prompt (the same every turn): what it may share and when. '' when nothing is on. */
+const WHEN_SHARE = {
+  sometimes: 'when one clearly adds warmth or fun: celebrations and festivals of any culture, good news, thanks to you, or when someone asks for one',
+  often: 'whenever the mood is light: also thanks, welcomes, jokes, praise and settled plans',
+};
+/** For the system prompt (the same every turn): the choice it makes at the end of every answer. '' when nothing is on. */
 export function sharingNote(services) {
   if (!services.length) return '';
-  const often = services.some((s) => s.share === 'often');
-  return `Sharing: you can add one fitting ${kindWords(services)} to an answer with whatsapp__share_media (mood: two to four generic words like "happy dance", "thank you", "mind blown"; never names or private details). ${often
-    ? 'Do it often: for thanks, celebrations, welcomes, jokes, praise, settled plans and when someone asks for one.'
-    : 'Do it only for real celebrations, thanks to you, or when someone asks for one.'} Never for serious, worried, upset, safety or money topics; at most one per answer; your useful text comes first. Instead of the tool you may end your text with [share: mood], or [share: none] when one would not fit.`;
+  const mode = services.some((s) => s.share === 'often') ? 'often' : 'sometimes';
+  return `Sharing: end every answer with one tag on its own line — [share: two to four generic English mood words, e.g. "happy dance", "festive lights", "thank you"] to add one fitting ${kindWords(services)} after your text, or [share: none]. Share ${WHEN_SHARE[mode]}. Never for serious, worried, upset, safety or money topics. Mood words only: never names or private details. The tag is never shown.`;
 }
 
-/** This turn's plan: the services that share on their own, the message's moment and the line added to the turn. */
+/** This turn's plan: the services that share on their own, the code's veto (serious, too soon) and its fallback moment. */
 export function sharePlan(ctx, services) {
   const on = [...services].sort((a, b) => RANK[b.share] - RANK[a.share]);
   if (!on.length || ctx.source === 'schedule') return null;
   const { serious, moment } = momentOf(ctx.text, { addressed: !ctx.unaddressed });
   const recent = sentWithin(ctx.chat, ctx.agent.id, SHARED, GAP_MS);
-  const svc = on.find((s) => qualifies(s.share, moment));
-  const note = !serious && !recent && svc ? `This is a lighthearted moment: after your text, end with share_media("${moment.mood}") (or [share: ${moment.mood}]) — one ${KIND_WORD[svc.kind]}.` : '';
-  return { services: on, serious, moment, recent, svc, note, chosen: null };
+  const fallback = on.find((s) => qualifies(s.share, moment)); // only when the model gives no tag
+  const note = serious || recent ? '' : 'End with [share: mood] or [share: none].';
+  return { services: on, serious, moment, recent, fallback, note };
 }
 
 const TAG = /\[(?:share|gif|sticker):\s*([^\]\n]{0,80})\]/gi;
@@ -136,37 +140,13 @@ export function takeShareTag(text) {
 }
 
 /**
- * After the model answered: what to share after the text, or null. One the model asked for (tool or tag) goes out
- * unless the topic is serious; otherwise code shares one on a moment the setting covers.
+ * After the model answered: what to share after the text, or null. The model's tag decides; without one, the
+ * fallback rules do. Never on a serious topic, after an error, or shortly after another one.
  */
 export function shareAfterReply(ctx, plan, { reply, hint }) {
   if (!plan || !reply || ctx.modelError || plan.serious || plan.recent || hint === 'none') return null;
-  if (plan.chosen) return plan.chosen; // share_media was called in this turn
   if (hint) return { svc: plan.services[0], mood: hint, by: 'the model' };
-  return plan.svc ? { svc: plan.svc, mood: plan.moment.mood, by: 'Duniya (a lighthearted moment)' } : null;
-}
-
-/** The share_media action for the agent's sharing services (the roles allowed to use them). */
-export function shareToolDef(services) {
-  return {
-    name: 'share_media', roles: ['organizer', 'participant'], annotations: { readOnlyHint: false, destructiveHint: false },
-    description: `Add one fitting ${kindWords(services)} after your text answer: give the mood in two to four generic words ("happy dance", "thank you", "applause"); never names or private details. Duniya finds a fitting one and posts it right after your text. At most one per answer.`,
-    input_schema: { type: 'object', properties: {
-      mood: { type: 'string', maxLength: 60, description: 'The mood, e.g. "celebration", "thank you", "laughing"' },
-      ...(services.length > 1 ? { service: { type: 'string', enum: services.map((s) => s.key), description: 'Which service (default: the first)' } } : {}),
-    }, required: ['mood'] },
-    async run(input, ctx) {
-      const plan = ctx.sharePlan; // shared by the turn (tools get a copy of ctx)
-      const svc = (plan?.services || []).find((s) => s.key === input.service) || plan?.services[0];
-      if (!plan || !svc) return { queued: false, note: 'Not here; answer in text only.' };
-      if (plan.chosen) return { queued: false, note: 'One per answer; one is already on its way.' };
-      if (plan.serious) return { queued: false, note: 'Not for this topic; answer in text only.' };
-      if (sentWithin(ctx.chat, ctx.agent.id, SHARED, GAP_MS)) return { queued: false, note: 'One was posted here a few minutes ago, so none now. Do not try again.' };
-      if (!moodWords(input.mood, namesOf(ctx))) return { queued: false, note: 'Give the mood in generic words (no names).' };
-      plan.chosen = { svc, mood: String(input.mood || ''), by: 'the model' };
-      return { queued: true, note: `A fitting ${KIND_WORD[svc.kind]} goes out right after your text. Do not send another one.` };
-    },
-  };
+  return plan.fallback ? { svc: plan.fallback, mood: plan.moment.mood, by: 'Duniya (no tag; a lighthearted moment)' } : null;
 }
 
 // ---------- search, pick, send ----------
@@ -230,6 +210,7 @@ export async function postMedia(m, { text = '', quote = undefined } = {}) {
   const caption = [text, m.credit && (text ? `_${m.credit}_` : m.credit)].filter(Boolean).join('\n\n');
   const r = await chatChannel().sendMedia(chat, { kind: svc.kind, url: m.url, caption, ...(quote ? { quote } : {}) });
   noteSent(chat, agent.id, { kind: 'share', url: m.url });
+  countStat(m.by === 'the model' ? 'shared_ai' : 'shared_rule', { agent: agent.id }); // who picks them: the card shows it
   kvSet(recentKey(chat, svc.key), JSON.stringify([...m.seen].filter((x) => x !== m.id).concat(m.id).slice(-KEEP_IDS)));
   const label = `[${svc.kind}: ${words}]`;
   const id = ctx.ownerChat && chat === ctx.ownerChat ? undefined
