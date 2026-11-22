@@ -8,7 +8,7 @@ import { readFileSync, existsSync, writeFileSync, statfsSync, statSync, mkdirSyn
 import { execFile } from 'node:child_process';
 import { APP_VERSION, DATA_DIR, ROOT, plural, fail } from './config.js';
 import { getSetting, updateSettings } from './store.js';
-import { activity } from './events.js';
+import { activity, recordFailure } from './events.js';
 
 const OPS_REQUEST_DIR = process.env.DUNIYA_OPS_REQUEST_DIR || '/var/lib/duniya/ops-request';
 export const OPS_STATE_DIR = process.env.DUNIYA_OPS_STATE_DIR || '/var/lib/duniya-ops';
@@ -108,7 +108,7 @@ export function startMetrics() {
   setInterval(sample, 30000).unref();
   // #96: check OS updates in the background now and then, so the Server tab badge is right without opening the page
   // (apt's simulation is short-lived; on a small server it runs at most twice a day).
-  const check = () => osUpdates().catch(() => {});
+  const check = () => osUpdates().catch(recordFailure('Checking for system updates'));
   setTimeout(check, 5 * 60000).unref();
   setTimeout(() => { try { maybeUpdateHelper(); } catch { /* never crash on bookkeeping */ } }, 30000).unref();
   setInterval(check, 12 * 3600000).unref();

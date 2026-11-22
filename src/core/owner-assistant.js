@@ -23,7 +23,7 @@ import { isGroup, phoneOf, phoneChat } from '../channels/index.js';
 import { getUser, onUserDeleted, TENANT } from './store.js';
 import { listAgents, agentForChat, getAgent, OWNER_AGENT_ID } from './agents.js';
 import { getChatPrefs, enabledChats, privateChats } from './chat-prefs.js';
-import { activity } from './events.js';
+import { activity, recordFailure } from './events.js';
 import { toolPhrase } from '../panel/public/app/names.js';
 import { chat as modelChat, effectiveFallback } from './providers/index.js';
 import { friendlyModelError } from './runner.js';
@@ -294,7 +294,7 @@ const whoInDm = (chat) => phoneOf(chat) || chat;
 const dmLine = (chat) => (isGroup(chat) ? '' : dmNoticeOnce(whoInDm(chat)));
 async function privacyLineAfterSend(chat) {
   const line = dmLine(chat);
-  if (line) await chatChannel()?.send(chat, `_${line}_`).catch(() => {});
+  if (line) await chatChannel()?.send(chat, `_${line}_`).catch(recordFailure('The privacy line after a message', { chat }));
 }
 async function sendPreview(chat, what) {
   const name = (chatLabels([chat])).get(chat);
@@ -698,7 +698,7 @@ async function ownerTurn(msg, channel, user, { queued = false } = {}) {
   }
 }
 
-const sorry = (text) => async (p) => { const ch = chatChannel(); const msg = unpackMsg(ch, p.msg); await ch?.send(msg.chat, text, quoteOf(msg)).catch(() => {}); };
+const sorry = (text) => async (p) => { const ch = chatChannel(); const msg = unpackMsg(ch, p.msg); await ch?.send(msg.chat, text, quoteOf(msg)).catch(recordFailure('An apology of the owner assistant', { chat: msg.chat })); };
 registerJobHandler('owner', {
   async run(p) {
     const ch = chatChannel();

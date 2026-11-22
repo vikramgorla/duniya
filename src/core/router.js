@@ -11,7 +11,7 @@ import { getSetting } from './store.js';
 import { listAgents as allAgents, getAgent, agentForChat, roleIn, isBuiltin } from './agents.js';
 import { runAgent, handleConfirmCommand } from './runner.js';
 import { lastAgentMessage, logMessage, messageByMsgId, deleteMessageByMsgId, saveReaction, savePollVote, pollTally, setMessageText, editStoredMessage, agentAnsweredAfter } from './db.js';
-import { activity } from './events.js';
+import { activity, recordFailure } from './events.js';
 import { maybeSummarize, forgetChanged } from './memory.js';
 import { setChatChannel } from './chat-tools.js';
 import { countStat } from './stats.js';
@@ -148,7 +148,7 @@ function dmSilence(msg) {
   return { agent: c.id, reason: c.dm === 'none' ? 'dm_not_allowed' : 'role_not_allowed' };
 }
 
-const summarizeLater = (chat, agent) => { maybeSummarize(chat, agent).catch(() => {}); };
+const summarizeLater = (chat, agent) => { maybeSummarize(chat, agent).catch(recordFailure('Summarising', { chat })); };
 
 /**
  * Store WhatsApp history batches (link/reconnect sync). Never replies. Group chats only.
@@ -353,7 +353,7 @@ async function answeringAgent(channel, s) {
   if (!msg.isGroup) {
     const d = dmSilence(msg); quiet(d.reason, d.agent);
     // 077: a channel without phone numbers does not know who this is yet: offer to link their number
-    if (d.reason === 'role_not_allowed' && !msg.phone && !capsOf(msg.chat)?.phoneNumbers) await channel.askForPhone?.(msg.chat, 'I answer only people I know here.').catch(() => {});
+    if (d.reason === 'role_not_allowed' && !msg.phone && !capsOf(msg.chat)?.phoneNumbers) await channel.askForPhone?.(msg.chat, 'I answer only people I know here.').catch(recordFailure('Asking for a phone number', { chat: msg.chat }));
   } else if (!groupAgent) { if (s.wakes) quiet('no_agent', ''); } else if (msg.mentioned || msg.replyToAgent || findTrigger(groupAgent, lower)) quiet('agent_disabled');
   return null;
 }
@@ -369,7 +369,7 @@ function learnAboutWriter({ msg, rowId }, agent) {
 function proposeLessonFromOwner({ msg, wake }, agent) {
   if (userForPhone(msg.phone)?.role !== 'owner') return;
   const last = lastAgentMessage(msg.chat);
-  if (last?.agent === agent.id && Date.now() - last.ts < 15 * 60000) lessonFromCorrection(agent, { chat: msg.chat, text: wake, answer: last.text, msg: last.id })?.catch(() => {});
+  if (last?.agent === agent.id && Date.now() - last.ts < 15 * 60000) lessonFromCorrection(agent, { chat: msg.chat, text: wake, answer: last.text, msg: last.id })?.catch(recordFailure('Proposing a lesson', { agent: agent.id, chat: msg.chat }));
 }
 
 const isAddressed = (agent, msg, lower) => !msg.isGroup || (agent.respondToMentions && (msg.mentioned || msg.replyToAgent)) || !!findTrigger(agent, lower);
@@ -495,7 +495,7 @@ const overloadedAt = new Map(); // chat → when it was last told the queue is f
 const OVERLOADED_NOTE_GAP = 5 * 60 * 1000; // ms before a chat is told again
 
 /** 094: a found GIF / sticker posted on its own after the answer (never fails the answer). */
-const postAfter = async (media) => { const m = await media; if (m) await postMedia(m).catch(() => {}); };
+const postAfter = async (media) => { const m = await media; if (m) await postMedia(m).catch(recordFailure('Sharing a picture after the answer', { agent: m.ctx.agent.id, chat: m.ctx.chat })); };
 
 /** A voice note as the answer (the text is kept in history). Returns the stored answer's id. */
 async function sendVoiceNote(channel, msg, agent, { text, voice, media }) {
@@ -681,11 +681,11 @@ function registerMediaHandlers(channel) {
     },
     async stale(p) {
       const msg = unpackMsg(channel, p.msg);
-      await channel.send(msg.chat, `Sorry, I couldn’t get to your ${msg.mediaInfo?.type === 'audio' ? 'voice note' : 'photo'} in time. Please send it again if you still need an answer.`, quoteOf(msg)).catch(() => {});
+      await channel.send(msg.chat, `Sorry, I couldn’t get to your ${msg.mediaInfo?.type === 'audio' ? 'voice note' : 'photo'} in time. Please send it again if you still need an answer.`, quoteOf(msg)).catch(recordFailure('The apology for a late answer', { chat: msg.chat }));
     },
     async failed(p) {
       const msg = unpackMsg(channel, p.msg);
-      await channel.send(msg.chat, 'Sorry, something went wrong with that. Please try again in a minute.', quoteOf(msg)).catch(() => {});
+      await channel.send(msg.chat, 'Sorry, something went wrong with that. Please try again in a minute.', quoteOf(msg)).catch(recordFailure('The apology for a failed answer', { chat: msg.chat }));
     },
   });
   registerJobHandler('image', {
@@ -699,8 +699,8 @@ function registerMediaHandlers(channel) {
       try { await createImage(p.input, { agent, chat: p.chat, image }); } finally { if (p.imageFile && !image) rmSync(p.imageFile, { force: true }); }
       if (p.imageFile) rmSync(p.imageFile, { force: true });
     },
-    async stale(p) { if (p.imageFile) rmSync(p.imageFile, { force: true }); await channel.send(p.chat, 'Sorry, I couldn’t make that picture in time. Ask me again if you still want it.').catch(() => {}); },
-    async failed(p, job, e) { if (p.imageFile) rmSync(p.imageFile, { force: true }); await channel.send(p.chat, `Sorry, I couldn’t make that picture${e?.permanent ? ` (${e.message})` : ''}.`).catch(() => {}); },
+    async stale(p) { if (p.imageFile) rmSync(p.imageFile, { force: true }); await channel.send(p.chat, 'Sorry, I couldn’t make that picture in time. Ask me again if you still want it.').catch(recordFailure('The apology for a late picture', { chat: p.chat })); },
+    async failed(p, job, e) { if (p.imageFile) rmSync(p.imageFile, { force: true }); await channel.send(p.chat, `Sorry, I couldn’t make that picture${e?.permanent ? ` (${e.message})` : ''}.`).catch(recordFailure('The apology for a failed picture', { chat: p.chat })); },
   });
   const voiceText = async (p) => { const agent = getAgent(p.agent) || { id: p.agent, media: { voiceReply: 'never' } }; await deliver(channel, unpackMsg(channel, p.msg), agent, p.text, { again: true }); };
   registerJobHandler('voice', {

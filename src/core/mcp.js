@@ -7,7 +7,7 @@ import { onSecretChange } from './store.js';
 import { onOAuthChange } from './mcp-oauth.js';
 import { onGlobalMcpChange } from './global-mcp.js';
 import { maxLocalServices, serverSize, onMemoryPressure } from './resources.js';
-import { activity } from './events.js';
+import { activity, recordFailure } from './events.js';
 import { within as withinTime } from './config.js';
 
 const REQUEST_TIMEOUT = -32001; // MCP error code: the request got no answer in time
@@ -157,7 +157,7 @@ async function stopLocalServices(reason) {
   if (running.length) activity('system', { summary: `Stopped ${running.length} local tool service${running.length === 1 ? '' : 's'}: ${reason}` });
   return running.length;
 }
-onMemoryPressure((tight) => { if (tight && serverSize().size === 'small') stopLocalServices('memory is tight on this small server').catch(() => {}); });
+onMemoryPressure((tight) => { if (tight && serverSize().size === 'small') stopLocalServices('memory is tight on this small server').catch(recordFailure('Stopping local tool services')); });
 
 onSecretChange(() => { resetMcpPool(); });
 onOAuthChange(() => { resetMcpPool(); });

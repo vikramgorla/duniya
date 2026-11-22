@@ -122,7 +122,10 @@ CI enforces the measurable ones (`npm run check:clean`, also in `node scripts/ci
 6. **One way to do each thing** (Lean code above): reuse the shared helpers; delete what you replace in the same PR.
 7. **Comments say why**, not what; a module starts with a short paragraph on what it is for.
 8. **Errors are explicit.** Throw with a plain message (and a status for the panel); never swallow an error silently
-   unless the comment says why it is safe; anything the owner sees is in plain words.
+   unless the comment says why it is safe; anything the owner sees is in plain words. Work nobody waits for (a courtesy
+   message, a background step) keeps its failure with `.catch(recordFailure('what it was', { chat }))`
+   (`src/core/events.js`); an empty `.catch(() => {})` needs its reason on the same line (`check:clean` counts the
+   ones without as `silent-catch`).
 9. **The ratchet only goes down.** Code that broke the rules before the gate is listed in `scripts/clean-baseline.json`;
    a new break fails CI, a file you made cleaner must lower its entry (`npm run clean:baseline`). Raising an entry
    needs a reason in the PR. When you touch a listed function, prefer to split it.

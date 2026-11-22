@@ -2,7 +2,7 @@
 // One-time links (060, #121): a signed-in owner or admin enters a secret in the panel instead of a chat, and a new
 // user sets their own password. Values are saved through the existing routes (`invoke`, as the signed-in user), so
 // validation, role gates and activity logging stay in one place. Values are never returned or logged.
-import { activity } from '../../core/events.js';
+import { activity, recordFailure } from '../../core/events.js';
 import { SECRET_NAME_RE, getUser, createUser, updateUser, onUserDeleted } from '../../core/store.js';
 import { accountById } from '../../core/providers/index.js';
 import { CHANNELS } from '../../channels/index.js';
@@ -68,7 +68,7 @@ export function linkRoutes(route, { invoke }) {
     else await invoke(user, 'PUT', '/api/secrets', { name: d.name, value });
     takeLink('secret', token); // single use, after a successful save (a failed save can be tried again)
     activity('system', { summary: `${d.label} saved through a one-time link by ${user.username} (asked by ${d.byName})` });
-    if (d.notify) await tellUser(d.by, `Saved ${d.label}${user.id === d.by ? '' : ` (entered by ${user.username})`}. The value never passed through this chat.`).catch(() => {});
+    if (d.notify) await tellUser(d.by, `Saved ${d.label}${user.id === d.by ? '' : ` (entered by ${user.username})`}. The value never passed through this chat.`).catch(recordFailure('The note that the value was saved'));
     return { ok: true, saved: d.label };
   }, { role: 'admin' });
 

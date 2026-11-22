@@ -62,7 +62,7 @@ async function shutdown(why, code = 0) {
   const finished = await closeRouter(6000);
   await modulesIdle(); // a list message on its way goes out (cut off, it would be marked failed and never sent again)
   if (!finished) console.error('Stopping with turns still running');
-  await channels.stop().catch(() => {});
+  await channels.stop().catch(() => {}); // stopping anyway; the database is closed next
   try { db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); db.close(); } catch { /* already closed */ }
   process.exit(code);
 }

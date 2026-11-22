@@ -298,7 +298,7 @@ ${passwordLoginAllowed() ? '' : `<div class=note>Password sign-in is switched of
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: toolDefs(auth.user) }));
     server.setRequestHandler(CallToolRequestSchema, async (r) => callTool(r.params.name, r.params.arguments || {}, ctx));
     const tr = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-    res.on('close', () => { tr.close().catch(() => {}); server.close().catch(() => {}); });
+    res.on('close', () => { tr.close().catch(() => {}); server.close().catch(() => {}); }); // the client is gone: nothing left to tell
     await server.connect(tr);
     await tr.handleRequest(req, res, body);
   }

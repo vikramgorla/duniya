@@ -20,7 +20,7 @@ import { execFile } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { env, fail } from './config.js';
 import { getSetting, updateSettings } from './store.js';
-import { activity } from './events.js';
+import { activity, recordFailure } from './events.js';
 import { OPS_STATE_DIR, OPS_WEBCONFIG, opsAvailable, opsStatus, requestOp } from './system.js';
 import {
   normalizeDomain, parseCidr, ipInRanges, validateWebConfig, renderCaddyfile, CLOUDFLARE_V4, CLOUDFLARE_V6, isIp, PROVIDERS,
@@ -552,8 +552,8 @@ export function startWebAccess() {
   };
   setTimeout(daily, 60000).unref();
   setInterval(daily, 24 * 3600000).unref();
-  setTimeout(() => checkProxied().catch(() => {}), 30000).unref();
-  setInterval(() => checkProxied().catch(() => {}), 10 * 60000).unref();
+  setTimeout(() => checkProxied().catch(recordFailure('Checking the web address')), 30000).unref();
+  setInterval(() => checkProxied().catch(recordFailure('Checking the web address')), 10 * 60000).unref();
 }
 
 /** Did this request come through the proxy the panel is locked to (or any known proxy)? */

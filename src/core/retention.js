@@ -88,7 +88,7 @@ export function checkDisk(now = Date.now(), info = diskInfo()) {
         : `The server disk is getting full (${free}). Old data is pruned automatically; consider fewer local backups or a bigger disk.`;
       activity('error', { summary: text });
       const last = Number(kvGet('health:diskAlertAt')) || 0;
-      if (now - last > DAY || level === 'full') { kvSet('health:diskAlertAt', now); sendOwnerAlert(`Duniya: ${text}`, { kind: 'disk' }).catch(() => {}); }
+      if (now - last > DAY || level === 'full') { kvSet('health:diskAlertAt', now); sendOwnerAlert(`Duniya: ${text}`, { kind: 'disk' }); } // never throws: it records its own failure
     }
   }
   return level;

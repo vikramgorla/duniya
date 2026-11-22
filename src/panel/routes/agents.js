@@ -7,7 +7,7 @@ import { chatLabel, chatLabels } from '../../core/chat-names.js';
 import { personInfo } from '../../core/contacts.js';
 import { digits, fail } from '../../core/config.js';
 import { deleteNote, getNote, listNotes, namesInChat } from '../../core/db.js';
-import { activity } from '../../core/events.js';
+import { activity, recordFailure } from '../../core/events.js';
 import { installPackage, installedInfo, localServiceCheck } from '../../core/mcp-local.js';
 import { GLOBAL_SCOPE, OAUTH_ROLES, disconnect as disconnectOAuth, finishSignIn, listConnections, probeServer, startSignIn } from '../../core/mcp-oauth.js';
 import { mcpConnection, resetMcpPool } from '../../core/mcp.js';
@@ -73,7 +73,7 @@ export function agentRoutes(route, { channel } = {}) {
     const r = rateAnswer(params.id, params.msg, body.rating, user.username);
     // 089: a 👎 proposes a lesson (in the background); 👍 on an answer to a judged message counts as good join-in feedback
     const ans = r.rating ? listAnswers(params.id, { before: r.id + 1, limit: 1 })[0] : null;
-    if (ans && r.rating < 0) lessonFromThumbsDown(agent, { msg: ans.id, chat: ans.chat, question: ans.question?.text || '', answer: ans.text, by: user.username })?.catch(() => {});
+    if (ans && r.rating < 0) lessonFromThumbsDown(agent, { msg: ans.id, chat: ans.chat, question: ans.question?.text || '', answer: ans.text, by: user.username })?.catch(recordFailure('Proposing a lesson', { agent: agent.id }));
     if (ans && r.rating > 0 && judgedOf([ans.id]).has(ans.id)) joinFeedback(agent, { chat: ans.chat, kind: 'good', msg: ans.id, by: user.username });
     return { ...r, counts: reviewCounts(params.id), ...(r.rating < 0 && agent.lessons?.enabled !== false ? { proposing: true } : {}) };
   }, { role: 'admin' });

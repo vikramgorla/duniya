@@ -90,7 +90,7 @@ export function stopClient(secret) {
   for (const [k, c] of [...clients]) {
     if (secret && k !== secret) continue;
     clients.delete(k);
-    c.started.then((cl) => cl.stop?.()).catch(() => {});
+    c.started.then((cl) => cl.stop?.()).catch(() => {}); // it is being dropped: a failed stop changes nothing
   }
 }
 onSecretChange((n) => { if (clients.has(n)) stopClient(n); });
@@ -245,7 +245,7 @@ class Conversation {
     for (const idv of this.pending.keys()) if (conversations.get(idv) === this) conversations.delete(idv);
     try { this.off?.(); } catch { /* ignore */ }
     const sid = this.session.sessionId;
-    Promise.resolve(this.session.disconnect?.()).catch(() => {}).then(() => this.client.deleteSession?.(sid)).catch(() => {});
+    Promise.resolve(this.session.disconnect?.()).catch(() => {}).then(() => this.client.deleteSession?.(sid)).catch(() => {}); // clean-up of a finished turn: nothing depends on it
   }
 }
 

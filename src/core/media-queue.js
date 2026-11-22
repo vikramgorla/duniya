@@ -13,7 +13,7 @@
 // Text-only replies never come here.
 import { db, kvGet, kvSet } from './db.js';
 import { within } from './config.js';
-import { activity } from './events.js';
+import { activity, recordFailure } from './events.js';
 import { isChatEnabled } from './chat-prefs.js';
 import { serverSize } from './resources.js';
 import { silenceReason } from './silences.js';
@@ -51,7 +51,7 @@ function queueFull(now = Date.now()) {
   kvSet('health:queueFullAt', now);
   const text = `Photos & voice: ${queueLimits().max} requests are waiting, so new ones are refused for now and people are asked to send them again in a few minutes. The queue empties by itself; on a busy server consider a bigger one.`;
   activity('error', { summary: text });
-  sendOwnerAlert(`Duniya: ${text}`, { kind: 'queue' }).catch(() => {});
+  sendOwnerAlert(`Duniya: ${text}`, { kind: 'queue' }); // never throws: it records its own failure
 }
 /** Queue a job. Throws { code: 'overloaded' } when the queue is full. Returns the job id. */
 export function enqueue({ kind, chat, msgId = '', senderJid = '', agent = '', payload = {} }) {
@@ -87,7 +87,7 @@ const ref = (job) => ({ msgId: job.msg_id, fromMe: false, participant: job.sende
 const chatOk = (job, payload = parse(job)) => !!payload.owner || isChatEnabled(job.chat);
 
 async function finish(job) {
-  if (job.signaled >= 1 && job.msg_id) await channel?.react?.(job.chat, ref(job), '').catch(() => {}); // take the ⏳ back
+  if (job.signaled >= 1 && job.msg_id) await channel?.react?.(job.chat, ref(job), '').catch(() => {}); // take the ⏳ back (it may stay: nothing to do about it)
 }
 
 async function runOne(job) {
@@ -111,7 +111,7 @@ async function runOne(job) {
     const again = job.attempts < MAX_ATTEMPTS && !e.permanent && Date.now() - job.created_at < timing.maxAgeMs;
     activity('error', { agent: job.agent, chat: job.chat, summary: `Media job ${job.kind} failed${again ? ' (will retry)' : ''}: ${e.message}` });
     if (again) db.prepare("UPDATE media_jobs SET state = 'queued' WHERE id = ?").run(job.id);
-    else { del(job.id); await finish(job); await h?.failed?.(payload, job, e).catch(() => {}); }
+    else { del(job.id); await finish(job); await h?.failed?.(payload, job, e).catch(recordFailure('The apology after a failed request', { chat: job.chat })); }
   }
 }
 
@@ -139,12 +139,12 @@ async function signals() {
     if (!chatOk(job)) continue;
     if (job.signaled === 0) {
       db.prepare('UPDATE media_jobs SET signaled = 1 WHERE id = ?').run(job.id);
-      if (job.msg_id) await channel.react?.(job.chat, ref(job), '⏳').catch(() => {});
+      if (job.msg_id) await channel.react?.(job.chat, ref(job), '⏳').catch(() => {}); // a courtesy: the job runs without it
     }
     if (now - job.created_at >= timing.noteMs) {
       db.prepare('UPDATE media_jobs SET signaled = 2 WHERE id = ?').run(job.id);
       const ahead = db.prepare("SELECT COUNT(*) AS n FROM media_jobs WHERE tenant_id = ? AND id < ?").get(TENANT, job.id).n;
-      await channel.send(job.chat, `I’m on it${ahead ? ` — ${ahead === 1 ? 'one request is' : 'a few requests are'} ahead of yours` : ''}.`, job.msg_id ? { quote: { ...ref(job), text: '' } } : undefined).catch(() => {});
+      await channel.send(job.chat, `I’m on it${ahead ? ` — ${ahead === 1 ? 'one request is' : 'a few requests are'} ahead of yours` : ''}.`, job.msg_id ? { quote: { ...ref(job), text: '' } } : undefined).catch(recordFailure('The “I’m on it” note', { chat: job.chat }));
     }
   }
 }
@@ -154,7 +154,7 @@ export function startQueue() {
   db.prepare("UPDATE media_jobs SET state = 'queued' WHERE tenant_id = ? AND state = 'running'").run(TENANT);
   for (const id of active.keys()) active.delete(id);
   if (!ticker) {
-    ticker = setInterval(() => { signals().catch(() => {}); pump(); }, timing.tickMs);
+    ticker = setInterval(() => { signals().catch(recordFailure('Photos & voice: the waiting signs')); pump(); }, timing.tickMs);
     ticker.unref?.();
   }
   setImmediate(pump);
