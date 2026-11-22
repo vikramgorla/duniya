@@ -36,21 +36,26 @@ import { namesTick } from './chat-names.js';
 
 const GROUP_EVERY_MS = 12 * 3600000;
 const DOWN_ALERT_MS = 15 * 60000;
-const downSince = new Map(); // number -> { since, alerted }
+const downSince = new Map(); // account key -> { since, alerted }
+// An account is down when it should be connected and is not. These are not down: connected, waiting for the owner
+// (a QR scan, a number that was unlinked: the panel says what to do) and stopped on purpose.
+const NOT_DOWN = ['open', 'qr', 'logged_out', 'stopped'];
 
-/** 069: a number that keeps reconnecting for 15 minutes (not unlinked, not waiting for a scan) is reported once. */
+/**
+ * 069: an account of any channel (a WhatsApp number, the Telegram bot) that has not been connected for 15 minutes is
+ * reported to the owner once, with the reason the channel gives.
+ */
 async function channelHealth(channel, now) {
-  const numbers = (await channel?.status?.().catch(() => null))?.numbers || [];
-  for (const n of numbers) {
-    if (!['reconnecting', 'closed', 'starting'].includes(n.status)) { downSince.delete(n.id); continue; }
-    const d = downSince.get(n.id) || { since: now, alerted: false };
-    downSince.set(n.id, d);
-    if (!d.alerted && now - d.since >= DOWN_ALERT_MS) {
-      d.alerted = true;
-      const text = `WhatsApp number ${n.label || n.id} has been reconnecting for ${Math.round((now - d.since) / 60000)} minutes${n.lastError ? ` (${n.lastError})` : ''}. It keeps retrying by itself; if it stays down, check the server's internet connection or restart the app on the Server screen.`;
-      activity('error', { summary: text });
-      sendOwnerAlert(`Duniya: ${text}`, { kind: 'whatsapp' }); // never throws: it records its own failure
-    }
+  const accounts = (await channel?.accounts?.().catch(() => null)) || []; // no answer: looked at again at the next tick
+  for (const a of accounts) {
+    if (NOT_DOWN.includes(a.status)) { downSince.delete(a.key); continue; }
+    const d = downSince.get(a.key) || { since: now, alerted: false };
+    downSince.set(a.key, d);
+    if (d.alerted || now - d.since < DOWN_ALERT_MS) continue;
+    d.alerted = true;
+    const text = `${a.app} (${a.label}) has not been connected for ${Math.round((now - d.since) / 60000)} minutes${a.lastError ? `: ${a.lastError}` : ''}. It keeps trying by itself; if it stays down, check the server's internet connection or restart the app on the Server screen.`;
+    activity('error', { summary: text });
+    sendOwnerAlert(`Duniya: ${text}`, { kind: a.channel }); // never throws: it records its own failure
   }
 }
 const GROUPS_PER_TICK = 2;

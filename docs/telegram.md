@@ -94,7 +94,8 @@ If the page says *Another program is reading this bot's messages*, the same toke
 or make a new token. A webhook left by another tool is removed automatically.
 
 If Telegram cannot be reached (at the start or later), the page says so and the server keeps trying by itself;
-**Activity** has a line when the connection broke and one when it was back.
+**Activity** has a line when the connection broke and one when it was back. After 15 minutes without a connection
+you get one owner alert with the reason (a refused token as well).
 
 Admin MCP: `list_channels` (with the bot's name and privacy mode), `set_channel_enabled`, `set_secret`
 (`TELEGRAM_BOT_TOKEN`), `set_telegram_dm_agent`.

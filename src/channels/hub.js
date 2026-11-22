@@ -161,6 +161,16 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     return out;
   }
 
+  /** Every account of every running channel, for the connection watch (upkeep.js): { key, channel, app, label, status, lastError }. */
+  async function accounts() {
+    const out = [];
+    for (const [id, { adapter: a }] of live) {
+      const st = await a.status().catch((e) => ({ numbers: [{ id, status: 'error', lastError: e.message }] }));
+      for (const n of st.numbers || []) out.push({ key: `${id}:${n.id}`, channel: id, app: label(id), label: n.label || n.id, status: n.status, lastError: n.lastError || '' });
+    }
+    return out;
+  }
+
   /** Switch a channel on (setting it up with its first account when needed) or off (adapter stopped and dropped). */
   async function setEnabled(id, on, by = '') {
     if (!channelInfo(id)) throw fail(`Unknown channel "${id}"`, 404);
@@ -209,6 +219,7 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
       return { ...st, channels: await channels() };
     },
     channels,
+    accounts,
     setEnabled,
     /** A new WhatsApp number (WhatsApp is switched on first when it was not running). */
     async addNumber(n) { if (!live.has('whatsapp')) await setEnabled('whatsapp', true); return adapter('whatsapp').addNumber(n); },

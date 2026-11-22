@@ -240,7 +240,7 @@ export function createRouter(channel) {
     // 049 (#92): one chat per person, whichever id WhatsApp writes from (a phone-form chat set up first joins the LID one)
     const msg = await resolveDirectChat(incoming);
     msg.arrived ??= Date.now(); // 087: sends after this moment that repeat each other are duplicates
-    drainReads(channel).catch(() => {}); // 080: read receipts that are due go out on every incoming message (and the upkeep tick)
+    drainReads(channel).catch(() => {}); // 080: read receipts that are due go out with every incoming message; one that failed goes out with the next message or the upkeep tick
     noteKeys(msg);
     if (await notAMessage(channel, msg)) return;
     // Owner assistant (044): link codes and linked panel users' direct messages (unless they start with an agent trigger).

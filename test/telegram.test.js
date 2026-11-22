@@ -305,3 +305,20 @@ test('Telegram: unreachable at the start is tried again; a webhook that stays an
   assert.ok(await until(async () => (await state()).status === 'open', 6000));
   await bot.stop();
 });
+
+test('Telegram: a bot that is not connected for 15 minutes is reported to the owner once, with the reason', async () => {
+  const { upkeepTick, resetUpkeep } = await import('../src/core/upkeep.js');
+  resetUpkeep();
+  assert.deepEqual((await hub.accounts()).map((a) => [a.app, a.label, a.status]), [['Telegram', '@family_helper_bot', 'open']]);
+  fake.down = true;
+  fake.stall(0); // the waiting long poll ends; the next one cannot reach Telegram
+  assert.ok(await until(async () => (await hub.accounts())[0].status === 'error'));
+  const t0 = Date.now();
+  await upkeepTick(hub, t0);
+  await upkeepTick(hub, t0 + 16 * 60000);
+  await upkeepTick(hub, t0 + 20 * 60000);
+  const lines = t.db.listActivity({ limit: 200 }).map((a) => a.summary).filter((x) => /^Telegram \(@family_helper_bot\) has not been connected for 16 minutes: Telegram could not be reached \(ENOTFOUND\)/.test(x));
+  assert.equal(lines.length, 1);
+  fake.down = false;
+  assert.ok(await until(async () => (await hub.accounts())[0].status === 'open', 12000), 'and it reconnects by itself');
+});
