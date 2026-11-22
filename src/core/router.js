@@ -103,31 +103,36 @@ export async function resolveRole(agent, msg, channel) {
 const accountDmAgent = (msg) => (msg.channel === 'telegram' ? getSetting('telegram', {})?.dmAgent
   : (getSetting('whatsappNumbers', null) || []).find((n) => n.id === (msg.number || 'main'))?.dmAgent) || '';
 
+/** A chat that is off: only an agent that explicitly answers anyone may take a direct message. */
+function openAgentFor(msg) {
+  const open = listAgents().filter((b) => b.enabled && b.dm === 'anyone');
+  const lower = msg.text.trim().toLowerCase();
+  return earliestTriggered(open, lower) || open.find((b) => b.id === accountDmAgent(msg)) || open.find((b) => b.id === getSetting('defaultDmAgent', '')) || open[0] || null;
+}
+
+/** Does this agent answer this person's direct messages? Anyone, its organizers, or also its participants and the
+ *  members of its groups, by its "direct messages" setting. */
+async function takesDm(agent, msg, channel) {
+  if (agent.dm === 'none') return false;
+  const role = await resolveRole(agent, msg, channel);
+  if (agent.dm === 'anyone' || role === 'organizer') return true;
+  if (agent.dm === 'organizers') return false;
+  if (inRole(agent.participants, { phone: msg.phone, person: msg.personId || '' })) return true;
+  for (const chat of agent.chats) if (await channel.isMember(chat, msg.phone, msg.senderJid)) return true;
+  return false;
+}
+
 /** Pick the agent for a direct message, or null. */
 async function agentForDm(msg, channel, { openOnly = false } = {}) {
   // A 1:1 chat an admin assigned to an agent (Chats page) always goes to that agent.
   const assigned = agentForChat(msg.chat);
   if (assigned) return assigned.enabled && (!openOnly || assigned.dm === 'anyone') ? assigned : null;
-  if (openOnly) { // chat is off: only an agent that explicitly answers anyone may take it
-    const open = listAgents().filter((b) => b.enabled && b.dm === 'anyone');
-    const lower = msg.text.trim().toLowerCase();
-    return earliestTriggered(open, lower) || open.find((b) => b.id === accountDmAgent(msg)) || open.find((b) => b.id === getSetting('defaultDmAgent', '')) || open[0] || null;
-  }
-  const lower = msg.text.trim().toLowerCase();
+  if (openOnly) return openAgentFor(msg);
   const enabled = listAgents().filter((b) => b.enabled);
-  const byTrigger = earliestTriggered(enabled, lower);
+  const byTrigger = earliestTriggered(enabled, msg.text.trim().toLowerCase());
   const candidates = byTrigger ? [byTrigger]
     : [getAgent(accountDmAgent(msg)), getAgent(getSetting('defaultDmAgent', '')), ...enabled].filter((b) => b?.enabled);
-  for (const agent of candidates) {
-    if (agent.dm === 'none') continue;
-    const role = await resolveRole(agent, msg, channel);
-    if (agent.dm === 'anyone' || role === 'organizer') return agent;
-    if (agent.dm === 'organizers') continue;
-    if (inRole(agent.participants, { phone: msg.phone, person: msg.personId || '' })) return agent;
-    for (const chat of agent.chats) {
-      if (await channel.isMember(chat, msg.phone, msg.senderJid)) return agent;
-    }
-  }
+  for (const agent of candidates) if (await takesDm(agent, msg, channel)) return agent;
   return null;
 }
 
@@ -156,64 +161,62 @@ export function createHistoryHandler() {
     try {
       noteLatestKeys(meta.keys || msgs.filter((m) => m.msgId).map((m) => ({ chat: m.chat, number: m.number, isGroup: m.isGroup, msgId: m.msgId, fromMe: m.fromMe, participant: m.isGroup && !m.fromMe ? m.senderJid : '', ts: m.ts })));
     } catch (e) { activity('error', { summary: `Could not note chat keys: ${e.message}` }); }
-    if (meta.onDemand) {
-      const byChat = new Map((meta.chats || []).map((c) => [c, []]));
-      for (const m of msgs) {
-        if (m.kind && m.kind !== 'text') continue;
-        if (!byChat.has(m.chat)) byChat.set(m.chat, []);
-        const agent = agentForChat(m.chat);
-        byChat.get(m.chat).push({ channel: m.channel, agent: agent?.id || '', msgId: m.msgId, sender: m.phone, name: m.senderName,
-          text: m.text, quoted: m.quoted, fromAgent: m.fromMe, ts: m.ts, senderJid: m.fromMe ? '' : m.senderJid });
-      }
-      for (const [chat, rows] of byChat) storeLoadedBatch(chat, rows); // chats that are off: nothing stored
-      return;
-    }
-    const touched = new Map();
-    let stored = 0;
-    for (const m of msgs) {
-      if (!m.isGroup || (m.kind && m.kind !== 'text')) continue; // never store private chats from history
-      if (!isChatEnabled(m.chat)) continue; // nor groups that are switched off (#10)
-      const agent = agentForChat(m.chat);
-      const id = logMessage({
-        channel: m.channel, chat: m.chat, agent: agent?.id || '', msgId: m.msgId, sender: m.phone, name: m.senderName,
-        text: m.text, quoted: m.quoted, fromAgent: m.fromMe, ts: m.ts, senderJid: m.fromMe ? '' : m.senderJid,
-      });
-      if (id) { stored++; touched.set(m.chat, agent); }
-    }
-    if (stored) activity('memory.history', { summary: `Stored ${stored} history message(s) from ${touched.size} group(s)` });
-    for (const [chat, agent] of touched) summarizeLater(chat, agent);
+    const texts = msgs.filter((m) => !m.kind || m.kind === 'text');
+    if (meta.onDemand) storeAskedHistory(texts, meta.chats || []); else storeSyncedHistory(texts);
   };
+}
+/** A message from the phone's history as a stored row. */
+const historyRow = (m, agent) => ({ channel: m.channel, chat: m.chat, agent: agent?.id || '', msgId: m.msgId, sender: m.phone, name: m.senderName,
+  text: m.text, quoted: m.quoted, fromAgent: m.fromMe, ts: m.ts, senderJid: m.fromMe ? '' : m.senderJid });
+/** History the owner asked the phone for (#91): per chat to history-load, which stores it for chats that are on only. */
+function storeAskedHistory(msgs, chats) {
+  const byChat = new Map(chats.map((c) => [c, []]));
+  for (const m of msgs) {
+    if (!byChat.has(m.chat)) byChat.set(m.chat, []);
+    byChat.get(m.chat).push(historyRow(m, agentForChat(m.chat)));
+  }
+  for (const [chat, rows] of byChat) storeLoadedBatch(chat, rows); // chats that are off: nothing stored
+}
+/** History the phone sends by itself (link, reconnect): groups that are on only; never private chats, nor groups that are off (#10). */
+function storeSyncedHistory(msgs) {
+  const touched = new Map();
+  let stored = 0;
+  for (const m of msgs.filter((x) => x.isGroup && isChatEnabled(x.chat))) {
+    const agent = agentForChat(m.chat);
+    if (logMessage(historyRow(m, agent))) { stored++; touched.set(m.chat, agent); }
+  }
+  if (stored) activity('memory.history', { summary: `Stored ${stored} history message(s) from ${touched.size} group(s)` });
+  for (const [chat, agent] of touched) summarizeLater(chat, agent);
 }
 
 /** 057: how the panel (Activity, why-quiet) names a sender: the one resolver, so known contacts show their name. */
 const whoOf = (msg) => personInfo({ phone: msg.phone, jid: msg.senderJid, fallbackName: msg.senderName }).label;
 
-/**
- * Reactions and poll votes (026): stored for context, never answered. Reactions are kept when they are on an agent's
- * message or in a chat bound to an enabled agent; votes when the poll is known (created while the app ran).
- */
-function recordEvent(msg) {
-  const who = msg.phone || msg.senderJid || 'someone';
-  const agent = agentForChat(msg.chat);
-  if (msg.kind === 'deleted') { // #178: deleted for everyone in WhatsApp → gone from Duniya's stored messages too
-    if (deleteMessageByMsgId(msg.chat, msg.target)) forgetChanged(msg.chat), activity('memory.history', { agent: agent?.id || '', chat: msg.chat, summary: 'A message deleted in WhatsApp was removed from the stored messages' });
-    return;
-  }
-  if (msg.kind === 'reaction') {
-    const target = msg.target ? messageByMsgId(msg.chat, msg.target) : null;
-    if (!target?.from_agent && !(agent?.enabled && msg.isGroup)) return;
-    saveReaction({ chat: msg.chat, msgId: msg.target, sender: who, name: msg.senderName, emoji: msg.emoji, ts: msg.ts });
-    activity('whatsapp.reaction', { agent: agent?.id || target?.agent || '', chat: msg.chat,
-      summary: msg.emoji ? `${whoOf(msg)} reacted ${msg.emoji} to "${clip(target?.text || 'a message', 80)}"` : `${whoOf(msg)} removed a reaction` });
-    return;
-  }
-  if (msg.kind === 'poll_vote') {
-    const p = savePollVote({ chat: msg.chat, msgId: msg.pollId, voter: who, name: msg.senderName, selected: msg.selected || [], ts: msg.ts });
-    if (!p) return;
-    activity('whatsapp.vote', { agent: agent?.id || '', chat: msg.chat,
-      summary: `${whoOf(msg)} voted ${msg.selected?.length ? msg.selected.join(', ') : '(withdrew)'} in "${clip(p.name, 60)}" → ${pollTally(p).map((o) => `${o.name} ${o.votes}`).join(', ')}` });
-  }
+const voterOf = (msg) => msg.phone || msg.senderJid || 'someone';
+// #178: deleted for everyone in WhatsApp → gone from Duniya's stored messages too
+function recordDeleted(msg, agent) {
+  if (!deleteMessageByMsgId(msg.chat, msg.target)) return;
+  forgetChanged(msg.chat);
+  activity('memory.history', { agent: agent?.id || '', chat: msg.chat, summary: 'A message deleted in WhatsApp was removed from the stored messages' });
 }
+/** A reaction is kept when it is on an agent's message or in a group bound to an enabled agent. */
+function recordReaction(msg, agent) {
+  const target = msg.target ? messageByMsgId(msg.chat, msg.target) : null;
+  if (!target?.from_agent && !(agent?.enabled && msg.isGroup)) return;
+  saveReaction({ chat: msg.chat, msgId: msg.target, sender: voterOf(msg), name: msg.senderName, emoji: msg.emoji, ts: msg.ts });
+  activity('whatsapp.reaction', { agent: agent?.id || target?.agent || '', chat: msg.chat,
+    summary: msg.emoji ? `${whoOf(msg)} reacted ${msg.emoji} to "${clip(target?.text || 'a message', 80)}"` : `${whoOf(msg)} removed a reaction` });
+}
+/** A vote is kept when the poll is known (created while the app ran). */
+function recordVote(msg, agent) {
+  const p = savePollVote({ chat: msg.chat, msgId: msg.pollId, voter: voterOf(msg), name: msg.senderName, selected: msg.selected || [], ts: msg.ts });
+  if (!p) return;
+  activity('whatsapp.vote', { agent: agent?.id || '', chat: msg.chat,
+    summary: `${whoOf(msg)} voted ${msg.selected?.length ? msg.selected.join(', ') : '(withdrew)'} in "${clip(p.name, 60)}" → ${pollTally(p).map((o) => `${o.name} ${o.votes}`).join(', ')}` });
+}
+const EVENT_RECORDERS = { deleted: recordDeleted, reaction: recordReaction, poll_vote: recordVote };
+/** Reactions, poll votes and deletions (026): stored for context, never answered. */
+const recordEvent = (msg) => EVENT_RECORDERS[msg.kind]?.(msg, agentForChat(msg.chat));
 
 /**
  * 077: a chat got a new id (Telegram turns a group into a supergroup): its settings, agent and memory move with it.
@@ -238,151 +241,190 @@ export function createRouter(channel) {
     const msg = await resolveDirectChat(incoming);
     msg.arrived ??= Date.now(); // 087: sends after this moment that repeat each other are duplicates
     drainReads(channel).catch(() => {}); // 080: read receipts that are due go out on every incoming message (and the upkeep tick)
-    // #91: newest message key per chat (metadata only, also while the chat is off) to load history when it goes on.
-    if (msg.msgId && (!msg.kind || msg.kind === 'text')) {
-      try { noteLatestKeys([{ chat: msg.chat, number: msg.number, isGroup: msg.isGroup, msgId: msg.msgId, fromMe: !!msg.fromMe, participant: msg.isGroup && !msg.fromMe ? msg.senderJid : '', ts: msg.ts }]); } catch { /* best effort */ }
-      try { historyChatActive(msg.chat); } catch { /* best effort */ } // 057: a load that had no anchor starts now
-    }
-    // 087: someone edited a message: the stored copy changes; an answer it got may need a correction
-    if (msg.kind === 'edited') { if (isChatEnabled(msg.chat)) await onEdited(channel, msg); return; }
-    // Reactions and poll votes: recorded only for chats that are on (#10).
-    if (msg.kind && msg.kind !== 'text') { if (isChatEnabled(msg.chat)) recordEvent(msg); return; }
+    noteKeys(msg);
+    if (await notAMessage(channel, msg)) return;
     // Owner assistant (044): link codes and linked panel users' direct messages (unless they start with an agent trigger).
     if (!msg.isGroup && await handleOwnerMessage(msg, channel)) return;
-    // A media caption can address the agent ("!panduga what is this?"); the stored text is the placeholder.
-    const wake = msg.caption || msg.text;
-    const lower = wake.trim().toLowerCase();
-    const groupAgent = msg.isGroup ? agentForChat(msg.chat) : null;
-    // #34: would this message have woken an agent? (Only then is staying silent worth explaining.)
-    const wakes = !msg.isGroup || msg.mentioned || msg.replyToAgent || listAgents().some((b) => findTrigger(b, lower));
-    const sender = whoOf(msg);
-    const quiet = (reason, agentId = groupAgent?.id || '') => silenceReason(reason, { chat: msg.chat, agent: agentId, sender });
-
-    // Silent by default (#10): a chat that is off is ignored completely — nothing stored, no model call — except
-    // organizers' admin helpers below, and direct messages to an agent explicitly set to answer anyone.
-    let openAgent = null;
-    if (!isChatEnabled(msg.chat)) {
-      const helper = isAnyOrganizer(msg.phone) && ((msg.isGroup && lower === '!groupid') || (!msg.isGroup && lower === '!groups'));
-      const open = !msg.isGroup && !helper ? await agentForDm(msg, channel, { openOnly: true }) : null;
-      if (!helper && !open) {
-        ignoredCounts.set(msg.chat, (ignoredCounts.get(msg.chat) || 0) + 1);
-        countStat('ignored', { chat: msg.chat }); // weekly summary (041): counts only
-        if (wakes) quiet('chat_off', groupAgent?.id || agentForChat(msg.chat)?.id || '');
-        return;
-      }
-      openAgent = open;
-      if (helper) { // organizer helper in a chat that is off: answer it, store nothing
-        if (msg.isGroup) await channel.send(msg.chat, `Group id: ${msg.chat}`, { quoted: msg.raw });
-        else await channel.send(msg.chat, (await channel.listChats()).map((g) => `${g.name} (${g.size})\n${g.id}`).join('\n\n') || 'No groups.');
-        return;
-      }
-    }
-
-    // 075: who wrote, across channels (ids and phone only; chats that are on or answered only)
-    msg.personId = notePerson(msg);
-    if (!openAgent) notePersonChat(msg.personId, msg.chat, 'wrote'); // 079: which agents may see them
-    if (!openAgent) queueRead(msg); // 080: chats that are on: read (blue ticks) after the read delay, answered or not
-    // 082: replies to list messages are counted; "stop" / "start" are answered by the Sending module (no model)
-    if (!msg.isGroup && msg.personId && await interceptMessage(msg, channel)) return;
-    // Groups: remember everything said (bound or not, paused or not) so agents have context.
-    let rowId = 0;
-    if (msg.isGroup) {
-      rowId = logMessage({
-        channel: msg.channel, chat: msg.chat, agent: groupAgent?.id || '', msgId: msg.msgId, sender: msg.phone,
-        name: msg.senderName, text: msg.text, quoted: msg.quoted, ts: msg.ts, senderJid: msg.senderJid,
-      });
-      summarizeLater(msg.chat, groupAgent);
-    }
-    if (getSetting('paused', false)) { if (wakes) quiet('paused'); return; }
-
-    // Admin helpers for organizers of any agent
-    if (isAnyOrganizer(msg.phone)) {
-      if (msg.isGroup && lower === '!groupid') {
-        await channel.send(msg.chat, `Group id: ${msg.chat}`, { quoted: msg.raw });
-        return;
-      }
-      if (!msg.isGroup && lower === '!groups') {
-        const chats = await channel.listChats();
-        await channel.send(msg.chat, chats.map((g) => `${g.name} (${g.size})\n${g.id}`).join('\n\n') || 'No groups.');
-        return;
-      }
-    }
-
-    const agent = msg.isGroup ? groupAgent : openAgent || await agentForDm(msg, channel);
-    if (!agent || !agent.enabled) {
-      if (msg.isGroup) {
-        if (!groupAgent) { if (wakes) quiet('no_agent', ''); }
-        else if (msg.mentioned || msg.replyToAgent || findTrigger(groupAgent, lower)) quiet('agent_disabled');
-      } else {
-        const d = dmSilence(msg); quiet(d.reason, d.agent);
-        // 077: a channel without phone numbers does not know who this is yet: offer to link their number
-        if (d.reason === 'role_not_allowed' && !msg.phone && !capsOf(msg.chat)?.phoneNumbers) await channel.askForPhone?.(msg.chat, 'I answer only people I know here.').catch(() => {});
-      }
-      return;
-    }
+    const s = incomingState(msg);
+    if (await chatOffGate(channel, s)) return;
+    if (await rememberOrIntercept(channel, s)) return;
+    if (getSetting('paused', false)) { if (s.wakes) s.quiet('paused'); return; }
+    if (await organizerHelper(channel, s)) return;
+    const agent = await answeringAgent(channel, s);
+    if (!agent) return;
     if (!msg.isGroup) {
-      rowId = logMessage({
+      s.rowId = logMessage({
         channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: msg.msgId, sender: msg.phone,
         name: msg.senderName, text: msg.text, quoted: msg.quoted, addressed: true, ts: msg.ts, senderJid: msg.senderJid,
       });
     }
-
-    // 091: what people say teaches Duniya about them (stored chats only): preferences, promises, family ties (suggested)
-    noteWriter(msg.personId);
-    try { noteCues(agent, msg); } catch { /* a suggestion is optional */ }
-    noteCommitments(agent, msg, rowId).catch(() => {});
+    learnAboutWriter(s, agent);
     const role = await resolveRole(agent, msg, channel);
-    const isConfirm = /^(confirm|cancel)\s+[a-z0-9]{4}$/i.test(lower);
-    // 089: the owner corrects the agent right after its answer here ("no, it's Chary who…"): a lesson is proposed
-    if (!isConfirm && userForPhone(msg.phone)?.role === 'owner') {
-      const last = lastAgentMessage(msg.chat);
-      if (last?.agent === agent.id && Date.now() - last.ts < 15 * 60000) lessonFromCorrection(agent, { chat: msg.chat, text: wake, answer: last.text, msg: last.id })?.catch(() => {});
-    }
-    const addressed = !msg.isGroup
-      || (agent.respondToMentions && (msg.mentioned || msg.replyToAgent))
-      || !!findTrigger(agent, lower);
-    const triggered = addressed || isConfirm;
+    const turn = { agent, role, addressed: isAddressed(agent, msg, s.lower), isConfirm: /^(confirm|cancel)\s+[a-z0-9]{4}$/i.test(s.lower) };
+    if (!turn.isConfirm) proposeLessonFromOwner(s, agent);
+    if (await answerBuiltin(channel, s, turn)) return;
+    const admitted = admitTurn(s, turn);
+    if (!admitted) return;
+    if (inboundKind(msg, agent)) { await queueTurn(channel, s, turn); return; }
+    await serialTurn(channel, msg, { agent, role, addressed: turn.addressed, rowId: s.rowId, quiet: s.quiet, judge: admitted.judge, solo: turn.isConfirm });
+  }
+}
 
-    // Built-in answers (054): quick replies and !help work without a trigger (the command is the address); the FAQ
-    // answers messages that wake the agent (or every group message when the agent is set so). No model call.
-    if (!isConfirm && hasBuiltins(agent)) {
-      const stripped = stripTriggers(agent, wake);
-      const ans = builtinAnswer(agent, { texts: [wake, stripped], question: stripped, role,
-        faqAllowed: !msg.mediaInfo && (addressed || (msg.isGroup && agent.faq.wholeGroup)),
-        values: { name: msg.senderName || '', date: todayText(agent.timezone) } });
-      if (ans) {
-        if (ans.text.includes('{group}')) ans.text = fillPlaceholders(ans.text, { group: msg.isGroup ? await channel.chatName?.(msg.chat).catch(() => '') || 'the group' : 'this chat' });
-        if (rateLimited(`${agent.id}:${msg.phone || msg.senderJid}`)) { quiet('rate_limited', agent.id); return; }
-        countStat('handled', { agent: agent.id });
-        activity('message.in', { agent: agent.id, chat: msg.chat, summary: `${whoOf(msg)} (${role}): ${stripped || wake}`, detail: { answeredBy: ans.label } });
-        await deliver(channel, msg, agent, ans.text, { textOnly: true });
-        const kind = ans.kind === 'faq' ? 'faq' : 'quick reply';
-        recordUsage({ ...usageTag(kind, { agent: agent.id, chat: msg.chat }), provider: 'built-in', model: kind, cost: 0, priced: 'free' });
-        return;
-      }
-    }
-    // 076: not woken, but maybe for the agent (a follow-up to it, or "answer when needed"): it judges, text only
-    const judge = !triggered && !msg.mediaInfo && shouldJudge(agent, msg);
-    if (!triggered && !judge) { quiet('not_addressed', agent.id); return; }
-    if (rateLimited(judge ? `${agent.id}:${msg.chat}:judge` : `${agent.id}:${msg.phone || msg.senderJid}`)) { quiet('rate_limited', agent.id); return; }
+// ---------- the steps of route(), in its order ----------
+/** #91: the newest message key per chat (metadata only, also while the chat is off), to load history when it goes on. */
+function noteKeys(msg) {
+  if (!msg.msgId || (msg.kind && msg.kind !== 'text')) return;
+  try { noteLatestKeys([{ chat: msg.chat, number: msg.number, isGroup: msg.isGroup, msgId: msg.msgId, fromMe: !!msg.fromMe, participant: msg.isGroup && !msg.fromMe ? msg.senderJid : '', ts: msg.ts }]); } catch { /* best effort */ }
+  try { historyChatActive(msg.chat); } catch { /* best effort */ } // 057: a load that had no anchor starts now
+}
 
-    // Photos & voice (043): photos, PDFs and voice notes addressed to the agent go through the media queue (a small
-    // server does one at a time; nobody has to resend). Only chats that are on get this far.
-    if (inboundKind(msg, agent)) {
-      try {
-        enqueue({ kind: 'turn', chat: msg.chat, msgId: msg.msgId, senderJid: msg.senderJid, agent: agent.id,
-          payload: { msg: packMsg(msg), agent: agent.id, role, addressed, rowId } });
-      } catch (e) {
-        if (e.code !== 'overloaded') throw e;
-        quiet('overloaded', agent.id);
-        if (Date.now() - (overloadedAt.get(msg.chat) || 0) > 5 * 60000) {
-          overloadedAt.set(msg.chat, Date.now());
-          await channel.send(msg.chat, 'I’m overloaded right now — please send that again in a few minutes.', { quoted: msg.raw });
-        }
-      }
-      return;
-    }
-    await serialTurn(channel, msg, { agent, role, addressed, rowId, quiet, judge, solo: isConfirm });
+/** Not a message to answer: an edit (087: the stored copy changes; an answer it got may need a correction), a reaction
+ *  or a poll vote. Recorded only for chats that are on (#10). True: dealt with. */
+async function notAMessage(channel, msg) {
+  if (!msg.kind || msg.kind === 'text') return false;
+  if (!isChatEnabled(msg.chat)) return true;
+  if (msg.kind === 'edited') await onEdited(channel, msg); else recordEvent(msg);
+  return true;
+}
+
+/** What one incoming message carries through the steps below. */
+function incomingState(msg) {
+  // A media caption can address the agent ("!panduga what is this?"); the stored text is the placeholder.
+  const wake = msg.caption || msg.text;
+  const lower = wake.trim().toLowerCase();
+  const groupAgent = msg.isGroup ? agentForChat(msg.chat) : null;
+  // #34: would this message have woken an agent? (Only then is staying silent worth explaining.)
+  const wakes = !msg.isGroup || msg.mentioned || msg.replyToAgent || listAgents().some((b) => findTrigger(b, lower));
+  const sender = whoOf(msg);
+  const quiet = (reason, agentId = groupAgent?.id || '') => silenceReason(reason, { chat: msg.chat, agent: agentId, sender });
+  return { msg, wake, lower, groupAgent, wakes, quiet, openAgent: null, rowId: 0 };
+}
+
+/** Admin helpers for organizers of any agent: "!groupid" in a group, "!groups" in a direct chat. True: answered. */
+async function organizerHelper(channel, { msg, lower }) {
+  if (!isAnyOrganizer(msg.phone)) return false;
+  if (msg.isGroup && lower === '!groupid') { await channel.send(msg.chat, `Group id: ${msg.chat}`, { quoted: msg.raw }); return true; }
+  if (msg.isGroup || lower !== '!groups') return false;
+  await channel.send(msg.chat, (await channel.listChats()).map((g) => `${g.name} (${g.size})\n${g.id}`).join('\n\n') || 'No groups.');
+  return true;
+}
+
+/**
+ * Silent by default (#10): a chat that is off is ignored completely — nothing stored, no model call — except the
+ * organizers' helpers (answered, nothing stored) and direct messages to an agent explicitly set to answer anyone
+ * (s.openAgent). True: the message ends here.
+ */
+async function chatOffGate(channel, s) {
+  const { msg } = s;
+  if (isChatEnabled(msg.chat)) return false;
+  if (await organizerHelper(channel, s)) return true;
+  s.openAgent = msg.isGroup ? null : await agentForDm(msg, channel, { openOnly: true });
+  if (s.openAgent) return false;
+  ignoredCounts.set(msg.chat, (ignoredCounts.get(msg.chat) || 0) + 1);
+  countStat('ignored', { chat: msg.chat }); // weekly summary (041): counts only
+  if (s.wakes) s.quiet('chat_off', s.groupAgent?.id || agentForChat(msg.chat)?.id || '');
+  return true;
+}
+
+/**
+ * A message that counts: who wrote it (075: across channels, ids and phone only; 079: which agents may see them), its
+ * read receipt (080: after the read delay, answered or not), and in groups the stored message (everything said, bound
+ * or not, paused or not, so agents have context). 082: replies to list messages are counted and "stop" / "start" are
+ * answered by the Sending module (no model): then true, the message ends here.
+ */
+async function rememberOrIntercept(channel, s) {
+  const { msg, groupAgent } = s;
+  msg.personId = notePerson(msg);
+  if (!s.openAgent) { notePersonChat(msg.personId, msg.chat, 'wrote'); queueRead(msg); }
+  if (!msg.isGroup) return !!msg.personId && interceptMessage(msg, channel);
+  s.rowId = logMessage({
+    channel: msg.channel, chat: msg.chat, agent: groupAgent?.id || '', msgId: msg.msgId, sender: msg.phone,
+    name: msg.senderName, text: msg.text, quoted: msg.quoted, ts: msg.ts, senderJid: msg.senderJid,
+  });
+  summarizeLater(msg.chat, groupAgent);
+  return false;
+}
+
+/** The agent that answers this message, or null: why nobody answers is recorded (#34). */
+async function answeringAgent(channel, s) {
+  const { msg, groupAgent, lower, quiet } = s;
+  const agent = msg.isGroup ? groupAgent : s.openAgent || await agentForDm(msg, channel);
+  if (agent?.enabled) return agent;
+  if (!msg.isGroup) {
+    const d = dmSilence(msg); quiet(d.reason, d.agent);
+    // 077: a channel without phone numbers does not know who this is yet: offer to link their number
+    if (d.reason === 'role_not_allowed' && !msg.phone && !capsOf(msg.chat)?.phoneNumbers) await channel.askForPhone?.(msg.chat, 'I answer only people I know here.').catch(() => {});
+  } else if (!groupAgent) { if (s.wakes) quiet('no_agent', ''); } else if (msg.mentioned || msg.replyToAgent || findTrigger(groupAgent, lower)) quiet('agent_disabled');
+  return null;
+}
+
+/** 091: what people say teaches Duniya about them (stored chats only): preferences, promises, family ties (suggested). */
+function learnAboutWriter({ msg, rowId }, agent) {
+  noteWriter(msg.personId);
+  try { noteCues(agent, msg); } catch { /* a suggestion is optional */ }
+  noteCommitments(agent, msg, rowId).catch(() => {}); // it records its own failures; a turn never waits for it
+}
+
+/** 089: the owner corrects the agent right after its answer here ("no, it's Chary who…"): a lesson is proposed. */
+function proposeLessonFromOwner({ msg, wake }, agent) {
+  if (userForPhone(msg.phone)?.role !== 'owner') return;
+  const last = lastAgentMessage(msg.chat);
+  if (last?.agent === agent.id && Date.now() - last.ts < 15 * 60000) lessonFromCorrection(agent, { chat: msg.chat, text: wake, answer: last.text, msg: last.id })?.catch(() => {});
+}
+
+const isAddressed = (agent, msg, lower) => !msg.isGroup || (agent.respondToMentions && (msg.mentioned || msg.replyToAgent)) || !!findTrigger(agent, lower);
+
+/**
+ * Built-in answers (054): quick replies and !help work without a trigger (the command is the address); the FAQ answers
+ * messages that wake the agent (or every group message when the agent is set so). No model call. True: answered (or
+ * held back by the rate limit).
+ */
+async function answerBuiltin(channel, s, { agent, role, addressed, isConfirm }) {
+  const { msg, wake, quiet } = s;
+  if (isConfirm || !hasBuiltins(agent)) return false;
+  const stripped = stripTriggers(agent, wake);
+  const ans = builtinAnswer(agent, { texts: [wake, stripped], question: stripped, role,
+    faqAllowed: !msg.mediaInfo && (addressed || (msg.isGroup && agent.faq.wholeGroup)),
+    values: { name: msg.senderName || '', date: todayText(agent.timezone) } });
+  if (!ans) return false;
+  if (ans.text.includes('{group}')) ans.text = fillPlaceholders(ans.text, { group: msg.isGroup ? await channel.chatName?.(msg.chat).catch(() => '') || 'the group' : 'this chat' });
+  if (rateLimited(`${agent.id}:${msg.phone || msg.senderJid}`)) { quiet('rate_limited', agent.id); return true; }
+  countStat('handled', { agent: agent.id });
+  activity('message.in', { agent: agent.id, chat: msg.chat, summary: `${whoOf(msg)} (${role}): ${stripped || wake}`, detail: { answeredBy: ans.label } });
+  await deliver(channel, msg, agent, ans.text, { textOnly: true });
+  const kind = ans.kind === 'faq' ? 'faq' : 'quick reply';
+  recordUsage({ ...usageTag(kind, { agent: agent.id, chat: msg.chat }), provider: 'built-in', model: kind, cost: 0, priced: 'free' });
+  return true;
+}
+
+/**
+ * May this message start a turn? 076: not woken, it may still be for the agent (a follow-up to it, or "answer when
+ * needed"): then the agent judges, text only. Returns { judge }, or null with the reason recorded.
+ */
+function admitTurn(s, { agent, addressed, isConfirm }) {
+  const { msg, quiet } = s;
+  const triggered = addressed || isConfirm;
+  const judge = !triggered && !msg.mediaInfo && shouldJudge(agent, msg);
+  if (!triggered && !judge) { quiet('not_addressed', agent.id); return null; }
+  if (rateLimited(judge ? `${agent.id}:${msg.chat}:judge` : `${agent.id}:${msg.phone || msg.senderJid}`)) { quiet('rate_limited', agent.id); return null; }
+  return { judge };
+}
+
+/**
+ * Photos & voice (043): photos, PDFs and voice notes addressed to the agent go through the media queue (a small server
+ * does one at a time; nobody has to resend). Only chats that are on get this far.
+ */
+async function queueTurn(channel, s, { agent, role, addressed }) {
+  const { msg } = s;
+  try {
+    enqueue({ kind: 'turn', chat: msg.chat, msgId: msg.msgId, senderJid: msg.senderJid, agent: agent.id,
+      payload: { msg: packMsg(msg), agent: agent.id, role, addressed, rowId: s.rowId } });
+  } catch (e) {
+    if (e.code !== 'overloaded') throw e;
+    s.quiet('overloaded', agent.id);
+    if (Date.now() - (overloadedAt.get(msg.chat) || 0) <= OVERLOADED_NOTE_GAP) return;
+    overloadedAt.set(msg.chat, Date.now());
+    await channel.send(msg.chat, 'I’m overloaded right now — please send that again in a few minutes.', { quoted: msg.raw });
   }
 }
 
@@ -449,39 +491,27 @@ export function createJoinHandler(channel) {
   };
 }
 
-const overloadedAt = new Map();
+const overloadedAt = new Map(); // chat → when it was last told the queue is full
+const OVERLOADED_NOTE_GAP = 5 * 60 * 1000; // ms before a chat is told again
 
-/** Send a reply (as a voice note when the agent's setting asks for it) and remember it. */
 /** 094: a found GIF / sticker posted on its own after the answer (never fails the answer). */
 const postAfter = async (media) => { const m = await media; if (m) await postMedia(m).catch(() => {}); };
 
-async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false, textOnly = false, typingSince = null, again = false, since = msg.arrived || Date.now(), media = null } = {}) {
-  // 087: the same answer it just gave here (two turns raced, or it repeats itself) is not sent again. Built-in answers
-  // are commands people ask for; `again`: the second leg of a voice answer (already checked).
-  if (!textOnly && !again && isDuplicate(msg.chat, agent.id, { kind: 'text', text }, since)) { silenceReason('already_answered', { chat: msg.chat, agent: agent.id, sender: whoOf(msg) }); return; }
-  if (!textOnly && !again) noteSent(msg.chat, agent.id, { kind: 'text', text });
-  if (msg.isGroup) agentSpoke(msg.chat, agent.id); // 076: replies right after this may be follow-ups
-  if (textOnly) { /* built-in answers (054): always text */ } else if (voiceNow && wantsVoice(agent, { voiceIn, text })) {
-    const v = await speak(text, { agent, chat: msg.chat }).catch(() => null);
-    if (v) {
-      await readWhenDue(channel, msg); // 080: read before the answer
-      const sent = await channel.sendMedia(msg.chat, { kind: 'audio', base64: v.buffer.toString('base64'), mimetype: 'audio/ogg', voiceNote: true, ...(quoteOf(msg).quote ? { quote: quoteOf(msg).quote } : {}) });
-      const notice = !msg.isGroup ? dmNoticeOnce(msg.phone || msg.chat) : null; // 044: once per person
-      if (notice) await channel.send(msg.chat, `_${notice}_`).catch(() => {});
-      countStat('reply', { agent: agent.id });
-      const id = logMessage({ channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
-      activity('message.out', { agent: agent.id, chat: msg.chat, summary: `🔊 ${text}`, detail: { voice: v.by, ...(id ? { msg: id } : {}) } });
-      await postAfter(media);
-      return id;
-    }
-  } else if (!voiceNow && wantsVoice(agent, { voiceIn, text })) {
-    // A text turn whose answer should be spoken: the voice note is made in the media queue (falls back to text).
-    try {
-      enqueue({ kind: 'voice', chat: msg.chat, msgId: msg.msgId, senderJid: msg.senderJid, agent: agent.id, payload: { msg: packMsg(msg), agent: agent.id, text } });
-      await postAfter(media);
-      return;
-    } catch { /* queue full: send it as text */ }
-  }
+/** A voice note as the answer (the text is kept in history). Returns the stored answer's id. */
+async function sendVoiceNote(channel, msg, agent, { text, voice, media }) {
+  await readWhenDue(channel, msg); // 080: read before the answer
+  const sent = await channel.sendMedia(msg.chat, { kind: 'audio', base64: voice.buffer.toString('base64'), mimetype: 'audio/ogg', voiceNote: true, ...(quoteOf(msg).quote ? { quote: quoteOf(msg).quote } : {}) });
+  const notice = !msg.isGroup ? dmNoticeOnce(msg.phone || msg.chat) : null; // 044: once per person
+  if (notice) await channel.send(msg.chat, `_${notice}_`).catch(() => {}); // the answer is out: the notice is tried again with the next one
+  countStat('reply', { agent: agent.id });
+  const id = logMessage({ channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
+  activity('message.out', { agent: agent.id, chat: msg.chat, summary: `🔊 ${text}`, detail: { voice: voice.by, ...(id ? { msg: id } : {}) } });
+  await postAfter(media);
+  return id;
+}
+
+/** The answer as text, at a human pace. Returns the stored answer's id. */
+async function sendText(channel, msg, agent, text, { typingSince, media }) {
   await paceReply(channel, msg, text, (await typingSince?.catch(() => 0)) || 0); // 080: read, then typing for the reply's length
   if (!msg.isGroup) { const notice = dmNoticeOnce(msg.phone || msg.chat); if (notice) text = `${text}\n\n_${notice}_`; } // 044: once per person
   // 094: a GIF found for this answer (searched while it was typing) carries a short answer as its caption: one message
@@ -499,70 +529,140 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
   return id;
 }
 
+/** 087: the same answer it just gave here (two turns raced, or it repeats itself) is not sent again; a new one is noted. */
+function alreadySaid(msg, agent, text, since) {
+  if (!isDuplicate(msg.chat, agent.id, { kind: 'text', text }, since)) { noteSent(msg.chat, agent.id, { kind: 'text', text }); return false; }
+  silenceReason('already_answered', { chat: msg.chat, agent: agent.id, sender: whoOf(msg) });
+  return true;
+}
+
+/** Send a reply (as a voice note when the agent's setting asks for it) and remember it. Returns the stored answer's id. */
+async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false, textOnly = false, typingSince = null, again = false, since = msg.arrived || Date.now(), media = null } = {}) {
+  // Built-in answers are commands people ask for; `again`: the second leg of a voice answer (already checked).
+  if (!textOnly && !again && alreadySaid(msg, agent, text, since)) return undefined;
+  if (msg.isGroup) agentSpoke(msg.chat, agent.id); // 076: replies right after this may be follow-ups
+  const spoken = !textOnly && wantsVoice(agent, { voiceIn, text }); // built-in answers (054): always text
+  if (spoken && voiceNow) {
+    const voice = await speak(text, { agent, chat: msg.chat }).catch(() => null); // no voice: the answer goes out as text
+    if (voice) return sendVoiceNote(channel, msg, agent, { text, voice, media });
+  } else if (spoken) {
+    // A text turn whose answer should be spoken: the voice note is made in the media queue (falls back to text).
+    try {
+      enqueue({ kind: 'voice', chat: msg.chat, msgId: msg.msgId, senderJid: msg.senderJid, agent: agent.id, payload: { msg: packMsg(msg), agent: agent.id, text } });
+      await postAfter(media);
+      return undefined;
+    } catch { /* queue full: send it as text */ }
+  }
+  return sendText(channel, msg, agent, text, { typingSince, media });
+}
+
 /** One agent turn for a routed message (inline for text; from the media queue for photos and voice notes). */
+/** What the agent reads of a message: a voice note's transcript, a media caption after its placeholder, or the text;
+ *  without the agent's triggers. */
+function turnWords(agent, msg, media) {
+  const voiceIn = msg.mediaInfo?.type === 'audio' && !!media?.transcript;
+  const base = voiceIn ? media.transcript : msg.caption ? `${msg.text.replace(/:.*$/s, ']')} ${stripTriggers(agent, msg.caption)}`.trim() : stripTriggers(agent, msg.text);
+  return { voiceIn, text: voiceIn ? stripTriggers(agent, base) || base : base };
+}
+
+/** The context of an agent turn (runner.js) for a message from a channel. */
+async function turnContext(channel, msg, { agent, role, rowId, text, media, judge, note }) {
+  return {
+    // #113: the name the owner knows them by (phone contact name unless switched off on the Contacts page)
+    agent, role, chat: msg.chat, senderName: agentName({ phone: msg.phone, jid: msg.senderJid, fallbackName: msg.senderName }) || msg.senderName, requester: msg.phone,
+    // 079: who wrote (People), and whether it is the owner (verified identity on any app: owner-level People access)
+    personId: msg.personId || '', ownerTurn: userForPhone(msg.phone)?.role === 'owner',
+    // 057: the sender's group member tag (chats that are on only)
+    senderTag: msg.isGroup ? memberTag(msg.chat, { phone: msg.phone, jid: msg.senderJid }) : '',
+    text, isGroup: msg.isGroup, source: msg.channel, msgRowId: rowId, msgId: msg.msgId, senderJid: msg.senderJid,
+    chatName: msg.isGroup ? await channel.chatName?.(msg.chat) : '',
+    attachments: media?.blocks || [], mediaNote: media?.note || '', unaddressed: judge, turnNote: note, since: msg.arrived || Date.now(),
+  };
+}
+
+/**
+ * Run the agent. An error becomes a short apology (nothing when nobody asked it). 074: an agent app waiting for its
+ * turn on a small server shows ⏳ on the message, taken back when the answer is out.
+ */
+async function askAgent(channel, msg, ctx, { judged, quiet }) {
+  const mref = msg.msgId ? { msgId: msg.msgId, fromMe: false, participant: msg.senderJid || undefined } : null;
+  let waited = false;
+  if (mref) ctx.onWait = () => { waited = true; channel.react?.(msg.chat, mref, '⏳')?.catch?.(() => {}); }; // a courtesy: the turn goes on without it
+  try {
+    return await runAgent(ctx);
+  } catch (e) {
+    activity('error', { agent: ctx.agent.id, chat: msg.chat, summary: `Agent failed: ${e.message}` });
+    quiet('model_error', ctx.agent.id); ctx.share = null; // never a GIF after an error
+    return judged ? '' : 'Sorry, I hit an error. Please try again in a minute.'; // nobody asked it: no error message
+  } finally {
+    if (waited) channel.react?.(msg.chat, mref, '')?.catch?.(() => {}); // the ⏳ may stay: nothing to do about it
+  }
+}
+
+/**
+ * The agent's answer to a message: { out, share, typingSince }. `out` is '' when nothing goes out ([quiet] / [done],
+ * no reply, an error nobody asked about); the reason is recorded.
+ */
+async function modelAnswer(channel, msg, o) {
+  const { agent, judged, quiet } = o;
+  // 080: the message is read after its read delay, then "typing…" shows; the model works meanwhile
+  const typingSince = judged ? null : readWhenDue(channel, msg).then(async () => { await channel.typing?.(msg.chat); return Date.now(); });
+  const ctx = await turnContext(channel, msg, o);
+  let out = await askAgent(channel, msg, ctx, o);
+  const verdict = verdictOf(out); // [quiet] / [done] are never sent (087: also after it corrected itself with an edit)
+  if (verdict) {
+    if (verdict === 'done') closeFollowups(msg.chat);
+    quiet('not_for_me', agent.id);
+    return { out: '', share: null, typingSince };
+  }
+  if (judged && ctx.modelError) out = '';
+  if (judged && out) { countStat('handled', { agent: agent.id }); o.logIn(); } // 076: a judged message is logged only when answered
+  if (ctx.modelError) quiet('model_error', agent.id); else if (!out) quiet('no_reply', agent.id);
+  return { out, share: !ctx.modelError && ctx.share ? { ctx, ...ctx.share } : null, typingSince };
+}
+
+/** A photo, PDF or voice note of a queued turn, made ready for the model. `done`: the turn ends here (over budget, or
+ *  answered without the model). */
+async function inboundMedia(channel, msg, { agent, quiet }) {
+  const media = await prepareInbound(msg, { agent, chat: msg.chat });
+  if (media?.quiet) { quiet('budget', agent.id); return { media, done: true }; }
+  if (media?.reply) { await deliver(channel, msg, agent, media.reply); return { media, done: true }; }
+  if (media?.transcript && msg.msgId) setMessageText(msg.chat, msg.msgId, `🎤 ${media.transcript}`);
+  return { media, done: false };
+}
+
+/**
+ * One turn for a message: a queued turn's media, "confirm CODE" / "cancel CODE", else the agent; then the answer goes
+ * out (with what it shares). queued: from the media queue; judge (076): nobody addressed the agent, it decides;
+ * mayStayQuiet (087): a follow-up turn for messages that arrived while it answered.
+ */
 async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, queued = false, judge = false, note = '', mayStayQuiet = false }) {
-  let media = null; let share = null; // 094: the GIF / sticker shared after the text
-  /** @type {Promise<number>|null} */ let typingSince = null;
+  let media = null;
   try {
     if (queued) {
-      media = await prepareInbound(msg, { agent, chat: msg.chat });
-      if (media?.quiet) { quiet('budget', agent.id); return; }
-      if (media?.reply) { await deliver(channel, msg, agent, media.reply); return; }
-      if (media?.transcript && msg.msgId) setMessageText(msg.chat, msg.msgId, `🎤 ${media.transcript}`);
+      const inbound = await inboundMedia(channel, msg, { agent, quiet });
+      media = inbound.media;
+      if (inbound.done) return;
     }
-    const voiceIn = msg.mediaInfo?.type === 'audio' && !!media?.transcript;
-    const base = voiceIn ? media.transcript : msg.caption ? `${msg.text.replace(/:.*$/s, ']')} ${stripTriggers(agent, msg.caption)}`.trim() : stripTriggers(agent, msg.text);
-    const text = voiceIn ? stripTriggers(agent, base) || base : base;
-    let out = await handleConfirmCommand({ agent, text, role, chat: msg.chat });
+    const { voiceIn, text } = turnWords(agent, msg, media);
     const judged = judge || mayStayQuiet; // 087: it may stay quiet: logged and counted only when it answers
-    if (out === undefined && !addressed && !judged) return; // looked like "cancel ABCD" but isn't ours
+    const confirmed = await handleConfirmCommand({ agent, text, role, chat: msg.chat });
+    if (confirmed === undefined && !addressed && !judged) return; // looked like "cancel ABCD" but isn't ours
     const logIn = () => activity('message.in', {
       agent: agent.id, chat: msg.chat,
       summary: `${whoOf(msg)} (${role}): ${voiceIn ? `🎤 ${text}` : text}`,
       detail: { phone: msg.phone, isGroup: msg.isGroup, quoted: msg.quoted || undefined, ...(judge ? { judged: true } : {}), ...(media?.blocks?.length ? { attachments: media.blocks.map((b) => b.type) } : {}) },
     });
     if (!judged) { countStat('handled', { agent: agent.id }); logIn(); } // 076: a judged message is logged only when answered
-
-    if (out === undefined) {
+    let answer = { out: confirmed, share: null, typingSince: null };
+    if (confirmed === undefined) {
       if (!text) return;
-      // 080: the message is read after its read delay, then "typing…" shows; the model works meanwhile
-      if (!judged) typingSince = readWhenDue(channel, msg).then(async () => { await channel.typing?.(msg.chat); return Date.now(); });
-      const ctx = {
-        // #113: the name the owner knows them by (phone contact name unless switched off on the Contacts page)
-        agent, role, chat: msg.chat, senderName: agentName({ phone: msg.phone, jid: msg.senderJid, fallbackName: msg.senderName }) || msg.senderName, requester: msg.phone,
-        // 079: who wrote (People), and whether it is the owner (verified identity on any app: owner-level People access)
-        personId: msg.personId || '', ownerTurn: userForPhone(msg.phone)?.role === 'owner',
-        // 057: the sender's group member tag (chats that are on only)
-        senderTag: msg.isGroup ? memberTag(msg.chat, { phone: msg.phone, jid: msg.senderJid }) : '',
-        text, isGroup: msg.isGroup, source: msg.channel, msgRowId: rowId, msgId: msg.msgId, senderJid: msg.senderJid,
-        chatName: msg.isGroup ? await channel.chatName?.(msg.chat) : '',
-        attachments: media?.blocks || [], mediaNote: media?.note || '', unaddressed: judge, turnNote: note, since: msg.arrived || Date.now(),
-      };
-      // 074: an agent app waiting for its turn on a small server: ⏳ on the message, taken back when the answer is out
-      const mref = msg.msgId ? { msgId: msg.msgId, fromMe: false, participant: msg.senderJid || undefined } : null;
-      let waited = false;
-      if (mref) ctx.onWait = () => { waited = true; channel.react?.(msg.chat, mref, '⏳')?.catch?.(() => {}); };
-      try {
-        out = await runAgent(ctx);
-      } catch (e) {
-        activity('error', { agent: agent.id, chat: msg.chat, summary: `Agent failed: ${e.message}` });
-        quiet('model_error', agent.id); ctx.share = null; // never a GIF after an error
-        out = judged ? '' : 'Sorry, I hit an error. Please try again in a minute.'; // nobody asked it: no error message
-      }
-      if (waited) channel.react?.(msg.chat, mref, '')?.catch?.(() => {});
-      const v = verdictOf(out); // [quiet] / [done] are never sent (087: also after it corrected itself with an edit)
-      if (v) { if (v === 'done') closeFollowups(msg.chat); quiet('not_for_me', agent.id); return; }
-      if (judged && ctx.modelError) out = '';
-      if (judged && out) { countStat('handled', { agent: agent.id }); logIn(); }
-      if (!ctx.modelError) share = ctx.share ? { ctx, ...ctx.share } : null;
-      if (ctx.modelError) quiet('model_error', agent.id);
-      else if (!out) quiet('no_reply', agent.id);
+      answer = await modelAnswer(channel, msg, { agent, role, rowId, text, media, judge, judged, note, quiet, logIn });
     }
-    if (out) {
-      const media = share ? findMedia(share.ctx, share) : null; // searched while the answer is typed
-      const id = await deliver(channel, msg, agent, out, { voiceIn, voiceNow: queued, typingSince, media });
-      if (judge && msg.isGroup) noteJudgedAnswer(id, agent.id, msg.chat); // 089: feedback on it teaches when to join in
-    }
+    if (!answer.out) return;
+    const found = answer.share ? findMedia(answer.share.ctx, answer.share) : null; // searched while the answer is typed
+    const id = await deliver(channel, msg, agent, answer.out, { voiceIn, voiceNow: queued, typingSince: answer.typingSince, media: found });
+    if (judge && msg.isGroup) noteJudgedAnswer(id, agent.id, msg.chat); // 089: feedback on it teaches when to join in
   } finally {
     media?.cleanup?.();
   }

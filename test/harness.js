@@ -8,6 +8,7 @@
 // requests with 400 (servers without streaming). Streamed requests are counted in t.claudeStreams / f.streams.
 // Phone history (#91): `t.phone` and `t.historyAsks` fake the linked phone answering fetchHistory (see below).
 import http from 'node:http';
+import './tmp.js';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
