@@ -1,90 +1,164 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.58.7": {
+      "breaking": false,
+      "title": "Panel keeps up with updates",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "After the server updates itself, an open panel loads the new version at your next tap instead of showing “Couldn’t load this screen”."
+        },
+        {
+          "type": "fixed",
+          "text": "Activity no longer shows an empty list after the phone wakes up; if loading fails it says so with Retry."
+        }
+      ]
+    },
     "2.58.6": {
       "breaking": false,
       "title": "Old panel links removed",
       "changes": [
-        { "type": "removed", "text": "Old panel addresses from earlier versions (#secrets, #contacts and old agent links) no longer redirect; links inside the panel use the current ones." }
+        {
+          "type": "removed",
+          "text": "Old panel addresses from earlier versions (#secrets, #contacts and old agent links) no longer redirect; links inside the panel use the current ones."
+        }
       ]
     },
     "2.58.5": {
       "breaking": false,
       "title": "GIF services use the standard image format only",
       "changes": [
-        { "type": "removed", "text": "Support for GIF and picture services that do not return the standard image format (schema.org ImageObject); the GIF service in use already does." }
+        {
+          "type": "removed",
+          "text": "Support for GIF and picture services that do not return the standard image format (schema.org ImageObject); the GIF service in use already does."
+        }
       ]
     },
     "2.58.4": {
       "breaking": false,
       "title": "Standard media results",
       "changes": [
-        { "type": "improved", "text": "GIF and picture services that return the standard image format (with its credit, creator and license) work out of the box, including the MP4 version of a GIF that chat apps send." }
+        {
+          "type": "improved",
+          "text": "GIF and picture services that return the standard image format (with its credit, creator and license) work out of the box, including the MP4 version of a GIF that chat apps send."
+        }
       ]
     },
     "2.58.3": {
       "breaking": false,
       "title": "Credits from the standard field",
       "changes": [
-        { "type": "improved", "text": "Credits for GIFs and pictures now come from the standard credit field services return, so the Credits list shows exactly what each service asks for." },
-        { "type": "fixed", "text": "A GIF or picture that needs its own credit (an author and license) is no longer shared on its own." }
+        {
+          "type": "improved",
+          "text": "Credits for GIFs and pictures now come from the standard credit field services return, so the Credits list shows exactly what each service asks for."
+        },
+        {
+          "type": "fixed",
+          "text": "A GIF or picture that needs its own credit (an author and license) is no longer shared on its own."
+        }
       ]
     },
     "2.58.2": {
       "breaking": false,
       "title": "Credits found for more services",
       "changes": [
-        { "type": "fixed", "text": "Credits now show in the panel for services whose credit sits between a title and a link (like KLIPY's), from the next GIF shared." }
+        {
+          "type": "fixed",
+          "text": "Credits now show in the panel for services whose credit sits between a title and a link (like KLIPY's), from the next GIF shared."
+        }
       ]
     },
     "2.58.1": {
       "breaking": false,
       "title": "Clean GIF messages",
       "changes": [
-        { "type": "improved", "text": "A GIF now arrives with just the answer as its caption: no title, credit or link." },
-        { "type": "new", "text": "Credits of GIF and picture services are shown in the panel instead: on the service in Settings, Tool services, and in Settings, Help, Credits." },
-        { "type": "fixed", "text": "Links to GIFs and pictures no longer appear in agents' answers or captions." }
+        {
+          "type": "improved",
+          "text": "A GIF now arrives with just the answer as its caption: no title, credit or link."
+        },
+        {
+          "type": "new",
+          "text": "Credits of GIF and picture services are shown in the panel instead: on the service in Settings, Tool services, and in Settings, Help, Credits."
+        },
+        {
+          "type": "fixed",
+          "text": "Links to GIFs and pictures no longer appear in agents' answers or captions."
+        }
       ]
     },
     "2.58.0": {
       "breaking": false,
       "title": "Agents can search the web",
       "changes": [
-        { "type": "new", "text": "Agents look up current facts on the web (opening hours, prices, train times, news) with the search built into Claude and ChatGPT. On by default; switch it off in Settings, Modules, or per role on an agent's Tools page." },
-        { "type": "improved", "text": "Links in answers show as plain addresses on WhatsApp, and an answer from the web carries the page it came from." },
-        { "type": "new", "text": "Usage shows web searches and their cost under Cost per feature." }
+        {
+          "type": "new",
+          "text": "Agents look up current facts on the web (opening hours, prices, train times, news) with the search built into Claude and ChatGPT. On by default; switch it off in Settings, Modules, or per role on an agent's Tools page."
+        },
+        {
+          "type": "improved",
+          "text": "Links in answers show as plain addresses on WhatsApp, and an answer from the web carries the page it came from."
+        },
+        {
+          "type": "new",
+          "text": "Usage shows web searches and their cost under Cost per feature."
+        }
       ]
     },
     "2.57.2": {
       "breaking": false,
       "title": "One chat per person",
       "changes": [
-        { "type": "fixed", "text": "A direct chat set up under a phone number now answers the person's first message even when WhatsApp sends it from its private id; the two no longer show as separate chats." },
-        { "type": "fixed", "text": "Chats that already appear twice become one with the person's next message: the agent, on/off, private and memory stay together (private is kept if either had it)." }
+        {
+          "type": "fixed",
+          "text": "A direct chat set up under a phone number now answers the person's first message even when WhatsApp sends it from its private id; the two no longer show as separate chats."
+        },
+        {
+          "type": "fixed",
+          "text": "Chats that already appear twice become one with the person's next message: the agent, on/off, private and memory stay together (private is kept if either had it)."
+        }
       ]
     },
     "2.57.1": {
       "breaking": false,
       "title": "The AI picks the moment for a GIF",
       "changes": [
-        { "type": "improved", "text": "With Proactively or Often, the AI decides at the end of every answer whether a GIF fits and which mood, so any celebration, festival or good news counts, in any language. Serious topics still never get one." },
-        { "type": "improved", "text": "The How it uses it card shows how many GIFs were shared in the last 7 days and how many the AI picked." }
+        {
+          "type": "improved",
+          "text": "With Proactively or Often, the AI decides at the end of every answer whether a GIF fits and which mood, so any celebration, festival or good news counts, in any language. Serious topics still never get one."
+        },
+        {
+          "type": "improved",
+          "text": "The How it uses it card shows how many GIFs were shared in the last 7 days and how many the AI picked."
+        }
       ]
     },
     "2.57.0": {
       "breaking": false,
       "title": "One setting for GIFs, in one message",
       "changes": [
-        { "type": "improved", "text": "\"Share GIFs on its own\" is now part of When to use it: Proactively adds one on clear moments, Often also on jokes, welcomes and praise. Your current choice is kept." },
-        { "type": "improved", "text": "A short answer and its GIF now arrive as one message: the GIF with the answer as its caption." },
-        { "type": "improved", "text": "Festival greetings like \"happy Diwali\" or \"happy Pongal\" now count as celebrations." }
+        {
+          "type": "improved",
+          "text": "\"Share GIFs on its own\" is now part of When to use it: Proactively adds one on clear moments, Often also on jokes, welcomes and praise. Your current choice is kept."
+        },
+        {
+          "type": "improved",
+          "text": "A short answer and its GIF now arrive as one message: the GIF with the answer as its caption."
+        },
+        {
+          "type": "improved",
+          "text": "Festival greetings like \"happy Diwali\" or \"happy Pongal\" now count as celebrations."
+        }
       ]
     },
     "2.56.1": {
       "breaking": false,
       "title": "Proactively shares GIFs",
       "changes": [
-        { "type": "fixed", "text": "Choosing Proactively for a GIF or sticker service now shares them on its own (Sometimes) unless you set sharing yourself; the How it uses it summary updates as you change it." }
+        {
+          "type": "fixed",
+          "text": "Choosing Proactively for a GIF or sticker service now shares them on its own (Sometimes) unless you set sharing yourself; the How it uses it summary updates as you change it."
+        }
       ]
     },
     "2.56.0": {
@@ -92,28 +166,58 @@
       "title": "Steadier when a service or provider is slow",
       "summary": "One tool service or model provider that does not answer no longer holds up replies or screens, and parts that fail to load now say so with Retry.",
       "changes": [
-        { "type": "improved", "text": "A tool service that does not answer delays a reply by a few seconds at most, once, instead of up to two minutes on every message." },
-        { "type": "improved", "text": "The Models screen opens at once even when a provider is down, so you can still fix or remove it." },
-        { "type": "improved", "text": "Settings opens at once: each section loads when you open it, and a change there no longer resets what you typed elsewhere in it." },
-        { "type": "fixed", "text": "Sharing GIFs on its own now works for everyone in a group, not only organizers, for services added from the Registry." },
-        { "type": "improved", "text": "Parts of Server, Usage, People and an agent's Tools page that fail to load show why, with Retry, instead of disappearing; a record that only failed to load is no longer called deleted." },
-        { "type": "fixed", "text": "Schedules and the morning brief still run when the server restarts or updates in their minute, and a failed scheduled post is tried again." },
-        { "type": "improved", "text": "When a service cannot be reached, the panel says why in plain words." },
-        { "type": "fixed", "text": "After setting up a direct chat, the panel opens that chat." }
+        {
+          "type": "improved",
+          "text": "A tool service that does not answer delays a reply by a few seconds at most, once, instead of up to two minutes on every message."
+        },
+        {
+          "type": "improved",
+          "text": "The Models screen opens at once even when a provider is down, so you can still fix or remove it."
+        },
+        {
+          "type": "improved",
+          "text": "Settings opens at once: each section loads when you open it, and a change there no longer resets what you typed elsewhere in it."
+        },
+        {
+          "type": "fixed",
+          "text": "Sharing GIFs on its own now works for everyone in a group, not only organizers, for services added from the Registry."
+        },
+        {
+          "type": "improved",
+          "text": "Parts of Server, Usage, People and an agent's Tools page that fail to load show why, with Retry, instead of disappearing; a record that only failed to load is no longer called deleted."
+        },
+        {
+          "type": "fixed",
+          "text": "Schedules and the morning brief still run when the server restarts or updates in their minute, and a failed scheduled post is tried again."
+        },
+        {
+          "type": "improved",
+          "text": "When a service cannot be reached, the panel says why in plain words."
+        },
+        {
+          "type": "fixed",
+          "text": "After setting up a direct chat, the panel opens that chat."
+        }
       ]
     },
     "2.55.2": {
       "breaking": false,
       "title": "How it uses it is easier to find",
       "changes": [
-        { "type": "improved", "text": "How it uses it is now a card right under each tool service's name (on an agent's Tools page and in Settings, Tool services), showing what it does now, with Change to open it." }
+        {
+          "type": "improved",
+          "text": "How it uses it is now a card right under each tool service's name (on an agent's Tools page and in Settings, Tool services), showing what it does now, with Change to open it."
+        }
       ]
     },
     "2.55.1": {
       "breaking": false,
       "title": "Tool settings show at once",
       "changes": [
-        { "type": "fixed", "text": "On an agent's Tools page, How it uses it now shows right away under every tool service, instead of only after the service answered (a slow or signed-out service could hide it). It stays open while the page fills in." }
+        {
+          "type": "fixed",
+          "text": "On an agent's Tools page, How it uses it now shows right away under every tool service, instead of only after the service answered (a slow or signed-out service could hide it). It stays open while the page fills in."
+        }
       ]
     },
     "2.55.0": {
@@ -121,19 +225,40 @@
       "title": "Tell agents how to use each tool, and GIFs at the right moments by themselves",
       "summary": "Every tool service now has a short How it uses it section (Settings, Tool services, for all agents; an agent's Tools page for just that agent): when to use it, how carefully it changes things, whether it shares GIFs or stickers on its own, and limits. How risky a tool is now comes from what the tool itself says it does, so read-only tools never ask and deletes always do. Agents whose instructions asked for GIFs now share them on their own; you can shorten those instructions.",
       "changes": [
-        { "type": "new", "text": "How it uses it, per tool service: when to use it (only when asked, when useful, proactively) with a note, how carefully it changes things, and limits per reply, per day and direct messages only. Set it once for all agents and change it for one agent." },
-        { "type": "new", "text": "Share GIFs or stickers on its own (sometimes or often, with style words like \"Telugu movie reactions\"): one fitting GIF after the answer at celebrations, thank-yous and jokes, even with a cheap model. Never on serious topics, no repeats; only mood words are searched, never names." },
-        { "type": "improved", "text": "Whether a change asks first now follows what each tool declares (read-only, change or destructive), the same for the app's own tools; you can correct a tool in the tool list." },
-        { "type": "improved", "text": "Agents whose instructions asked for GIFs now share them on their own, set to often." },
-        { "type": "improved", "text": "Registration and order lists (pages and agent answers) load faster." },
-        { "type": "removed", "text": "The old risk rules based on tool names, and the per-agent risk lists in agent files." }
+        {
+          "type": "new",
+          "text": "How it uses it, per tool service: when to use it (only when asked, when useful, proactively) with a note, how carefully it changes things, and limits per reply, per day and direct messages only. Set it once for all agents and change it for one agent."
+        },
+        {
+          "type": "new",
+          "text": "Share GIFs or stickers on its own (sometimes or often, with style words like \"Telugu movie reactions\"): one fitting GIF after the answer at celebrations, thank-yous and jokes, even with a cheap model. Never on serious topics, no repeats; only mood words are searched, never names."
+        },
+        {
+          "type": "improved",
+          "text": "Whether a change asks first now follows what each tool declares (read-only, change or destructive), the same for the app's own tools; you can correct a tool in the tool list."
+        },
+        {
+          "type": "improved",
+          "text": "Agents whose instructions asked for GIFs now share them on their own, set to often."
+        },
+        {
+          "type": "improved",
+          "text": "Registration and order lists (pages and agent answers) load faster."
+        },
+        {
+          "type": "removed",
+          "text": "The old risk rules based on tool names, and the per-agent risk lists in agent files."
+        }
       ]
     },
     "2.54.1": {
       "breaking": false,
       "title": "Follow-ups without the wake word work with Act on clear requests",
       "changes": [
-        { "type": "fixed", "text": "A follow-up without the wake word (\"should go to the shopping list\", \"Yes\") is now treated as part of the conversation: small changes are applied, and a plain yes confirms a change that was waiting." }
+        {
+          "type": "fixed",
+          "text": "A follow-up without the wake word (\"should go to the shopping list\", \"Yes\") is now treated as part of the conversation: small changes are applied, and a plain yes confirms a change that was waiting."
+        }
       ]
     },
     "2.54.0": {
@@ -141,11 +266,26 @@
       "title": "Agents act on clear requests instead of asking again and again",
       "summary": "Each agent has a new setting, How sure before changing things (agent page, Tools). By default an organizer's clear request is the go-ahead: the agent makes a small change in the same answer and says what changed, instead of asking \"Shall I save?\" after every message. Deletes, payments, sends and changes to someone else's registration or duty still wait for a yes, and every change made without asking is listed in Activity. If you wrote \"always ask before saving\" into an agent's instructions, you can remove it now.",
       "changes": [
-        { "type": "new", "text": "How sure before changing things, per agent: Ask first, Act on clear requests (default) or Act and report." },
-        { "type": "improved", "text": "An organizer's clear request is applied in the same answer, with \"say undo to revert\" when the tool service can undo; follow-up tweaks are applied without asking again." },
-        { "type": "improved", "text": "Deletes, payments and refunds, sends to lists and changes to someone else's registration or duty always wait for a yes; this is checked by the app, not only by the agent's instructions." },
-        { "type": "new", "text": "Activity: every change made without asking is marked, and the agent's Tools section links to just those changes." },
-        { "type": "improved", "text": "Tool services that preview changes, like panduga.ch, are recognised by themselves; their changes follow the agent's setting." }
+        {
+          "type": "new",
+          "text": "How sure before changing things, per agent: Ask first, Act on clear requests (default) or Act and report."
+        },
+        {
+          "type": "improved",
+          "text": "An organizer's clear request is applied in the same answer, with \"say undo to revert\" when the tool service can undo; follow-up tweaks are applied without asking again."
+        },
+        {
+          "type": "improved",
+          "text": "Deletes, payments and refunds, sends to lists and changes to someone else's registration or duty always wait for a yes; this is checked by the app, not only by the agent's instructions."
+        },
+        {
+          "type": "new",
+          "text": "Activity: every change made without asking is marked, and the agent's Tools section links to just those changes."
+        },
+        {
+          "type": "improved",
+          "text": "Tool services that preview changes, like panduga.ch, are recognised by themselves; their changes follow the agent's setting."
+        }
       ]
     },
     "2.53.0": {
@@ -153,13 +293,34 @@
       "title": "Every promise in one list, more languages, and the cost of each feature",
       "summary": "People → Promises shows what people promised across all your agents, overdue first, and lets you finish, reopen, re-date or delete them. Agents now recognise Indian, Arabic, Cyrillic, Greek and East Asian languages, and Telugu or Hindi typed in Latin letters. Usage shows what each feature costs.",
       "changes": [
-        { "type": "new", "text": "People → Promises: every agent's promises in one list (open, overdue, done), filtered by person, agent or chat, with links to the person and the message they came from. Mark done, reopen, change the due date, edit or delete." },
-        { "type": "new", "text": "Organizers can ask their agent what is still promised in their chats and mark promises done, reopen them or change the date; others can mark their own done." },
-        { "type": "new", "text": "People's language now includes Telugu, Hindi, Tamil, Kannada, Malayalam, Bengali, Gujarati, Punjabi, Urdu, Arabic, Russian, Ukrainian, Greek, Hebrew, Thai, Chinese, Japanese and Korean, and Telugu or Hindi typed in Latin letters (\"ela unnaru\"), so agents answer the way people write." },
-        { "type": "improved", "text": "A learned language changes only after several messages, mixed Telugu and English messages follow what a person mostly writes, and a language you set is never changed." },
-        { "type": "new", "text": "Usage → Cost per feature: tokens and cost of agent answers (light and strong), judged group messages, summaries, promises, lessons, self-check, catch-ups, voice and pictures, sending, surveys, the AI helper and the owner assistant, one line each." },
-        { "type": "fixed", "text": "A person's WhatsApp messages were counted twice when learning their language and usual hours." },
-        { "type": "removed", "text": "The Kind tab under Usage → Breakdown: Cost per feature replaces it." }
+        {
+          "type": "new",
+          "text": "People → Promises: every agent's promises in one list (open, overdue, done), filtered by person, agent or chat, with links to the person and the message they came from. Mark done, reopen, change the due date, edit or delete."
+        },
+        {
+          "type": "new",
+          "text": "Organizers can ask their agent what is still promised in their chats and mark promises done, reopen them or change the date; others can mark their own done."
+        },
+        {
+          "type": "new",
+          "text": "People's language now includes Telugu, Hindi, Tamil, Kannada, Malayalam, Bengali, Gujarati, Punjabi, Urdu, Arabic, Russian, Ukrainian, Greek, Hebrew, Thai, Chinese, Japanese and Korean, and Telugu or Hindi typed in Latin letters (\"ela unnaru\"), so agents answer the way people write."
+        },
+        {
+          "type": "improved",
+          "text": "A learned language changes only after several messages, mixed Telugu and English messages follow what a person mostly writes, and a language you set is never changed."
+        },
+        {
+          "type": "new",
+          "text": "Usage → Cost per feature: tokens and cost of agent answers (light and strong), judged group messages, summaries, promises, lessons, self-check, catch-ups, voice and pictures, sending, surveys, the AI helper and the owner assistant, one line each."
+        },
+        {
+          "type": "fixed",
+          "text": "A person's WhatsApp messages were counted twice when learning their language and usual hours."
+        },
+        {
+          "type": "removed",
+          "text": "The Kind tab under Usage → Breakdown: Cost per feature replaces it."
+        }
       ]
     },
     "2.52.0": {
@@ -288,58 +449,124 @@
       "breaking": false,
       "title": "An easier first day for new owners",
       "changes": [
-        { "type": "improved", "text": "Getting started accepts Telegram for its first step: a connected Telegram bot is a start too, and step one links to it." },
-        { "type": "improved", "text": "The model step explains the free start in plain words: sign up at OpenRouter, create a key, paste it." },
-        { "type": "improved", "text": "A fresh Overview is calmer: while Getting started is open, no row of red status chips and no cards that repeat its steps." },
-        { "type": "improved", "text": "The installer says what to do when something fails, warns when your domain does not point to the server yet, and ends with where to go next." },
-        { "type": "new", "text": "A troubleshooting guide for the ten most common first-day problems, and a Question or help form on GitHub." },
-        { "type": "fixed", "text": "Agents list who has not paid and who registered as fast as before 2.47.0 again." }
+        {
+          "type": "improved",
+          "text": "Getting started accepts Telegram for its first step: a connected Telegram bot is a start too, and step one links to it."
+        },
+        {
+          "type": "improved",
+          "text": "The model step explains the free start in plain words: sign up at OpenRouter, create a key, paste it."
+        },
+        {
+          "type": "improved",
+          "text": "A fresh Overview is calmer: while Getting started is open, no row of red status chips and no cards that repeat its steps."
+        },
+        {
+          "type": "improved",
+          "text": "The installer says what to do when something fails, warns when your domain does not point to the server yet, and ends with where to go next."
+        },
+        {
+          "type": "new",
+          "text": "A troubleshooting guide for the ten most common first-day problems, and a Question or help form on GitHub."
+        },
+        {
+          "type": "fixed",
+          "text": "Agents list who has not paid and who registered as fast as before 2.47.0 again."
+        }
       ]
     },
     "2.47.0": {
       "breaking": false,
       "title": "Calmer, clearer People, events, orders, sending and surveys",
       "changes": [
-        { "type": "improved", "text": "Dates, amounts and phone numbers read the same everywhere, in your language's format, with \"tomorrow\" or \"6 days ago\" when it is close." },
-        { "type": "new", "text": "An event's page and a survey's page list the messages and campaigns sent to their people, with a row to send a new one." },
-        { "type": "improved", "text": "A message's page shows each person as a row with their state (Sent, Replied, Said stop, Waiting), the wording they got, and a tap to their page; a survey's page does the same for answers, finished first." },
-        { "type": "improved", "text": "Orders past their due date say Overdue, and an order's page says how much is left and how late it is." },
-        { "type": "improved", "text": "On a phone, People's switch shows Events, Orders, Sending and Surveys instead of hiding them off-screen." },
-        { "type": "improved", "text": "Past events show how many people came; registrations and duties have a quiet ⋯ instead of a button on every row." },
-        { "type": "improved", "text": "Sending pace: tapping Careful, Normal or Faster saves at once. Updates settings save as you change them, with clear labels." },
-        { "type": "improved", "text": "Shorter help texts on Sending, New message, Modules, Sending pace and Telegram; the details are behind ?." }
+        {
+          "type": "improved",
+          "text": "Dates, amounts and phone numbers read the same everywhere, in your language's format, with \"tomorrow\" or \"6 days ago\" when it is close."
+        },
+        {
+          "type": "new",
+          "text": "An event's page and a survey's page list the messages and campaigns sent to their people, with a row to send a new one."
+        },
+        {
+          "type": "improved",
+          "text": "A message's page shows each person as a row with their state (Sent, Replied, Said stop, Waiting), the wording they got, and a tap to their page; a survey's page does the same for answers, finished first."
+        },
+        {
+          "type": "improved",
+          "text": "Orders past their due date say Overdue, and an order's page says how much is left and how late it is."
+        },
+        {
+          "type": "improved",
+          "text": "On a phone, People's switch shows Events, Orders, Sending and Surveys instead of hiding them off-screen."
+        },
+        {
+          "type": "improved",
+          "text": "Past events show how many people came; registrations and duties have a quiet ⋯ instead of a button on every row."
+        },
+        {
+          "type": "improved",
+          "text": "Sending pace: tapping Careful, Normal or Faster saves at once. Updates settings save as you change them, with clear labels."
+        },
+        {
+          "type": "improved",
+          "text": "Shorter help texts on Sending, New message, Modules, Sending pace and Telegram; the details are behind ?."
+        }
       ]
     },
     "2.46.3": {
       "breaking": false,
       "title": "Steadier speed checks",
       "changes": [
-        { "type": "fixed", "text": "The automatic speed checks no longer fail at random on a busy build machine; real slowdowns are still caught." }
+        {
+          "type": "fixed",
+          "text": "The automatic speed checks no longer fail at random on a busy build machine; real slowdowns are still caught."
+        }
       ]
     },
     "2.46.2": {
       "breaking": false,
       "title": "Clearer guide for forks",
       "changes": [
-        { "type": "improved", "text": "The forking guide now says to let GitHub Actions open pull requests before running Fork setup, and what to do if the set-up pull request does not appear." }
+        {
+          "type": "improved",
+          "text": "The forking guide now says to let GitHub Actions open pull requests before running Fork setup, and what to do if the set-up pull request does not appear."
+        }
       ]
     },
     "2.46.1": {
       "breaking": false,
       "title": "Duniya has moved to github.com/vikramgorla/duniya",
       "changes": [
-        { "type": "improved", "text": "The project now lives at github.com/vikramgorla/duniya and its website at vikramgorla.github.io/duniya. Old links to the repository keep working, and your server keeps updating as before." }
+        {
+          "type": "improved",
+          "text": "The project now lives at github.com/vikramgorla/duniya and its website at vikramgorla.github.io/duniya. Old links to the repository keep working, and your server keeps updating as before."
+        }
       ]
     },
     "2.46.0": {
       "breaking": false,
       "title": "Update source, forks and Duniya for WhatsApp and Telegram",
       "changes": [
-        { "type": "new", "text": "Settings → Updates shows where updates come from and lets you switch to a fork or another GitHub repository (sudo duniya source owner/name does the same on the server). Its releases are checked first; nothing changes if that fails." },
-        { "type": "new", "text": "Forks set themselves up: on a fork, a workflow points the install command, website, buttons and image at the fork and opens a pull request." },
-        { "type": "new", "text": "Duniya is MIT licensed." },
-        { "type": "improved", "text": "AI assistants connected to the admin MCP server see a title and complete safety hints (read-only, destructive, repeatable, reaches outside) for every tool, as app directories require." },
-        { "type": "improved", "text": "The project is called Duniya everywhere, for WhatsApp and Telegram. Newly linked WhatsApp numbers show as \"Duniya\" in your phone's Linked devices. Nothing changes on your server." }
+        {
+          "type": "new",
+          "text": "Settings → Updates shows where updates come from and lets you switch to a fork or another GitHub repository (sudo duniya source owner/name does the same on the server). Its releases are checked first; nothing changes if that fails."
+        },
+        {
+          "type": "new",
+          "text": "Forks set themselves up: on a fork, a workflow points the install command, website, buttons and image at the fork and opens a pull request."
+        },
+        {
+          "type": "new",
+          "text": "Duniya is MIT licensed."
+        },
+        {
+          "type": "improved",
+          "text": "AI assistants connected to the admin MCP server see a title and complete safety hints (read-only, destructive, repeatable, reaches outside) for every tool, as app directories require."
+        },
+        {
+          "type": "improved",
+          "text": "The project is called Duniya everywhere, for WhatsApp and Telegram. Newly linked WhatsApp numbers show as \"Duniya\" in your phone's Linked devices. Nothing changes on your server."
+        }
       ]
     },
     "2.45.0": {
@@ -347,14 +574,38 @@
       "title": "Surveys and campaigns",
       "summary": "Two additions for reaching people. Surveys (a new module): a few questions people answer in the chat, where the agent asks one at a time, or with their own link; results with bars, each person's answers, CSV. Campaigns (in Lists and sending): a few messages over days, confirmed once, where follow-ups skip people who replied, registered, paid or answered. Same consent, pace and stop signals as every send.",
       "changes": [
-        { "type": "new", "text": "Settings → Modules → Surveys: questions with one or several choices, a number or a short text; required or optional." },
-        { "type": "new", "text": "People answer in the chat (the agent asks the next question and saves each answer, checked) or on their own link page; no sign-in." },
-        { "type": "new", "text": "Survey results: counts per choice, averages, the latest notes, each person's answers, CSV; a person's page lists their answers." },
-        { "type": "new", "text": "Send a survey with any message: {survey} and each person's own {survey_link}." },
-        { "type": "new", "text": "People → Sending → New campaign: messages and waits of some days, confirmed once; a campaign page with each step's progress, pause, resume and stop." },
-        { "type": "new", "text": "Campaign follow-ups skip people who replied, said stop, registered for the event, paid for it or finished the survey; an optional last day." },
-        { "type": "new", "text": "AI assistants and the owner assistant can make surveys, read the answers and start, pause or stop campaigns." },
-        { "type": "improved", "text": "The orders of one event load the same quick way on large servers." }
+        {
+          "type": "new",
+          "text": "Settings → Modules → Surveys: questions with one or several choices, a number or a short text; required or optional."
+        },
+        {
+          "type": "new",
+          "text": "People answer in the chat (the agent asks the next question and saves each answer, checked) or on their own link page; no sign-in."
+        },
+        {
+          "type": "new",
+          "text": "Survey results: counts per choice, averages, the latest notes, each person's answers, CSV; a person's page lists their answers."
+        },
+        {
+          "type": "new",
+          "text": "Send a survey with any message: {survey} and each person's own {survey_link}."
+        },
+        {
+          "type": "new",
+          "text": "People → Sending → New campaign: messages and waits of some days, confirmed once; a campaign page with each step's progress, pause, resume and stop."
+        },
+        {
+          "type": "new",
+          "text": "Campaign follow-ups skip people who replied, said stop, registered for the event, paid for it or finished the survey; an optional last day."
+        },
+        {
+          "type": "new",
+          "text": "AI assistants and the owner assistant can make surveys, read the answers and start, pause or stop campaigns."
+        },
+        {
+          "type": "improved",
+          "text": "The orders of one event load the same quick way on large servers."
+        }
       ]
     },
     "2.44.0": {
@@ -362,14 +613,38 @@
       "title": "Lists and sending: message the families, with consent",
       "summary": "A new module under Settings → Modules. Send a message to a list, a tag, a household, an event's families or everyone who still owes. Only people who said yes get it (checked before every message), each person gets their own wording with their own facts, and it goes out one at a time at a person's pace on WhatsApp (or fast on Telegram). Nothing is sent before you confirm the preview. Pacing lowers the risk of a WhatsApp ban; it does not remove it, and WhatsApp's terms restrict bulk messaging.",
       "changes": [
-        { "type": "new", "text": "People → Sending: a message to a list, a tag, a household, people registered for an event, or people with an open order; or one post in a group." },
-        { "type": "new", "text": "A preview before anything is sent: who gets it, on which app, how long it takes, who is skipped and why, and three sample messages." },
-        { "type": "new", "text": "Consent is checked before every message (updates or marketing; not asked counts as no). A reply \"stop\" records no and confirms once; \"start\" undoes it." },
-        { "type": "new", "text": "Each person gets their own wording with their name, household, event and open amount; facts are never invented." },
-        { "type": "new", "text": "The sending pace drives it: sending hours, typing, random gaps, a longer pause, a daily limit, slower for people who never wrote. It waits for tomorrow by itself at the limit." },
-        { "type": "new", "text": "Runs pause and tell you when someone says stop, several people in a row do not answer, messages fail, or WhatsApp logs out." },
-        { "type": "new", "text": "Payment reminders: Send reminders on Orders, or automatically a few days before the due date per event. Events: Message registered people (one message per household)." },
-        { "type": "new", "text": "Agents can prepare a message to a list for an organizer to confirm; anyone can tell the agent they want no more messages. AI assistants can send, pause, resume and stop." }
+        {
+          "type": "new",
+          "text": "People → Sending: a message to a list, a tag, a household, people registered for an event, or people with an open order; or one post in a group."
+        },
+        {
+          "type": "new",
+          "text": "A preview before anything is sent: who gets it, on which app, how long it takes, who is skipped and why, and three sample messages."
+        },
+        {
+          "type": "new",
+          "text": "Consent is checked before every message (updates or marketing; not asked counts as no). A reply \"stop\" records no and confirms once; \"start\" undoes it."
+        },
+        {
+          "type": "new",
+          "text": "Each person gets their own wording with their name, household, event and open amount; facts are never invented."
+        },
+        {
+          "type": "new",
+          "text": "The sending pace drives it: sending hours, typing, random gaps, a longer pause, a daily limit, slower for people who never wrote. It waits for tomorrow by itself at the limit."
+        },
+        {
+          "type": "new",
+          "text": "Runs pause and tell you when someone says stop, several people in a row do not answer, messages fail, or WhatsApp logs out."
+        },
+        {
+          "type": "new",
+          "text": "Payment reminders: Send reminders on Orders, or automatically a few days before the due date per event. Events: Message registered people (one message per household)."
+        },
+        {
+          "type": "new",
+          "text": "Agents can prepare a message to a list for an organizer to confirm; anyone can tell the agent they want no more messages. AI assistants can send, pause, resume and stop."
+        }
       ]
     },
     "2.43.0": {
@@ -377,12 +652,30 @@
       "title": "Events, orders and payments",
       "summary": "Two new modules under Settings → Modules. Events: registrations with adults and kids from the household, a waiting list that moves up by itself, organizer confirmation, duties. Orders and payments: price lists turn registrations into orders, part payments and refunds with your own ways to pay. Agents register people and answer \"what do I owe?\"; organizers' changes wait for confirm. Both are off until you switch them on.",
       "changes": [
-        { "type": "new", "text": "Settings → Modules: switch Events and Orders and payments on or off. Off keeps their data." },
-        { "type": "new", "text": "Events: places, deadline, one currency, registration per household or per person, automatic or organizer confirmation, a waiting list that fills by itself, duties, attendance and CSV." },
-        { "type": "new", "text": "People can register themselves or their family through an agent, take a duty and ask what they owe; organizers register others, confirm, mark paid and refund with a confirm code." },
-        { "type": "new", "text": "Orders and payments: an event's price list (adult, kid, kids under an age free) makes the order; record part payments and refunds with your own ways to pay; totals per event; a daily message about orders due." },
-        { "type": "improved", "text": "A person's and a household's page show their registrations, duties and orders; merge, export and erase include them." },
-        { "type": "removed", "text": "The one-time moves of 2.40 (chats people wrote in, organizer numbers to people, old contact tool rules) ran on your server already and are gone." }
+        {
+          "type": "new",
+          "text": "Settings → Modules: switch Events and Orders and payments on or off. Off keeps their data."
+        },
+        {
+          "type": "new",
+          "text": "Events: places, deadline, one currency, registration per household or per person, automatic or organizer confirmation, a waiting list that fills by itself, duties, attendance and CSV."
+        },
+        {
+          "type": "new",
+          "text": "People can register themselves or their family through an agent, take a duty and ask what they owe; organizers register others, confirm, mark paid and refund with a confirm code."
+        },
+        {
+          "type": "new",
+          "text": "Orders and payments: an event's price list (adult, kid, kids under an age free) makes the order; record part payments and refunds with your own ways to pay; totals per event; a daily message about orders due."
+        },
+        {
+          "type": "improved",
+          "text": "A person's and a household's page show their registrations, duties and orders; merge, export and erase include them."
+        },
+        {
+          "type": "removed",
+          "text": "The one-time moves of 2.40 (chats people wrote in, organizer numbers to people, old contact tool rules) ran on your server already and are gone."
+        }
       ]
     },
     "2.42.0": {
@@ -390,20 +683,44 @@
       "title": "Reads and types at a person's pace",
       "summary": "Messages in chats that are on now get blue ticks after a natural pause, and replies show typing for a time that fits them. Normal pace is on by default; change it under Settings → Sending pace.",
       "changes": [
-        { "type": "new", "text": "Read receipts: messages in chats that are on are marked read after a short random pause, before the agent types; messages it leaves alone are read too. Chats that are off are never touched. A switch turns it off." },
-        { "type": "improved", "text": "Typing… now lasts as long as the reply would take to type (at most 8 seconds) instead of a quick flash." },
-        { "type": "new", "text": "Settings → Sending pace: Careful, Normal or Faster, or your own ranges for read delay, typing speed, gaps between messages, new chats a day and sending hours." },
-        { "type": "new", "text": "Intros to new direct chats count toward a daily limit (40 by default); a number linked in the last week starts lower and grows over the week." }
+        {
+          "type": "new",
+          "text": "Read receipts: messages in chats that are on are marked read after a short random pause, before the agent types; messages it leaves alone are read too. Chats that are off are never touched. A switch turns it off."
+        },
+        {
+          "type": "improved",
+          "text": "Typing… now lasts as long as the reply would take to type (at most 8 seconds) instead of a quick flash."
+        },
+        {
+          "type": "new",
+          "text": "Settings → Sending pace: Careful, Normal or Faster, or your own ranges for read delay, typing speed, gaps between messages, new chats a day and sending hours."
+        },
+        {
+          "type": "new",
+          "text": "Intros to new direct chats count toward a daily limit (40 by default); a number linked in the last week starts lower and grows over the week."
+        }
       ]
     },
     "2.41.0": {
       "breaking": false,
       "title": "Delete stored messages; calmer history loading",
       "changes": [
-        { "type": "fixed", "text": "When contacts from your phone are added to People in the background, an open People list now shows them right away instead of waiting for a refresh." },
-        { "type": "new", "text": "Delete a stored message: tap it in a chat's Messages, then Delete. The agent forgets it (the chat summary is rebuilt without it)." },
-        { "type": "improved", "text": "A message deleted for everyone in WhatsApp is now removed from the stored messages too." },
-        { "type": "fixed", "text": "Loading earlier messages from your phone no longer retries for days: it tries 3 more times, each from another message, then stops." }
+        {
+          "type": "fixed",
+          "text": "When contacts from your phone are added to People in the background, an open People list now shows them right away instead of waiting for a refresh."
+        },
+        {
+          "type": "new",
+          "text": "Delete a stored message: tap it in a chat's Messages, then Delete. The agent forgets it (the chat summary is rebuilt without it)."
+        },
+        {
+          "type": "improved",
+          "text": "A message deleted for everyone in WhatsApp is now removed from the stored messages too."
+        },
+        {
+          "type": "fixed",
+          "text": "Loading earlier messages from your phone no longer retries for days: it tries 3 more times, each from another message, then stops."
+        }
       ]
     },
     "2.40.0": {
@@ -411,23 +728,56 @@
       "title": "People and agents: agents know who is writing, everyone is in People",
       "summary": "Everyone from your chats that are on and from your phone's contacts is now in People by itself. Agents get a short card about who is writing and People tools, and see only the people of their own chats unless you choose otherwise. Nothing to do: saved organizer numbers move to the person on the first start.",
       "changes": [
-        { "type": "new", "text": "Members of groups that are on, and every contact synced from your phone, become people by themselves. The People count is everyone; filter by where they came from: chats, your phone or added by you." },
-        { "type": "new", "text": "Agents know who is writing: a short card with name, nickname, household, tags and your notes (never message text)." },
-        { "type": "new", "text": "People tools for agents: find a person, see their card, add a note, tag them or add them to a list. Changes about someone else wait for an organizer's confirm code." },
-        { "type": "new", "text": "People access per agent: the people of its own chats (default), plus lists you share with it, or everyone in People, or nobody. When you write to an agent yourself, it sees everyone." },
-        { "type": "new", "text": "Organizers can be people or a list (for example the committee), and a person keeps the role on WhatsApp and Telegram." },
-        { "type": "new", "text": "Consent on each person's page: saw the privacy notice (recorded by itself), may receive updates, may receive marketing." },
-        { "type": "improved", "text": "A person's page shows their groups (also where they are only a member) and the agents that can see them." },
-        { "type": "removed", "text": "Erase is no longer in the panel: Hide keeps someone out of People and agents, and Show again brings them back. A true delete for privacy requests stays available to AI assistants with the admin tools, with a confirmation." },
-        { "type": "removed", "text": "The line about names from your phone on the People screen: those names are people now." }
+        {
+          "type": "new",
+          "text": "Members of groups that are on, and every contact synced from your phone, become people by themselves. The People count is everyone; filter by where they came from: chats, your phone or added by you."
+        },
+        {
+          "type": "new",
+          "text": "Agents know who is writing: a short card with name, nickname, household, tags and your notes (never message text)."
+        },
+        {
+          "type": "new",
+          "text": "People tools for agents: find a person, see their card, add a note, tag them or add them to a list. Changes about someone else wait for an organizer's confirm code."
+        },
+        {
+          "type": "new",
+          "text": "People access per agent: the people of its own chats (default), plus lists you share with it, or everyone in People, or nobody. When you write to an agent yourself, it sees everyone."
+        },
+        {
+          "type": "new",
+          "text": "Organizers can be people or a list (for example the committee), and a person keeps the role on WhatsApp and Telegram."
+        },
+        {
+          "type": "new",
+          "text": "Consent on each person's page: saw the privacy notice (recorded by itself), may receive updates, may receive marketing."
+        },
+        {
+          "type": "improved",
+          "text": "A person's page shows their groups (also where they are only a member) and the agents that can see them."
+        },
+        {
+          "type": "removed",
+          "text": "Erase is no longer in the panel: Hide keeps someone out of People and agents, and Show again brings them back. A true delete for privacy requests stays available to AI assistants with the admin tools, with a confirmation."
+        },
+        {
+          "type": "removed",
+          "text": "The line about names from your phone on the People screen: those names are people now."
+        }
       ]
     },
     "2.39.1": {
       "breaking": false,
       "title": "Faster person pages and lists on large servers",
       "changes": [
-        { "type": "improved", "text": "Faster person pages, People lists and People search when there are many stored messages and people (a person's page went from about 0.2 s to a few milliseconds)." },
-        { "type": "improved", "text": "Older pages of Activity and the hourly clean-up read only what they need." }
+        {
+          "type": "improved",
+          "text": "Faster person pages, People lists and People search when there are many stored messages and people (a person's page went from about 0.2 s to a few milliseconds)."
+        },
+        {
+          "type": "improved",
+          "text": "Older pages of Activity and the hourly clean-up read only what they need."
+        }
       ]
     },
     "2.39.0": {
@@ -435,13 +785,34 @@
       "title": "People: who is who, families and kids, in one place",
       "summary": "Contacts become People (More → People). Your saved names, notes and Shared move over by themselves on the first start; nothing to do.",
       "changes": [
-        { "type": "new", "text": "People: everyone who writes in a chat that is on, one person across WhatsApp and Telegram, with their apps and last contact. Search by name, number, tag or note, and filter by app, tag, list or household." },
-        { "type": "new", "text": "A person's page with Family and ties (“parent of” shows as “child of” on the other page), notes and a timeline, tags and lists, and their chats." },
-        { "type": "new", "text": "Households with adults and kids. Kids without a phone can be added too; agents never message them, they are reached through the adults." },
-        { "type": "new", "text": "Merge two entries of the same person in one tap, with 30 days to undo. Export everything about a person, or erase them, including their stored messages." },
-        { "type": "new", "text": "Ask your owner assistant “who is Ravi's kid?” or “which household is Mia in?”; changes it suggests wait for your confirmation." },
-        { "type": "improved", "text": "Names in a chat's messages, group member lists and direct chats open the person's page; Find anything finds people, households and lists." },
-        { "type": "removed", "text": "The Contacts screen: saved names, notes and Shared moved into People." }
+        {
+          "type": "new",
+          "text": "People: everyone who writes in a chat that is on, one person across WhatsApp and Telegram, with their apps and last contact. Search by name, number, tag or note, and filter by app, tag, list or household."
+        },
+        {
+          "type": "new",
+          "text": "A person's page with Family and ties (“parent of” shows as “child of” on the other page), notes and a timeline, tags and lists, and their chats."
+        },
+        {
+          "type": "new",
+          "text": "Households with adults and kids. Kids without a phone can be added too; agents never message them, they are reached through the adults."
+        },
+        {
+          "type": "new",
+          "text": "Merge two entries of the same person in one tap, with 30 days to undo. Export everything about a person, or erase them, including their stored messages."
+        },
+        {
+          "type": "new",
+          "text": "Ask your owner assistant “who is Ravi's kid?” or “which household is Mia in?”; changes it suggests wait for your confirmation."
+        },
+        {
+          "type": "improved",
+          "text": "Names in a chat's messages, group member lists and direct chats open the person's page; Find anything finds people, households and lists."
+        },
+        {
+          "type": "removed",
+          "text": "The Contacts screen: saved names, notes and Shared moved into People."
+        }
       ]
     },
     "2.38.0": {
@@ -449,40 +820,88 @@
       "title": "Telegram: your agents in Telegram groups too",
       "summary": "Add a Telegram bot under Settings → Channels → Telegram: paste the token from @BotFather and the same agents answer in your Telegram groups and chats. Nothing of Telegram runs until you do.",
       "changes": [
-        { "type": "new", "text": "Telegram as a second channel: create a bot in @BotFather, paste its token on a one-time secure page, then add the bot to a group with one tap." },
-        { "type": "new", "text": "Telegram groups appear in Chats, off until you switch them on; agents, wake words, follow-ups, quick replies, FAQ, polls, photos and voice notes work as on WhatsApp." },
-        { "type": "new", "text": "People tap “Share my number” in a direct chat with the bot: the same phone on WhatsApp and Telegram is then the same person, with the same role. A forwarded contact never counts." },
-        { "type": "new", "text": "Your Telegram reaches your owner assistant once you shared your number with the bot." },
-        { "type": "improved", "text": "The Telegram page shows what the bot can see in groups and exactly what to change so agents can follow the whole conversation." },
-        { "type": "improved", "text": "Managing Duniya from ChatGPT or Claude: connect a Telegram bot with a one-time link and choose the agent for its direct messages." }
+        {
+          "type": "new",
+          "text": "Telegram as a second channel: create a bot in @BotFather, paste its token on a one-time secure page, then add the bot to a group with one tap."
+        },
+        {
+          "type": "new",
+          "text": "Telegram groups appear in Chats, off until you switch them on; agents, wake words, follow-ups, quick replies, FAQ, polls, photos and voice notes work as on WhatsApp."
+        },
+        {
+          "type": "new",
+          "text": "People tap “Share my number” in a direct chat with the bot: the same phone on WhatsApp and Telegram is then the same person, with the same role. A forwarded contact never counts."
+        },
+        {
+          "type": "new",
+          "text": "Your Telegram reaches your owner assistant once you shared your number with the bot."
+        },
+        {
+          "type": "improved",
+          "text": "The Telegram page shows what the bot can see in groups and exactly what to change so agents can follow the whole conversation."
+        },
+        {
+          "type": "improved",
+          "text": "Managing Duniya from ChatGPT or Claude: connect a Telegram bot with a one-time link and choose the agent for its direct messages."
+        }
       ]
     },
     "2.37.0": {
       "breaking": false,
       "title": "Agents follow the conversation in groups",
       "changes": [
-        { "type": "new", "text": "After an agent speaks in a group, people can just reply: it reads the next messages, answers or acts on the ones meant for it and stays quiet otherwise, until the group moves on." },
-        { "type": "new", "text": "In groups (agent → Where it answers): when woken + follow-ups (the default), only when woken, or whenever needed without any wake word." },
-        { "type": "improved", "text": "Wake words are tags: add one with Enter, remove it with ×. Any word works, in any case." },
-        { "type": "new", "text": "Why quiet shows messages an agent read and left alone as \"not for it\"." }
+        {
+          "type": "new",
+          "text": "After an agent speaks in a group, people can just reply: it reads the next messages, answers or acts on the ones meant for it and stays quiet otherwise, until the group moves on."
+        },
+        {
+          "type": "new",
+          "text": "In groups (agent → Where it answers): when woken + follow-ups (the default), only when woken, or whenever needed without any wake word."
+        },
+        {
+          "type": "improved",
+          "text": "Wake words are tags: add one with Enter, remove it with ×. Any word works, in any case."
+        },
+        {
+          "type": "new",
+          "text": "Why quiet shows messages an agent read and left alone as \"not for it\"."
+        }
       ]
     },
     "2.36.0": {
       "breaking": false,
       "title": "Choose tools for a role in one tap",
       "changes": [
-        { "type": "new", "text": "Each role in a tool list has an all / none tick, so you no longer tick tools one by one." },
-        { "type": "new", "text": "Everyone: all tools lets participants and organizers use every tool of a service in one tap. Confirming changes still needs an organizer." },
-        { "type": "improved", "text": "WhatsApp tools have the same All tick per role." },
-        { "type": "fixed", "text": "Loading earlier messages from your phone no longer spins and retries for days when the phone simply has nothing older (for example, a group the number joined recently)." }
+        {
+          "type": "new",
+          "text": "Each role in a tool list has an all / none tick, so you no longer tick tools one by one."
+        },
+        {
+          "type": "new",
+          "text": "Everyone: all tools lets participants and organizers use every tool of a service in one tap. Confirming changes still needs an organizer."
+        },
+        {
+          "type": "improved",
+          "text": "WhatsApp tools have the same All tick per role."
+        },
+        {
+          "type": "fixed",
+          "text": "Loading earlier messages from your phone no longer spins and retries for days when the phone simply has nothing older (for example, a group the number joined recently)."
+        }
       ]
     },
     "2.35.1": {
       "breaking": false,
       "title": "The test console remembers the conversation",
       "changes": [
-        { "type": "fixed", "text": "In an agent's Test, each message was answered on its own. The agent now sees the earlier messages of the test, so a follow-up like \"To Chary\" is understood." },
-        { "type": "new", "text": "New conversation starts the test over; changing who you test as or the chat also starts fresh." }
+        {
+          "type": "fixed",
+          "text": "In an agent's Test, each message was answered on its own. The agent now sees the earlier messages of the test, so a follow-up like \"To Chary\" is understood."
+        },
+        {
+          "type": "new",
+          "text": "New conversation starts the test over; changing who you test as or the chat also starts fresh."
+        }
       ]
     },
     "2.35.0": {
@@ -490,11 +909,26 @@
       "title": "Settings → Channels: WhatsApp has its own page, and loads only when you use it",
       "summary": "Chat apps now plug in as channels; WhatsApp is the first. Nothing changes for your numbers, chats or agents. A new server loads no WhatsApp code until you link a number, which makes it lighter and gets Duniya ready for more channels.",
       "changes": [
-        { "type": "new", "text": "Settings → Channels → WhatsApp: your numbers (link, add, unlink, direct-message agent), the memory WhatsApp uses on your server, and a switch to turn WhatsApp off without unlinking." },
-        { "type": "improved", "text": "Overview shows a short WhatsApp card; it and the WhatsApp chip open the WhatsApp page." },
-        { "type": "improved", "text": "A new server uses less memory: WhatsApp loads only when you tap Show the QR code in Getting started." },
-        { "type": "improved", "text": "Server → Health shows how much memory each channel uses." },
-        { "type": "new", "text": "ChatGPT or Claude can list your channels and switch one on or off (switching off asks you first)." }
+        {
+          "type": "new",
+          "text": "Settings → Channels → WhatsApp: your numbers (link, add, unlink, direct-message agent), the memory WhatsApp uses on your server, and a switch to turn WhatsApp off without unlinking."
+        },
+        {
+          "type": "improved",
+          "text": "Overview shows a short WhatsApp card; it and the WhatsApp chip open the WhatsApp page."
+        },
+        {
+          "type": "improved",
+          "text": "A new server uses less memory: WhatsApp loads only when you tap Show the QR code in Getting started."
+        },
+        {
+          "type": "improved",
+          "text": "Server → Health shows how much memory each channel uses."
+        },
+        {
+          "type": "new",
+          "text": "ChatGPT or Claude can list your channels and switch one on or off (switching off asks you first)."
+        }
       ],
       "data": "unchanged"
     },
@@ -502,7 +936,10 @@
       "breaking": false,
       "title": "A renamed WhatsApp group shows its new name right away",
       "changes": [
-        { "type": "improved", "text": "When a group is renamed on WhatsApp, Duniya saves the new name as soon as WhatsApp tells it, so Chats, Activity, Why quiet and the owner assistant show it at once." }
+        {
+          "type": "improved",
+          "text": "When a group is renamed on WhatsApp, Duniya saves the new name as soon as WhatsApp tells it, so Chats, Activity, Why quiet and the owner assistant show it at once."
+        }
       ]
     },
     "2.34.0": {
@@ -510,11 +947,26 @@
       "title": "Use your Claude, ChatGPT and Copilot plans through their official apps, also on a 1 GB server",
       "summary": "Models has two new providers: Claude Code (your Claude Pro or Max plan) and Codex (your ChatGPT plan). Duniya runs each vendor's own app on your server for each answer, downloaded only when you connect it. Your agents keep their tools and rules. On a 1 GB server, switch on Small server mode: one app answers at a time.",
       "changes": [
-        { "type": "new", "text": "Claude Code: use your Claude Pro or Max plan. Run claude setup-token on your computer and paste the token under Models." },
-        { "type": "new", "text": "Codex: use your ChatGPT plan through OpenAI's Codex app. Sign in from Models with a link and a one-time code; the page updates by itself." },
-        { "type": "improved", "text": "GitHub Copilot now works on 1 GB servers with Small server mode. Its helper downloads faster (about 220 MB) and stops after 2 idle minutes on small servers." },
-        { "type": "improved", "text": "Agent apps start only for an answer and only with enough free memory. One answers at a time on small servers; a waiting message gets ⏳. If an app can't start or hits its plan limit, the next model answers." },
-        { "type": "improved", "text": "Each agent app's page shows how much memory it used on your server and how fast it started." }
+        {
+          "type": "new",
+          "text": "Claude Code: use your Claude Pro or Max plan. Run claude setup-token on your computer and paste the token under Models."
+        },
+        {
+          "type": "new",
+          "text": "Codex: use your ChatGPT plan through OpenAI's Codex app. Sign in from Models with a link and a one-time code; the page updates by itself."
+        },
+        {
+          "type": "improved",
+          "text": "GitHub Copilot now works on 1 GB servers with Small server mode. Its helper downloads faster (about 220 MB) and stops after 2 idle minutes on small servers."
+        },
+        {
+          "type": "improved",
+          "text": "Agent apps start only for an answer and only with enough free memory. One answers at a time on small servers; a waiting message gets ⏳. If an app can't start or hits its plan limit, the next model answers."
+        },
+        {
+          "type": "improved",
+          "text": "Each agent app's page shows how much memory it used on your server and how fast it started."
+        }
       ],
       "data": "unchanged"
     },
@@ -522,35 +974,86 @@
       "breaking": false,
       "title": "Chats by their name everywhere, calmer Overview, shorter screens on your phone",
       "changes": [
-        { "type": "fixed", "text": "Why agents stayed quiet (and Activity, Pending, Usage, caps, the owner assistant and the admin tools) shows a group's name instead of a long number. Group names are remembered, so they show while WhatsApp is offline too." },
-        { "type": "improved", "text": "Why agents stayed quiet is grouped by chat: the chat's name, then each reason with its count and the fix as a small link (Open triggers, Switch on). Clear is behind ⋯." },
-        { "type": "improved", "text": "The update on Overview is one line: Up to date · version · checked 2m ago, with Release notes and ⋯ for Check now. The last update, its backup and the update settings are on the new Settings → Updates page." },
-        { "type": "fixed", "text": "No more thick ring around the tab or button you just tapped on Android. Keyboard users still see where they are." },
-        { "type": "improved", "text": "Usage is a quarter of its length on a phone: one Breakdown with Agents, Chats, Models, Accounts and Kind as short rows. A model's price is set from its ⋯." },
-        { "type": "improved", "text": "Server is shorter: one line about this server, Health as a summary with Details, and Logs open when you need them." },
-        { "type": "new", "text": "Each contact has a page: name, number, note, Shared, their direct chat with its agent and the groups they wrote in. A person's chat links back to it, and Find anything lists contacts." },
-        { "type": "improved", "text": "On Overview, an agent's name opens its page and Review is one tap away. Tool calls in Activity are in plain words." }
+        {
+          "type": "fixed",
+          "text": "Why agents stayed quiet (and Activity, Pending, Usage, caps, the owner assistant and the admin tools) shows a group's name instead of a long number. Group names are remembered, so they show while WhatsApp is offline too."
+        },
+        {
+          "type": "improved",
+          "text": "Why agents stayed quiet is grouped by chat: the chat's name, then each reason with its count and the fix as a small link (Open triggers, Switch on). Clear is behind ⋯."
+        },
+        {
+          "type": "improved",
+          "text": "The update on Overview is one line: Up to date · version · checked 2m ago, with Release notes and ⋯ for Check now. The last update, its backup and the update settings are on the new Settings → Updates page."
+        },
+        {
+          "type": "fixed",
+          "text": "No more thick ring around the tab or button you just tapped on Android. Keyboard users still see where they are."
+        },
+        {
+          "type": "improved",
+          "text": "Usage is a quarter of its length on a phone: one Breakdown with Agents, Chats, Models, Accounts and Kind as short rows. A model's price is set from its ⋯."
+        },
+        {
+          "type": "improved",
+          "text": "Server is shorter: one line about this server, Health as a summary with Details, and Logs open when you need them."
+        },
+        {
+          "type": "new",
+          "text": "Each contact has a page: name, number, note, Shared, their direct chat with its agent and the groups they wrote in. A person's chat links back to it, and Find anything lists contacts."
+        },
+        {
+          "type": "improved",
+          "text": "On Overview, an agent's name opens its page and Review is one tap away. Tool calls in Activity are in plain words."
+        }
       ]
     },
     "2.32.0": {
       "breaking": false,
       "title": "A chat's Messages and Memory one tap away, and the same 👍 / 👎 everywhere",
       "changes": [
-        { "type": "new", "text": "A chat's page has rows for Messages, Memory, WhatsApp group and Activity, each opening its own page. No more hunting behind ⋯." },
-        { "type": "new", "text": "In a chat's Messages, each answer shows its agent's avatar and colour, with 👍 / 👎 and Teach… right under it. A rating made there, in the agent's Review or in Activity is the same rating everywhere." },
-        { "type": "new", "text": "Review answers open the conversation at that answer (In chat ›). Activity entries link to their chat, agent and message, and a chat's Activity shows only that chat." },
-        { "type": "improved", "text": "Pending changes show the agent, what it would do in plain words and the chat, with a link to it." },
-        { "type": "improved", "text": "Usage links each agent and chat to its page and shows models by name. Activity shows models by name too (\"Claude Haiku 5.5\")." },
-        { "type": "improved", "text": "An agent's Memory links to the memory of each of its chats. Find anything lists each chat's Messages and Memory." }
+        {
+          "type": "new",
+          "text": "A chat's page has rows for Messages, Memory, WhatsApp group and Activity, each opening its own page. No more hunting behind ⋯."
+        },
+        {
+          "type": "new",
+          "text": "In a chat's Messages, each answer shows its agent's avatar and colour, with 👍 / 👎 and Teach… right under it. A rating made there, in the agent's Review or in Activity is the same rating everywhere."
+        },
+        {
+          "type": "new",
+          "text": "Review answers open the conversation at that answer (In chat ›). Activity entries link to their chat, agent and message, and a chat's Activity shows only that chat."
+        },
+        {
+          "type": "improved",
+          "text": "Pending changes show the agent, what it would do in plain words and the chat, with a link to it."
+        },
+        {
+          "type": "improved",
+          "text": "Usage links each agent and chat to its page and shows models by name. Activity shows models by name too (\"Claude Haiku 5.5\")."
+        },
+        {
+          "type": "improved",
+          "text": "An agent's Memory links to the memory of each of its chats. Find anything lists each chat's Messages and Memory."
+        }
       ]
     },
     "2.31.1": {
       "breaking": false,
       "title": "Clearer guides and a new website",
       "changes": [
-        { "type": "improved", "text": "The guides follow the path you take: install, connect WhatsApp, add a model, first agent, chats, owner assistant, everyday use, then server and reference. Shorter pages with current screenshots." },
-        { "type": "improved", "text": "A new website: what Duniya is in one line, a short tour, how it works in three steps, the features that matter, one-click install and straight answers." },
-        { "type": "removed", "text": "The one-time backup in the new format at startup (it ran once after updating to 2.31.0). Backups made by 2.30 or earlier still can't be restored: make a new one under Backups if you haven't since updating." }
+        {
+          "type": "improved",
+          "text": "The guides follow the path you take: install, connect WhatsApp, add a model, first agent, chats, owner assistant, everyday use, then server and reference. Shorter pages with current screenshots."
+        },
+        {
+          "type": "improved",
+          "text": "A new website: what Duniya is in one line, a short tour, how it works in three steps, the features that matter, one-click install and straight answers."
+        },
+        {
+          "type": "removed",
+          "text": "The one-time backup in the new format at startup (it ran once after updating to 2.31.0). Backups made by 2.30 or earlier still can't be restored: make a new one under Backups if you haven't since updating."
+        }
       ]
     },
     "2.31.0": {
@@ -558,20 +1061,44 @@
       "title": "Search what was said in every chat, and teach agents from their real answers",
       "summary": "Backups now use a new file format that needs only a few MB of memory. Backups made by 2.30 or earlier can't be restored by this version: your next scheduled backup (or Backups → Back up now) makes a new one.",
       "changes": [
-        { "type": "new", "text": "Search messages: in Find anything (press /), search the stored messages of every chat that is on, with the words marked. A result opens that chat's messages." },
-        { "type": "new", "text": "Review on each agent's page: its recent answers with the question, 👍 or 👎, and Teach… to fix a wrong answer with the AI helper (usually a new FAQ entry)." },
-        { "type": "new", "text": "Your AI assistant (ChatGPT, Claude) can search messages and list and rate an agent's answers too." },
-        { "type": "improved", "text": "Backups are compressed and encrypted while they are written, using a few MB of memory instead of several times the database size; a damaged backup is refused before anything is replaced." },
-        { "type": "improved", "text": "The Chats list, Usage by day and every message are handled faster, also with hundreds of chats." },
-        { "type": "improved", "text": "The sign-in and consent page for AI assistants looks like the rest of Duniya and runs no inline code." },
-        { "type": "removed", "text": "Restoring backups made by Duniya 2.30 or earlier. Make a new backup after updating (Backups → Back up now, or wait for the next scheduled one) so you always have one you can restore." }
+        {
+          "type": "new",
+          "text": "Search messages: in Find anything (press /), search the stored messages of every chat that is on, with the words marked. A result opens that chat's messages."
+        },
+        {
+          "type": "new",
+          "text": "Review on each agent's page: its recent answers with the question, 👍 or 👎, and Teach… to fix a wrong answer with the AI helper (usually a new FAQ entry)."
+        },
+        {
+          "type": "new",
+          "text": "Your AI assistant (ChatGPT, Claude) can search messages and list and rate an agent's answers too."
+        },
+        {
+          "type": "improved",
+          "text": "Backups are compressed and encrypted while they are written, using a few MB of memory instead of several times the database size; a damaged backup is refused before anything is replaced."
+        },
+        {
+          "type": "improved",
+          "text": "The Chats list, Usage by day and every message are handled faster, also with hundreds of chats."
+        },
+        {
+          "type": "improved",
+          "text": "The sign-in and consent page for AI assistants looks like the rest of Duniya and runs no inline code."
+        },
+        {
+          "type": "removed",
+          "text": "Restoring backups made by Duniya 2.30 or earlier. Make a new backup after updating (Backups → Back up now, or wait for the next scheduled one) so you always have one you can restore."
+        }
       ]
     },
     "2.30.1": {
       "breaking": false,
       "title": "Plan usage meters removed for every provider",
       "changes": [
-        { "type": "removed", "text": "Plan and quota meters on Models, Usage and Overview (Copilot's premium requests, OpenRouter's free requests and credit, API rate-limit headroom) and their alerts. When a provider's limit is reached, the account still pauses until the reset and another model answers." }
+        {
+          "type": "removed",
+          "text": "Plan and quota meters on Models, Usage and Overview (Copilot's premium requests, OpenRouter's free requests and credit, API rate-limit headroom) and their alerts. When a provider's limit is reached, the account still pauses until the reset and another model answers."
+        }
       ]
     },
     "2.30.0": {
@@ -579,31 +1106,70 @@
       "title": "Fast and dependable on a small server with months of history: old data is pruned by itself, a Health card, and recovery without you",
       "summary": "Duniya was measured with 300 chats, 30 agents and 200 000 stored messages on one CPU: replies are stored about 3 times faster and the panel answers in milliseconds. Old data now goes by itself every hour (you choose how long on Server → Health), a full disk or a wrong clock never breaks anything, and restarts and reconnects take care of themselves. Nothing to do on your server.",
       "changes": [
-        { "type": "new", "text": "Server → Health: database size, how many messages, activity entries and model calls are kept and since when, the last automatic clean-up and the photos & voice queue." },
-        { "type": "new", "text": "Choose how long stored messages and usage detail are kept (Server → Health → Change how long data is kept). Old data goes by itself every hour; chat summaries, notes and contacts are never pruned." },
-        { "type": "improved", "text": "Messages are stored about 3 times faster and busy servers stay calm: the database writes less often to disk and old data is no longer cleaned up while a message comes in." },
-        { "type": "new", "text": "When the disk gets full you are told; when it is almost full, stored messages and backups pause (agents keep answering) and everything resumes by itself when space is back." },
-        { "type": "improved", "text": "WhatsApp reconnects with growing pauses and tells you once if a number stays down for 15 minutes." },
-        { "type": "improved", "text": "Restarts and updates stop cleanly: replies already being written finish and the database is closed properly; after a crash the app starts again by itself." },
-        { "type": "new", "text": "When too many photos and voice notes are waiting, you hear about it (at most once an hour)." },
-        { "type": "improved", "text": "Contacts load 100 at a time with Show more, so long address books open quickly; search still covers everyone." },
-        { "type": "fixed", "text": "Two backups made in the same second no longer overwrite each other." },
-        { "type": "fixed", "text": "A server clock that jumps can no longer make Duniya delete history." }
+        {
+          "type": "new",
+          "text": "Server → Health: database size, how many messages, activity entries and model calls are kept and since when, the last automatic clean-up and the photos & voice queue."
+        },
+        {
+          "type": "new",
+          "text": "Choose how long stored messages and usage detail are kept (Server → Health → Change how long data is kept). Old data goes by itself every hour; chat summaries, notes and contacts are never pruned."
+        },
+        {
+          "type": "improved",
+          "text": "Messages are stored about 3 times faster and busy servers stay calm: the database writes less often to disk and old data is no longer cleaned up while a message comes in."
+        },
+        {
+          "type": "new",
+          "text": "When the disk gets full you are told; when it is almost full, stored messages and backups pause (agents keep answering) and everything resumes by itself when space is back."
+        },
+        {
+          "type": "improved",
+          "text": "WhatsApp reconnects with growing pauses and tells you once if a number stays down for 15 minutes."
+        },
+        {
+          "type": "improved",
+          "text": "Restarts and updates stop cleanly: replies already being written finish and the database is closed properly; after a crash the app starts again by itself."
+        },
+        {
+          "type": "new",
+          "text": "When too many photos and voice notes are waiting, you hear about it (at most once an hour)."
+        },
+        {
+          "type": "improved",
+          "text": "Contacts load 100 at a time with Show more, so long address books open quickly; search still covers everyone."
+        },
+        {
+          "type": "fixed",
+          "text": "Two backups made in the same second no longer overwrite each other."
+        },
+        {
+          "type": "fixed",
+          "text": "A server clock that jumps can no longer make Duniya delete history."
+        }
       ]
     },
     "2.29.2": {
       "breaking": false,
       "title": "ChatGPT plan limits removed from Models",
       "changes": [
-        { "type": "removed", "text": "ChatGPT's 5-hour and weekly limits on Models: ChatGPT doesn't share them with this sign-in. When a ChatGPT limit is reached, Duniya still pauses it until the reset and another model answers." }
+        {
+          "type": "removed",
+          "text": "ChatGPT's 5-hour and weekly limits on Models: ChatGPT doesn't share them with this sign-in. When a ChatGPT limit is reached, Duniya still pauses it until the reset and another model answers."
+        }
       ]
     },
     "2.29.1": {
       "breaking": false,
       "title": "ChatGPT plan limits now show up: the 5-hour and weekly limits are read from your plan",
       "changes": [
-        { "type": "fixed", "text": "ChatGPT's 5-hour and weekly limits did not appear on Models: Duniya now asks your plan for them, the way OpenAI's Codex does." },
-        { "type": "improved", "text": "If ChatGPT does not share plan usage for your sign-in, its page says so in one line instead of staying empty." }
+        {
+          "type": "fixed",
+          "text": "ChatGPT's 5-hour and weekly limits did not appear on Models: Duniya now asks your plan for them, the way OpenAI's Codex does."
+        },
+        {
+          "type": "improved",
+          "text": "If ChatGPT does not share plan usage for your sign-in, its page says so in one line instead of staying empty."
+        }
       ]
     },
     "2.29.0": {
@@ -611,16 +1177,46 @@
       "title": "Calm Agents and Chats: one row each, an agent's settings as short sections, less text everywhere",
       "summary": "Agents and Chats are now simple lists: one row per agent or chat with its switch, and the page of the one you tap beside the list (or over it on a phone). An agent's page has a short header and sections that show their current value (Character, Where it answers, People, Model, Tools…); each section saves on its own with Undo. A chat's page holds all its settings and links to its agent. Overview, More, Contacts and Settings say less and show more. Nothing to do on your server.",
       "changes": [
-        { "type": "improved", "text": "Agents is a calm list: one row per agent (name, “On · 1 chat · Auto model”, switch); the owner assistant has its own section and New agent is the last row. On a computer the agent's page opens beside the list." },
-        { "type": "improved", "text": "An agent's page is short: a header with its switch and ⋯ (Test, Change with AI, Duplicate, Export, Delete), then sections that show their current value. Each section opens its own page and saves on its own, with Undo." },
-        { "type": "new", "text": "Links and Find anything reach every section of an agent, e.g. “Tools · Car pooling”." },
-        { "type": "improved", "text": "Chats is one row per chat (its agent and members, or Off, with a short hint when an agent stayed quiet) and a page per chat with all its settings; tap the agent's name to open the agent, and the agent lists its chats." },
-        { "type": "improved", "text": "“Load the last N messages when a chat is switched on” moved to Settings → Chats & direct messages." },
-        { "type": "improved", "text": "Overview is calmer: one status line when everything is fine, Ask without the paragraph, shorter WhatsApp, server and why-quiet cards." },
-        { "type": "improved", "text": "More on the phone: compact rows, Refresh as a small icon and your account row; Sign out now asks first, so it can't be tapped by mistake." },
-        { "type": "improved", "text": "Less explanatory text on every screen: one short line, with a small ? that opens the guide. Contacts is one row per person." },
-        { "type": "improved", "text": "A provider's page in Models is calmer: the account you signed in with in one short line (partly hidden), Rename and Disconnect behind ⋯, and Add another account as one row. The list says “Connected · 8 models”." },
-        { "type": "fixed", "text": "On iPhone, text could show through the top bar while scrolling; the bar is now solid." }
+        {
+          "type": "improved",
+          "text": "Agents is a calm list: one row per agent (name, “On · 1 chat · Auto model”, switch); the owner assistant has its own section and New agent is the last row. On a computer the agent's page opens beside the list."
+        },
+        {
+          "type": "improved",
+          "text": "An agent's page is short: a header with its switch and ⋯ (Test, Change with AI, Duplicate, Export, Delete), then sections that show their current value. Each section opens its own page and saves on its own, with Undo."
+        },
+        {
+          "type": "new",
+          "text": "Links and Find anything reach every section of an agent, e.g. “Tools · Car pooling”."
+        },
+        {
+          "type": "improved",
+          "text": "Chats is one row per chat (its agent and members, or Off, with a short hint when an agent stayed quiet) and a page per chat with all its settings; tap the agent's name to open the agent, and the agent lists its chats."
+        },
+        {
+          "type": "improved",
+          "text": "“Load the last N messages when a chat is switched on” moved to Settings → Chats & direct messages."
+        },
+        {
+          "type": "improved",
+          "text": "Overview is calmer: one status line when everything is fine, Ask without the paragraph, shorter WhatsApp, server and why-quiet cards."
+        },
+        {
+          "type": "improved",
+          "text": "More on the phone: compact rows, Refresh as a small icon and your account row; Sign out now asks first, so it can't be tapped by mistake."
+        },
+        {
+          "type": "improved",
+          "text": "Less explanatory text on every screen: one short line, with a small ? that opens the guide. Contacts is one row per person."
+        },
+        {
+          "type": "improved",
+          "text": "A provider's page in Models is calmer: the account you signed in with in one short line (partly hidden), Rename and Disconnect behind ⋯, and Add another account as one row. The list says “Connected · 8 models”."
+        },
+        {
+          "type": "fixed",
+          "text": "On iPhone, text could show through the top bar while scrolling; the bar is now solid."
+        }
       ]
     },
     "2.28.0": {
@@ -628,23 +1224,56 @@
       "title": "See how much of each AI plan is left: ChatGPT's 5-hour and weekly limits, Copilot's premium requests, OpenRouter credit",
       "summary": "Models now shows what each provider reports about your plan, never a guess. A provider's row says '62% of 5-hour limit' with a thin bar, and its page has Plan usage: a bar per limit with what is left and when it resets, and when the provider last said so. ChatGPT shows its 5-hour and weekly limits, GitHub Copilot its premium requests, OpenRouter the free requests today, the key's limit and your prepaid credit, and API keys (Claude, OpenAI, custom) their rate-limit headroom and what Duniya spent through them this month. Usage has a Plans and credit card, and Overview shows a note when a plan is 80% used. You get one WhatsApp alert when a plan reaches 90% and one when it runs out, per window. When a limit runs out, the agent answers with the next model and the pause says which limit and when it resets. Nothing to do on your server.",
       "changes": [
-        { "type": "new", "text": "Models shows how much of each plan is used: ChatGPT's 5-hour and weekly limits, Copilot's premium requests, OpenRouter's free requests and credit, with reset times." },
-        { "type": "new", "text": "API keys (Claude, OpenAI, custom) show their rate-limit headroom and what Duniya spent through them this month." },
-        { "type": "new", "text": "Usage has a Plans and credit card, and Overview shows a note when a plan is 80% used." },
-        { "type": "new", "text": "A WhatsApp alert when a plan reaches 90% and when it runs out, once per window." },
-        { "type": "improved", "text": "When a limit runs out, the pause and the fallback say which one and when it resets, and the account waits for that reset." },
-        { "type": "improved", "text": "Ask “how much ChatGPT quota is left?”: the owner assistant and connected AI assistants see each account's plan usage." }
+        {
+          "type": "new",
+          "text": "Models shows how much of each plan is used: ChatGPT's 5-hour and weekly limits, Copilot's premium requests, OpenRouter's free requests and credit, with reset times."
+        },
+        {
+          "type": "new",
+          "text": "API keys (Claude, OpenAI, custom) show their rate-limit headroom and what Duniya spent through them this month."
+        },
+        {
+          "type": "new",
+          "text": "Usage has a Plans and credit card, and Overview shows a note when a plan is 80% used."
+        },
+        {
+          "type": "new",
+          "text": "A WhatsApp alert when a plan reaches 90% and when it runs out, once per window."
+        },
+        {
+          "type": "improved",
+          "text": "When a limit runs out, the pause and the fallback say which one and when it resets, and the account waits for that reset."
+        },
+        {
+          "type": "improved",
+          "text": "Ask “how much ChatGPT quota is left?”: the owner assistant and connected AI assistants see each account's plan usage."
+        }
       ]
     },
     "2.27.1": {
       "breaking": false,
       "title": "Small fixes from the phone: Ask empties its box, a quiet Copy icon, the refresh spinner goes away, plain words in Activity",
       "changes": [
-        { "type": "fixed", "text": "Ask kept your question in the box after it was answered; the box now empties when you send, ready for a follow-up." },
-        { "type": "fixed", "text": "After pull to refresh, the round refresh icon stayed under the header; it now disappears when the refresh is done." },
-        { "type": "fixed", "text": "Activity showed tool names for AI assistants and older entries (\"check_for_updates\", \"Chat_recap\"); they read in plain words too (\"Checked for updates\", \"Chat recap\")." },
-        { "type": "improved", "text": "Copy under an answer is a small copy icon instead of a big button; it turns into a tick when copied." },
-        { "type": "improved", "text": "Owner assistant entries in Activity use the agent icon instead of a house." }
+        {
+          "type": "fixed",
+          "text": "Ask kept your question in the box after it was answered; the box now empties when you send, ready for a follow-up."
+        },
+        {
+          "type": "fixed",
+          "text": "After pull to refresh, the round refresh icon stayed under the header; it now disappears when the refresh is done."
+        },
+        {
+          "type": "fixed",
+          "text": "Activity showed tool names for AI assistants and older entries (\"check_for_updates\", \"Chat_recap\"); they read in plain words too (\"Checked for updates\", \"Chat recap\")."
+        },
+        {
+          "type": "improved",
+          "text": "Copy under an answer is a small copy icon instead of a big button; it turns into a tick when copied."
+        },
+        {
+          "type": "improved",
+          "text": "Owner assistant entries in Activity use the agent icon instead of a house."
+        }
       ]
     },
     "2.27.0": {

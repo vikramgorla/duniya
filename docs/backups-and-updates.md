@@ -72,7 +72,8 @@ installs in place, keeps all data, survives a reload.
 
 After an update, Overview shows **Updated to vX — see what's new** once per person: it opens the changes of the
 versions you just got (hide it with ✕). All release notes are in **Settings → Help → Release notes** (or press `/` and
-type *release*). An update confirmed on WhatsApp is reported there with what is new.
+type *release*). An update confirmed on WhatsApp is reported there with what is new. A panel left open during an update
+loads the new version by itself at your next tap; nothing to refresh.
 
 <p align="center"><img src="diagrams/update-decision.svg" alt="How updates are decided: ordinary releases follow the update mode (install automatically after a backup, or notify); a breaking release or new major stops automatic updates, tells the owner once, and the owner updates, postpones or dismisses it" width="720"></p>
 
