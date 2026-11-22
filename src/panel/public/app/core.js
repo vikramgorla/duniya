@@ -182,8 +182,10 @@ async function fetchJson(method, path, body) {
   const timer = setTimeout(() => ctl.abort(new DOMException('timeout', 'TimeoutError')), method === 'GET' ? S.loadTimeout : 60000);
   const opts = { method, headers: {}, signal: ctl.signal };
   if (method !== 'GET') { opts.headers['content-type'] = 'application/json'; opts.body = JSON.stringify(body ?? {}); }
+  // iOS: a request on a frozen connection can ignore abort
+  const dropped = new Promise((_, no) => ctl.signal.addEventListener('abort', () => no(ctl.signal.reason), { once: true }));
   let res;
-  try { res = await fetch(path, opts); } catch (e) {
+  try { res = await Promise.race([fetch(path, opts), dropped]); } catch (e) {
     throw ctl.signal.aborted ? Object.assign(new Error('The server did not answer in time. Check the connection and try again.'), { kind: 'data' }) : e;
   } finally { clearTimeout(timer); inflight.delete(ctl); }
   if (res.status === 401 && !['/api/login', '/api/setup'].includes(path)) { renderLogin(); throw new Error('Please sign in'); }
@@ -523,12 +525,14 @@ function loadFailed(e, retry) {
 export function recover(force = false) {
   const main = $('#main');
   // draw again only when something was waiting or the screen is not drawn (keeps a half-edited form otherwise)
-  const stuck = force || inflight.size > 0 || !!main?.querySelector('.skel, .load-failed') || main?.classList.contains('loading');
+  const stuck = inflight.size > 0 || !!main?.querySelector('.skel, .load-failed') || main?.classList.contains('loading');
+  // pulled down on a stuck screen: a fresh start (a frozen request or module can hold any retry in this page)
+  if (force && stuck && S.user) { location.reload(); return; }
   for (const c of inflight) c.abort(); inflight.clear();
   dropCache();
   if (!S.user) return;
   connectEvents(); refreshStatus();
-  if (stuck) show(S.tab);
+  if (stuck || force) show(S.tab);
 }
 /** 062: #tab/<section> scrolls to the element marked data-jump="<section>" (a settings card, a provider, a chat). */
 export function jumpToSub() {
