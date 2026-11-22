@@ -261,3 +261,18 @@ test('a service that cannot be reached is explained in plain words (502), not as
   assert.match(r.body.error, /refused the connection|Could not reach/);
   assert.doesNotMatch(r.body.error, /fetch failed|MCP http/);
 });
+
+test('"Proactively" on a media service shares now and then unless sharing is set either way', async () => {
+  const chat = CHATS[13];
+  await setRaju({ clips: { when: 'proactive' } });
+  let n = t.claudeReqs.length;
+  t.script.push(text('Congrats!'));
+  await say(chat, 'raju we got the keys!! 🎉');
+  assert.ok(t.toolNames(n).includes('whatsapp__share_media'), 'proactive → sometimes');
+  await setRaju({ clips: { when: 'proactive', share: 'off' } });
+  n = t.claudeReqs.length;
+  t.script.push(text('Congrats!'));
+  await say(chat, 'raju and the car too!! 🎉');
+  assert.ok(!t.toolNames(n).includes('whatsapp__share_media'), 'an explicit Off wins');
+  await setRaju({ clips: { share: 'often', style: 'telugu movie' } });
+});
