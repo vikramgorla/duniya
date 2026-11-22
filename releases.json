@@ -10,6 +10,7 @@
         { "type": "new", "text": "Share GIFs or stickers on its own (sometimes or often, with style words like \"Telugu movie reactions\"): one fitting GIF after the answer at celebrations, thank-yous and jokes, even with a cheap model. Never on serious topics, no repeats; only mood words are searched, never names." },
         { "type": "improved", "text": "Whether a change asks first now follows what each tool declares (read-only, change or destructive), the same for the app's own tools; you can correct a tool in the tool list." },
         { "type": "improved", "text": "Agents whose instructions asked for GIFs now share them on their own, set to often." },
+        { "type": "improved", "text": "Registration and order lists (pages and agent answers) load faster." },
         { "type": "removed", "text": "The old risk rules based on tool names, and the per-agent risk lists in agent files." }
       ]
     },

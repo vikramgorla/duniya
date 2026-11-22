@@ -157,6 +157,8 @@ export const ownNameOf = (phone) => (digits(phone) ? st("SELECT name FROM people
 /** A person's row as lists show it ({ id, name, nickname, phone, birthday, shared, source, hidden?, apps, lastContact, createdAt }), or null. */
 export const personRow = (id) => view(st(`SELECT ${ROW} ${FROM} WHERE p.tenant_id = ? AND p.id = ?`).get(TENANT, String(id || ''))) || null;
 const nameOf = (id) => personRow(id)?.name || 'Someone';
+/** A person's shown name and whether they are hidden, without the rest of the row (lists of many people), or null. */
+export const personName = (id) => { const r = st(`SELECT ${LABEL} AS label, p.hidden ${FROM} WHERE p.tenant_id = ? AND p.id = ?`).get(TENANT, String(id || '')); return r ? { name: r.label, hidden: !!r.hidden } : null; };
 /** 079: the name an app last showed for a person ('' when none), for names agents may see. */
 export const seenNameOf = (id) => st("SELECT name FROM identities WHERE tenant_id = ? AND person = ? AND name <> '' ORDER BY last_seen DESC LIMIT 1").get(TENANT, String(id))?.name || '';
 

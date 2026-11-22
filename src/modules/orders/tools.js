@@ -4,13 +4,13 @@
 //   organizers    who_has_not_paid (with totals), and — held for an organizer's "confirm XXXX" — mark_paid, refund
 // Duniya records payments; it never takes money. Hidden people are left out of names agents see.
 import { clip, fail, money } from '../../core/config.js';
-import { listHouseholds, listPeople, personByRef, personRow } from '../../core/people.js';
+import { listHouseholds, listPeople, personByRef, personName, personRow } from '../../core/people.js';
 import { canSee, peopleScope } from '../../core/people-access.js';
 import { findEvent } from '../events/index.js';
 import { STATUS_WORD, change, eventTotals, listOrders, openOrdersOf, paymentMethods } from './index.js';
 
 const ev = { type: 'string', description: 'Event name (or part of it) or id (optional)' };
-const shown = (o) => ({ who: o.person && personRow(o.person)?.hidden ? '(hidden)' : o.who, for: o.title, total: money(o.total, o.currency), paid: money(o.paid, o.currency),
+const shown = (o) => ({ who: o.person && personName(o.person)?.hidden ? '(hidden)' : o.who, for: o.title, total: money(o.total, o.currency), paid: money(o.paid, o.currency),
   left: money(o.left, o.currency), status: STATUS_WORD[o.status], ...(o.due ? { due: o.due } : {}), ...(o.overdue ? { overdue: true } : {}) });
 
 /** The open order of a person or household an organizer names (for an event when given). */

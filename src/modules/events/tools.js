@@ -96,7 +96,7 @@ export const eventTools = [
     async run({ event, status = '' }) {
       const e = findEvent(event);
       return { event: e.name, counts: counted(counts(e.id)),
-        registrations: registrationsOf(e.id, status).slice(0, 200).map((r) => ({ who: r.person ? nameOf(r.person) : r.who, adults: r.adults, kids: r.kids, status: r.status, ...(r.notes ? { notes: r.notes } : {}) })) };
+        registrations: registrationsOf(e.id, status).slice(0, 200).map((r) => ({ who: r.hidden ? '(hidden)' : r.who, adults: r.adults, kids: r.kids, status: r.status, ...(r.notes ? { notes: r.notes } : {}) })) };
     },
   },
   // 090: ask your data — questions across events (organizers and the owner assistant)
@@ -108,7 +108,7 @@ export const eventTools = [
     async run({ came_to: past, not_registered_for: next, attended_only: attended = false }) {
       const a = findEvent(past); const b = findEvent(next);
       const list = cameButNotRegistered(a.id, b.id, { attendedOnly: !!attended });
-      return { cameTo: a.name, notRegisteredFor: b.name, count: list.length, who: list.slice(0, 200).map((r) => ({ who: r.person ? nameOf(r.person) : r.who, adults: r.adults, kids: r.kids })) };
+      return { cameTo: a.name, notRegisteredFor: b.name, count: list.length, who: list.slice(0, 200).map((r) => ({ who: r.hidden ? '(hidden)' : r.who, adults: r.adults, kids: r.kids })) };
     },
   },
   {
