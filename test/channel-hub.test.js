@@ -262,3 +262,27 @@ test('a send refused while the channel reconnects is tried again; any other fail
     await hub.setEnabled('fake', false, 'admin');
   } finally { mock.timers.reset(); }
 });
+
+test('once the groups are known, a channel that is slow to list them does not hold the caller', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const groups = [{ id: 'fk:a#g1', name: 'Fake group', size: 3 }];
+    let answer = null; let asks = 0;
+    // the second listing is slow (answered below); the others answer at once
+    const slow = { ...fakeAdapter([]), listChats: () => (++asks === 2 ? new Promise((r) => { answer = r; }) : Promise.resolve([...groups])) };
+    const hub = hubMod.createHub({ loaders: { fake: async () => slow } });
+    t.store.setSecret('FAKE_CHAT_TOKEN', 'fake-4');
+    await hub.start({ onMessage: async () => {} });
+    await hub.setEnabled('fake', true, 'admin');
+    assert.deepEqual((await hub.listChats()).map((c) => c.name), ['Fake group'], 'the first list is waited for');
+    const second = hub.listChats();
+    await new Promise((r) => setImmediate(r));
+    mock.timers.tick(1500);
+    assert.deepEqual((await second).map((c) => c.name), ['Fake group'], 'the last known list, after a short wait');
+    groups.push({ id: 'fk:a#g2', name: 'New group', size: 2 });
+    answer([...groups]);
+    await new Promise((r) => setImmediate(r));
+    assert.deepEqual((await hub.listChats()).map((c) => c.name), ['Fake group', 'New group'], 'the new list is there for the next look');
+    await hub.setEnabled('fake', false, 'admin');
+  } finally { mock.timers.reset(); }
+});

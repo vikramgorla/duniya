@@ -49,6 +49,7 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
   let onHistory = () => {};
   let onJoin = () => {};
   let onMemberTag = () => {};
+  let groupList = []; // the groups WhatsApp last listed for this number (shown while it reconnects)
   let onPhoneActive = () => {};
   let onGroupChange = () => {};
   let namesDueAt = 0; // 057: checked by the shared upkeep tick; no timer of its own
@@ -659,10 +660,12 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
       try { return (await groupMeta(chat)).subject || ''; } catch { return ''; }
     },
     async typing(chat) { await sock?.sendPresenceUpdate('composing', chat).catch(() => {}); },
+    /** The groups this number is in; while it reconnects, the ones it last listed. */
     async listChats() {
-      if (state.status !== 'open') return [];
+      if (state.status !== 'open') return groupList;
       const all = await sock.groupFetchAllParticipating();
-      return Object.values(all).map((g) => ({ id: g.id, name: g.subject, size: g.participants?.length || 0 }));
+      groupList = Object.values(all).map((g) => ({ id: g.id, name: g.subject, size: g.participants?.length || 0 }));
+      return groupList;
     },
     /** Group members: [{ phone, jid, admin }] (phone digits when WhatsApp shares it). */
     async groupMembers(groupJid) {

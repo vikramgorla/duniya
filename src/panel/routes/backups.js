@@ -43,8 +43,10 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
   route('GET', '/api/backups', async () => {
     const token = getSecret('GITHUB_BACKUP_TOKEN');
     const app = appView();
-    let login = '';
-    if (token) { try { login = await github.whoami(token); } catch { login = ''; } }
+    // the account name is stored when the token is saved; a token saved before that is looked up once, in the
+    // background (the screen never waits for GitHub)
+    const login = token ? getBackupSettings().githubLogin : '';
+    if (token && !login) github.whoami(token).then((name) => { if (name) updateBackupSettings({ githubLogin: name }); }, () => {});
     const via = app.installed && app.keySet ? 'app' : token ? 'token' : null;
     return {
       settings: getBackupSettings(), passphraseSet: !!getSecret('BACKUP_PASSPHRASE'), last: lastBackup(), local: listLocal(),
@@ -131,6 +133,7 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
     device = null;
     setSecret('GITHUB_BACKUP_TOKEN', r.token);
     const login = await github.whoami(r.token);
+    updateBackupSettings({ githubLogin: login || '' });
     activity('backup.settings', { summary: `GitHub connected for backups as ${login} by ${user.username}` });
     return { status: 'connected', login };
   }, OWNER);
@@ -139,6 +142,7 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
     const login = await github.whoami(token);
     if (!login) return [400, { error: 'Token rejected by GitHub' }];
     setSecret('GITHUB_BACKUP_TOKEN', token);
+    updateBackupSettings({ githubLogin: login });
     activity('backup.settings', { summary: `GitHub token saved for ${login} by ${user.username}` });
     return { login };
   }, OWNER);
@@ -154,7 +158,7 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
   }, OWNER);
   route('DELETE', '/api/backups/github', async () => {
     setSecret('GITHUB_BACKUP_TOKEN', '');
-    if (!getBackupSettings().githubApp?.installationId) updateBackupSettings({ github: { enabled: false } });
+    updateBackupSettings({ githubLogin: '', ...(getBackupSettings().githubApp?.installationId ? {} : { github: { enabled: false } }) });
     return { ok: true };
   }, OWNER);
   route('PUT', '/api/backups/github/client-id', async ({ body }) => {

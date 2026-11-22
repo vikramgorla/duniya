@@ -1,6 +1,24 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.58.15": {
+      "breaking": false,
+      "title": "Screens that never wait on WhatsApp or GitHub",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "Chats opens at once even when WhatsApp is slow to answer or reconnecting: it shows the groups it last knew."
+        },
+        {
+          "type": "fixed",
+          "text": "Backups opens at once even when GitHub is slow or unreachable."
+        },
+        {
+          "type": "fixed",
+          "text": "Group names are learned right after a start, so Overview and Activity show them instead of “Unnamed group”."
+        }
+      ]
+    },
     "2.58.14": {
       "breaking": false,
       "title": "Steadier message handling",

@@ -55,6 +55,8 @@ async function whileOffline(run) {
   }
   return run();
 }
+const CHATS_RETRY = 60 * 1000; // ms before upkeep asks a channel for its groups again when it did not answer
+const CHATS_WAIT = 1500; // ms a caller waits for a new list of groups once one is known
 const MB = 1048576;
 const MEASURE_AFTER_MS = 60000;
 
@@ -95,6 +97,30 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
       activity('error', { summary: `${channelInfo(id)?.label || id} did not start: ${e.message}` });
       throw e;
     }
+  }
+  // The groups of each channel as it last told them. A channel that does not answer in time keeps its last list.
+  const lastChats = new Map(); // channel id → [{ id, name, size }]
+  let chatsKnown = false; // every live channel answered at least once since the start
+  let asking = null; // the listing in progress (one at a time)
+  let chatsAskedAt = 0; // when upkeep last asked because nothing was known yet
+  async function askChats() {
+    const lists = await Promise.all([...live].map(async ([id, { adapter: a }]) => {
+      try { lastChats.set(id, await within(a.listChats(), READ_WAIT, 'chat list')); } catch { /* it did not answer: its last list stands */ }
+      return lastChats.get(id) || [];
+    }));
+    chatsKnown = [...live.keys()].every((id) => lastChats.has(id));
+    const all = lists.flat();
+    rememberGroupNames(all);
+    return all;
+  }
+  /**
+   * The groups every channel is in. The channels are asked each time (the names they tell are remembered), but once a
+   * list is known a caller waits for the new one only for CHATS_WAIT: a screen then shows the last known list and the
+   * new one is there for the next look.
+   */
+  function listChats() {
+    asking ||= askChats().finally(() => { asking = null; });
+    return chatsKnown ? within(asking, CHATS_WAIT, 'chat list').catch(() => [...lastChats.values()].flat()) : asking;
   }
   const setUp = isSetUp;
   const label = (id) => channelInfo(id)?.label || id;
@@ -142,7 +168,7 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     const off = offList().filter((x) => x !== id);
     updateSettings({ channelsOff: on ? off : [...off, id] });
     if (on) { FIRST_ACCOUNT[id]?.(); await load(id); } else {
-      const l = live.get(id); live.delete(id);
+      const l = live.get(id); live.delete(id); lastChats.delete(id);
       await l?.adapter.stop().catch(() => {});
       bus.emit('status');
     }
@@ -154,7 +180,7 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
   async function secretChanged(name) {
     const c = CHANNELS.find((x) => x.secret?.name === name);
     if (!c) return;
-    const l = live.get(c.id); live.delete(c.id);
+    const l = live.get(c.id); live.delete(c.id); lastChats.delete(c.id);
     await l?.adapter.stop().catch(() => {});
     errors.delete(c.id);
     if (setUp(c.id) && !offList().includes(c.id)) await load(c.id).catch(() => {});
@@ -175,13 +201,7 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
       try { const name = await within(Promise.resolve(route(chat).chatName?.(chat)), READ_WAIT, 'chat name'); rememberGroupNames([{ id: chat, name }]); return name || ''; } catch { return ''; }
     },
     async isMember(chat, phone, senderJid) { try { return !!(await within(Promise.resolve(route(chat).isMember?.(chat, phone, senderJid)), READ_WAIT, 'member check')); } catch { return false; } },
-    async listChats() {
-      const out = [];
-      const lists = await Promise.all([...live.values()].map(({ adapter: a }) => within(a.listChats(), READ_WAIT, 'chat list').catch(() => [])));
-      for (const l of lists) out.push(...l);
-      rememberGroupNames(out);
-      return out;
-    },
+    listChats,
     /** WhatsApp's first number at the top level (as the panel has always read it), its numbers, and every channel. */
     async status() {
       const wa = live.get('whatsapp');
@@ -201,6 +221,8 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
       for (const l of live.values()) if (l.costMb === null && now - l.loadedAt >= MEASURE_AFTER_MS) l.costMb = Math.max(0, Math.round((rss - l.rssBefore) / MB));
       const list = [...live.values()];
       if (!list.length) return { ok: false, reason: 'not_due' };
+      // after a start: the groups each channel is in, once, so lists have their names before anyone opens Chats
+      if (!chatsKnown && now - chatsAskedAt >= CHATS_RETRY) { chatsAskedAt = now; await listChats(); }
       const r = await list[turn++ % list.length].adapter.upkeep?.().catch(() => null);
       return r || { ok: false, reason: 'not_due' };
     },
