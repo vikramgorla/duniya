@@ -14,7 +14,9 @@ const queries = []; // what the fake media service was asked
 const order = []; // texts and media as they reached the chat
 let count = 8;
 const results = () => Array.from({ length: count }, (_, i) => ({ id: `c${i}`, title: `Clip ${i}`, url: `https://media.example/${i}.gif`,
-  mp4Url: `https://media.example/${i}.mp4`, previewUrl: `https://media.example/${i}-small.gif`, attribution: `"Clip ${i}" · Powered by ExampleClips · https://clips.example/c/${i}` })); // title and link differ per result
+  mp4Url: `https://media.example/${i}.mp4`, previewUrl: `https://media.example/${i}-small.gif`, attribution: `"Clip ${i}" · Powered by ExampleClips · https://clips.example/c/${i}`, creditText: credits(i) }));
+// schema.org creditText: a platform credit every result shares (changeable per test to a work's own credit)
+let credits = () => 'Powered by ExampleClips';
 const OUT = { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, url: { type: 'string' }, mp4Url: { type: 'string' }, previewUrl: { type: 'string' } } } } } };
 const QUERY = { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer' } }, required: ['query'] };
 
@@ -338,4 +340,18 @@ test('media links and service credits never reach the chat: in the answer, or in
   await say(chat, 'raju send that one');
   assert.equal(media(chat).at(-1).media.caption, 'Woo!');
   await t.api(owner, 'PUT', '/api/agents/raju', { tools: { participant: ['whatsapp:-'], organizer: [], deny: [] } });
+});
+
+test('a result that needs its own credit (an author and license) is never posted on its own; one that needs none is', async () => {
+  credits = (i) => `Author ${i} · CC BY 4.0`;
+  let chat = CHATS[19]; const before = media(chat).length;
+  t.script.push(text('Congrats! [share: party]'));
+  await say(chat, 'raju we did it!! 🎉');
+  assert.equal(media(chat).length, before, 'each needs its own credit in the message: none posted');
+  credits = () => '';
+  chat = CHATS[20];
+  t.script.push(text('Yay! [share: party]'));
+  await say(chat, 'raju we did it again!! 🎉');
+  assert.equal(media(chat).at(-1).media.caption, 'Yay!', 'no credit needed: posted, the caption is the answer');
+  credits = () => 'Powered by ExampleClips';
 });
