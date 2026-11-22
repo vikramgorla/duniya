@@ -29,3 +29,17 @@ test('a scheduled post that failed is tried again on the next tick, then runs on
   assert.equal((await runSchedule(agent, agent.schedules[0], t.channel)).length, 0, 'once a day');
   t.channel.send = send;
 });
+
+test('a post in progress is never started twice, and nothing stored says "running" (a restart would lose the post)', async () => {
+  const { runSchedule } = await import('../src/core/scheduler.js');
+  await t.agents.updateAgent('helper', { schedules: [{ id: 'twice', at: '09:00', days: 'daily', prompt: 'Post the plan', enabled: true }] });
+  const agent = t.agents.getAgent('helper');
+  t.script.push([{ type: 'text', text: 'Plan: bus at 8.' }]);
+  const stored = () => t.db.db.prepare("SELECT v FROM kv WHERE k LIKE 'sched:helper:twice:%'").all().map((r) => r.v);
+  const first = runSchedule(agent, agent.schedules[0], t.channel);
+  const second = runSchedule(agent, agent.schedules[0], t.channel); // the next tick, while the first is still writing
+  assert.ok(!stored().includes('running'));
+  assert.equal((await second).length, 0);
+  assert.equal((await first).length, 1);
+  assert.deepEqual([...new Set(stored())], ['1']);
+});

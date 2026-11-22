@@ -75,7 +75,9 @@ The owner runs the latest version on one server, so the code carries nothing for
 9. **Never wait on the outside for good:** anything a screen, a list or a reply waits for from a channel, a model, a
    tool service or the web has a deadline. Use `within(promise, ms, who)` from `src/core/config.js` (it fails as
    "<who> did not answer in time", status 504) or `AbortSignal.timeout(ms)` for `fetch`. Reads through the channel hub
-   are bounded already (`READ_WAIT`); names and other extras load in parallel with a short cap and fill in later.
+   are bounded already (`READ_WAIT`); lists read chat names from what is stored, and a missing one is learned on the
+   upkeep tick (`namesTick`). A send refused while a channel reconnects is tried again by the hub; a tool call that
+   timed out is never sent twice. A programming error in a panel route is a 500 that is kept in Activity.
    Only real chat ids reach a channel: the test console's chats (`testChatId`) belong to none.
 
 ## Panel modules

@@ -159,7 +159,7 @@ export function chatRoutes(route, { channel } = {}) {
     if (query.length < 2) return { results: [], more: false };
     const chats = visibleChats();
     const rows = searchStored({ chats, query, before: q.get('before'), limit: 31 });
-    const names = await chatLabels(rows.slice(0, 30).map((m) => m.chat), channel);
+    const names = chatLabels(rows.slice(0, 30).map((m) => m.chat));
     if (!q.get('before')) activity('config', { summary: `Messages searched by ${user.username} (“${query.slice(0, 40)}”, ${rows.length > 30 ? '30+' : rows.length} found in ${chats.length} chats)` });
     return {
       chats: chats.length, more: rows.length > 30,

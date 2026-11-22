@@ -525,14 +525,12 @@ function loadFailed(e, retry) {
 export function recover(force = false) {
   const main = $('#main');
   // draw again only when something was waiting or the screen is not drawn (keeps a half-edited form otherwise)
-  const stuck = inflight.size > 0 || !!main?.querySelector('.skel, .load-failed') || main?.classList.contains('loading');
-  // pulled down on a stuck screen: a fresh start (a frozen request or module can hold any retry in this page)
-  if (force && stuck && S.user) { location.reload(); return; }
+  const stuck = force || inflight.size > 0 || !!main?.querySelector('.skel, .load-failed') || main?.classList.contains('loading');
   for (const c of inflight) c.abort(); inflight.clear();
   dropCache();
   if (!S.user) return;
   connectEvents(); refreshStatus();
-  if (stuck || force) show(S.tab);
+  if (stuck) show(S.tab);
 }
 /** 062: #tab/<section> scrolls to the element marked data-jump="<section>" (a settings card, a provider, a chat). */
 export function jumpToSub() {

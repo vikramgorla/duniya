@@ -21,7 +21,6 @@ import { moduleRows, need } from '../modules/index.js';
 import { updateStatus } from './updates.js';
 import { paceSettings } from './pace.js';
 import { chatLabels } from './chat-names.js';
-import { chatChannel } from './chat-tools.js';
 import { personInfo } from './contacts.js';
 import { personRow } from './people.js';
 
@@ -95,7 +94,7 @@ export async function briefData(now = Date.now(), chats = []) {
   const me = ownerNames();
   if (me.names.length) {
     const re = new RegExp(`(^|[^\\p{L}])(${me.names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})($|[^\\p{L}])`, 'iu');
-    const names = await chatLabels(chats.slice(0, 50), chatChannel());
+    const names = chatLabels(chats.slice(0, 50));
     for (const chat of chats.slice(0, 50)) {
       const rows = db.prepare("SELECT id, sender, sender_jid, name, text, ts FROM messages WHERE chat = ? AND ts >= ? AND from_agent = 0 AND text LIKE '%?%' ORDER BY id DESC LIMIT 100").all(chat, now - DAY);
       const ownerLast = me.phones.length ? db.prepare(`SELECT MAX(ts) AS ts FROM messages WHERE chat = ? AND ts >= ? AND sender IN (${me.phones.map(() => '?').join(',')})`).get(chat, now - DAY, ...me.phones).ts || 0 : 0;

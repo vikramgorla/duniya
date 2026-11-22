@@ -34,7 +34,7 @@ async function personChats(p, channel) {
     if ((phone && (r.phone === phone || phoneOf(r.chat) === phone)) || ids.includes(native)) direct.add(r.chat);
   }
   const groups = p.id ? chatsOfPerson(p.id).filter((g) => isGroup(g.chat)).slice(0, 50) : [];
-  const names = await chatLabels([...direct, ...groups.map((g) => g.chat)], channel);
+  const names = chatLabels([...direct, ...groups.map((g) => g.chat)]);
   const view = (id, extra) => { const a = agentForChat(id); return { id, name: names.get(id), agent: a?.id || '', agentName: a?.name || '', enabled: getChatPrefs(id).enabled, ...extra }; };
   return { direct: [...direct].map((id) => view(id, {})), groups: groups.map((g) => view(g.chat, { lastAt: g.lastAt, wrote: g.wrote, member: g.member })) };
 }

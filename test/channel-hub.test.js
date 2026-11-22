@@ -242,3 +242,23 @@ test('a read a channel never answers fails in plain words instead of holding the
     await hub.setEnabled('fake', false, 'admin');
   } finally { mock.timers.reset(); }
 });
+
+test('a send refused while the channel reconnects is tried again; any other failure is not', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    let offline = 2; const sent = [];
+    const flaky = { ...fakeAdapter([]),
+      async send(chat, text) { if (offline-- > 0) throw Object.assign(new Error('Fake chat is not connected'), { offline: true }); sent.push(text); return { msgId: 'm1' }; },
+      async react() { throw new Error('refused'); } };
+    const hub = hubMod.createHub({ loaders: { fake: async () => flaky } });
+    t.store.setSecret('FAKE_CHAT_TOKEN', 'fake-3');
+    await hub.start({ onMessage: async () => {} });
+    await hub.setEnabled('fake', true, 'admin');
+    const going = hub.send('fk:a#g1', 'the answer');
+    for (const ms of [2000, 5000]) { await new Promise((r) => setImmediate(r)); mock.timers.tick(ms); }
+    assert.deepEqual(await going, { msgId: 'm1' });
+    assert.deepEqual(sent, ['the answer'], 'sent once');
+    await assert.rejects(hub.react('fk:a#g1', { msgId: 'm' }, '👍'), /refused/);
+    await hub.setEnabled('fake', false, 'admin');
+  } finally { mock.timers.reset(); }
+});

@@ -51,7 +51,7 @@ export function insightRoutes(route, { channel }) {
     const rows = listSilences({ chat: q.get('chat') || '', agent: q.get('agent') || '', reason: q.get('reason') || '', days: q.get('days') || 7, limit: q.get('limit') || 200 });
     // 073: names from the one chat-name resolver, never ids
     const agentNames = new Map(listAgents().map((a) => [a.id, a.name]));
-    return { reasons: SILENCE_REASONS, silences: (await withChatNames(rows, channel)).map((r) => ({ ...r, agentName: agentNames.get(r.agent) || '' })) };
+    return { reasons: SILENCE_REASONS, silences: withChatNames(rows).map((r) => ({ ...r, agentName: agentNames.get(r.agent) || '' })) };
   });
   route('DELETE', '/api/silences', async (req, res, body, q, p, user) => {
     const f = { chat: q.get('chat') || '', agent: q.get('agent') || '', reason: q.get('reason') || '' };

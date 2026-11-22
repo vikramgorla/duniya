@@ -1,6 +1,6 @@
 // The panel's entry module (063): page-wide listeners, then sign-in (which boots the shell). Screens load on first
 // visit (core.js#show); see docs/development.md#panel-modules.
-import { $, S, connectEvents, openFind, recover, refreshStatus, show } from './core.js';
+import { $, S, connectEvents, openFind, recover, refreshStatus, show, toast } from './core.js';
 import './pull.js';
 import { renderLogin } from './login.js';
 // Back from the background (phones suspend the live stream and may leave requests hanging): after more than 30 s away,
@@ -23,4 +23,6 @@ window.addEventListener('hashchange', () => { if (S.user) show(location.hash.sli
 // opens it again and catches up (058).
 window.addEventListener('pagehide', () => { S.es?.close(); S.es = null; hiddenAt ||= Date.now(); });
 window.addEventListener('pageshow', (e) => { if (e.persisted || !S.es) back(); }); // 066: also when the stream was closed without the back/forward cache
+// a failure nobody handled: say so
+window.addEventListener('unhandledrejection', (e) => { const m = e.reason?.message; if (m && m !== 'Please sign in' && e.reason?.name !== 'AbortError') toast(m, { bad: true }); });
 renderLogin();

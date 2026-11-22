@@ -60,6 +60,9 @@ async function shutdown(why, code = 0) {
   try { db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); db.close(); } catch { /* already closed */ }
   process.exit(code);
 }
-process.on('unhandledRejection', (e) => activity('error', { summary: `Unhandled: ${e instanceof Error ? e.message : e}` }));
+process.on('unhandledRejection', (e) => {
+  console.error('Unhandled:', e);
+  try { activity('error', { summary: `Unhandled: ${e instanceof Error ? e.message : e}` }); } catch { /* logging must never crash the app (the database may be the problem) */ }
+});
 process.on('uncaughtException', (e) => { console.error('Fatal:', e); shutdown(`fatal: ${e?.message || e}`, 1); });
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => shutdown(sig));

@@ -3,6 +3,7 @@
 // calls, and the static panel files. Routes live in routes/<area>.js, registered here in one place.
 import http from 'node:http';
 import { env, fail } from '../core/config.js';
+import { activity } from '../core/events.js';
 import { setChatChannel } from '../core/chat-tools.js';
 import { domainCheckResponse } from '../core/webaccess.js';
 import { setOwnerToolRunner } from '../core/owner-assistant.js';
@@ -44,14 +45,22 @@ function unreachable(e) {
   return '';
 }
 const ROLE_RANK = { viewer: 1, admin: 2, owner: 3 };
+const BODY_MAX = 2e6; // bytes of a JSON or form body
+// A programming error (not a refused request): answered as 500 without its internals, and kept where the owner and a
+// developer find it. Before, it reached the panel as a 400 with the raw message and left no trace.
+const isBug = (e) => e instanceof TypeError || e instanceof ReferenceError || e instanceof RangeError || e instanceof SyntaxError;
+function reportBug(method, path, e) {
+  console.error(`panel ${method} ${path}:`, e);
+  try { activity('error', { summary: `The panel hit an error on ${method} ${path}: ${e.message}` }); } catch { /* the database may be the problem */ }
+}
 
 // ---------- helpers ----------
 async function readBody(req, form = false) {
   let size = 0; const chunks = [];
-  for await (const c of req) { size += c.length; if (size > 2e6) throw new Error('Body too large'); chunks.push(c); }
+  for await (const c of req) { size += c.length; if (size > BODY_MAX) throw fail('That is too large to send', 413); chunks.push(c); }
   const raw = Buffer.concat(chunks).toString('utf8');
   if (form) return new URLSearchParams(raw);
-  return raw ? JSON.parse(raw) : {};
+  try { return raw ? JSON.parse(raw) : {}; } catch { throw fail('The request was not valid JSON', 400); }
 }
 /** 083: a plain HTML form of a public page (survey links): urlencoded, and the browser says it comes from this site. */
 function formAllowed(req) {
@@ -177,7 +186,9 @@ export function startPanel({ channel, extend = [] }) {
     } catch (e) {
       const plain = e.status ? '' : unreachable(e); // 2.56: a service or provider that could not be reached, in plain words
       if (plain) console.warn(`panel ${req.method} ${url.pathname}: ${e.message}`);
-      if (!res.headersSent) send(res, e.status || (plain ? 502 : 400), { error: plain || e.message, code: e.code, field: e.field, needsConfirm: e.needsConfirm, warnings: e.warnings, check: e.check });
+      const bug = !e.status && !plain && isBug(e);
+      if (bug) reportBug(req.method, url.pathname, e);
+      if (!res.headersSent) send(res, e.status || (plain ? 502 : bug ? 500 : 400), { error: plain || (bug ? 'Something went wrong on the server. It is in Activity; please try again.' : e.message), code: e.code, field: e.field, needsConfirm: e.needsConfirm, warnings: e.warnings, check: e.check });
     }
   });
   server.listen(env.panelPort, env.panelHost, () => {

@@ -10,6 +10,7 @@ import { maxLocalServices, serverSize, onMemoryPressure } from './resources.js';
 import { activity } from './events.js';
 import { within as withinTime } from './config.js';
 
+const REQUEST_TIMEOUT = -32001; // MCP error code: the request got no answer in time
 const TOOLS_TTL = 10 * 60 * 1000;
 const FAIL_TTL = 60 * 1000;
 const LIST_TIMEOUT = 20 * 1000; // one listing attempt (the SDK default is 60 s)
@@ -98,7 +99,9 @@ class McpConnection {
         return { isError: !!res.isError, text, data: res.structuredContent || null }; // data: the structured result, when the service gives one
       } catch (e) {
         await this.close();
-        if (e.reconnect || attempt === 1) return { isError: true, text: `Tool error: ${e.message}` };
+        // No second try after a timeout: the service may still be doing the work, and a tool that changes something
+        // would do it twice.
+        if (e.reconnect || attempt === 1 || e.code === REQUEST_TIMEOUT) return { isError: true, text: `Tool error: ${e.message}` };
       }
     }
   }

@@ -163,7 +163,6 @@ export function hideChats(v, hidden) {
 }
 
 /** 073: the one chat-name resolver (group subjects, people's names), never an id. */
-const chatNames = (ids) => chatLabels(ids, chatChannel());
 function parseSince(v, fallbackMs = 7 * 86400000) {
   const s = String(v ?? '').trim();
   if (!s) return Date.now() - fallbackMs;
@@ -182,7 +181,7 @@ const CORE_TOOLS = [
     input: { days: { type: 'integer', description: 'Look back this many days (default 7)', minimum: 1, maximum: 365 } },
     run: async (a) => {
       const since = Date.now() - (Number(a.days) || 7) * 86400000;
-      const names = await chatNames(visibleChats());
+      const names = chatLabels(visibleChats());
       return visibleChats().map((chat) => {
         const r = db.prepare('SELECT COUNT(*) AS n, MAX(ts) AS last FROM messages WHERE chat = ? AND ts >= ?').get(chat, since);
         const last = r.last || db.prepare('SELECT MAX(ts) AS last FROM messages WHERE chat = ?').get(chat).last;
@@ -201,7 +200,7 @@ const CORE_TOOLS = [
       if (!chats.length) return [];
       // 070: the same full-text search as the panel's Search messages
       const rows = searchStored({ chats, query: a.query, person: a.person, since: parseSince(a.since, 30 * 86400000), limit: Math.min(Number(a.limit) || 25, 50) }).reverse();
-      const names = await chatNames(rows.map((m) => m.chat));
+      const names = chatLabels(rows.map((m) => m.chat));
       return rows.map((m) => msgLine(m, names));
     } },
   { name: 'chat_recap', role: 'admin', readOnly: true,
@@ -212,7 +211,7 @@ const CORE_TOOLS = [
       if (!isVisible(a.chat)) throw fail('That chat is not visible to the assistant (off or private to members)', 403);
       const since = parseSince(a.since, 86400000);
       const rows = db.prepare('SELECT * FROM (SELECT * FROM messages WHERE chat = ? AND ts >= ? ORDER BY id DESC LIMIT 300) ORDER BY id').all(a.chat, since);
-      const names = await chatNames([a.chat]);
+      const names = chatLabels([a.chat]);
       return { chat: a.chat, name: names.get(a.chat), since: iso(since), runningSummary: getChatMemory(a.chat)?.summary || '', messages: rows.map((m) => { const l = msgLine(m, names); delete l.chat; delete l.chatName; return l; }) };
     } },
   // 090: "what did I miss in <group>?" — since the user last wrote there (else 24 h), with message ids to link to
@@ -223,7 +222,7 @@ const CORE_TOOLS = [
     run: async (a, user) => {
       if (!isVisible(a.chat)) throw fail('That chat is not visible to the assistant (off or private to members)', 403);
       const m = catchUpMaterial(a.chat, phonesOf(user));
-      return { chat: (await chatNames([a.chat])).get(a.chat), since: iso(m.since), sinceYourLastMessage: m.sinceYourLastMessage, runningSummary: m.runningSummary, messages: m.messages };
+      return { chat: (chatLabels([a.chat])).get(a.chat), since: iso(m.since), sinceYourLastMessage: m.sinceYourLastMessage, runningSummary: m.runningSummary, messages: m.messages };
     } },
   // 090: next steps the server suggests from the data (unpaid orders, a paused send, an update); each needs the user's OK
   { name: 'list_suggestions', role: 'admin', readOnly: true,
@@ -282,7 +281,7 @@ async function resolveChat(want, ownChat, user) {
   if (agentRole(user) !== 'organizer') throw fail('Your account is read-only: I can act only in our own chat.', 403);
   const chats = visibleChats();
   if (chats.includes(w)) return w;
-  const names = await chatNames(chats);
+  const names = chatLabels(chats);
   const lw = w.toLowerCase();
   const exact = chats.filter((c) => (names.get(c) || '').toLowerCase() === lw);
   const hits = exact.length ? exact : chats.filter((c) => (names.get(c) || '').toLowerCase().includes(lw));
@@ -298,7 +297,7 @@ async function privacyLineAfterSend(chat) {
   if (line) await chatChannel()?.send(chat, `_${line}_`).catch(() => {});
 }
 async function sendPreview(chat, what) {
-  const name = (await chatNames([chat])).get(chat);
+  const name = (chatLabels([chat])).get(chat);
   return `${what} in "${name}"${!isGroup(chat) && dmNoticePending(whoInDm(chat)) ? ' (with the privacy line, first time)' : ''}`;
 }
 

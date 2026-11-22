@@ -18,7 +18,7 @@ import { PLAN_PROVIDERS, listPrices, setPrice, smartReport, usageReport } from '
 /** @param {import('../http.js').Route} route  @param {import('../http.js').RouteContext} [ctx] */
 export function systemRoutes(route, { channel } = {}) {
   // ---------- pending ----------
-  route('GET', '/api/pending', async () => withChatNames(listPending(), channel)); // 073: chat names, never ids
+  route('GET', '/api/pending', async () => withChatNames(listPending())); // 073: chat names, never ids
   route('DELETE', '/api/pending/:code', async (req, res, body, q, p, user) => {
     dropPending(p.code); activity('confirm.cancelled', { summary: `${p.code} (panel, ${user.username})` }); return { ok: true };
   });
@@ -51,7 +51,7 @@ export function systemRoutes(route, { channel } = {}) {
   route('GET', '/api/usage', async (req, res, body, q) => {
     const groupBy = q.get('groupBy') || 'agent';
     const r = usageReport({ from: periodFrom(q.get('period')), groupBy, agent: q.get('agent') || '', chat: q.get('chat') || '' });
-    return groupBy === 'chat' ? { ...r, rows: await withChatNames(r.rows, channel, 'key') } : r; // 073: chat names, never ids
+    return groupBy === 'chat' ? { ...r, rows: withChatNames(r.rows, 'key') } : r; // 073: chat names, never ids
   });
   // 088: Smart model choice: answers per tier, cost per answer, and what the strong model alone would have cost
   route('GET', '/api/usage/smart', async (req, res, body, q) => smartReport({ from: periodFrom(q.get('period')), agent: q.get('agent') || '' }));

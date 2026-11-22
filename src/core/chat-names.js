@@ -5,7 +5,6 @@
 // WhatsApp is offline), "Unnamed group" until it is known; a person is the contacts resolver's label (own name,
 // phone contact, business or profile name, else +number, else "Unknown (hidden number)").
 import { db } from './db.js';
-import { within } from './config.js';
 import './chat-prefs.js'; // chats_seen
 import { personInfo } from './contacts.js';
 import { isGroup, personOfChat, testChatOf } from '../channels/index.js';
@@ -20,14 +19,16 @@ const putName = db.prepare(`INSERT INTO chats_seen (tenant_id, chat, is_group, n
 const subjects = new Map(); // group → subject, so a known name costs no query
 const asked = new Map(); // group → when WhatsApp was last asked without an answer
 const ASK_AGAIN = 10 * 60 * 1000; // ms before a group that did not answer is asked again
-const NAME_WAIT = 1500; // ms a list waits for names WhatsApp has not told us yet
+const NAMES_PER_TICK = 3; // groups asked per upkeep tick
+const WANTED_MAX = 500; // groups waiting for a name, at most
+const wanted = new Set(); // groups a list showed without a name
 
 /** Remember group subjects WhatsApp told us ([{ id, name }]); the channel registry calls this for every lookup. */
 export function rememberGroupNames(list) {
   for (const g of list || []) {
     const name = String(g?.name || '').trim().slice(0, 100);
     if (!g?.id || !name || !isGroup(g.id) || subjects.get(g.id) === name) continue;
-    subjects.set(g.id, name); asked.delete(g.id);
+    subjects.set(g.id, name); asked.delete(g.id); wanted.delete(g.id);
     try { putName.run(TENANT, g.id, name); } catch { /* best effort */ }
   }
 }
@@ -49,23 +50,33 @@ export function chatLabel(id) {
 }
 
 /**
- * Names for many chats. Groups not known yet are asked all at once and waited for at most NAME_WAIT; slower answers
- * are remembered when they come, for the next load. Waiting for each in turn held the panel's Activity list for up to a
- * minute per group that never answers (WhatsApp's query timeout). A group that did not answer is asked again after
- * ASK_AGAIN at the earliest. Returns a Map id → name.
+ * Names for many chats, from what is stored: a list never asks a channel. A group without a name yet is noted and
+ * asked in the background (namesTick), so a later load shows it. Returns a Map id → name.
  */
-export async function chatLabels(ids, channel) {
-  const list = [...new Set([...(ids || [])].filter(Boolean).map(String))];
-  const ask = list.filter((id) => isGroup(id) && chatLabel(id) === UNNAMED_GROUP && channel?.chatName && Date.now() - (asked.get(id) || 0) > ASK_AGAIN);
-  if (ask.length) {
-    const answers = ask.map((id) => { asked.set(id, Date.now()); return channel.chatName(id).then((name) => rememberGroupNames([{ id, name }]), () => {}); });
-    await within(Promise.all(answers), NAME_WAIT, 'WhatsApp').catch(() => {}); // the late ones are remembered when they come
+export function chatLabels(ids) {
+  const out = new Map();
+  for (const id of new Set([...(ids || [])].filter(Boolean).map(String))) {
+    const name = chatLabel(id);
+    if (name === UNNAMED_GROUP && isGroup(id) && wanted.size < WANTED_MAX) wanted.add(id);
+    out.set(id, name);
   }
-  return new Map(list.map((id) => [id, chatLabel(id)]));
+  return out;
+}
+
+/** Upkeep: ask the channel for a few names lists were missing (the hub remembers every answer). A group that does not
+ *  answer is asked again after ASK_AGAIN at the earliest. Returns how many were asked. */
+export async function namesTick(channel, now = Date.now()) {
+  if (typeof channel?.chatName !== 'function') return 0;
+  const due = [...wanted].filter((id) => now - (asked.get(id) || 0) > ASK_AGAIN).slice(0, NAMES_PER_TICK);
+  await Promise.all(due.map(async (id) => {
+    asked.set(id, now);
+    rememberGroupNames([{ id, name: await channel.chatName(id).catch(() => '') }]);
+  }));
+  return due.length;
 }
 
 /** Adds `chatName` to rows that have a `chat` (activity entries, silences, pending changes, usage rows…). */
-export async function withChatNames(rows, channel, key = 'chat') {
-  const names = await chatLabels(rows.map((r) => r?.[key]), channel);
+export function withChatNames(rows, key = 'chat') {
+  const names = chatLabels(rows.map((r) => r?.[key]));
   return rows.map((r) => (r?.[key] ? { ...r, chatName: names.get(String(r[key])) } : r));
 }

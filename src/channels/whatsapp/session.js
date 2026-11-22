@@ -485,7 +485,7 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
     return meta;
   }
   // ---------- helpers for the WhatsApp actions (026) ----------
-  const ready = () => { if (state.status !== 'open' || !sock) throw fail('WhatsApp is not connected', 409); return sock; };
+  const ready = () => { if (state.status !== 'open' || !sock) throw fail('WhatsApp is not connected', 409, { offline: true }); return sock; };
   const needGroup = (jid) => { if (!isJidGroup(jid)) throw fail('This only works in a group'); };
   /** A phone number (any format) or a jid → jid. */
   const toJid = (who) => {
@@ -649,7 +649,7 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
     },
     /** Sends text; returns { msgId } of the sent message. */
     async send(chat, text, { quoted, quote, mentions } = {}) {
-      if (state.status !== 'open') throw new Error('WhatsApp is not connected');
+      ready();
       const q = quoted || quotedOf(chat, quote);
       const sent = await sock.sendMessage(chat, { text, ...(mentions?.length ? { mentions } : {}) }, q ? { quoted: q } : undefined);
       return { msgId: sent?.key?.id || null };

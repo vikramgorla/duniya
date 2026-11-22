@@ -1,6 +1,36 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.58.11": {
+      "breaking": false,
+      "title": "Sturdier in everyday use",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Lists never ask WhatsApp for group names while you wait; a missing name is learned in the background and shows shortly after."
+        },
+        {
+          "type": "fixed",
+          "text": "An answer written while WhatsApp was reconnecting is sent once it is back, instead of being lost."
+        },
+        {
+          "type": "fixed",
+          "text": "A scheduled post interrupted by a restart or update goes out afterwards instead of being skipped that day."
+        },
+        {
+          "type": "fixed",
+          "text": "A tool that was slow to answer is no longer called a second time, so a change is never made twice."
+        },
+        {
+          "type": "improved",
+          "text": "If the panel hits an error of its own, it says so and records it in Activity."
+        },
+        {
+          "type": "removed",
+          "text": "Pulling down on a stuck screen no longer restarts the panel; it simply loads the screen again."
+        }
+      ]
+    },
     "2.58.10": {
       "breaking": false,
       "title": "Nothing waits on WhatsApp for long",
