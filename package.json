@@ -1,6 +1,6 @@
 {
   "name": "duniya",
-  "version": "2.60.2",
+  "version": "2.60.3",
   "private": true,
   "description": "Self-hosted AI agents for WhatsApp and Telegram groups and chats: any model, MCP tools, People, events and orders, admin panel.",
   "license": "MIT",
@@ -29,7 +29,7 @@
     "node": ">=22.13"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.8.0",
+    "@anthropic-ai/sdk": "^1.11.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "baileys": "7.0.0-rc14",
     "pino": "^10.4.0",
@@ -41,7 +41,7 @@
     "eslint": "^10.15.0",
     "globals": "^17.14.0",
     "jscpd": "^5.4.3",
-    "knip": "^6.45.1",
-    "typescript": "^5.9.3"
+    "knip": "^6.46.1",
+    "typescript": "^7.0.2"
   }
 }

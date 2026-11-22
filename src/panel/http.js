@@ -150,7 +150,7 @@ export async function receiveUpload(req, { magic = '', max = UPLOAD_MAX } = {}) 
       if (!out.write(chunk)) await new Promise((r) => out.once('drain', () => r(null)));
     }
     if (size < magic.length || (magic && head.toString() !== magic)) throw fail('This is not a Duniya backup file (.dbk)');
-    await new Promise((r, j) => out.end((e) => (e ? j(e) : r())));
+    await new Promise((r, j) => out.end((e) => (e ? j(e) : r(null))));
     renameSync(part, resolve(UPLOAD_DIR, `${id}.dbk`));
     return { upload: id, size };
   } catch (e) {

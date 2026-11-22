@@ -105,7 +105,7 @@ jobs:
           fi
           echo "namespace=$NS" >> "$GITHUB_OUTPUT"
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         if: steps.check.outputs.ok == 'true'
         with:
           terraform_version: "1.17.2"
