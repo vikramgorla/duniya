@@ -48,6 +48,8 @@ const NAV_STRESS = `window.__realFetch ||= window.fetch; const { dropCache } = a
   if (main.querySelector('.skel') || main.classList.contains('loading')) throw new Error('stuck on placeholders on ' + S.tab);
   if (main.dataset.screen !== S.tab) throw new Error('screen ' + main.dataset.screen + ' drawn under tab ' + S.tab);
   if (S.tab === 'activity' && !document.getElementById('feed')?.isConnected) throw new Error('activity list not on screen; shown: ' + main.textContent.trim().slice(0, 60));`;
+// iOS: a request on a frozen connection that never settles, not even when aborted (the screen stayed on placeholders)
+const FROZEN_ACTIVITY = `S.loadTimeout = 800; window.__realFetch ||= window.fetch; window.fetch = (u, o) => (String(u).startsWith('/api/activity') ? new Promise(() => {}) : window.__realFetch(u, o));`;
 const HANG_AGENTS = `const { dropCache } = await import('/app/core.js'); dropCache(); S.loadTimeout = 800; window.__realFetch ||= window.fetch;
   window.fetch = (u, o) => (String(u).startsWith('/api/agents') ? new Promise((_, no) => o?.signal?.addEventListener('abort', () => no(new DOMException('aborted', 'AbortError')))) : window.__realFetch(u, o));`;
 // 045: pretend v3.0.0 (breaking) is available, with v2.26.0 still safe to install; 065: the notes of the range are the
@@ -123,6 +125,7 @@ const STATES = [
   // fully drawn: no placeholder cards left, no screen drawn under another tab, header in view. Throws otherwise.
   { name: 'nav-stress', hash: 'overview', wait: 2000, js: NAV_STRESS },
   { name: 'load-failed', hash: 'agents', before: HANG_AGENTS, wait: 2500, js: "if (!document.querySelector('.load-failed')) throw new Error('no Retry card after a hung request'); window.fetch = window.__realFetch; S.loadTimeout = 15000;" },
+  { name: 'load-frozen', hash: 'activity', before: FROZEN_ACTIVITY, wait: 2500, js: "window.fetch = window.__realFetch; S.loadTimeout = 15000; if (!document.querySelector('.load-failed')) throw new Error('no Retry card after a request that ignores abort');" },
   { name: 'load-retry', hash: 'agents', before: HANG_AGENTS, wait: 2500, js: "window.fetch = window.__realFetch; S.loadTimeout = 15000; await T.click('Retry', 'button', 1500); if (document.querySelector('.load-failed, .skel') || !document.querySelector('.ld-list .lrow')) throw new Error('Retry did not recover the screen');" },
   { name: 'pull-refresh', hash: 'overview', js: "const m = document.createElement('div'); m.className = 'ptr armed busy'; m.setAttribute('aria-hidden', 'true'); m.append(Object.assign(document.createElement('span'), { className: 'spinner' })); m.style.transform = 'translate(-50%, 64px)'; document.body.append(m); await T.wait(200);" },
   { name: 'agents-new', hash: 'agents/new', wait: 2000 },
