@@ -219,6 +219,7 @@ test('tools via the SDK client: read and write as the approving user, logged as 
   assert.deepEqual(agents.map((b) => b.id).sort(), ['helper', 'owner-assistant', 'panduga']);
   const ov = JSON.parse(text(await c.callTool({ name: 'get_overview', arguments: {} })));
   assert.equal(ov.you.username, 'admin');
+  assert.deepEqual(ov.accounts.map((a) => [a.channel, a.app, a.status]), [['whatsapp', 'WhatsApp', 'open']], 'every channel\'s accounts, not WhatsApp\'s numbers only');
   // 062: the Getting started steps still open (no reply yet in this harness)
   assert.deepEqual(ov.gettingStarted.open.map((x) => x.step), ['reply']);
   // 062: assign_chat with switch_on binds and switches an Off chat on

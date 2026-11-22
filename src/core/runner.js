@@ -48,7 +48,7 @@ function withSources(text, sources) {
 }
 const turnFeature = (ctx, smart) => (ctx.source === 'panel' ? 'test' : ctx.source === 'schedule' ? 'scheduled' : ctx.unaddressed ? 'judge' : smart ? `reply-${smart.tier}` : 'reply');
 
-// Test console (#37): WhatsApp actions are never carried out from the panel. Read-only ones look at the chat being
+// Test console (#37): chat actions are never carried out from the panel. Read-only ones look at the chat being
 // tested; every other one returns what it would have done.
 export const WA_READ_ONLY = new Set(['whatsapp:poll_results', 'whatsapp:group_info', 'whatsapp:profile_info']);
 async function runTool(run, m, call, ctx) {

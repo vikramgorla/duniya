@@ -338,6 +338,9 @@ test('Telegram: a bot that is not connected for 15 minutes is reported to the ow
   const { upkeepTick, resetUpkeep } = await import('../src/core/upkeep.js');
   resetUpkeep();
   assert.deepEqual((await hub.accounts()).map((a) => [a.app, a.label, a.status]), [['Telegram', '@family_helper_bot', 'open']]);
+  // Overview reads the accounts of every channel from the status (no WhatsApp number here: the bot alone is "everything")
+  const seen = (await hub.status()).accounts;
+  assert.deepEqual(seen.map((a) => [a.channel, a.app, a.label, a.status, a.me]), [['telegram', 'Telegram', '@family_helper_bot', 'open', '']]);
   fake.down = true;
   fake.stall(0); // the waiting long poll ends; the next one cannot reach Telegram
   assert.ok(await until(async () => (await hub.accounts())[0].status === 'error'));

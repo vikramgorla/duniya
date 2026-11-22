@@ -6,12 +6,12 @@ import { iso, str, bool, int } from './fields.js';
 export const OVERVIEW_TOOLS = [
   // ---------- overview & activity ----------
   { name: 'get_overview', readOnly: true, calls: [['GET', '/api/status'], ['GET', '/api/checklist']],
-    description: 'Overview of the app: version, uptime, memory, whether agents are paused, WhatsApp connection per number, agents, how many changes wait for confirmation, and the Getting started steps still open (link WhatsApp, connect a model, create an agent, switch a chat on, send a test).',
+    description: 'Overview of the app: version, uptime, memory, whether agents are paused, the accounts of every channel and whether each is connected (WhatsApp numbers, a Telegram bot), agents, how many changes wait for confirmation, and the Getting started steps still open (link WhatsApp, connect a model, create an agent, switch a chat on, send a test).',
     input: {},
     run: async (a, x) => {
       const [s, c] = await Promise.all([x.call('GET', '/api/status'), x.call('GET', '/api/checklist').catch(() => null)]);
       return { you: { username: s.user.username, role: s.user.role }, version: s.version, uptimeSec: s.uptimeSec, memoryMb: s.memoryMb, node: s.node,
-        agentsPaused: !!s.settings?.paused, whatsapp: (s.channel?.numbers || [s.channel]).map((n) => ({ id: n.id, label: n.label, status: n.status, me: n.me })),
+        agentsPaused: !!s.settings?.paused, accounts: (s.channel?.accounts || []).map((a) => ({ channel: a.channel, app: a.app, label: a.label, status: a.status, me: a.me, ...(a.lastError ? { error: a.lastError } : {}) })),
         agents: s.agents, pendingConfirmations: s.pending,
         gettingStarted: c && !c.complete ? { done: c.done, total: c.total, open: c.steps.filter((st) => !st.done && !st.skipped).map((st) => ({ step: st.id, title: st.title, hint: st.hint })) } : 'done' };
     } },

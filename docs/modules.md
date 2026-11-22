@@ -27,7 +27,7 @@
 ## Agent tools
 
 When a module is on, every agent gets its tools, shown on the agent's page under **Tools** with a tick per role and
-**All: participants / All: organizers**, like WhatsApp actions:
+**All: participants / All: organizers**, like chat actions:
 
 - **Participants** get the tools about themselves (register me or my household, cancel, take a duty, what do I owe).
 - **Organizers** get the rest. A change about anyone other than the sender (register someone, confirm, waiting list,

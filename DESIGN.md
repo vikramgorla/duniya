@@ -69,9 +69,10 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
   its case: `pill raw`.
 - **Avatars** (`avatar(name, id)`): initials on one of the five "people" colours, the same colour for the same agent
   or chat everywhere (agent cards, Overview, Chats, Activity); grey when off.
-- **Status console:** Overview opens with one sentence about the state ("Everything is running", "A WhatsApp
-  number needs attention"; on a fresh install the first missing thing: "Link WhatsApp or Telegram to begin") and
-  compact status chips with an LED, written as a phrase: "WhatsApp connected", "2 agents live", "3 chats on",
+- **Status console:** Overview opens with one sentence about the state ("Everything is running", "WhatsApp Home
+  needs attention": the account that is down, by app and name; on a fresh install the first missing thing: "Link
+  WhatsApp or Telegram to begin") and compact status chips with an LED, written as a phrase: "WhatsApp connected"
+  ("WhatsApp 2/2 · Telegram connected" with several accounts: every channel counts), "2 agents live", "3 chats on",
   "Nothing waiting".
 - **On the accent:** anything drawn on lime (`--signal`, and `--accent` in dark mode) — text, icons, badges — uses the
   dark on-accent ink (`--signal-ink` / `--accent-ink`), never `--ink` (it is near-white in dark mode). Icons need 3:1
@@ -137,7 +138,9 @@ Calm and compact: say more with less chrome.
   (`menu(label, …buttons)`), or onto the item's page, never in a row of buttons. A row shows at most one primary
   action.
 - **Progressive disclosure.** Show what is needed every day. The rest goes under *More settings* in place, an
-  *Advanced* `<details>`, or the item's page.
+  *Advanced* `<details>`, or the item's page. A section that opens in place shows a chevron before its title that
+  turns when it opens (`.sblock > summary`, release notes): without it a folded section reads as a heading with
+  nothing under it.
 - **List → page** (`listDetail()` in `listdetail.js`).
   - A list of rows, grouped under eyebrow titles, and the page of the chosen row.
   - On wide screens: two panes, with the list sticky on the left.
@@ -146,8 +149,12 @@ Calm and compact: say more with less chrome.
   - Adding something is one row at the end of its list ("Add a provider").
   - A row may carry one switch next to its chevron (`end`, outside the link: Agents, Chats); everything else about the
     item is on its page.
+  - A row is a name and one line under it. In the list pane that line stays on one line (the pane is 250 to 360 px wide
+    on a wide screen). In a card's list (Orders, Events, Sending, Households) it may wrap once: the amount left, the
+    due date or how many were sent is never cut off on a phone. Write the line with what matters most first.
+  - A link that ends in "›" keeps the chevron with its last word (`\u00a0›`).
   - Used by Agents, Chats, Models, Settings and Backups.
-  - Settings opens with **Channels** (075): one row per channel the server really has (today WhatsApp), with its
+  - Settings opens with **Channels** (075): one row per channel the server really has (WhatsApp, Telegram), with its
     state as the row's line (*2 of 2 numbers connected*, *Switched off*, *Not set up yet*). Never a "coming soon" row.
     A channel's page: its status card (on/off switch for the owner, the memory it uses), then its accounts.
 - **Touch:** every target is at least 44 px on phones (40 px is the hard floor that `check:responsive` enforces).

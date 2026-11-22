@@ -248,7 +248,9 @@ const STATES = [
   { name: 'settings-pace-custom', hash: 'settings/sending-pace', wait: 2000, js: "await T.click('Custom', 'button', 300);" }, // 080: custom ranges
   { name: 'models-setup', hash: 'models/chatgpt', before: `const f = window.fetch; window.fetch = async (u, o) => { const r = await f(u, o);
       if (String(u).startsWith('/api/providers') && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json(); if (Array.isArray(j)) return new Response(JSON.stringify(j.filter((x) => x.id !== 'openrouter').map((x) => ({ ...x, connected: false, models: 0 })))); }
-      return r; }; S.models = null;`, js: "await T.click('Sign in with ChatGPT', 'button', 1200); T.openAll();" },
+      return r; };
+      // the screen may have asked for the providers before this ran: let that settle, then forget it (the 60-second cache too)
+      await new Promise((r) => setTimeout(r, 500)); S.models = null; (await import('/app/core.js')).dropCache();`, js: "await T.click('Sign in with ChatGPT', 'button', 1200); T.openAll();" },
   { name: 'usage', hash: 'usage' },
   { name: 'usage-features', hash: 'usage', wait: 1200, js: "document.querySelector('[data-jump=features]').scrollIntoView(); await T.click('Show all', 'button', 400);" }, // 092: Cost per feature
   { name: 'agent-model-smart', hash: 'agents/office/model' },
@@ -307,7 +309,8 @@ const PRELUDE = `const T = {
   openAll: () => document.querySelectorAll('details').forEach((d) => { d.open = true; }),
   async click(text, sel = 'button,a,summary', ms = 900) {
     let el = null; // 069: wait up to 5 s for it (a screen still drawing made models-setup flaky)
-    for (let t = 0; t < 5000 && !(el = [...document.querySelectorAll(sel)].find((e) => e.textContent.trim().includes(text) && e.offsetParent)); t += 100) await T.wait(100);
+    // checkVisibility: what is inside a closed <details> has a box (content-visibility) but is not on the screen
+    for (let t = 0; t < 5000 && !(el = [...document.querySelectorAll(sel)].find((e) => e.textContent.trim().includes(text) && e.offsetParent && e.checkVisibility())); t += 100) await T.wait(100);
     if (!el) throw new Error('nothing to click: ' + text);
     el.click(); await T.wait(ms);
   },

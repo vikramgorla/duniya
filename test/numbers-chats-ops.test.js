@@ -101,6 +101,8 @@ test('011: logging levels, categories and per-chat override; errors and config a
   t.events.activity('error', { summary: 'boom' });
   assert.equal(count('error', since), 1, 'errors always kept');
   assert.ok(count('config', since) >= 1, 'config changes always kept');
+  t.events.activity('access', { summary: 'Stored messages viewed by admin' });
+  assert.equal(count('access', since), 1, 'who looked at stored messages is always kept');
 
   await t.api(owner, 'PUT', '/api/logging', { level: 'normal', categories: { messages: false } });
   since = Date.now();

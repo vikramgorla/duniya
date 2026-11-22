@@ -29,7 +29,7 @@ before(async () => {
   t = await setup();
   owner = await t.login();
   const { startRuntimeFile } = await import('../src/core/runtime.js');
-  t.channel.accounts = async () => [{ key: 'whatsapp:main', channel: 'whatsapp', app: 'WhatsApp', label: 'Main', status: 'open', lastError: '', me: '41790000099:1@s.whatsapp.net' },
+  t.channel.accounts = async () => [{ key: 'whatsapp:main', channel: 'whatsapp', app: 'WhatsApp', label: 'Main', status: 'open', lastError: '', me: '41790000099' },
     { key: 'telegram:77', channel: 'telegram', app: 'Telegram', label: '@duniya_bot', status: 'connecting', lastError: 'not reachable', me: '' }];
   await startRuntimeFile(t.channel).write();
 });

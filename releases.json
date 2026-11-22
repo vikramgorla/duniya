@@ -1,6 +1,40 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.60.6": {
+      "breaking": false,
+      "title": "Overview for every channel, lists that show what matters, updates that say why",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Overview lists every account: a Telegram bot next to your WhatsApp numbers. “Everything is running” means all of them are connected; when one is not, the headline names it."
+        },
+        {
+          "type": "improved",
+          "text": "On a phone, a row in Orders, Events, Sending and Households shows its second line in full (the amount left and the due date, how many were sent) instead of cutting it off."
+        },
+        {
+          "type": "improved",
+          "text": "A section that opens in place (Spending cap on a chat, Cancelled on an event) shows a small arrow, so it no longer looks like a title with nothing under it. On a wide screen the lists of Chats and Agents are wider."
+        },
+        {
+          "type": "improved",
+          "text": "What agents do in a chat (polls, reactions, group changes) is called “Chat actions” everywhere, as it works on Telegram too. Activity marks a payment, a send or a change in People as “Change” (it said “Settings”) and a look at stored messages as “Looked at”."
+        },
+        {
+          "type": "improved",
+          "text": "An update that fails says why, in Settings → Updates and in Activity. A release that could not be rolled back if it did not start (found by rehearsing a failed update) is not installed at all; your version keeps running."
+        },
+        {
+          "type": "fixed",
+          "text": "Model pickers show a model’s name (“Claude · Claude Sonnet 5.5”) where they showed its internal id, Modules no longer says “about 0 MB”, the choices of the morning brief line up on the left, and in “Change with AI” a section’s name and what changed in it no longer run together."
+        },
+        {
+          "type": "fixed",
+          "text": "After an update, the update status lists only the releases that are still to come. An AI assistant connected to the panel could read installed ones as waiting."
+        }
+      ]
+    },
     "2.60.5": {
       "breaking": false,
       "title": "Nothing is left behind: a chat that moves, people who are merged, a person who is erased",

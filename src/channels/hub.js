@@ -161,12 +161,16 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     return out;
   }
 
-  /** Every account of every running channel, for the connection watch (upkeep.js) and `duniya status`: { key, channel, app, label, status, lastError, me }. */
+  /**
+   * Every account of every running channel, for Overview, the connection watch (upkeep.js) and `duniya status`:
+   * { key, channel, app, label, status, lastError, me }. `me`: the account's own id without device and server parts
+   * ("41790000001:3@s.whatsapp.net" → "41790000001"), '' when the channel has none to show.
+   */
   async function accounts() {
     const out = [];
     for (const [id, { adapter: a }] of live) {
       const st = await a.status().catch((e) => ({ numbers: [{ id, status: 'error', lastError: e.message }] }));
-      for (const n of st.numbers || []) out.push({ key: `${id}:${n.id}`, channel: id, app: label(id), label: n.label || n.id, status: n.status, lastError: n.lastError || '', me: n.me || '' });
+      for (const n of st.numbers || []) out.push({ key: `${id}:${n.id}`, channel: id, app: label(id), label: n.label || n.id, status: n.status, lastError: n.lastError || '', me: String(n.me || '').split(':')[0].split('@')[0] });
     }
     return out;
   }
@@ -212,11 +216,11 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     },
     async isMember(chat, phone, senderJid) { try { return !!(await within(Promise.resolve(route(chat).isMember?.(chat, phone, senderJid)), READ_WAIT, 'member check')); } catch { return false; } },
     listChats,
-    /** WhatsApp's first number at the top level (as the panel has always read it), its numbers, and every channel. */
+    /** Every channel and every account (Overview); WhatsApp's numbers too, for the screens that link and add them. */
     async status() {
       const wa = live.get('whatsapp');
       const st = wa ? await wa.adapter.status() : { status: setUp('whatsapp') ? 'off' : 'not_set_up', numbers: [] };
-      return { ...st, channels: await channels() };
+      return { ...st, channels: await channels(), accounts: await accounts() };
     },
     channels,
     accounts,

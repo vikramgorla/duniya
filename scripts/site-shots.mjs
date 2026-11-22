@@ -145,8 +145,7 @@ async function open(page, hash, js, checklist) {
   await sleep(500);
 }
 const capture = async (page, file, clip, quality = 80) => {
-  const { data } = await page.send('Page.captureScreenshot', { format: 'webp', quality, ...(clip ? { clip, captureBeyondViewport: true } : {}) });
-  writeFileSync(file, Buffer.from(data, 'base64'));
+  writeFileSync(file, await page.capture({ format: 'webp', quality, ...(clip ? { clip, captureBeyondViewport: true } : {}) }));
   console.log('✓', file);
 };
 

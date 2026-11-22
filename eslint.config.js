@@ -9,6 +9,7 @@ const rules = {
   eqeqeq: ['error', 'smart'],
   'no-var': 'error',
   'prefer-const': ['error', { destructuring: 'all' }],
+  'no-irregular-whitespace': ['error', { skipStrings: false }], // an invisible character in a string cannot be reviewed: write its escape (\u00a0)
 };
 const options = (env) => ({ ecmaVersion: 2024, sourceType: 'module', globals: { ...env } });
 

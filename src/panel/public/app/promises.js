@@ -35,7 +35,7 @@ function commitmentRows(list, after, { who = true, agent = false, empty = 'No op
     h('div', { class: 'lesson-text' }, who ? [c.person ? h('a', { href: `#people/${enc(c.person)}` }, c.who || 'Someone') : c.who || 'Someone', ': '] : null, c.what,
       STATUS[c.status] ? [' ', h('span', { class: `pill ${STATUS[c.status][0]}` }, STATUS[c.status][1])] : null),
     h('div', { class: 'small muted' }, [dueLine(c), c.chatName ? h('a', { href: `#chats/${enc(c.chat)}` }, c.chatName) : null,
-      c.msg ? h('a', { href: `#chats/${enc(c.chat)}/messages/${c.msg}` }, 'the message ›') : null, agent && c.agentName ? c.agentName : null,
+      c.msg ? h('a', { href: `#chats/${enc(c.chat)}/messages/${c.msg}` }, 'the message\u00a0›') : null, agent && c.agentName ? c.agentName : null,
       c.followedUpAt && c.status === 'open' ? 'reminded' : null].filter(Boolean).flatMap((x, i) => (i ? [' · ', x] : [x]))),
     can('admin') ? h('div', { class: 'row fx' }, c.status === 'open'
       ? h('button', { class: 'btn small', type: 'button', onclick: () => put(c, { status: 'done' }, 'Marked done') }, 'Done')
@@ -91,7 +91,7 @@ export function promisesView(x, save) {
     h('p', { class: 'small muted' }, 'In its chats that are on, it notices promises ("I’ll bring the speakers on Friday") and reminds gently when one is due; when the chat shows it done, it is marked done. ', helpLink('intelligence.md#commitments')),
     h('label', { class: 'tick' }, track, ' Track promises'), h('label', { class: 'field' }, h('span', {}, 'When one is due'), follow),
     h('label', { class: 'tick' }, cues, ' Suggest family ties in People from what people say ("my daughter Vedika")'),
-    h('div', { class: 'sblock' }, h('h3', {}, 'Open promises ', h('a', { class: 'small', href: `#people/promises/agent:${x.enc}` }, 'All promises ›')), list));
+    h('div', { class: 'sblock' }, h('h3', {}, 'Open promises ', h('a', { class: 'small', href: `#people/promises/agent:${x.enc}` }, 'All promises\u00a0›')), list));
 }
 
 /** A person's Preferences and Commitments blocks. `p`: the person (with prefs and commitments); `redraw()` after a change. */
@@ -115,7 +115,7 @@ export function personBlocks(p, redraw) {
     h('div', { class: 'grid2' }, h('label', { class: 'field' }, h('span', {}, 'Language'), lang), h('label', { class: 'field' }, h('span', {}, 'App'), app)),
     h('div', { class: 'small' }, hoursLine, pf.auto.hours ? '' : ' (set by you)'),
     admin ? h('div', { class: 'row' }, from, to, pf.auto.hours ? null : h('button', { class: 'btn small ghost', type: 'button', onclick: () => put({ hoursFrom: 'auto' }) }, 'Automatic')) : null);
-  const promises = p.commitments?.length ? h('div', { class: 'sblock' }, h('h3', {}, 'Commitments ', h('a', { class: 'small', href: `#people/promises/person:${enc(p.id)}` }, 'All promises ›')), commitmentRows(p.commitments, redraw, { who: false, agent: true })) : null;
+  const promises = p.commitments?.length ? h('div', { class: 'sblock' }, h('h3', {}, 'Commitments ', h('a', { class: 'small', href: `#people/promises/person:${enc(p.id)}` }, 'All promises\u00a0›')), commitmentRows(p.commitments, redraw, { who: false, agent: true })) : null;
   return [prefs, promises];
 }
 

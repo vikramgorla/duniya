@@ -22,6 +22,14 @@ test('status saved before an update is corrected after the restart (regression)'
   assert.equal(st.available, false);
   kvSet('updates:status', JSON.stringify({ current: u.RUNNING_VERSION, latest: 'v99.0.0', available: false, channel: 'stable', checkedAt: Date.now() }));
   assert.equal(u.updateStatus().available, true);
+  // what the check listed as ahead and is installed by now is not listed any more
+  const done = { title: 'installed by now', changes: [] }; const next = { title: 'still ahead', changes: [] };
+  kvSet('updates:status', JSON.stringify({ current: 'v0.0.1', latest: 'v99.0.0', available: true, channel: 'stable', checkedAt: Date.now(),
+    tags: ['v0.0.2', u.RUNNING_VERSION, 'v99.0.0'], releases: { '0.0.2': done, [u.RUNNING_VERSION.slice(1)]: done, '99.0.0': next } }));
+  const after = u.updateStatus();
+  assert.deepEqual(after.tags, ['v99.0.0']);
+  assert.deepEqual(Object.keys(after.releases), ['99.0.0']);
+  assert.deepEqual(after.notes.map((n) => n.version), ['99.0.0']);
   kvSet('updates:status', 'null');
 });
 
@@ -91,7 +99,27 @@ test('stable and main channels update a real checkout; failed dependency install
   r = await u.applyUpdate({ root: app, target: 'main' });
   assert.equal(r.code, 1);
   assert.match(r.log, /Dependencies changed, installing…[\s\S]*rolling back/);
+  assert.equal(r.why, 'The packages this release needs could not be installed: not installed, the previous version stays', 'the last line says why, in plain words');
   assert.equal(git(app, 'rev-parse', 'HEAD'), before);
+
+  // A release whose start guard (or entry) does not load could never be put back by it: refused while the previous version runs
+  const release = (v, files) => {
+    pkg(v); writeFileSync(join(work, 'package-lock.json'), JSON.stringify({ name: 'x', version: v, lockfileVersion: 3, requires: true, packages: { '': { name: 'x', version: v } } }));
+    for (const [file, text] of Object.entries(files)) writeFileSync(join(work, file), text);
+    git(work, 'add', '-A'); git(work, 'commit', '-qm', `v${v}`); git(work, 'push', '-q', 'origin', 'main');
+  };
+  const guard = readFileSync(resolve(import.meta.dirname, '../src/core/update-guard.js'), 'utf8');
+  for (const [v, files] of [['1.2.1', { 'src/core/update-guard.js': 'export const depsKey = () => ;' }], ['1.2.2', { 'src/core/update-guard.js': guard, 'src/index.js': 'await import(;' }]]) {
+    release(v, files);
+    r = await u.applyUpdate({ root: app, target: 'main' });
+    assert.equal(r.code, 1, r.log);
+    assert.match(r.why, /^This release could not be put back if it did not start .*previous version stays$/);
+    assert.equal(git(app, 'rev-parse', 'HEAD'), before, 'the code is the previous one');
+  }
+  release('1.2.3', { 'src/index.js': "await import('./core/update-guard.js');" });
+  r = await u.applyUpdate({ root: app, target: 'main' });
+  assert.equal(r.code, 0, r.log);
+  assert.equal(JSON.parse(readFileSync(join(app, 'package.json'), 'utf8')).version, '1.2.3');
 });
 
 test('084 update source: shown without credentials, switched to a fork (its tags replace the old ones), refused or put back when wrong', async () => {

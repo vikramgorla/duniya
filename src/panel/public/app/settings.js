@@ -126,7 +126,7 @@ function updatesCard(u, { line, check, reviewBtn, updateBtn, docker }) {
     docker ? h('div', { class: 'note' }, 'Docker install: update with  docker compose pull && docker compose up -d') : null,
     h('div', { class: 'upd-main' }, line, notes),
     rb ? h('div', { class: 'note bad' }, h('b', {}, rb.ok ? 'Rolled back. ' : 'Not rolled back. '), rb.text, ` (${time(rb.at)})`) // 095: instead of "Last update", which it undid
-      : lr ? h('p', { class: 'small muted' }, lr.ok ? `Last update: ${lr.from ? `${lr.from} → ` : ''}${lr.target} on ${time(lr.at)}${lr.backup ? ` · backup ${lr.backup}` : ''}` : `Last update failed on ${time(lr.at)}; the previous version kept running.`) : null,
+      : lr ? h('p', { class: 'small muted' }, lr.ok ? `Last update: ${lr.from ? `${lr.from} → ` : ''}${lr.target} on ${time(lr.at)}${lr.backup ? ` · backup ${lr.backup}` : ''}` : `Last update failed on ${time(lr.at)}; the previous version kept running.${lr.why ? ` ${lr.why}` : ''}`) : null,
     h('div', { class: 'row', style: 'margin-top:8px' }, reviewBtn, updateBtn, h('button', { class: 'btn small', onclick: check }, 'Check now'), h('a', { class: 'btn small ghost', href: '#settings/release-notes' }, 'Release notes')),
     h('div', { class: 'sblock' }, h('h3', {}, 'Settings'),
       h('div', { class: 'grid2' }, field('New versions', mode, 'Breaking releases always wait for your OK.'), field('Releases', channel), field('Install at', at), field('Backups before an update, keep', keep)),
@@ -729,7 +729,7 @@ function modulesCard(st) {
   const card = h('div', { class: 'card' }, h('h2', {}, 'Modules'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, 'Features on top of People. Off hides them; their data stays. ', helpLink('modules.md')),
     h('ul', { class: 'people-list' }, st.modules.map((m) => h('li', { class: 'has-end' }, h(m.on ? 'a' : 'div', { class: 'lrow', href: m.on ? `#people/${m.id}` : null },
-      h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, m.label), h('span', { class: 'lrow-sub' }, `${m.line}${m.on && m.memoryMb !== null ? ` · about ${m.memoryMb} MB` : ''}`))),
+      h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, m.label), h('span', { class: 'lrow-sub' }, `${m.line}${m.on && m.memoryMb ? ` · about ${m.memoryMb} MB` : ''}`))),
     h('span', { class: 'row-end' }, toggle(m.on, (v) => flip(m, v), !can('admin'), m.label))))),
     st.methods ? h('div', { class: 'sblock' }, h('h3', {}, 'Ways to pay'), field('One per line', methods, 'Duniya records payments; it never takes money.'),
       can('admin') ? h('button', { class: 'btn', style: 'margin-top:8px', onclick: () => tryApi(() => api('PUT', '/api/orders/methods', { methods: methods.value.split('\n') }), 'Saved') }, 'Save ways to pay') : null) : null);

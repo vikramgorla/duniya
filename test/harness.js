@@ -251,7 +251,9 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
     listChats: async () => [{ id: 'g1@g.us', name: 'Panduga families', size: 12 }, { id: 'g2@g.us', name: 'Carpool', size: 6 }],
     isMember: async (chat, phone) => chat === 'g1@g.us' && phone === '41790000002',
     groupMembers: async (chat) => (chat === 'g1@g.us' ? [{ phone: '41790000001', jid: 'a', admin: true }, { phone: '41790000002', jid: 'b', admin: false }, { phone: '41790000003', jid: 'c', admin: true }, { phone: '', jid: 'x@lid', admin: false }] : []),
-    status: async () => ({ status: 'open', me: '41790000099:1@s.whatsapp.net', since: Date.now() }),
+    // as the hub answers: WhatsApp's own state plus the accounts of every channel (one number here)
+    status: async () => ({ status: 'open', me: '41790000099:1@s.whatsapp.net', since: Date.now(), accounts: await t.channel.accounts() }),
+    accounts: async () => [{ key: 'whatsapp:main', channel: 'whatsapp', app: 'WhatsApp', label: 'main', status: 'open', lastError: '', me: '41790000099' }],
     // 075: the hub's channel list (one WhatsApp channel, on)
     channels: async () => [{ id: 'whatsapp', label: 'WhatsApp', setup: 'qr', state: 'on', error: '', accounts: 1, connected: 1, memoryMb: 21, measuring: false }],
     setEnabled: async (id, on) => ({ id, state: on ? 'on' : 'off' }),

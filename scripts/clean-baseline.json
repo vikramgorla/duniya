@@ -156,10 +156,6 @@
   "complexity": 2,
   "max-lines-per-function": 1
  },
- "src/panel/public/app/overview.js": {
-  "complexity": 1,
-  "silent-catch": 3
- },
  "src/panel/public/app/people.js": {
   "complexity": 2,
   "silent-catch": 2

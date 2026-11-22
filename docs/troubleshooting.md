@@ -60,9 +60,9 @@ extras (on-server speech, local tool services) stay off unless you turn on **Sma
 ## 8. An update is waiting or did not install
 
 **Settings → Updates** shows the state. A **breaking** release never installs by itself: it waits for your OK on the
-panel or in WhatsApp, with what to do. A failed update keeps the previous version running. A release that cannot
-start on your server is put back by itself after three tries, and the page says so. On the server:
-`sudo duniya update`. [Updates](backups-and-updates.md#updates) ·
+panel or in WhatsApp, with what to do. A failed update keeps the previous version running, and the page and Activity
+say why. A release that cannot start on your server is put back by itself after three tries, and the page says so. On
+the server: `sudo duniya update`. [Updates](backups-and-updates.md#updates) ·
 [A release that does not start](backups-and-updates.md#a-release-that-does-not-start) ·
 [Breaking releases](backups-and-updates.md#breaking-releases-need-your-decision)
 

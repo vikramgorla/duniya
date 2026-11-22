@@ -53,7 +53,7 @@ test('spending-cap months, backup slots and the automatic update\'s time go by t
     const dec = await import('../src/core/update-decision.js');
     u.setUpdateSettings({ mode: 'auto', at: '04:00' });
     const next = `v${u.runningVersion().replace(/^v/, '').split('.')[0]}.9999.0`; // a later release of the same major: nothing to decide
-    const waiting = (now) => t.db.kvSet('updates:status', JSON.stringify({ current: u.runningVersion(), currentVersion: u.runningVersion(), latest: next, available: true, target: next, targetVersion: null,
+    const waiting = (now) => t.db.kvSet('updates:status', JSON.stringify({ current: u.runningVersion(), latest: next, available: true, target: next, targetVersion: null,
       tags: [next], releases: {}, channel: 'stable', checkedAt: now.getTime(), lastResult: null }));
     const early = new Date('2027-01-10T22:00:00Z'); // 03:30 on the 11th in Kolkata (23:00 on the 10th in Zurich)
     waiting(early); t.db.kvSet('updates:autoDay', '');

@@ -50,7 +50,7 @@ const SECTIONS = [
     sub: (x) => { const s = x.c.schedules || []; return s.length ? `${plural(s.length, 'schedule')} · ${s.map((y) => y.at).join(', ')}` : 'None'; }, build: buildSchedules },
   { group: 'How it works', id: 'model', icon: 'models', c: 'c4', title: () => 'Model', help: 'models.md', line: () => 'Which model answers, and what happens when it is unavailable.',
     sub: (x) => `${x.c.model === 'auto' ? 'Auto' : modelLabel(x.c.model, x.models)}${x.c.fallback?.mode === 'off' ? ' · no fallback' : ''}${x.c.selfCheck === false ? ' · no self-check' : ''}`, build: buildModel },
-  { group: 'How it works', id: 'tools', icon: 'settings', c: 'c0', title: () => 'Tools', help: 'agents.md#tool-services-mcp', line: () => 'Tool services and WhatsApp actions, allowed per role in code.',
+  { group: 'How it works', id: 'tools', icon: 'settings', c: 'c0', title: () => 'Tools', help: 'agents.md#tool-services-mcp', line: () => 'Tool services and chat actions, allowed per role in code.',
     sub: (x) => { const t = [...Object.keys(x.c.mcpServers || {}), ...(x.b.globalTools || []).filter((g) => g.on).map((g) => g.name)]; return [x.bi ? '' : autonomyLabel(x.c.autonomy), t.length ? t.join(', ') : 'no tool services'].filter(Boolean).join(' · '); }, build: buildTools },
   { group: 'How it works', id: 'memory', icon: 'notes', c: 'c2', title: () => 'Memory', help: 'agents.md#memory', line: (x) => (x.bi ? 'Notes it saves when you ask, private to you.' : 'Chat memory and notes shared across its chats.'),
     sub: (x) => (x.c.memory?.enabled === false ? 'Off' : 'On'), build: buildMemory },
@@ -196,7 +196,7 @@ function buildReview(x, { teach }) {
     h('div', { class: 'small muted' }, [a.question?.name, a.chatName, time(a.ts)].filter(Boolean).join(' · ')),
     a.question ? h('div', { class: 'rv-q' }, a.question.text) : null,
     h('div', { class: 'rv-a', title: 'Tap to show all', onclick: (e) => e.currentTarget.classList.toggle('open') }, a.text),
-    answerActions({ ...a, agent: x.id }, { teach, extra: h('a', { class: 'btn small ghost rv-in', href: `#chats/${encodeURIComponent(a.chat)}/messages/${a.id}` }, 'In chat ›') }));
+    answerActions({ ...a, agent: x.id }, { teach, extra: h('a', { class: 'btn small ghost rv-in', href: `#chats/${encodeURIComponent(a.chat)}/messages/${a.id}` }, 'In chat\u00a0›') }));
   async function load(older) {
     const r = await tryApi(() => api('GET', `/api/agents/${x.enc}/review?only=${only}${older && last ? `&before=${last}` : ''}`));
     if (!r) return;
@@ -267,7 +267,7 @@ function buildPeople(x) {
     participants: F.participants?.values() || x.c.participants || [], peopleAccess: F.access.value, peopleLists: F.lists?.values() || x.c.peopleLists || [] }) };
 }
 function buildModel(x) {
-  const F = { model: modelSelect(x.models, x.c.model, { smart: true, autoLabel: `Auto${x.models.resolvedDefault ? ` (now ${x.models.resolvedDefault})` : ''}` }) };
+  const F = { model: modelSelect(x.models, x.c.model, { smart: true, autoLabel: `Auto${x.models.resolvedDefault ? ` (now ${modelLabel(x.models.resolvedDefault, x.models)})` : ''}` }) };
   const fb = fallbackPicker(x.models, x.c.fallback, { what: 'agent' });
   // 088: Smart choice — its own light / strong models (empty: Settings → Models), shown while "smart" is chosen
   const sm = x.models.smart || {};
@@ -314,7 +314,7 @@ function buildMemory(x) {
   if (!x.bi) loadNotes();
   // 072: each chat's own memory lives on the chat's page; one tap from here
   const chats = x.bi || !x.chats.length ? null : block('Memory of each chat', h('ul', { class: 'notes' }, x.chats.map((ch) => h('li', {},
-    h('a', { href: `#chats/${encodeURIComponent(ch.id)}/memory` }, `${ch.name || ch.id} ›`)))));
+    h('a', { href: `#chats/${encodeURIComponent(ch.id)}/memory` }, `${ch.name || ch.id}\u00a0›`)))));
   return { F, el: h('div', {}, tick(F.memory, x.bi ? 'Keep notes when asked' : 'Remember each chat (summary and notes)'), chats, notesBox), value: () => ({ memory: { enabled: F.memory.checked } }) };
 }
 function buildMedia(x) {
@@ -419,7 +419,7 @@ function buildTools(x, { save }) {
         custom ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { for (const role of ['organizer', 'participant']) rulesBox[role].value = splitLines(rulesBox[role].value).filter((r) => !r.startsWith(`${g.name}:`)).join('\n'); drawGlobals(); } }, 'Use the defaults') : null) : null, grid);
     })));
   }
-  // Built-in tools by role (WhatsApp actions; 081: module tools): "<key>:" rules, all / none per role (#165)
+  // Built-in tools by role (chat actions; 081: module tools): "<key>:" rules, all / none per role (#165)
   const bOn = (key, role, t) => { const mine = splitLines(rulesBox[role].value).filter((r) => r.startsWith(`${key}:`)); return !mine.length ? role === 'organizer' || t.participantDefault : mine.some((r) => globRe(r).test(`${key}:${t.name}`)); };
   const setB = (key, tools, role, name, on) => {
     const may = tools.filter((t) => role === 'organizer' || !t.organizerOnly);
@@ -464,12 +464,12 @@ function buildTools(x, { save }) {
     type: 'button', class: 'choice', 'aria-pressed': String(autonomy === v), disabled: !can('admin'),
     onclick: (e) => { autonomy = v; pick.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); } }, h('b', {}, label), h('span', {}, line))));
   const sure = bi ? null : block('How sure before changing things', pick, h('p', { class: 'small muted' }, 'Tools that declare themselves destructive always ask, read-only ones never do; each service can differ (How it uses it). Participants never change things. ',
-    helpLink('agents.md#how-sure-before-changing-things'), ' ', h('a', { href: '#activity/type=change.auto' }, 'Changes made without asking ›')));
+    helpLink('agents.md#how-sure-before-changing-things'), ' ', h('a', { href: '#activity/type=change.auto' }, 'Changes made without asking\u00a0›')));
   return { ready, value, el: h('div', {},
     sure,
     block('Its own tool services', srvList, addRow),
     block('Tool services for all agents', globalBox),
-    block('WhatsApp actions', h('p', { class: 'small muted' }, bi ? 'In your own chat it acts at once; anything sent elsewhere waits for your confirm.' : 'Organizer-only actions happen at once when an organizer asks. Every action is in Activity.'), waBox),
+    block('Chat actions', h('p', { class: 'small muted' }, bi ? 'In your own chat it acts at once; anything sent elsewhere waits for your confirm.' : 'Organizer-only actions happen at once when an organizer asks. Every action is in Activity.'), waBox),
     modBox,
     confirmBox,
     h('details', { class: 'sblock' }, h('summary', {}, 'Tool rules (advanced)'), field('Participant rules', rulesBox.participant), field('Organizer rules', rulesBox.organizer), field('Never allowed', rulesBox.deny))) };
