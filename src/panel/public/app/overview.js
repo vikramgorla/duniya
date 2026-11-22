@@ -39,7 +39,7 @@ function standing(st) {
 function channelsCard({ accounts, apps, off }) {
   const pill = (a) => h('span', { class: `pill ${a.status === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(a.status) ? 'warn' : 'bad'}` }, word(a));
   const line = (a) => (a.status !== 'open' ? 'Open Details to link it' : [apps.length > 1 || !Number(a.me) ? a.app : '', Number(a.me) ? `+${a.me}` : ''].filter(Boolean).join(' · '));
-  return h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, apps.length === 1 ? apps[0] : 'Channels'), h('a', { class: 'small', href: apps.length === 1 ? `#settings/${accounts[0].channel}` : '#settings' }, 'Details ›')),
+  return h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, apps.length === 1 ? apps[0] : 'Channels'), h('a', { class: 'small', href: apps.length === 1 ? `#settings/${accounts[0].channel}` : '#settings' }, 'Details\u00a0›')),
     accounts.length ? h('ul', { class: 'ctl-list' }, accounts.map((a) => h('li', {}, h('div', {}, h('b', {}, a.label), h('div', { class: 'small muted num' }, line(a))), pill(a))))
       : h('p', { class: 'small muted' }, off ? `Switched off: agents do not answer on ${off}.` : 'Not linked yet: Getting started shows how.'));
 }
@@ -58,7 +58,7 @@ function controlCard(st) {
     st.pending ? h('p', {}, h('a', { class: 'pill warn', href: '#pending' }, `${plural(st.pending, 'change')} waiting for a confirm`)) : null);
 }
 // 068: one calm line instead of a table; details are on the Server screen. 073: updates are one row too.
-const serverCard = (st, updates) => h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'Server'), h('a', { class: 'small', href: '#server' }, 'Details ›')),
+const serverCard = (st, updates) => h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'Server'), h('a', { class: 'small', href: '#server' }, 'Details\u00a0›')),
   h('p', { class: 'small muted num', style: 'margin:6px 0 0' }, `${st.version} · up `, h('span', { id: 'ov-uptime' }, ago(Date.now() - st.uptimeSec * 1000)), ' · ', h('span', { id: 'ov-memory' }, `${st.memoryMb} MB`)),
   updates || h('div', { id: 'updates-box' }));
 const recentCard = () => h('div', { class: 'card', style: 'grid-column:1/-1' }, h('div', { class: 'row spread' }, h('h2', {}, 'Recent activity'), h('button', { class: 'btn small', onclick: () => show('activity') }, 'All activity')),

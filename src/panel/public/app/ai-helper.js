@@ -49,7 +49,7 @@ const segNode = (s) => (s.newline ? null : s.type === 'add' ? h('ins', {}, s.tex
 function diffLine(segs) {
   const add = segs.some((s) => s.type === 'add' && s.text.trim()); const del = segs.some((s) => s.type === 'del' && s.text.trim());
   const mark = add && del ? '±' : add ? '+' : del ? '−' : '';
-  return h('div', { class: `dl${add && !del ? ' a' : ''}${del && !add ? ' d' : ''}${add && del ? ' m' : ''}` }, h('i', { 'aria-hidden': 'true' }, mark), h('span', {}, segs.map(segNode), '​'));
+  return h('div', { class: `dl${add && !del ? ' a' : ''}${del && !add ? ' d' : ''}${add && del ? ' m' : ''}` }, h('i', { 'aria-hidden': 'true' }, mark), h('span', {}, segs.map(segNode), '\u200b'));
 }
 /** Lines with folded unchanged stretches ("… 12 unchanged lines …", tap to show). keep(seg) filters a side. */
 function diffBlocks(blocks, keep = () => true) {
