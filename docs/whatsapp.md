@@ -41,7 +41,7 @@ its state) and the *WhatsApp 2/2 connected* chip; both open this page.
 | **⋯ → Remove** (owner, extra numbers) | removes the number; its chats keep their memory |
 | **Direct messages** | which agent answers people who write to this number privately (default: **Settings → Chats & direct messages**) |
 
-A number that keeps reconnecting for 15 minutes is reported to the owner once. A restart or update keeps the link.
+A number that is not connected for 15 minutes is reported to the owner once, with the reason. A restart or update keeps the link.
 
 ## Several numbers
 

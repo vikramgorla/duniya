@@ -141,7 +141,7 @@ channel uses. Nothing to click:
 ## Recovering by itself
 
 - **WhatsApp** reconnects with growing pauses (2 s up to 1 minute, a little random so several numbers never retry at
-  the same moment). A number that keeps reconnecting for 15 minutes is reported to the owner once.
+  the same moment). A WhatsApp number or a Telegram bot that is not connected for 15 minutes is reported to the owner once.
 - **Restarts** (updates, the Restart button, systemd) are graceful: no new replies start, running ones get a few
   seconds, WhatsApp closes without unlinking and the database is closed cleanly. A crash restarts the app
   (systemd `Restart=always` with no start limit, or Docker `restart: unless-stopped`); `MemoryMax=700M` keeps a

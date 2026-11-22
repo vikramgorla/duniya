@@ -102,13 +102,28 @@ test('People page through the server: limit and offset', async () => {
   assert.equal(p1[0].name, 'Page 00'); assert.equal(p3[4].name, 'Page 24');
 });
 
-test('a WhatsApp number that keeps reconnecting for 15 minutes is reported once', async () => {
-  const ch = { ...t.channel, status: async () => ({ numbers: [{ id: 'main', label: 'Main', status: 'reconnecting', lastError: 'Connection Failure' }] }) };
+test('an account of any channel that is not connected for 15 minutes is reported once; one that waits for the owner is not', async () => {
+  const account = (o) => ({ key: `${o.channel}:${o.label}`, lastError: '', ...o });
+  let list = [account({ channel: 'whatsapp', app: 'WhatsApp', label: 'Main', status: 'reconnecting', lastError: 'Connection Failure' }),
+    account({ channel: 'telegram', app: 'Telegram', label: '@family_bot', status: 'error', lastError: 'Telegram could not be reached (ENOTFOUND)' }),
+    account({ channel: 'whatsapp', app: 'WhatsApp', label: 'Shop', status: 'qr' }), account({ channel: 'whatsapp', app: 'WhatsApp', label: 'Club', status: 'logged_out' })];
+  const ch = { ...t.channel, accounts: async () => list };
   const t0 = Date.now();
   await upkeepTick(ch, t0);
   await upkeepTick(ch, t0 + 16 * 60000);
   await upkeepTick(ch, t0 + 20 * 60000);
-  assert.equal(acts(/^WhatsApp number Main has been reconnecting for 16 minutes \(Connection Failure\)/).length, 1);
+  assert.equal(acts(/^WhatsApp \(Main\) has not been connected for 16 minutes: Connection Failure\. It keeps trying by itself/).length, 1);
+  assert.equal(acts(/^Telegram \(@family_bot\) has not been connected for 16 minutes: Telegram could not be reached \(ENOTFOUND\)/).length, 1);
+  assert.equal(acts(/^\w+ \(.+\) has not been connected/).length, 2, 'a QR code to scan and an unlinked number wait for the owner: the panel says so');
+  // back, then down again: a new count
+  list = list.map((a) => (a.label === 'Main' ? { ...a, status: 'open' } : a));
+  await upkeepTick(ch, t0 + 21 * 60000);
+  list = list.map((a) => (a.label === 'Main' ? { ...a, status: 'closed' } : a));
+  await upkeepTick(ch, t0 + 22 * 60000);
+  await upkeepTick(ch, t0 + 30 * 60000);
+  assert.equal(acts(/^WhatsApp \(Main\) has not been connected/).length, 1, 'eight minutes are not fifteen');
+  await upkeepTick(ch, t0 + 38 * 60000);
+  assert.equal(acts(/^WhatsApp \(Main\) has not been connected for 16 minutes/).length, 2);
 });
 
 test('the clock guard: a clock behind the newest activity prunes nothing and Health says so', async () => {
