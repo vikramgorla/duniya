@@ -60,6 +60,7 @@ Always include, for this repository:
 | Privacy | [allow-list, logging of contents, privacy notice] |
 | Small servers | [memory / CPU / downloads on a 1 GB VM; queue, timeouts, refusal below 2 GB; new queries pass `npm run check:perf` (indexes, sizes)] |
 | Lean code | [what this replaces and deletes; helpers/resolvers reused; knip + jscpd + panel budgets (first screen, total); no new polling] |
+| Clean code | [how the work splits into small single-purpose functions; the generic rule (no tool/service/channel names); `npm run check:clean` with no new breaks] |
 | Admin MCP | [new or changed tools in `src/panel/admin-tools.js`, or n/a] |
 | Docs | [`docs/*.md` pages, `docs/README.md`, `README.md` highlights, `DESIGN.md`, diagrams in `docs/diagrams/` (`npm run docs:diagrams`)] |
 | Website | [section/tile in `docs/site/index.html`; shots to retake with `npm run site:shots`] |

@@ -60,6 +60,10 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
       its threshold), the panel budgets in `scripts/check-panel.mjs` (first screen and total; raise one only with a
       reason in the PR), `tsc` over the `// @ts-check` files.
 - [ ] Tests check behaviour (panel API, router, fakes), not internals; nothing is exported only for a test.
+- [ ] **Clean code** (see [Clean code](#clean-code)): small functions with one job, early returns over nesting, names
+      that say what a thing is, no magic numbers (a named constant with its unit), generic over special-cased (nothing
+      keyed on a tool, service or channel name), comments say *why*. `npm run check:clean` passes: no new break of the
+      size, branch, nesting, parameter and file-length rules; `scripts/clean-baseline.json` only ever goes down.
 - [ ] UI changes keep the panel snappy: no new polling (status and activity come over `/api/events`), screens load
       through `api()` and its cache, simple switches update at once.
 
@@ -95,6 +99,30 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 - [ ] Never pushed to `main`; squash-merged after all required checks passed, with an explicit title and message
       (`commit_title`, `commit_message`), so no co-author trailers from branch commits are appended.
 - [ ] Issue closed with the release version in the done comment.
+
+## Clean code
+
+Every change, by anyone or any agent, leaves the code at least as clean as it found it. These are rules, not tips:
+CI enforces the measurable ones (`npm run check:clean`, also in `node scripts/ci-checks.mjs`), reviews the rest.
+
+1. **One job per function, one topic per file.** At most 120 lines per function and 800 per file, at most 20
+   branches (complexity), 4 levels of nesting, 5 parameters (more: one options object), 4 nested callbacks. Split
+   by meaning (find → decide → act), not by line count.
+2. **Return early.** Guard clauses first; the main path stays at the left margin.
+3. **Names carry meaning.** A function says what it returns or does (`findMedia`, `postMedia`, not `handle`); a
+   boolean reads as a question (`fitsCaption`); no abbreviations a newcomer can't read.
+4. **No magic values.** A number or string that means something is a named constant with its unit
+   (`CAPTION_MAX = 500`, `FAIL_TTL = 60 * 1000`).
+5. **Generic, never special-cased.** Behaviour comes from what a tool, service or channel declares (MCP annotations,
+   output schemas, channel capabilities), never from its name. If you are about to write `if (name === 'gifs')`,
+   design the general rule instead.
+6. **One way to do each thing** (Lean code above): reuse the shared helpers; delete what you replace in the same PR.
+7. **Comments say why**, not what; a module starts with a short paragraph on what it is for.
+8. **Errors are explicit.** Throw with a plain message (and a status for the panel); never swallow an error silently
+   unless the comment says why it is safe; anything the owner sees is in plain words.
+9. **The ratchet only goes down.** Code that broke the rules before the gate is listed in `scripts/clean-baseline.json`;
+   a new break fails CI, a file you made cleaner must lower its entry (`npm run clean:baseline`). Raising an entry
+   needs a reason in the PR. When you touch a listed function, prefer to split it.
 
 ## Workflow
 
@@ -157,7 +185,7 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 | `install.sh`, `deploy/`, `infra/oci/`, `infra/gcp/`, `Dockerfile` | Installer, root maintenance helper (`deploy/ops/`), OCI stack, GCP script, Docker |
 | `templates/` | Agent templates (JSON) |
 | `test/` | `node:test` e2e tests with fakes (`harness.js`) |
-| `scripts/` | `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `measure-load.mjs` (`npm run measure:load`), `check-panel.mjs` (modules link, budgets), `check-perf.mjs` + `scale-fixture.mjs` (query plans and time budgets on 200k messages / 5k people), `ci-checks.mjs` (versions, releases, docs, knip, jscpd, panel budgets, types, check-perf, repository slug), `repo-sync.mjs` (`npm run repo:sync`: project URLs from `package.json` `repository`), `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails), `render-diagrams.mjs` (`npm run docs:diagrams`: docs/diagrams/*.mmd → SVG) |
+| `scripts/` | `check-clean.mjs` + `clean-baseline.json` (`npm run check:clean`: the clean-code ratchet), `demo-panel.mjs`, `check-responsive.mjs`, `site-shots.mjs`, `cdp.mjs`, `measure-load.mjs` (`npm run measure:load`), `check-panel.mjs` (modules link, budgets), `check-perf.mjs` + `scale-fixture.mjs` (query plans and time budgets on 200k messages / 5k people), `ci-checks.mjs` (versions, releases, docs, knip, jscpd, panel budgets, types, check-perf, repository slug), `repo-sync.mjs` (`npm run repo:sync`: project URLs from `package.json` `repository`), `check-doc-links.mjs` (broken doc links fail CI), `doc-thumbs.mjs` (docs/img thumbnails), `render-diagrams.mjs` (`npm run docs:diagrams`: docs/diagrams/*.mmd → SVG) |
 | `docs/` | Reference docs (`docs/README.md` index), deploy guides, diagrams (`docs/diagrams/`), the website `docs/site/` |
 | `specs/`, `.specify/` | Spec Kit: one folder per feature; constitution and templates |
 

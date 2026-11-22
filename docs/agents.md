@@ -11,7 +11,7 @@ tools it uses.**
   message. After it speaks, the group can just carry on: it reads the replies and answers the ones meant for it.
 - Tools are allowed per role **in code**. An organizer's clear request is the go-ahead for changes; tools that declare
   themselves destructive wait for a yes ([How sure before changing things](#how-sure-before-changing-things)). Each
-  tool service can say when to use it, share GIFs on its own and set limits ([Tool services](tool-services.md)).
+  tool service can say when to use it (for GIFs: share them on its own) and set limits ([Tool services](tool-services.md)).
 - **Test** it before the group does; **Review** its real answers afterwards and teach it in two taps.
 
 ![Agents: one row per agent; Car pooling's page beside it](site/img/agents-desktop.webp)
@@ -260,7 +260,8 @@ with `type: "change.auto"` lists the changes made without asking.
 3. **Discover tools** → tick what participants and organizers may use → save. **All: Participants** / **All: Organizers**
    tick all or none; **Everyone: all tools** gives both roles every tool (confirming still follows
    [How sure before changing things](#how-sure-before-changing-things)). WhatsApp tools have the same *All* ticks.
-4. **How it uses it** under the service: when to use it, changes it makes, sharing GIFs on its own, limits; each tool's
+4. **How it uses it** under the service: when to use it (for a GIF service, *Proactively* and *Often* share on their
+   own), changes it makes, limits; each tool's
    **Risk** comes from what it declares ([Tool services](tool-services.md)).
 
 Or skip the URL hunting: **Browse tool services** (below).

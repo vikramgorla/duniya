@@ -1,6 +1,6 @@
 {
   "name": "duniya",
-  "version": "2.56.1",
+  "version": "2.57.0",
   "private": true,
   "description": "Self-hosted AI agents for WhatsApp and Telegram groups and chats: any model, MCP tools, People, events and orders, admin panel.",
   "license": "MIT",
@@ -21,7 +21,9 @@
     "docs:diagrams": "node --disable-warning=ExperimentalWarning scripts/render-diagrams.mjs",
     "knip": "knip",
     "jscpd": "jscpd",
-    "repo:sync": "node scripts/repo-sync.mjs"
+    "repo:sync": "node scripts/repo-sync.mjs",
+    "check:clean": "node scripts/check-clean.mjs",
+    "clean:baseline": "node scripts/check-clean.mjs --update"
   },
   "engines": {
     "node": ">=22.13"

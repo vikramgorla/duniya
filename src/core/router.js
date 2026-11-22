@@ -32,7 +32,7 @@ import { claimTurn, releaseTurn, isDuplicate, noteSent, similarity } from './tur
 import { lessonFromCorrection, noteJudgedAnswer } from './lessons.js';
 import { noteMessage as noteCommitments } from './commitments.js';
 import { noteCues, noteWriter } from './person-insights.js';
-import { shareMedia } from './sharing.js';
+import { findMedia, fitsCaption, postMedia } from './sharing.js';
 
 // 059: the built-in owner assistant is reached through the owner hand-off only, never by routing.
 const listAgents = () => allAgents().filter((b) => !isBuiltin(b));
@@ -458,7 +458,10 @@ export function createJoinHandler(channel) {
 const overloadedAt = new Map();
 
 /** Send a reply (as a voice note when the agent's setting asks for it) and remember it. */
-async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false, textOnly = false, typingSince = null, again = false, since = msg.arrived || Date.now() } = {}) {
+/** 094: a found GIF / sticker posted on its own after the answer (never fails the answer). */
+const postAfter = async (media) => { const m = await media; if (m) await postMedia(m).catch(() => {}); };
+
+async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = false, textOnly = false, typingSince = null, again = false, since = msg.arrived || Date.now(), media = null } = {}) {
   // 087: the same answer it just gave here (two turns raced, or it repeats itself) is not sent again. Built-in answers
   // are commands people ask for; `again`: the second leg of a voice answer (already checked).
   if (!textOnly && !again && isDuplicate(msg.chat, agent.id, { kind: 'text', text }, since)) { silenceReason('already_answered', { chat: msg.chat, agent: agent.id, sender: whoOf(msg) }); return; }
@@ -474,25 +477,31 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
       countStat('reply', { agent: agent.id });
       const id = logMessage({ channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
       activity('message.out', { agent: agent.id, chat: msg.chat, summary: `🔊 ${text}`, detail: { voice: v.by, ...(id ? { msg: id } : {}) } });
+      await postAfter(media);
       return id;
     }
   } else if (!voiceNow && wantsVoice(agent, { voiceIn, text })) {
     // A text turn whose answer should be spoken: the voice note is made in the media queue (falls back to text).
     try {
       enqueue({ kind: 'voice', chat: msg.chat, msgId: msg.msgId, senderJid: msg.senderJid, agent: agent.id, payload: { msg: packMsg(msg), agent: agent.id, text } });
+      await postAfter(media);
       return;
     } catch { /* queue full: send it as text */ }
   }
   await paceReply(channel, msg, text, (await typingSince?.catch(() => 0)) || 0); // 080: read, then typing for the reply's length
   if (!msg.isGroup) { const notice = dmNoticeOnce(msg.phone || msg.chat); if (notice) text = `${text}\n\n_${notice}_`; } // 044: once per person
-  const sent = await channel.send(msg.chat, text, quoteOf(msg));
+  // 094: a GIF found for this answer (searched while it was typing) carries a short answer as its caption: one message
+  const m = await media;
+  let id = fitsCaption(m, text) ? await postMedia(m, { text, quote: quoteOf(msg).quote }).catch(() => null) : null;
+  const together = id !== null;
+  if (!together) {
+    const sent = await channel.send(msg.chat, text, quoteOf(msg));
+    id = logMessage({ channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
+  }
   countStat('reply', { agent: agent.id });
-  const id = logMessage({
-    channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent',
-    name: 'Assistant', text, fromAgent: true,
-  });
   // 072: the stored answer's id, so Activity can show and change its rating and open it in the chat
   activity('message.out', { agent: agent.id, chat: msg.chat, summary: text, ...(id ? { detail: { msg: id } } : {}) });
+  if (!together) await postAfter(m);
   return id;
 }
 
@@ -556,9 +565,9 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
       else if (!out) quiet('no_reply', agent.id);
     }
     if (out) {
-      const id = await deliver(channel, msg, agent, out, { voiceIn, voiceNow: queued, typingSince });
+      const media = share ? findMedia(share.ctx, share) : null; // searched while the answer is typed
+      const id = await deliver(channel, msg, agent, out, { voiceIn, voiceNow: queued, typingSince, media });
       if (judge && msg.isGroup) noteJudgedAnswer(id, agent.id, msg.chat); // 089: feedback on it teaches when to join in
-      if (share) await shareMedia(share.ctx, share);
     }
   } finally {
     media?.cleanup?.();

@@ -41,13 +41,13 @@ const clips = fakeService([
 const drawer = fakeService([{ name: 'draw', description: 'Draws a picture (changes an album)', inputSchema: QUERY, outputSchema: OUT }]);
 const url = (srv) => `http://127.0.0.1:${srv.address().port}/mcp`;
 
-const CHATS = Array.from({ length: 16 }, (_, i) => `b${i + 1}@g.us`);
+const CHATS = Array.from({ length: 19 }, (_, i) => `b${i + 1}@g.us`);
 before(async () => {
   t = await setup({ env: { RATE_LIMIT_PER_MIN: '1000' } }); owner = await t.login();
   for (const c of [...CHATS, '41790000007@s.whatsapp.net']) t.chatPrefs.setChatPrefs(c, { enabled: true });
   assert.equal((await t.api(owner, 'PUT', '/api/tool-services/clips', { url: url(clips), auth: 'none', defaults: { organizer: ['*'], participant: ['*'] } })).status, 201);
   await t.api(owner, 'POST', '/api/agents', { template: 'blank', config: { name: 'Raju', triggers: ['raju'], model: 'anthropic:claude-sonnet-5-5', dm: 'anyone',
-    services: { clips: { share: 'often', style: 'telugu movie' } }, tools: { participant: ['whatsapp:-'], organizer: [], deny: [] } } });
+    services: { clips: { when: 'often', style: 'telugu movie' } }, tools: { participant: ['whatsapp:-'], organizer: [], deny: [] } } });
   for (const c of CHATS) await t.api(owner, 'POST', '/api/chats/bind', { chat: c, agent: 'raju' });
   const send = t.channel.send; const sendMedia = t.channel.sendMedia;
   t.channel.send = async (chat, text, o) => { order.push({ chat, text }); return send(chat, text, o); };
@@ -57,7 +57,9 @@ after(() => { clips.close(); drawer.close(); t.close(); });
 
 const inChat = (chat) => order.filter((o) => o.chat === chat);
 const media = (chat) => inChat(chat).filter((o) => o.media);
-const shape = (chat) => inChat(chat).map((o) => (o.media ? o.media.kind : o.text));
+// a short answer goes as the GIF's caption (one message, the credit in italics under it): "text + gif"
+const withText = (m) => { const p = String(m.caption || '').split('\n\n'); return p.length > 1 && p.at(-1).startsWith('_') ? `${p.slice(0, -1).join('\n\n')} + ${m.kind}` : m.kind; };
+const shape = (chat) => inChat(chat).map((o) => (o.media ? withText(o.media) : o.text));
 const say = (chat, text, o = {}) => t.route(t.msg({ chat, text, phone: '41790000007', senderName: 'Priya', ...o }));
 const share = (input, id = 's1') => ({ type: 'tool_use', id, name: 'whatsapp__share_media', input });
 const use = (name, input = {}) => ({ type: 'tool_use', id: `u${Math.random().toString(36).slice(2)}`, name: `clips__${name}`, input });
@@ -69,10 +71,10 @@ test('the panel sees each tool\'s risk from its annotations and which tool retur
   const mine = await t.api(owner, 'GET', '/api/agents/raju/services');
   const c = mine.body.find((x) => x.service === 'clips');
   assert.deepEqual(c.tools.map((x) => [x.name, x.risk, x.annotated, x.media || '']), [['find', 'read', true, 'gif'], ['save_clip', 'change', false, ''], ['drop_clip', 'destructive', true, '']]);
-  assert.deepEqual(c.own, { share: 'often', style: 'telugu movie' });
+  assert.deepEqual(c.own, { when: 'often', style: 'telugu movie' });
 });
 
-test('a celebration with "often": the text, then exactly one GIF with the tool\'s credit; one call; a participant without send_media too', async () => {
+test('a celebration with "often": one message, the GIF with the answer and the tool\'s credit as its caption; one call; a participant without send_media too', async () => {
   const chat = CHATS[0]; const n = t.claudeReqs.length;
   t.script.push([share({ mood: 'party dance' })], text('Congrats Chary, mission accomplished! 🎉'));
   await say(chat, 'raju Chary got promoted, congrats!! 🎉');
@@ -81,7 +83,7 @@ test('a celebration with "often": the text, then exactly one GIF with the tool\'
   assert.ok(!names.includes('whatsapp__send_media'), 'this participant has no send_media');
   assert.match(String(t.claudeReqs[n].system), /Sharing: you can add one fitting GIF/);
   assert.match(JSON.stringify(t.userTurn(n)), /lighthearted moment: after your text, end with share_media\(\\"celebration\\"\)/);
-  assert.deepEqual(shape(chat), ['Congrats Chary, mission accomplished! 🎉', 'gif'], 'text first, then the GIF');
+  assert.deepEqual(shape(chat), ['Congrats Chary, mission accomplished! 🎉 + gif'], 'one message: the GIF, the answer as its caption');
   const m = media(chat)[0].media;
   assert.match(m.url, /\/\d\.mp4$/, 'the MP4, not the preview');
   assert.match(m.caption, /Powered by ExampleClips/, 'the credit text the tool returned');
@@ -98,8 +100,17 @@ test('sharing on its own works for participants who have no tools of the service
   const names = t.toolNames(n);
   assert.ok(names.includes('whatsapp__share_media'), 'the owner chose sharing: every sender');
   assert.ok(!names.some((x) => x.startsWith('clips__')), 'none of the service\'s own tools for this role');
-  assert.deepEqual(shape(chat), ['Yay!', 'gif']);
+  assert.deepEqual(shape(chat), ['Yay! + gif']);
   await t.api(owner, 'PUT', '/api/tool-services/clips', { url: url(clips), auth: 'none', defaults: { organizer: ['*'], participant: ['*'] } });
+});
+
+test('a long answer goes first, the GIF right after it with only the credit; stored as two messages', async () => {
+  const chat = CHATS[12];
+  const long = `Congratulations! ${'What a day for everyone here, '.repeat(20)}`.trim();
+  t.script.push([share({ mood: 'party' })], text(long));
+  await say(chat, 'raju we launched!! 🎉');
+  assert.deepEqual(shape(chat), [long, 'gif']);
+  assert.doesNotMatch(media(chat)[0].media.caption, /Congratulations/);
 });
 
 test('a text-only reply on a clear moment (light tier): code shares one after the text', async () => {
@@ -109,7 +120,7 @@ test('a text-only reply on a clear moment (light tier): code shares one after th
   await say(chat, 'thanks raju!');
   await t.api(owner, 'PUT', '/api/agents/raju', { model: 'anthropic:claude-sonnet-5-5' });
   assert.equal(t.db.listActivity({ type: 'model.usage' })[0].detail.tier, 'light');
-  assert.deepEqual(shape(chat), ['Anytime, squad!', 'gif']);
+  assert.deepEqual(shape(chat), ['Anytime, squad! + gif']);
   assert.equal(queries.at(-1), 'thank you telugu movie');
 });
 
@@ -117,7 +128,7 @@ test('a [share: …] tag is never shown; serious topics get none, even when aske
   let chat = CHATS[2];
   t.script.push(text('Ha, classic! [share: mind blown]'));
   await say(chat, 'raju that was hilarious');
-  assert.deepEqual(shape(chat), ['Ha, classic!', 'gif']);
+  assert.deepEqual(shape(chat), ['Ha, classic! + gif']);
   chat = CHATS[3]; const n = t.claudeReqs.length;
   t.script.push(text('Take care, I will tell the others. [share: hug]'));
   await say(chat, 'raju sorry, accident on the highway, I will be late');
@@ -150,8 +161,8 @@ test('two quick celebratory messages → one GIF; repeats avoided; names never s
   assert.equal(queries.at(-1), 'party telugu movie');
 });
 
-test('"sometimes" only on strong moments; "off" never; not offered for a tool that is not read-only', async () => {
-  await setRaju({ clips: { share: 'sometimes', style: 'telugu movie' } });
+test('Proactively shares only on strong moments; When useful never; not offered for a tool that is not read-only', async () => {
+  await setRaju({ clips: { when: 'proactive', style: 'telugu movie' } });
   let chat = CHATS[8];
   t.script.push(text('Haha!'));
   await say(chat, 'raju lol that joke');
@@ -159,7 +170,7 @@ test('"sometimes" only on strong moments; "off" never; not offered for a tool th
   t.script.push(text('Party!'));
   await say(chat, 'raju happy birthday everyone!');
   assert.equal(media(chat).length, 1);
-  await setRaju({ clips: { share: 'off' } });
+  await setRaju({ clips: { when: 'useful' } });
   chat = CHATS[9]; let n = t.claudeReqs.length;
   t.script.push(text('Congrats! [share: party]'));
   await say(chat, 'raju congrats on the promotion!! 🎉');
@@ -167,7 +178,7 @@ test('"sometimes" only on strong moments; "off" never; not offered for a tool th
   assert.doesNotMatch(String(t.claudeReqs[n].system), /Sharing:/);
   assert.deepEqual(shape(chat), ['Congrats!']);
   // a service whose media tool changes something (no readOnlyHint): never shared on its own
-  assert.equal((await t.api(owner, 'PUT', '/api/tool-services/drawer', { url: url(drawer), auth: 'none', defaults: { organizer: ['*'], participant: ['*'] }, behaviour: { share: 'often' } })).status, 201);
+  assert.equal((await t.api(owner, 'PUT', '/api/tool-services/drawer', { url: url(drawer), auth: 'none', defaults: { organizer: ['*'], participant: ['*'] }, behaviour: { when: 'often' } })).status, 201);
   chat = CHATS[10]; n = t.claudeReqs.length;
   t.script.push(text('Congrats!'));
   await say(chat, 'raju congrats!! 🎉');
@@ -225,18 +236,18 @@ test('limits: per reply, per day and direct messages only, enforced in code with
   t.script.push([use('find', { query: 'f' })], text('Here you go.'));
   await say('41790000007@s.whatsapp.net', 'a clip please', { isGroup: false });
   assert.equal(queries.length, before + 1, 'allowed in a direct message');
-  await setRaju({ clips: { share: 'often', style: 'telugu movie' } });
+  await setRaju({ clips: { when: 'often', style: 'telugu movie' } });
 });
 
 test('admin MCP: get and set how a service is used, per agent and as the default', async () => {
   const { TOOLS } = await import('../src/panel/admin-tools.js');
   const x = { call: async (m, p, b) => { const r = await t.api(owner, m, p, b); if (r.status >= 400) throw new Error(JSON.stringify(r.body)); return r.body; } };
   const set = TOOLS.find((y) => y.name === 'set_tool_behaviour'); const get = TOOLS.find((y) => y.name === 'get_tool_behaviour');
-  assert.deepEqual((await set.run({ agent_id: 'raju', service: 'clips', when: 'proactive', per_reply: 2 }, x)).settings, { share: 'often', style: 'telugu movie', when: 'proactive', perReply: 2 });
-  assert.deepEqual((await set.run({ agent_id: 'raju', service: 'clips', when: 'inherit' }, x)).settings, { share: 'often', style: 'telugu movie', perReply: 2 });
-  assert.deepEqual((await set.run({ service: 'clips', share: 'sometimes', style: 'cats' }, x)).default, { share: 'sometimes', style: 'cats' });
+  assert.deepEqual((await set.run({ agent_id: 'raju', service: 'clips', when: 'proactive', per_reply: 2 }, x)).settings, { when: 'proactive', style: 'telugu movie', perReply: 2 });
+  assert.deepEqual((await set.run({ agent_id: 'raju', service: 'clips', when: 'inherit' }, x)).settings, { style: 'telugu movie', perReply: 2 });
+  assert.deepEqual((await set.run({ service: 'clips', when: 'often', style: 'cats' }, x)).default, { when: 'often', style: 'cats' });
   const all = await get.run({}, x);
-  assert.deepEqual(all.find((s) => s.service === 'clips').default, { share: 'sometimes', style: 'cats' });
+  assert.deepEqual(all.find((s) => s.service === 'clips').default, { when: 'often', style: 'cats' });
   assert.equal((await get.run({ agent_id: 'raju' }, x)).find((s) => s.service === 'clips').media, 'gif');
 });
 
@@ -262,17 +273,43 @@ test('a service that cannot be reached is explained in plain words (502), not as
   assert.doesNotMatch(r.body.error, /fetch failed|MCP http/);
 });
 
-test('"Proactively" on a media service shares now and then unless sharing is set either way', async () => {
+test('one setting: Proactively shares sometimes, Often often, When useful never (no separate share switch)', async () => {
   const chat = CHATS[13];
   await setRaju({ clips: { when: 'proactive' } });
   let n = t.claudeReqs.length;
   t.script.push(text('Congrats!'));
   await say(chat, 'raju we got the keys!! 🎉');
   assert.ok(t.toolNames(n).includes('whatsapp__share_media'), 'proactive → sometimes');
-  await setRaju({ clips: { when: 'proactive', share: 'off' } });
+  await setRaju({ clips: { when: 'useful' } });
   n = t.claudeReqs.length;
   t.script.push(text('Congrats!'));
   await say(chat, 'raju and the car too!! 🎉');
-  assert.ok(!t.toolNames(n).includes('whatsapp__share_media'), 'an explicit Off wins');
-  await setRaju({ clips: { share: 'often', style: 'telugu movie' } });
+  assert.ok(!t.toolNames(n).includes('whatsapp__share_media'), 'when useful: the AI decides, nothing shared on its own');
+  await setRaju({ clips: { when: 'often', style: 'telugu movie' } });
+});
+
+test('one-time: a saved "share" setting becomes When to use it (sometimes → proactive, often → often)', async () => {
+  const { saveAgentRow, getAgentRow } = t.store;
+  const cfg = getAgentRow('raju').config;
+  saveAgentRow('raju', { ...cfg, services: { clips: { share: 'sometimes', style: 'x' } } }, 'test');
+  t.agents.loadAgents();
+  assert.deepEqual(t.agents.getAgent('raju').services, { clips: { style: 'x', when: 'proactive' } });
+  saveAgentRow('raju', { ...cfg, services: { clips: { share: 'often', style: 'telugu movie' } } }, 'test');
+  t.agents.loadAgents();
+  assert.deepEqual(t.agents.getAgent('raju').services, { clips: { style: 'telugu movie', when: 'often' } });
+});
+
+test('festival greetings are celebrations ("happy Diwali", "happy Pongal"); "happy to help" is not', async () => {
+  await setRaju({ clips: { when: 'proactive', style: 'telugu movie' } });
+  for (const [i, greet] of [['happy Diwali'], ['happy pongal everyone']].entries()) {
+    const chat = CHATS[16 + i];
+    t.script.push(text('Same to you!'));
+    await say(chat, `raju ${greet}`);
+    assert.equal(media(chat).length, 1, greet);
+  }
+  const chat = CHATS[18]; const before = media(chat).length;
+  t.script.push(text('Glad to hear.'));
+  await say(chat, 'raju happy to help anytime');
+  assert.equal(media(chat).length, before, 'not a celebration');
+  await setRaju({ clips: { when: 'often', style: 'telugu movie' } });
 });

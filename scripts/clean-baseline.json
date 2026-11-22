@@ -1,0 +1,291 @@
+{
+ "bin/duniya.js": {
+  "complexity": 2
+ },
+ "scripts/check-clean.mjs": {
+  "max-depth": 1
+ },
+ "scripts/check-panel.mjs": {
+  "max-depth": 1
+ },
+ "scripts/check-responsive.mjs": {
+  "complexity": 2,
+  "max-depth": 5
+ },
+ "scripts/demo-panel.mjs": {
+  "complexity": 1,
+  "max-lines-per-function": 1
+ },
+ "scripts/scale-fixture.mjs": {
+  "complexity": 1,
+  "max-lines-per-function": 1
+ },
+ "src/channels/hub.js": {
+  "max-lines-per-function": 1
+ },
+ "src/channels/telegram/index.js": {
+  "complexity": 3,
+  "max-lines-per-function": 1
+ },
+ "src/channels/whatsapp/session.js": {
+  "complexity": 4,
+  "max-lines-per-function": 1
+ },
+ "src/core/ai-builder.js": {
+  "complexity": 1
+ },
+ "src/core/brief.js": {
+  "complexity": 1
+ },
+ "src/core/commitments.js": {
+  "complexity": 4
+ },
+ "src/core/contacts.js": {
+  "complexity": 2
+ },
+ "src/core/direct-chats.js": {
+  "complexity": 1
+ },
+ "src/core/events.js": {
+  "complexity": 1
+ },
+ "src/core/fact-check.js": {
+  "complexity": 1
+ },
+ "src/core/google-signin.js": {
+  "complexity": 1
+ },
+ "src/core/history-load.js": {
+  "complexity": 2
+ },
+ "src/core/lessons.js": {
+  "complexity": 1
+ },
+ "src/core/mcp-registry.js": {
+  "complexity": 3
+ },
+ "src/core/media-ai.js": {
+  "complexity": 2
+ },
+ "src/core/media.js": {
+  "complexity": 1
+ },
+ "src/core/owner-assistant.js": {
+  "complexity": 2,
+  "max-depth": 1
+ },
+ "src/core/pace.js": {
+  "complexity": 1
+ },
+ "src/core/people.js": {
+  "complexity": 2
+ },
+ "src/core/person-insights.js": {
+  "complexity": 1
+ },
+ "src/core/providers/claude-code.js": {
+  "complexity": 1
+ },
+ "src/core/providers/codex.js": {
+  "complexity": 1
+ },
+ "src/core/providers/errors.js": {
+  "complexity": 2
+ },
+ "src/core/providers/index.js": {
+  "complexity": 3,
+  "max-depth": 2
+ },
+ "src/core/providers/openai-chat.js": {
+  "complexity": 2
+ },
+ "src/core/releases.js": {
+  "complexity": 2
+ },
+ "src/core/router.js": {
+  "complexity": 6,
+  "max-lines-per-function": 2
+ },
+ "src/core/runner.js": {
+  "complexity": 1,
+  "max-lines-per-function": 1
+ },
+ "src/core/scheduler.js": {
+  "complexity": 1
+ },
+ "src/core/schema.js": {
+  "complexity": 3,
+  "max-lines-per-function": 1
+ },
+ "src/core/tools.js": {
+  "complexity": 1
+ },
+ "src/core/upkeep.js": {
+  "complexity": 1
+ },
+ "src/core/usage.js": {
+  "complexity": 1
+ },
+ "src/core/webaccess.js": {
+  "complexity": 3
+ },
+ "src/modules/events/index.js": {
+  "complexity": 4
+ },
+ "src/modules/orders/index.js": {
+  "complexity": 1
+ },
+ "src/modules/orders/tools.js": {
+  "complexity": 1
+ },
+ "src/modules/sending/audience.js": {
+  "complexity": 1
+ },
+ "src/modules/sending/index.js": {
+  "complexity": 2
+ },
+ "src/modules/surveys/index.js": {
+  "complexity": 1
+ },
+ "src/panel/admin-mcp.js": {
+  "complexity": 1,
+  "max-lines-per-function": 1,
+  "max-params": 3
+ },
+ "src/panel/admin-tools.js": {
+  "max-lines": 1
+ },
+ "src/panel/public/app/ai-helper.js": {
+  "complexity": 1
+ },
+ "src/panel/public/app/answers.js": {
+  "complexity": 1
+ },
+ "src/panel/public/app/backups.js": {
+  "complexity": 2,
+  "max-params": 1
+ },
+ "src/panel/public/app/chats.js": {
+  "complexity": 1,
+  "max-params": 1
+ },
+ "src/panel/public/app/core.js": {
+  "complexity": 1
+ },
+ "src/panel/public/app/diff.js": {
+  "complexity": 1
+ },
+ "src/panel/public/app/events.js": {
+  "complexity": 1
+ },
+ "src/panel/public/app/find.js": {
+  "complexity": 1
+ },
+ "src/panel/public/app/models.js": {
+  "complexity": 2,
+  "max-lines-per-function": 1
+ },
+ "src/panel/public/app/overview.js": {
+  "complexity": 1
+ },
+ "src/panel/public/app/people.js": {
+  "complexity": 2
+ },
+ "src/panel/public/app/promises.js": {
+  "complexity": 1
+ },
+ "src/panel/public/app/registry.js": {
+  "max-lines-per-function": 1
+ },
+ "src/panel/public/app/server.js": {
+  "complexity": 2
+ },
+ "src/panel/public/app/settings.js": {
+  "complexity": 3,
+  "max-lines-per-function": 2
+ },
+ "src/panel/public/app/tool-editor.js": {
+  "complexity": 1
+ },
+ "src/panel/public/app/updates.js": {
+  "complexity": 2
+ },
+ "src/panel/routes/agents.js": {
+  "complexity": 1,
+  "max-lines-per-function": 1,
+  "max-params": 12
+ },
+ "src/panel/routes/auth.js": {
+  "max-params": 3
+ },
+ "src/panel/routes/backups.js": {
+  "max-lines-per-function": 1,
+  "max-params": 9
+ },
+ "src/panel/routes/chats.js": {
+  "max-lines-per-function": 1,
+  "max-params": 12
+ },
+ "src/panel/routes/direct-chats.js": {
+  "max-params": 2
+ },
+ "src/panel/routes/google.js": {
+  "max-params": 9
+ },
+ "src/panel/routes/insights.js": {
+  "max-params": 1
+ },
+ "src/panel/routes/lessons.js": {
+  "max-params": 3
+ },
+ "src/panel/routes/links.js": {
+  "max-params": 4
+ },
+ "src/panel/routes/mcp-registry.js": {
+  "complexity": 1,
+  "max-params": 3
+ },
+ "src/panel/routes/media.js": {
+  "max-params": 3
+ },
+ "src/panel/routes/modules.js": {
+  "max-params": 25
+ },
+ "src/panel/routes/owner-alerts.js": {
+  "max-params": 1
+ },
+ "src/panel/routes/owner-assistant.js": {
+  "max-params": 14
+ },
+ "src/panel/routes/pace.js": {
+  "max-params": 1
+ },
+ "src/panel/routes/people.js": {
+  "max-params": 9
+ },
+ "src/panel/routes/promises.js": {
+  "max-params": 4
+ },
+ "src/panel/routes/providers.js": {
+  "max-lines-per-function": 1,
+  "max-params": 21
+ },
+ "src/panel/routes/status.js": {
+  "max-params": 5
+ },
+ "src/panel/routes/system.js": {
+  "max-params": 7
+ },
+ "src/panel/routes/tool-services.js": {
+  "max-params": 5
+ },
+ "src/panel/routes/updates.js": {
+  "max-params": 4
+ },
+ "src/panel/routes/web.js": {
+  "max-params": 7
+ },
+ "src/panel/server.js": {
+  "complexity": 1
+ }
+}

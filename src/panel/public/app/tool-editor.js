@@ -24,42 +24,38 @@ export const seg = (label, options, value, onPick) => {
   return el;
 };
 // 094: how a service is used — the same editor for a service's default (Settings) and an agent's override (its Tools page)
-const WHEN = [['asked', 'Only when asked'], ['useful', 'When useful'], ['proactive', 'Proactively']];
+const WHEN = [['asked', 'Only when asked'], ['useful', 'When useful'], ['proactive', 'Proactively'], ['often', 'Often']];
 const CHANGES = [['ask', 'Ask first'], ['clear', 'Clear requests'], ['act', 'Act and report']];
-const SHARE = [['off', 'Off'], ['sometimes', 'Sometimes'], ['often', 'Often']];
 const WHERE = [['all', 'Groups and direct'], ['dm', 'Direct only']];
 const KIND_WORD = { gif: 'GIFs', sticker: 'stickers', image: 'pictures' };
 const label = (opts, v) => (opts.find((o) => o[0] === v) || [])[1] || v;
-/** Sharing as it applies: not set and "Proactively" = sometimes (the server's rule, tool-behaviour.js). */
-const shareOf = (b) => b.share || (b.when === 'proactive' ? 'sometimes' : 'off');
+const SHARES = { proactive: 'sometimes', often: 'often' }; // a media service shares on its own (tool-behaviour.js)
 /** One line for a service's settings (the row's summary). */
 const behaviourLine = (b, media) => [label(WHEN, b.when || 'useful'), b.changes ? `changes: ${label(CHANGES, b.changes).toLowerCase()}` : '',
-  media && shareOf(b) !== 'off' ? `shares ${KIND_WORD[media]} ${shareOf(b)}` : '', b.perReply || b.perDay ? 'limits' : '', b.where === 'dm' ? 'direct only' : ''].filter(Boolean).join(' · ');
+  media && SHARES[b.when] ? `shares ${KIND_WORD[media]} ${SHARES[b.when]}` : '', b.perReply || b.perDay ? 'limits' : '', b.where === 'dm' ? 'direct only' : ''].filter(Boolean).join(' · ');
 /**
- * How it uses a service: when, changes, share on its own (only `media`: a read-only tool that returns media), limits.
+ * How it uses a service: when (with `media`, a read-only tool that returns media: Proactively and Often also share it
+ * on its own; style words), changes, limits.
  * state: the fields this level sets (a service's default, or an agent's override); `dflt`: what applies without one
  * (an agent: the service's default) — then every choice starts with "Default (…)". onChange after each edit.
  */
 export function behaviourEditor(state, { dflt = null, media = '', onChange = () => {}, open = false, onToggle = null } = {}) {
-  const set = (k, v) => { if (v === 'inherit' || v === '') delete state[k]; else state[k] = v; onChange(); now.textContent = behaviourLine({ ...(dflt || {}), ...state }, media) || 'When useful'; if (k === 'when' && media) drawShare(); };
+  const set = (k, v) => { if (v === 'inherit' || v === '') delete state[k]; else state[k] = v; onChange(); now.textContent = behaviourLine({ ...(dflt || {}), ...state }, media) || 'When useful'; };
   const choice = (k, title, opts, fallback) => {
     const first = dflt ? [['inherit', `Default (${label(opts, dflt[k] || fallback) || 'agent'})`]] : k === 'changes' ? [['', 'Agent’s setting']] : [];
     return field(title, seg(title, [...first, ...opts], state[k] ?? (dflt ? 'inherit' : k === 'changes' ? '' : fallback), (v) => set(k, v)));
   };
   const now = h('span', { class: 'bh-now' }, behaviourLine({ ...(dflt || {}), ...state }, media) || 'When useful'); // the summary, kept current
-  // sharing follows "When to use it" until it is set: its default (and the summary) say so, and change with it
-  const shareBox = h('div', {});
-  const drawShare = () => shareBox.replaceChildren(field(`Share ${KIND_WORD[media]} on its own`, seg('Share', [['inherit', `Default (${label(SHARE, shareOf({ ...(dflt || {}), ...state, share: dflt?.share }))})`], ...SHARE],
-    state.share ?? 'inherit', (v) => set('share', v))));
   const text = (k, title, ph, max) => field(title, h('input', { value: state[k] || '', maxlength: max, disabled: !can('admin'), placeholder: dflt?.[k] || ph, oninput: (e) => set(k, e.target.value.trim()) }));
   const num = (k, title) => field(title, h('input', { type: 'number', min: 0, max: 1000, value: state[k] ?? '', disabled: !can('admin'), placeholder: dflt ? String(dflt[k] || 'no limit') : 'no limit',
     oninput: (e) => set(k, e.target.value === '' ? '' : Math.max(0, Number(e.target.value) || 0)) }));
   return h('details', { class: 'behaviour', open, ontoggle: onToggle ? (e) => onToggle(e.target.open) : null }, h('summary', {}, h('span', { class: 'bh-title' }, h('b', {}, 'How it uses it'), now), h('span', { class: 'bh-change' }, 'Change')),
     h('div', { class: 'row spread' }, h('span', { class: 'small muted' }, 'Read-only tools never ask; tools that declare themselves destructive always ask.'), helpLink('tool-services.md#how-agents-use-a-service')),
-    choice('when', 'When to use it', WHEN, 'useful'), text('note', 'Note (optional)', 'e.g. only for this year’s event', 200),
+    choice('when', 'When to use it', media || [state.when, dflt?.when].includes('often') ? WHEN : WHEN.slice(0, 3), 'useful'),
+    media ? h('p', { class: 'small muted' }, `Proactively: it adds one of its ${KIND_WORD[media]} on clear moments (celebrations, thanks, when asked). Often: also jokes, welcomes, praise. Never on serious topics; only mood and style words are searched.`) : null,
+    text('note', 'Note (optional)', 'e.g. only for this year’s event', 200),
     choice('changes', 'Changes it makes', CHANGES, ''),
-    media ? h('div', {}, (drawShare(), shareBox), text('style', 'Style words (optional)', 'e.g. Telugu movie reactions', 120),
-      h('p', { class: 'small muted' }, 'Sometimes: celebrations, thanks to it, when asked. Often: also thanks, welcomes, jokes, praise. Never on serious topics; only mood and style words are searched.')) : null,
+    media ? text('style', `Style of the ${KIND_WORD[media]} (optional)`, 'e.g. Telugu movie reactions', 120) : null,
     h('div', { class: 'grid2' }, num('perReply', 'Most uses per reply'), num('perDay', 'Most uses per day')),
     choice('where', 'Where results may be posted', WHERE, 'all'));
 }

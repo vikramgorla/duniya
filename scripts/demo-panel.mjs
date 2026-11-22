@@ -324,8 +324,8 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   await mk('neighbours', 'neighbours.json', { enabled: false, chats: [] });
   globalMcp.saveGlobalServer('weather', { url: weatherUrl, defaults: { organizer: ['*'], participant: ['forecast'] } }, 'admin');
   // 094: a GIF search for every agent; Car pooling shares GIFs on its own, often, in its own style
-  globalMcp.saveGlobalServer('gifs', { url: gifsUrl, auth: 'none', defaults: { organizer: ['*'], participant: ['*'] }, behaviour: { share: 'sometimes' } }, 'admin');
-  await agents.updateAgent('carpool', { services: { gifs: { when: 'proactive', share: 'often', style: 'Telugu movie reactions' }, weather: { perDay: 20 } } }, 'admin');
+  globalMcp.saveGlobalServer('gifs', { url: gifsUrl, auth: 'none', defaults: { organizer: ['*'], participant: ['*'] }, behaviour: { when: 'proactive' } }, 'admin');
+  await agents.updateAgent('carpool', { services: { gifs: { when: 'often', style: 'Telugu movie reactions' }, weather: { perDay: 20 } } }, 'admin');
 
   // chats: on/off (silent by default), direct chats seen
   for (const c of [G(1), G(2), G(3), G(4), `club#${G(8)}`, `${P(4)}@s.whatsapp.net`, TG(1)]) prefs.setChatPrefs(c, { enabled: true });

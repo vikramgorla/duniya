@@ -1,5 +1,11 @@
 <!--
-Sync Impact Report (1.4.3 → 1.4.4, PATCH)
+Sync Impact Report (1.4.4 → 1.5.0, MINOR)
+- Principle IX extended: "Clean code" (2.57). Small single-purpose functions, early returns, meaningful names, named
+  constants, generic rules never keyed on a tool/service/channel name; enforced by `npm run check:clean` (a ratchet over
+  scripts/clean-baseline.json, part of ci-checks.mjs). Templates: plan, tasks and checklist (both copies), PR template,
+  CLAUDE.md and AGENTS.md updated. Follow-up: none.
+
+Previous (1.4.3 → 1.4.4, PATCH)
 - Principle IX wording: the checks include `npm run typecheck` (tsc over `// @ts-check` files) and the panel's budgets
   are now two (first screen and total, scripts/check-panel.mjs) since the panel became native ES modules (#127, 063).
   Templates: plan, tasks (both copies), PR template, CONTRIBUTING and copilot-instructions updated. Follow-up: none.
@@ -138,7 +144,9 @@ impact considered; **documentation updated in the same change** — `docs/`, `RE
 `DESIGN.md` where relevant; and the version bumped in `package.json`, `package-lock.json` and
 `infra/oci/schema.yaml` (semver). Code MUST stay lean: what a change replaces is deleted in the same change, no
 compatibility layer or one-time migration outlives the release that needed it, and `knip`, `jscpd` and the panel
-budgets pass in CI. Plans MUST list these as final tasks; the Spec Kit templates do so.
+budgets pass in CI. Code MUST stay clean (AGENTS.md, Clean code): small single-purpose functions, early returns,
+meaningful names, named constants and generic rules never keyed on a tool, service or channel name; `npm run
+check:clean` allows no new break and its baseline only goes down. Plans MUST list these as final tasks; the Spec Kit templates do so.
 
 *Rationale*: features that are not documented, shown or versioned are invisible to the owners, and rules that live
 in one harness's file are missed by every other agent.
@@ -194,4 +202,4 @@ principle removed or redefined; MINOR: principle or section added or materially 
 clarification), and reviewed in a pull request. Reviewers verify constitution compliance for every
 change.
 
-**Version**: 1.4.4 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-17
+**Version**: 1.5.0 | **Ratified**: 2026-11-14 | **Last Amended**: 2026-11-22

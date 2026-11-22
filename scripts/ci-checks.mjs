@@ -15,6 +15,9 @@
 //  7. Types (fails, 063): `tsc` checks every file that starts with // @ts-check (tsconfig.json, npm run typecheck).
 //  8. Performance (fails, #174): no full scans of large tables on hot paths and every time budget met against the
 //     scale fixture (scripts/check-perf.mjs, npm run check:perf; ~30 s).
+// 10. Clean code (fails, 2.57): no new break of the clean-code rules (function size and branches, nesting, parameters,
+//     file length); code that broke them before is listed in scripts/clean-baseline.json and may only shrink
+//     (scripts/check-clean.mjs, npm run check:clean; npm run clean:baseline lowers it).
 //  9. Repository (fails, 084): every project URL in tracked files (README, docs, website, infra, installer) uses the
 //     slug in package.json `repository` (scripts/repo-sync.mjs; fix with npm run repo:sync). specs/ keep their history.
 import { execFileSync } from 'node:child_process';
@@ -24,6 +27,7 @@ import { normalizeReleases, releaseCheck } from '../src/core/releases.js';
 import { checkDocLinks } from './check-doc-links.mjs';
 import { checkDiagrams } from './render-diagrams.mjs';
 import { findDrift } from './repo-sync.mjs';
+import { checkClean } from './check-clean.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const read = (f) => readFileSync(resolve(root, f), 'utf8');
@@ -121,4 +125,11 @@ try {
 try {
   console.log(execFileSync(process.execPath, ['--disable-warning=ExperimentalWarning', join(root, 'scripts', 'check-perf.mjs')], { cwd: root, encoding: 'utf8', env: { ...process.env, PANEL_PORT: '0' } }).trim());
 } catch (e) { failed = true; console.log(String(e.stdout || e.message)); }
+// 10. clean code: no new breaks; a cleaner file lowers its baseline entry
+{
+  const { errors, lower } = await checkClean();
+  for (const e of errors) console.log(`::error::Clean code (AGENTS.md): ${e}`);
+  for (const l of lower) console.log(`::error::Clean code: cleaner than scripts/clean-baseline.json, lower it with npm run clean:baseline: ${l}`);
+  if (errors.length || lower.length) failed = true; else console.log('clean code: ok');
+}
 process.exit(failed ? 1 : 0);

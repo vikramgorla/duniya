@@ -2,13 +2,14 @@
 // How an agent uses each tool service (094). Five settings per service — a default on the service (Settings → Tool
 // services), overridable per agent (its Tools page); nothing here knows a service or tool by name:
 //   1. Who can use it      — the per-role tool rules (tools.js).
-//   2. When to use it      — asked | useful (default) | proactive, plus a short note: one compact line per service in
-//                            the agent's instructions (servicesNote, token-budgeted).
+//   2. When to use it      — asked | useful (default) | proactive | often, plus a short note: one compact line per
+//                            service in the agent's instructions (servicesNote, token-budgeted). For a service whose
+//                            read-only tool returns media, proactive and often also share it on its own (sharing.js):
+//                            code spots the moments and makes sure one goes out — sometimes | often.
 //   3. Changes it makes    — ask | clear | act for that service (default: the agent's "How sure before changing
 //                            things"); the risk of each call comes from the tool's annotations (autonomy.js riskOf),
 //                            with a per-tool override.
-//   4. Share on its own    — off | sometimes | often + style words, for read-only tools that return media (sharing.js);
-//                            not set and "proactive": sometimes.
+//   4. Style words         — added to every media search.
 //   5. Limits              — uses per reply and per day, and groups and direct messages | direct messages only;
 //                            enforced in code (limitStop), with an Activity line when a limit stops a call.
 import { kvGet, kvSet } from './db.js';
@@ -22,6 +23,7 @@ import { clip, env, localParts } from './config.js';
  * A service's settings for an agent: the agent's override field by field, else the service's default, else the
  * defaults. `changes` ends as ask | clear | act (empty = the agent's own setting). `srv` may be null (Duniya's tools).
  */
+const SHARE_OF = { proactive: 'sometimes', often: 'often' };
 export function behaviourOf(agent, key, srv) {
   const own = agent?.services?.[key] || {};
   const dflt = srv?.behaviour || {};
@@ -33,14 +35,12 @@ export function behaviourOf(agent, key, srv) {
   }
   out.tools = { ...(dflt.tools || {}), ...(own.tools || {}) };
   out.changes = out.changes || autonomyOf(agent);
-  // "Proactively" on a service that returns media means sharing it now and then, unless sharing was set either way
-  const set = (v) => v !== undefined && v !== '' && v !== 'inherit';
-  if (!set(own.share) && !set(dflt.share) && out.when === 'proactive') out.share = 'sometimes';
-  return /** @type {typeof SERVICE_DEFAULTS & { changes: string }} */ (out);
+  out.share = SHARE_OF[out.when] || 'off'; // what sharing on its own follows from (only used where results are media)
+  return /** @type {typeof SERVICE_DEFAULTS & { changes: string, share: 'off' | 'sometimes' | 'often' }} */ (out);
 }
 
 // ---------- 2. when to use it (and 3. when a service changes differently from the agent): the instructions ----------
-const WHEN_TEXT = { asked: 'only when someone asks for that kind of thing', proactive: 'look for chances to use it when it helps' };
+const WHEN_TEXT = { asked: 'only when someone asks for that kind of thing', proactive: 'look for chances to use it when it helps', often: 'use it often, wherever it fits' };
 const CHANGES_TEXT = { ask: 'show each change and wait for a yes', clear: 'a clear request from an organizer is the go-ahead', act: 'also make changes that clearly follow; report each' };
 const NOTE_BUDGET = 900; // characters for the whole section
 /**

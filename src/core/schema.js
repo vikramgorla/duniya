@@ -8,10 +8,11 @@ import { QUICK_WHO, FAQ_STRICTNESS } from './quick.js';
 import { AUTONOMY, RISKS } from './autonomy.js';
 
 // 094: how an agent uses each tool service (a service's default in Settings → Tool services, overridable per agent)
-const WHEN = ['asked', 'useful', 'proactive']; // when to use it: only when asked | the agent decides | looks for chances
-const SHARE_MODES = ['off', 'sometimes', 'often']; // share media results on its own
+// when to use it: only when asked | the agent decides | looks for chances | often (a service whose results are media:
+// proactive and often also share them on its own, sharing.js)
+const WHEN = ['asked', 'useful', 'proactive', 'often'];
 const WHERE = ['all', 'dm']; // where results may be posted: groups and direct messages | direct messages only
-export const SERVICE_DEFAULTS = Object.freeze({ when: 'useful', note: '', changes: '', share: 'off', style: '', perReply: 0, perDay: 0, where: 'all', tools: {} });
+export const SERVICE_DEFAULTS = Object.freeze({ when: 'useful', note: '', changes: '', style: '', perReply: 0, perDay: 0, where: 'all', tools: {} });
 
 export const AGENT_DEFAULTS = Object.freeze({
   name: '',
@@ -44,7 +45,7 @@ export const AGENT_DEFAULTS = Object.freeze({
   schedules: [],
   memory: { enabled: true },
   globalMcp: { disabled: [] },
-  services: {}, // 094: per tool service, what differs from the service's default: when, note, changes, share, style, perReply, perDay, where, tools
+  services: {}, // 094: per tool service, what differs from the service's default: when, note, changes, style, perReply, perDay, where, tools
   timezone: '',
   // Photos & voice (043): what the agent does with photos, PDFs and voice notes, and when it answers with voice.
   media: { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', createImages: { organizer: true, participant: false } },
@@ -142,7 +143,7 @@ function behaviour(v, f, inherit) {
     if (!allowed.includes(x)) fail(`${f}.${k}`, `must be ${[...(inherit ? ['inherit'] : []), ...allowed].join(', ')}`);
     if (inherit || x !== SERVICE_DEFAULTS[k]) out[k] = x;
   };
-  pick('when', WHEN); pick('changes', AUTONOMY); pick('share', SHARE_MODES); pick('where', WHERE);
+  pick('when', WHEN); pick('changes', AUTONOMY); pick('where', WHERE);
   for (const k of ['note', 'style']) { const t = str(b[k], `${f}.${k}`, { max: k === 'note' ? 200 : 120 }); if (t) out[k] = t; }
   for (const k of ['perReply', 'perDay']) {
     if (b[k] === undefined || b[k] === null || b[k] === '') continue;
