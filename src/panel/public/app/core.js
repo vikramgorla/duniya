@@ -486,6 +486,28 @@ export function show(tab) {
     if (S.renderDone === S.renderSeq) { if (S.tab) show(S.tab); } else S.overdrawn = S.renderSeq;
   });
 }
+/**
+ * 2.56: a part of a screen that loads on its own: "Loading…", then the part, or "Couldn't load" with the reason and
+ * Retry inside it (one slow or failing request never hides or holds up the rest). `p.reload()` draws it again.
+ * @param {() => any} load  returns a node (or a promise of one)
+ * @param {string} [title]
+ */
+export function part(load, title = '') {
+  const slot = h('div', { class: 'part' });
+  const run = () => {
+    slot.setAttribute('aria-busy', 'true');
+    if (!slot.firstChild) slot.append(h('p', { class: 'small muted' }, 'Loading…'));
+    return Promise.resolve().then(load).then((node) => slot.replaceChildren(node ?? ''), (e) => slot.replaceChildren(partFailed(e, title, () => { dropCache(); run(); })))
+      .finally(() => slot.removeAttribute('aria-busy'));
+  };
+  run();
+  return Object.assign(slot, { reload: run });
+}
+/** For a page of one record: null when it is gone (404); any other failure stays a failure (the screen shows it with Retry). */
+export const unless404 = (e) => { if (e?.status === 404) return null; throw e; };
+/** "Couldn't load" with the reason and Retry, inside a part or a section. */
+export const partFailed = (e, title, retry) => h('div', { class: 'note warn', role: 'alert' }, title ? h('b', {}, `${title}: `) : null, `Couldn’t load. ${e?.message || ''} `,
+  h('button', { class: 'btn small', onclick: retry }, 'Retry'));
 /** 066: "Couldn't load" with the reason and Retry. A screen module that never arrived cannot be asked for again in
  * this page (the browser keeps the pending import), so its Retry reloads the app; data is simply asked again. */
 function loadFailed(e, retry) {

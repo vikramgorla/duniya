@@ -105,7 +105,7 @@ export async function renderChats() {
   if (can('admin')) groups.push({ items: [{ id: 'add', name: 'Add a direct chat', sub: 'Set it up before the person writes', mark: h('span', { class: 'lmark add', 'aria-hidden': 'true' }, '+') }] });
   if (!chats.length && !can('admin')) return $('#main').replaceChildren(h('div', { class: 'card' }, emptyChats()));
   const ld = listDetail({ screen: 'chats', title: 'Chats', groups, first: chats[0]?.id || 'add',
-    page: (id) => (id === 'add' ? addDirectChatCard(agents, { pre: takePrefill(), onDone: (r) => { location.hash = `chats/${encodeURIComponent(r.id || '')}`; } })
+    page: (id) => (id === 'add' ? addDirectChatCard(agents, { pre: takePrefill(), onDone: (r) => { location.hash = `chats/${encodeURIComponent(r.chat || '')}`; } })
       : chatPage(chats.find((c) => c.id === id), { agents, models, us, quiet: quietBy.get(id) || [], refresh, setOn })) });
   // 068: filters and search on one line above the list; rows are hidden in place (the open page stays)
   const apply = () => {

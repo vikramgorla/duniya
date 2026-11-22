@@ -1,6 +1,6 @@
 // People (078): Households and Lists, each a list → page (#people/households/<id>, #people/lists/<id>). Loaded from
 // people.js on first visit. A household's kid without any app is reached through its adults.
-import { $, api, ask, emptyState, field, h, icon, menu, tryApi } from './core.js';
+import { $, api, ask, emptyState, field, h, icon, menu, tryApi, unless404 } from './core.js';
 import { helpLink, plural } from './shared.js';
 import { moduleBlocks, peopleNav, personRow, pickPerson } from './people.js';
 const enc = encodeURIComponent;
@@ -33,7 +33,7 @@ export async function renderGroup(kind, id) {
 async function renderOne(kind, id) {
   const k = KIND[kind];
   const back = h('a', { class: 'sub-back', href: `#people/${kind}` }, icon('back'), k.title);
-  const g = await api('GET', `${k.api}/${enc(id)}`).catch(() => null);
+  const g = await api('GET', `${k.api}/${enc(id)}`).catch(unless404);
   if (!g) { $('#main').replaceChildren(h('div', { class: 'card' }, back, h('p', { class: 'muted' }, `This ${k.one} is gone.`))); return; }
   document.title = `${g.name} · Duniya`;
   const redraw = (fn, ok) => tryApi(fn, ok).then((r) => { if (r !== false) renderOne(kind, id); });

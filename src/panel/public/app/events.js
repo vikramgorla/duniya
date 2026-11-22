@@ -1,7 +1,7 @@
 // Events and Orders (081): People → Events (list → event page with registrations, waiting list, duties, payments)
 // and People → Orders (list with filters and totals per event → order page with lines and payments). Loaded from
 // people.js on first visit, only when the module is on. Names and notes are built from text nodes.
-import { $, S, api, ask, avatar, can, emptyState, field, h, icon, menu, tryApi } from './core.js';
+import { $, api, ask, avatar, can, emptyState, field, h, icon, menu, S, tryApi, unless404 } from './core.js';
 import { helpLink, plural } from './shared.js';
 import { day, money, moduleBlocks, peopleNav, pickPerson } from './people.js';
 const enc = encodeURIComponent;
@@ -75,7 +75,7 @@ async function eventList() {
 }
 
 async function eventPage(id) {
-  const g = await api('GET', `/api/module/events/${enc(id)}`).catch(() => null);
+  const g = await api('GET', `/api/module/events/${enc(id)}`).catch(unless404);
   const bk = back('#people/events', 'Events');
   if (!g) { $('#main').replaceChildren(h('div', { class: 'card' }, bk, h('p', { class: 'muted' }, 'This event is gone.'))); return; }
   const { event: e, counts: c } = g;
@@ -181,7 +181,7 @@ async function orderList(event) {
 }
 
 async function orderPage(id) {
-  const o = await api('GET', `/api/orders/${enc(id)}`).catch(() => null);
+  const o = await api('GET', `/api/orders/${enc(id)}`).catch(unless404);
   const bk = back('#people/orders', 'Orders');
   if (!o) { $('#main').replaceChildren(h('div', { class: 'card' }, bk, h('p', { class: 'muted' }, 'This order is gone.'))); return; }
   document.title = `${o.who} · ${o.title} · Duniya`;

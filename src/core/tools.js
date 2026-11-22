@@ -88,15 +88,12 @@ function serverAllow(srv, key, allow, role) {
   return explicit.length ? explicit : (srv.defaults?.[role] || []).map((g) => `${key}:${g}`);
 }
 
-/** 094: a service's tools within 5 s (a slow or unreachable service does not hold up a panel page). */
-async function listWithin(conn) {
-  let timer;
-  const slow = new Promise((resolve, reject) => { timer = setTimeout(() => reject(new Error('The tool service did not answer in time')), 5000); });
-  try { return await Promise.race([conn.listTools(), slow]); } finally { clearTimeout(timer); }
-}
+const PANEL_WAIT = 5000; // a panel page never waits longer for one service
+const TURN_WAIT = 8000; // a reply never waits longer for one service
+const LOCAL_START_WAIT = 60000;
 /** 094: a service's tools as the panel shows them: name, description, risk from its annotations, shareable media. */
-export async function describeTools(key, conn) {
-  const tools = await listWithin(conn);
+export async function describeTools(key, conn, { fresh = false } = {}) {
+  const tools = await conn.listTools({ within: PANEL_WAIT, fresh });
   const media = mediaTool(key, tools);
   return tools.map((t) => ({ name: t.name, description: (t.description || '').slice(0, 300), risk: riskOf(t.annotations || {}), annotated: !!t.annotations, ...(media?.tool === t.name ? { media: media.kind } : {}) }));
 }
@@ -131,24 +128,32 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
   const services = []; // 094: { key, behaviour } of each service it may use
   const sharing = []; // 094: services whose media results it shares on its own
 
-  for (const [serverKey, srv] of Object.entries(effectiveServers(agent))) {
+  // every service at once, each within its wait (a slow or down service never holds up the reply)
+  const listed = await Promise.all(Object.entries(effectiveServers(agent)).map(async ([serverKey, srv]) => {
     const sAllow = serverAllow(srv, serverKey, allow, role);
-    if (!sAllow.some((r) => r.startsWith(`${serverKey}:`))) continue; // nothing of it allowed for this role
-    let conn;
-    let tools;
+    const uses = sAllow.some((r) => r.startsWith(`${serverKey}:`));
+    // sharing on its own (094) is the owner's choice for every sender: it uses the service's read-only media tool even
+    // when this role has no tools of it (code searches mood words and posts; nothing else of the service is offered)
+    if (!uses && behaviourOf(agent, serverKey, srv).share === 'off') return null;
     try {
-      conn = connectionFor(agent, serverKey, role);
-      tools = await conn.listTools();
-    } catch (e) {
-      meta.set('__errors', [...(meta.get('__errors') || []), e.message]);
-      continue;
-    }
-    const pair = changeTools(agent, serverKey, tools.map((t) => t.name)); // 093: preview → confirm tools of this service
+      const conn = connectionFor(agent, serverKey, role);
+      // a local service may need to start (and install) on first use: it gets longer
+      const tools = await conn.listTools({ within: srv.type === 'local' && !conn.tools ? LOCAL_START_WAIT : TURN_WAIT });
+      return { serverKey, srv, sAllow, uses, conn, tools };
+    } catch (e) { return { error: e.message }; }
+  }));
+  for (const l of listed) {
+    if (!l) continue;
+    if (l.error) { meta.set('__errors', [...(meta.get('__errors') || []), l.error]); continue; }
+    const { serverKey, srv, sAllow, uses, conn, tools } = l;
     const b = behaviourOf(agent, serverKey, srv); // 094: when, changes, sharing, limits of this service for the agent
-    services.push({ key: serverKey, behaviour: b });
-    const mine = tools.filter((t) => matchesAny(`${serverKey}:${t.name}`, sAllow) && !matchesAny(`${serverKey}:${t.name}`, deny));
-    const mt = b.share === 'off' ? null : mediaTool(serverKey, mine);
+    const open = tools.filter((t) => !matchesAny(`${serverKey}:${t.name}`, deny)); // the deny list always wins
+    const mt = b.share === 'off' ? null : mediaTool(serverKey, open);
     if (mt) sharing.push({ key: serverKey, ...mt, share: b.share, style: b.style, behaviour: b, conn });
+    if (!uses) continue;
+    const pair = changeTools(agent, serverKey, tools.map((t) => t.name)); // 093: preview → confirm tools of this service
+    services.push({ key: serverKey, behaviour: b });
+    const mine = open.filter((t) => matchesAny(`${serverKey}:${t.name}`, sAllow));
     for (const t of mine) {
       const fq = `${serverKey}:${t.name}`;
       const name = exposedName(serverKey, t.name);

@@ -1,6 +1,21 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.56.0": {
+      "breaking": false,
+      "title": "Steadier when a service or provider is slow",
+      "summary": "One tool service or model provider that does not answer no longer holds up replies or screens, and parts that fail to load now say so with Retry.",
+      "changes": [
+        { "type": "improved", "text": "A tool service that does not answer delays a reply by a few seconds at most, once, instead of up to two minutes on every message." },
+        { "type": "improved", "text": "The Models screen opens at once even when a provider is down, so you can still fix or remove it." },
+        { "type": "improved", "text": "Settings opens at once: each section loads when you open it, and a change there no longer resets what you typed elsewhere in it." },
+        { "type": "fixed", "text": "Sharing GIFs on its own now works for everyone in a group, not only organizers, for services added from the Registry." },
+        { "type": "improved", "text": "Parts of Server, Usage, People and an agent's Tools page that fail to load show why, with Retry, instead of disappearing; a record that only failed to load is no longer called deleted." },
+        { "type": "fixed", "text": "Schedules and the morning brief still run when the server restarts or updates in their minute, and a failed scheduled post is tried again." },
+        { "type": "improved", "text": "When a service cannot be reached, the panel says why in plain words." },
+        { "type": "fixed", "text": "After setting up a direct chat, the panel opens that chat." }
+      ]
+    },
     "2.55.2": {
       "breaking": false,
       "title": "How it uses it is easier to find",

@@ -198,7 +198,7 @@ function keyForm({ placeholder, button = 'Connect', submit, busy = 'Checking…'
 const replaceKey = (form) => h('details', { class: 'small mut' }, h('summary', {}, 'Replace key'), form);
 
 export async function renderModels() {
-  const [provs, models, us, media] = await Promise.all([api('GET', '/api/providers'), loadModels(true), usageSummary(), api('GET', '/api/media').catch(() => null)]);
+  const [provs, models, us, media] = await Promise.all([api('GET', '/api/providers'), loadModels().catch(() => ({ models: [] })), usageSummary(), api('GET', '/api/media').catch(() => null)]);
   providerCard.usage = us;
   const by = Object.fromEntries(provs.map((p) => [p.id, p]));
   const anyOn = provs.some((p) => p.connected);

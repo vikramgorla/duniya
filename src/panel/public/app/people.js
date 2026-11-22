@@ -1,6 +1,6 @@
 // People (078, PRM core): the list, a person's page, and the People · Households · Lists switch. Households and Lists
 // load from people-groups.js. Module of the panel (063). Text from WhatsApp or people is built from text nodes.
-import { $, S, ago, api, ask, avatar, can, emptyState, field, h, icon, menu, tryApi } from './core.js';
+import { $, ago, api, ask, avatar, can, emptyState, field, h, icon, menu, partFailed, S, tryApi, unless404 } from './core.js';
 import { helpLink } from './shared.js';
 import { tagInput } from './tags.js';
 // ---------- money, days and numbers (085): one format on every screen, in the reader's locale ----------
@@ -61,7 +61,8 @@ export async function renderPeople() {
   if (a) return renderPerson(a);
   const [k, v] = filter.split(':');
   const page = (offset) => api('GET', `/api/people?q=${enc(query)}&${k ? `${k}=${enc(v)}&` : ''}limit=${PAGE}&offset=${offset}`);
-  const [list, sum] = await Promise.all([page(0), api('GET', '/api/people/summary').catch(() => null)]);
+  let sumErr = null;
+  const [list, sum] = await Promise.all([page(0), api('GET', '/api/people/summary').catch((e) => { sumErr = e; return null; })]);
   const search = h('input', { type: 'search', placeholder: 'Search people', 'aria-label': 'Search people by name, number, tag or note', title: 'Name, number, tag or note', value: query });
   let timer; search.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { query = search.value; renderPeople().then(() => { const i = $('#main input[type=search]'); i?.focus(); i?.setSelectionRange(i.value.length, i.value.length); }); }, 250); };
   const opt = (value, label) => h('option', { value, selected: value === filter }, label);
@@ -95,7 +96,7 @@ export async function renderPeople() {
       : emptyState('list', 'No people yet', `${WHERE} You can also add someone, a kid without a phone too.`, h('button', { class: 'btn primary', onclick: add }, 'Add a person')),
     sum ? h('label', { class: 'tick small muted', style: 'justify-content:flex-start;margin-top:14px' }, h('input', { type: 'checkbox', checked: sum.namesForAgents !== false, disabled: !can('owner'),
       onchange: (e) => tryApi(async () => { await api('PUT', '/api/people/agent-names', { enabled: e.target.checked }); }, e.target.checked ? 'Agents use your contact names' : 'Agents use profile names') }),
-      ' Agents may use the names from your phone contacts') : null));
+      ' Agents may use the names from your phone contacts') : partFailed(sumErr, 'Filters and contact names', renderPeople)));
 }
 
 /** 091: a person's Preferences and Commitments, and People → Suggestions (promises.js, loaded with them). */
@@ -126,7 +127,7 @@ const TIES = [['parent', 'Parent of', false], ['parent', 'Child of', true], ['pa
  *  that can see them (079); ⋯ Edit, Merge, Export, Hide / Show again. */
 async function renderPerson(ref) {
   const back = h('a', { class: 'sub-back', href: '#people' }, icon('back'), 'People');
-  const p = await api('GET', `/api/people/${enc(ref)}`).catch(() => null);
+  const p = await api('GET', `/api/people/${enc(ref)}`).catch(unless404);
   if (!p) { $('#main').replaceChildren(h('div', { class: 'card' }, back, h('h2', {}, 'People'), h('p', { class: 'muted' }, 'This person is not in People (any more).'))); return; }
   window.scrollTo(0, 0);
   document.title = `${p.name} · Duniya`;

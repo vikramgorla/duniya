@@ -30,6 +30,19 @@ import { moduleRoutes } from './routes/modules.js';
 import { lessonRoutes } from './routes/lessons.js';
 import { promiseRoutes } from './routes/promises.js';
 
+/** Why a service, provider or address could not be reached, for an owner ('' when the error is something else). */
+function unreachable(e) {
+  if (!e?.cause && e?.code === undefined) return ''; // our own messages are already plain; only wrapped system errors
+  let text = '';
+  for (let x = e; x && text.length < 2000; x = x.cause) text += ` ${x.code || ''} ${x.message || ''}`;
+  if (/ECONNREFUSED/.test(text)) return 'The service refused the connection: is it running at that address?';
+  if (/ENOTFOUND|EAI_AGAIN/.test(text)) return 'That address could not be found: check its spelling.';
+  if (/CERT|self[- ]signed|UNABLE_TO_VERIFY|SSL|TLS/i.test(text)) return 'The service\'s HTTPS certificate is not valid, so it was not used.';
+  if (/-32001|timed? ?out|ETIMEDOUT|did not answer in time/i.test(text)) return 'The service did not answer in time. Try again in a minute.';
+  if (/\b401\b|Unauthorized/i.test(text)) return 'The service refused the key or sign-in (401).';
+  if (/fetch failed|ECONNRESET|socket hang up|EHOSTUNREACH|ENETUNREACH/i.test(text)) return 'Could not reach the service. Check its address and that it is online.';
+  return '';
+}
 const ROLE_RANK = { viewer: 1, admin: 2, owner: 3 };
 
 // ---------- helpers ----------
@@ -162,7 +175,9 @@ export function startPanel({ channel, extend = [] }) {
       if (Array.isArray(out) && typeof out[0] === 'number' && out.length === 2) return send(res, out[0], out[1]);
       return send(res, 200, out ?? { ok: true });
     } catch (e) {
-      if (!res.headersSent) send(res, e.status || 400, { error: e.message, code: e.code, field: e.field, needsConfirm: e.needsConfirm, warnings: e.warnings, check: e.check });
+      const plain = e.status ? '' : unreachable(e); // 2.56: a service or provider that could not be reached, in plain words
+      if (plain) console.warn(`panel ${req.method} ${url.pathname}: ${e.message}`);
+      if (!res.headersSent) send(res, e.status || (plain ? 502 : 400), { error: plain || e.message, code: e.code, field: e.field, needsConfirm: e.needsConfirm, warnings: e.warnings, check: e.check });
     }
   });
   server.listen(env.panelPort, env.panelHost, () => {

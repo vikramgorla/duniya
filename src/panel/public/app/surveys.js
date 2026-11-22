@@ -1,7 +1,7 @@
 // Surveys (083): People → Surveys. The list → a survey's page (results per question, who answered what, CSV, Send…),
 // and the editor (title, intro, questions of four kinds with their choices). Loaded from people.js on first visit;
 // answers from people are text nodes, never HTML.
-import { $, api, ask, avatar, can, emptyState, field, h, menu, time, toggle, tryApi } from './core.js';
+import { $, api, ask, avatar, can, emptyState, field, h, menu, time, toggle, tryApi, unless404 } from './core.js';
 import { helpLink, plural } from './shared.js';
 import { peopleNav } from './people.js';
 import { back, group, row, sentBlock } from './events.js';
@@ -49,7 +49,7 @@ async function surveyList() {
 }
 
 async function surveyPage(id) {
-  const r = await api('GET', `/api/surveys/${enc(id)}`).catch(() => null);
+  const r = await api('GET', `/api/surveys/${enc(id)}`).catch(unless404);
   const bk = back('#people/surveys', 'Surveys');
   if (!r) { $('#main').replaceChildren(h('div', { class: 'card' }, bk, h('p', { class: 'muted' }, 'This survey is gone.'))); return; }
   const { survey: s, counts: c } = r;

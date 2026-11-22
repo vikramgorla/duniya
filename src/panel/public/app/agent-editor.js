@@ -5,7 +5,7 @@ import { changeWithAi as changeWithAiDialog } from './ai-helper.js';
 import { answerActions } from './answers.js';
 import { askCard } from './ask.js';
 import { peoplePicker, tagInput } from './tags.js';
-import { S, api, ask, avatar, can, field, fieldError, h, icon, lines, menu, splitLines, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
+import { S, api, ask, avatar, can, field, fieldError, h, icon, lines, menu, partFailed, splitLines, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
 import { fallbackLine, fallbackPicker } from './fallback.js';
 import { browseButton } from './registry.js';
 import { helpLink, loadModels, modelLabel, modelSelect, openAgent, plural, trunc, usageLine } from './shared.js';
@@ -372,13 +372,17 @@ function buildTools(x, { save }) {
     if (st.tools && !Object.keys(st.tools).length) delete st.tools;
     if (Object.keys(st).length) services[key] = st; else delete services[key];
   };
+  const bhFill = new Map(); // service → redraw its How it uses it card (only that card, when the services' tools arrive)
   const behaviourBox = (key) => {
     if (bi) return null;
     // shown at once with the service defaults; whether it shares media (and the service's own defaults) fill in when the
-    // services' tools arrive (a slow or signed-out service must never hide these settings)
-    const i = sinfo.find((x) => x.service === key) || {};
-    return behaviourEditor(stateOf(key), { dflt: i.default || {}, media: i.media || '', onChange: () => commit(key),
-      open: openFolds.has(key), onToggle: (on) => (on ? openFolds.add(key) : openFolds.delete(key)) }); // stays open when redrawn
+    // services' tools arrive (a slow or signed-out service must never hide these settings, nor wipe an open tool grid)
+    const box = h('div', {});
+    const fill = () => { const i = sinfo.find((y) => y.service === key) || {};
+      box.replaceChildren(behaviourEditor(stateOf(key), { dflt: i.default || {}, media: i.media || '', onChange: () => commit(key),
+        open: openFolds.has(key), onToggle: (on) => (on ? openFolds.add(key) : openFolds.delete(key)) })); }; // stays open when redrawn
+    fill(); bhFill.set(key, fill);
+    return box;
   };
   const riskOf = (key) => ({ get: (name) => stateOf(key).tools?.[name],
     set: (name, v) => { const st = stateOf(key); st.tools = { ...(st.tools || {}) }; if (v === 'auto') delete st.tools[name]; else st.tools[name] = v; commit(key); } });
@@ -429,13 +433,18 @@ function buildTools(x, { save }) {
     h('div', { class: 'row', style: 'gap:4px;margin-top:4px' }, ['participant', 'organizer'].map((role) => h('label', { class: 'tick' }, h('input', { type: 'checkbox', checked: (role === 'organizer' || !t.organizerOnly) && bOn(key, role, t), disabled: !can('admin') || (role === 'participant' && t.organizerOnly),
       onchange: (e) => { setB(key, tools, role, t.name, e.target.checked); drawB(box, key, tools); } }), ` ${ROLE_LABEL[role]}`))))))) : h('p', { class: 'small muted' }, 'None.'));
   const modBox = h('div', {});
-  const ready = Promise.all([api('GET', `/api/agents/${x.enc}/connections`).catch(() => []), api('GET', `/api/agents/${x.enc}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => []),
-    can('admin') ? api('GET', '/api/tool-services/registry/settings').catch(() => null) : null, bi ? [] : api('GET', '/api/modules/tools').catch(() => [])]).then(([cn, lo, wa, reg, mods]) => {
-    conns = cn; locals = lo; waTools = bi ? wa.filter((t) => t.owner) : wa; registry = reg;
+  const ready = Promise.all([api('GET', `/api/agents/${x.enc}/connections`).catch(() => []), api('GET', `/api/agents/${x.enc}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch((e) => ({ failed: e })),
+    can('admin') ? api('GET', '/api/tool-services/registry/settings').catch(() => null) : null, bi ? [] : api('GET', '/api/modules/tools').catch((e) => ({ failed: e }))]).then(([cn, lo, wa, reg, mods]) => {
+    conns = cn; locals = lo; registry = reg;
     // 094: how it uses each service needs the services' tools (a slow service must not hold up the page): drawn when they arrive
-    if (!bi) api('GET', `/api/agents/${x.enc}/services`).then((sv) => { sinfo = sv; drawServers(); drawGlobals(); }, () => {});
-    drawServers(); drawGlobals(); drawB(waBox, 'whatsapp', waTools);
-    modBox.replaceChildren(...mods.map((m) => { const box = h('div', {}); drawB(box, m.id, m.tools); return block(m.label, h('p', { class: 'small muted' }, 'A module (Settings → Modules). Registrations, duties, payments and sends for someone else wait for an organizer\'s confirm code.'), box); }));
+    if (!bi) api('GET', `/api/agents/${x.enc}/services`).then((sv) => { sinfo = sv; for (const fill of bhFill.values()) fill(); }, () => {});
+    drawServers(); drawGlobals();
+    // a list that did not load says so (never "None."); Retry draws the Tools page again
+    const drawWa = (w) => { if (w.failed) return waBox.replaceChildren(partFailed(w.failed, '', () => api('GET', '/api/whatsapp/tools').catch((e) => ({ failed: e })).then(drawWa)));
+      waTools = bi ? w.filter((t) => t.owner) : w; drawB(waBox, 'whatsapp', waTools); };
+    const drawMods = (ms) => (ms.failed ? modBox.replaceChildren(partFailed(ms.failed, 'Modules', () => api('GET', '/api/modules/tools').catch((e) => ({ failed: e })).then(drawMods)))
+      : modBox.replaceChildren(...ms.map((m) => { const box = h('div', {}); drawB(box, m.id, m.tools); return block(m.label, h('p', { class: 'small muted' }, 'A module (Settings → Modules). Registrations, duties, payments and sends for someone else wait for an organizer\'s confirm code.'), box); })));
+    drawWa(wa); drawMods(mods);
     addRow.replaceChildren(browseButton({ target: x.id, targetName: c.name || x.id, onAdded: () => location.reload() }, registry),
       can('admin') ? h('button', { class: 'btn small', type: 'button', onclick: () => { servers.push(serverState('', {})); drawServers(); } }, '+ Add by address') : null);
   });

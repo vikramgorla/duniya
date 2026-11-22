@@ -13,7 +13,7 @@
 // action it names) or in WhatsApp with the owner assistant's confirm code — and nothing is sent or changed before that.
 // A dismissed suggestion never comes back for the same thing (its key).
 import { db, getChatMemory, kvGet, kvSet, listPending } from './db.js';
-import { clip, env, localParts, money, plural } from './config.js';
+import { clip, dueAt, env, localParts, money, plural } from './config.js';
 import { activity } from './events.js';
 import { getSetting, updateSettings, TENANT } from './store.js';
 import { getAgent, OWNER_AGENT_ID } from './agents.js';
@@ -197,12 +197,12 @@ export function setSuggestionStatus(key, status, by = '') {
   return view({ ...r, status });
 }
 
-/** Is the brief due now (its time today, not sent yet)? Marks today's brief as sent. */
+/** Is the brief due now (its time today or up to 30 minutes after, not sent yet)? Marks today's brief as sent. */
 export function briefDue(now = Date.now()) {
   const s = briefSettings();
   if (!s.enabled) return null;
   const { hhmm, date } = localParts(ownerTz(), now);
-  if (hhmm !== briefTime(s.at) || kvGet(`brief:${date}`)) return null;
+  if (!dueAt(briefTime(s.at), hhmm) || kvGet(`brief:${date}`)) return null;
   kvSet(`brief:${date}`, '1');
   return { date, sections: s.sections };
 }

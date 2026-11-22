@@ -205,7 +205,7 @@ export function agentRoutes(route, { channel } = {}) {
       if (!saved || (body.type === 'local' ? saved.type !== 'local' : saved.auth !== 'oauth')) {
         return [400, { error: body.type === 'local' ? 'Save the agent with this local tool service first' : 'Save the agent and connect the tool service first' }];
       }
-      return describeTools(body.server, organizerConnection(agent, body.server));
+      return describeTools(body.server, organizerConnection(agent, body.server), { fresh: true });
     }
     if (body.url) { url = interpolate(String(body.url)); token = interpolate(String(body.token || '')); } else {
       const agent = getAgent(p.id);
@@ -215,7 +215,7 @@ export function agentRoutes(route, { channel } = {}) {
     }
     if (!url) return [400, { error: 'URL is empty (is its secret set?)' }];
     const headers = interpolate(body.headers && typeof body.headers === 'object' ? body.headers : {});
-    return describeTools(String(body.server || ''), mcpConnection(url, { token, headers }));
+    return describeTools(String(body.server || ''), mcpConnection(url, { token, headers }), { fresh: true });
   });
   route('POST', '/api/agents/:id/test', async (req, res, body, q, p) => {
     const agent = getAgent(p.id);

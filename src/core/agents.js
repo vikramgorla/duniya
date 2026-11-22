@@ -41,26 +41,8 @@ function toRuntime(row) {
 }
 
 // ---------- registry ----------
-// 094 (one-time, remove in the next release): agents whose instructions ask for GIFs and that can use a service with a
-// read-only tool returning media now share on their own ("proactive", "often"; style words from the prompt when it
-// names a film style) — a setting on their Tools page instead of prompt text.
-const STYLE = /\b((?:[A-Z][\p{L}-]+ )(?:or [A-Z][\p{L}-]+ )?(?:movie|cinema|film|anime|cartoon)s?(?: reactions?)?)/u;
-async function sharingFromPrompts() {
-  const rows = listAgentRows().filter((r) => r.id !== OWNER_AGENT_ID && r.config.services === undefined && /\bgifs?\b/i.test(r.config.prompt || ''));
-  if (!rows.length) return;
-  const { agentServices } = await import('./tools.js');
-  for (const row of rows) {
-    const media = (await agentServices({ ...row.config, id: row.id }).catch(() => [])).filter((x) => x.media);
-    if (!media.length) continue;
-    const style = (row.config.prompt.match(STYLE)?.[1] || '').slice(0, 120);
-    saveAgentRow(row.id, { ...row.config, services: Object.fromEntries(media.map((x) => [x.service, { when: 'proactive', share: 'often', ...(style ? { style } : {}) }])) }, 'system');
-    activity('config', { agent: row.id, summary: `${row.config.name || row.id} now shares ${media.map((x) => x.service).join(', ')} results on its own (often), as its instructions ask: Tools` });
-  }
-}
-
-export async function loadAgents() {
+export function loadAgents() {
   ensureOwnerAgent();
-  await sharingFromPrompts();
   const next = new Map();
   for (const row of listAgentRows()) next.set(row.id, toRuntime(row));
   agents = next;

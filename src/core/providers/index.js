@@ -231,13 +231,21 @@ export function removeCompatible(id) {
 
 // ---------- models ----------
 const modelCache = new Map(); // providerId -> { at, models, error }
+const listing = new Map(); // providerId -> the listing in progress
+const MODELS_TTL = 10 * 60000;
+const MODELS_WAIT = 10000; // one provider that does not answer never holds up a screen or a turn longer
+/** A provider's models: cached 10 min; an older list is used at once while a fresh one loads; one listing at a time,
+ *  given up after 10 s (it fails as "did not answer in time"). `refresh` (Refresh, a key change): wait for a new list. */
 export async function providerModels(p, { refresh = false } = {}) {
   const hit = modelCache.get(p.id);
-  if (!refresh && hit && Date.now() - hit.at < 10 * 60000) return hit;
-  let entry;
-  try { entry = { at: Date.now(), models: await p.adapter.listModels(), error: null }; } catch (e) { entry = { at: Date.now(), models: [], error: e.message }; }
-  modelCache.set(p.id, entry);
-  return entry;
+  if (!refresh && hit && Date.now() - hit.at < MODELS_TTL) return hit;
+  if (!listing.has(p.id)) {
+    let timer;
+    const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('The provider did not answer in time')), MODELS_WAIT); });
+    listing.set(p.id, Promise.race([p.adapter.listModels(), late]).then((models) => ({ at: Date.now(), models, error: null }), (e) => ({ at: Date.now(), models: [], error: e.message }))
+      .then((entry) => { modelCache.set(p.id, entry); return entry; }).finally(() => { clearTimeout(timer); listing.delete(p.id); }));
+  }
+  return !refresh && hit ? hit : listing.get(p.id);
 }
 export const clearModelCache = (id) => (id ? modelCache.delete(id) : modelCache.clear());
 
@@ -246,11 +254,12 @@ export async function status({ refresh = false } = {}) {
   const strat = strategies();
   const groups = new Map();
   for (const p of providers()) if (p.configured) groups.set(p.group, (groups.get(p.group) || 0) + 1);
+  const lists = new Map(await Promise.all(providers().filter((p) => p.configured).map(async (p) => [p.id, await providerModels(p, { refresh })]))); // all at once
   for (const p of providers()) {
     const row = { id: p.id, type: p.type, name: p.name, label: p.label, primary: p.primary, group: p.group, connected: false, models: 0,
       ...(p.baseUrl ? { baseUrl: p.baseUrl } : {}), ...(p.account ? { account: p.account } : {}), ...(p.type === 'compatible' || p.type === 'openrouter' ? { freeOnly: p.freeOnly } : {}) };
     if (p.configured) {
-      const m = await providerModels(p, { refresh });
+      const m = lists.get(p.id);
       row.connected = !m.error; row.models = m.models.length; if (m.error) row.error = m.error;
       if (row.connected && p.type === 'copilot') Object.assign(row, await copilotExtras(p, { refresh }));
       row.health = breaker.accountState(p.id); // 042: { state: ok | paused | probing | reconnect, text }
@@ -278,9 +287,10 @@ export function clearCopilotExtras(id) { if (id) extrasCache.delete(id); else ex
 
 export async function allModels({ refresh = false } = {}) {
   const out = [];
-  for (const p of providers()) {
-    if (!p.configured) continue;
-    const m = await providerModels(p, { refresh });
+  const ps = providers().filter((p) => p.configured);
+  const lists = await Promise.all(ps.map((p) => providerModels(p, { refresh }))); // all at once
+  for (const [i, p] of ps.entries()) {
+    const m = lists[i];
     for (const x of m.models) out.push({ ref: `${p.id}:${x.id}`, provider: p.id, type: p.type, label: `${p.name} · ${modelName(x.id, x.label)}` });
   }
   return out;
