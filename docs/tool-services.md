@@ -85,8 +85,8 @@ good news counts — Diwali, Eid, an exam passed, a joke that landed — with no
   service with the mood and your style words and picks a result it did not post in that chat lately.
 - **One message.** A short answer (up to 500 characters) goes as the GIF's caption and nothing else: no title, credit
   or link. A longer answer, or a sticker, goes first and the GIF right after it.
-- **Credits live in the panel.** The credit a service asks for (the part all its results share, e.g. *Powered by
-  KLIPY*) shows on its card in **Settings → Tool services** and in **Settings → Help → Credits**; Activity keeps each
+- **Credits live in the panel.** The credit a service asks for (the words all its results share, without their
+  titles and links, e.g. *Powered by KLIPY*) shows on its card in **Settings → Tool services** and in **Settings → Help → Credits**; Activity keeps each
   GIF's own credit and link. Links to GIFs, videos and pictures, and those credits, are taken out of the agent's text
   and of captions it writes itself.
 - **Code keeps the limits.** Serious topics never get one, whatever the AI picks; at most one per answer and none

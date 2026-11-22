@@ -14,7 +14,7 @@ const queries = []; // what the fake media service was asked
 const order = []; // texts and media as they reached the chat
 let count = 8;
 const results = () => Array.from({ length: count }, (_, i) => ({ id: `c${i}`, title: `Clip ${i}`, url: `https://media.example/${i}.gif`,
-  mp4Url: `https://media.example/${i}.mp4`, previewUrl: `https://media.example/${i}-small.gif`, attribution: `"Clip ${i}" · Powered by ExampleClips` }));
+  mp4Url: `https://media.example/${i}.mp4`, previewUrl: `https://media.example/${i}-small.gif`, attribution: `"Clip ${i}" · Powered by ExampleClips · https://clips.example/c/${i}` })); // title and link differ per result
 const OUT = { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, url: { type: 'string' }, mp4Url: { type: 'string' }, previewUrl: { type: 'string' } } } } } };
 const QUERY = { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer' } }, required: ['query'] };
 
