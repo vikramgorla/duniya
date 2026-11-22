@@ -14,7 +14,8 @@
 // mark done, reopen, re-date or delete them there (and through the admin MCP / owner assistant); an agent's organizers
 // do the same for the promises of its chats from the chat (PROMISE_TOOLS), participants see their own.
 import { db, kvGet, kvSet, logMessage } from './db.js';
-import { clip, env, localParts } from './config.js';
+import { clip, localParts } from './config.js';
+import { agentTz, ownerDay } from './owner-clock.js';
 import { usageTag } from './usage.js';
 import { activity } from './events.js';
 import { chat as modelChat } from './providers/index.js';
@@ -43,8 +44,7 @@ const MAX_PER_DAY = 50;
 const PER_TICK = 3;
 const PROMISE = /\b(i'?ll|i will|i can|i'?m going to|i am going to|i shall|let me|je vais|je peux|ich werde|ich bringe|voy a|lo hago|i'?ll do|on it)\b/i;
 const DONE = /\b(done|did it|brought|paid|sent|finished|ready|delivered|sorted|handled|got (it|them)|fait|erledigt|bezahlt|hecho)\b|✅|✔️/i;
-const today = (tz = env.timezone, now = Date.now()) => localParts(tz, now).date;
-const view = (r, day = today()) => ({ id: r.id, agent: r.agent, chat: r.chat, person: r.person, who: r.who || (r.person ? personRow(r.person)?.name : '') || '', what: r.what, due: r.due, status: r.status,
+const view = (r, day = ownerDay()) => ({ id: r.id, agent: r.agent, chat: r.chat, person: r.person, who: r.who || (r.person ? personRow(r.person)?.name : '') || '', what: r.what, due: r.due, status: r.status,
   overdue: r.status === 'open' && !!r.due && r.due < day, msg: r.msg || null, by: r.by, followedUpAt: r.followed_up_at || null, createdAt: r.created_at, updatedAt: r.updated_at });
 const STATUSES = ['open', 'overdue', 'done', 'dropped', 'all'];
 const notFound = () => Object.assign(new Error('No such promise'), { status: 404 });
@@ -57,7 +57,7 @@ const one = (id) => db.prepare('SELECT * FROM commitments WHERE id = ?').get(Mat
  */
 export function listCommitments({ agent = '', person = '', chat = '', chats = null, status = 'open', limit = 200 } = {}) {
   if (!STATUSES.includes(status)) throw Object.assign(new Error(`status: ${STATUSES.join(', ')}`), { status: 400, field: 'status' });
-  const day = today();
+  const day = ownerDay();
   const where = []; /** @type {(string|number)[]} */ const args = [];
   if (status === 'overdue') { where.push("c.status = 'open' AND c.due <> '' AND c.due < ?"); args.push(day); } else if (status !== 'all') { where.push('c.status = ?'); args.push(status); }
   if (agent) { where.push('c.agent = ?'); args.push(agent); }
@@ -122,8 +122,8 @@ export const promiseTools = [
 /** A person is erased: their commitments go. A chat's memory is erased: its commitments go. */
 export const forgetCommitments = ({ person = '', chat = '' }) => db.prepare(person ? 'DELETE FROM commitments WHERE person = ?' : 'DELETE FROM commitments WHERE chat = ?').run(person || chat);
 
-const callsToday = (agent) => Number(kvGet(`commitments:${agent}:${today()}`) || 0);
-const countCall = (agent) => kvSet(`commitments:${agent}:${today()}`, String(callsToday(agent) + 1));
+const callsToday = (agent) => Number(kvGet(`commitments:${agent}:${ownerDay()}`) || 0);
+const countCall = (agent) => kvSet(`commitments:${agent}:${ownerDay()}`, String(callsToday(agent) + 1));
 
 const FIND = 'You read one chat message and find promises its writer makes about something they will do (bring, pay, send, organise, call…). Answer in JSON only: {"promises": [{"what": "short, in the writer\'s words, third person, e.g. bring the speakers", "due": "YYYY-MM-DD or empty"}]} — an empty list when it is not a real promise (a question, a joke, a maybe). Resolve "Friday", "tomorrow", "next week" against the date given.';
 const JUDGE = 'You check whether a chat message shows that open promises are done. Answer in JSON only: {"done": [ids]} — ids of the promises the message clearly shows done (the writer says it is done, or someone confirms it). Empty when unsure.';
@@ -135,7 +135,7 @@ const parse = (res, key) => { const t = res.content.filter((b) => b.type === 'te
  */
 export async function noteMessage(agent, msg, rowId) {
   if (!agent?.promises?.track || !msg.text || msg.fromMe || !isChatEnabled(msg.chat)) return;
-  const tz = agent.timezone || env.timezone;
+  const tz = agentTz(agent);
   try {
     const open = db.prepare("SELECT id, who, what FROM commitments WHERE chat = ? AND status = 'open' ORDER BY id DESC LIMIT 20").all(msg.chat);
     if (open.length && DONE.test(msg.text) && callsToday(agent.id) < MAX_PER_DAY) {
@@ -150,7 +150,7 @@ export async function noteMessage(agent, msg, rowId) {
     if (!PROMISE.test(msg.text) || callsToday(agent.id) >= MAX_PER_DAY) return;
     countCall(agent.id);
     const res = await modelChat({ model: 'auto', purpose: 'background', maxTokens: 150, fallback: undefined, usage: usageTag('commitments', { agent: agent.id, chat: msg.chat }), system: FIND,
-      messages: [{ role: 'user', content: `Today is ${today(tz)} (${new Date().toLocaleDateString('en-GB', { weekday: 'long', timeZone: tz })}).\nMessage from ${msg.senderName || 'someone'}: ${clip(msg.text, 500)}` }] });
+      messages: [{ role: 'user', content: `Today is ${localParts(tz).date} (${new Date().toLocaleDateString('en-GB', { weekday: 'long', timeZone: tz })}).\nMessage from ${msg.senderName || 'someone'}: ${clip(msg.text, 500)}` }] });
     const now = Date.now();
     for (const p of parse(res, 'promises').slice(0, 3)) {
       const what = clip(String(p.what || '').trim(), 200);
@@ -175,7 +175,7 @@ export async function commitmentsTick(now = Date.now()) {
   const ch = chatChannel();
   if (!ch?.send) return 0;
   let n = 0;
-  for (const c of db.prepare("SELECT * FROM commitments WHERE status = 'open' AND due <> '' AND due <= ? AND followed_up_at IS NULL ORDER BY due LIMIT 20").all(today(env.timezone, now))) {
+  for (const c of db.prepare("SELECT * FROM commitments WHERE status = 'open' AND due <> '' AND due <= ? AND followed_up_at IS NULL ORDER BY due LIMIT 20").all(ownerDay(now))) {
     if (n >= PER_TICK) break;
     const agent = getAgent(c.agent);
     const mode = agent?.promises?.followUp || 'chat';
@@ -196,6 +196,6 @@ export async function commitmentsTick(now = Date.now()) {
 
 // the morning brief (090): commitments due today or overdue
 registerBriefSection('commitments', (now) => {
-  const rows = db.prepare("SELECT * FROM commitments WHERE status = 'open' AND due <> '' AND due <= ? ORDER BY due LIMIT 10").all(today(env.timezone, now));
-  return { lines: rows.map((c) => `${c.who || personRow(c.person)?.name || 'Someone'}: ${c.what} (${c.due < today(env.timezone, now) ? `overdue since ${c.due}` : 'due today'})`) };
+  const rows = db.prepare("SELECT * FROM commitments WHERE status = 'open' AND due <> '' AND due <= ? ORDER BY due LIMIT 10").all(ownerDay(now));
+  return { lines: rows.map((c) => `${c.who || personRow(c.person)?.name || 'Someone'}: ${c.what} (${c.due < ownerDay(now) ? `overdue since ${c.due}` : 'due today'})`) };
 });

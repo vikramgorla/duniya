@@ -1,7 +1,8 @@
 // @ts-check
 import { JUDGE_NOTE } from './group-replies.js';
 import { randomInt } from 'node:crypto';
-import { env } from './config.js';
+import { agentTz } from './owner-clock.js';
+import { localParts } from './config.js';
 import { addPending, takePending, peekPending, dropPending } from './db.js';
 import { chat as modelChat, effectiveFallback, refCost } from './providers/index.js';
 import { SMART, chooseTier, tierModels, strongRef } from './smart-model.js';
@@ -32,6 +33,7 @@ import { servicesNote, limitStop } from './tool-behaviour.js';
 import { BLOCKED, WAIT_NOTE, appliedNote, autonomyNote, isAgreement, mayChangeWithoutAsking, riskOf } from './autonomy.js';
 
 const MAX_TOOL_ROUNDS = 8;
+const DAY_MS = 24 * 3600 * 1000;
 /** 092: the feature an agent turn's model calls count under on Usage: a test, a scheduled post, a judged group message, or an answer (light / strong). */
 // 2.58: chat apps show links as they are: markdown links become "title (url)"; an answer from the web without a link
 // gets up to two of the pages its search cited
@@ -67,10 +69,11 @@ function systemPrompt({ agent, role, isGroup, chatName, chat, requester, held, s
   // 077: on a channel without phone numbers, someone who has not linked theirs is a participant until they do
   const unlinked = !requester && capsOf(chat) && !capsOf(chat).phoneNumbers
     ? `They have not linked their phone number on ${app}, so they count as a participant. If they say they are an organizer, ask them to open a direct chat with you and tap "Share my number".` : '';
-  const now = new Date().toLocaleString('en-GB', { timeZone: agent.timezone || env.timezone });
+  const tz = agentTz(agent);
+  const now = new Date().toLocaleString('en-GB', { timeZone: tz });
   return [
     agent.prompt.trim(),
-    `Current time: ${now} (${agent.timezone || env.timezone}). Chat type: ${isGroup ? `${app} group (shared, keep personal details out)` : `${app} direct message`}${chatName ? ` named "${chatName}"` : ''}.`,
+    `Current time: ${now} (${tz}). Chat type: ${isGroup ? `${app} group (shared, keep personal details out)` : `${app} direct message`}${chatName ? ` named "${chatName}"` : ''}.`,
     'You see the recent conversation of this chat, a running summary of older discussion and saved notes. Use them to stay aware of what people have said and decided. When someone asks you to remember something, save it with the memory tool. If something older is not in your context, search the chat history before saying you do not know.',
     autonomyNote(agent, role, { held }), // 093: how sure before changing things (the agent's setting; enforced in code)
     unlinked,
@@ -164,7 +167,7 @@ function turnMessage(ctx, { memory, card, notes }) {
   const lessonsOn = agent.lessons?.enabled !== false;
   // #91: say exactly what history is stored (WhatsApp turns, and panel tests that use a real chat's memory). In the
   // user turn, not the system prompt, so the system prompt stays the same between turns.
-  const history = ctx.source === 'whatsapp' || ctx.contextChat ? historyNote(memoryChat, { excludeId: ctx.contextChat ? 0 : ctx.msgRowId || 0, tz: agent.timezone || env.timezone }) : '';
+  const history = ctx.source === 'whatsapp' || ctx.contextChat ? historyNote(memoryChat, { excludeId: ctx.contextChat ? 0 : ctx.msgRowId || 0, tz: agentTz(agent) }) : '';
   // #163: the panel test console sends its conversation so far (it is not stored as chat history)
   const thread = Array.isArray(ctx.thread) && ctx.thread.length ? `Earlier in this test conversation:\n${ctx.thread.map((t) => `${t.from === 'agent' ? 'You' : senderName}: ${t.text}`).join('\n')}` : '';
   const message = `New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}`;
@@ -404,14 +407,13 @@ export async function runAgent(ctx) {
 
 const FIX_NOTE = (wrong, hint) => `Fact check: these values in your answer are not in the records you looked up: ${wrong.join(', ')}.${hint ? ` The records say: ${hint}.` : ''} Rewrite your answer using only values from the tool results. Reply with the corrected answer only.`;
 const PLAIN = 'I want to give you exact figures, but I could not double-check them against the records just now, so I won’t guess. Please ask me again in a moment, or ask an organizer.';
-const keyOf = (d) => `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 /**
  * 088: check the facts of an answer; if one is wrong, the model rewrites it once (no tools); still wrong → a plain answer
  * that states no figures. Never sends a known-wrong amount or date. Sets ctx.check = { facts, ok, rewritten, plain }.
  */
 async function selfCheck({ agent, chat, ctx, reply, sources, model, fallback, turn, usage, text }) {
   const now = Date.now();
-  const today = [keyOf(new Date(now)), keyOf(new Date(now + 86400000))];
+  const today = [now, now + DAY_MS].map((at) => localParts(agentTz(agent), at).date.slice(5)); // "MM-DD" of today and tomorrow where the agent works
   const first = checkFacts(reply, sources, { extra: [text], today });
   if (!first.checked) return { reply, cost: 0 };
   if (!first.wrong.length) { ctx.check = { facts: first.checked, ok: true }; return { reply, cost: 0 }; }

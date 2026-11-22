@@ -1,6 +1,7 @@
 // Group memory (feature 004): stored messages, rolling summary, notes, memory tools.
 import { optionalPaused } from './resources.js';
-import { env, clip } from './config.js';
+import { env, clip, localParts } from './config.js';
+import { agentTz, ownerTz } from './owner-clock.js';
 import { usageTag } from './usage.js';
 import {
   history, messagesAfter, getChatMemory, setChatMemory, addNote, listNotes, deleteNote, getNote, updateNote, searchNotes,
@@ -19,7 +20,7 @@ const windowFor = (agent) => agent?.historySize || DEFAULT_WINDOW;
 
 // 069: one formatter per time zone (building one per message was the slowest part of a turn with a long history)
 const stampFmt = new Map();
-function stamp(ts, tz = env.timezone) {
+function stamp(ts, tz = ownerTz()) {
   if (!stampFmt.has(tz)) stampFmt.set(tz, new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }));
   return stampFmt.get(tz).format(new Date(ts));
 }
@@ -35,7 +36,7 @@ export function formatMessage(m, tz, tags = null) {
  * `excludeId` is the stored row id of the message being answered (it is appended separately).
  */
 export function buildContext({ agent, chat, excludeId = 0 }) {
-  const tz = agent?.timezone || env.timezone;
+  const tz = agentTz(agent);
   const parts = [];
   const recent = history(chat, windowFor(agent) + 1).filter((m) => m.id !== excludeId).slice(-windowFor(agent));
   if (memoryEnabled(agent)) {
@@ -43,11 +44,11 @@ export function buildContext({ agent, chat, excludeId = 0 }) {
     if (mem?.summary) parts.push(`<group_memory updated="${stamp(mem.updated_at, tz)}">\n${mem.summary.trim()}\n</group_memory>`);
     const shared = agent?.id ? listNotes(agentScope(agent), env.memory.notesInContext) : [];
     if (shared.length) {
-      parts.push(`<agent_memory note="shared by this agent across all its chats">\n${shared.map((n) => `- [#${n.id}, ${new Date(n.ts).toISOString().slice(0, 10)}] ${clip(n.text, 500)}`).join('\n')}\n</agent_memory>`);
+      parts.push(`<agent_memory note="shared by this agent across all its chats">\n${shared.map((n) => `- [#${n.id}, ${localParts(tz, n.ts).date}] ${clip(n.text, 500)}`).join('\n')}\n</agent_memory>`);
     }
     const notes = listNotes(chat, env.memory.notesInContext);
     if (notes.length) {
-      parts.push(`<notes>\n${notes.map((n) => `- [#${n.id}, ${n.role || 'note'} ${n.author || ''}, ${new Date(n.ts).toISOString().slice(0, 10)}] ${clip(n.text, 500)}`).join('\n')}\n</notes>`);
+      parts.push(`<notes>\n${notes.map((n) => `- [#${n.id}, ${n.role || 'note'} ${n.author || ''}, ${localParts(tz, n.ts).date}] ${clip(n.text, 500)}`).join('\n')}\n</notes>`);
     }
   }
   const activityLines = chatEventsSummary(chat, tz);
@@ -59,7 +60,7 @@ export function buildContext({ agent, chat, excludeId = 0 }) {
 }
 
 /** Reactions and polls of a chat in plain lines (026): "Anu reacted 👍 to …", "Poll 'Lunch?': Pizza 3, Dosa 2". */
-export function chatEventsSummary(chat, tz = env.timezone) {
+export function chatEventsSummary(chat, tz = ownerTz()) {
   const lines = [];
   for (const p of recentPolls(chat, 3)) {
     const tally = pollTally(p);
@@ -99,7 +100,7 @@ export async function maybeSummarize(chat, agent, { force = false } = {}) {
   const older = messagesAfter(chat, mem.upto_id ?? 0, boundary);
   if (!older.length) return null;
 
-  const tz = agent?.timezone || env.timezone;
+  const tz = agentTz(agent);
   return summarize(chat, agent, {
     current: mem.summary || '(empty)', note: '', messages: older.map((m) => formatMessage(m, tz)), upto: older.at(-1).id,
     what: `${older.length} messages`,
@@ -138,7 +139,7 @@ export async function summarizeAfterLoad(chat, agent, rowIds = []) {
   const ids = new Set(rowIds);
   const earlier = messagesAfter(chat, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER).filter((m) => ids.has(m.id));
   if (!earlier.length) return null;
-  const tz = agent?.timezone || env.timezone;
+  const tz = agentTz(agent);
   return summarize(chat, agent, {
     current: mem.summary, note: ' note="these are EARLIER messages, from before the current summary"', messages: earlier.map((m) => formatMessage(m, tz)),
     upto: mem.upto_id, what: `${earlier.length} earlier messages`,
@@ -149,7 +150,7 @@ export async function summarizeAfterLoad(chat, agent, rowIds = []) {
  * #91: one honest line for the agent about what it can know of this chat's past (so it never guesses). `excludeId`
  * is the message being answered (not counted).
  */
-export function historyNote(chat, { excludeId = 0, tz = env.timezone } = {}) {
+export function historyNote(chat, { excludeId = 0, tz = ownerTz() } = {}) {
   const span = storedSpan(chat);
   const count = span.count - (excludeId ? 1 : 0);
   const hasSummary = !!getChatMemory(chat)?.summary;
@@ -187,7 +188,7 @@ export const MEMORY_DEFAULT_ALLOW = {
   participant: ['memory:remember', 'memory:list_notes', 'memory:find_notes', 'memory:search_history'],
 };
 const noteOut = (n, agent) => ({
-  id: n.id, scope: n.chat === agentScope(agent) ? 'agent' : 'chat', text: n.text, author: n.author, date: new Date(n.ts).toISOString().slice(0, 10),
+  id: n.id, scope: n.chat === agentScope(agent) ? 'agent' : 'chat', text: n.text, author: n.author, date: localParts(agentTz(agent), n.ts).date,
 });
 /** A note this chat may touch: one of its own, or one of the agent's shared notes. */
 function ownNote(id, ctx) {
@@ -268,7 +269,7 @@ export const memoryTools = [
     roles: ['organizer', 'participant'],
     async run({ query, limit }, ctx) {
       if (String(query || '').trim().length < 2) throw new Error('query too short');
-      const tz = ctx.agent?.timezone || env.timezone;
+      const tz = agentTz(ctx.agent);
       return searchMessages(ctx.chat, String(query).trim(), limit).map((m) => ({
         date: stamp(m.ts, tz), name: m.from_agent ? 'Assistant' : agentName({ phone: m.sender, jid: m.sender_jid, fallbackName: m.name }) || m.sender, text: clip(m.text, 500),
       }));
@@ -289,7 +290,7 @@ export async function rebuildStaleSummary(agentFor) {
   if (!all.length) { setChatMemory(chat, '', 0); return true; }
   const agent = agentFor(chat);
   const done = await summarize(chat, agent, { current: '(empty)', note: ' reason="rebuilt after a message was deleted or edited"',
-    messages: all.map((m) => formatMessage(m, agent?.timezone || env.timezone)), upto: all.at(-1).id, what: `${all.length} messages (rebuilt after a deletion or an edit)` });
+    messages: all.map((m) => formatMessage(m, agentTz(agent))), upto: all.at(-1).id, what: `${all.length} messages (rebuilt after a deletion or an edit)` });
   if (!done) stale.add(chat);
   return true;
 }

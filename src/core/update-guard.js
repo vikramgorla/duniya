@@ -11,6 +11,7 @@
 // fails open (nothing in here may keep a release from starting); every command has a deadline; the note is read as
 // untrusted input. It does nothing in Docker or a development checkout.
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -26,6 +27,19 @@ const COMMIT = /^[0-9a-f]{7,64}$/; // nothing else may reach git as an argument
 const WORD_MAX = 80; // characters of a version or a file name taken from the note
 /** The kind of install the guard works on: installer servers, where a service manager restarts the app. */
 export const GUARDED_INSTALL = 'systemd';
+
+/**
+ * What a server has installed, as one key: the packages of the lockfile that `npm ci --omit=dev` installs. The app's
+ * own version (it changes with every release) and the development tools are left out, so an update reinstalls only
+ * when a package the app runs on changed. '' without a readable lockfile. deploy/update.sh asks for this key too.
+ */
+export function depsKey(root) {
+  try {
+    const { '': app = {}, ...packages } = JSON.parse(readFileSync(resolve(root, 'package-lock.json'), 'utf8')).packages;
+    const installed = Object.entries(packages).filter(([, p]) => !p.dev);
+    return createHash('sha256').update(JSON.stringify([app.dependencies, app.optionalDependencies, installed])).digest('hex');
+  } catch { return ''; /* no lockfile, or not one of npm's: nothing to compare */ }
+}
 
 const dataDirOf = () => resolve(ROOT, process.env.DATA_DIR || 'data'); // as config.js (not imported: see the rules above)
 const say = (text) => console.error(`Update guard: ${text}`);

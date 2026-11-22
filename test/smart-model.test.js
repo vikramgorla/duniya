@@ -89,7 +89,7 @@ test('Usage: answers per tier, cost per answer and what the strong model alone w
 });
 
 // ---------- self-check ----------
-test('self-check: a wrong amount is rewritten once; still wrong → a plain answer; right → checked; off → not checked', async () => {
+test('self-check: a wrong amount is rewritten once; still wrong → a plain answer; right → checked; off → not checked', async (tt) => {
   await t.api(owner, 'PUT', '/api/modules/orders', { on: true });
   const anu = (await t.api(owner, 'GET', `/api/people/${ANU}`)).body; // she wrote above: already in People
   await t.api(owner, 'PUT', `/api/people/${anu.id}`, { name: 'Anu Rao' });
@@ -114,6 +114,15 @@ test('self-check: a wrong amount is rewritten once; still wrong → a plain answ
   // a wrong date is caught too
   await ask('mira when is it due?', owe, 'It is due on 9 January.', 'It is due on 8 January.');
   assert.equal(t.sent.at(-1).text, 'It is due on 8 January.');
+  // today's date needs no record, where the agent works: the 9th in New York is already the 10th in UTC
+  await t.api(owner, 'PUT', '/api/agents/mira', { timezone: 'America/New_York' });
+  tt.mock.timers.enable({ apis: ['Date'], now: Date.parse('2027-01-10T03:00:00Z') });
+  try {
+    reqs = await ask('mira what do I owe?', owe, 'Today, 9 January, you owe CHF 120.00.');
+    assert.equal(reqs.length, 2, 'no rewrite');
+    assert.equal(t.sent.at(-1).text, 'Today, 9 January, you owe CHF 120.00.');
+  } finally { tt.mock.timers.reset(); }
+  await t.api(owner, 'PUT', '/api/agents/mira', { timezone: '' });
   // right → no extra call, "checked" in Activity
   reqs = await ask('mira what do I owe?', owe, 'You owe CHF 120.00 for Sankranti.');
   assert.equal(reqs.length, 2);

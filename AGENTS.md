@@ -58,8 +58,9 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 - [ ] No compatibility layers or one-time migrations kept after the release that needed them; schema lives in
       `CREATE TABLE` and a fresh install works.
 - [ ] One way to do each thing: reuse the resolvers (models, names), the scheduler tick, the small-server switch, the
-      owner's clock (`src/core/owner-clock.js`: dates the owner enters and once-a-day work, never the UTC day) and the
-      shared helpers in `src/core/config.js` instead of a local copy.
+      owner's clock (`src/core/owner-clock.js`: dates the owner enters, once-a-day work, months and times of day, never
+      the UTC day or the server's zone; `agentTz(agent)` for an agent: its own zone, else the owner's) and the shared
+      helpers in `src/core/config.js` instead of a local copy.
 - [ ] `node scripts/ci-checks.mjs` passes: knip (no unused files, exports or dependencies), jscpd (no duplication over
       its threshold), the panel budgets in `scripts/check-panel.mjs` (first screen and total; raise one only with a
       reason in the PR), `tsc` over the `// @ts-check` files.

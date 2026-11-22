@@ -1,6 +1,7 @@
 // @ts-check
 import { isChatEnabled } from './chat-prefs.js';
-import { dueAt, env, localParts } from './config.js';
+import { dueAt, localParts } from './config.js';
+import { agentTz } from './owner-clock.js';
 import { isGroup } from '../channels/index.js';
 import { getSetting } from './store.js';
 import { listAgents, isBuiltin } from './agents.js';
@@ -17,7 +18,7 @@ const dayMatches = (days, day) => !days || days === 'daily' || days.split(',').m
 const running = new Set();
 /** Run one schedule now. Returns [{chat, reply}] */
 export async function runSchedule(agent, sched, channel, { force = false } = {}) {
-  const { date } = localParts(agent.timezone || env.timezone);
+  const { date } = localParts(agentTz(agent));
   if (isBuiltin(agent)) return runOwnerSchedule(sched, { date, force }); // 059: to linked owners and admins
   const chats = sched.chats === 'all' ? agent.chats : sched.chats;
   const results = [];
@@ -58,7 +59,7 @@ export function startScheduler(channel) {
     const paused = getSetting('paused', false);
     for (const agent of listAgents()) {
       if (!agent.enabled || (paused && !isBuiltin(agent))) continue; // 059: the owner assistant's schedules run even while paused
-      const { hhmm, day } = localParts(agent.timezone || env.timezone);
+      const { hhmm, day } = localParts(agentTz(agent));
       for (const s of agent.schedules || []) {
         if (s.enabled === false || !dueAt(s.at, hhmm) || !dayMatches(s.days, day)) continue; // 2.56: or up to 30 min late (a restart that minute)
         await runSchedule(agent, s, channel);

@@ -17,7 +17,8 @@ import { activity } from './events.js';
 import { autonomyOf } from './autonomy.js';
 import { isGroup } from '../channels/index.js';
 import { SERVICE_DEFAULTS } from './schema.js';
-import { clip, env, localParts } from './config.js';
+import { clip } from './config.js';
+import { ownerDay } from './owner-clock.js';
 
 /**
  * A service's settings for an agent: the agent's override field by field, else the service's default, else the
@@ -63,7 +64,7 @@ export function servicesNote(agent, services) {
 // ---------- 5. limits ----------
 // one row per agent and service: { day, n } (today's uses), overwritten, so nothing piles up
 const usesKey = (agent, key) => `uses:${agent}:${key}`;
-const today = () => localParts(env.timezone).date;
+const today = () => ownerDay(); // "a day" of a limit is the owner's day
 function usedToday(agent, key) {
   try { const u = JSON.parse(kvGet(usesKey(agent, key)) || '{}'); return u.day === today() ? Number(u.n) || 0 : 0; } catch { return 0; }
 }

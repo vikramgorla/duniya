@@ -60,8 +60,8 @@ const SECTIONS = [
     sub: (x) => (x.cap ? `${Math.round(x.cap.used * 100)}% of this month's cap` : 'No cap'), build: buildCap },
   { group: 'How it works', id: 'alerts', only: 'bi', icon: 'shield', c: 'c1', title: () => 'Alerts', help: 'owner-assistant.md', line: () => 'Spending, provider and update alerts go to this WhatsApp number.',
     sub: (x) => (x.c.alerts?.to ? `+${x.c.alerts.to}` : 'Only in Activity'), build: buildAlerts },
-  { group: 'How it works', id: 'advanced', icon: 'settings', c: 'c0', title: () => 'Advanced', help: 'agents.md', line: () => 'Timezone and how much it reads and writes.',
-    sub: (x) => [x.c.timezone || 'Server timezone', plural(x.c.historySize, 'message'), `${x.c.maxTokens} tokens`].join(' · '), build: buildAdvanced },
+  { group: 'How it works', id: 'advanced', icon: 'settings', c: 'c0', title: () => 'Advanced', help: 'agents.md', line: () => 'Time zone and how much it reads and writes.',
+    sub: (x) => [x.c.timezone || (x.bi ? x.b.clock.server : 'Your time zone'), plural(x.c.historySize, 'message'), `${x.c.maxTokens} tokens`].join(' · '), build: buildAdvanced },
   { group: 'Try it', id: 'review', agent: true, icon: 'activity', c: 'c3', title: () => 'Review', help: 'agents.md#review-and-teach', line: () => 'Its recent answers. Rate them, and teach it where it went wrong.',
     sub: (x) => reviewLine(x.review), build: buildReview },
   { group: 'Try it', id: 'lessons', agent: true, icon: 'notes', c: 'c2', title: () => 'Lessons', help: 'intelligence.md#lessons', line: () => 'What it learned from your corrections, and when to join in.',
@@ -294,8 +294,12 @@ function buildAlerts(x) {
     value: () => ({ alerts: { to: F['alerts.to'].value } }) };
 }
 function buildAdvanced(x) {
-  const F = { timezone: h('input', { value: x.c.timezone || '', placeholder: 'Europe/Zurich (default)' }), historySize: h('input', { type: 'number', value: x.c.historySize }), maxTokens: h('input', { type: 'number', value: x.c.maxTokens }) };
-  return { F, el: h('div', { class: 'grid2' }, field('Timezone', F.timezone), field('Recent messages it reads', F.historySize), field('Longest reply (tokens)', F.maxTokens)),
+  // the owner assistant's time zone is the owner's clock; every other agent uses it unless it has its own
+  const zones = h('datalist', { id: 'zones' }, Intl.supportedValuesOf('timeZone').map((z) => h('option', { value: z })));
+  const F = { timezone: h('input', { value: x.c.timezone || '', list: 'zones', autocomplete: 'off', placeholder: x.bi ? `${x.b.clock.server} (the server’s)` : `${x.b.clock.yours} (yours)` }),
+    historySize: h('input', { type: 'number', value: x.c.historySize }), maxTokens: h('input', { type: 'number', value: x.c.maxTokens }) };
+  const zone = x.bi ? field('Your time zone', F.timezone, 'Your day, the months of spending caps and the times of updates and backups go by it. So does every agent without a time zone of its own.') : field('Time zone', F.timezone);
+  return { F, el: h('div', { class: 'grid2' }, zone, zones, field('Recent messages it reads', F.historySize), field('Longest reply (tokens)', F.maxTokens)),
     value: () => ({ timezone: F.timezone.value.trim(), historySize: Number(F.historySize.value), maxTokens: Number(F.maxTokens.value) }) };
 }
 function buildMemory(x) {

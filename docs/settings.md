@@ -15,7 +15,7 @@
 | `ADMIN_PASSWORD` | — | Create owner `admin` with this password on first start (otherwise a setup code is printed); never logged or returned ([SECURITY.md](../SECURITY.md#secrets-from-the-environment)) |
 | `MASTER_KEY` | generated `master.key` | 32 bytes, base64: the key that encrypts stored secrets, kept outside the data directory ([SECURITY.md](../SECURITY.md#secrets-from-the-environment)) |
 | `DATA_DIR` | `data` | SQLite database, WhatsApp sessions, local backups |
-| `TZ_DEFAULT` | `Europe/Zurich` | Default timezone for schedules |
+| `TZ_DEFAULT` | `Europe/Zurich` | The server's default time zone: your clock until you set [your time zone](owner-assistant.md#your-time-zone) |
 | `RATE_LIMIT_PER_MIN` | 6 | Requests one person may make to one agent per minute |
 | `MEMORY_RETENTION_DAYS` / `MEMORY_MAX_MESSAGES` | 90 / 5000 | Default stored-message limits per chat; the owner changes them on **Server → Health** ([Health](small-servers.md#health-data-that-stays-small)) |
 | `HISTORY_WAIT_MS` | 45000 | How long to wait for the phone to send a chat's recent messages after it is switched on (per 50 messages) |

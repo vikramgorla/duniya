@@ -9,7 +9,8 @@
 // - 095: a release that did not start and was rolled back (update-guard.js) is told to the owner once, and the
 //   automatic round does not install it again.
 import { randomInt } from 'node:crypto';
-import { env, fail, restartSoon } from './config.js';
+import { fail, restartSoon } from './config.js';
+import { ownerNow } from './owner-clock.js';
 import { phoneChat } from '../channels/index.js';
 import { kvGet, kvSet } from './db.js';
 import { getUser } from './store.js';
@@ -196,8 +197,6 @@ async function deliverRollbackAlert() {
 }
 
 // ---------------------------------------------------------------- scheduler
-const hhmm = (d) => d.toLocaleTimeString('en-GB', { timeZone: env.timezone, hour: '2-digit', minute: '2-digit', hour12: false });
-const today = (d) => d.toLocaleDateString('en-CA', { timeZone: env.timezone });
 
 /** One scheduler round (exported for tests). */
 export async function updateTick({ now = new Date() } = {}) {
@@ -212,8 +211,9 @@ export async function updateTick({ now = new Date() } = {}) {
   const target = st.breaking ? st.safeTarget : st.target;
   if (!target) return { action: 'waiting', breaking: true };
   if (isRolledBack(target, st)) return { action: 'rolled_back', target }; // 095: it did not start here; a newer release is installed, this one is not
-  if (hhmm(now) < s.at || kvGet('updates:autoDay') === today(now)) return { action: 'later', target };
-  kvSet('updates:autoDay', today(now));
+  const clock = ownerNow(now.getTime()); // "at 04:00" is the owner's 04:00, once on the owner's day
+  if (clock.hhmm < s.at || kvGet('updates:autoDay') === clock.date) return { action: 'later', target };
+  kvSet('updates:autoDay', clock.date);
   const r = await applyUpdate({ target, by: 'automatic update' });
   if (r.code === 0) restartFn();
   return { action: r.code === 0 ? 'updated' : 'failed', target, code: r.code };

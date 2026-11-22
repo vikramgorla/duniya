@@ -55,7 +55,7 @@ removes it). Admin MCP: `set_model_price`.
 | At | What happens |
 |---|---|
 | 80 % | one WhatsApp alert to the owner ([owner alerts](owner-assistant.md#owner-alerts-and-weekly-summary)) |
-| 100 % | the agent stays quiet in that scope, or switches to the cheaper model, until the month ends (server timezone) |
+| 100 % | the agent stays quiet in that scope, or switches to the cheaper model, until the month ends (a month begins and ends in [your time zone](owner-assistant.md#your-time-zone)) |
 
 > [!NOTE]
 > Cost caps count only priced calls (your prices, published prices, plans and free models). Kinds: reply, summary,

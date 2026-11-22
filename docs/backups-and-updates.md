@@ -77,6 +77,9 @@ installs in place, keeps all data, survives a reload.
 **Settings → Updates**: *Notify me*, *Install automatically* (time of day) or *Off*; stable or latest `main`
 (`--update-mode off|notify|auto`). Also `sudo duniya update [--check]` or re-running the installer.
 
+An update takes a few seconds: packages are installed again only when one the app runs on changed (most releases
+change none), and then the update needs the npm registry.
+
 ### What's new after an update
 
 After an update, Overview shows **Updated to vX — see what's new** once per person: it opens the changes of the
@@ -89,7 +92,7 @@ loads the new version by itself at your next tap; nothing to refresh.
 <details><summary>Diagram as text</summary>
 
 1. A new release is published.
-2. Not breaking: with *Install automatically* it is installed after a backup at the set time; with *Notify me* it is shown on Updates.
+2. Not breaking: with *Install automatically* it is installed after a backup at the set time ([your time zone](owner-assistant.md#your-time-zone)); with *Notify me* it is shown on Updates.
 3. Breaking or a new major: automatic updates stop at the last safe release.
 4. The owner is told once: Overview banner, Updates, Activity and WhatsApp.
 5. The owner decides: **Update to vX** (or `confirm ABCD`) backs up, updates and reports after the restart; **Remind me in 7 days** (or `cancel ABCD`) asks again later; **Dismiss** hides it until a newer breaking release.

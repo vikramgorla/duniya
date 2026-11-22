@@ -17,7 +17,7 @@ after(() => t.close());
 const spend = (o) => usage.recordUsage({ provider: 'anthropic', model: 'claude-sonnet-5-5', feature: 'reply', ...o });
 const toOwner = () => t.sent.filter((m) => m.chat === '41791112233@s.whatsapp.net');
 
-test('040: months follow the server timezone', () => {
+test('040: months follow a time zone (the owner\'s clock by default: owner-clock.test.js)', () => {
   const m = budget.monthOf(Date.UTC(2026, 10, 30, 23, 30), 'Europe/Zurich'); // 1 Dec 00:30 in Zurich
   assert.equal(m.key, '2026-12');
   assert.equal(m.from, Date.UTC(2026, 10, 30, 23, 0));
