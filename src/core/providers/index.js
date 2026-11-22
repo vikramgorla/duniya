@@ -435,6 +435,148 @@ function recordSearches(p, modelId, usage, n) {
 }
 const describeFailures = (failures) => failures.map((f) => `${f.name} (${f.paused ? 'paused: ' : ''}${REASON_TEXT[f.reason] || f.reason})`).join(', ');
 
+/** The options of chat() with their defaults. */
+const chatOptions = ({ model = 'auto', purpose = 'agent', system, messages, tools = [], natives = [], maxTokens = 1024, usage = {}, fallback, turn = null, direct = false, accept = null, lastResort = [], onText = null, onRestart = null, signal = undefined, onWait = undefined }) => ({ model, purpose, system, messages, tools, natives, maxTokens, usage, fallback, turn, direct, accept, lastResort, onText, onRestart, signal, onWait });
+
+/** The accounts and models a call may ask, in order: the plan (or the one account of a direct call), then the last resorts. */
+function candidatesOf({ model, purpose, direct, fallback, turn, lastResort }) {
+  if (direct) return [{ id: parseRef(model)?.provider, model: parseRef(model)?.model }];
+  const fb = fallback || fallbackSettings();
+  const cands = planCandidates({ model, purpose, fallback: fb, sticky: turn?.ref || '' });
+  if (!fb.enabled) return cands;
+  for (const r of lastResort.map((x) => parseRef(x)).filter(Boolean)) if (!cands.some((c) => c.id === r.provider && c.model === r.model)) cands.push({ id: r.provider, model: r.model });
+  return cands;
+}
+
+// A paused account counts as a reason for the switch ("after Anthropic (paused: usage limit reached)").
+function notePaused(st, p) {
+  if (st.paused.some((x) => x.id === p.id)) return;
+  st.paused.push(p);
+  if (st.failures.some((f) => f.account === p.id)) return; // it already failed in this call
+  st.failures.push({ ref: `${p.id}:auto`, account: p.id, name: p.name, reason: breaker.accountState(p.id).reason || 'server', paused: true });
+}
+
+const TRANSIENT = new Set(['server', 'network', 'timeout']);
+/**
+ * The accounts a pass asks even though they are paused. The first pass: none. The second pass (last resort): when
+ * every candidate was paused and nothing was tried, accounts paused for a transient error (outage, network, timeout)
+ * are tried once anyway — there is no one else to ask; accounts paused for limits, quota or sign-in stay paused.
+ * Null: there is no second pass.
+ */
+function forcedAccounts(st, pass) {
+  if (pass === 0) return new Set();
+  const transient = st.paused.filter((x) => TRANSIENT.has(breaker.accountState(x.id).reason)).map((x) => x.id);
+  return st.lastErr || !transient.length ? null : new Set(transient);
+}
+
+/** The model of a candidate: its own, or the account's automatic choice for the purpose (null when it lists none). */
+async function modelOf(st, p, c, purpose) {
+  if (c.model !== 'auto') return c.model;
+  if (p.type !== 'anthropic') await providerModels(p);
+  const modelId = autoFor(p, purpose);
+  if (modelId) return modelId;
+  st.configErr ??= Object.assign(new Error(`No usable model listed by ${p.name}`), { code: 'no_model' });
+  return null;
+}
+
+/** The account of a candidate when it can be asked in this pass, else null (not connected: noted on the first pass). */
+function accountOf(st, c, { pass, force }) {
+  if (pass === 1 && !force.has(c.id)) return null;
+  const p = providerById(c.id);
+  if (p?.configured) return p;
+  if (pass === 0) {
+    st.configErr ??= Object.assign(new Error(p ? `Provider "${p.name}" is not connected` : `Unknown model provider "${c.id}"`), { code: 'no_model' });
+    st.failures.push({ ref: `${c.id}:${c.model}`, account: c.id, name: p?.name || c.id, reason: 'unavailable' });
+  }
+  return null;
+}
+
+/**
+ * Is this candidate asked now? Returns { p, modelId, ref }, or null: not connected, paused, without a model, asked
+ * already, or refused by `accept` (#67); the reason is kept in the call's state.
+ */
+async function pickCandidate(st, c, { pass, force, direct, purpose, accept }) {
+  const p = accountOf(st, c, { pass, force });
+  if (!p) return null;
+  const guarded = !direct && !force.has(p.id); // pauses count for this account in this pass
+  if (guarded && breaker.isPaused(p.id, { name: p.name })) { notePaused(st, p); return null; }
+  const modelId = await modelOf(st, p, c, purpose);
+  const ref = `${p.id}:${modelId}`;
+  if (modelId === null || st.tried.has(ref)) return null;
+  if (accept && !direct && !(await accept(ref))) {
+    if (!st.skipped.some((x) => x.ref === ref)) st.skipped.push({ ref, account: p.id, name: p.name });
+    return null;
+  }
+  if (guarded && !breaker.canTry(p.id, { name: p.name })) { notePaused(st, p); return null; }
+  st.tried.add(ref);
+  lastUsed.set(p.id, Date.now()); useOrder.set(p.id, ++useSeq);
+  return { p, modelId, ref };
+}
+
+/**
+ * One call to an account. 047: streamed when the caller listens and the adapter streams. A stream that fails after its
+ * first token: the caller drops the partial text (onRestart) and this account is asked once more without streaming; if
+ * that fails too, the normal fallback continues, without streaming.
+ */
+async function askAccount(st, p, args, { signal, onText, onRestart }) {
+  let started = false; // this account already sent text to onText
+  const streamed = st.streamOn && p.adapter.streams ? { ...args, signal, onText: (d) => { started = true; try { onText(d); } catch { /* a closed stream must not break the call */ } } } : null;
+  try {
+    return await p.adapter.chat(streamed || args);
+  } catch (e) {
+    if (!started || signal?.aborted) throw e;
+    st.streamOn = false;
+    try { onRestart?.({ reason: classify(e).reason, account: p.id }); } catch { /* the caller's listener failed: the answer still counts */ }
+    return p.adapter.chat(args);
+  }
+}
+
+const stopped = () => Object.assign(new Error('Stopped'), { code: 'aborted' });
+/** An account failed: the breaker and the call's state hear about it. Throws when no other candidate may be asked. */
+function noteFailure(st, { p, ref, e, direct }) {
+  const cls = classify(e);
+  if (cls.breaker) breaker.recordFailure(p.id, cls, { name: p.name, message: e.message });
+  else breaker.release(p.id);
+  st.lastErr = e;
+  st.failures.push({ ref, account: p.id, name: p.name, reason: cls.reason, message: String(e.message || '').slice(0, 200) });
+  if (!cls.next || direct) { e.failures = st.failures; e.fallbackReason = cls.reason; throw e; }
+}
+
+/** An account answered: usage and cost (023: the account and model that actually answered, and why it switched, 042), then the result. */
+function answered(st, { p, modelId, ref, res, usage, turn }) {
+  breaker.recordSuccess(p.id, { name: p.name });
+  const failed = st.failures.filter((f) => f.reason !== 'unavailable' && !(f.paused && f.account === p.id));
+  const fbText = failed.length ? `after ${describeFailures(failed)}` : '';
+  let cost = null;
+  try {
+    const published = modelCache.get(p.id)?.models?.find((m) => m.id === modelId)?.price || null;
+    cost = recordUsage({ ...usage, provider: p.type === 'compatible' ? p.id : p.type, account: p.id, model: modelId,
+      input: res.usage?.input_tokens || 0, output: res.usage?.output_tokens || 0, published, fallback: fbText });
+  } catch { /* never fail a reply because of bookkeeping */ }
+  if (res.usage?.web_searches) recordSearches(p, modelId, usage, res.usage.web_searches);
+  const firstFail = failed.find((f) => f.account !== p.id);
+  if (firstFail) breaker.noteSwitch({ from: firstFail.name, to: p.name, reason: firstFail.reason, agent: usage.agent, chat: usage.chat });
+  if (turn) turn.ref = ref;
+  return { ...res, model: ref, account: p.id, answeredBy: p.name, failures: failed, cost };
+}
+
+/** Nothing answered: the error that says why (the last failure, every account paused, or nothing set up). */
+function nothingAnswered(st) {
+  const failed = st.failures.filter((f) => f.reason !== 'unavailable');
+  let err = st.lastErr;
+  if (!err && st.paused.length) {
+    const until = breaker.nextTry(st.paused.map((p) => p.id));
+    err = Object.assign(new Error(`All usable AI providers are paused (${st.paused.map((p) => `${p.name}: ${breaker.accountState(p.id).text}`).join('; ')})`),
+      { code: 'all_paused', until, fallbackReason: breaker.accountState(st.paused[0].id).reason });
+  }
+  if (!err) err = st.configErr || Object.assign(new Error('No model available: connect a provider and choose a default model (Models)'), { code: 'no_model' });
+  err.failures = st.failures;
+  err.skipped = st.skipped;
+  if (st.lastErr) err.fallbackReason ??= classify(st.lastErr).reason;
+  if (failed.length) breaker.allFailed(describeFailures(failed));
+  return err;
+}
+
 /**
  * Unified chat call with automatic fallback (042). Input/output use Anthropic-style blocks.
  * Returns { content, stop_reason, usage, model: 'account:model', account, answeredBy, failures: [{ ref, name, reason }] }.
@@ -451,116 +593,36 @@ const describeFailures = (failures) => failures.map((f) => `${f.name} (${f.pause
  * streaming, then the chain continues without streaming. Usage is recorded once, from the answer that is returned.
  * signal (066): an AbortSignal (Stop in the Ask box); it ends a streaming call, nothing falls back, the account is not blamed.
  */
-export async function chat({ model = 'auto', purpose = 'agent', system, messages, tools = [], natives = [], maxTokens = 1024, usage = {}, fallback, turn = null, direct = false, accept = null, lastResort = [], onText = null, onRestart = null, signal = undefined, onWait = undefined }) {
-  let streamOn = typeof onText === 'function';
+export async function chat(options) {
+  const o = chatOptions(options);
+  const { model, purpose, direct, usage, signal } = o;
   if (!direct && (!parseRef(model) || parseRef(model).model === 'auto')) await warmModels();
-  const fb = direct ? { enabled: false, chain: [] } : (fallback || fallbackSettings());
-  const cands = direct ? [{ id: parseRef(model)?.provider, model: parseRef(model)?.model }] : planCandidates({ model, purpose, fallback: fb, sticky: turn?.ref || '' });
-  if (!direct && fb.enabled) {
-    for (const r of lastResort.map((x) => parseRef(x)).filter(Boolean)) if (!cands.some((c) => c.id === r.provider && c.model === r.model)) cands.push({ id: r.provider, model: r.model });
-  }
-  const failures = []; const paused = []; let lastErr = null; let configErr = null;
-  const skipped = []; // refused by `accept` (#67)
-  const tried = new Set();
-  // A paused account counts as a reason for the switch ("after Anthropic (paused: usage limit reached)").
-  const notePaused = (p) => {
-    if (paused.some((x) => x.id === p.id)) return;
-    paused.push(p);
-    if (failures.some((f) => f.account === p.id)) return; // it already failed in this call
-    const st = breaker.accountState(p.id);
-    failures.push({ ref: `${p.id}:auto`, account: p.id, name: p.name, reason: st.reason || 'server', paused: true });
-  };
-  // Second pass (last resort): when every candidate was paused and nothing was tried, accounts paused for a
-  // transient error (outage, network, timeout) are tried once anyway — there is no one else to ask. Accounts paused
-  // for limits, quota or sign-in stay paused.
-  const TRANSIENT = new Set(['server', 'network', 'timeout']);
+  const cands = candidatesOf(o);
+  // what this call keeps while it goes through its candidates
+  const st = { failures: [], paused: [], skipped: [] /* refused by `accept` (#67) */, tried: new Set(), lastErr: null, configErr: null, streamOn: typeof o.onText === 'function' };
   for (const pass of [0, 1]) {
-    if (pass === 1 && (lastErr || !paused.some((x) => TRANSIENT.has(breaker.accountState(x.id).reason)))) break;
-    const force = pass === 1 ? new Set(paused.filter((x) => TRANSIENT.has(breaker.accountState(x.id).reason)).map((x) => x.id)) : new Set();
+    const force = forcedAccounts(st, pass);
+    if (!force) break;
     for (const c of cands) {
-      if (signal?.aborted) throw Object.assign(new Error('Stopped'), { code: 'aborted' });
-      if (pass === 1 && !force.has(c.id)) continue;
-      const p = providerById(c.id);
-      if (pass === 0 && (!p || !p.configured)) {
-        configErr ??= Object.assign(new Error(p ? `Provider "${p.name}" is not connected` : `Unknown model provider "${c.id}"`), { code: 'no_model' });
-        failures.push({ ref: `${c.id}:${c.model}`, account: c.id, name: p?.name || c.id, reason: 'unavailable' });
-        continue;
-      }
-      if (!p?.configured) continue;
-      if (!direct && !force.has(p.id) && breaker.isPaused(p.id, { name: p.name })) { notePaused(p); continue; }
-      let modelId = c.model;
-      if (modelId === 'auto') {
-        if (p.type !== 'anthropic') await providerModels(p);
-        modelId = autoFor(p, purpose);
-        if (!modelId) { configErr ??= Object.assign(new Error(`No usable model listed by ${p.name}`), { code: 'no_model' }); continue; }
-      }
-      const ref = `${p.id}:${modelId}`;
-      if (tried.has(ref)) continue;
-      if (accept && !direct && !(await accept(ref))) {
-        if (!skipped.some((x) => x.ref === ref)) skipped.push({ ref, account: p.id, name: p.name });
-        continue;
-      }
-      if (!direct && !force.has(p.id) && !breaker.canTry(p.id, { name: p.name })) { notePaused(p); continue; }
-      tried.add(ref);
-      lastUsed.set(p.id, Date.now()); useOrder.set(p.id, ++useSeq);
-      let res;
+      if (signal?.aborted) throw stopped();
+      const pick = await pickCandidate(st, c, { pass, force, direct, purpose, accept: o.accept });
+      if (!pick) continue;
+      const { p, modelId, ref } = pick;
       // 2.58: tools the provider runs itself (built-in web search) only where the adapter has them; blocks from them in
       // the conversation so far are dropped for an adapter that cannot read them (a fallback mid-turn)
-      const own = natives.filter((n) => p.adapter.natives?.includes(n));
-      const args = { model: modelId, system, messages: p.adapter.natives?.length ? messages : withoutServerBlocks(messages), tools, maxTokens, ...(own.length ? { natives: own } : {}), ...(onWait ? { onWait } : {}) }; // 074: onWait — an agent app waits for its turn
-      let started = false; // 047: this account already sent text to onText
-      const streamed = streamOn && p.adapter.streams ? { ...args, signal, onText: (d) => { started = true; try { onText(d); } catch { /* a closed stream must not break the call */ } } } : null;
-      try {
-        try {
-          res = await p.adapter.chat(streamed || args);
-        } catch (e) {
-          if (!started || signal?.aborted) throw e;
-          // Failed after the first token (047): the caller drops the partial text (onRestart) and this account is asked
-          // once more without streaming; if that fails too, the normal fallback continues, without streaming.
-          streamOn = false;
-          try { onRestart?.({ reason: classify(e).reason, account: p.id }); } catch { /* ignore */ }
-          res = await p.adapter.chat(args);
-        }
-      } catch (e) {
-        if (signal?.aborted) { breaker.release(p.id); throw Object.assign(new Error('Stopped'), { code: 'aborted' }); } // 066: the asker pressed Stop; not the provider's fault
-        const cls = classify(e);
-        if (cls.breaker) breaker.recordFailure(p.id, cls, { name: p.name, message: e.message });
-        else breaker.release(p.id);
-        lastErr = e;
-        failures.push({ ref, account: p.id, name: p.name, reason: cls.reason, message: String(e.message || '').slice(0, 200) });
-        if (!cls.next || direct) { e.failures = failures; e.fallbackReason = cls.reason; throw e; }
+      const own = o.natives.filter((n) => p.adapter.natives?.includes(n));
+      const args = { model: modelId, system: o.system, messages: p.adapter.natives?.length ? o.messages : withoutServerBlocks(o.messages), tools: o.tools, maxTokens: o.maxTokens,
+        ...(own.length ? { natives: own } : {}), ...(o.onWait ? { onWait: o.onWait } : {}) }; // 074: onWait — an agent app waits for its turn
+      let res;
+      try { res = await askAccount(st, p, args, o); } catch (e) {
+        if (signal?.aborted) { breaker.release(p.id); throw stopped(); } // 066: the asker pressed Stop; not the provider's fault
+        noteFailure(st, { p, ref, e, direct });
         continue;
       }
-      breaker.recordSuccess(p.id, { name: p.name });
-      const failed = failures.filter((f) => f.reason !== 'unavailable' && !(f.paused && f.account === p.id));
-      const fbText = failed.length ? `after ${describeFailures(failed)}` : '';
-      let cost = null;
-      try { // usage & cost (023): the account and model that actually answered, and why it switched (042)
-        const published = modelCache.get(p.id)?.models?.find((m) => m.id === modelId)?.price || null;
-        cost = recordUsage({ ...usage, provider: p.type === 'compatible' ? p.id : p.type, account: p.id, model: modelId,
-          input: res.usage?.input_tokens || 0, output: res.usage?.output_tokens || 0, published, fallback: fbText });
-      } catch { /* never fail a reply because of bookkeeping */ }
-      if (res.usage?.web_searches) recordSearches(p, modelId, usage, res.usage.web_searches);
-      const firstFail = failed.find((f) => f.account !== p.id);
-      if (firstFail) breaker.noteSwitch({ from: firstFail.name, to: p.name, reason: firstFail.reason, agent: usage.agent, chat: usage.chat });
-      if (turn) turn.ref = ref;
-      return { ...res, model: ref, account: p.id, answeredBy: p.name, failures: failed, cost };
+      return answered(st, { p, modelId, ref, res, usage, turn: o.turn });
     }
   }
-  // Nothing answered.
-  const failed = failures.filter((f) => f.reason !== 'unavailable');
-  let err = lastErr;
-  if (!err && paused.length) {
-    const until = breaker.nextTry(paused.map((p) => p.id));
-    const st = breaker.accountState(paused[0].id);
-    err = Object.assign(new Error(`All usable AI providers are paused (${paused.map((p) => `${p.name}: ${breaker.accountState(p.id).text}`).join('; ')})`), { code: 'all_paused', until, fallbackReason: st.reason });
-  }
-  if (!err) err = configErr || Object.assign(new Error('No model available: connect a provider and choose a default model (Models)'), { code: 'no_model' });
-  err.failures = failures;
-  err.skipped = skipped;
-  if (lastErr) err.fallbackReason ??= classify(lastErr).reason;
-  if (failed.length) breaker.allFailed(describeFailures(failed));
-  throw err;
+  throw nothingAnswered(st);
 }
 
 /** 088: what tokens would cost on a model ref ("account:model"), from its set or published price; null when unknown. */

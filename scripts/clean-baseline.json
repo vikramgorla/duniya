@@ -28,7 +28,7 @@
   "max-lines-per-function": 1
  },
  "src/channels/whatsapp/session.js": {
-  "complexity": 4,
+  "complexity": 3,
   "max-lines-per-function": 1
  },
  "src/core/ai-builder.js": {
@@ -93,8 +93,7 @@
   "complexity": 2
  },
  "src/core/providers/index.js": {
-  "complexity": 3,
-  "max-depth": 2
+  "complexity": 2
  },
  "src/core/providers/openai-chat.js": {
   "complexity": 2
