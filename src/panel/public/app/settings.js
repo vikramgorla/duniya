@@ -307,11 +307,11 @@ async function toolServicesCard() {
         const canEdit = can('admin') && (isOwner || it.s.savedType !== 'local');
         const extra = h('div', {}, status,
           h('div', { class: 'small muted' }, `Defaults: organizers ${sum(it.s, 'organizer')}; participants ${sum(it.s, 'participant')}. Discover tools to change them.`),
-          behaviourEditor(it.s.behaviour, { media: g?.media || '' }), // 094: how every agent uses it unless an agent says otherwise
           canEdit ? h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn small primary', onclick: () => saveOne(it) }, it.s.isNew ? 'Add for all agents' : 'Save')) : null);
         const risk = { get: (n) => it.s.behaviour.tools?.[n], set: (n, v) => { const t = { ...(it.s.behaviour.tools || {}) }; if (v === 'auto') delete t[n]; else t[n] = v; it.s.behaviour.tools = t; } };
         return toolServiceEditor(it.s, { base: '/api/tool-services', conns, locals, isOwner, save: () => saveOne(it), saveHint: 'Save to connect', rules: defaultsRules(it.s), risk,
-          redraw: draw, remove: () => removeOne(it), keyLocked: !it.s.isNew, extra });
+          redraw: draw, remove: () => removeOne(it), keyLocked: !it.s.isNew, extra,
+          top: behaviourEditor(it.s.behaviour, { media: g?.media || '' }) }); // 094: how every agent uses it unless an agent says otherwise
       }),
       can('admin') ? h('div', { class: 'row', style: 'margin-top:8px' }, browseButton({ target: 'all', targetName: 'all agents', onAdded: () => renderSettings() }, reg),
         h('button', { class: 'btn small mut', onclick: () => { items.push({ s: serverState('', {}), g: null }); draw(); } }, '+ Add tool service for all agents')) : null,

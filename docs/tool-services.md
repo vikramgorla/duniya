@@ -4,7 +4,7 @@
 own, and how often — without writing it into the prompt.**
 
 **Do it:** panel → **Settings → Tool services** → a service → **How it uses it** (the default for every agent), or an
-agent's page → **Tools** → the service → **How it uses it** (just that agent).
+agent's page → **Tools** → the card **How it uses it** right under the service's name → **Change** (just that agent).
 
 **In 30 seconds**
 - Every tool service has five settings: **who can use it**, **when to use it**, **changes it makes**, **share results
