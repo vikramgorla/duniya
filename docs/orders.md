@@ -12,7 +12,8 @@
   cancellation cancels it (if something was paid, the timeline says so and you refund).
 - Record **payments** (part or full) and **refunds** with a method from **your own list** (Cash, Bank transfer,
   Instant online payment by default). Status: **Not paid**, **Part paid**, **Paid**, **Refunded**, **Cancelled**; **Overdue** once the due date has passed.
-- Once a day you get one message with the open orders due within three days or overdue (owner alerts). With
+- Once a day, at the start of your [sending hours](sending-pace.md) (never at night), you get one message with the
+  open orders due within three days or overdue (owner alerts). Due dates and payment dates are days where you live. With
   [Lists and sending](sending.md) on, **Remind everyone who has not paid** messages the people themselves, and an event can send them
   automatically a few days before the due date; a [campaign](campaigns.md) follows up only with people who have not
   paid.

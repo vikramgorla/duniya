@@ -1,6 +1,28 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.59.1": {
+      "breaking": false,
+      "title": "Events and orders go by your day, and the waiting list moves by itself",
+      "changes": [
+        {
+          "type": "fixed",
+          "text": "The daily list of orders due soon comes at the start of your sending hours. It used to come in the middle of the night (when the day changed in UTC)."
+        },
+        {
+          "type": "fixed",
+          "text": "A registration deadline ends with its day where you live, and due dates, payment dates, a campaign’s last day and birthdays in the morning brief go by your day too."
+        },
+        {
+          "type": "fixed",
+          "text": "Events: when a registered party gets smaller, the places it frees go to the waiting list by themselves; a waiting party that got smaller gets in when it fits."
+        },
+        {
+          "type": "fixed",
+          "text": "Events: changing the numbers of a cancelled registration changes that registration instead of adding a second one."
+        }
+      ]
+    },
     "2.59.0": {
       "breaking": false,
       "title": "A release that does not start is rolled back by itself",

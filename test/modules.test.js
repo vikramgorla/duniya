@@ -14,6 +14,9 @@ const viewer = await t.login('vera', 'viewer password 123');
 after(() => t.close());
 const { TOOLS } = await import('../src/panel/admin-tools.js');
 const { upkeepTick } = await import('../src/core/upkeep.js');
+const { ownerNow } = await import('../src/core/owner-clock.js');
+/** Today on the owner's clock, at `hhmm`. */
+const ownerAt = (hhmm) => { const mins = (x) => Number(x.slice(0, 2)) * 60 + Number(x.slice(3)); const now = Date.now(); return now + (mins(hhmm) - mins(ownerNow(now).hhmm)) * 60000; };
 const api = async (m, p, b) => { const r = await t.api(owner, m, p, b); if (r.status >= 400) throw Object.assign(new Error(r.body.error || r.body), { status: r.status, field: r.body.field }); return r.body; };
 const x = { call: (m, p, b) => api(m, p, b) };
 const tool = (n) => TOOLS.find((y) => y.name === n);
@@ -98,6 +101,34 @@ test('capacity: a full event puts people on the waiting list; a cancellation let
   assert.equal((await api('GET', '/api/orders?status=all')).orders.find((o) => o.household === rao.id).status, 'cancelled', 'unpaid order of a cancellation is cancelled');
 });
 
+test('capacity: a smaller party frees places for those who wait; an edited registration stays one registration', async () => {
+  const fest = (await api('POST', '/api/module/events', { name: 'Ugadi 2027', starts: '2027-04-07', per: 'person', capacity: 4 })).event;
+  const regs = async () => (await api('GET', `/api/module/events/${fest.id}`)).registrations;
+  const of = async (key, id) => (await regs()).filter((r) => r[key] === id);
+  const big = await api('POST', `/api/module/events/${fest.id}/registrations`, { household: chary.id }); // 2 adults + 2 kids: full
+  const one = await api('POST', `/api/module/events/${fest.id}/registrations`, { person: hari.id });
+  assert.deepEqual([big.status, one.status], ['registered', 'waiting']);
+  await api('PUT', `/api/module/registrations/${big.id}`, { kids: 1 }); // 3 of 4: a place opened
+  assert.equal((await of('person', hari.id))[0].status, 'registered', 'the one who waited got the place by itself');
+
+  const rao3 = await api('POST', `/api/module/events/${fest.id}/registrations`, { household: rao.id, adults: 3 });
+  assert.equal(rao3.status, 'waiting');
+  await api('PUT', `/api/module/registrations/${one.id}`, { status: 'cancelled' }); // one place: three do not fit
+  assert.equal((await of('household', rao.id))[0].status, 'waiting');
+  await api('PUT', `/api/module/registrations/${rao3.id}`, { adults: 1 });
+  assert.equal((await of('household', rao.id))[0].status, 'registered', 'a waiting party that got smaller fits now');
+
+  // numbers of a cancelled registration: the same registration changes, no second one appears
+  await api('PUT', `/api/module/registrations/${rao3.id}`, { status: 'cancelled' });
+  await api('PUT', `/api/module/registrations/${rao3.id}`, { adults: 2, notes: 'two after all' });
+  assert.deepEqual((await of('household', rao.id)).map((r) => [r.id, r.status, r.adults, r.notes]), [[rao3.id, 'cancelled', 2, 'two after all']]);
+  // back in with new numbers in one step: the capacity is checked against the new numbers (3 + 2 > 4)
+  const back = await api('PUT', `/api/module/registrations/${rao3.id}`, { status: 'registered', adults: 2 });
+  assert.deepEqual([(await of('household', rao.id)).length, back.status], [1, 'waiting']);
+  await assert.rejects(api('PUT', `/api/module/registrations/${rao3.id}`, { status: 'nonsense', adults: 1 }), /Status:/);
+  assert.equal((await of('household', rao.id))[0].adults, 2, 'a refused change changes nothing');
+});
+
 test('organizer confirmation: self-registration is pending until an organizer confirms (held, confirm code); the deadline binds participants only', async () => {
   const diwali = (await api('POST', '/api/module/events', { name: 'Diwali 2027', starts: '2027-11-01', per: 'person', confirm: 'organizer', deadline: '2027-10-20' })).event;
   const r = await toolTurn('41790000031', 'events__register', { event: 'diwali' });
@@ -163,15 +194,32 @@ test('payments: part paid, paid, refund; methods are the owner\'s list; organize
   assert.ok((await api('GET', '/api/orders?status=overdue')).orders.some((y) => y.id === hand.id));
 });
 
-test('the owner gets one list a day of orders due soon or overdue (upkeep tick)', async () => {
+test('the owner gets one list a day of orders due soon or overdue, in the sending hours of the owner\'s day (never at night)', async () => {
   const sent = t.sent.length;
   await t.agents.updateAgent('owner-assistant', { alerts: { to: '+41 79 000 00 99' } });
-  await upkeepTick(t.channel);
-  const alert = t.sent.slice(sent).find((m) => /open orders? due soon or overdue/.test(m.text));
-  assert.ok(alert, JSON.stringify(t.sent.slice(sent)));
-  assert.match(alert.text, /Gita: CHF 31\.00 for T-shirt, overdue since 2020-02-01/);
-  await upkeepTick(t.channel);
-  assert.equal(t.sent.slice(sent).filter((m) => /due soon/.test(m.text)).length, 1, 'once a day');
+  const lists = () => t.sent.slice(sent).filter((m) => /open orders? due soon or overdue/.test(m.text));
+  await upkeepTick(t.channel, ownerAt('01:30'));
+  assert.equal(lists().length, 0, 'the day has begun, but nobody is written to at night');
+  await upkeepTick(t.channel, ownerAt('09:05'));
+  assert.equal(lists().length, 1, JSON.stringify(t.sent.slice(sent)));
+  assert.match(lists()[0].text, /Gita: CHF 31\.00 for T-shirt, overdue since 2020-02-01/);
+  await upkeepTick(t.channel, ownerAt('15:00'));
+  assert.equal(lists().length, 1, 'once a day');
+});
+
+test('the owner\'s day, not the UTC day: a deadline closes at the owner\'s midnight and a payment is dated where the owner lives', async (tt) => {
+  const ev = await import('../src/modules/events/index.js');
+  await t.agents.updateAgent('owner-assistant', { timezone: 'Asia/Kolkata' }); // UTC+5:30, no summer time
+  try {
+    const mela = (await api('POST', '/api/module/events', { name: 'Mela 2027', starts: '2027-02-01', per: 'person', deadline: '2027-01-10' })).event;
+    tt.mock.timers.enable({ apis: ['Date'], now: Date.parse('2027-01-10T18:00:00Z') }); // 23:30 on the 10th for the owner
+    assert.equal(ev.register({ event: mela.id, person: hari.id }, { by: 'Hari', organizer: false }).status, 'registered');
+    tt.mock.timers.setTime(Date.parse('2027-01-10T20:00:00Z')); // 01:30 on the 11th for the owner; still the 10th in UTC
+    assert.throws(() => ev.register({ event: mela.id, person: gita.id }, { by: 'Gita', organizer: false }), /closed on 2027-01-10/);
+    const ord = await import('../src/modules/orders/index.js');
+    const o = ord.createOrder({ person: gita.id, lines: [{ item: 'Sweets', qty: 1, price: 5 }] });
+    assert.equal(ord.addPayment(o.id, {}).payments[0].at, '2027-01-11', 'paid on the 11th where the owner lives');
+  } finally { tt.mock.timers.reset(); await t.agents.updateAgent('owner-assistant', { timezone: '' }); }
 });
 
 test('tool rules: none for participants removes the tools; switching a module off removes its tools and keeps its data', async () => {

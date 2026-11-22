@@ -10,6 +10,7 @@ import { db } from '../../core/db.js';
 import { clip, fail, plural } from '../../core/config.js';
 import { TENANT } from '../../core/store.js';
 import { activity, bus } from '../../core/events.js';
+import { ownerDay } from '../../core/owner-clock.js';
 import { cleanAudience, describe, missingFields } from './audience.js';
 import { controlRun, preview, runSummary, startRun } from './index.js';
 
@@ -117,7 +118,7 @@ export async function campaignsTick(now = Date.now()) {
   for (const c of db.prepare("SELECT * FROM snd_campaigns WHERE tenant_id = ? AND status = 'running' ORDER BY created_at LIMIT 10").all(TENANT)) {
     try {
       const steps = JSON.parse(c.steps);
-      if (c.end_day && new Date(now).toISOString().slice(0, 10) > c.end_day) { const run = runOf(c.id, c.step); if (run) controlRun(run, 'stop', 'campaign end'); await finishCampaign(c, `ended on ${c.end_day}`); continue; }
+      if (c.end_day && ownerDay(now) > c.end_day) { const run = runOf(c.id, c.step); if (run) controlRun(run, 'stop', 'campaign end'); await finishCampaign(c, `ended on ${c.end_day}`); continue; }
       const s = steps[c.step];
       if (!s) { await finishCampaign(c, ''); continue; }
       if (s.kind === 'wait') { if (now >= c.step_at + s.days * DAY) advance(c, now); continue; }

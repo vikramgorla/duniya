@@ -9,7 +9,8 @@
   (CHF by default), registration **per household** or **per person**, and confirmation **automatic** or **by an
   organizer**. Optionally a **price list** (adult, kid, kids under an age free) and a pay-by date.
 - People register through an agent (*"!panduga register us for Sankranti"*) or you register them here.
-- Full → **waiting list**. When someone cancels, the first waiting registrations that fit get the place by themselves.
+- Full → **waiting list**. When someone cancels or a party gets smaller, the first waiting registrations that fit get
+  the place by themselves. The deadline ends with its day where you live (the owner assistant's time zone).
 - **Duties**: a task, a time, how many people; anyone takes one (*"I'll do the chairs"*), organizers assign.
 - With [Orders and payments](orders.md) on, a registration on an event with prices becomes an order by itself.
 
