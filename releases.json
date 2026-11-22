@@ -1,6 +1,13 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.54.1": {
+      "breaking": false,
+      "title": "Follow-ups without the wake word work with Act on clear requests",
+      "changes": [
+        { "type": "fixed", "text": "A follow-up without the wake word (\"should go to the shopping list\", \"Yes\") is now treated as part of the conversation: small changes are applied, and a plain yes confirms a change that was waiting." }
+      ]
+    },
     "2.54.0": {
       "breaking": false,
       "title": "Agents act on clear requests instead of asking again and again",

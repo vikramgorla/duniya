@@ -8,6 +8,7 @@
 - [x] T6 Admin MCP descriptions; tests with fakes (autonomy.test.js; people-agents updated)
 - [x] T7 Docs (agents, diagram, privacy, architecture, admin-mcp, SECURITY), README, website, screenshots
 - [x] T8 Version 2.54.0, releases.json; checks; PR; merge; done comment; #62
+- [x] T9 2.54.1: follow-ups without the wake word (judged turns) count for clear requests and a later yes; test
 
 ## Definition of Done
 - [x] Small servers: no timers or dependencies; one MCP call replaces a model round

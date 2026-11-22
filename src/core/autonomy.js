@@ -58,13 +58,14 @@ export function changeTools(agent, server, names) {
 const autonomyOf = (agent) => (AUTONOMY.includes(agent?.autonomy) ? agent.autonomy : 'clear');
 
 /**
- * May this change happen without an extra confirmation? Only for an organizer (or the owner) on a live turn addressed
- * to the agent (not the test console, a schedule or a message it judged by itself), in clear / act, and a low-risk change.
+ * May this change happen without an extra confirmation? Only for an organizer (or the owner) on a live message (also a
+ * follow-up without the wake word; never the test console or a schedule), in clear / act, and a low-risk change.
  */
 export function mayChangeWithoutAsking(ctx, fq, input) {
   if (autonomyOf(ctx.agent) === 'ask') return false;
   if (ctx.role !== 'organizer' && !ctx.ownerTurn) return false;
-  if (['panel', 'schedule'].includes(ctx.source) || ctx.unaddressed) return false;
+  // a follow-up without the wake word ("should go to the shopping list", "yes") counts: the model judged it is for it
+  if (['panel', 'schedule'].includes(ctx.source)) return false;
   return riskOf(fq, input, ctx.agent) === 'low';
 }
 

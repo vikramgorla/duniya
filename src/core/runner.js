@@ -326,13 +326,13 @@ function changedWithoutAsking(ctx, fq, input, undo) {
 }
 /**
  * 093: the model calls a service's confirm tool itself. Allowed only for a preview shown in an earlier message that the
- * sender now clearly agrees to ("yes", "ok", "go ahead" …) on a live turn; a preview from this same turn waits (ask
+ * sender now clearly agrees to ("yes", "ok", "go ahead" …) on a live message (a "yes" without the wake word too); a preview from this same turn waits (ask
  * mode, high risk, not an organizer). Returns the refusal, or null when the call may run.
  */
 function confirmGate(ctx, input, applied, waiting) {
   const ids = Object.values(input || {}).filter((v) => typeof v === 'string');
   if (ids.some((id) => applied.has(id))) return { isError: false, text: 'Already applied in this turn.' };
-  if (ids.some((id) => waiting.has(id)) || ['panel', 'schedule'].includes(ctx.source) || ctx.unaddressed || !isAgreement(ctx.text)) return { isError: true, text: BLOCKED };
+  if (ids.some((id) => waiting.has(id)) || ['panel', 'schedule'].includes(ctx.source) || !isAgreement(ctx.text)) return { isError: true, text: BLOCKED };
   return null;
 }
 

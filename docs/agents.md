@@ -199,8 +199,9 @@ tools: [People → What agents see](people.md#what-agents-see).
 - **Ask first**: it shows the specific change and waits for a yes in a later message.
 - **Act and report**: like *Act on clear requests*, and it also makes changes that clearly follow from what was asked.
 - Whatever you pick: deletes, payments and refunds, sends to lists and changes to someone else's registration, duty or
-  money always wait for a yes; participants never change things; a schedule, the **Test** console and messages the
-  agent joined by itself never change anything without a yes.
+  money always wait for a yes; participants never change things; a schedule and the **Test** console never change
+  anything without a yes. Follow-ups without the wake word ("should go to the shopping list", "yes") count as part of
+  the conversation.
 
 | The organizer says | Ask first | Act on clear requests | Act and report |
 |---|---|---|---|
