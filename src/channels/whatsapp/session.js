@@ -29,6 +29,11 @@ const AUTH_DIR = resolve(DATA_DIR, 'whatsapp-auth');
 const QUERY_TIMEOUT = 20 * 1000; // ms
 /** 066: a number's state in Activity, in plain words (the pill already says WhatsApp). */
 const STATUS_WORDS = { open: 'Connected', qr: 'Waiting for the QR scan', reconnecting: 'Reconnecting', starting: 'Starting', logged_out: 'Unlinked from the phone', closed: 'Disconnected' };
+// Media kinds whose words are a caption (the message is the media; its text is shown as "what it is").
+const CAPTIONED = ['imageMessage', 'videoMessage', 'documentMessage', 'documentWithCaptionMessage'];
+// Where a message keeps what it quotes, mentions and answers (its contextInfo), by kind.
+const WITH_CONTEXT = ['extendedTextMessage', 'imageMessage', 'videoMessage', 'documentMessage', 'audioMessage', 'stickerMessage', 'locationMessage'];
+const contextOf = (c) => WITH_CONTEXT.map((k) => c?.[k]?.contextInfo).find(Boolean);
 
 /**
  * One WhatsApp number: a linked-device session via Baileys (075: the adapter in index.js holds one per number).
@@ -427,55 +432,82 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
     return null;
   }
 
-  async function normalize(msg, { includeOwn = false } = {}) {
-    if (!msg?.message || (msg.key.fromMe && !includeOwn)) return null;
+  /** Is this one of the messages we handle: in a chat, not our own (unless asked for), not a status or a channel post. */
+  function isChatMessage(msg, includeOwn) {
+    if (!msg?.message || (msg.key.fromMe && !includeOwn)) return false;
     const chat = msg.key.remoteJid;
-    if (!chat || chat === 'status@broadcast' || chat.endsWith('@newsletter')) return null;
-    const c = normalizeMessageContent(msg.message);
-    if (!c) return null;
+    return !!chat && chat !== 'status@broadcast' && !chat.endsWith('@newsletter');
+  }
+
+  /** Who sent a message, where and when: what every kind of message shares. */
+  async function envelopeOf(msg) {
+    const chat = msg.key.remoteJid;
     const isGroup = !!isJidGroup(chat);
     const fromMe = !!msg.key.fromMe;
     const senderJid = fromMe ? sock.user?.id : isGroup ? msg.key.participant : chat;
     const phone = fromMe ? '' : await phoneOf(senderJid, isGroup ? msg.key.participantAlt : msg.key.remoteJidAlt);
     const ts = Number(msg.messageTimestamp || 0) * 1000 || Date.now();
-    const base = { channel: 'whatsapp', raw: msg, chat, isGroup, phone, senderJid, fromMe, msgId: msg.key.id || null, ts,
+    return { channel: 'whatsapp', raw: msg, chat, isGroup, phone, senderJid, fromMe, msgId: msg.key.id || null, ts,
       senderName: fromMe ? 'Assistant' : msg.pushName || phone || 'someone' };
-    // "Delete for everyone": the stored copy goes too (#178); 087: an edit changes it. Other protocol messages carry nothing to store.
-    if (c.protocolMessage) {
-      const pm = c.protocolMessage;
-      if (pm.type === proto.Message.ProtocolMessage.Type.REVOKE && pm.key?.id) return { ...base, kind: 'deleted', text: '', target: pm.key.id };
-      const edited = pm.type === proto.Message.ProtocolMessage.Type.MESSAGE_EDIT && pm.key?.id ? textOf(normalizeMessageContent(pm.editedMessage)) : '';
-      return edited && !fromMe ? { ...base, kind: 'edited', text: String(edited), target: pm.key.id } : null;
-    }
-    // Reactions and poll votes are events about another message: stored, never answered.
-    if (c.reactionMessage) {
-      if (includeOwn) return null;
-      return { ...base, kind: 'reaction', text: '', target: c.reactionMessage.key?.id || '', emoji: c.reactionMessage.text || '' };
-    }
-    if (c.pollUpdateMessage) {
-      if (includeOwn) return null;
-      const vote = decryptVote(chat, c.pollUpdateMessage, msg.key);
-      if (!vote) { activity('system', { summary: 'A poll vote could not be read (poll not created while this app was running)' }); return null; }
-      return { ...base, kind: 'poll_vote', text: '', ...vote };
-    }
-    if (pollOf(c)) {
-      const creator = fromMe ? jidNormalizedUser(sock.user?.id || '') : isGroup ? (msg.key.participantAlt || msg.key.participant) : (msg.key.remoteJidAlt || chat);
-      keepPoll(chat, msg.key.id, msg.message, creator, ts);
-    }
-    const text = textOf(c) && !c.imageMessage && !c.videoMessage && !c.documentMessage && !c.documentWithCaptionMessage ? textOf(c) : (describe(c) || textOf(c));
+  }
+
+  /** "Delete for everyone": the stored copy goes too (#178); 087: an edit changes it. Other protocol messages carry nothing to store. */
+  function protocolEvent(base, pm) {
+    const { Type } = proto.Message.ProtocolMessage;
+    if (pm.type === Type.REVOKE && pm.key?.id) return { ...base, kind: 'deleted', text: '', target: pm.key.id };
+    const edited = pm.type === Type.MESSAGE_EDIT && pm.key?.id ? textOf(normalizeMessageContent(pm.editedMessage)) : '';
+    return edited && !base.fromMe ? { ...base, kind: 'edited', text: String(edited), target: pm.key.id } : null;
+  }
+
+  /**
+   * A message about another message: deleted, edited, a reaction or a poll vote. Stored, never answered. Returns the
+   * event, null when there is nothing to keep, or undefined when the message is not one of these.
+   */
+  function eventOf(base, c, msg, includeOwn) {
+    if (c.protocolMessage) return protocolEvent(base, c.protocolMessage);
+    if (!c.reactionMessage && !c.pollUpdateMessage) return undefined;
+    if (includeOwn) return null;
+    if (c.reactionMessage) return { ...base, kind: 'reaction', text: '', target: c.reactionMessage.key?.id || '', emoji: c.reactionMessage.text || '' };
+    const vote = decryptVote(base.chat, c.pollUpdateMessage, msg.key);
+    if (vote) return { ...base, kind: 'poll_vote', text: '', ...vote };
+    activity('system', { summary: 'A poll vote could not be read (poll not created while this app was running)' });
+    return null;
+  }
+
+  /** A poll is kept when it is created, so its votes can be read later. */
+  function rememberPoll(base, msg) {
+    const { chat, isGroup, fromMe, ts } = base;
+    const creator = fromMe ? jidNormalizedUser(sock.user?.id || '') : isGroup ? (msg.key.participantAlt || msg.key.participant) : (msg.key.remoteJidAlt || chat);
+    keepPoll(chat, msg.key.id, msg.message, creator, ts);
+  }
+
+  /** A message with words or media: its text (or what the media is), what it quotes and whether it addresses this number. */
+  function textMessage(base, c, msg, includeOwn) {
+    const said = textOf(c); const shown = describe(c);
+    const text = said && !CAPTIONED.some((k) => c[k]) ? said : (shown || said);
     if (!String(text).trim()) return null;
-    const ctx = c?.extendedTextMessage?.contextInfo || c?.imageMessage?.contextInfo || c?.videoMessage?.contextInfo
-      || c?.documentMessage?.contextInfo || c?.audioMessage?.contextInfo || c?.stickerMessage?.contextInfo || c?.locationMessage?.contextInfo;
+    const ctx = contextOf(c);
     const quotedMsg = ctx?.quotedMessage ? normalizeMessageContent(ctx.quotedMessage) : null;
     const quoted = quotedMsg ? (textOf(quotedMsg) || describe(quotedMsg)).slice(0, 500) : '';
     const selfIds = [sock.user?.id, sock.user?.lid].filter(Boolean).map(jidNormalizedUser);
     const mediaInfo = includeOwn ? null : mediaInfoOf(c);
     const media = mediaInfo ? { mediaInfo, mediaRef: mediaRefOf(msg), fetchMedia: () => downloadRef(msg, mediaInfo.size) } : {};
     return {
-      ...base, ...media, kind: 'text', text, quoted, media: !!describe(c), caption: describe(c) ? textOf(c) : '',
+      ...base, ...media, kind: 'text', text, quoted, media: !!shown, caption: shown ? said : '',
       mentioned: (ctx?.mentionedJid || []).some((j) => selfIds.includes(jidNormalizedUser(j))),
       replyToAgent: !!ctx?.participant && selfIds.includes(jidNormalizedUser(ctx.participant)),
     };
+  }
+
+  /** A WhatsApp message as the app's message (see hub.js), or null when it is not one to handle. */
+  async function normalize(msg, { includeOwn = false } = {}) {
+    const c = isChatMessage(msg, includeOwn) ? normalizeMessageContent(msg.message) : null;
+    if (!c) return null;
+    const base = await envelopeOf(msg);
+    const event = eventOf(base, c, msg, includeOwn);
+    if (event !== undefined) return event;
+    if (pollOf(c)) rememberPoll(base, msg);
+    return textMessage(base, c, msg, includeOwn);
   }
 
   async function groupMeta(jid) {
