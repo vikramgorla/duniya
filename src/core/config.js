@@ -54,7 +54,6 @@ export const env = {
 export const digits = (s) => String(s ?? '').replace(/\D/g, '');
 /** One line of at most `n` characters (whitespace collapsed, "…" when cut). */
 export const clip = (s, n = 120) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n)}…` : t; };
-/** An error the panel answers with `status` (default 400); `extra` (field, code, …) goes along to the client. */
 /** Cents → "CHF 25.00", "€25.00": one money format for agents, module rows and the admin tools (085). */
 const moneyFormats = new Map(); // one formatter per currency: building one costs more than formatting (hot paths list hundreds)
 export const money = (cents, cur) => {
@@ -63,8 +62,8 @@ export const money = (cents, cur) => {
   if (f === undefined) { try { f = new Intl.NumberFormat('en', { style: 'currency', currency: cur }); } catch { f = null; } moneyFormats.set(cur, f); }
   return f ? f.format(v).replace(/\u00a0/g, ' ') : `${cur} ${v.toFixed(2)}`;
 };
+/** An error the panel answers with `status` (default 400); `extra` (field, code, …) goes along to the client. */
 export const fail = (message, status = 400, extra = {}) => Object.assign(new Error(message), { status, ...extra });
-/** A 400-style error the panel shows next to `field`. */
 /** `p`, or a plain "<who> did not answer in time" error (status 504) after `ms`: one slow service never holds a screen,
  *  a turn or a list for good. The work itself goes on; its result is just no longer waited for. */
 export function within(p, ms, who) {
@@ -72,6 +71,7 @@ export function within(p, ms, who) {
   const late = new Promise((_, reject) => { timer = setTimeout(() => reject(fail(`${who} did not answer in time`, 504)), ms); });
   return Promise.race([p, late]).finally(() => clearTimeout(timer));
 }
+/** A 400-style error the panel shows next to `field`. */
 export const bad = (message, field, status = 400) => fail(message, status, field ? { field } : {});
 /** "panduga:*_preview" style globs (tool rules). */
 function globToRegex(glob) {

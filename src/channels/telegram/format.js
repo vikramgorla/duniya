@@ -3,7 +3,7 @@
 // gets plain text plus "entities" (offsets in UTF-16 units, which is how JavaScript counts), so nothing is parsed as
 // HTML or Markdown on Telegram's side and no text can break the message. Long texts are cut into messages of at most
 // 4096 characters, at a line break when possible.
-const MAX_TEXT = 4096;
+export const MAX_TEXT = 4096;
 
 const MARKS = [
   ['```', 'pre'], ['`', 'code'], ['*', 'bold'], ['_', 'italic'], ['~', 'strikethrough'],
@@ -38,6 +38,28 @@ export function toEntities(input) {
     out += s[i]; i++;
   }
   return { text: out, entities };
+}
+
+/**
+ * "@<user id>" in a formatted text becomes the person's name, linked to them (a text mention). It is done after the
+ * markup, so the offsets are right whatever precedes the name: marks after it move along, a mark around it grows.
+ * @param {{ text: string, entities: any[] }} formatted
+ * @param {{ id: string, name: string }[]} people
+ */
+export function linkMentions({ text, entities }, people) {
+  let out = text; const all = entities.map((e) => ({ ...e }));
+  for (const { id, name } of people) {
+    const tag = `@${id}`; const at = out.indexOf(tag);
+    if (at < 0) continue;
+    const grown = name.length - tag.length;
+    out = `${out.slice(0, at)}${name}${out.slice(at + tag.length)}`;
+    for (const e of all) {
+      if (e.offset > at) e.offset += grown;
+      else if (e.offset + e.length > at) e.length += grown;
+    }
+    all.push({ type: 'text_mention', offset: at, length: name.length, user: { id: Number(id) } });
+  }
+  return { text: out, entities: all };
 }
 
 /** Cut text into parts of at most `max` characters, at a line break (else a space) in the last third when possible. */

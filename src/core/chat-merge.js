@@ -11,6 +11,15 @@ import { activity } from './events.js';
 
 const TENANT = 'default';
 
+/** A chat list with `from` replaced by `to` (dropped when `to` is null), without doubles. */
+const swapped = (chats, from, to) => [...new Set(chats.map((c) => (c === from ? to : c)).filter(Boolean))];
+
+/** `from`'s agent has the chat under `to` from now on (`to` null: another agent has it): its chats and the schedules limited to some chats. */
+function followChat(agent, from, to) {
+  return updateAgent(agent.id, { chats: swapped(agent.chats, from, to),
+    schedules: agent.schedules.map((s) => (s.chats === 'all' ? s : { ...s, chats: swapped(s.chats, from, to) })) }, 'system');
+}
+
 /** Move `from` into `to` (`why`: the Activity line). Agent of `to` wins; `from`'s agent follows when `to` has none. */
 export async function mergeChats(from, to, why) {
   if (!from || !to || from === to) return;
@@ -20,6 +29,6 @@ export async function mergeChats(from, to, why) {
   db.prepare("DELETE FROM budget_caps WHERE tenant_id = ? AND scope = 'chat' AND id = ?").run(TENANT, from);
   const agent = agentForChat(from);
   const keep = agentForChat(to);
-  if (agent) await updateAgent(agent.id, { chats: [...new Set(agent.chats.map((c) => (c === from ? (keep ? null : to) : c)).filter(Boolean))] }, 'system');
+  if (agent) await followChat(agent, from, !keep || keep.id === agent.id ? to : null);
   activity('config', { chat: to, agent: (keep || agent)?.id || '', summary: `${why}: its settings${agent ? ', agent' : ''} and memory are now in one chat` });
 }

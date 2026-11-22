@@ -4,9 +4,10 @@
 // their own contact with the bot (people.js).
 export const PREFIX = 'tg';
 const RE = /^tg:(\d+)#(-?\d+)$/;
-const parts = (chat) => RE.exec(String(chat || ''));
-export const isTelegramChat = (chat) => !!parts(chat);
-export const isGroupChat = (chat) => Number(parts(chat)?.[2]) < 0;
-export const isDirectChat = (chat) => Number(parts(chat)?.[2]) > 0;
+/** The bot (`account`) and Telegram's chat id (`native`) of an app chat id; null when it is not a Telegram chat. */
+export const chatParts = (chat) => { const m = RE.exec(String(chat || '')); return m ? { account: m[1], native: m[2] } : null; };
+export const isTelegramChat = (chat) => !!chatParts(chat);
+export const isGroupChat = (chat) => Number(chatParts(chat)?.native) < 0;
+export const isDirectChat = (chat) => Number(chatParts(chat)?.native) > 0;
 /** The sender id of a direct chat (the user id), '' for groups. */
-export const personOfChat = (chat) => (isDirectChat(chat) ? parts(chat)[2] : '');
+export const personOfChat = (chat) => (isDirectChat(chat) ? chatParts(chat).native : '');
