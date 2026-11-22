@@ -63,6 +63,8 @@ context…" (edit under **Settings → Privacy notice**).
 
 ## What is kept, and who sees it
 
+<a id="tool-services"></a>
+
 | | |
 |---|---|
 | **Stored messages** | only chats that are on, for memory, with retention limits (90 days and 5 000 per chat by default, pruned every hour; **Server → Health**). Switching a chat on loads its recent messages from your phone ([Agents → Earlier messages](chats.md#earlier-messages-when-a-chat-is-switched-on)). Admins and owners can read them; every look is in the activity log. Erase a chat's memory with one click |
@@ -78,7 +80,8 @@ context…" (edit under **Settings → Privacy notice**).
 | **Morning brief & catch-up** | the brief is built in code from counts, names, amounts and due dates and goes only to linked owners and admins; nothing is stored but "sent today" and suggestion keys (to keep dismissed ones dismissed). Catch-up sends the messages since you last wrote in that group (at most 120, chats that are on and not private) to your background model, on demand |
 | **Lessons** | short rules per agent (and optionally per chat) that you approve, proposed from your 👎 and corrections; the proposal call sends the question and answer (or your correction) to your background model. Join-in feedback keeps counts per chat. Delete any lesson on the agent's **Lessons**; erasing a chat's memory deletes its lessons and feedback ([Lessons](intelligence.md#lessons)) |
 | **Smarter agents** | [Smart model choice](intelligence.md#smart-model-choice) keeps per answer the tier, a short reason and the cost (never text); its classifier sends the message alone (≤ 400 characters) to your light model. [Self-check](intelligence.md#self-check) compares figures in code and keeps counts only |
-| **Changes made without asking** | when an organizer's clear request is applied at once ([How sure before changing things](agents.md#how-sure-before-changing-things)), Activity keeps the tool, its input and who asked (role), like any tool call; the summary names the change, never message text. Deletes, money, sends and other people's registrations or duties always wait for a yes, and participants never change things |
+| **Changes made without asking** | when an organizer's clear request is applied at once ([How sure before changing things](agents.md#how-sure-before-changing-things)), Activity keeps the tool, its input and who asked (role), like any tool call; the summary names the change, never message text. Tools that declare themselves destructive always wait for a yes, and participants never change things |
+| **Tool services** | a tool's input goes to its service when the agent uses it. **Shared on its own** (GIFs, stickers): only mood and style words go to the service (e.g. *party telugu movie*), never message text, names, numbers or emails; names people use in the chat, the sender's, the agent's and the group's are removed first. Duniya keeps the ids of the last 30 results posted per chat (to avoid repeats) and, with a daily limit, a count per agent and service ([Tool services](tool-services.md#share-results-on-its-own)) |
 | **Welcomes** | a hash of the group and the new member's id, so each person is welcomed once (no names or numbers); the activity log says how many were welcomed |
 | **Personal details** | agents don't post phone numbers, emails, health or payment details in groups |
 | **Keys and passwords** | never through a chat or a model: entered on one-time panel links; a key pasted to the owner assistant is not read, stored or logged ([Owner assistant](owner-assistant.md#what-it-may-do-decided-in-code)) |

@@ -8,9 +8,9 @@ import { QUICK_WHO, FAQ_STRICTNESS } from './quick.js';
 import { AUTONOMY, RISKS } from './autonomy.js';
 
 // 094: how an agent uses each tool service (a service's default in Settings → Tool services, overridable per agent)
-export const WHEN = ['asked', 'useful', 'proactive']; // when to use it: only when asked | the agent decides | looks for chances
-export const SHARE_MODES = ['off', 'sometimes', 'often']; // share media results on its own
-export const WHERE = ['all', 'dm']; // where results may be posted: groups and direct messages | direct messages only
+const WHEN = ['asked', 'useful', 'proactive']; // when to use it: only when asked | the agent decides | looks for chances
+const SHARE_MODES = ['off', 'sometimes', 'often']; // share media results on its own
+const WHERE = ['all', 'dm']; // where results may be posted: groups and direct messages | direct messages only
 export const SERVICE_DEFAULTS = Object.freeze({ when: 'useful', note: '', changes: '', share: 'off', style: '', perReply: 0, perDay: 0, where: 'all', tools: {} });
 
 export const AGENT_DEFAULTS = Object.freeze({

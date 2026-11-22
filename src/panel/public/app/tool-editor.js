@@ -31,7 +31,7 @@ const WHERE = [['all', 'Groups and direct'], ['dm', 'Direct only']];
 const KIND_WORD = { gif: 'GIFs', sticker: 'stickers', image: 'pictures' };
 const label = (opts, v) => (opts.find((o) => o[0] === v) || [])[1] || v;
 /** One line for a service's settings (the row's summary). */
-export const behaviourLine = (b, media) => [label(WHEN, b.when || 'useful'), b.changes ? `changes: ${label(CHANGES, b.changes).toLowerCase()}` : '',
+const behaviourLine = (b, media) => [label(WHEN, b.when || 'useful'), b.changes ? `changes: ${label(CHANGES, b.changes).toLowerCase()}` : '',
   media && b.share && b.share !== 'off' ? `shares ${KIND_WORD[media]} ${b.share}` : '', b.perReply || b.perDay ? 'limits' : '', b.where === 'dm' ? 'direct only' : ''].filter(Boolean).join(' · ');
 /**
  * How it uses a service: when, changes, share on its own (only `media`: a read-only tool that returns media), limits.

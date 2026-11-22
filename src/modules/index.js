@@ -6,7 +6,8 @@
 // The catalogue below knows, without loading a module, where its rows name a person or a household (`refs`), and which
 // tables hang off those rows (`children`). That is enough for People to merge, undo, export and erase module rows
 // generically — also while a module is off. A loaded module's manifest (its index.js `manifest`) adds:
-//   tools        agent tools { name, description, input_schema, roles, participantDefault?, confirm?, run(args, ctx) }
+//   tools        agent tools { name, description, input_schema, roles, annotations (094: MCP hints, readOnlyHint /
+//                destructiveHint: the risk of a change), participantDefault?, confirm?, run(args, ctx) }
 //                ("<module>:<tool>" rules; organizers get all, participants the participantDefault ones by default)
 //   apply        apply(action, agent): a change an organizer confirmed ("confirm XXXX", the runner's confirm gate)
 //   person       person(id) / household(id) → page sections [{ title, rows: [{ name, sub?, href? }] }]

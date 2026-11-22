@@ -25,9 +25,11 @@ See [docs/upgrading.md](docs/upgrading.md).
   new users set their own password on a one-time sign-up link (48 hours, rate limited); restores from chat use the
   stored passphrase. Messages that look like keys are not stored or sent to a model.
 - Chats are off by default; off chats are never stored or sent to a model. Tool permissions are enforced in code per
-  role. Changes follow the agent's *How sure before changing things*: only low-risk changes an organizer clearly asked
-  for happen at once (logged in Activity); deletes, money, sends and other people's registrations wait for a human yes
-  or `confirm CODE`, decided in code, never by the prompt.
+  role. Changes follow the agent's *How sure before changing things* (or a service's own setting): a risk from each
+  tool's annotations; only changes an organizer clearly asked for happen at once (logged in Activity); tools that
+  declare themselves destructive (deletes, money, sends, other people's registrations) wait for a human yes or
+  `confirm CODE`, decided in code, never by the prompt. Per-service limits are enforced in code. Media shared on its
+  own sends only mood and style words to the service, never names or message text.
 - Local tool services (npm/GitHub) are owner-only and run with a scrubbed environment.
 - The admin MCP server uses OAuth 2.1 with PKCE and resource-bound tokens; its tokens only open `/mcp`. The panel API
   accepts only the panel's session cookie (HttpOnly, SameSite=Strict).

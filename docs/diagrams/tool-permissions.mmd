@@ -1,8 +1,8 @@
 flowchart TD
   M["Model wants<br/>a tool"] --> AL{"Allowed for<br/>this role?"}
   AL -- "no" --> N["Not offered"]
-  AL -- "yes" --> CH{"Changes<br/>something?"}
+  AL -- "yes" --> CH{"Changes something<br/>(not read-only)?"}
   CH -- "no" --> R["Runs"]
-  CH -- "yes" --> LO{"Organizer's clear request<br/>and low risk?"}
+  CH -- "yes" --> LO{"Organizer's clear request<br/>and not destructive?"}
   LO -- "yes (Act on clear requests)" --> A["Applied now,<br/>in Activity"]
   LO -- "no, or Ask first" --> P["Preview waits"] --> C["Organizer says yes<br/>or confirm CODE"] --> R
