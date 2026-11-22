@@ -71,7 +71,6 @@ const SECTIONS = [
 ];
 const shown = (sec, bi) => (bi ? sec.only === 'bi' || !sec.agent : sec.only !== 'bi');
 /** Old deep links (first-run guide, why-quiet fixes) land in the section that now holds them. */
-const OLD = { triggers: ['where', 'triggers'], dm: ['where', 'dm'] };
 
 /** The page of one agent inside the Agents list → page. `onChange(agent)` keeps the list row in step. */
 export function agentPage(id, { onChange } = {}) {
@@ -83,8 +82,7 @@ export function agentPage(id, { onChange } = {}) {
       api('GET', '/api/budget').catch(() => null), api('GET', '/api/chats').catch(() => [])]);
     const x = { id, enc, b, c: structuredClone(b.config), bi: !!b.builtin, models, us, review: b.review, cap: (bud?.caps || []).find((k) => k.scope === 'agent' && k.id === id) || null,
       chats: chats.filter((ch) => (b.config.chats || []).includes(ch.id)) };
-    const route = location.hash.split('/');
-    const [want, focus] = OLD[route[2]] || [route[2], ''];
+    const [, , want, focus = ''] = location.hash.split('/'); // #agents/<id>/<section>/<part>: a part to focus in it
     if (want && SECTIONS.some((s) => s.id === want && shown(s, x.bi))) openSection(x, want, false, focus); else drawHome(x);
   }
   /** Saves a part of the agent; Undo puts the previous values back. Returns true when saved. */

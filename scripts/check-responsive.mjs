@@ -265,7 +265,7 @@ const STATES = [
       return r; };`, js: "T.openAll(); document.getElementById('helper-update')?.scrollIntoView(); await T.wait(300);" },
   { name: 'backups', hash: 'backups', js: 'T.openAll();' },
   { name: 'pending', hash: 'pending' },
-  { name: 'settings-secrets', hash: 'secrets' }, // 062: #secrets opens Settings → Secrets
+  { name: 'settings-secrets', hash: 'settings/secrets' },
   // 060: one-time links — enter a secret (signed in), a new user's sign-up page (before sign-in), the link in Users.
   { name: 'secret-link', hash: 'secrets', js: "const r = await (await fetch('/api/secret-links', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'OPENAI_API_KEY' }) })).json(); await (await import('/app/login.js')).renderSecretLink(r.link.split('=')[1]);" },
   { name: 'signup-link', hash: '', js: "const r = await (await fetch('/api/users', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: `lea${Date.now() % 1e6}`, role: 'admin' }) })).json(); S.tab = ''; S.es?.close(); history.replaceState(null, '', `#signup=${r.signup.link.split('=')[1]}`); await (await import('/app/login.js')).renderLogin();" },

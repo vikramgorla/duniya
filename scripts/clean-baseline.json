@@ -169,9 +169,6 @@
   "complexity": 1,
   "max-params": 1
  },
- "src/panel/public/app/core.js": {
-  "complexity": 1
- },
  "src/panel/public/app/diff.js": {
   "complexity": 1
  },
