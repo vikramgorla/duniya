@@ -94,13 +94,13 @@ const PANEL_WAIT = 5000; // a panel page never waits longer for one service
 const TURN_WAIT = 8000; // a reply never waits longer for one service
 const LOCAL_START_WAIT = 60000;
 /** 094: a service's tools as the panel shows them: name, description, risk from its annotations, shareable media. */
-export async function describeTools(key, conn, { fresh = false } = {}) {
+export async function describeTools(conn, { fresh = false } = {}) {
   const tools = await conn.listTools({ within: PANEL_WAIT, fresh });
-  const media = mediaTool(key, tools);
+  const media = mediaTool(tools);
   return tools.map((t) => ({ name: t.name, description: (t.description || '').slice(0, 300), risk: riskOf(t.annotations || {}), annotated: !!t.annotations, ...(media?.tool === t.name ? { media: media.kind } : {}) }));
 }
 /** 094: the media kind a service can share on its own ('' when none, or when it cannot be reached). */
-export const serviceMedia = (key, conn) => describeTools(key, conn).then((tools) => tools.find((t) => t.media)?.media || '', () => '');
+export const serviceMedia = (conn) => describeTools(conn).then((tools) => tools.find((t) => t.media)?.media || '', () => '');
 /** 094: an agent's services with its own settings, the service's default and the tools (its Tools page). */
 export async function agentServices(agent) {
   return Promise.all(Object.entries(effectiveServers(agent)).map(async ([key, srv]) => {
@@ -108,7 +108,7 @@ export async function agentServices(agent) {
     try {
       const conn = connectionFor(agent, key, 'organizer');
       // a local service is never started just to show this page: only one that is running already lists its tools
-      if (srv.type !== 'local' || conn.tools) tools = await describeTools(key, conn);
+      if (srv.type !== 'local' || conn.tools) tools = await describeTools(conn);
     } catch { /* shown as not reachable */ }
     const media = tools?.find((t) => t.media)?.media || '';
     return { service: key, global: !!srv.global, own: agent.services?.[key] || {}, default: srv.behaviour || {}, tools, media, ...(media ? { shared: sharedCounts(agent.id), credit: serviceCredits()[key] || '' } : {}) };
@@ -151,7 +151,7 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
     const { serverKey, srv, sAllow, uses, conn, tools } = l;
     const b = behaviourOf(agent, serverKey, srv); // 094: when, changes, sharing, limits of this service for the agent
     const open = tools.filter((t) => !matchesAny(`${serverKey}:${t.name}`, deny)); // the deny list always wins
-    const mt = b.share === 'off' ? null : mediaTool(serverKey, open);
+    const mt = b.share === 'off' ? null : mediaTool(open);
     if (mt) sharing.push({ key: serverKey, ...mt, share: b.share, style: b.style, behaviour: b, conn });
     if (!uses) continue;
     const pair = changeTools(agent, serverKey, tools.map((t) => t.name)); // 093: preview → confirm tools of this service

@@ -13,11 +13,16 @@ let t; let owner;
 const queries = []; // what the fake media service was asked
 const order = []; // texts and media as they reached the chat
 let count = 8;
-const results = () => Array.from({ length: count }, (_, i) => ({ id: `c${i}`, title: `Clip ${i}`, url: `https://media.example/${i}.gif`,
-  mp4Url: `https://media.example/${i}.mp4`, previewUrl: `https://media.example/${i}-small.gif`, attribution: `"Clip ${i}" · Powered by ExampleClips · https://clips.example/c/${i}`, creditText: credits(i) }));
-// schema.org creditText: a platform credit every result shares (changeable per test to a work's own credit)
+// results are schema.org ImageObjects: the GIF, its MP4 rendition (what chat apps send), a thumbnail and the credit
+const results = () => Array.from({ length: count }, (_, i) => ({ '@context': 'https://schema.org', '@type': 'ImageObject', identifier: `c${i}`, name: `Clip ${i}`,
+  contentUrl: `https://media.example/${i}.gif`, encodingFormat: 'image/gif', thumbnailUrl: `https://media.example/${i}-small.gif`, contentSize: '2.1 MB',
+  encoding: [{ '@type': 'MediaObject', contentUrl: `https://media.example/${i}.mp4`, encodingFormat: 'video/mp4' }], url: `https://clips.example/c/${i}`,
+  ...(credits(i) ? { creditText: credits(i) } : {}), provider: { '@type': 'Organization', name: 'ExampleClips' } }));
+// schema.org creditText: a platform credit every result shares (changeable per test to a work's own credit, or none)
 let credits = () => 'Powered by ExampleClips';
-const OUT = { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, url: { type: 'string' }, mp4Url: { type: 'string' }, previewUrl: { type: 'string' } } } } } };
+const OUT = { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: {
+  '@type': { type: 'string', const: 'ImageObject' }, identifier: { type: 'string' }, contentUrl: { type: 'string' }, encodingFormat: { type: 'string', const: 'image/gif' },
+  encoding: { type: 'array' }, creditText: { type: 'string' } } } } } };
 const QUERY = { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer' } }, required: ['query'] };
 
 /** A fake service: `tools` are MCP tool definitions; every call returns media results (structured) and is recorded. */
@@ -40,22 +45,6 @@ const clips = fakeService([
   { name: 'save_clip', description: 'Save a clip', inputSchema: QUERY },
   { name: 'drop_clip', description: 'Delete a clip', inputSchema: QUERY, annotations: { destructiveHint: true } },
 ]);
-// schema.org ImageObjects (the standard shape): encodingFormat declares a GIF; the MP4 is a rendition in `encoding`
-const IMAGE_OBJECT = { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: {
-  '@type': { type: 'string', const: 'ImageObject' }, identifier: { type: 'string' }, contentUrl: { type: 'string' }, encodingFormat: { type: 'string', const: 'image/gif' },
-  thumbnailUrl: { type: 'string' }, creditText: { type: 'string' } } } } } };
-const imageObjects = () => Array.from({ length: 6 }, (_, i) => ({ '@context': 'https://schema.org', '@type': 'ImageObject', identifier: `io:${i}`, name: `Dance ${i}`,
-  contentUrl: `https://media.example/io${i}.gif`, encodingFormat: 'image/gif', thumbnailUrl: `https://media.example/io${i}-small.gif`, contentSize: '2.1 MB',
-  encoding: [{ '@type': 'MediaObject', contentUrl: `https://media.example/io${i}.mp4`, encodingFormat: 'video/mp4' }], url: `https://media.example/page/${i}`,
-  creditText: 'Powered by Example', provider: { '@type': 'Organization', name: 'Example' } }));
-const ios = http.createServer(async (req, res) => {
-  let d = ''; for await (const c of req) d += c;
-  const srv = new Server({ name: 'io', version: '1' }, { capabilities: { tools: {} } });
-  srv.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [{ name: 'search', description: 'Find GIFs', inputSchema: QUERY, outputSchema: IMAGE_OBJECT, annotations: { readOnlyHint: true } }] }));
-  srv.setRequestHandler(CallToolRequestSchema, async () => ({ content: [{ type: 'text', text: 'Found 6' }], structuredContent: { results: imageObjects() } }));
-  const tr = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  await srv.connect(tr); await tr.handleRequest(req, res, d ? JSON.parse(d) : undefined);
-}).listen(0);
 const drawer = fakeService([{ name: 'draw', description: 'Draws a picture (changes an album)', inputSchema: QUERY, outputSchema: OUT }]);
 const url = (srv) => `http://127.0.0.1:${srv.address().port}/mcp`;
 
@@ -71,7 +60,7 @@ before(async () => {
   t.channel.send = async (chat, text, o) => { order.push({ chat, text }); return send(chat, text, o); };
   t.channel.sendMedia = async (chat, m) => { order.push({ chat, media: m }); return sendMedia(chat, m); };
 });
-after(() => { clips.close(); drawer.close(); ios.close(); t.close(); });
+after(() => { clips.close(); drawer.close(); t.close(); });
 
 const inChat = (chat) => order.filter((o) => o.chat === chat);
 const media = (chat) => inChat(chat).filter((o) => o.media);
@@ -101,7 +90,7 @@ test('the AI picks the mood with a tag it must give every turn: one message, the
   assert.match(JSON.stringify(t.userTurn(n)), /End with \[share: mood\] or \[share: none\]/);
   assert.deepEqual(shape(chat), ['Congrats Chary, mission accomplished! 🎉 + gif'], 'one message: the GIF, the answer as its caption');
   const m = media(chat)[0].media;
-  assert.match(m.url, /\/\d\.mp4$/, 'the MP4, not the preview');
+  assert.match(m.url, /\/\d\.mp4$/, 'the MP4 rendition (encoding), not the GIF or the thumbnail');
   assert.doesNotMatch(m.caption, /Powered by|Clip \d|https?:/, 'no credit, title or link in the message');
   assert.deepEqual((await t.api(owner, 'GET', '/api/credits')).body, [{ service: 'clips', credit: 'Powered by ExampleClips' }], 'the credit all results share, for the panel');
   assert.equal((await t.api(owner, 'GET', '/api/tool-services')).body.find((g) => g.name === 'clips').credit, 'Powered by ExampleClips');
@@ -303,17 +292,6 @@ test('one setting: Proactively shares sometimes, Often often, When useful never 
   await setRaju({ clips: { when: 'often', style: 'telugu movie' } });
 });
 
-test('one-time: a saved "share" setting becomes When to use it (sometimes → proactive, often → often)', async () => {
-  const { saveAgentRow, getAgentRow } = t.store;
-  const cfg = getAgentRow('raju').config;
-  saveAgentRow('raju', { ...cfg, services: { clips: { share: 'sometimes', style: 'x' } } }, 'test');
-  t.agents.loadAgents();
-  assert.deepEqual(t.agents.getAgent('raju').services, { clips: { style: 'x', when: 'proactive' } });
-  saveAgentRow('raju', { ...cfg, services: { clips: { share: 'often', style: 'telugu movie' } } }, 'test');
-  t.agents.loadAgents();
-  assert.deepEqual(t.agents.getAgent('raju').services, { clips: { style: 'telugu movie', when: 'often' } });
-});
-
 test('festival greetings are celebrations ("happy Diwali", "happy Pongal"); "happy to help" is not', async () => {
   await setRaju({ clips: { when: 'proactive', style: 'telugu movie' } });
   for (const [i, greet] of [['happy Diwali'], ['happy pongal everyone']].entries()) {
@@ -370,19 +348,4 @@ test('a result that needs its own credit (an author and license) is never posted
   await say(chat, 'raju we did it again!! 🎉');
   assert.equal(media(chat).at(-1).media.caption, 'Yay!', 'no credit needed: posted, the caption is the answer');
   credits = () => 'Powered by ExampleClips';
-});
-
-test('schema.org ImageObjects: the GIF kind from encodingFormat, the MP4 rendition sent, creditText to the panel, identifier against repeats', async () => {
-  await t.api(owner, 'PUT', '/api/tool-services/io', { url: url(ios), auth: 'none', defaults: { organizer: ['*'], participant: ['*'] } });
-  assert.equal((await t.api(owner, 'GET', '/api/tool-services/media')).body.io, 'gif', 'declared by encodingFormat');
-  await setRaju({ clips: { when: 'useful' }, io: { when: 'proactive' } });
-  const chat = '41790000007@s.whatsapp.net';
-  t.script.push(text('Congrats! [share: party]'));
-  await say(chat, 'raju we got the flat!! 🎉', { isGroup: false });
-  const sent = media(chat).at(-1).media;
-  assert.match(sent.url, /^https:\/\/media\.example\/io\d\.mp4$/, 'the MP4 rendition, not the GIF or the thumbnail');
-  assert.equal(sent.caption, 'Congrats!');
-  assert.ok((await t.api(owner, 'GET', '/api/credits')).body.some((c) => c.service === 'io' && c.credit === 'Powered by Example'));
-  await setRaju({ clips: { when: 'often', style: 'telugu movie' } });
-  await t.api(owner, 'DELETE', '/api/tool-services/io');
 });

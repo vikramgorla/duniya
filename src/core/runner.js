@@ -26,7 +26,7 @@ import { faqContext } from './quick.js';
 import { peopleScope, senderCard } from './people-access.js';
 import { applyPeopleAction } from './people-tools.js';
 import { applyModuleAction } from '../modules/index.js';
-import { sharePlan, sharingNote, takeShareTag, shareAfterReply, noteToolOutput } from './sharing.js';
+import { sharePlan, sharingNote, takeShareTag, shareAfterReply } from './sharing.js';
 import { withoutMediaClutter } from './credits.js';
 import { servicesNote, limitStop } from './tool-behaviour.js';
 import { BLOCKED, WAIT_NOTE, appliedNote, autonomyNote, isAgreement, mayChangeWithoutAsking, riskOf } from './autonomy.js';
@@ -259,7 +259,7 @@ export async function runAgent(ctx) {
       const why = m?.kind === 'mcp' ? limitStop(ctx, m.server, m.behaviour, uses) : '';
       const out = why ? { isError: true, text: `Not used: ${m.server} has a limit (${why}). Answer without it.` }
         : (m?.change === 'confirm' && confirmGate(ctx, call.input, applied, waiting)) || await runTool(run, m, call, { ...ctx, toolRisk: risk, toolMode: m?.behaviour?.changes || '' });
-      if (!out.isError && m?.kind === 'mcp' && m.annotations?.readOnlyHint === true) { noteToolOutput(m.server, m.tool, out.text); mediaLinks.push(...linksWithMedia(out.text)); }
+      if (!out.isError && m?.kind === 'mcp' && m.annotations?.readOnlyHint === true) mediaLinks.push(...linksWithMedia(out.text));
       let content = String(out.text ?? '').slice(0, 12000);
       activity(out.isError ? 'tool.error' : 'tool.call', {
         agent: agent.id, chat,
