@@ -100,6 +100,25 @@ test('stable and main channels update a real checkout; failed dependency install
   assert.equal(r.code, 1);
   assert.match(r.log, /Dependencies changed, installing…[\s\S]*rolling back/);
   assert.equal(git(app, 'rev-parse', 'HEAD'), before);
+
+  // A release whose start guard (or entry) does not load could never be put back by it: refused while the previous version runs
+  const release = (v, files) => {
+    pkg(v); writeFileSync(join(work, 'package-lock.json'), JSON.stringify({ name: 'x', version: v, lockfileVersion: 3, requires: true, packages: { '': { name: 'x', version: v } } }));
+    for (const [file, text] of Object.entries(files)) writeFileSync(join(work, file), text);
+    git(work, 'add', '-A'); git(work, 'commit', '-qm', `v${v}`); git(work, 'push', '-q', 'origin', 'main');
+  };
+  const guard = readFileSync(resolve(import.meta.dirname, '../src/core/update-guard.js'), 'utf8');
+  for (const [v, files] of [['1.2.1', { 'src/core/update-guard.js': 'export const depsKey = () => ;' }], ['1.2.2', { 'src/core/update-guard.js': guard, 'src/index.js': 'await import(;' }]]) {
+    release(v, files);
+    r = await u.applyUpdate({ root: app, target: 'main' });
+    assert.equal(r.code, 1, r.log);
+    assert.match(r.log, /could not be put back if it did not start[\s\S]*previous version stays/);
+    assert.equal(git(app, 'rev-parse', 'HEAD'), before, 'the code is the previous one');
+  }
+  release('1.2.3', { 'src/index.js': "await import('./core/update-guard.js');" });
+  r = await u.applyUpdate({ root: app, target: 'main' });
+  assert.equal(r.code, 0, r.log);
+  assert.equal(JSON.parse(readFileSync(join(app, 'package.json'), 'utf8')).version, '1.2.3');
 });
 
 test('084 update source: shown without credentials, switched to a fork (its tags replace the old ones), refused or put back when wrong', async () => {
