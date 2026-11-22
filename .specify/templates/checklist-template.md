@@ -43,6 +43,7 @@ requirements and plan cover the steps every change in this repository must compl
 - [ ] CHK### Are security requirements stated (secrets, TLS, untrusted input, permissions enforced in code)?
 - [ ] CHK### Are privacy requirements stated (chat allow-list, message contents in logs, privacy notice)?
 - [ ] CHK### Is the impact on a 1 GB / 1 vCPU server specified (memory, CPU, downloads, degraded behaviour)?
+- [ ] CHK### Does every wait on a channel, model, tool service or the web have a deadline, and what does the owner see when it passes?
 - [ ] CHK### Do new queries have an index (`npm run check:perf`: no full scans of large tables, time budgets met)?
 - [ ] CHK### Does everything the server can do or retry itself happen automatically, with buttons only as optional extras?
 - [ ] CHK### Clean code: is the behaviour a generic rule (from what tools, services or channels declare, never their names), split into small single-purpose functions with clear names and named constants?

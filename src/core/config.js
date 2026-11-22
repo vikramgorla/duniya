@@ -65,6 +65,13 @@ export const money = (cents, cur) => {
 };
 export const fail = (message, status = 400, extra = {}) => Object.assign(new Error(message), { status, ...extra });
 /** A 400-style error the panel shows next to `field`. */
+/** `p`, or a plain "<who> did not answer in time" error (status 504) after `ms`: one slow service never holds a screen,
+ *  a turn or a list for good. The work itself goes on; its result is just no longer waited for. */
+export function within(p, ms, who) {
+  let timer;
+  const late = new Promise((_, reject) => { timer = setTimeout(() => reject(fail(`${who} did not answer in time`, 504)), ms); });
+  return Promise.race([p, late]).finally(() => clearTimeout(timer));
+}
 export const bad = (message, field, status = 400) => fail(message, status, field ? { field } : {});
 /** "panduga:*_preview" style globs (tool rules). */
 function globToRegex(glob) {

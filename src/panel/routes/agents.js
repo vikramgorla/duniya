@@ -22,7 +22,7 @@ import { joinFeedback, judgedOf, lessonFromThumbsDown, proposedCount } from '../
 import { runSchedule } from '../../core/scheduler.js';
 import { interpolate } from '../../core/store.js';
 import { oauthClientOf, organizerConnection, agentServices, describeTools } from '../../core/tools.js';
-import { isGroup as isGroupChat } from '../../channels/index.js';
+import { isGroup as isGroupChat, testChatId } from '../../channels/index.js';
 import { isHttps, resultPage, send } from '../http.js';
 
 // Local tool services run third-party code on this server: only owners may add or change them.
@@ -226,7 +226,7 @@ export function agentRoutes(route, { channel } = {}) {
     const pick = body.chat && body.chat !== 'new' ? String(body.chat) : '';
     if (pick && !agent.chats.includes(pick)) return [400, { error: 'Choose one of this agent’s chats, or a new direct chat', field: 'chat' }];
     const isGroup = pick ? isGroupChat(pick) : false;
-    const chat = pick ? `panel:${p.id}:${pick}` : `panel:${p.id}`;
+    const chat = testChatId(p.id, pick);
     const text = String(body.text || '').slice(0, 4000);
     const confirm = await handleConfirmCommand({ agent, text, role, chat });
     if (confirm !== undefined) return { reply: confirm };

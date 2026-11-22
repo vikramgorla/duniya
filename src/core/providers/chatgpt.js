@@ -11,6 +11,7 @@ const ISSUER = () => process.env.OPENAI_AUTH_ISSUER || 'https://auth.openai.com'
 const API_BASE = () => (process.env.OPENAI_API_BASE || 'https://api.openai.com/v1').replace(/\/+$/, '');
 const RESOURCE = 'https://api.openai.com/v1';
 const REDIRECT_URI = 'http://127.0.0.1:1455/auth/callback';
+const ANSWER_TIMEOUT = 3 * 60 * 1000; // ms for one model call; the fallback chain takes over after
 const SCOPE = 'openid profile email offline_access resource.invoke chatgpt.tokens.use.direct';
 const PLAN_SCOPE = 'chatgpt.tokens.use.direct';
 const APP_NAME = 'whatsapp-agent-duniya';
@@ -174,7 +175,7 @@ export async function disconnect(secret = CRED) {
     try {
       const disc = await (await fetch(`${AUTH_BASE()}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(10000) })).json();
       if (disc.revocation_endpoint) {
-        await fetch(disc.revocation_endpoint, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token: c.refresh_token, token_type_hint: 'refresh_token', client_id: c.client_id }) });
+        await fetch(disc.revocation_endpoint, { signal: AbortSignal.timeout(10000), method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token: c.refresh_token, token_type_hint: 'refresh_token', client_id: c.client_id }) });
       }
     } catch { /* best effort */ }
   }
@@ -239,7 +240,7 @@ async function chatFor(secret, { model, system, messages, tools, natives = [], o
   };
   const res = await fetch(`${API_BASE()}/responses`, {
     method: 'POST', headers: { authorization: `Bearer ${await accessToken(secret)}`, 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify(body), signal: signal ? AbortSignal.any([AbortSignal.timeout(180000), signal]) : AbortSignal.timeout(180000), // 066: Stop
+    body: JSON.stringify(body), signal: signal ? AbortSignal.any([AbortSignal.timeout(ANSWER_TIMEOUT), signal]) : AbortSignal.timeout(ANSWER_TIMEOUT), // 066: Stop
   });
   if (!res.ok) {
     const json = await res.json().catch(() => ({}));

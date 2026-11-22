@@ -1,6 +1,6 @@
 // 075: the channel hub — adapters load only when set up and on, chat ids route to their channel, tools follow the
 // channel's capabilities, people join across channels by phone, and a fresh install never loads Baileys.
-import { test, before, after } from 'node:test';
+import { test, before, after, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
@@ -47,6 +47,13 @@ test('075: ids — WhatsApp ids unchanged, prefixed ids parse, helpers ask the c
   assert.equal(c.channelOf('fk:a#g1'), 'fake');
   assert.equal(c.channelOf('xx:bot1#-1001'), '', 'an unknown prefix belongs to no channel');
   assert.equal(c.channelOf('panel test'), '');
+  // the test console's chats look like WhatsApp ids at the end but belong to no channel: nothing is ever sent for them
+  const test = c.testChatId('mochi', 'g1@g.us');
+  assert.equal(c.channelOf(test), '');
+  assert.ok(!c.isGroup(test) && !c.isDirect(test));
+  assert.deepEqual(c.testChatOf(test), { agent: 'mochi', chat: 'g1@g.us' });
+  assert.deepEqual(c.testChatOf(c.testChatId('mochi')), { agent: 'mochi', chat: '' });
+  assert.equal(c.testChatOf('g1@g.us'), null);
   assert.deepEqual(c.splitChatId('fk:a#g1'), { channel: 'fake', account: 'a', native: 'g1' });
   assert.deepEqual(c.splitChatId('shop#g1@g.us'), { channel: 'whatsapp', account: 'shop', native: 'g1@g.us' });
   assert.equal(c.chatKey('whatsapp', 'main', 'g1@g.us'), 'g1@g.us');
@@ -214,4 +221,24 @@ test('075: a fresh install never loads Baileys; switching WhatsApp on does', () 
   const r = JSON.parse(out.trim().split('\n').at(-1));
   assert.equal(r.before, 'not_set_up');
   assert.match(r.after, /BAILEYS_IMPORTED/, 'the hook works: switching WhatsApp on is what imports Baileys');
+});
+
+test('a read a channel never answers fails in plain words instead of holding the caller', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const silent = { ...fakeAdapter([]), groupInfo: () => new Promise(() => {}), chatName: () => new Promise(() => {}), listChats: () => new Promise(() => {}) };
+    const hub = hubMod.createHub({ loaders: { fake: async () => silent } });
+    t.store.setSecret('FAKE_CHAT_TOKEN', 'fake-2');
+    await hub.start({ onMessage: async () => {} });
+    await hub.setEnabled('fake', true, 'admin');
+    const info = assert.rejects(hub.groupInfo('fk:a#g1'), (e) => e.status === 504 && /Fake chat did not answer in time/.test(e.message));
+    const name = hub.chatName('fk:a#g1');
+    const list = hub.listChats();
+    await new Promise((r) => setImmediate(r));
+    mock.timers.tick(10 * 1000);
+    await info;
+    assert.equal(await name, '', 'a name that never comes is no name');
+    assert.deepEqual(await list, [], 'a list that never comes is an empty list');
+    await hub.setEnabled('fake', false, 'admin');
+  } finally { mock.timers.reset(); }
 });

@@ -46,6 +46,14 @@ export const CHANNELS = [
 ];
 const PREFIXED = /^([a-z]{2,8}):([^#]*)#(.+)$/;
 
+/** The test console's chat (#37 "Test as…"): "panel:<agent>" or "panel:<agent>:<the chat it tests in>". It belongs to
+ *  no channel, so nothing is ever sent to one for it. */
+export const testChatId = (agent, chat = '') => `panel:${agent}${chat ? `:${chat}` : ''}`;
+/** { agent, chat } of a test console chat id, or null. */
+export function testChatOf(id) {
+  const m = /^panel:([a-z0-9-]+)(?::(.+))?$/.exec(String(id || ''));
+  return m ? { agent: m[1], chat: m[2] || '' } : null;
+}
 /** The catalogue entry of a channel id ('whatsapp'), or undefined. */
 export const channelInfo = (id) => CHANNELS.find((c) => c.id === id);
 

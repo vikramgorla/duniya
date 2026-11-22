@@ -17,7 +17,7 @@ import { chatCompletionsProvider } from './openai-chat.js';
 import { classify, REASON_TEXT } from './errors.js';
 import * as breaker from './breaker.js';
 import { REF_RE, cleanChain } from './fallback-config.js';
-import { bad, fail } from '../config.js';
+import { bad, fail, within } from '../config.js';
 import { accountName, modelName } from '../../panel/public/app/names.js';
 
 export { REF_RE, FALLBACK_MODES, cleanChain, cleanOverride } from './fallback-config.js';
@@ -240,10 +240,8 @@ export async function providerModels(p, { refresh = false } = {}) {
   const hit = modelCache.get(p.id);
   if (!refresh && hit && Date.now() - hit.at < MODELS_TTL) return hit;
   if (!listing.has(p.id)) {
-    let timer;
-    const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('The provider did not answer in time')), MODELS_WAIT); });
-    listing.set(p.id, Promise.race([p.adapter.listModels(), late]).then((models) => ({ at: Date.now(), models, error: null }), (e) => ({ at: Date.now(), models: [], error: e.message }))
-      .then((entry) => { modelCache.set(p.id, entry); return entry; }).finally(() => { clearTimeout(timer); listing.delete(p.id); }));
+    listing.set(p.id, within(p.adapter.listModels(), MODELS_WAIT, 'The provider').then((models) => ({ at: Date.now(), models, error: null }), (e) => ({ at: Date.now(), models: [], error: e.message }))
+      .then((entry) => { modelCache.set(p.id, entry); return entry; }).finally(() => { listing.delete(p.id); }));
   }
   return !refresh && hit ? hit : listing.get(p.id);
 }

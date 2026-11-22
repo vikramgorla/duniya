@@ -5,12 +5,14 @@
 // WhatsApp is offline), "Unnamed group" until it is known; a person is the contacts resolver's label (own name,
 // phone contact, business or profile name, else +number, else "Unknown (hidden number)").
 import { db } from './db.js';
+import { within } from './config.js';
 import './chat-prefs.js'; // chats_seen
 import { personInfo } from './contacts.js';
-import { isGroup, personOfChat } from '../channels/index.js';
+import { isGroup, personOfChat, testChatOf } from '../channels/index.js';
 
 const TENANT = 'default';
 export const UNNAMED_GROUP = 'Unnamed group';
+const TEST_LABEL = 'Panel test'; // the test console's chats (testChatId)
 const getSeen = db.prepare('SELECT name, phone FROM chats_seen WHERE tenant_id = ? AND chat = ?');
 // A group that is new to chats_seen stays out of seenChats() (last_at NULL): it only carries the name.
 const putName = db.prepare(`INSERT INTO chats_seen (tenant_id, chat, is_group, name) VALUES (?, ?, 1, ?)
@@ -38,8 +40,10 @@ export function chatLabel(id) {
     if (!subjects.has(chat)) { const n = getSeen.get(TENANT, chat)?.name; if (n) subjects.set(chat, n); }
     return subjects.get(chat) || UNNAMED_GROUP;
   }
+  const test = testChatOf(chat);
+  if (test) return test.chat ? `${TEST_LABEL} in ${chatLabel(test.chat)}` : TEST_LABEL;
   const jid = personOfChat(chat);
-  if (!jid) return chat; // not a person on a channel (the test console's own words)
+  if (!jid) return chat; // not a chat on a channel
   const seen = getSeen.get(TENANT, chat);
   return personInfo({ phone: seen?.phone || '', jid, fallbackName: seen?.name || '' }).label;
 }
@@ -55,7 +59,7 @@ export async function chatLabels(ids, channel) {
   const ask = list.filter((id) => isGroup(id) && chatLabel(id) === UNNAMED_GROUP && channel?.chatName && Date.now() - (asked.get(id) || 0) > ASK_AGAIN);
   if (ask.length) {
     const answers = ask.map((id) => { asked.set(id, Date.now()); return channel.chatName(id).then((name) => rememberGroupNames([{ id, name }]), () => {}); });
-    await Promise.race([Promise.all(answers), new Promise((r) => setTimeout(r, NAME_WAIT).unref?.())]);
+    await within(Promise.all(answers), NAME_WAIT, 'WhatsApp').catch(() => {}); // the late ones are remembered when they come
   }
   return new Map(list.map((id) => [id, chatLabel(id)]));
 }
