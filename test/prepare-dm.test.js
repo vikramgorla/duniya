@@ -155,8 +155,10 @@ test('a chat set up under the number after WhatsApp already wrote from the priva
   t.script.push([{ type: 'text', text: 'Here now.' }]);
   await sessions.main.handler(dm({ chat: lid, phone: '41790000730', senderJid: lid, text: 'hello' }));
   t.chatPrefs.setChatPrefs(phoneChat, { enabled: true, private: true }); await t.agents.bindChat(phoneChat, 'helper'); // …and private under the number
+  t.db.setChatMemory(phoneChat, 'She asked about her homework.', 3);
   assert.equal(oa.isVisible(lid), true, 'before: the chat with the messages is not private');
   await upkeepTick(t.channel);
+  assert.deepEqual([t.db.getChatMemory(lid).summary, t.db.getChatMemory(lid).upto_id, t.db.getChatMemory(phoneChat)], ['She asked about her homework.', 3, null], 'a summary only the number had moves as it is');
   const row = await chatRow(lid);
   assert.deepEqual([row.agent, row.enabled, row.private], ['helper', true, true], 'private where the messages are');
   assert.equal(oa.isVisible(lid), false);

@@ -4,7 +4,7 @@
 // under their phone number (…@s.whatsapp.net). Everything the app keeps per chat joins the id the app uses now:
 // settings (combined, the stricter choice kept), the agent, the spending cap, stored messages and memory; the old id
 // stays as an alias so later messages and lookups find the same chat.
-import { db, moveChatData } from './db.js';
+import { db, getChatMemory, moveChatData, setChatMemory } from './db.js';
 import { mergeChatPrefs } from './chat-prefs.js';
 import { agentForChat, updateAgent } from './agents.js';
 import { activity } from './events.js';
@@ -20,9 +20,21 @@ function followChat(agent, from, to) {
     schedules: agent.schedules.map((s) => (s.chats === 'all' ? s : { ...s, chats: swapped(s.chats, from, to) })) }, 'system');
 }
 
+/**
+ * Both ids have a running summary: `to` keeps both texts, the older first, and the mark of what is summarised goes back
+ * to the earlier of the two, so the next regular summary covers every message at least once (a summary alone would
+ * hide the other id's conversation from the agent). One summary, or none: it moves with the other rows.
+ */
+function joinSummaries(from, to) {
+  const [older, newer] = [getChatMemory(from), getChatMemory(to)].sort((a, b) => (a?.updated_at || 0) - (b?.updated_at || 0));
+  if (!older?.summary || !newer?.summary) return;
+  setChatMemory(to, `${older.summary}\n\n${newer.summary}`, Math.min(older.upto_id, newer.upto_id));
+}
+
 /** Move `from` into `to` (`why`: the Activity line). Agent of `to` wins; `from`'s agent follows when `to` has none. */
 export async function mergeChats(from, to, why) {
   if (!from || !to || from === to) return;
+  joinSummaries(from, to);
   moveChatData(from, to);
   mergeChatPrefs(from, to);
   db.prepare("UPDATE OR IGNORE budget_caps SET id = ? WHERE tenant_id = ? AND scope = 'chat' AND id = ?").run(to, TENANT, from);

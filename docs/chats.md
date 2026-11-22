@@ -104,7 +104,8 @@ does, a chat set up under the number (here, or switched on from its chat page) j
 agent, on/off, *Private to members* (kept if either had it), model, spending cap and memory move with it, and the
 number keeps pointing to it. That happens within a minute of the server knowing both, also when the person has
 not written since: you never see the same person twice in Chats for long, and *Private to members* set on one
-holds for the chat with the messages. Nothing stays stored under the old id. Nothing to switch on twice; Activity
+holds for the chat with the messages. If both had a summary, the agent keeps both. Nothing stays stored under the
+old id. Nothing to switch on twice; Activity
 notes the move.
 
 > [!NOTE]

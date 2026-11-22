@@ -175,7 +175,8 @@ test('077: photos are downloaded through getFile (refused above the limit); a gr
   const [oldId, newId] = [chat(-100500), chat(-1009999)];
   const sql = t.db.db;
   t.db.setChatMemory(oldId, 'They read one book a month.', 5);
-  t.db.setChatMemory(newId, 'The supergroup starts here.', 0);
+  sql.prepare('UPDATE chat_memory SET updated_at = updated_at - 60000 WHERE chat = ?').run(oldId); // written a minute earlier
+  t.db.setChatMemory(newId, 'The supergroup starts here.', 9);
   t.db.addNote({ chat: oldId, agent: 'panduga', text: 'Next book: Malgudi Days', author: 'Anu', role: 'organizer' });
   for (const id of [oldId, newId]) {
     sql.prepare('INSERT OR REPLACE INTO member_tags (chat, member, label) VALUES (?, ?, ?)').run(id, 'tg:77', id === oldId ? 'host' : 'reader');
@@ -185,7 +186,9 @@ test('077: photos are downloaded through getFile (refused above the limit); a gr
   assert.ok(await until(() => t.agents.getAgent('panduga').chats.includes(chat(-1009999))));
   const under = (id) => ['messages', 'wa_reactions', 'wa_polls', 'chat_memory', 'notes', 'member_tags'].map((table) => sql.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE chat = ?`).get(id).n);
   assert.deepEqual(under(oldId), [0, 0, 0, 0, 0, 0], 'nothing is left under the old id');
-  assert.equal(t.db.getChatMemory(newId).summary, 'The supergroup starts here.', 'the memory of the id in use stays');
+  const memory = t.db.getChatMemory(newId);
+  assert.equal(memory.summary, 'They read one book a month.\n\nThe supergroup starts here.', 'both summaries are kept, the older first');
+  assert.equal(memory.upto_id, 5, 'summarised up to the earlier mark: the next summary misses no message');
   assert.deepEqual(t.db.listNotes(newId).map((n) => n.text), ['Next book: Malgudi Days'], 'what only the old id had moves');
   assert.equal(sql.prepare('SELECT emoji FROM wa_reactions WHERE chat = ? AND msg_id = ?').get(newId, 'r1').emoji, '🎉');
   assert.ok(!t.agents.getAgent('panduga').chats.includes(chat(-100500)));

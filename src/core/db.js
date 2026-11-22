@@ -223,8 +223,9 @@ const CHAT_TABLES = ['messages', 'wa_reactions', 'wa_polls', 'chat_memory', 'not
 
 /**
  * 077: a chat's stored messages, reactions, polls, memory, notes and tags move to its new id (a Telegram supergroup, a
- * person's private id on WhatsApp). Where the new id has a row of its own (its memory, a tag for the same member) that
- * one stays; the old id's is removed, so nothing is left under an id that no lookup or erase reaches any more.
+ * person's private id on WhatsApp). Where the new id has a row of its own (a tag for the same member, its summary:
+ * chat-merge.js joins the two texts first) that one stays; the old id's is removed, so nothing is left under an id
+ * that no lookup or erase reaches any more.
  */
 export function moveChatData(from, to) {
   for (const t of CHAT_TABLES) {
