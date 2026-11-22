@@ -254,49 +254,66 @@ export function setHidden(id, on, by = 'panel') {
 }
 
 // ---------- list and search ----------
+const PAGE = 100; const PAGE_MAX = 500; // people per page: the default and the most one request gets
+const NUMBER_MIN = 3; // digits before a search also looks at phone numbers
+/** A piece of the WHERE of listPeople: its SQL and the values of its "?". */
+const clause = (sql, ...args) => ({ sql, args });
+
+/** The words of a search: names (own, phone contact, business, profile, app), nickname, tags, notes, and the number. */
+function searchClause(text) {
+  const s = String(text ?? '').trim().toLowerCase();
+  if (!s) return null;
+  const like = `%${s}%`; const d = digits(s);
+  const number = d.length >= NUMBER_MIN;
+  return clause(`(lower(${LABEL}) LIKE ? OR lower(p.name) LIKE ? OR lower(p.nickname) LIKE ? OR lower(COALESCE(c.book_name, '')) LIKE ? OR lower(COALESCE(c.push_name, '')) LIKE ?
+      OR EXISTS (SELECT 1 FROM person_tags t WHERE t.tenant_id = p.tenant_id AND t.person = p.id AND t.tag LIKE ?)
+      OR EXISTS (SELECT 1 FROM person_notes n WHERE n.tenant_id = p.tenant_id AND n.person = p.id AND n.kind = 'note' AND lower(n.text) LIKE ?)${number ? ' OR p.phone LIKE ?' : ''})`,
+  like, like, like, like, like, like, like, ...(number ? [`%${d}%`] : []));
+}
+/** #174: a filter picks its people through its own index (the members of a tag, list or household; an app's identities). */
+function filterClauses({ tag, list, household, app, source, hidden, shared }) {
+  return [
+    tag && clause('p.id IN (SELECT t.person FROM person_tags t INDEXED BY person_tags_tag WHERE t.tenant_id = ? AND t.tag = ?)', TENANT, normTag(tag)),
+    list && clause('p.id IN (SELECT l.person FROM person_list_members l WHERE l.tenant_id = ? AND l.list = ?)', TENANT, String(list)),
+    household && clause('p.id IN (SELECT m.person FROM household_members m WHERE m.tenant_id = ? AND m.household = ?)', TENANT, String(household)),
+    app === 'none' && clause('NOT EXISTS (SELECT 1 FROM identities i WHERE i.tenant_id = p.tenant_id AND i.person = p.id)'),
+    app && app !== 'none' && clause('p.id IN (SELECT i.person FROM identities i WHERE i.tenant_id = ? AND i.channel = ?)', TENANT, String(app)),
+    source && clause('p.id IN (SELECT s.id FROM people s WHERE s.tenant_id = ? AND s.source = ?)', TENANT, String(source)),
+    hidden ? clause('p.id IN (SELECT x.id FROM people x WHERE x.tenant_id = ? AND x.hidden = 1)', TENANT) : clause('p.hidden = 0'),
+    shared && clause('p.shared = 1'),
+  ].filter(Boolean);
+}
+/** 079: only the people an agent may see: those of its chats or its lists. Null: no such scope; false: it sees nobody. */
+function scopeClause(scope) {
+  if (!scope || scope.all) return null;
+  const chats = scope.chats || []; const lists = scope.lists || [];
+  const marks = (xs) => xs.map(() => '?').join(',');
+  const parts = [chats.length ? `p.id IN (SELECT c.person FROM person_chats c WHERE c.tenant_id = ? AND c.chat IN (${marks(chats)}))` : '',
+    lists.length ? `p.id IN (SELECT l2.person FROM person_list_members l2 WHERE l2.tenant_id = ? AND l2.list IN (${marks(lists)}))` : ''].filter(Boolean);
+  if (!parts.length) return false;
+  return clause(`(${parts.join(' OR ')})`, ...(chats.length ? [TENANT, ...chats] : []), ...(lists.length ? [TENANT, ...lists] : []));
+}
+
 /**
  * People by name. q matches names (own, phone contact, business, profile, app), nickname, number, tags and notes;
  * filters: tag, list, household, app (a channel id, or 'none' for people without any app), source (chat | phone |
  * owner), hidden (079: only the hidden ones; otherwise hidden people never appear). `scope` (079, people-access.js):
  * only the people an agent may see. `limit` + `offset` page.
  * @param {{ q?: string, tag?: string, list?: string, household?: string, app?: string, source?: string, hidden?: boolean,
- *   limit?: number, offset?: number, shared?: boolean, scope?: { all?: boolean, chats?: string[], lists?: string[] } | null }} [o]
+ *   limit?: number, offset?: number, shared?: boolean, scope?: { all?: boolean, chats?: string[], lists?: string[] } | null }} [options]
  */
-export function listPeople({ q: text = '', tag = '', list = '', household = '', app = '', source = '', hidden = false, limit = 100, offset = 0, shared = false, scope = null } = {}) {
-  const where = ['p.tenant_id = ?']; const args = [TENANT];
-  const s = String(text).trim().toLowerCase();
-  if (s) {
-    const like = `%${s}%`; const d = digits(s);
-    where.push(`(lower(${LABEL}) LIKE ? OR lower(p.name) LIKE ? OR lower(p.nickname) LIKE ? OR lower(COALESCE(c.book_name, '')) LIKE ? OR lower(COALESCE(c.push_name, '')) LIKE ?
-      OR EXISTS (SELECT 1 FROM person_tags t WHERE t.tenant_id = p.tenant_id AND t.person = p.id AND t.tag LIKE ?)
-      OR EXISTS (SELECT 1 FROM person_notes n WHERE n.tenant_id = p.tenant_id AND n.person = p.id AND n.kind = 'note' AND lower(n.text) LIKE ?)${d.length >= 3 ? ' OR p.phone LIKE ?' : ''})`);
-    args.push(like, like, like, like, like, like, like, ...(d.length >= 3 ? [`%${d}%`] : []));
-  }
-  // #174: a filter picks its people through its own index (the members of a tag, list or household; an app's identities)
-  if (tag) { where.push('p.id IN (SELECT t.person FROM person_tags t INDEXED BY person_tags_tag WHERE t.tenant_id = ? AND t.tag = ?)'); args.push(TENANT, normTag(tag)); }
-  if (list) { where.push('p.id IN (SELECT l.person FROM person_list_members l WHERE l.tenant_id = ? AND l.list = ?)'); args.push(TENANT, String(list)); }
-  if (household) { where.push('p.id IN (SELECT m.person FROM household_members m WHERE m.tenant_id = ? AND m.household = ?)'); args.push(TENANT, String(household)); }
-  if (app === 'none') where.push('NOT EXISTS (SELECT 1 FROM identities i WHERE i.tenant_id = p.tenant_id AND i.person = p.id)');
-  else if (app) { where.push('p.id IN (SELECT i.person FROM identities i WHERE i.tenant_id = ? AND i.channel = ?)'); args.push(TENANT, String(app)); }
-  if (source) { where.push('p.id IN (SELECT s.id FROM people s WHERE s.tenant_id = ? AND s.source = ?)'); args.push(TENANT, String(source)); }
-  if (hidden) { where.push('p.id IN (SELECT x.id FROM people x WHERE x.tenant_id = ? AND x.hidden = 1)'); args.push(TENANT); } else where.push('p.hidden = 0');
-  if (shared) where.push('p.shared = 1');
-  const scoped = scope && !scope.all;
-  if (scoped) {
-    const chats = scope.chats || []; const lists = scope.lists || [];
-    const parts = [chats.length ? `p.id IN (SELECT c.person FROM person_chats c WHERE c.tenant_id = ? AND c.chat IN (${chats.map(() => '?').join(',')}))` : '',
-      lists.length ? `p.id IN (SELECT l2.person FROM person_list_members l2 WHERE l2.tenant_id = ? AND l2.list IN (${lists.map(() => '?').join(',')}))` : ''].filter(Boolean);
-    if (!parts.length) return [];
-    where.push(`(${parts.join(' OR ')})`);
-    if (chats.length) args.push(TENANT, ...chats);
-    if (lists.length) args.push(TENANT, ...lists);
-  }
+export function listPeople(options = {}) {
+  const { q: text, tag, list, household, app, source, hidden, limit, offset, shared, scope } = options;
+  const filters = [searchClause(text), ...filterClauses({ tag, list, household, app, source, hidden, shared })];
+  const scoped = scopeClause(scope);
+  if (scoped === false) return [];
+  const clauses = [clause('p.tenant_id = ?', TENANT), ...filters, scoped].filter(Boolean);
   // Without such a filter every person's display name is needed to sort (and to search) by it: the one full read of
   // `people`, marked for scripts/check-perf.mjs and kept within its time budget.
   const all = !(tag || list || household || source || hidden || scoped || (app && app !== 'none')) ? '/* people: every name sorts */ ' : '';
   // the page is chosen by name first; apps and last contact are looked up for that page only
-  const sql = `SELECT ${ROW} ${FROM} WHERE p.tenant_id = ? AND p.id IN (SELECT ${all}p.id ${FROM} WHERE ${where.join(' AND ')} ORDER BY lower(${LABEL}) LIMIT ? OFFSET ?) ORDER BY lower(label)`;
-  return db.prepare(sql).all(TENANT, ...args, Math.min(Number(limit) || 100, 500), Math.max(0, Number(offset) || 0)).map(view);
+  const sql = `SELECT ${ROW} ${FROM} WHERE p.tenant_id = ? AND p.id IN (SELECT ${all}p.id ${FROM} WHERE ${clauses.map((c) => c.sql).join(' AND ')} ORDER BY lower(${LABEL}) LIMIT ? OFFSET ?) ORDER BY lower(label)`;
+  return db.prepare(sql).all(TENANT, ...clauses.flatMap((c) => c.args), Math.min(Number(limit) || PAGE, PAGE_MAX), Math.max(0, Number(offset) || 0)).map(view);
 }
 /** How many people, households and lists there are, and the tags in use (with counts) for the filters. */
 export function peopleCounts() {
