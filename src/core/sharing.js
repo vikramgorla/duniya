@@ -6,7 +6,8 @@
 //
 // - One call: the agent gets `share_media(mood)` (for the roles allowed to use that service). It only picks the mood;
 //   code searches with the mood words (names stripped) + style words, picks a fitting result it did not post in that
-//   chat lately and sends it as media with the credit text the tool returns, right after the text answer.
+//   chat lately and sends it with the answer as its caption (one message; a long answer or a sticker: right after it),
+//   with the credit text the tool returns.
 // - Moments in code: thanks, celebrations, welcomes, jokes, praise, settled plans and requests are found by cheap
 //   rules; "often" asks for one on such a moment and sends one itself when the model did not; "sometimes" only on
 //   strong moments (celebrations, thanks to the agent, requests). The model can also end its text with
@@ -67,7 +68,8 @@ const SERIOUS = /\b(sorry|sad|sick|ill|hospital|doctor|accident|emergency|urgent
 const MOMENTS = [
   // [strength, mood, test] — strong: worth one whenever sharing is on; light: only for "often"
   ['strong', 'excited yes', /\b(gifs?|stickers?|memes?)\b/i],
-  ['strong', 'celebration', /\b(congrat\w*|celebrat\w*|happy birthday|birthday|anniversary|promot\w*|we did it|woo+h?o+|hurray|yay+|party)\b|[🎉🥳🎂🍾🎊]/iu],
+  // festival greetings in any language's name ("happy Diwali", "happy Pongal", "happy new year"), not "happy to help"
+  ['strong', 'celebration', /\b(congrat\w*|celebrat\w*|happy birthday|birthday|anniversary|promot\w*|we did it|woo+h?o+|hurray|yay+|party|festival|best wishes|season'?s greetings)\b|\bhappy (?!to\b|with\b|for\b|about\b|that\b|now\b|hour\b|enough\b)\p{L}{3,}|[🎉🥳🎂🍾🎊🪔]/iu],
   ['thanks', 'thank you', /\b(thanks?|thank (you|u)|thx|ty|dhanyavad\w*|merci|danke|gracias)\b|🙏/iu],
   ['light', 'welcome', /\b(welcome|glad to have you)\b/i],
   ['light', 'laughing', /\b(haha\w*|hehe\w*|lol|lmao|rofl|funny|joke)\b|[😂🤣😆]/iu],
@@ -189,14 +191,13 @@ function urlFor(r, kind) {
 const creditOf = (r) => clip(String(r.attribution || r.credit || r.credits || ''), 200);
 
 /**
- * Search with the mood words and the style words, pick a fitting result not posted here lately (a random one of the
- * first few) and post it to the chat. Returns { sent }. Never throws.
+ * Search with the mood words and the style words and pick a fitting result not posted here lately (a random one of
+ * the first few): { ctx, svc, by, words, query, url, id, credit, seen } or null. Never throws.
  */
-export async function shareMedia(ctx, { svc, mood, by }) {
+export async function findMedia(ctx, { svc, mood, by }) {
   const chat = ctx.chat; const agent = ctx.agent;
-  const channel = chatChannel();
-  if (!channel || sentWithin(chat, agent.id, SHARED, GAP_MS)) return { sent: false };
-  if (limitStop(ctx, svc.key, svc.behaviour, ctx.uses || new Map())) return { sent: false };
+  if (!chatChannel() || sentWithin(chat, agent.id, SHARED, GAP_MS)) return null;
+  if (limitStop(ctx, svc.key, svc.behaviour, ctx.uses || new Map())) return null;
   const words = moodWords(mood, namesOf(ctx)) || 'happy';
   const query = clip([words, svc.style].filter(Boolean).join(' '), 200);
   try {
@@ -206,19 +207,34 @@ export async function shareMedia(ctx, { svc, mood, by }) {
     const usable = resultsOf(res).filter((r) => urlFor(r, svc.kind));
     const fresh = usable.filter((r) => !seen.has(String(r.id || urlFor(r, svc.kind))));
     const pool = (fresh.length ? fresh : usable).slice(0, 6);
-    if (!pool.length) { activity('whatsapp.action', { agent: agent.id, chat, summary: `No ${KIND_WORD[svc.kind]} found for "${words}" (${svc.key})`, detail: { tool: 'share_media', service: svc.key, query } }); return { sent: false }; }
+    if (!pool.length) { activity('whatsapp.action', { agent: agent.id, chat, summary: `No ${KIND_WORD[svc.kind]} found for "${words}" (${svc.key})`, detail: { tool: 'share_media', service: svc.key, query } }); return null; }
     const pick = pool[randomInt(pool.length)];
-    const url = urlFor(pick, svc.kind); const id = String(pick.id || url);
-    const r = await channel.sendMedia(chat, { kind: svc.kind, url, caption: creditOf(pick) });
-    noteSent(chat, agent.id, { kind: 'share', url });
-    kvSet(recentKey(chat, svc.key), JSON.stringify([...seen].filter((x) => x !== id).concat(id).slice(-KEEP_IDS)));
-    const label = `[${svc.kind}: ${words}]`;
-    if (!(ctx.ownerChat && chat === ctx.ownerChat)) logMessage({ chat, agent: agent.id, msgId: r?.msgId || null, sender: 'agent', name: 'Assistant', text: label, fromAgent: true });
-    activity('whatsapp.action', { agent: agent.id, chat, summary: `Shared a ${KIND_WORD[svc.kind]} (${words}) from ${svc.key}, chosen by ${by}`,
-      detail: { tool: 'share_media', service: svc.key, query, url, by, role: ctx.role } });
-    return { sent: true };
+    const url = urlFor(pick, svc.kind);
+    return { ctx, svc, by, words, query, url, id: String(pick.id || url), credit: creditOf(pick), seen };
   } catch (e) {
     activity('whatsapp.action', { agent: agent.id, chat, summary: `Could not share a ${KIND_WORD[svc.kind]} from ${svc.key}: ${clip(e.message, 160)}`, detail: { tool: 'share_media', service: svc.key, error: clip(e.message, 300) } });
-    return { sent: false };
+    return null;
   }
+}
+
+const CAPTION_MAX = 500; // a longer answer goes as its own message, the media after it
+/** Can the answer go as the media's caption (one message)? Stickers take no caption. */
+export const fitsCaption = (m, text) => !!m && m.svc.kind !== 'sticker' && String(text || '').length <= CAPTION_MAX;
+
+/**
+ * Post a found result: alone (its credit as the caption), or with the answer as its caption (`text`: one message,
+ * the credit under it). Returns the stored message's id (or undefined) and records it as shared.
+ */
+export async function postMedia(m, { text = '', quote = undefined } = {}) {
+  const { ctx, svc, words } = m; const chat = ctx.chat; const agent = ctx.agent;
+  const caption = [text, m.credit && (text ? `_${m.credit}_` : m.credit)].filter(Boolean).join('\n\n');
+  const r = await chatChannel().sendMedia(chat, { kind: svc.kind, url: m.url, caption, ...(quote ? { quote } : {}) });
+  noteSent(chat, agent.id, { kind: 'share', url: m.url });
+  kvSet(recentKey(chat, svc.key), JSON.stringify([...m.seen].filter((x) => x !== m.id).concat(m.id).slice(-KEEP_IDS)));
+  const label = `[${svc.kind}: ${words}]`;
+  const id = ctx.ownerChat && chat === ctx.ownerChat ? undefined
+    : logMessage({ chat, agent: agent.id, msgId: r?.msgId || null, sender: 'agent', name: 'Assistant', text: text ? `${text}\n${label}` : label, fromAgent: true });
+  activity('whatsapp.action', { agent: agent.id, chat, summary: `Shared a ${KIND_WORD[svc.kind]} (${words}) from ${svc.key}, chosen by ${m.by}${text ? ', with the answer' : ''}`,
+    detail: { tool: 'share_media', service: svc.key, query: m.query, url: m.url, by: m.by, role: ctx.role } });
+  return id;
 }

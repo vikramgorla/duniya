@@ -19,6 +19,7 @@ npm install && ADMIN_PASSWORD=dev-password-123 npm start     # panel on http://1
 | `node scripts/ci-checks.mjs` | versions match, breaking-release entries, **doc links** (`scripts/check-doc-links.mjs`), diagrams, **lean code** (knip, jscpd, panel budgets), types, **performance budgets** (`check-perf`) |
 | `npm run check:perf` | no full scans of large tables on hot paths, and every time budget met, against the scale fixture ([Performance budgets](#performance-budgets), ~30 s) |
 | `npm run knip` / `npm run jscpd` | unused files, exports and dependencies / duplicated code ([Lean code](#lean-code)) |
+| `npm run check:clean` / `npm run clean:baseline` | the clean-code ratchet (function size, branches, nesting, parameters, file length) / lower its baseline after a cleanup ([Lean code](#lean-code)) |
 | `node scripts/demo-panel.mjs` | seeded demo panel on :8099 (admin / demo-password-123), no network |
 | `DEMO_EMPTY=1 node scripts/demo-panel.mjs` | a fresh install (no provider, no agent, WhatsApp waiting for a scan; *Get code* links it): check the first run |
 | `npm run check:responsive` | every screen at 375 / 393 / 1440 px, light + dark: layout, tap targets, text size, and accessibility (every control named, AA text contrast, 3:1 for icons) (needs Chrome). CI runs its navigation states: `nav-stress` (fast tab switching on a slow network ends on the chosen screen, fully drawn), `load-failed` / `load-retry` (a hung request ends in Retry, and Retry recovers) |
@@ -63,7 +64,11 @@ The owner runs the latest version on one server, so the code carries nothing for
    and on a missed time budget ([Performance budgets](#performance-budgets)).
 6. **Test behaviour, not internals:** tests go through the panel API, the router and the fakes in `test/harness.js`;
    export something only when the app uses it.
-7. **Keep the panel snappy:** no new polling. The status and activity arrive over `/api/events` (server-sent events);
+7. **Clean code** ([AGENTS.md](../AGENTS.md#clean-code)): small single-purpose functions, early returns, meaningful
+   names, named constants, generic rules. `npm run check:clean` (also in `ci-checks.mjs`) fails on a new break of the
+   function size, branch, nesting, parameter and file-length rules; older code is listed in
+   `scripts/clean-baseline.json`, which only goes down (`npm run clean:baseline` lowers it after a cleanup).
+8. **Keep the panel snappy:** no new polling. The status and activity arrive over `/api/events` (server-sent events);
    screens load through `api()`, whose screen-data cache is dropped by any change or live event. Simple switches update
    the screen at once and put the old state back when the server refuses. The shell and its modules are served from
    memory, compressed, with ETag/304; screens load on their first visit ([Panel modules](#panel-modules)).

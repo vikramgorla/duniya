@@ -25,7 +25,8 @@ Tick each item or write "n/a – reason".
 
 **Lean code**
 - [ ] What the change replaces is deleted; no compatibility layer or one-time migration left after its release; existing helpers reused
-- [ ] `node scripts/ci-checks.mjs` passes (knip, jscpd, panel budgets, types, one repository slug); tests check behaviour, not internals
+- [ ] `node scripts/ci-checks.mjs` passes (knip, jscpd, panel budgets, types, one repository slug, clean code); tests check behaviour, not internals
+- [ ] Clean code (AGENTS.md#clean-code): small single-purpose functions, early returns, meaningful names, named constants, generic (nothing keyed on a tool/service/channel name); `npm run check:clean` passes and `scripts/clean-baseline.json` did not go up (or the PR says why)
 - [ ] No hard-coded repository owner/name: code reads `REPO` (`src/core/config.js`), docs are rewritten by `npm run repo:sync`
 - [ ] UI: no new polling (live data over `/api/events`)
 

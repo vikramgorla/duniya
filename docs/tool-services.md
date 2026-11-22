@@ -7,13 +7,13 @@ own, and how often — without writing it into the prompt.**
 agent's page → **Tools** → the card **How it uses it** right under the service's name → **Change** (just that agent).
 
 **In 30 seconds**
-- Every tool service has five settings: **who can use it**, **when to use it**, **changes it makes**, **share results
-  on its own** and **limits**. The service's settings are the default; an agent can differ in any of them.
+- Every tool service has four settings: **who can use it**, **when to use it**, **changes it makes** and **limits**.
+  The service's settings are the default; an agent can differ in any of them.
 - How risky a tool is comes from what the tool itself declares (MCP annotations): *read-only* never asks, *destructive*
   always asks, anything else is a change that follows **Changes it makes**. You can correct a tool that declares
   itself wrongly.
-- **Share results on its own** appears for a read-only tool that returns pictures, GIFs or stickers: the agent adds one
-  after its text at the right moments (celebrations, thanks, jokes), with the credit the service gives.
+- For a service that returns pictures, GIFs or stickers, **When to use it → Proactively** or **Often** means the agent
+  adds one at the right moments (celebrations, thanks, jokes) by itself, in the same message as a short answer.
 - Nothing is decided by a tool's name; Duniya's own tools (People, Events, Orders, WhatsApp actions, memory) declare
   their risk the same way.
 
@@ -22,9 +22,8 @@ agent's page → **Tools** → the card **How it uses it** right under the servi
 | Setting | Choices | What it does |
 |---|---|---|
 | **Who can use it** | ticks per role | Which tools participants and organizers get (Discover tools → ticks). Decided in code: a tool a role may not use is never offered. |
-| **When to use it** | *Only when asked* · *When useful* (default) · *Proactively*, plus a note | One short line per service in the agent's instructions, e.g. "- tracker: only when someone asks for that kind of thing; only for this year's event." Services left at *When useful* without a note add nothing. |
+| **When to use it** | *Only when asked* · *When useful* (default) · *Proactively* · *Often* (services that return media), plus a note | One short line per service in the agent's instructions, e.g. "- tracker: only when someone asks for that kind of thing; only for this year's event." Services left at *When useful* without a note add nothing. For a service that returns media, *Proactively* and *Often* also share on their own ([below](#share-results-on-its-own)). |
 | **Changes it makes** | *Agent's setting* (default) · *Ask first* · *Clear requests* · *Act and report* | Like the agent's [How sure before changing things](agents.md#how-sure-before-changing-things), for this service only. |
-| **Share results on its own** | *Off* · *Sometimes* · *Often*, plus style words | Only for a read-only tool that returns media; see [below](#share-results-on-its-own). |
 | **Limits** | most uses per reply, most uses per day, *Groups and direct* · *Direct only* | Enforced in code. A use a limit stops is not made; the agent is told why and Activity shows *Limit reached*. |
 
 On an agent's page every choice starts with **Default (…)**: what the service says. Pick another choice to differ;
@@ -65,29 +64,30 @@ Duniya reads them:
 
 ## Share results on its own
 
-**An agent with a GIF or sticker service adds one fitting GIF after its text, at the right moments, by itself.**
+**An agent with a GIF or sticker service adds one fitting GIF at the right moments, by itself.**
 
-1. **Settings → Tool services** → the service → **How it uses it** → **Share GIFs on its own** → *Sometimes* or
-   *Often*; add style words (e.g. *Telugu movie reactions, Brahmanandam*). Or set it per agent on its **Tools** page.
+1. **Settings → Tool services** → the service → **How it uses it** → **When to use it** → *Proactively* or *Often*;
+   add style words (e.g. *Telugu movie reactions, Brahmanandam*). Or set it per agent on its **Tools** page.
 2. That's it: no prompt text needed.
 
-> [!TIP]
-> **When to use it → Proactively** on such a service already shares *Sometimes* until you pick **Share … on its own**
-> yourself (an explicit *Off* keeps it off). The card's summary shows it: *Proactively · shares GIFs sometimes*.
+A hint alone is not enough for an extra like a GIF (models often just answer), so here Duniya makes it happen: it spots
+the moment in code, gives the agent one simple *share* step, and shares one itself when the agent answered with text
+only.
 
-| | Sometimes | Often |
+| | Proactively | Often |
 |---|---|---|
 | Celebrations ("congrats!", 🎉), thanks said to the agent, "send a gif" | ✓ | ✓ |
 | Other thanks, welcomes, jokes (😂), praise ("well said"), settled plans ("all set") | | ✓ |
 | Serious, worried, upset, safety or money topics ("accident", "sick", "refund") | never | never |
 
 - **One call.** The agent gets one action, *share media* with a mood ("party", "thank you"). Duniya searches the
-  service with the mood and your style words, picks a result it did not post in that chat lately, and posts it right
-  after the text with the credit text the service returns (KLIPY: *Powered by KLIPY*).
-- **Not up to the model alone.** Duniya spots the moment itself and asks for one in that turn; with *Often*, when a
-  model (often a light one) answers with text only, Duniya posts one anyway.
+  service with the mood and your style words and picks a result it did not post in that chat lately.
+- **One message.** A short answer (up to 500 characters) goes as the GIF's caption, with the service's credit in
+  italics under it (KLIPY: *Powered by KLIPY*); a longer answer, or a sticker, goes first and the GIF right after it.
+- **Not up to the model alone.** Duniya spots the moment itself (also festival greetings: "happy Diwali") and asks
+  for one in that turn; when the model answers with text only, Duniya shares one anyway.
 - **One per moment.** At most one per answer, and none when one went out in that chat in the last few minutes.
-- **Who.** Everyone in the chat, once you switch sharing on: participants need neither the service's tools (a service
+- **Who.** Everyone in the chat, once it is set to *Proactively* or *Often*: participants need neither the service's tools (a service
   added from the Registry gives them none) nor *send media*; only its read-only media tool is used, and the agent's deny
   list still wins.
 - Which tools qualify: read-only (`readOnlyHint: true`), with media in its results (media fields such as `mp4Url` or

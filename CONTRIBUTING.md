@@ -37,7 +37,7 @@ check that proves it works.
 
    ```bash
    npm test && npm run lint && npm run typecheck && npm run check:panel
-   node scripts/ci-checks.mjs          # versions, releases.json, doc links, diagrams, knip, jscpd, panel budgets, perf, repository slug
+   node scripts/ci-checks.mjs          # versions, releases.json, doc links, diagrams, knip, jscpd, panel budgets, perf, repository slug, clean code
    npm run check:responsive            # UI changes: 375 / 393 / 1440 px, light and dark (needs Chrome)
    ```
 
