@@ -1,5 +1,6 @@
 // @ts-check
-import { isChatEnabled, ignoredCounts, noteLatestKeys, moveChatPrefs } from './chat-prefs.js';
+import { isChatEnabled, ignoredCounts, noteLatestKeys } from './chat-prefs.js';
+import { mergeChats } from './chat-merge.js';
 import { agentSpoke, shouldJudge, verdictOf, closeFollowups } from './group-replies.js';
 import { storeLoadedBatch, setHistoryChannel, historyChatActive } from './history-load.js';
 import { personInfo, agentName } from './contacts.js';
@@ -7,9 +8,9 @@ import { memberTag } from './member-tags.js';
 import { env, clip } from './config.js';
 import { capsOf, isGroup } from '../channels/index.js';
 import { getSetting } from './store.js';
-import { listAgents as allAgents, getAgent, agentForChat, roleIn, isBuiltin, updateAgent } from './agents.js';
+import { listAgents as allAgents, getAgent, agentForChat, roleIn, isBuiltin } from './agents.js';
 import { runAgent, handleConfirmCommand } from './runner.js';
-import { lastAgentMessage, logMessage, messageByMsgId, deleteMessageByMsgId, saveReaction, savePollVote, pollTally, setMessageText, moveChatData, editStoredMessage, agentAnsweredAfter } from './db.js';
+import { lastAgentMessage, logMessage, messageByMsgId, deleteMessageByMsgId, saveReaction, savePollVote, pollTally, setMessageText, editStoredMessage, agentAnsweredAfter } from './db.js';
 import { activity } from './events.js';
 import { maybeSummarize, forgetChanged } from './memory.js';
 import { setChatChannel } from './chat-tools.js';
@@ -219,14 +220,7 @@ function recordEvent(msg) {
  * Only chats that were on carry anything over; a chat that was off just shows up under its new id (off).
  */
 export function createChatMoveHandler() {
-  return async ({ from, to }) => {
-    if (!from || !to || from === to) return;
-    const agent = agentForChat(from);
-    moveChatData(from, to);
-    moveChatPrefs(from, to);
-    if (agent) await updateAgent(agent.id, { chats: agent.chats.map((c) => (c === from ? to : c)) }, 'Telegram').catch(() => {});
-    activity('config', { chat: to, agent: agent?.id || '', summary: 'Telegram upgraded this group (new id): its settings, agent and memory moved with it' });
-  };
+  return ({ from, to }) => mergeChats(from, to, 'Telegram upgraded this group (new id)');
 }
 
 /** Build the live message router for a channel. */
@@ -240,8 +234,8 @@ export function createRouter(channel) {
     try { await route(incoming); } finally { if (--inFlight === 0) for (const r of idleWaiters.splice(0)) r(); }
   };
   async function route(incoming) {
-    // 049 (#92): a direct message from a prepared person may arrive from their LID; use the prepared chat id.
-    const msg = resolveDirectChat(incoming);
+    // 049 (#92): one chat per person, whichever id WhatsApp writes from (a phone-form chat set up first joins the LID one)
+    const msg = await resolveDirectChat(incoming);
     msg.arrived ??= Date.now(); // 087: sends after this moment that repeat each other are duplicates
     drainReads(channel).catch(() => {}); // 080: read receipts that are due go out on every incoming message (and the upkeep tick)
     // #91: newest message key per chat (metadata only, also while the chat is off) to load history when it goes on.

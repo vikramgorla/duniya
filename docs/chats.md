@@ -99,8 +99,10 @@ chat's newest message). When you switch a chat **on**, the server asks your phon
 3. Choose the agent, **On** and, if you like, **Private to members** → **Set up chat**.
 
 The chat shows **Waiting for the first message** until the person writes; that message goes straight to the agent.
-Messages that arrive from WhatsApp's private id (`…@lid`) are matched to the prepared chat, so replies, memory and
-settings stay together.
+**One chat per person.** WhatsApp often writes from a private id (`…@lid`) instead of the phone number. When it
+does, a chat set up under the number (here, or switched on from its chat page) joins the chat WhatsApp uses: the
+agent, on/off, *Private to members* (kept if either had it), model, spending cap and memory move with it, and the
+number keeps pointing to it. Nothing to switch on twice; Activity notes the move.
 
 > [!NOTE]
 > Nothing is sent to the person. **Send intro…** lets the agent write first: you see the exact text (with the privacy

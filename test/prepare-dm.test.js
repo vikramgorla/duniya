@@ -1,5 +1,7 @@
 // 049 (#92): prepare a direct chat by phone number before the person writes; the first message (phone or LID form,
 // any WhatsApp number) goes to the prepared agent with the prepared settings; optional intro behind a confirm.
+// 2.57.2: one chat per person — the chat WhatsApp writes from (the LID) is the chat; a phone-form chat set up first
+// joins it (settings, agent, memory) and stays as an alias.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setup, fakeNumbers, fakeWhatsAppHub } from './harness.js';
@@ -64,24 +66,26 @@ test('049: prepared before any message; the first message arrives from the LID a
   // helper only answers organizers in DMs — but an assigned chat always goes to its agent
   t.script.push([{ type: 'text', text: 'Hi Vedika, Helper here.' }]);
   await sessions.main.handler(dm({ chat: 'v701@lid', phone: '41790000701', senderJid: 'v701@lid', text: 'hello' }));
-  assert.equal(sessions.main.sent.at(-1).jid, chat, 'the reply goes to the prepared chat');
+  const lid = 'v701@lid';
+  assert.equal(sessions.main.sent.at(-1).jid, lid, 'the reply goes to the chat WhatsApp writes from');
   assert.match(sessions.main.sent.at(-1).text, /^Hi Vedika, Helper here\./);
   assert.equal(t.claudeReqs.at(-1).model, 'claude-haiku-5-5', 'prepared model used');
-  assert.equal(stored(chat).length, 2, 'message + reply stored under the prepared chat');
-  assert.equal(stored('v701@lid').length, 0);
-  row = await chatRow(chat);
+  assert.equal(stored(lid).length, 2, 'message + reply stored under the one chat');
+  row = await chatRow(lid);
   assert.ok(!row.waiting);
-  assert.ok(!(await chatRow('v701@lid')), 'the LID chat is not listed separately');
+  assert.equal(row.agent, 'helper'); assert.equal(row.private, true);
+  assert.ok(!(await chatRow(chat)), 'the phone-form chat is not listed separately');
+  assert.ok(dc.isChatAlias(chat));
 
-  // later messages from the LID with the phone hidden still find the chat (alias)
+  // later messages from the phone form find the same chat (alias)
   t.script.push([{ type: 'text', text: 'Again' }]);
-  await sessions.main.handler(dm({ chat: 'v701@lid', phone: '', senderJid: 'v701@lid', text: 'still me' }));
-  assert.equal(sessions.main.sent.at(-1).jid, chat);
-  assert.equal(stored(chat).length, 4);
+  await sessions.main.handler(dm({ chat, phone: '41790000701', text: 'still me' }));
+  assert.equal(sessions.main.sent.at(-1).jid, lid);
+  assert.equal(stored(lid).length, 4);
 
   // private to members: the owner assistant never sees it
-  assert.ok(!oa.visibleChats().includes(chat));
-  assert.equal(oa.isVisible(chat), false);
+  assert.ok(!oa.visibleChats().includes(lid));
+  assert.equal(oa.isVisible(lid), false);
 });
 
 test('049: phone form, second WhatsApp number, and a LID learned when the number was checked', async () => {
@@ -98,20 +102,21 @@ test('049: phone form, second WhatsApp number, and a LID learned when the number
   assert.deepEqual(t.lookups.at(-1), { number: 'shop', phone: '41790000703' });
   t.script.push([{ type: 'text', text: 'Shop helper' }]);
   await sessions.shop.handler(dm({ chat: 's703@lid', phone: '41790000703', text: 'hi shop' }));
-  assert.equal(sessions.shop.sent.at(-1).jid, '41790000703@s.whatsapp.net');
+  assert.equal(sessions.shop.sent.at(-1).jid, 's703@lid');
   assert.equal(sessions.shop.sent.at(-1).text.split('\n')[0], 'Shop helper');
-  assert.equal(stored('shop#41790000703@s.whatsapp.net').length, 2);
+  assert.equal(stored('shop#s703@lid').length, 2);
   const mainBefore = sessions.main.sent.length;
   await sessions.main.handler(dm({ chat: 's703@lid', phone: '41790000703', text: 'same person, main number' }));
   assert.equal(sessions.main.sent.length, mainBefore, 'not prepared on the main number: stays off there');
-  assert.equal(stored('41790000703@s.whatsapp.net').length, 0);
+  assert.equal(stored('s703@lid').length, 0);
 
-  // LID known from the number check: matched even when the first message hides the phone
-  await prepare({ phone: '+41 79 000 07 04', agent: 'helper' });
-  assert.ok(dc.isChatAlias('99704@lid'));
+  // LID known from the number check: the chat is set up under it, so the first message finds it even without a phone
+  const k = await prepare({ phone: '+41 79 000 07 04', agent: 'helper' });
+  assert.equal(k.body.chat, '99704@lid');
+  assert.ok(dc.isChatAlias('41790000704@s.whatsapp.net'));
   t.script.push([{ type: 'text', text: 'Found you' }]);
   await t.route(dm({ chat: '99704@lid', phone: '', senderJid: '99704@lid', text: 'hi' }));
-  assert.equal(t.sent.at(-1).chat, '41790000704@s.whatsapp.net');
+  assert.equal(t.sent.at(-1).chat, '99704@lid');
 });
 
 test('049: nothing is stored or sent to a model before the prepared chat is on', async () => {
@@ -123,7 +128,23 @@ test('049: nothing is stored or sent to a model before the prepared chat is on',
   assert.equal(t.claudeReqs.length, reqs);
   assert.equal(t.sent.length, sent);
   assert.equal(stored('41790000705@s.whatsapp.net').length + stored('v705@lid').length, 0);
-  assert.ok(!(await chatRow('41790000705@s.whatsapp.net')).waiting, 'it did arrive (time only, no text)');
+  const row = await chatRow('v705@lid');
+  assert.ok(!row.enabled, 'still off after joining the LID chat');
+  assert.ok(!row.waiting, 'it did arrive (time only, no text)');
+});
+
+test('a chat set up on its chat page under the phone number (no prepared entry) and a LID chat seen before become one', async () => {
+  const phoneChat = '41790000720@s.whatsapp.net'; const lid = 'v720@lid';
+  t.chatPrefs.setChatPrefs(lid, { enabled: false }); // the LID chat was seen and left off
+  t.chatPrefs.setChatPrefs(phoneChat, { enabled: true, private: true }); await t.agents.bindChat(phoneChat, 'helper');
+  t.script.push([{ type: 'text', text: 'Hi, Helper here.' }]);
+  await t.route(dm({ chat: lid, phone: '41790000720', senderJid: lid, text: 'hello' }));
+  assert.match(t.sent.at(-1).text, /^Hi, Helper here/, 'answered at once: no second switch-on');
+  assert.equal(t.sent.at(-1).chat, lid);
+  const row = await chatRow(lid);
+  assert.equal(row.agent, 'helper'); assert.equal(row.enabled, true); assert.equal(row.private, true, 'private kept (the stricter choice)');
+  assert.ok(!(await chatRow(phoneChat)), 'one chat, not two');
+  assert.ok(!t.agents.getAgent('helper').chats.includes(phoneChat));
 });
 
 test('049: a number that is not on WhatsApp gets a warning but is still prepared', async () => {
