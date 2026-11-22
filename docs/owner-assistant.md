@@ -118,7 +118,8 @@ confirmation setup; its *Try it* section is the Ask box). It adds **Alerts**. Th
 
 **Agents → Owner assistant → Alerts**: enter your number.
 
-- **Cap alerts** and model-provider alerts go there as they happen ([spending caps](spending.md)).
+- **Cap alerts** and model-provider alerts go there as they happen ([spending caps](spending.md)), and so does a
+  scheduled backup that failed three times in a row ([backups](backups-and-updates.md#backups)).
 - **Weekly summary**: the owner assistant's `weekly-summary` schedule (on, Monday 09:00; change day, time or switch it
   off in **Scheduled messages to you**). Messages handled, replies and cost per agent this week vs last, ignored
   chats, pending confirmations, update available, backup failures, a server restart waiting more than 7 days to

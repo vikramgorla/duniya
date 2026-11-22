@@ -25,6 +25,11 @@ encrypted (AES-256-GCM with a key from your passphrase) while it is written, so 
 for a large database. A restore checks the whole file before anything is replaced: a wrong passphrase or a damaged
 file changes nothing.
 
+A scheduled backup that fails is tried again by itself, up to three times, ten minutes apart; when only the copy to
+GitHub or S3 failed, that copy is sent again without making a second backup. If it still fails, you get one message
+on WhatsApp (to the [alert number](owner-assistant.md#owner-alerts-and-weekly-summary)) saying what is missing, and
+Activity has the details.
+
 > [!IMPORTANT]
 > Backups made by Duniya **2.30 or earlier can't be restored** (older file format). If your newest backup is from
 > before 2.31, make a new one: **Backups → Back up now**.
@@ -51,6 +56,10 @@ Uploads up to `BACKUP_UPLOAD_MAX_MB` ([settings](settings.md)). Leave the passph
 on this server. Command line: `sudo duniya backup-now`. Admin MCP and the owner assistant: `get_backup_status`,
 `list_backups`, `run_backup`, `restore_backup` (with confirmation; it uses the stored passphrase, and a backup made
 elsewhere is restored here in the panel).
+
+After the restart, Activity says which backup was restored. The data from before stays on the server in
+`data/pre-restore-<time>/` (the last three are kept), so a restore can be undone by hand. A restore that is
+interrupted (a power cut during the restart) carries on at the next start.
 
 ## Updates
 

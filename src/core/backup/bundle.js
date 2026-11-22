@@ -3,16 +3,16 @@
 // disk through gzip and passphrase encryption (scrypt + AES-256-GCM) into the backup file, so a backup never holds
 // the database in memory. Layout: MAGIC · header line (kdf, salt, iv) · ciphertext · 16-byte GCM tag.
 // Plaintext (before gzip): a meta line (JSON), then per file a line {"n": name, "s": size} followed by its bytes.
-import { createReadStream, createWriteStream, existsSync, readdirSync, rmSync, mkdirSync, statSync, openSync, readSync, closeSync, writeFileSync, renameSync } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync, readdirSync, rmSync, mkdirSync, statSync, openSync, readSync, closeSync, renameSync } from 'node:fs';
 import { resolve, dirname, relative } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createGzip, createGunzip } from 'node:zlib';
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
-import { tmpdir } from 'node:os';
 import { DATA_DIR, fail } from '../config.js';
 import { db } from '../db.js';
 import { keyFromPassphrase } from '../crypto.js';
+import { writeWhole } from '../restore-apply.js';
 
 export const MAGIC = 'DUNIYA2\n';
 const OLD_MAGIC = 'DUNIYA1\n';
@@ -60,32 +60,35 @@ async function* plaintext(meta, files) {
   }
 }
 
+// Work files of a backup in progress, beside the backup itself: the same disk as the data (the system's temporary
+// folder can be a small in-memory disk, where a snapshot of a large database does not fit or eats the server's memory).
+const WORK_FILE = /\.(part|snap)$/;
+/** Work files a backup left behind when the app was stopped in the middle (only one backup runs at a time). */
+function dropLeftovers(dir) {
+  for (const f of existsSync(dir) ? readdirSync(dir) : []) if (WORK_FILE.test(f)) rmSync(resolve(dir, f), { force: true });
+}
+
 /**
- * Write an encrypted backup to `file` (via a .part file). Returns { size, files, bytes? }.
- * Memory stays flat: the database snapshot is a temporary file that is streamed, never loaded. `keep`: also return
- * the encrypted file's bytes (compressed size) for the GitHub / S3 copies.
+ * Write an encrypted backup to `file` (via a .part file). Returns { size, files }.
+ * Memory stays flat: the database snapshot is a work file that is streamed, never loaded.
  */
-export async function writeBackup(file, passphrase, { includeWhatsApp = true, appVersion = '', keep = false } = {}) {
-  const snap = resolve(tmpdir(), `duniya-snap-${process.pid}-${Date.now()}.sqlite`);
+export async function writeBackup(file, passphrase, { includeWhatsApp = true, appVersion = '' } = {}) {
+  const snap = `${file}.snap`;
   const part = `${file}.part`;
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  dropLeftovers(dirname(file));
   try {
     db.exec(`VACUUM INTO '${snap.replace(/'/g, "''")}'`);
     const files = sources(includeWhatsApp, snap);
     const salt = randomBytes(16); const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', keyFromPassphrase(passphrase, salt), iv);
-    mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
     const out = createWriteStream(part, { mode: 0o600 });
-    const head = Buffer.from(`${MAGIC}${JSON.stringify({ ...KDF, salt: salt.toString('base64'), iv: iv.toString('base64') })}\n`);
-    /** @type {Buffer[]} */
-    const kept = keep ? [head] : [];
-    if (keep) cipher.on('data', (c) => kept.push(c));
-    out.write(head);
+    out.write(Buffer.from(`${MAGIC}${JSON.stringify({ ...KDF, salt: salt.toString('base64'), iv: iv.toString('base64') })}\n`));
     const meta = { format: FORMAT, version: 3, createdAt: new Date().toISOString(), app: { version: appVersion } };
     await pipeline(Readable.from(plaintext(meta, files)), createGzip(), cipher, out, { end: false });
     await new Promise((ok, ko) => { out.on('error', ko); out.end(cipher.getAuthTag(), () => ok(null)); });
     renameSync(part, file);
-    if (keep) kept.push(cipher.getAuthTag());
-    return { size: statSync(file).size, files: files.length, ...(keep ? { bytes: Buffer.concat(kept) } : {}) };
+    return { size: statSync(file).size, files: files.length };
   } finally {
     rmSync(snap, { force: true }); rmSync(part, { force: true });
   }
@@ -115,7 +118,21 @@ function openSource(src) {
   return { h, tag, stream: end > start ? stream : Readable.from([]) };
 }
 
-/** Parses the plaintext records; onFile(name) returns a sink { write(buf), end() } or null to skip. */
+/** A staged file, written at the disk's pace. A failed write (disk full) fails the restore; it never waits for good. */
+function fileSink(dst) {
+  const ws = createWriteStream(dst, { mode: 0o600 });
+  let failed = null;
+  const closed = new Promise((ok, ko) => { ws.on('finish', () => ok(null)); ws.on('error', (e) => { failed = e; ko(e); }); });
+  closed.catch(() => {}); // reported by write() or by the caller's wait on `closed`
+  const settled = () => new Promise((ok) => { const go = () => { ws.off('drain', go); ws.off('error', go); ok(null); }; ws.once('drain', go); ws.once('error', go); });
+  return {
+    closed,
+    async write(buf) { if (!failed && !ws.write(buf)) await settled(); if (failed) throw failed; },
+    end(buf) { if (!failed) ws.end(buf); },
+  };
+}
+
+/** Parses the plaintext records; onFile(name) returns a sink { write(buf) → promise, end(buf) } or null to skip. */
 function recordReader(onMeta, onFile) {
   let buf = Buffer.alloc(0); let meta = null; let cur = null; let left = 0;
   return new Writable({
@@ -127,8 +144,7 @@ function recordReader(onMeta, onFile) {
             const part = buf.subarray(0, Math.min(left, buf.length));
             const sink = cur.sink; left -= part.length; buf = buf.subarray(part.length);
             if (!left) { cur = null; sink?.end(part); continue; }
-            // respect the disk's pace: never queue a whole database in memory
-            if (sink && !sink.write(part)) await new Promise((ok) => sink.once('drain', ok));
+            await sink?.write(part); // at the disk's pace: never a whole database queued in memory
             continue;
           }
           const nl = buf.indexOf(0x0a);
@@ -166,15 +182,17 @@ async function readBackup(src, passphrase, stage = '') {
     if (!stage) return null;
     const dst = resolve(stage, rel);
     mkdirSync(dirname(dst), { recursive: true });
-    const ws = createWriteStream(dst, { mode: 0o600 });
-    sinks.push(new Promise((ok, ko) => { ws.on('finish', () => ok(null)); ws.on('error', ko); }));
-    return ws;
+    const sink = fileSink(dst);
+    sinks.push(sink.closed);
+    return sink;
   });
   try {
     await pipeline(stream, d, createGunzip(), reader);
     await Promise.all(sinks);
   } catch (e) {
     if (e.status) throw e;
+    // a failed write (disk full, no permission) is not a wrong passphrase: say what it is
+    if (e.syscall) throw fail(`The restored files could not be written to the server's disk (${e.message})`, 507);
     throw fail('Wrong passphrase (or the file is damaged)');
   }
   if (!names.includes('duniya.sqlite')) throw fail('Backup has no database');
@@ -191,6 +209,6 @@ export async function stageRestore(src, passphrase, source = '', dataDir = DATA_
   mkdirSync(stage, { recursive: true, mode: 0o700 });
   let r;
   try { r = await readBackup(src, passphrase, stage); } catch (e) { rmSync(stage, { recursive: true, force: true }); throw e; }
-  writeFileSync(resolve(stage, 'manifest.json'), JSON.stringify({ source, createdAt: r.createdAt, files: r.files }));
+  writeWhole(resolve(stage, 'manifest.json'), { source, createdAt: r.createdAt, files: r.files });
   return r;
 }

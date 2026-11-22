@@ -217,10 +217,16 @@ function saveResult({ ok, target, log, backup }) {
   kvSet('updates:status', JSON.stringify({ ...st, lastResult: { at: Date.now(), ok, target: target || 'latest', from: runningVersion(), backup, log: String(log).slice(-1000) } }));
 }
 
+const UPDATE_MAX = 20 * 60 * 1000; // ms for fetching the release and installing its dependencies on a slow server
 function runUpdate({ root, target }) {
   return new Promise((r) => {
     const p = spawn('bash', [resolve(root, 'deploy/update.sh'), ...(target ? [target] : [])], { cwd: root });
     let log = ''; p.stdout.on('data', (d) => (log += d)); p.stderr.on('data', (d) => (log += d));
-    p.on('close', (code) => r({ code, log: log.slice(-6000) }));
+    // A download that never ends would hold "an update is running" for good: stop it (update.sh has changed nothing
+    // that runs yet; the next try starts over).
+    const late = setTimeout(() => { log += '\nThe update took too long and was stopped; the previous version keeps running.'; p.kill('SIGKILL'); }, UPDATE_MAX);
+    const done = (code) => { clearTimeout(late); r({ code: code ?? 1, log: log.slice(-6000) }); };
+    p.on('error', (e) => { log += `\nThe update could not start: ${e.message}`; done(1); }); // without this, a failed start is an uncaught error
+    p.on('close', done);
   });
 }

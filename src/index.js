@@ -20,6 +20,8 @@ import { historyPhoneOnline, resumeHistoryRetries } from './core/history-load.js
 import { markGroupDue } from './core/upkeep.js';
 import { stopQueue } from './core/media-queue.js';
 import { db } from './core/db.js';
+import { DATA_DIR } from './core/config.js';
+import { takeRestoreResult } from './core/restore-apply.js';
 
 await loadAgents();
 await startModules(); // 081: the modules that are switched on (import() only then)
@@ -40,8 +42,11 @@ startUpdateScheduler();
 startMetrics();
 startRuntimeFile(channels);
 startWebAccess();
-// #10 silent by default: chats are off until switched on; tell the owner once after the update.
 activity('system', { summary: 'Started' });
+// A restore applied at this start (before the database opened) is recorded in the restored data, where it shows.
+{ const r = takeRestoreResult(DATA_DIR);
+  if (r?.ok) activity('backup.restore', { summary: `Restored the backup ${r.source} (${r.files} files). The data from before is kept on the server in ${r.keep}.` });
+  else if (r) activity('error', { summary: `A restore was prepared but could not be applied (${r.error}); nothing was changed. Start it again under Backups.` }); }
 
 // 069: graceful shutdown (systemd stop/restart, updates): no new messages or jobs, running turns get a few seconds,
 // channel connections close (WhatsApp stays linked), the database is checkpointed and closed. A crash (uncaught exception)
