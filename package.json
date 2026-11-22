@@ -29,7 +29,7 @@
     "node": ">=22.13"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.8.0",
+    "@anthropic-ai/sdk": "^1.11.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "baileys": "7.0.0-rc14",
     "pino": "^10.4.0",
