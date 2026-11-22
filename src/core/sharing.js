@@ -37,12 +37,19 @@ const MEDIA_PROP = /(gif|mp4|webp|image|img|sticker|thumbnail|preview)/i;
 /** Media property names in an output schema (results of any depth): the media kind they suggest, or ''. */
 function schemaKind(schema, depth = 0) {
   if (!schema || typeof schema !== 'object' || depth > 4) return '';
+  const declared = formatKind(schema.properties?.encodingFormat); // schema.org: the format a result declares
+  if (declared) return declared;
   const props = Object.keys(schema.properties || {});
   const media = props.filter((p) => MEDIA_PROP.test(p));
   if (media.length) return media.some((p) => /gif|mp4/i.test(p)) ? 'gif' : media.some((p) => /sticker/i.test(p)) ? 'sticker' : 'image';
   for (const v of [...Object.values(schema.properties || {}), schema.items].filter(Boolean)) { const k = schemaKind(v, depth + 1); if (k) return k; }
   return '';
 }
+// schema.org media (ImageObject, MediaObject): `encodingFormat` says what a result is, `contentUrl` where it is,
+// `encoding` lists the same item in other formats (an MP4 of a GIF is what chat apps send)
+const kindOfFormat = (f) => (/gif|^video\//i.test(f) ? 'gif' : /webp/i.test(f) ? 'sticker' : /^image\//i.test(f) ? 'image' : '');
+/** The media kind an output schema's encodingFormat declares (const, or the first of an enum), or ''. */
+function formatKind(prop) { const v = prop?.const ?? prop?.enum?.[0]; return v ? kindOfFormat(String(v)) : ''; }
 const learnedKey = (key, tool) => `media:${key}:${tool}`;
 /** Remember that a read-only tool returned media (from a normal call's result), so it can be shared on its own. */
 export function noteToolOutput(key, tool, text) {
@@ -162,13 +169,29 @@ function resultsOf(res) {
   return [...new Set(String(res?.text || '').match(MEDIA_URL) || [])].map((url) => ({ id: url, url }));
 }
 const MAX_BYTES = 15 * 1024 * 1024;
+const UNIT = { b: 1, kb: 1e3, mb: 1e6, gb: 1e9 };
+/** Bytes of a result: its size field, or a schema.org contentSize such as "6.3 MB" (0 when unknown). */
+function sizeOf(r) {
+  if (r.fileSizeBytes) return Number(r.fileSizeBytes);
+  const m = String(r.contentSize || '').match(/([\d.]+)\s*(b|kb|mb|gb)\b/i);
+  return m ? Number(m[1]) * UNIT[m[2].toLowerCase()] : 0;
+}
+/** schema.org: the rendition of the wanted kind from `encoding`, else `contentUrl` (unless too big), else ''. */
+function schemaOrgUrl(r, kind) {
+  const want = kind === 'gif' ? /^video\/mp4/i : kind === 'sticker' ? /webp/i : /^image\/(png|jpe?g)/i;
+  const alt = (Array.isArray(r.encoding) ? r.encoding : []).find((e) => want.test(e?.encodingFormat || '') && /^https:\/\//.test(e?.contentUrl || ''));
+  return alt?.contentUrl || (sizeOf(r) > MAX_BYTES ? '' : r.contentUrl);
+}
 /** The URL to post: for GIFs the MP4 (what chat apps send) when given, for stickers the WebP; any media field else. */
 function urlFor(r, kind) {
+  if (typeof r.contentUrl === 'string' && /^https:\/\//.test(r.contentUrl)) return schemaOrgUrl(r, kind);
   const fields = Object.entries(r).filter(([k, v]) => typeof v === 'string' && /^https:\/\//.test(v) && (MEDIA_PROP.test(k) || k === 'url') && !/preview|thumb/i.test(k));
   const by = (re) => fields.find(([k, v]) => re.test(k) || re.test(v))?.[1];
-  const url = kind === 'gif' ? by(/mp4/i) || (r.fileSizeBytes > MAX_BYTES ? '' : by(/gif/i)) : kind === 'sticker' ? by(/webp|sticker/i) : by(/png|jpe?g|image|img/i);
-  return url || (r.fileSizeBytes > MAX_BYTES ? '' : r.url) || '';
+  const url = kind === 'gif' ? by(/mp4/i) || (sizeOf(r) > MAX_BYTES ? '' : by(/gif/i)) : kind === 'sticker' ? by(/webp|sticker/i) : by(/png|jpe?g|image|img/i);
+  return url || (sizeOf(r) > MAX_BYTES ? '' : r.url) || '';
 }
+/** A result's id (schema.org: identifier), else its URL: what is not picked again in a chat. */
+const idOf = (r, kind) => String(r.id || r.identifier || urlFor(r, kind));
 
 /**
  * Search with the mood words and the style words and pick a fitting result not posted here lately (a random one of
@@ -186,12 +209,12 @@ export async function findMedia(ctx, { svc, mood, by }) {
     const seen = new Set(recentIds(chat, svc.key));
     // a shared credit (schema.org creditText) is shown in the panel, never in the message; one of its own keeps it out
     const usable = postableResults(svc.key, resultsOf(res)).filter((r) => urlFor(r, svc.kind));
-    const fresh = usable.filter((r) => !seen.has(String(r.id || urlFor(r, svc.kind))));
+    const fresh = usable.filter((r) => !seen.has(idOf(r, svc.kind)));
     const pool = (fresh.length ? fresh : usable).slice(0, 6);
     if (!pool.length) { activity('whatsapp.action', { agent: agent.id, chat, summary: `No ${KIND_WORD[svc.kind]} found for "${words}" (${svc.key})`, detail: { tool: 'share_media', service: svc.key, query } }); return null; }
     const pick = pool[randomInt(pool.length)];
     const url = urlFor(pick, svc.kind);
-    return { ctx, svc, by, words, query, url, id: String(pick.id || url), credit: creditOf(pick), seen };
+    return { ctx, svc, by, words, query, url, id: idOf(pick, svc.kind), credit: creditOf(pick), seen };
   } catch (e) {
     activity('whatsapp.action', { agent: agent.id, chat, summary: `Could not share a ${KIND_WORD[svc.kind]} from ${svc.key}: ${clip(e.message, 160)}`, detail: { tool: 'share_media', service: svc.key, error: clip(e.message, 300) } });
     return null;
