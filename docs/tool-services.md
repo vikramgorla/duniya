@@ -112,15 +112,19 @@ Declare your tools and Duniya does the right thing without settings:
 
 ```json
 { "name": "search_gifs", "annotations": { "readOnlyHint": true },
-  "outputSchema": { "type": "object", "properties": { "results": { "type": "array", "items": { "type": "object",
-    "properties": { "id": { "type": "string" }, "mp4Url": { "type": "string" }, "creditText": { "type": "string" } } } } } } }
+  "outputSchema": { "type": "object", "properties": { "results": { "type": "array", "items": { "type": "object", "properties": {
+    "@type": { "const": "ImageObject" }, "identifier": { "type": "string" }, "contentUrl": { "type": "string" },
+    "encodingFormat": { "const": "image/gif" }, "encoding": { "type": "array" }, "creditText": { "type": "string" } } } } } } }
 ```
 
 - `readOnlyHint: true` on tools that only read; `destructiveHint: true` on deletes, payments and anything that touches
   someone else's data.
-- Return media as `results` with an `id`, a media URL (`mp4Url`, `gifUrl`, `webpUrl`, `imageUrl` or `url`) and, when
-  a credit is needed, `creditText` — the [schema.org](https://schema.org/creditText) property (IPTC *Credit Line*):
-  the credit without the item's title or link. Give every result the same text for a platform credit (*Powered by
+- Return media as `results` of [schema.org `ImageObject`s](https://schema.org/ImageObject): `identifier`,
+  `contentUrl`, `encodingFormat` (declare it in the output schema, e.g. `const: "image/gif"`: that is how Duniya knows
+  what the tool returns), `encoding` for other formats of the same item (`MediaObject`s; an MP4 of a GIF is what chat
+  apps send), `thumbnailUrl`, `contentSize`, `creator`, `license`, `provider` and, when a credit is needed,
+  `creditText` (IPTC *Credit Line*): the credit without the item's title or link. Older shapes (`id` with `mp4Url`,
+  `gifUrl`, `webpUrl`, `imageUrl` or `url`) still work. Give every result the same text for a platform credit (*Powered by
   …*): Duniya shows it in its panel, never in messages. A work's own credit (author, license) differs per result:
   Duniya then does not post that result on its own, since the credit would have to go with it.
 
