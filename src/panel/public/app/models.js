@@ -335,7 +335,7 @@ export async function renderModels() {
         h('div', { class: 'row', style: 'margin-top:8px' }, cid, cname), h('div', { class: 'row', style: 'margin-top:6px' }, curl, ckey), h('button', { class: 'btn', style: 'margin-top:8px' }, 'Add endpoint'))));
 
   // Defaults
-  const def = modelSelect(models, models.defaultModel, { autoLabel: `Auto${models.resolvedDefault ? ` (now ${models.resolvedDefault})` : ''}` });
+  const def = modelSelect(models, models.defaultModel, { autoLabel: `Auto${models.resolvedDefault ? ` (now ${modelLabel(models.resolvedDefault, models)})` : ''}` });
   const bg = modelSelect(models, models.backgroundModel, { autoLabel: `Auto${models.resolvedBackground ? ` (now ${models.resolvedBackground})` : ''}` });
   // 088: Smart choice — the light and strong models of agents on "Auto: light or strong"
   const sm = models.smart || { light: 'auto', strong: 'auto', classifier: true };
@@ -344,7 +344,7 @@ export async function renderModels() {
   const judge = h('input', { type: 'checkbox', checked: sm.classifier !== false });
   const defaults = h('div', { class: 'card' }, h('h2', {}, 'Default models'),
     anyOn ? null : h('p', { class: 'small muted' }, 'Connect a provider above first.'),
-    field('Default model (agents on Auto)', def, models.resolvedDefault ? `Auto currently means ${models.resolvedDefault}` : ''),
+    field('Default model (agents on Auto)', def, models.resolvedDefault ? `Auto currently means ${modelLabel(models.resolvedDefault, models)}` : ''),
     field('Background model (memory summaries)', bg, models.resolvedBackground ? `Auto currently means ${models.resolvedBackground}` : ''),
     h('h3', { id: 'smart' }, 'Smart choice'), h('p', { class: 'small muted' }, 'For agents on “Auto: light for simple, strong when needed”. A free model on OpenRouter makes a good light model. ', helpLink('models.md#smart-choice')),
     h('div', { class: 'grid2' }, field('Light model', light, sm.resolvedLight ? `Now ${modelLabel(sm.resolvedLight, models)}` : ''), field('Strong model', strong, sm.resolvedStrong ? `Now ${modelLabel(sm.resolvedStrong, models)}` : '')),

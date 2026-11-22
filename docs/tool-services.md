@@ -14,7 +14,7 @@ agent's page → **Tools** → the card **How it uses it** right under the servi
   itself wrongly.
 - For a service that returns pictures, GIFs or stickers, **When to use it → Proactively** or **Often** means the agent
   adds one at the right moments (celebrations, thanks, jokes) by itself, in the same message as a short answer.
-- Nothing is decided by a tool's name; Duniya's own tools (People, Events, Orders, WhatsApp actions, memory) declare
+- Nothing is decided by a tool's name; Duniya's own tools (People, Events, Orders, chat actions, memory) declare
   their risk the same way.
 
 ## How agents use a service

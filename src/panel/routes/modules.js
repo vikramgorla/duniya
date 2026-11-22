@@ -20,7 +20,7 @@ export function moduleRoutes(route) {
     if (typeof body.on !== 'boolean') return [400, { error: 'on must be true or false', field: 'on' }];
     return { modules: await setModuleOn(params.id, body.on, user.username) };
   }, admin);
-  // the tools of the modules that are on, for an agent's tool list (all / none per role, like WhatsApp actions)
+  // the tools of the modules that are on, for an agent's tool list (all / none per role, like chat actions)
   route('GET', '/api/modules/tools', async () => liveModules().map((m) => ({ id: m.id, label: MODULES.find((x) => x.id === m.id)?.label || m.id, line: MODULES.find((x) => x.id === m.id)?.line || '', changes: m.tools.some((t) => t.annotations?.readOnlyHint !== true),
     tools: m.tools.map((t) => ({ name: t.name, description: t.description, organizerOnly: !t.roles.includes('participant'), participantDefault: !!t.participantDefault })) })), { role: 'viewer' });
   route('PUT', '/api/orders/methods', async ({ body, user }) => ({ methods: (await need('orders')).setPaymentMethods(body.methods, user.username) }), admin);

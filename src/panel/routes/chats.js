@@ -173,7 +173,7 @@ export function chatRoutes(route, { channel } = {}) {
   const waGroup = (p) => {
     const chat = decodeURIComponent(p.chat);
     if (!isGroup(chat)) throw fail('This is not a group');
-    if (typeof channel.groupInfo !== 'function') throw fail('WhatsApp actions are not available', 501);
+    if (typeof channel.groupInfo !== 'function') throw fail('Group tools are not available on this channel', 501);
     return chat;
   };
   const waLog = (chat, user, summary, detail) => activity('whatsapp.action', { agent: agentForChat(chat)?.id || '', chat, summary: `${summary} (panel, ${user.username})`, detail: { ...detail, by: user.username, source: 'panel' } });

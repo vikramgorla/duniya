@@ -45,7 +45,7 @@ Names are the same everywhere (panel, admin MCP tools, activity): *ChatGPT*, *Cl
 **In 30 seconds**
 - Duniya runs the official app on the server for each answer: Claude Code (Claude plan), Codex (ChatGPT plan), the
   Copilot SDK (Copilot plan). The app is downloaded only when you connect it, into the data folder.
-- Your agents' tools (WhatsApp actions, tool services) still work, and roles and confirmations are still decided by
+- Your agents' tools (chat actions, tool services) still work, and roles and confirmations are still decided by
   Duniya: the app sees only those tools, never a shell, files or the web.
 - A usage limit pauses the account until the reset the app reports; the next model answers meanwhile.
 - On a small server: switch on [Small server mode](small-servers.md#small-server-mode); one app answers at a time.

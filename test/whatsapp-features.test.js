@@ -119,7 +119,7 @@ test('every tool calls the matching channel function on the current chat and is 
   assert.ok(t.db.history('g1@g.us', 50).some((m) => m.from_agent && m.text.startsWith('[poll: Lunch?')), 'own sends are stored for context');
   assert.equal(t.db.messageByMsgId('g1@g.us', agentMsg.msg_id).text, '[deleted]');
   assert.equal(t.events.categoryOf('whatsapp.action'), 'whatsapp');
-  assert.equal(t.events.LOG_CATEGORIES.whatsapp, 'WhatsApp actions');
+  assert.equal(t.events.LOG_CATEGORIES.whatsapp, 'Chat actions (polls, reactions, group changes)');
 });
 
 test('group_info hides phone numbers from participants; profile_info is limited to people of the chat', async () => {

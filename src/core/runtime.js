@@ -6,14 +6,12 @@ import { resolve } from 'node:path';
 import { APP_VERSION, DATA_DIR } from './config.js';
 
 const RUNTIME_FILE = resolve(DATA_DIR, 'runtime.json');
-/** An account's own id without device and server parts: "41790000001:3@s.whatsapp.net" → "41790000001". */
-const handleOf = (me) => String(me || '').split(':')[0].split('@')[0];
 
 export function startRuntimeFile(channel, { everyMs = 30000 } = {}) {
   const startedAt = Date.now();
   const write = async () => {
     let accounts = [];
-    try { accounts = (await channel.accounts()).map((a) => ({ app: a.app, label: a.label, status: a.status || 'unknown', me: handleOf(a.me) })); } catch { /* channels not ready */ }
+    try { accounts = (await channel.accounts()).map((a) => ({ app: a.app, label: a.label, status: a.status || 'unknown', me: a.me })); } catch { /* channels not ready */ }
     const doc = { pid: process.pid, startedAt, at: Date.now(), version: APP_VERSION, node: process.version, rssMb: Math.round(process.memoryUsage().rss / 1048576), accounts };
     try { writeFileSync(`${RUNTIME_FILE}.tmp`, JSON.stringify(doc), { mode: 0o600 }); renameSync(`${RUNTIME_FILE}.tmp`, RUNTIME_FILE); } catch { /* read-only data dir */ }
   };

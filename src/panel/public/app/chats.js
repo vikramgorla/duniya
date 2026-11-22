@@ -171,8 +171,8 @@ function chatPage(c, { agents, models, us, quiet, refresh, setOn }) {
     const savePrefs = (patch) => tryApi(async () => { Object.assign(c, await api('PUT', `/api/chats/${enc}/prefs`, patch)); refresh(c); return true; }, 'Saved');
     const agentLink = h('span', {});
     // 073, 078: chat ↔ person — a direct chat links to the person's page in People
-    const drawLink = () => agentLink.replaceChildren(c.agent ? h('a', { href: `#agents/${encodeURIComponent(c.agent)}` }, `Open ${agents.find((x) => x.id === c.agent)?.name || 'agent'} ›`) : null,
-      !c.isGroup && c.phone && can('admin') ? [c.agent ? ' · ' : '', h('a', { href: `#people/${encodeURIComponent(c.phone)}` }, 'Person page ›')] : null);
+    const drawLink = () => agentLink.replaceChildren(c.agent ? h('a', { href: `#agents/${encodeURIComponent(c.agent)}` }, `Open ${agents.find((x) => x.id === c.agent)?.name || 'agent'}\u00a0›`) : null,
+      !c.isGroup && c.phone && can('admin') ? [c.agent ? ' · ' : '', h('a', { href: `#people/${encodeURIComponent(c.phone)}` }, 'Person page\u00a0›')] : null);
     drawLink();
     const agentSel = h('select', { disabled: !admin, onchange: (e) => tryApi(async () => {
       // 062: choosing an agent for a chat that is Off switches it on too (one step instead of two)

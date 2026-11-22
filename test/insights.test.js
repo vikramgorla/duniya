@@ -183,7 +183,7 @@ test('#37: tools per role for the test console', async () => {
   assert.ok(names(p).includes('whatsapp:send_media') && !names(p).includes('whatsapp:block'));
   assert.ok(names(o).includes('whatsapp:block'));
   assert.equal(o.count, names(o).length);
-  assert.equal(o.services.find((s) => s.service === 'whatsapp').name, 'WhatsApp actions');
+  assert.equal(o.services.find((s) => s.service === 'whatsapp').name, 'Chat actions');
   assert.equal((await t.api(owner, 'GET', '/api/agents/nope/test-tools')).status, 404);
   const { TOOLS } = await import('../src/panel/admin-tools.js');
   const lt = TOOLS.find((x) => x.name === 'list_agent_tools');

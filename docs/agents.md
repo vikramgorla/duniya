@@ -103,7 +103,7 @@ gets an answer.
 - **The agent corrects itself:** when someone corrects it right after an answer ("no, it's Chary"), it changes that
   answer with the `edit_my_last_message` action instead of posting a second message. Only its own last message in that
   chat, only while the app still allows edits (WhatsApp 15 minutes, Telegram 48 hours); otherwise it answers again.
-  Participants and organizers have it by default (Tools → WhatsApp actions).
+  Participants and organizers have it by default (Tools → Chat actions).
 - **People edit their messages:** the stored copy is updated and marked *edited* (chats that are on only). When the
   agent already answered that message and the edit changes its meaning, the agent reads it once more and corrects
   itself or stays quiet; fixing a typo changes nothing.
@@ -309,11 +309,13 @@ unless allowed.
 - OAuth sign-ins are per service (shared by all agents).
 - Admin MCP: `list_global_tool_services`, `add_global_tool_service`, `remove_global_tool_service`.
 
-## WhatsApp actions
+## Chat actions
 
 24 actions, chosen per role: send images, documents, voice notes, locations and contact cards, react, correct its last
 message, run polls and read votes, and (organizers) manage the group: name, description, picture, settings, invite link, members. Every
-action is logged (`whatsapp.action`). Admins get the same group tools on a group's page → **WhatsApp group** ([Chats](chats.md#whatsapp-group-tools)).
+action is logged (`whatsapp.action`, shown as *Chat action* in Activity). They work in WhatsApp chats and, where
+Telegram has the same thing, in Telegram chats ([what differs](telegram.md#what-agents-can-do-on-telegram)). Admins get
+the same group tools on a group's page → **WhatsApp group** ([Chats](chats.md#whatsapp-group-tools)).
 
 ![WhatsApp card of a group](site/img/card-wa-group.webp)
 

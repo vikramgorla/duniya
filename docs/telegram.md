@@ -84,6 +84,7 @@ leaves **Chats** by itself.
 | | |
 |---|---|
 | **On / off** (owner) | **off** closes the connection and frees its memory; agents stop answering on Telegram. The token stays |
+| **On Overview** | the bot is listed with its state next to your WhatsApp numbers; the headline says "Everything is running" only when every account is connected, and names the one that is not |
 | **Add to a group** / **Open a direct chat** | Telegram links for the bot |
 | **What the bot sees** | privacy mode, with the steps above |
 | **Direct messages to the bot go to** | the agent that answers people who write to the bot privately (default: **Settings → Chats & direct messages**) |

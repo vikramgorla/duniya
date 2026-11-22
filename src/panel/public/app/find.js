@@ -6,7 +6,7 @@ import { SETTINGS_SECTIONS } from './shared.js';
 /** 068: the sections of an agent's page that Find anything lists ([id, title, words, only for normal agents]). */
 const AGENT_SECTIONS = [['character', 'Character', 'instructions prompt description name'], ['where', 'Where it answers', 'triggers mention direct dm chats', true],
   ['people', 'People', 'organizers participants roles', true], ['quick', 'Quick replies & FAQ', 'commands help faq', true], ['welcome', 'Welcome', 'new members greet rules', true],
-  ['schedules', 'Schedules', 'scheduled posts weekly summary'], ['model', 'Model', 'fallback provider'], ['tools', 'Tools', 'mcp tool services whatsapp actions confirm'],
+  ['schedules', 'Schedules', 'scheduled posts weekly summary'], ['model', 'Model', 'fallback provider'], ['tools', 'Tools', 'mcp tool services chat actions whatsapp telegram confirm'],
   ['memory', 'Memory', 'notes shared'], ['media', 'Photos & voice', 'images pictures voice notes'], ['cap', 'Spending cap', 'budget limit cost'],
   ['advanced', 'Advanced', 'timezone history tokens'], ['review', 'Review', 'answers rate thumbs teach feedback quality', true], ['test', 'Test', 'try console']];
 /** 070: the words of a search, as the server matches them (word beginnings, any order). */

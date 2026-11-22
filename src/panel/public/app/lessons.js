@@ -26,8 +26,8 @@ export function lessonsView(x, save) {
     };
     const del = (l) => tryApi(async () => { await api('DELETE', `${path}/${l.id}`); await draw(); }, 'Lesson deleted');
     const where = (l) => [l.kind === 'join' ? 'When to join in' : '', SOURCE[l.source] || '', time(l.createdAt)].filter(Boolean).join(' · ');
-    const from = (l) => (l.msg && l.chat ? h('a', { href: `#chats/${encodeURIComponent(l.chat)}/messages/${l.msg}` }, 'See the message ›')
-      : l.msg ? h('a', { href: `#agents/${x.enc}/review` }, 'In Review ›') : null);
+    const from = (l) => (l.msg && l.chat ? h('a', { href: `#chats/${encodeURIComponent(l.chat)}/messages/${l.msg}` }, 'See the message\u00a0›')
+      : l.msg ? h('a', { href: `#agents/${x.enc}/review` }, 'In Review\u00a0›') : null);
     const row = (l, proposed) => h('li', { class: 'lesson' }, h('div', { class: 'lesson-text' }, l.text),
       h('div', { class: 'small muted' }, where(l), ' ', from(l)),
       admin ? h('div', { class: 'row fx' }, proposed ? h('button', { class: 'btn small primary', type: 'button', onclick: () => change(l, { status: 'active' }, 'Lesson approved') }, 'Approve') : null,

@@ -26,8 +26,9 @@
 
 ## Settings → Channels → WhatsApp
 
-WhatsApp is the first entry under **Settings → Channels**. Overview keeps a short **WhatsApp** card (each number and
-its state) and the *WhatsApp 2/2 connected* chip; both open this page.
+WhatsApp is the first entry under **Settings → Channels**. Overview keeps a short card with each number and its
+state (called **WhatsApp**; **Channels** once a [Telegram](telegram.md) bot is connected too, which it lists as
+well) and the *WhatsApp 2/2 connected* chip; both open this page.
 
 ![Settings → WhatsApp: on, memory used, two numbers connected, each with its direct-message agent](site/img/card-wa-numbers.webp)
 

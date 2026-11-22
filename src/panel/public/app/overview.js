@@ -21,14 +21,16 @@ export async function renderOverview(soft) {
   }
   if (soft && (S.overviewBusy || S.ask?.busy || $('#main')?.contains(document.activeElement))) return; // #66: never redraw under a streaming answer
   overviewSig = sig;
-  // 075: WhatsApp numbers live under Settings → WhatsApp; Overview keeps one status chip that links there
-  const wa = st.channel.channels?.find((x) => x.id === 'whatsapp') || { state: 'on' };
-  const numbers = st.channel.numbers || [];
-  // 075: one calm row per number; linking, adding and switching off are on the channel's page
-  const pill = (n) => h('span', { class: `pill ${n.status === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(n.status) ? 'warn' : 'bad'}` }, n.status === 'open' ? 'connected' : n.status === 'qr' ? 'waiting for scan' : n.status.replace('_', ' '));
-  const channelsCard = h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'WhatsApp'), h('a', { class: 'small', href: '#settings/whatsapp' }, 'Details ›')),
-    numbers.length ? h('ul', { class: 'ctl-list' }, numbers.map((n) => h('li', {}, h('div', {}, h('b', {}, n.label), h('div', { class: 'small muted num' }, n.status === 'open' ? `+${(n.me || '').split(':')[0].split('@')[0]}` : 'Open Details to link it')), pill(n))))
-      : h('p', { class: 'small muted' }, wa.state === 'off' ? 'Switched off: agents do not answer on WhatsApp.' : 'Not linked yet: Getting started shows the QR code.'));
+  // Every channel's accounts (WhatsApp numbers, a Telegram bot): one calm row each; linking and adding are on the channel's page
+  const accounts = st.channel.accounts || []; const chans = st.channel.channels || [];
+  const apps = [...new Set(accounts.map((a) => a.app))];
+  const word = (a) => (a.status === 'open' ? 'connected' : a.status === 'qr' ? 'waiting for scan' : a.status.replace('_', ' '));
+  const pill = (a) => h('span', { class: `pill ${a.status === 'open' ? 'ok' : ['qr', 'reconnecting', 'starting'].includes(a.status) ? 'warn' : 'bad'}` }, word(a));
+  const off = chans.filter((c) => c.state === 'off').map((c) => c.label).join(' and ');
+  const channelsCard = h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, apps.length === 1 ? apps[0] : 'Channels'), h('a', { class: 'small', href: apps.length === 1 ? `#settings/${accounts[0].channel}` : '#settings' }, 'Details\u00a0›')),
+    accounts.length ? h('ul', { class: 'ctl-list' }, accounts.map((a) => h('li', {}, h('div', {}, h('b', {}, a.label),
+      h('div', { class: 'small muted num' }, a.status !== 'open' ? 'Open Details to link it' : [apps.length > 1 || !Number(a.me) ? a.app : '', Number(a.me) ? `+${a.me}` : ''].filter(Boolean).join(' · '))), pill(a))))
+      : h('p', { class: 'small muted' }, off ? `Switched off: agents do not answer on ${off}.` : 'Not linked yet: Getting started shows how.'));
   // 064: avatars, a live pulse per agent (reading… / answered, from the activity stream) and named switches
   const pause = (v) => optimistic(() => { st.settings.paused = v; }, () => api('POST', '/api/settings', { paused: v }), v ? 'All agents paused' : 'Agents resumed', () => pause(!v));
   const control = h('div', { class: 'card' }, h('h2', {}, 'Control'),
@@ -45,7 +47,7 @@ export async function renderOverview(soft) {
   const reusedUpdates = soft && $('#updates-box')?.childElementCount ? $('#updates-box') : null;
   const updateBanner = (reusedUpdates && $('#ov-update-banner')) || h('div', { id: 'ov-update-banner' });
   // 068: one calm line instead of a table; details are on the Server screen. 073: updates are one row too.
-  const server = h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'Server'), h('a', { class: 'small', href: '#server' }, 'Details ›')),
+  const server = h('div', { class: 'card' }, h('div', { class: 'row spread nowrap' }, h('h2', { style: 'margin:0' }, 'Server'), h('a', { class: 'small', href: '#server' }, 'Details\u00a0›')),
     h('p', { class: 'small muted num', style: 'margin:6px 0 0' }, `${st.version} · up `, h('span', { id: 'ov-uptime' }, ago(Date.now() - st.uptimeSec * 1000)), ' · ', h('span', { id: 'ov-memory' }, `${st.memoryMb} MB`)),
     reusedUpdates || h('div', { id: 'updates-box' }));
   const recent = h('div', { class: 'card', style: 'grid-column:1/-1' }, h('div', { class: 'row spread' }, h('h2', {}, 'Recent activity'), h('button', { class: 'btn small', onclick: () => show('activity') }, 'All activity')),
@@ -53,21 +55,24 @@ export async function renderOverview(soft) {
     S.feed.length ? null : emptyState('activity', 'Quiet so far', 'What your agents read, answer and change shows up here live.'));
   const hr = new Date().getHours();
   const hello = hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
-  const live = st.agents.filter((b) => b.enabled).length; const open = numbers.filter((n) => n.status === 'open').length;
-  const allGood = !st.settings.paused && open > 0 && open === numbers.length && live > 0;
+  const live = st.agents.filter((b) => b.enabled).length; const open = accounts.filter((a) => a.status === 'open').length;
+  const down = accounts.find((a) => a.status !== 'open');
+  const allGood = !st.settings.paused && open > 0 && !down && live > 0;
   const led = (ok, text, href) => h(href ? 'a' : 'span', { class: 'led', ...(href ? { href } : {}) }, h('span', { class: `dot ${ok === true ? 'ok' : ok === false ? 'bad' : 'warn'}`, 'aria-hidden': 'true' }), text);
+  // "WhatsApp connected", "WhatsApp 2/2 connected", "WhatsApp 2/2 · Telegram connected"
+  const of = (app, status) => accounts.filter((a) => a.app === app && (!status || a.status === status)).length;
+  const connected = `${apps.map((app) => (of(app) > 1 ? `${app} ${of(app, 'open')}/${of(app)}` : app)).join(' · ')} connected`;
   // 062: the first thing that is missing, in the order Getting started asks for it
   const noModel = S.checklist?.steps?.find((x) => x.id === 'provider')?.done === false;
-  const tgOk = (st.channel.channels || []).some((c) => c.id !== 'whatsapp' && c.connected > 0);
-  const headline = st.settings.paused ? 'All agents are paused' : wa.state === 'off' && !tgOk ? 'WhatsApp is switched off' : !open && !tgOk ? 'Link WhatsApp or Telegram to begin' : noModel ? 'Connect an AI model so agents can answer'
+  const headline = st.settings.paused ? 'All agents are paused' : !accounts.length && off ? `${off} ${off.includes(' and ') ? 'are' : 'is'} switched off` : !open ? `Link ${chans.map((c) => c.label).join(' or ')} to begin` : noModel ? 'Connect an AI model so agents can answer'
     : !st.agents.length ? 'Create your first agent' : st.enabledChats === 0 ? 'No chat is switched on — agents stay silent' : allGood ? 'Everything is running'
-      : open < numbers.length ? 'A WhatsApp number needs attention' : live ? 'Running, with something to check' : 'No agent is switched on yet';
+      : down ? `${down.app} ${down.label} needs attention` : live ? 'Running, with something to check' : 'No agent is switched on yet';
   const hero = h('div', { class: 'card console' },
     h('div', {}, h('div', { class: 'eyebrow' }, `${hello} · ${S.user.username}`),
       h('h2', {}, headline)),
-    checklistActive() ? null : allGood && !st.pending ? h('p', { class: 'small muted calm-line' }, [numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : 'WhatsApp connected', `${plural(live, 'agent')} live`, `${plural(st.enabledChats, 'chat')} on`].join(' · ')) : h('div', { class: 'leds' },
+    checklistActive() ? null : allGood && !st.pending ? h('p', { class: 'small muted calm-line' }, [connected, `${plural(live, 'agent')} live`, `${plural(st.enabledChats, 'chat')} on`].join(' · ')) : h('div', { class: 'leds' },
       // 066: plain sentence-case chips ("2 agents live"), not mono caps
-      led(numbers.length && open === numbers.length ? true : open ? null : false, wa.state === 'off' ? 'WhatsApp off' : numbers.length > 1 ? `WhatsApp ${open}/${numbers.length} connected` : open ? 'WhatsApp connected' : 'WhatsApp not linked', '#settings/whatsapp'),
+      led(open && !down ? true : open ? null : false, down ? `${down.app} ${down.label}: ${word(down)}` : open ? connected : off ? `${off} off` : 'Nothing linked', `#settings/${(down || accounts[0])?.channel || chans[0]?.id}`),
       led(st.settings.paused ? false : live ? true : null, st.settings.paused ? 'Agents paused' : live ? `${plural(live, 'agent')} live` : 'No agent live'),
       led(st.enabledChats ? true : null, st.enabledChats ? `${plural(st.enabledChats, 'chat')} on` : 'No chat on'),
       led(st.pending ? null : true, st.pending ? `${st.pending} waiting for a confirm` : 'Nothing waiting')),

@@ -8,7 +8,7 @@ character.
 
 **In 30 seconds**
 - A built-in agent: your DMs to any agent number, the **Ask** box (also on your phone). Always there, cannot be deleted.
-- Everything an agent can have: tool services (e.g. GIF search), WhatsApp actions, photos, PDFs, voice notes, voice
+- Everything an agent can have: tool services (e.g. GIF search), chat actions, photos, PDFs, voice notes, voice
   replies, pictures, memory, schedules — set on the normal agent page.
 - Sees only chats that are on and not **Private to members**; never answers in groups.
 - Changes, and anything sent into another chat, need `confirm CODE` (valid 10 minutes, also across a restart).
@@ -49,7 +49,7 @@ confirmation setup; its *Try it* section is the Ask box). It adds **Alerts**. Th
 | **Model** | Model and fallback, recent turns in context, max reply tokens; **Your time zone** (Advanced, see [below](#your-time-zone)) |
 | **Memory** | Notes it saves when you ask ("remember Vedika likes ILLIT"): per person, never in a chat's memory |
 | **Tool services** | Global services are on by default (switch one off here); it can have its own services too. Each service's role defaults decide its tools |
-| **WhatsApp actions** | Send pictures, GIFs, files, locations, contact cards, polls, reactions, replies. Group administration stays with the admin tools |
+| **Chat actions** | Send pictures, GIFs, files, locations, contact cards, polls, reactions, replies. Group administration stays with the admin tools |
 | **Photos & voice** | Look at photos and PDFs, listen to voice notes, answer with voice, create pictures (in your own chat) |
 | **Alerts** | The number spending-cap, model-provider and update alerts go to. Only the owner can change it |
 | **Scheduled messages to you** | The **weekly summary** (on, Monday 09:00) and your own, e.g. a morning brief. Sent to every linked owner and admin in their own chat; they run even while agents are paused |
@@ -63,8 +63,8 @@ confirmation setup; its *Try it* section is the Ask box). It adds **Alerts**. Th
 |---|---|---|
 | Admin tools | with their panel role; changes need `confirm CODE` | read-only, without message contents |
 | Tool services | the services' organizer defaults | the services' participant defaults |
-| WhatsApp actions in their own chat | right away | right away (participant set) |
-| Sending into another chat | `send_message` or a WhatsApp action with the chat's name; always `confirm CODE` | never |
+| Chat actions in their own chat | right away | right away (participant set) |
+| Sending into another chat | `send_message` or a chat action with the chat's name; always `confirm CODE` | never |
 | Pictures | as set under Photos & voice | as set (participants) |
 
 - **Other chats:** only chats that are on and not private, by group name, person name or id. A chat switched off

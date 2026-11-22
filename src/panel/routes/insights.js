@@ -12,7 +12,7 @@ import { toolsFor } from '../../core/tools.js';
 import { activity } from '../../core/events.js';
 import '../../core/usage.js'; // the usage table
 
-const SERVICE_NAME = { memory: 'Memory', contacts: 'Contacts', whatsapp: 'WhatsApp actions', local: 'Built-in' };
+const SERVICE_NAME = { memory: 'Memory', contacts: 'Contacts', whatsapp: 'Chat actions', local: 'Built-in' };
 
 /** Getting started (#36, 062): live state of the five setup steps, in the order a new owner does them. The built-in
  *  owner assistant does not count as "an agent". `agent` is the one the inline steps use (switch a chat on, test). */

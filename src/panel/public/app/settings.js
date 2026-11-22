@@ -729,7 +729,7 @@ function modulesCard(st) {
   const card = h('div', { class: 'card' }, h('h2', {}, 'Modules'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, 'Features on top of People. Off hides them; their data stays. ', helpLink('modules.md')),
     h('ul', { class: 'people-list' }, st.modules.map((m) => h('li', { class: 'has-end' }, h(m.on ? 'a' : 'div', { class: 'lrow', href: m.on ? `#people/${m.id}` : null },
-      h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, m.label), h('span', { class: 'lrow-sub' }, `${m.line}${m.on && m.memoryMb !== null ? ` · about ${m.memoryMb} MB` : ''}`))),
+      h('span', { class: 'lrow-main' }, h('span', { class: 'lrow-name' }, m.label), h('span', { class: 'lrow-sub' }, `${m.line}${m.on && m.memoryMb ? ` · about ${m.memoryMb} MB` : ''}`))),
     h('span', { class: 'row-end' }, toggle(m.on, (v) => flip(m, v), !can('admin'), m.label))))),
     st.methods ? h('div', { class: 'sblock' }, h('h3', {}, 'Ways to pay'), field('One per line', methods, 'Duniya records payments; it never takes money.'),
       can('admin') ? h('button', { class: 'btn', style: 'margin-top:8px', onclick: () => tryApi(() => api('PUT', '/api/orders/methods', { methods: methods.value.split('\n') }), 'Saved') }, 'Save ways to pay') : null) : null);

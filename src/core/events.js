@@ -23,7 +23,7 @@ const trim = (v, n = 4000) => {
 export const LOG_CATEGORIES = {
   messages: 'Messages in and out', tools: 'Tool calls', models: 'Model usage (tokens)', memory: 'Memory (summaries, notes)',
   schedules: 'Scheduled posts', backups: 'Backups', system: 'System (start, updates, maintenance)', mcp: 'AI assistants (MCP)',
-  whatsapp: 'WhatsApp actions', media: 'Photos & voice (transcripts, created pictures)', silences: 'Why agents stayed silent (at most hourly per chat)',
+  whatsapp: 'Chat actions (polls, reactions, group changes)', media: 'Photos & voice (transcripts, created pictures)', silences: 'Why agents stayed silent (at most hourly per chat)',
 };
 // Always recorded, whatever the settings: errors, confirmations of changes, configuration changes, channel status, and
 // the owner assistant's audit trail (044: every question and action).

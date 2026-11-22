@@ -67,15 +67,15 @@ function withAnalysis(st, current) {
   return { ...st, breaking: a.breaking, steps: a.steps, safeTarget, decisionVersion: a.decisionVersion, notes };
 }
 
-/** Last check, corrected for what is running now (a check saved before an update + restart is otherwise stale). */
+/** Last check, corrected for what is running now: a check saved before an update + restart still lists as ahead what is installed by now. */
 export const updateStatus = () => {
   const st = savedStatus();
   if (!st) return null;
-  if (st.channel === 'stable' && parseVersion(runningVersion())) {
-    const current = runningVersion();
-    return withAnalysis({ ...st, current, available: !!(st.latest && parseVersion(st.latest) && compareVersions(current, st.latest) < 0) }, current);
-  }
-  return withAnalysis(st, parseVersion(runningVersion()) ? runningVersion() : st.currentVersion);
+  const current = runningVersion();
+  if (st.channel !== 'stable') return withAnalysis(st, current);
+  const ahead = (v) => !!parseVersion(v) && compareVersions(v, current) > 0;
+  return withAnalysis({ ...st, current, available: ahead(st.latest), tags: (st.tags || []).filter(ahead),
+    releases: Object.fromEntries(Object.entries(st.releases || {}).filter(([v]) => ahead(v))) }, current);
 };
 
 /** Check the remote. Returns the status { current, latest, available, target, breaking, steps, safeTarget, … }. */
@@ -105,7 +105,7 @@ export async function checkForUpdate({ root = appRoot, channel = getUpdateSettin
   }
   // Keep only what lies ahead (the status is small and stays meaningful after a restart).
   releases = Object.fromEntries(Object.entries(releases).filter(([v]) => compareVersions(v, `v${pkg}`) > 0));
-  const status = { current, currentVersion: `v${pkg}`, latest, available, target, targetVersion, tags, releases, channel, checkedAt: Date.now(), lastResult: savedStatus()?.lastResult || null };
+  const status = { current, latest, available, target, targetVersion, tags, releases, channel, checkedAt: Date.now(), lastResult: savedStatus()?.lastResult || null };
   if (root === appRoot) kvSet('updates:status', JSON.stringify(status));
   return withAnalysis(status, channel === 'stable' ? current : `v${pkg}`);
 }

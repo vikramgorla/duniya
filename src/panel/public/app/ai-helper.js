@@ -162,7 +162,7 @@ export async function aiHelper({ agentId = '', title, placeholder, applyLabel, o
   const ask = h('textarea', { class: 'prose', style: 'min-height:90px', placeholder, value: initial, 'aria-label': 'What you want, in your own words' });
   // 070: Teach pre-fills the request; the cursor waits at the end ("Better answer: ")
   if (initial) setTimeout(() => { ask.focus(); ask.setSelectionRange(initial.length, initial.length); }, 50);
-  const model = modelSelect(models, 'auto', { 'aria-label': 'Model for the AI helper', autoLabel: `Default model${models.resolvedDefault ? ` (${models.resolvedDefault})` : ''}` });
+  const model = modelSelect(models, 'auto', { 'aria-label': 'Model for the AI helper', autoLabel: `Default model${models.resolvedDefault ? ` (${modelLabel(models.resolvedDefault, models)})` : ''}` });
   const out = h('div', {});
   const go = h('button', { class: 'btn primary', onclick: async () => {
     go.disabled = true; out.replaceChildren(h('p', { class: 'muted small' }, h('span', { class: 'spinner' }), ' Thinking… this can take up to a minute.'));

@@ -22,6 +22,14 @@ test('status saved before an update is corrected after the restart (regression)'
   assert.equal(st.available, false);
   kvSet('updates:status', JSON.stringify({ current: u.RUNNING_VERSION, latest: 'v99.0.0', available: false, channel: 'stable', checkedAt: Date.now() }));
   assert.equal(u.updateStatus().available, true);
+  // what the check listed as ahead and is installed by now is not listed any more
+  const done = { title: 'installed by now', changes: [] }; const next = { title: 'still ahead', changes: [] };
+  kvSet('updates:status', JSON.stringify({ current: 'v0.0.1', latest: 'v99.0.0', available: true, channel: 'stable', checkedAt: Date.now(),
+    tags: ['v0.0.2', u.RUNNING_VERSION, 'v99.0.0'], releases: { '0.0.2': done, [u.RUNNING_VERSION.slice(1)]: done, '99.0.0': next } }));
+  const after = u.updateStatus();
+  assert.deepEqual(after.tags, ['v99.0.0']);
+  assert.deepEqual(Object.keys(after.releases), ['99.0.0']);
+  assert.deepEqual(after.notes.map((n) => n.version), ['99.0.0']);
   kvSet('updates:status', 'null');
 });
 
