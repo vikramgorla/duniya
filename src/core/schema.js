@@ -137,81 +137,82 @@ const TOOL_NAME_RE = /^[\w.-]{1,64}$/;
 function behaviour(v, f, inherit) {
   const b = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
   const out = {};
+  const unset = (x) => x === undefined || x === '' || x === null;
   const pick = (k, allowed) => {
     const x = b[k];
-    if (x === undefined || x === '' || x === null || (inherit && x === 'inherit')) return;
+    if (unset(x) || (inherit && x === 'inherit')) return;
     if (!allowed.includes(x)) fail(`${f}.${k}`, `must be ${[...(inherit ? ['inherit'] : []), ...allowed].join(', ')}`);
     if (inherit || x !== SERVICE_DEFAULTS[k]) out[k] = x;
   };
   pick('when', WHEN); pick('changes', AUTONOMY); pick('where', WHERE);
   for (const k of ['note', 'style']) { const t = str(b[k], `${f}.${k}`, { max: k === 'note' ? 200 : 120 }); if (t) out[k] = t; }
   for (const k of ['perReply', 'perDay']) {
-    if (b[k] === undefined || b[k] === null || b[k] === '') continue;
+    if (unset(b[k])) continue;
     const n = int(b[k], `${f}.${k}`, 0, 1000);
     if (inherit || n) out[k] = n;
   }
-  const tools = b.tools && typeof b.tools === 'object' && !Array.isArray(b.tools) ? Object.entries(b.tools) : [];
+  const risks = toolRisks(b.tools, f);
+  if (risks) out.tools = risks;
+  return out;
+}
+/** The owner's own risk per tool of a service ({ tool: read | change | destructive }), or null when none is set. */
+function toolRisks(v, f) {
+  const tools = v && typeof v === 'object' && !Array.isArray(v) ? Object.entries(v) : [];
   if (tools.length > 100) fail(`${f}.tools`, 'at most 100 tools');
+  let out = null;
   for (const [name, risk] of tools) {
     if (!risk || risk === 'auto') continue;
     if (!TOOL_NAME_RE.test(name)) fail(`${f}.tools`, `"${name}" is not a tool name`);
     if (!RISKS.includes(risk)) fail(`${f}.tools.${name}`, 'must be read, change or destructive');
-    (out.tools ||= {})[name] = risk;
+    (out ||= {})[name] = risk;
   }
   return out;
 }
 /** A service's own default behaviour, to spread into its config ({} when all defaults). */
 const serviceBehaviour = (v, f) => { const bh = behaviour(v, `${f}.behaviour`, false); return Object.keys(bh).length ? { behaviour: bh } : {}; };
 
-/** Validate one tool service (MCP server) definition: remote (URL + token/OAuth/none) or local (npm/GitHub package). */
-function validateServer(key, srv, f = key) {
-  if (!SERVER_KEY_RE.test(key)) fail(f, 'name must be lowercase letters, digits or _');
-  if (RESERVED_SERVER_KEYS.includes(key)) fail(f, `"${key}" is the name of built-in tools; choose another name`);
-  const tokens = srv?.tokens || {};
-  const t = {
-    organizer: tokenRef(tokens.organizer, `${f}.tokens.organizer`),
-    participant: tokenRef(tokens.participant, `${f}.tokens.participant`),
-  };
-  const type = srv?.type ?? 'remote';
-  if (!['remote', 'local'].includes(type)) fail(`${f}.type`, 'must be remote or local');
-  if (type === 'local') {
-    const spec = str(srv?.package, `${f}.package`, { min: 1, max: 200 }).trim();
-    if (!validPackageSpec(spec)) fail(`${f}.package`, 'must look like name, name@version, @scope/name or github:owner/repo#ref');
-    const args = list(srv?.args ?? [], `${f}.args`).map((a) => str(a, `${f}.args`, { max: 500 }));
-    if (args.length > 30) fail(`${f}.args`, 'at most 30 arguments');
-    return { type, package: spec, args, env: kvMap(srv?.env, `${f}.env`, ENV_NAME_RE, ['PATH', 'HOME']), allowScripts: !!srv?.allowScripts, ...serviceBehaviour(srv?.behaviour, f) };
-  }
-  const authMode = srv?.auth ?? (t.organizer || t.participant ? 'token' : 'none');
+const FORBIDDEN_ENV = ['PATH', 'HOME'];
+const FORBIDDEN_HEADERS = ['host', 'content-length', 'content-type', 'accept', 'authorization', 'mcp-session-id', 'mcp-protocol-version'];
+/** A tool service that runs on this server: an npm or GitHub package with its arguments and environment. */
+function localServer(srv, f) {
+  const spec = str(srv?.package, `${f}.package`, { min: 1, max: 200 }).trim();
+  if (!validPackageSpec(spec)) fail(`${f}.package`, 'must look like name, name@version, @scope/name or github:owner/repo#ref');
+  const args = list(srv?.args ?? [], `${f}.args`).map((a) => str(a, `${f}.args`, { max: 500 }));
+  if (args.length > 30) fail(`${f}.args`, 'at most 30 arguments');
+  return { type: 'local', package: spec, args, env: kvMap(srv?.env, `${f}.env`, ENV_NAME_RE, FORBIDDEN_ENV), allowScripts: !!srv?.allowScripts, ...serviceBehaviour(srv?.behaviour, f) };
+}
+/** A tool service at a URL: signed in with OAuth, with a token per role, or open. */
+function remoteServer(srv, f, tokens) {
+  const authMode = srv?.auth ?? (tokens.organizer || tokens.participant ? 'token' : 'none');
   if (!['oauth', 'token', 'none'].includes(authMode)) fail(`${f}.auth`, 'must be oauth, token or none');
   /** @type {Record<string, any>} */
-  const entry = { type, url: urlOrRef(srv?.url, `${f}.url`), auth: authMode, tokens: authMode === 'token' ? t : { organizer: '', participant: '' },
-    headers: kvMap(srv?.headers, `${f}.headers`, HEADER_NAME_RE, ['host', 'content-length', 'content-type', 'accept', 'authorization', 'mcp-session-id', 'mcp-protocol-version']),
-    ...serviceBehaviour(srv?.behaviour, f) };
+  const entry = { type: 'remote', url: urlOrRef(srv?.url, `${f}.url`), auth: authMode, tokens: authMode === 'token' ? tokens : { organizer: '', participant: '' },
+    headers: kvMap(srv?.headers, `${f}.headers`, HEADER_NAME_RE, FORBIDDEN_HEADERS), ...serviceBehaviour(srv?.behaviour, f) };
   const oc = srv?.oauthClient;
   if (authMode === 'oauth' && oc && (oc.id || oc.secret)) {
     entry.oauthClient = { id: str(oc.id, `${f}.oauthClient.id`, { min: 1, max: 300 }).trim(), secret: tokenRef(oc.secret, `${f}.oauthClient.secret`) };
   }
   return entry;
 }
+/** Validate one tool service (MCP server) definition: remote (URL + token/OAuth/none) or local (npm/GitHub package). */
+function validateServer(key, srv, f = key) {
+  if (!SERVER_KEY_RE.test(key)) fail(f, 'name must be lowercase letters, digits or _');
+  if (RESERVED_SERVER_KEYS.includes(key)) fail(f, `"${key}" is the name of built-in tools; choose another name`);
+  const tokens = { organizer: tokenRef(srv?.tokens?.organizer, `${f}.tokens.organizer`), participant: tokenRef(srv?.tokens?.participant, `${f}.tokens.participant`) };
+  const type = srv?.type ?? 'remote';
+  if (!['remote', 'local'].includes(type)) fail(`${f}.type`, 'must be remote or local');
+  return type === 'local' ? localServer(srv, f) : remoteServer(srv, f, tokens);
+}
 
-/**
- * Validate and normalise a full agent config. Unknown fields are dropped and reported in `warnings`.
- * Returns { config, warnings }.
- */
-export function validateAgentConfig(input) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) fail('config', 'must be an object');
-  const warnings = [];
-  for (const k of Object.keys(input)) {
-    if (!(k in AGENT_DEFAULTS) && k !== 'id') warnings.push(`Ignored unknown field "${k}"`);
-  }
-  const c = { ...structuredClone(AGENT_DEFAULTS), ...input };
+const section = (v) => (v && typeof v === 'object' ? v : {});
+const oneOf = (value, choices, field, words) => { if (!choices.includes(value)) fail(field, `must be ${words}`); return value; };
+
+/** Which model answers and how: the model and its light / strong pair, self-check, lessons, promises, limits, the prompt. */
+function modelFields(c) {
   const out = {};
-  out.name = str(c.name, 'name', { min: 1, max: 80 });
-  out.description = str(c.description, 'description', { max: 500 });
-  out.enabled = !!c.enabled;
   out.model = str(c.model || 'auto', 'model', { min: 1, max: 120 });
   if (out.model !== 'auto' && out.model !== 'smart' && !REF_RE.test(out.model)) fail('model', 'must be "auto", "smart" or "account:model"');
-  const tiers = c.modelTiers && typeof c.modelTiers === 'object' ? c.modelTiers : {};
+  const tiers = section(c.modelTiers);
   out.modelTiers = {};
   for (const k of ['light', 'strong']) {
     const v = String(tiers[k] || '').trim();
@@ -219,27 +220,30 @@ export function validateAgentConfig(input) {
     out.modelTiers[k] = v === 'auto' ? '' : v;
   }
   out.selfCheck = c.selfCheck !== false;
-  const ls = c.lessons && typeof c.lessons === 'object' ? c.lessons : {};
+  const ls = section(c.lessons);
   out.lessons = { enabled: ls.enabled !== false, autoApprove: !!ls.autoApprove };
-  const pr = c.promises && typeof c.promises === 'object' ? c.promises : {};
-  if (pr.followUp !== undefined && !['chat', 'dm', 'off'].includes(pr.followUp)) fail('promises.followUp', 'must be chat, dm or off');
+  const pr = section(c.promises);
+  if (pr.followUp !== undefined) oneOf(pr.followUp, ['chat', 'dm', 'off'], 'promises.followUp', 'chat, dm or off');
   out.promises = { track: !!pr.track, followUp: pr.followUp || 'chat' };
   out.cues = !!c.cues;
   out.maxTokens = int(c.maxTokens, 'maxTokens', 64, 8192);
   try { out.fallback = cleanOverride(c.fallback, 'fallback'); } catch (e) { fail(e.field || 'fallback', e.message); }
   out.historySize = int(c.historySize, 'historySize', 0, 200);
   out.prompt = str(c.prompt, 'prompt', { min: 1, max: 20000 });
+  return out;
+}
+
+/** When it answers and to whom: wake words, groups, direct chats, roles, People, its chats and time zone. */
+function audienceFields(c) {
+  const out = {};
   out.triggers = [...new Set(list(c.triggers, 'triggers').map((t) => t.toLowerCase()))];
   if (out.triggers.some((t) => t.length > 40)) fail('triggers', 'each trigger must be at most 40 characters');
   out.respondToMentions = !!c.respondToMentions;
-  out.groupReplies = c.groupReplies ?? 'followups';
-  if (!GROUP_REPLIES.includes(out.groupReplies)) fail('groupReplies', 'must be wake, followups or auto');
-  if (!['none', 'organizers', 'members', 'anyone'].includes(c.dm)) fail('dm', 'must be none, organizers, members or anyone');
-  out.dm = c.dm;
+  out.groupReplies = oneOf(c.groupReplies ?? 'followups', GROUP_REPLIES, 'groupReplies', 'wake, followups or auto');
+  out.dm = oneOf(c.dm, ['none', 'organizers', 'members', 'anyone'], 'dm', 'none, organizers, members or anyone');
   out.organizers = roleEntries(c.organizers, 'organizers');
   out.participants = roleEntries(c.participants, 'participants');
-  if (!['off', 'own', 'everyone'].includes(c.peopleAccess)) fail('peopleAccess', 'must be off, own or everyone');
-  out.peopleAccess = c.peopleAccess;
+  out.peopleAccess = oneOf(c.peopleAccess, ['off', 'own', 'everyone'], 'peopleAccess', 'off, own or everyone');
   out.peopleLists = [...new Set(list(c.peopleLists, 'peopleLists'))];
   if (out.peopleLists.some((l) => !/^l_[a-f0-9]{6,32}$/.test(l))) fail('peopleLists', 'must be list ids (l_…)');
   out.chats = [...new Set(list(c.chats, 'chats'))];
@@ -247,58 +251,67 @@ export function validateAgentConfig(input) {
   if (out.timezone) {
     try { new Intl.DateTimeFormat('en', { timeZone: out.timezone }); } catch { fail('timezone', 'is not a valid IANA timezone'); }
   }
+  return out;
+}
 
+/** The preview → confirm pair of a tool service (null when the agent has none). */
+function confirmRule(c) {
+  const confirm = c.confirm && (c.confirm.preview || c.confirm.tool) ? c.confirm : null;
+  if (!confirm) return null;
+  if (!RULE_RE.test(confirm.preview || '')) fail('confirm.preview', 'must look like server:*_preview');
+  if (!RULE_RE.test(confirm.tool || '')) fail('confirm.tool', 'must look like server:confirm');
+  return {
+    preview: confirm.preview, tool: confirm.tool,
+    idField: str(confirm.idField || 'confirm_id', 'confirm.idField', { min: 1, max: 60 }),
+    ttlMinutes: int(confirm.ttlMinutes ?? 9, 'confirm.ttlMinutes', 1, 60),
+  };
+}
+/** Its own tool services, the confirm pair, how sure it must be before a change, and the tool rules per role. */
+function toolFields(c, warnings) {
+  const out = {};
   if (typeof c.mcpServers !== 'object' || Array.isArray(c.mcpServers)) fail('mcpServers', 'must be an object');
   out.mcpServers = {};
   for (const [key, srv] of Object.entries(c.mcpServers || {})) out.mcpServers[key] = validateServer(key, srv, `mcpServers.${key}`);
-
-  const confirm = c.confirm && (c.confirm.preview || c.confirm.tool) ? c.confirm : null;
-  if (confirm) {
-    if (!RULE_RE.test(confirm.preview || '')) fail('confirm.preview', 'must look like server:*_preview');
-    if (!RULE_RE.test(confirm.tool || '')) fail('confirm.tool', 'must look like server:confirm');
-    out.confirm = {
-      preview: confirm.preview, tool: confirm.tool,
-      idField: str(confirm.idField || 'confirm_id', 'confirm.idField', { min: 1, max: 60 }),
-      ttlMinutes: int(confirm.ttlMinutes ?? 9, 'confirm.ttlMinutes', 1, 60),
-    };
-  } else out.confirm = null;
-
-  out.autonomy = c.autonomy ?? 'clear';
-  if (!AUTONOMY.includes(out.autonomy)) fail('autonomy', 'must be ask, clear or act');
+  out.confirm = confirmRule(c);
+  out.autonomy = oneOf(c.autonomy ?? 'clear', AUTONOMY, 'autonomy', 'ask, clear or act');
   out.tools = {};
   for (const role of ['participant', 'organizer', 'deny']) {
     const rules = list(c.tools?.[role], `tools.${role}`);
     for (const r of rules) if (!RULE_RE.test(r)) fail(`tools.${role}`, `"${r}" must look like server:tool (globs * ? allowed)`);
     out.tools[role] = [...new Set(rules)];
   }
-  if (out.confirm) {
-    for (const role of ['participant', 'organizer']) {
-      if (out.tools[role].includes(out.confirm.tool)) warnings.push(`Removed ${out.confirm.tool} from ${role} tools: confirmation is never given to the model`);
-      out.tools[role] = out.tools[role].filter((r) => r !== out.confirm.tool);
-    }
+  if (!out.confirm) return out;
+  for (const role of ['participant', 'organizer']) {
+    if (out.tools[role].includes(out.confirm.tool)) warnings.push(`Removed ${out.confirm.tool} from ${role} tools: confirmation is never given to the model`);
+    out.tools[role] = out.tools[role].filter((r) => r !== out.confirm.tool);
   }
+  return out;
+}
 
+const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+/** Scheduled posts: a time of day, the days, what to post and where. */
+function scheduleList(c) {
   if (!Array.isArray(c.schedules)) fail('schedules', 'must be a list');
   const ids = new Set();
-  out.schedules = c.schedules.map((s, i) => {
+  return c.schedules.map((s, i) => {
     const f = `schedules[${i + 1}]`;
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(s?.at || '')) fail(`${f}.at`, 'must be HH:MM (24h)');
     const days = String(s.days || 'daily').toLowerCase().replace(/\s/g, '');
-    if (days !== 'daily' && !days.split(',').every((d) => ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].includes(d))) {
-      fail(`${f}.days`, 'must be "daily" or a list like mon,wed,fri');
-    }
+    if (days !== 'daily' && !days.split(',').every((d) => WEEKDAYS.includes(d))) fail(`${f}.days`, 'must be "daily" or a list like mon,wed,fri');
     const id = str(s.id || `s${i + 1}`, `${f}.id`, { min: 1, max: 40 });
     if (ids.has(id)) fail(`${f}.id`, 'must be unique');
     ids.add(id);
-    const kind = s.kind ?? 'prompt';
-    if (!SCHEDULE_KINDS.includes(kind)) fail(`${f}.kind`, `must be ${SCHEDULE_KINDS.join(' or ')}`);
+    const kind = oneOf(s.kind ?? 'prompt', SCHEDULE_KINDS, `${f}.kind`, SCHEDULE_KINDS.join(' or '));
     return {
       id, at: s.at, days, kind, prompt: kind === 'prompt' ? str(s.prompt, `${f}.prompt`, { min: 1, max: 4000 }) : '',
       chats: s.chats === 'all' || !s.chats ? 'all' : list(s.chats, `${f}.chats`), enabled: s.enabled !== false,
     };
   });
+}
 
-  out.memory = { enabled: c.memory?.enabled !== false };
+/** Memory, the shared tool services it does not use, and how it uses each service. */
+function serviceFields(c) {
+  const out = { memory: { enabled: c.memory?.enabled !== false } };
   const off = list(c.globalMcp?.disabled, 'globalMcp.disabled');
   for (const k of off) if (!SERVER_KEY_RE.test(k)) fail('globalMcp.disabled', `"${k}" is not a tool service name`);
   out.globalMcp = { disabled: [...new Set(off)] };
@@ -310,19 +323,52 @@ export function validateAgentConfig(input) {
     const bh = behaviour(v, `services.${k}`, true);
     if (Object.keys(bh).length) out.services[k] = bh;
   }
-  const md = c.media && typeof c.media === 'object' ? c.media : {};
+  return out;
+}
+
+/** Photos & voice: what it looks at and listens to, when it answers by voice, who may ask for pictures. */
+function mediaSettings(c) {
+  const md = section(c.media);
   const mdef = AGENT_DEFAULTS.media;
   const flag = (k) => (md[k] === undefined ? mdef[k] : !!md[k]);
-  const voiceReply = md.voiceReply ?? mdef.voiceReply;
-  if (!['never', 'voice', 'always'].includes(voiceReply)) fail('media.voiceReply', 'must be never, voice or always');
-  out.media = { photos: flag('photos'), documents: flag('documents'), stickers: flag('stickers'), voiceNotes: flag('voiceNotes'), voiceReply,
-    createImages: { organizer: md.createImages?.organizer === undefined ? mdef.createImages.organizer : !!md.createImages.organizer,
-      participant: md.createImages?.participant === undefined ? mdef.createImages.participant : !!md.createImages.participant } };
+  const mayCreate = (role) => (md.createImages?.[role] === undefined ? mdef.createImages[role] : !!md.createImages[role]);
+  const voiceReply = oneOf(md.voiceReply ?? mdef.voiceReply, ['never', 'voice', 'always'], 'media.voiceReply', 'never, voice or always');
+  return { photos: flag('photos'), documents: flag('documents'), stickers: flag('stickers'), voiceNotes: flag('voiceNotes'), voiceReply,
+    createImages: { organizer: mayCreate('organizer'), participant: mayCreate('participant') } };
+}
+
+/** The number owner alerts go to (the owner assistant's). */
+function alertsTo(c) {
   const to = digits(c.alerts?.to || '');
   if (to && (to.length < 8 || to.length > 15)) fail('alerts.to', 'enter the number with its country code, e.g. +41 79 123 45 67');
-  out.alerts = { to };
-  Object.assign(out, builtins(c));
-  return { config: out, warnings };
+  return { to };
+}
+
+/**
+ * Validate and normalise a full agent config. Unknown fields are dropped and reported in `warnings`.
+ * Returns { config, warnings }. The fields keep their order (a stored config reads the same after every save).
+ */
+export function validateAgentConfig(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) fail('config', 'must be an object');
+  const warnings = [];
+  for (const k of Object.keys(input)) {
+    if (!(k in AGENT_DEFAULTS) && k !== 'id') warnings.push(`Ignored unknown field "${k}"`);
+  }
+  const c = { ...structuredClone(AGENT_DEFAULTS), ...input };
+  const config = {
+    name: str(c.name, 'name', { min: 1, max: 80 }),
+    description: str(c.description, 'description', { max: 500 }),
+    enabled: !!c.enabled,
+    ...modelFields(c),
+    ...audienceFields(c),
+    ...toolFields(c, warnings),
+    schedules: scheduleList(c),
+    ...serviceFields(c),
+    media: mediaSettings(c),
+    alerts: alertsTo(c),
+    ...builtins(c),
+  };
+  return { config, warnings };
 }
 
 const COMMAND_RE = /^[^\s]{2,40}$/;

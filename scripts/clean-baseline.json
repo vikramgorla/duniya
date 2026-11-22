@@ -67,14 +67,13 @@
   "complexity": 1
  },
  "src/core/owner-assistant.js": {
-  "complexity": 2,
-  "max-depth": 1
+  "complexity": 1
  },
  "src/core/pace.js": {
   "complexity": 1
  },
  "src/core/people.js": {
-  "complexity": 2
+  "complexity": 1
  },
  "src/core/person-insights.js": {
   "complexity": 1
@@ -84,9 +83,6 @@
  },
  "src/core/providers/codex.js": {
   "complexity": 1
- },
- "src/core/providers/errors.js": {
-  "complexity": 2
  },
  "src/core/providers/index.js": {
   "complexity": 2
@@ -100,10 +96,6 @@
  "src/core/scheduler.js": {
   "complexity": 1
  },
- "src/core/schema.js": {
-  "complexity": 3,
-  "max-lines-per-function": 1
- },
  "src/core/tools.js": {
   "complexity": 1
  },
@@ -114,10 +106,10 @@
   "complexity": 1
  },
  "src/core/webaccess.js": {
-  "complexity": 3
+  "complexity": 2
  },
  "src/modules/events/index.js": {
-  "complexity": 4
+  "complexity": 1
  },
  "src/modules/orders/index.js": {
   "complexity": 1
@@ -212,8 +204,5 @@
  },
  "src/panel/routes/providers.js": {
   "max-lines-per-function": 1
- },
- "src/panel/server.js": {
-  "complexity": 1
  }
 }

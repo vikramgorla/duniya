@@ -68,6 +68,42 @@ function formAllowed(req) {
   try { return new URL(String(req.headers.origin || '')).host === req.headers.host; } catch { return false; }
 }
 
+const mayNot = (user, r) => fail(user.role === 'viewer' ? 'Read-only account' : `Requires ${r.role} role`, 403);
+/** Who asks, when they may use this route (public routes: nobody needs to sign in); throws 401 / 403 otherwise. */
+function userFor(r, req) {
+  if (r.public) return null;
+  const user = requestUser(req);
+  if (!user) throw fail('Login required', 401);
+  if (ROLE_RANK[user.role] < ROLE_RANK[r.role]) throw mayNot(user, r);
+  return user;
+}
+/**
+ * The guard against requests another site makes for a signed-in user (with SameSite=Strict): what changes something
+ * comes as JSON, as the panel's own upload, or as a form sent from its own page. Throws otherwise.
+ */
+function guardBody(r, req) {
+  if (req.method === 'GET') return;
+  if (r.raw) { if (!uploadAllowed(req)) throw fail('Uploads must come from the panel', 415); return; }
+  if (r.form) { if (!formAllowed(req)) throw fail('Send the form from its page', 403); return; }
+  if (!String(req.headers['content-type'] || '').startsWith('application/json')) throw fail('JSON required', 415);
+}
+/** What a handler returned, on the wire: null (it answered by itself), [status, answer], or the answer. */
+function answer(res, out) {
+  if (out === null) return;
+  if (Array.isArray(out) && typeof out[0] === 'number' && out.length === 2) return send(res, out[0], out[1]);
+  return send(res, 200, out ?? { ok: true });
+}
+/** A request that threw: its own status and words; a service that could not be reached in plain words (2.56); a bug is recorded and answered as a 500. */
+function answerError(req, res, url, e) {
+  const plain = e.status ? '' : unreachable(e);
+  if (plain) console.warn(`panel ${req.method} ${url.pathname}: ${e.message}`);
+  const bug = !e.status && !plain && isBug(e);
+  if (bug) reportBug(req.method, url.pathname, e);
+  if (res.headersSent) return;
+  send(res, e.status || (plain ? 502 : bug ? 500 : 400), { error: plain || (bug ? 'Something went wrong on the server. It is in Activity; please try again.' : e.message),
+    code: e.code, field: e.field, needsConfirm: e.needsConfirm, warnings: e.warnings, check: e.check });
+}
+
 export function startPanel({ channel, extend = [] }) {
   bootstrapAuth();
   setChatChannel(channel);
@@ -126,9 +162,7 @@ export function startPanel({ channel, extend = [] }) {
     const url = new URL(path, 'http://x');
     const r = findRoute(method, url.pathname);
     if (!r) throw fail('Not found', 404);
-    if (!r.public && ROLE_RANK[user.role] < ROLE_RANK[r.role]) {
-      throw fail(user.role === 'viewer' ? 'Read-only account' : `Requires ${r.role} role`, 403);
-    }
+    if (!r.public && ROLE_RANK[user.role] < ROLE_RANK[r.role]) throw mayNot(user, r);
     const req = { method, url: path, headers: { host, 'content-type': 'application/json' }, socket: { remoteAddress: 'mcp' }, on() {} };
     const chunks = [];
     const res = {
@@ -153,49 +187,31 @@ export function startPanel({ channel, extend = [] }) {
 
   // The panel shell, its modules and icons: from memory, compressed, ETag/304 (058, 063: assets.js).
   const { shell, assets } = panelAssets();
+  /** What needs no route: the shell, the health probe, the domain check, the panel's files and the admin MCP. True when answered. */
+  async function serveBuiltIn(req, res, url) {
+    const get = req.method === 'GET';
+    if (get && (url.pathname === '/' || url.pathname === '/index.html')) { await shell(req, res); return true; }
+    if (url.pathname === '/healthz') { send(res, 200, 'ok'); return true; }
+    // 036: domain reachability proof + Caddy's on-demand TLS "ask" (public, answers only one-time tokens).
+    if (get && url.pathname.startsWith('/.well-known/duniya-check')) {
+      const r = domainCheckResponse(url, req);
+      send(res, r.status, r.body, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+      return true;
+    }
+    if (get && Object.hasOwn(assets, url.pathname)) { await assets[url.pathname](req, res, url); return true; }
+    return adminMcp.handle(req, res, url);
+  }
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     try {
-      if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-        return shell(req, res);
-      }
-      if (url.pathname === '/healthz') return send(res, 200, 'ok');
-      // 036: domain reachability proof + Caddy's on-demand TLS "ask" (public, answers only one-time tokens).
-      if (req.method === 'GET' && url.pathname.startsWith('/.well-known/duniya-check')) {
-        const r = domainCheckResponse(url, req);
-        return send(res, r.status, r.body, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
-      }
-      if (req.method === 'GET' && Object.hasOwn(assets, url.pathname)) return assets[url.pathname](req, res, url);
-      if (await adminMcp.handle(req, res, url)) return;
+      if (await serveBuiltIn(req, res, url)) return;
       const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));
-      if (!r) return send(res, 404, { error: 'Not found' });
-      let user = null;
-      if (!r.public) {
-        user = requestUser(req);
-        if (!user) return send(res, 401, { error: 'Login required' });
-        if (ROLE_RANK[user.role] < ROLE_RANK[r.role]) {
-          return send(res, 403, { error: user.role === 'viewer' ? 'Read-only account' : `Requires ${r.role} role` });
-        }
-      }
-      if (req.method !== 'GET' && r.raw) {
-        if (!uploadAllowed(req)) return send(res, 415, { error: 'Uploads must come from the panel' });
-      } else if (req.method !== 'GET' && r.form) {
-        if (!formAllowed(req)) return send(res, 403, { error: 'Send the form from its page' });
-      } else if (req.method !== 'GET' && !String(req.headers['content-type'] || '').startsWith('application/json')) {
-        return send(res, 415, { error: 'JSON required' }); // CSRF guard (with SameSite=Strict)
-      }
+      if (!r) throw fail('Not found', 404);
+      const user = userFor(r, req);
+      guardBody(r, req);
       const body = req.method === 'GET' || r.raw ? {} : await readBody(req, r.form);
-      const out = await r.handler({ req, res, body, query: url.searchParams, params: url.pathname.match(r.re).groups || {}, user });
-      if (out === null) return;
-      if (Array.isArray(out) && typeof out[0] === 'number' && out.length === 2) return send(res, out[0], out[1]);
-      return send(res, 200, out ?? { ok: true });
-    } catch (e) {
-      const plain = e.status ? '' : unreachable(e); // 2.56: a service or provider that could not be reached, in plain words
-      if (plain) console.warn(`panel ${req.method} ${url.pathname}: ${e.message}`);
-      const bug = !e.status && !plain && isBug(e);
-      if (bug) reportBug(req.method, url.pathname, e);
-      if (!res.headersSent) send(res, e.status || (plain ? 502 : bug ? 500 : 400), { error: plain || (bug ? 'Something went wrong on the server. It is in Activity; please try again.' : e.message), code: e.code, field: e.field, needsConfirm: e.needsConfirm, warnings: e.warnings, check: e.check });
-    }
+      answer(res, await r.handler({ req, res, body, query: url.searchParams, params: url.pathname.match(r.re).groups || {}, user }));
+    } catch (e) { answerError(req, res, url, e); }
   });
   server.listen(env.panelPort, env.panelHost, () => {
     console.log(`Admin panel on http://${env.panelHost}:${env.panelPort}`);

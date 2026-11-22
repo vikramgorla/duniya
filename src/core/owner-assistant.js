@@ -464,6 +464,142 @@ function systemPrompt(user, source) {
   ].join('\n\n');
 }
 
+const TOOL_RESULT_MAX = 12000; // characters of a tool's result the model gets
+const QUESTION_MAX = 4000; // characters of a question
+const filled = (v) => v !== undefined && v !== null && v !== '';
+/** A tool as the model gets it. */
+const toolDef = (t) => ({ name: t.name, description: t.description, input_schema: t.schema || { type: 'object', properties: t.input || {}, ...(t.required ? { required: t.required } : {}) } });
+
+/** The conversation so far as model messages: turns of one side in a row are joined, and it begins with the user. */
+function conversationOf(userId, source) {
+  const messages = [];
+  for (const m of recentTurns(userId, source)) {
+    const role = m.role === 'assistant' ? 'assistant' : 'user';
+    if (messages.length && messages.at(-1).role === role) messages.at(-1).content += `\n\n${m.text}`;
+    else messages.push({ role, content: m.text });
+  }
+  while (messages.length && messages[0].role !== 'user') messages.shift();
+  return messages;
+}
+
+/**
+ * What one turn of the owner assistant carries from its start to its reply: who asks and where, the tools, the
+ * conversation with this question (and its photos or PDFs, 043), and what the rounds add (held changes, links, the reply).
+ */
+async function startTurn({ user, question, source, surface, onEvent, dm, signal }) {
+  const emit = (e) => { try { onEvent?.(e); } catch { /* a closed stream must not break the turn */ } };
+  // 059: `dm` = the WhatsApp turn ({ chat, phone, msgId, senderJid, attachments, mediaNote }); agent tools act there.
+  const tools = await toolsFor(user, { ...dm, text: question });
+  const messages = conversationOf(user.id, source);
+  // Photos & PDFs (043 machinery): image / document blocks for a model that sees them (or the vision fallback model).
+  const rec = record();
+  const plan = await planAttachments(rec.model, dm.attachments || []);
+  const before = messages.at(-1)?.role === 'user' ? `${messages.pop().content}\n\n` : '';
+  const notes = buildContext({ agent: rec, chat: notesKey(user.id) }); // its saved notes (memory on), as information
+  const turnText = `${notes ? `${notes}\n\n` : ''}${before}${[question, dm.mediaNote, plan.note].filter(Boolean).join('\n')}`;
+  messages.push({ role: 'user', content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText });
+  const t = { user, source, surface, dm, signal, emit, rec, plan, turnText, messages, model: plan.model, byName: new Map(tools.map((x) => [x.name, x])), defs: tools.map(toolDef),
+    vision: plan.attachments.length ? visionCallOptions() : null, fallback: effectiveFallback({ agent: rec }), turn: { ref: '' },
+    held: [], links: [], reply: '', stopped: false,
+    partial: '', // 066: what was streamed in this round, kept when the asker presses Stop
+    streaming: {} };
+  // 047 (#83): with a stream listener, the model's text arrives token by token ({ type: 'delta', text }); when a stream
+  // breaks after its first token, { type: 'restarted', reason } tells the client to drop the partial text of this round.
+  // Nothing is buffered here: deltas go straight to the listener. WhatsApp (no onEvent) gets whole replies as before.
+  if (onEvent) t.streaming = { onText: (d) => { t.partial += d; emit({ type: 'delta', text: d }); }, onRestart: ({ reason }) => emit({ type: 'restarted', reason }) };
+  return t;
+}
+
+/**
+ * One call of the model. Returns its answer; 'again' when the photos were taken out because no model that sees them
+ * could answer (#67); null when the turn ends here: the asker pressed Stop, or the model failed (the reply says so).
+ */
+async function askModel(t) {
+  try {
+    return await modelChat({ model: t.model, purpose: 'agent', maxTokens: t.rec.maxTokens, system: systemPrompt(t.user, t.source), tools: t.defs, messages: t.messages, fallback: t.fallback, turn: t.turn,
+      usage: usageTag('owner', { agent: OWNER_AGENT }), ...t.streaming, ...(t.vision || {}), signal: t.signal });
+  } catch (e) {
+    if (e.code === 'aborted' || t.signal?.aborted) { t.stopped = true; t.reply = t.partial.trim(); return null; }
+    if (t.vision && e.skipped?.length) {
+      t.vision = null;
+      t.messages[t.messages.length - 1] = { role: 'user', content: `${t.turnText}\n${noVisionNote(t.plan.attachments)}` };
+      return 'again';
+    }
+    activity('error', { summary: `Owner assistant model error: ${e.message}` });
+    t.reply = friendlyModelError(e) || 'Sorry, I hit an error. Please try again in a minute.';
+    return null;
+  }
+}
+
+/** A change waits for the user's confirm: held with a code, and the model hears that it is not done. */
+async function holdChange(t, tool, args) {
+  const preview = await previewOf(tool, args, t.user);
+  const code = newConfirm({ userId: t.user.id, surface: t.surface, tool: tool.name, args, preview, ...(tool.kind === 'agent' || tool.prepare ? { dm: { chat: t.dm.chat || '', phone: t.dm.phone || '' } } : {}) });
+  t.held.push({ code, preview });
+  activity('confirm.created', { summary: `${preview} — asked by ${t.user.username} (owner assistant), waiting for confirm ${code}`.slice(0, 480) });
+  return JSON.stringify({ status: 'held_for_confirmation', preview, note: 'Not done. The system asks the user to confirm with a code.' });
+}
+/** A tool that only looks things up (or needs no confirm, #91) runs now; a link in its result goes under the reply. */
+async function runNow(t, tool, args) {
+  const out = await runReadTool(tool, args, t.user, t.surface);
+  if (linkOf(out)) t.links.push(linkOf(out));
+  return typeof out === 'string' ? out : JSON.stringify(out ?? { ok: true });
+}
+/** One tool call of the model: checked, then held for a confirm or run. Returns what the model gets back. */
+async function runCall(t, call) {
+  t.emit({ type: 'step', step: 'calling', tool: call.name }); // 066: the panel shows "Checking …" while it runs
+  const tool = t.byName.get(call.name);
+  let args = call.input || {};
+  let content; let isError = false; let hold; // hold: the change waits for a confirm
+  try {
+    if (!tool) throw fail(`Unknown or not allowed tool: ${call.name}`, 403);
+    const missing = (tool.required || []).filter((k) => !filled(args[k]));
+    if (missing.length) throw fail(`Missing: ${missing.join(', ')}`);
+    if (tool.prepare) args = await tool.prepare(args); // 059: chat names → chat ids (on, not private), before any preview
+    hold = needsConfirm(tool, args); // noConfirm (#91): harmless actions, logged as owner.tool below
+    content = hold ? await holdChange(t, tool, args) : await runNow(t, tool, args);
+  } catch (e) { isError = true; hold = false; content = e.message || String(e); }
+  content = content.slice(0, TOOL_RESULT_MAX);
+  t.emit({ type: 'step', step: hold ? 'held' : 'tool', tool: call.name, ok: !isError });
+  activity('owner.tool', { summary: `${toolPhrase(call.name)}${isError ? ` failed — ${clip(content, 120)}` : hold ? ', held for your confirm' : ''} · via ${t.user.username}`.slice(0, 480), // 066: plain words; the tool name is in detail
+    detail: { tool: call.name, args: scrub(args), ok: !isError } });
+  return { type: 'tool_result', tool_use_id: call.id, is_error: isError, content };
+}
+
+/** The rounds of a turn: the model answers, its tool calls run, until it has nothing more to ask for (or Stop, or MAX_ROUNDS). */
+async function runRounds(t) {
+  for (let round = 0; round <= MAX_ROUNDS; round++) {
+    if (t.signal?.aborted) { t.stopped = true; return; } // 066: Stop: no further model calls or tools
+    t.partial = '';
+    t.emit({ type: 'step', step: 'thinking', round });
+    const res = await askModel(t);
+    if (res === 'again') { round--; continue; }
+    if (!res) return;
+    t.reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+    const calls = res.content.filter((b) => b.type === 'tool_use');
+    const last = res.stop_reason !== 'tool_use' || !calls.length;
+    if (t.reply) t.emit({ type: 'text', text: t.reply, final: last });
+    if (last) return;
+    t.messages.push({ role: 'assistant', content: res.content });
+    const results = [];
+    for (const call of calls) {
+      if (t.signal?.aborted) break; // 066: Stop: the remaining tools do not run
+      results.push(await runCall(t, call));
+    }
+    t.messages.push({ role: 'user', content: results });
+  }
+}
+
+/** The reply as the user gets it: the model's words, links its tools gave, and on WhatsApp the changes that wait for a confirm. */
+function finalReply(t) {
+  let reply = t.stopped ? `${t.reply ? `${t.reply}\n\n` : ''}(Stopped.)` : t.reply;
+  reply = reply || (t.held.length ? 'Here is what I prepared:' : 'I have no answer for that.');
+  for (const l of t.links) if (!reply.includes(l)) reply += `\n\n${l}`;
+  if (t.source === 'panel') return reply;
+  for (const h of t.held) reply += `\n\n*${h.preview}*\nReply *confirm ${h.code}* to apply, or *cancel ${h.code}* (valid 10 min).`;
+  return reply;
+}
+
 /**
  * One question from a linked user (WhatsApp) or a panel user (Ask box). Returns { reply, confirms: [{ code, preview }] }.
  * source: 'whatsapp' | 'panel'; surface: where a confirmation must come from.
@@ -474,121 +610,20 @@ function systemPrompt(user, source) {
  * text). The round's whole { type: 'text' } still follows and is the source of truth.
  */
 export async function ask({ user, text, source, surface, onEvent = null, dm = {}, signal = undefined }) {
-  const emit = (e) => { try { onEvent?.(e); } catch { /* a closed stream must not break the turn */ } };
   if (!wiring) throw fail('The owner assistant is not ready yet', 503);
-  const question = String(text || '').trim().slice(0, 4000);
+  const question = String(text || '').trim().slice(0, QUESTION_MAX);
   if (!question) throw fail('Ask a question');
   if (looksSecret(question)) {
     activity('owner.question', { summary: `${user.username} (${source === 'panel' ? 'panel' : 'WhatsApp'}) sent what looks like a key or password: not read, not stored, not sent to a model` });
     return { reply: SECRET_REPLY, confirms: [] };
   }
   activity('owner.question', { summary: `“${clip(question, 140)}” · asked by ${user.username} (${user.role}) in ${source === 'panel' ? 'the panel' : 'WhatsApp'}` });
-  // 059: `dm` = the WhatsApp turn ({ chat, phone, msgId, senderJid, attachments, mediaNote }); agent tools act there.
-  const tools = await toolsFor(user, { ...dm, text: question });
-  const byName = new Map(tools.map((t) => [t.name, t]));
-  const defs = tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.schema || { type: 'object', properties: t.input || {}, ...(t.required ? { required: t.required } : {}) } }));
-  const messages = [];
-  for (const m of recentTurns(user.id, source)) {
-    const role = m.role === 'assistant' ? 'assistant' : 'user';
-    if (messages.length && messages.at(-1).role === role) messages.at(-1).content += `\n\n${m.text}`;
-    else messages.push({ role, content: m.text });
-  }
-  while (messages.length && messages[0].role !== 'user') messages.shift();
-  // Photos & PDFs (043 machinery): image / document blocks for a model that sees them (or the vision fallback model).
-  const rec = record();
-  let model = rec.model;
-  const plan = await planAttachments(model, dm.attachments || []);
-  model = plan.model;
-  const before = messages.at(-1)?.role === 'user' ? `${messages.pop().content}\n\n` : '';
-  const notes = buildContext({ agent: rec, chat: notesKey(user.id) }); // its saved notes (memory on), as information
-  const turnText = `${notes ? `${notes}\n\n` : ''}${before}${[question, dm.mediaNote, plan.note].filter(Boolean).join('\n')}`;
-  messages.push({ role: 'user', content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText });
-  let vision = plan.attachments.length ? visionCallOptions() : null;
+  const t = await startTurn({ user, question, source, surface, onEvent, dm, signal });
   remember(user.id, source, 'user', question);
-
-  const held = [];
-  const links = [];
-  const turn = { ref: '' };
-  let reply = '';
-  let partial = ''; // 066: what was streamed in this round, kept when the asker presses Stop
-  let stopped = false;
-  const fallback = effectiveFallback({ agent: rec });
-  // 047 (#83): with a stream listener, the model's text arrives token by token ({ type: 'delta', text }); when a stream
-  // breaks after its first token, { type: 'restarted', reason } tells the client to drop the partial text of this round.
-  // Nothing is buffered here: deltas go straight to the listener. WhatsApp (no onEvent) gets whole replies as before.
-  const streaming = onEvent ? {
-    onText: (d) => { partial += d; emit({ type: 'delta', text: d }); },
-    onRestart: ({ reason }) => emit({ type: 'restarted', reason }),
-  } : {};
-  for (let round = 0; round <= MAX_ROUNDS; round++) {
-    let res;
-    if (signal?.aborted) { stopped = true; break; } // 066: Stop: no further model calls or tools
-    partial = '';
-    emit({ type: 'step', step: 'thinking', round });
-    try {
-      res = await modelChat({ model, purpose: 'agent', maxTokens: rec.maxTokens, system: systemPrompt(user, source), tools: defs, messages, fallback, turn,
-        usage: usageTag('owner', { agent: OWNER_AGENT }), ...streaming, ...(vision || {}), signal });
-    } catch (e) {
-      if (e.code === 'aborted' || signal?.aborted) { stopped = true; reply = partial.trim(); break; }
-      if (vision && e.skipped?.length) { // no model that sees photos could answer: ask again without them (#67)
-        vision = null;
-        messages[messages.length - 1] = { role: 'user', content: `${turnText}\n${noVisionNote(plan.attachments)}` };
-        round--;
-        continue;
-      }
-      const friendly = friendlyModelError(e);
-      activity('error', { summary: `Owner assistant model error: ${e.message}` });
-      reply = friendly || 'Sorry, I hit an error. Please try again in a minute.';
-      break;
-    }
-    reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
-    const calls = res.content.filter((b) => b.type === 'tool_use');
-    if (reply) emit({ type: 'text', text: reply, final: res.stop_reason !== 'tool_use' || !calls.length });
-    if (res.stop_reason !== 'tool_use' || !calls.length) break;
-    messages.push({ role: 'assistant', content: res.content });
-    const results = [];
-    for (const call of calls) {
-      if (signal?.aborted) break; // 066: Stop: the remaining tools do not run
-      emit({ type: 'step', step: 'calling', tool: call.name }); // 066: the panel shows "Checking …" while it runs
-      const tool = byName.get(call.name);
-      let args = call.input || {};
-      let content; let isError = false;
-      let hold = false;
-      try {
-        if (!tool) throw fail(`Unknown or not allowed tool: ${call.name}`, 403);
-        const missing = (tool.required || []).filter((k) => args[k] === undefined || args[k] === null || args[k] === '');
-        if (missing.length) throw fail(`Missing: ${missing.join(', ')}`);
-        if (tool.prepare) args = await tool.prepare(args); // 059: chat names → chat ids (on, not private), before any preview
-        hold = needsConfirm(tool, args);
-        if (hold) { // noConfirm (#91): harmless actions, logged as owner.tool below
-          const preview = await previewOf(tool, args, user);
-          const code = newConfirm({ userId: user.id, surface, tool: tool.name, args, preview, ...(tool.kind === 'agent' || tool.prepare ? { dm: { chat: dm.chat || '', phone: dm.phone || '' } } : {}) });
-          held.push({ code, preview });
-          activity('confirm.created', { summary: `${preview} — asked by ${user.username} (owner assistant), waiting for confirm ${code}`.slice(0, 480) });
-          content = JSON.stringify({ status: 'held_for_confirmation', preview, note: 'Not done. The system asks the user to confirm with a code.' });
-        } else {
-          const out = await runReadTool(tool, args, user, surface);
-          if (linkOf(out)) links.push(linkOf(out));
-          content = typeof out === 'string' ? out : JSON.stringify(out ?? { ok: true });
-        }
-      } catch (e) { isError = true; content = e.message || String(e); }
-      content = content.slice(0, 12000);
-      if (isError) hold = false;
-      emit({ type: 'step', step: hold ? 'held' : 'tool', tool: call.name, ok: !isError });
-      activity('owner.tool', { summary: `${toolPhrase(call.name)}${isError ? ` failed — ${clip(content, 120)}` : hold ? ', held for your confirm' : ''} · via ${user.username}`.slice(0, 480), // 066: plain words; the tool name is in detail
-        detail: { tool: call.name, args: scrub(args), ok: !isError } });
-      results.push({ type: 'tool_result', tool_use_id: call.id, is_error: isError, content });
-    }
-    messages.push({ role: 'user', content: results });
-  }
-  if (stopped) reply = `${reply ? `${reply}\n\n` : ''}(Stopped.)`;
-  reply = reply || (held.length ? 'Here is what I prepared:' : 'I have no answer for that.');
-  for (const l of links) if (!reply.includes(l)) reply += `\n\n${l}`;
-  if (source !== 'panel') {
-    for (const h of held) reply += `\n\n*${h.preview}*\nReply *confirm ${h.code}* to apply, or *cancel ${h.code}* (valid 10 min).`;
-  }
+  await runRounds(t);
+  const reply = finalReply(t);
   remember(user.id, source, 'assistant', reply);
-  return { reply, confirms: held };
+  return { reply, confirms: t.held };
 }
 
 /** Split a long answer into WhatsApp-sized messages at paragraph, line or sentence boundaries. */

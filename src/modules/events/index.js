@@ -69,29 +69,42 @@ export function findEvent(ref) {
   return view(hits[0]);
 }
 
-/** Validate and save an event (new without id). Prices in the event's currency (e.g. 25 = CHF 25.00). */
-export function saveEvent(body = {}, by = 'panel') {
-  const cur = body.id ? getEvent(body.id) : null;
-  const pick = (k, d) => (body[k] !== undefined ? body[k] : cur ? cur[k] : d);
-  const name = clean(pick('name', ''), 80);
-  if (!name) throw fail('An event needs a name', 400, { field: 'name' });
+const DATE_FIELDS = ['starts', 'ends', 'deadline', 'payBy'];
+const CAPACITY_MAX = 100000; // people
+const FREE_UNDER_MAX = 18; // years
+/** The event's dates as entered: each a date (or a date and time); a start is needed, the end is not before it. */
+function eventDates(pick) {
   const dates = {};
-  for (const k of ['starts', 'ends', 'deadline', 'payBy']) {
+  for (const k of DATE_FIELDS) {
     const v = String(pick(k, '') || '').trim();
     if (v && !DATE.test(v)) throw fail('Use a date like 2027-01-14 (or 2027-01-14T18:00)', 400, { field: k });
     dates[k] = v;
   }
   if (!dates.starts) throw fail('When does it start?', 400, { field: 'starts' });
   if (dates.ends && dates.ends < dates.starts) throw fail('It ends before it starts', 400, { field: 'ends' });
+  return dates;
+}
+/** How people register: capacity, currency, per household or per person, who confirms, the price list. */
+function eventRules(pick) {
   const capacity = Number(pick('capacity', 0));
-  if (!Number.isInteger(capacity) || capacity < 0 || capacity > 100000) throw fail('Capacity: 0 (no limit) to 100000 people', 400, { field: 'capacity' });
+  if (!Number.isInteger(capacity) || capacity < 0 || capacity > CAPACITY_MAX) throw fail(`Capacity: 0 (no limit) to ${CAPACITY_MAX} people`, 400, { field: 'capacity' });
   const currency = String(pick('currency', 'CHF') || 'CHF').trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(currency)) throw fail('A three-letter currency, e.g. CHF, EUR, INR', 400, { field: 'currency' });
   const per = pick('per', 'household'); const confirm = pick('confirm', 'auto');
   if (!['household', 'person'].includes(per)) throw fail('Registration is per household or per person', 400, { field: 'per' });
   if (!['auto', 'organizer'].includes(confirm)) throw fail('Confirmation is automatic or by an organizer', 400, { field: 'confirm' });
   const p = pick('prices', {}) || {};
-  const prices = { adult: money(p.adult), kid: money(p.kid), freeUnder: Math.max(0, Math.min(18, Math.round(Number(p.freeUnder || 0)))) };
+  const prices = { adult: money(p.adult), kid: money(p.kid), freeUnder: Math.max(0, Math.min(FREE_UNDER_MAX, Math.round(Number(p.freeUnder || 0)))) };
+  return { capacity, currency, per, confirm, prices };
+}
+/** Validate and save an event (new without id). Prices in the event's currency (e.g. 25 = CHF 25.00). */
+export function saveEvent(body = {}, by = 'panel') {
+  const cur = body.id ? getEvent(body.id) : null;
+  const pick = (k, d) => (body[k] !== undefined ? body[k] : cur ? cur[k] : d);
+  const name = clean(pick('name', ''), 80);
+  if (!name) throw fail('An event needs a name', 400, { field: 'name' });
+  const dates = eventDates(pick);
+  const { capacity, currency, per, confirm, prices } = eventRules(pick);
   const vals = [name, dates.starts, dates.ends, clean(pick('place', ''), 160), capacity, dates.deadline, currency, per, confirm, JSON.stringify(prices), dates.payBy];
   const id = cur?.id || rid('ev');
   if (cur) db.prepare('UPDATE ev_events SET name = ?, starts = ?, ends = ?, place = ?, capacity = ?, deadline = ?, currency = ?, per = ?, confirm = ?, prices = ?, pay_by = ? WHERE tenant_id = ? AND id = ?').run(...vals, TENANT, id);
@@ -211,27 +224,19 @@ function resize(e, r, { a, k, notes }, by) {
   return next;
 }
 
-/**
- * Register a person or a household for an event. `organizer`: an organizer (or the owner) registers: the deadline and
- * organizer confirmation do not hold them back. Re-registering updates the active registration. Household: adults
- * and kids default to its members. Returns the registration.
- */
-export function register({ event, person = '', household = '', adults, kids, notes = '' }, { by = 'panel', organizer = true } = {}) {
-  const e = getEvent(event);
+/** The household that registers, or null for a person (who must be in People). */
+function householdOf(person, household) {
   if (!person && !household) throw fail('Register a person or a household');
-  let hh = null;
-  if (household) hh = getHousehold(household);
-  else if (!personRow(person)) throw fail('No such person', 404);
-  if (!organizer && e.deadline && today() > e.deadline.slice(0, 10)) throw fail(`Registration for ${e.name} closed on ${e.deadline}. An organizer can still add you.`);
-  const members = (role) => (hh ? hh.members.filter((m) => m.role === role).length : role === 'adult' ? 1 : 0);
-  const { a, k } = headcount(given(adults) ? adults : Math.max(1, members('adult')), given(kids) ? kids : members('kid'));
-  const existing = db.prepare(`SELECT * FROM ev_registrations WHERE tenant_id = ? AND event = ? AND ${hh ? 'household' : 'person'} = ? AND status IN ${ACTIVE} ORDER BY created_at DESC LIMIT 1`).get(TENANT, e.id, hh ? hh.id : person);
-  const n = clean(notes, 300);
-  if (existing) return resize(e, existing, { a, k, notes: n || existing.notes }, by);
+  if (household) return getHousehold(household);
+  if (!personRow(person)) throw fail('No such person', 404);
+  return null;
+}
+/** A new registration: registered when it fits, else on the waiting list; pending when an organizer has to confirm. */
+function addRegistration(e, { hh, person, a, k, notes }, { by, organizer }) {
   const status = e.confirm === 'organizer' && !organizer ? 'pending' : fits(e.id, a + k) ? 'registered' : 'waiting';
   const id = rid('r'); const now = Date.now();
   db.prepare('INSERT INTO ev_registrations (tenant_id, id, event, person, household, adults, kids, notes, status, by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(TENANT, id, e.id, hh ? '' : person, hh ? hh.id : '', a, k, n, status, clean(by, 60), now, now);
+    .run(TENANT, id, e.id, hh ? '' : person, hh ? hh.id : '', a, k, notes, status, clean(by, 60), now, now);
   const r = regRow(id);
   note(r, `${hh ? `${hh.name}: ` : ''}${STATUS_WORD[status][0].toUpperCase()}${STATUS_WORD[status].slice(1)} for ${e.name} (${a} adult${a === 1 ? '' : 's'}${k ? `, ${k} kid${k === 1 ? '' : 's'}` : ''})`);
   activity('config', { summary: `Registration for ${e.name}: ${STATUS_WORD[status]} (${by})` });
@@ -239,6 +244,29 @@ export function register({ event, person = '', household = '', adults, kids, not
   return regView(r);
 }
 
+/**
+ * Register a person or a household for an event. `organizer`: an organizer (or the owner) registers: the deadline and
+ * organizer confirmation do not hold them back. Re-registering updates the active registration. Household: adults
+ * and kids default to its members. Returns the registration.
+ */
+export function register({ event, person = '', household = '', adults, kids, notes = '' }, { by = 'panel', organizer = true } = {}) {
+  const e = getEvent(event);
+  const hh = householdOf(person, household);
+  if (!organizer && e.deadline && today() > e.deadline.slice(0, 10)) throw fail(`Registration for ${e.name} closed on ${e.deadline}. An organizer can still add you.`);
+  const members = (role) => (hh ? hh.members.filter((m) => m.role === role).length : role === 'adult' ? 1 : 0);
+  const { a, k } = headcount(given(adults) ? adults : Math.max(1, members('adult')), given(kids) ? kids : members('kid'));
+  const existing = db.prepare(`SELECT * FROM ev_registrations WHERE tenant_id = ? AND event = ? AND ${hh ? 'household' : 'person'} = ? AND status IN ${ACTIVE} ORDER BY created_at DESC LIMIT 1`).get(TENANT, e.id, hh ? hh.id : person);
+  const n = clean(notes, 300);
+  return existing ? resize(e, existing, { a, k, notes: n || existing.notes }, by) : addRegistration(e, { hh, person, a, k, notes: n }, { by, organizer });
+}
+
+/** A new status for a registration. Confirming (or leaving the waiting list) still respects the capacity: full → waiting list. */
+function setStatus(e, r, status, by) {
+  const next = status === 'registered' && !fits(r.event, r.adults + r.kids, r.id) ? 'waiting' : status;
+  setStatusRow(r, next, by, next === 'cancelled' ? `Registration for ${e.name} cancelled` : `Now ${STATUS_WORD[next]} for ${e.name}`);
+  if (r.status === 'registered' && next !== 'registered') fillFromWaitingList(r.event, by);
+  activity('config', { summary: `Registration for ${e.name}: ${STATUS_WORD[next]} (${by})` });
+}
 /** Change a registration's status (confirm a pending one, waiting list, cancel), its numbers and notes, or attendance.
  * @param {string} id @param {{ status?: string, attended?: boolean, adults?: number, kids?: number, notes?: string }} [changes] @param {string} [by] */
 export function updateRegistration(id, { status, attended, adults, kids, notes } = {}, by = 'panel') {
@@ -246,18 +274,12 @@ export function updateRegistration(id, { status, attended, adults, kids, notes }
   const e = getEvent(r.event);
   if (status !== undefined && !STATUSES.includes(status)) throw fail('Status: registered, waiting, pending or cancelled', 400, { field: 'status' });
   // this registration itself changes (also a cancelled one: it never becomes a second registration)
-  if (adults !== undefined || kids !== undefined || notes !== undefined) {
+  if ([adults, kids, notes].some((v) => v !== undefined)) {
     resize(e, r, { ...headcount(adults ?? r.adults, kids ?? r.kids), notes: notes === undefined ? r.notes : clean(notes, 300) }, by);
     r = regRow(id);
   }
   if (attended !== undefined) db.prepare('UPDATE ev_registrations SET attended = ?, updated_at = ? WHERE tenant_id = ? AND id = ?').run(attended ? 1 : 0, Date.now(), TENANT, r.id);
-  if (status !== undefined && status !== r.status) {
-    // confirming (or moving off the waiting list) still respects the capacity: full → waiting list
-    const next = status === 'registered' && !fits(r.event, r.adults + r.kids, r.id) ? 'waiting' : status;
-    setStatusRow(r, next, by, next === 'cancelled' ? `Registration for ${e.name} cancelled` : `Now ${STATUS_WORD[next]} for ${e.name}`);
-    if (r.status === 'registered' && next !== 'registered') fillFromWaitingList(r.event, by);
-    activity('config', { summary: `Registration for ${e.name}: ${STATUS_WORD[next]} (${by})` });
-  }
+  if (status !== undefined && status !== r.status) setStatus(e, r, status, by);
   return getRegistration(r.id);
 }
 

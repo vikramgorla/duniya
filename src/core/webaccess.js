@@ -449,6 +449,39 @@ export function cancelSwitch({ user } = {}) {
   return { ok: true };
 }
 
+/** The proxy / CDN the panel is locked to (null: none) and, for a custom one, its address ranges. */
+function proxyChoice(body, s) {
+  const proxy = body.proxy || null;
+  if (proxy !== null && !Object.hasOwn(PROVIDERS, proxy)) throw fail('Unknown proxy / CDN', 400, { field: 'proxy' });
+  let customRanges = s.customRanges;
+  if (proxy === 'custom' && body.customRanges !== undefined) customRanges = [...new Set([].concat(body.customRanges).map((x) => String(x).trim()).filter(Boolean).map((x) => parseCidr(x).text))];
+  if (proxy === 'custom' && !customRanges.length) throw fail('Enter your proxy’s address ranges (one per line)', 400, { field: 'customRanges' });
+  return { proxy, customRanges };
+}
+/** The addresses that may open the panel; the asker's own is added when they keep "always allow mine". */
+function allowList(body, s, ip) {
+  const list = [];
+  for (const x of [].concat(body.allow ?? [])) { if (String(x).trim()) list.push(parseCidr(x).text); }
+  const mine = String(ip || '').trim().replace(/^::ffff:(?=\d+\.)/i, '');
+  const keepMine = (body.alwaysAllowMine ?? s.alwaysAllowMine) !== false;
+  if (keepMine && list.length && isIp(mine) && !ipInRanges(mine, list)) list.push(parseCidr(mine).text);
+  return { allow: [...new Set(list)], keepMine };
+}
+const THIS_SERVER = ['127.0.0.1/8', '::1/128'];
+/** Would the request that makes this change still get in afterwards? The warnings to show (none: it would). */
+function lockoutWarnings({ proxy, allow, proxyRanges, req, ip }) {
+  const warnings = [];
+  const hop = String(req?.socket?.remoteAddress || '');
+  const edge = String(req?.headers?.['x-forwarded-for'] || '').split(',').map((x) => x.trim()).filter(Boolean).pop() || '';
+  const throughProxy = edge && ipInRanges(edge, proxyRanges);
+  const onTheServer = ipInRanges(hop, THIS_SERVER) && !req?.headers?.['x-duniya-client-ip'];
+  if (proxy && !throughProxy && !onTheServer) warnings.push(`You are not using the panel through ${PROVIDERS[proxy].name} right now: afterwards it only opens through ${PROVIDERS[proxy].name}.`);
+  if (allow.length && ip && !ipInRanges(ip, allow)) warnings.push(`Your current address (${ip}) is not on the list: you would lose access to the panel.`);
+  return warnings;
+}
+/** The rule in a few words, for Activity. */
+const accessWords = (proxy, allow) => `${proxy ? `only ${PROVIDERS[proxy].name}` : ''}${proxy && allow.length ? ' + ' : ''}${allow.length ? `allow-list of ${allow.length}` : ''}` || 'open to everyone';
+
 /**
  * Change who may open the panel. Anything stricter than now is a trial: it reverts by itself unless confirmed through
  * the new rule within TRIAL_MS. Rules that would shut out the current request need `confirmLockout`.
@@ -458,39 +491,22 @@ export async function setAccess(body, { user, ip = '', req } = {}) {
   ensureFree();
   const s = webSettings();
   if (s.trial) throw fail('Confirm or undo the access change that is being tried first', 409);
-  const proxy = body.proxy || null;
-  if (proxy !== null && !Object.hasOwn(PROVIDERS, proxy)) throw fail('Unknown proxy / CDN', 400, { field: 'proxy' });
-  let customRanges = s.customRanges;
-  if (proxy === 'custom' && body.customRanges !== undefined) customRanges = [...new Set([].concat(body.customRanges).map((x) => String(x).trim()).filter(Boolean).map((x) => parseCidr(x).text))];
-  if (proxy === 'custom' && !customRanges.length) throw fail('Enter your proxy’s address ranges (one per line)', 400, { field: 'customRanges' });
-  const list = [];
-  for (const x of [].concat(body.allow ?? [])) { if (String(x).trim()) list.push(parseCidr(x).text); }
-  const mine = String(ip || '').trim().replace(/^::ffff:(?=\d+\.)/i, '');
-  const keepMine = (body.alwaysAllowMine ?? s.alwaysAllowMine) !== false;
-  if (keepMine && list.length && isIp(mine) && !ipInRanges(mine, list)) list.push(parseCidr(mine).text);
+  const { proxy, customRanges } = proxyChoice(body, s);
+  const { allow, keepMine } = allowList(body, s, ip);
   saveWeb({ customRanges });
   const cur = current();
-  const access = { proxy, allow: [...new Set(list)] };
-  const t = { ...cur, serverIp: await publicIp().catch(() => null), access };
-  const doc = makeDoc(t, { by: user?.username });
+  const access = { proxy, allow };
+  const doc = makeDoc({ ...cur, serverIp: await publicIp().catch(() => null), access }, { by: user?.username });
   const cfg = validateWebConfig(doc);
-  // Would the request making this change still get in?
-  const warnings = [];
-  const hop = String(req?.socket?.remoteAddress || '');
-  const edge = String(req?.headers?.['x-forwarded-for'] || '').split(',').map((x) => x.trim()).filter(Boolean).pop() || '';
-  if (proxy && !(edge && ipInRanges(edge, cfg.proxyRanges)) && !(ipInRanges(hop, ['127.0.0.1/8', '::1/128']) && !req?.headers?.['x-duniya-client-ip'])) {
-    warnings.push(`You are not using the panel through ${PROVIDERS[proxy].name} right now: afterwards it only opens through ${PROVIDERS[proxy].name}.`);
-  }
-  if (access.allow.length && ip && !ipInRanges(ip, access.allow)) warnings.push(`Your current address (${ip}) is not on the list: you would lose access to the panel.`);
+  const warnings = lockoutWarnings({ proxy, allow, proxyRanges: cfg.proxyRanges, req, ip });
   if (warnings.length && !body.confirmLockout) throw fail(warnings.join(' '), 409, { needsConfirm: true, warnings });
-  const stricter = (proxy && proxy !== cur.access.proxy) || access.allow.some((c) => !cur.access.allow.includes(c));
+  const stricter = (proxy && proxy !== cur.access.proxy) || allow.some((c) => !cur.access.allow.includes(c));
   saveWeb({
     proxy, allow: [].concat(body.allow ?? []).map((x) => String(x).trim()).filter(Boolean), alwaysAllowMine: keepMine,
     trial: stricter ? { revert: cur.access, requestedAt: Date.now(), until: null, by: user?.username || '' } : null,
-    lastRequest: { at: Date.now(), by: user?.username || '', host: cfg.host, proxy, allow: access.allow },
+    lastRequest: { at: Date.now(), by: user?.username || '', host: cfg.host, proxy, allow },
   });
-  const what = `${proxy ? `only ${PROVIDERS[proxy].name}` : ''}${proxy && access.allow.length ? ' + ' : ''}${access.allow.length ? `allow-list of ${access.allow.length}` : ''}` || 'open to everyone';
-  send(doc, user?.username, `Web access: ${what}${stricter ? ` (trial: reverts in ${Math.round(TRIAL_MS / 60000)} minutes unless confirmed)` : ''} (${user?.username || '?'})`);
+  send(doc, user?.username, `Web access: ${accessWords(proxy, allow)}${stricter ? ` (trial: reverts in ${Math.round(TRIAL_MS / 60000)} minutes unless confirmed)` : ''} (${user?.username || '?'})`);
   return { ok: true, trial: stricter, warnings };
 }
 /** Keep the trial: only from a request that came through the web server with the new rules in place. */
