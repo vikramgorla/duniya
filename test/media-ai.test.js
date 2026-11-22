@@ -395,6 +395,20 @@ test('queue: jobs survive a restart, run in order per chat, ⏳ when waiting, ap
   await queue.drain(10000);
 });
 
+test('queue: a job whose work never comes back gives its worker up; the person is told, the next job runs', async () => {
+  const told = []; const ran = [];
+  queue.registerJobHandler('test-hang', { run: () => new Promise(() => {}), async failed(p) { told.push(p.n); } });
+  queue.registerJobHandler('test-next', { async run(p) { ran.push(p.n); } });
+  queue.setQueueTiming({ maxAgeMs: 150 });
+  queue.enqueue({ kind: 'test-hang', chat: 'g1@g.us', payload: { n: 1 } });
+  await t.waitFor(() => told.length);
+  queue.setQueueTiming({ maxAgeMs: 15 * 60000 });
+  queue.enqueue({ kind: 'test-next', chat: 'g1@g.us', payload: { n: 2 } });
+  await queue.drain();
+  assert.deepEqual([told, ran], [[1], [2]]);
+  assert.ok(t.db.listActivity({ limit: 20 }).some((a) => /Media job test-hang failed: The work on this message did not answer in time/.test(a.summary)));
+});
+
 // ---------- small-server guardrails ----------
 test('small servers: size in status, on-server engines and agent apps refused, low memory falls back, pressure pauses optional work', async () => {
   res.setResourceProbe({ totalMb: 958, availableMb: 250, cpus: 1, rssMb: 180 });

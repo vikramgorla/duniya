@@ -1,12 +1,13 @@
 // @ts-check
 // Backups (007): settings, run, retention per destination, schedule, list, restore staging.
-import { readdirSync, rmSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, rmSync, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DATA_DIR, env, fail } from '../config.js';
 import { getSecret, setSecret, getSetting, updateSettings } from '../store.js';
 import { kvGet, kvSet } from '../db.js';
 import { activity } from '../events.js';
 import { assertDiskRoom } from '../retention.js';
+import { sendOwnerAlert } from '../owner-alerts.js';
 import { writeBackup, checkBackup, stageRestore } from './bundle.js';
 import * as gh from './github.js';
 import { s3Client } from './s3.js';
@@ -95,6 +96,62 @@ export function listLocal() {
 const preUpdateFiles = () => { try { return JSON.parse(kvGet('backup:preUpdate') || '[]').filter((f) => FILE_RE.test(f)); } catch { return []; } };
 export const listPreUpdate = () => preUpdateFiles().filter((f) => existsSync(resolve(LOCAL_DIR, f)));
 
+// Copies off the server. Each destination says whether it is on and how to store one backup file (and prune there);
+// a backup and the retry of a failed copy go through this one list.
+const DESTINATIONS = {
+  github: {
+    on: (s) => s.github.enabled,
+    async put(s, file, bytes) {
+      if (!ghToken()) throw new Error('GitHub is not connected');
+      const r = await gh.upload(ghToken(), s.github, file, bytes, s.keep);
+      return r.pruned.length ? `ok (pruned ${r.pruned.length})` : 'ok';
+    },
+  },
+  s3: {
+    on: (s) => s.s3.enabled,
+    async put(s, file, bytes) {
+      const c = s3For(s);
+      await c.put(`${s.s3.prefix}${file}`, bytes);
+      const objs = (await c.list(s.s3.prefix)).filter((o) => FILE_RE.test(o.key.slice(s.s3.prefix.length))).sort((a, z) => z.key.localeCompare(a.key));
+      for (const o of objs.slice(s.keep)) await c.del(o.key);
+      return 'ok';
+    },
+  },
+};
+const isError = (v) => String(v).startsWith('error');
+/** Copy a local backup to the destinations in `names`. Returns { name: 'ok…' | 'error: …' }; never throws. */
+async function copyOffServer(s, file, names) {
+  const results = {};
+  if (!names.length) return results;
+  const bytes = readFileSync(resolve(LOCAL_DIR, file)); // the same encrypted bytes as the local file
+  for (const name of names) {
+    try { results[name] = await DESTINATIONS[name].put(s, file, bytes); } catch (e) { results[name] = `error: ${e.message}`; }
+  }
+  return results;
+}
+
+/** Keep the newest `keep` local backups, and the last `keepPreUpdate` made before updates (045) apart from them. */
+function pruneLocal(s, file, { preUpdate, keepPreUpdate }) {
+  let pre = preUpdateFiles();
+  if (!preUpdate) {
+    for (const old of listLocal().filter((b) => !pre.includes(b.file)).slice(s.keep)) rmSync(resolve(LOCAL_DIR, old.file), { force: true });
+    return;
+  }
+  pre = [...pre, file];
+  const keepN = Math.max(1, Number(keepPreUpdate) || 3);
+  for (const old of pre.slice(0, Math.max(0, pre.length - keepN))) rmSync(resolve(LOCAL_DIR, old), { force: true });
+  kvSet('backup:preUpdate', JSON.stringify(pre.slice(-keepN)));
+}
+
+function record(last, { preUpdate = false, again = false } = {}) {
+  kvSet('backup:last', JSON.stringify(last));
+  const failed = Object.values(last.results).some(isError);
+  activity(failed ? 'error' : 'backup.done', {
+    summary: `${preUpdate ? 'Pre-update backup' : again ? 'Backup copied again:' : 'Backup'} ${last.file} (${Math.round(last.size / 1024)} KB): ${Object.entries(last.results).map(([k, v]) => `${k} ${v}`).join(', ')}`,
+  });
+  return last;
+}
+
 let running = null;
 /**
  * Make a backup now. Returns { file, size, results: { local, github?, s3? } }.
@@ -103,56 +160,31 @@ let running = null;
 export function runBackup({ reason = 'manual', appVersion = '', preUpdate = false, keepPreUpdate = 3 } = {}) {
   if (running) return running;
   running = (async () => {
-    await null; // always async, so the guard below is set before the work starts
-    {
-      const s = getBackupSettings();
-      const pass = getSecret('BACKUP_PASSPHRASE');
-      if (!pass) throw bad('passphrase', 'set a backup passphrase first');
-      assertDiskRoom(); // 069: never fill the last of the disk with a backup
-      let file = stampName();
-      // the same millisecond (a clock that went back): wait for the next stamp
-      while (existsSync(resolve(LOCAL_DIR, file))) { await new Promise((r) => setTimeout(r, 5)); file = stampName(); }
-      const results = {};
-      // 070: streamed from disk into the file; GitHub / S3 get the same encrypted bytes (compressed size)
-      const keep = (s.github.enabled || s.s3.enabled) && !preUpdate;
-      const { size, bytes: remote } = await writeBackup(resolve(LOCAL_DIR, file), pass, { includeWhatsApp: s.includeWhatsApp, appVersion, keep });
-      let pre = preUpdateFiles();
-      if (preUpdate) {
-        pre = [...pre, file];
-        const keepN = Math.max(1, Number(keepPreUpdate) || 3);
-        for (const old of pre.slice(0, Math.max(0, pre.length - keepN))) rmSync(resolve(LOCAL_DIR, old), { force: true });
-        pre = pre.slice(-keepN);
-        kvSet('backup:preUpdate', JSON.stringify(pre));
-      } else {
-        for (const old of listLocal().filter((b) => !pre.includes(b.file)).slice(s.keep)) rmSync(resolve(LOCAL_DIR, old.file), { force: true });
-      }
-      results.local = 'ok';
-      if (s.github.enabled && !preUpdate) {
-        try {
-          if (!ghToken()) throw new Error('GitHub is not connected');
-          const r = await gh.upload(ghToken(), s.github, file, remote, s.keep);
-          results.github = r.pruned.length ? `ok (pruned ${r.pruned.length})` : 'ok';
-        } catch (e) { results.github = `error: ${e.message}`; }
-      }
-      if (s.s3.enabled && !preUpdate) {
-        try {
-          const c = s3For(s);
-          await c.put(`${s.s3.prefix}${file}`, remote);
-          const objs = (await c.list(s.s3.prefix)).filter((o) => FILE_RE.test(o.key.slice(s.s3.prefix.length))).sort((a, z) => z.key.localeCompare(a.key));
-          for (const o of objs.slice(s.keep)) await c.del(o.key);
-          results.s3 = 'ok';
-        } catch (e) { results.s3 = `error: ${e.message}`; }
-      }
-      const last = { at: Date.now(), file, size, results, reason };
-      kvSet('backup:last', JSON.stringify(last));
-      const failed = Object.entries(results).filter(([, v]) => v.startsWith('error'));
-      activity(failed.length ? 'error' : 'backup.done', {
-        summary: `${preUpdate ? 'Pre-update backup' : 'Backup'} ${file} (${Math.round(size / 1024)} KB): ${Object.entries(results).map(([k, v]) => `${k} ${v}`).join(', ')}`,
-      });
-      return last;
-    }
+    await null; // always async, so the guard above is set before the work starts
+    const s = getBackupSettings();
+    const pass = getSecret('BACKUP_PASSPHRASE');
+    if (!pass) throw bad('passphrase', 'set a backup passphrase first');
+    assertDiskRoom(); // 069: never fill the last of the disk with a backup
+    let file = stampName();
+    // the same millisecond (a clock that went back): wait for the next stamp
+    while (existsSync(resolve(LOCAL_DIR, file))) { await new Promise((r) => setTimeout(r, 5)); file = stampName(); }
+    // 070: streamed from disk into the file
+    const { size } = await writeBackup(resolve(LOCAL_DIR, file), pass, { includeWhatsApp: s.includeWhatsApp, appVersion });
+    pruneLocal(s, file, { preUpdate, keepPreUpdate });
+    const remote = preUpdate ? [] : Object.keys(DESTINATIONS).filter((name) => DESTINATIONS[name].on(s));
+    const results = { local: 'ok', ...await copyOffServer(s, file, remote) };
+    return record({ at: Date.now(), file, size, results, reason }, { preUpdate });
   })().finally(() => { running = null; });
   return running;
+}
+
+/** Copy the last backup again to the destinations where its copy failed (a retry: no second local backup). */
+async function copyLastAgain() {
+  const last = lastBackup();
+  const failed = Object.keys(last?.results || {}).filter((name) => DESTINATIONS[name] && isError(last.results[name]));
+  if (!failed.length || !existsSync(resolve(LOCAL_DIR, last.file))) return last;
+  const results = { ...last.results, ...await copyOffServer(getBackupSettings(), last.file, failed) };
+  return record({ ...last, at: Date.now(), results }, { again: true });
 }
 
 export const lastBackup = () => { try { return JSON.parse(kvGet('backup:last') || 'null'); } catch { return null; } };
@@ -213,16 +245,45 @@ export function slotFor(s, date = new Date(), tz = env.timezone) {
   return null;
 }
 
+const TRIES = 3; // a scheduled backup that fails is tried this often in its slot
+const TRY_GAP = 10 * 60 * 1000; // ms between tries
+const readRun = () => { try { return JSON.parse(kvGet('backup:run') || '{}') || {}; } catch { return {}; } };
+/** What went wrong with a backup result or error, in one line ('' when all is well). */
+const problemOf = (last) => Object.entries(last?.results || {}).filter(([, v]) => isError(v)).map(([k, v]) => `${k}: ${String(v).replace(/^error: /, '')}`).join('; ');
+
+/**
+ * One scheduler round (exported for tests): the backup of the slot that is due. A failed one is tried again (the whole
+ * backup when nothing was written, only the copies off the server when those failed), TRIES times TRY_GAP apart; after
+ * the last try the owner hears about it once (a backup that fails quietly every night is no backup).
+ */
+export async function backupTick({ now = Date.now(), appVersion = '' } = {}) {
+  const s = getBackupSettings();
+  const slot = s.enabled ? slotFor(s, new Date(now)) : null;
+  if (!slot) return null;
+  const run = readRun().slot === slot ? readRun() : { slot, tries: 0, done: false, at: 0, local: false };
+  if (run.done || run.tries >= TRIES || now - run.at < TRY_GAP) return null;
+  run.tries++; run.at = now;
+  kvSet('backup:run', JSON.stringify(run));
+  let problem;
+  try {
+    const last = run.local ? await copyLastAgain() : await runBackup({ reason: 'schedule', appVersion });
+    run.local = true;
+    problem = problemOf(last);
+  } catch (e) {
+    problem = e.message;
+    activity('error', { summary: `Scheduled backup failed: ${e.message}` });
+  }
+  run.done = !problem;
+  kvSet('backup:run', JSON.stringify(run));
+  if (problem && run.tries >= TRIES) {
+    sendOwnerAlert(`Duniya: the scheduled backup failed ${TRIES} times (${problem}). ${run.local ? 'The copy on the server was made; the copy off the server is missing.' : 'No backup was made.'} Check Backups in the panel.`, { kind: 'backup' })
+      .catch(() => {}); // sendOwnerAlert records its own failure in Activity
+  }
+  return { ...run, problem };
+}
+
 export function startBackupScheduler({ appVersion = '' } = {}) {
-  const tick = async () => {
-    const s = getBackupSettings();
-    if (!s.enabled) return;
-    const slot = slotFor(s);
-    if (!slot || kvGet('backup:slot') === slot) return;
-    kvSet('backup:slot', slot);
-    try { await runBackup({ reason: 'schedule', appVersion }); } catch (e) { activity('error', { summary: `Scheduled backup failed: ${e.message}` }); }
-  };
-  setInterval(tick, 60 * 1000).unref();
+  setInterval(() => { backupTick({ appVersion }).catch((e) => activity('error', { summary: `Scheduled backup failed: ${e.message}` })); }, 60 * 1000).unref();
 }
 
 export { gh as github };

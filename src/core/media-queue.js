@@ -12,6 +12,7 @@
 //    (069) the owner hears about it at most once an hour: the newest work is refused, waiting work is never dropped.
 // Text-only replies never come here.
 import { db, kvGet, kvSet } from './db.js';
+import { within } from './config.js';
 import { activity } from './events.js';
 import { isChatEnabled } from './chat-prefs.js';
 import { serverSize } from './resources.js';
@@ -101,7 +102,9 @@ async function runOne(job) {
       await h.stale?.(payload, job);
       return;
     }
-    await h.run(payload, job);
+    // A step that never comes back would hold a worker (the only one on a small server) for good: give up on the job
+    // when it has run as long as a job may wait.
+    await within(h.run(payload, job), timing.maxAgeMs, 'The work on this message');
     del(job.id);
     await finish(job);
   } catch (e) {

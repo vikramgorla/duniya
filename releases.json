@@ -1,6 +1,40 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.58.12": {
+      "breaking": false,
+      "title": "Backups and restore you can rely on",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "A scheduled backup that fails is tried again by itself, up to three times; if it still fails you get one WhatsApp message saying what is missing."
+        },
+        {
+          "type": "fixed",
+          "text": "A restore interrupted during the restart (a power cut) carries on at the next start instead of leaving the server unable to start."
+        },
+        {
+          "type": "improved",
+          "text": "After a restore, Activity says which backup was restored and where the previous data is kept."
+        },
+        {
+          "type": "fixed",
+          "text": "A restore that runs out of disk space says so, instead of “wrong passphrase” or waiting for ever."
+        },
+        {
+          "type": "fixed",
+          "text": "Backups no longer need room in the system’s temporary folder, and leftovers of a backup that was cut short are cleaned up."
+        },
+        {
+          "type": "fixed",
+          "text": "An update whose download hangs is stopped after 20 minutes, so later updates are not blocked."
+        },
+        {
+          "type": "fixed",
+          "text": "A photo or voice note whose handling hangs no longer holds up the ones waiting behind it."
+        }
+      ]
+    },
     "2.58.11": {
       "breaking": false,
       "title": "Sturdier in everyday use",
