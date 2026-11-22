@@ -92,13 +92,10 @@ function rewordAnswers(survey, before, after) {
 /** Create or change a survey: { id?, title, intro, questions: [{ text, kind, options, required }], status }. */
 export function saveSurvey(body = {}, by = 'panel') {
   const cur = body.id ? getSurvey(body.id) : null;
-  const title = clip(body.title ?? cur?.title, 80);
-  if (!title) throw fail('A survey needs a title', 400, { field: 'title' });
-  const questions = body.questions !== undefined ? cleanQuestions(body.questions) : cur?.questions || cleanQuestions([]);
+  const { title, intro, questions, status } = surveyAfter(body, cur);
   const keepAnswers = !!cur && body.questions !== undefined && answered(cur.id);
   if (keepAnswers) checkAnswered(cur.questions, questions);
-  const status = ['open', 'closed'].includes(body.status) ? body.status : cur?.status || 'open';
-  const vals = [title, clip(body.intro ?? cur?.intro ?? '', 400), JSON.stringify(questions), status];
+  const vals = [title, intro, JSON.stringify(questions), status];
   const id = cur?.id || rid('sv');
   if (keepAnswers) rewordAnswers(id, cur.questions, questions);
   if (cur) db.prepare('UPDATE srv_surveys SET title = ?, intro = ?, questions = ?, status = ? WHERE tenant_id = ? AND id = ?').run(...vals, TENANT, id);
@@ -107,6 +104,14 @@ export function saveSurvey(body = {}, by = 'panel') {
   return getSurvey(id);
 }
 const answered = (id) => !!db.prepare('SELECT 1 FROM srv_answers WHERE tenant_id = ? AND survey = ? LIMIT 1').get(TENANT, id);
+/** What a survey holds after a change: what the change says, else what it had. */
+function surveyAfter(body, cur) {
+  const title = clip(body.title ?? cur?.title, 80);
+  if (!title) throw fail('A survey needs a title', 400, { field: 'title' });
+  return { title, intro: clip(body.intro ?? cur?.intro ?? '', 400),
+    questions: body.questions !== undefined ? cleanQuestions(body.questions) : cur?.questions || cleanQuestions([]),
+    status: ['open', 'closed'].includes(body.status) ? body.status : cur?.status || 'open' };
+}
 export function deleteSurvey(id, by = 'panel') {
   const s = getSurvey(id);
   for (const t of ['srv_answers', 'srv_people']) db.prepare(`DELETE FROM ${t} WHERE tenant_id = ? AND survey = ?`).run(TENANT, s.id);

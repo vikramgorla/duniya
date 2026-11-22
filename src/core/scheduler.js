@@ -16,31 +16,37 @@ const dayMatches = (days, day) => !days || days === 'daily' || days.split(',').m
 // Posts in progress, in memory only: stored as "running", a restart in that minute (an update) left the post marked
 // for good and it never went out that day. Only outcomes are stored ('1', 'fail:<n>').
 const running = new Set();
+/** How often today's post of a chat has failed (0 when it has not run or went out). */
+const failsOf = (key) => Number((kvGet(key) || '').match(/^fail:(\d)$/)?.[1] || 0);
+/** Once a day per chat; a failed run is tried again on the next ticks, at most 3 times. */
+const mayRun = (key, force, fails) => !running.has(key) && (force || !kvGet(key) || (fails > 0 && fails < 3));
+/** One chat's post: what the agent writes goes out and is kept with the chat's messages, unless it says SKIP. */
+async function post(agent, sched, chat, channel) {
+  const reply = await runAgent({
+    agent, role: 'participant', chat, senderName: 'scheduler', requester: 'scheduler',
+    text: `${sched.prompt}\n(If there is nothing worth posting, reply with exactly: SKIP)`,
+    isGroup: isGroup(chat), source: 'schedule',
+  });
+  const skip = !reply || reply.trim() === 'SKIP';
+  if (!skip) {
+    const sent = await channel.send(chat, reply);
+    logMessage({ chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text: reply, fromAgent: true });
+  }
+  return { reply, skip };
+}
 /** Run one schedule now. Returns [{chat, reply}] */
 export async function runSchedule(agent, sched, channel, { force = false } = {}) {
   const { date } = localParts(agentTz(agent));
   if (isBuiltin(agent)) return runOwnerSchedule(sched, { date, force }); // 059: to linked owners and admins
-  const chats = sched.chats === 'all' ? agent.chats : sched.chats;
   const results = [];
-  for (const chat of chats) {
+  for (const chat of sched.chats === 'all' ? agent.chats : sched.chats) {
     if (!isChatEnabled(chat)) continue; // #10: never post into chats that are off
-    // once a day per chat; a failed run is tried again on the next ticks, at most 3 times
     const key = `sched:${agent.id}:${sched.id}:${chat}:${date}`;
-    const was = kvGet(key) || '';
-    const fails = Number(was.match(/^fail:(\d)$/)?.[1] || 0);
-    if (running.has(key) || (!force && was && !(fails && fails < 3))) continue;
+    const fails = failsOf(key);
+    if (!mayRun(key, force, fails)) continue;
     running.add(key);
     try {
-      const reply = await runAgent({
-        agent, role: 'participant', chat, senderName: 'scheduler', requester: 'scheduler',
-        text: `${sched.prompt}\n(If there is nothing worth posting, reply with exactly: SKIP)`,
-        isGroup: isGroup(chat), source: 'schedule',
-      });
-      const skip = !reply || reply.trim() === 'SKIP';
-      if (!skip) {
-        const sent = await channel.send(chat, reply);
-        logMessage({ chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text: reply, fromAgent: true });
-      }
+      const { reply, skip } = await post(agent, sched, chat, channel);
       kvSet(key, '1');
       activity('schedule.run', { agent: agent.id, chat, summary: `${sched.id}: ${skip ? 'skipped' : 'posted'}`, detail: { reply } });
       results.push({ chat, reply: skip ? null : reply });

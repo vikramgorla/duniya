@@ -49,25 +49,27 @@ export function paceSettings() {
   return { preset, readReceipts: s.readReceipts !== false, ...ranges };
 }
 
+/** Custom ranges, checked: each within its limits, the shortest not above the longest, hours as two different times. */
+function checkedCustom(wanted) {
+  const custom = Object.fromEntries(Object.keys(PRESETS.normal).map((k) => [k, wanted[k]]));
+  for (const [k, [lo, hi, label]] of /** @type {[string, [number, number, string]][]} */ (Object.entries(LIMITS))) {
+    const v = Number(custom[k]);
+    if (!Number.isFinite(v) || v < lo || v > hi) throw bad(`${label}: ${lo}–${hi}`, k);
+    custom[k] = k === 'cps' ? Math.round(v * 10) / 10 : Math.round(v);
+  }
+  if (custom.gapMin > custom.gapMax) throw bad('The shortest gap is longer than the longest', 'gapMin');
+  if (custom.readMin > custom.readMax) throw bad('The shortest read delay is longer than the longest', 'readMin');
+  for (const k of ['hoursFrom', 'hoursTo']) if (!HHMM.test(String(custom[k]))) throw bad('Use a time like 09:00', k);
+  if (custom.hoursFrom === custom.hoursTo) throw bad('Sending hours need a start and an end', 'hoursTo');
+  return custom;
+}
 /** Change the pace: { preset?, readReceipts?, custom? } (custom ranges switch the preset to custom). Validated. */
 export function setPaceSettings(body = {}, by = '') {
   const cur = getSetting('sendingPace', null) || {};
   const preset = body.preset ?? (body.custom ? 'custom' : cur.preset || 'normal');
   if (preset !== 'custom' && !PRESETS[preset]) throw bad('Choose Careful, Normal, Faster or Custom', 'preset');
-  let custom = cur.custom || null;
-  if (body.custom || (preset === 'custom' && !custom)) {
-    custom = { ...paceSettings(), ...(body.custom || {}) }; // starts from the pace in force
-    custom = Object.fromEntries(Object.keys(PRESETS.normal).map((k) => [k, custom[k]]));
-    for (const [k, [lo, hi, label]] of /** @type {[string, [number, number, string]][]} */ (Object.entries(LIMITS))) {
-      const v = Number(custom[k]);
-      if (!Number.isFinite(v) || v < lo || v > hi) throw bad(`${label}: ${lo}–${hi}`, k);
-      custom[k] = k === 'cps' ? Math.round(v * 10) / 10 : Math.round(v);
-    }
-    if (custom.gapMin > custom.gapMax) throw bad('The shortest gap is longer than the longest', 'gapMin');
-    if (custom.readMin > custom.readMax) throw bad('The shortest read delay is longer than the longest', 'readMin');
-    for (const k of ['hoursFrom', 'hoursTo']) if (!HHMM.test(String(custom[k]))) throw bad('Use a time like 09:00', k);
-    if (custom.hoursFrom === custom.hoursTo) throw bad('Sending hours need a start and an end', 'hoursTo');
-  }
+  const fresh = body.custom || (preset === 'custom' && !cur.custom);
+  const custom = fresh ? checkedCustom({ ...paceSettings(), ...(body.custom || {}) }) : cur.custom || null; // new ranges start from the pace in force
   const next = { preset, readReceipts: body.readReceipts === undefined ? cur.readReceipts !== false : !!body.readReceipts, ...(custom ? { custom } : {}) };
   updateSettings({ sendingPace: next });
   const p = paceSettings();

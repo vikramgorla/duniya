@@ -31,25 +31,19 @@ export const LOG_CATEGORIES = {
 const ALWAYS = new Set(['errors', 'confirmations', 'config', 'channel', 'owner']);
 export const LOGGING_DEFAULTS = Object.freeze({ level: 'normal', categories: Object.fromEntries(Object.keys(LOG_CATEGORIES).map((k) => [k, true])), retentionDays: 30, maxEntries: 5000 });
 
+// A type's category: its own entry first, then its family ("memory.summary" → memory), else system.
+const CATEGORY_OF_TYPE = new Map(Object.entries({
+  error: 'errors', 'tool.error': 'errors', 'tool.call': 'tools', 'model.usage': 'models',
+  'model.fallback': 'system', 'model.provider': 'system', // provider switches and pauses (042)
+  'channel.status': 'channel', config: 'config', access: 'config', 'backup.settings': 'config',
+  'whatsapp.action': 'whatsapp', 'whatsapp.reaction': 'messages', 'whatsapp.vote': 'messages', silence: 'silences',
+}));
+const CATEGORY_OF_FAMILY = new Map(Object.entries({
+  message: 'messages', confirm: 'confirmations', memory: 'memory', schedule: 'schedules', agent: 'config', backup: 'backups', mcp: 'mcp', owner: 'owner', media: 'media',
+}));
 export function categoryOf(type) {
-  if (type === 'error' || type === 'tool.error') return 'errors';
-  if (type.startsWith('message.')) return 'messages';
-  if (type === 'tool.call') return 'tools';
-  if (type.startsWith('confirm.')) return 'confirmations';
-  if (type === 'model.usage') return 'models';
-  if (type === 'model.fallback' || type === 'model.provider') return 'system'; // provider switches and pauses (042)
-  if (type.startsWith('memory.')) return 'memory';
-  if (type.startsWith('schedule.')) return 'schedules';
-  if (type === 'channel.status') return 'channel';
-  if (type.startsWith('agent.') || type === 'config' || type === 'access' || type === 'backup.settings') return 'config';
-  if (type.startsWith('backup.')) return 'backups';
-  if (type.startsWith('mcp.')) return 'mcp';
-  if (type === 'whatsapp.action') return 'whatsapp';
-  if (type === 'whatsapp.reaction' || type === 'whatsapp.vote') return 'messages';
-  if (type === 'silence') return 'silences';
-  if (type.startsWith('owner.')) return 'owner';
-  if (type.startsWith('media.')) return 'media';
-  return 'system';
+  const dot = type.indexOf('.');
+  return CATEGORY_OF_TYPE.get(type) || (dot > 0 && CATEGORY_OF_FAMILY.get(type.slice(0, dot))) || 'system';
 }
 
 let cfgCache = null;

@@ -96,12 +96,16 @@ const ins = db.prepare('INSERT INTO usage (ts, agent, chat, provider, model, kin
  * reported by the provider (OpenRouter), an owner-set per-image price, or 0 for on-server engines.
  */
 export function recordUsage({ agent = '', chat = '', provider, account = '', model, feature, input = 0, output = 0, published = null, fallback = '', cost: known, priced }) {
-  const fixed = known !== undefined && known !== null && Number.isFinite(Number(known));
-  const price = fixed ? null : priceFor(provider, model, published);
-  const cost = fixed ? Number(known) : price ? (input * price.in + output * price.out) / 1e6 : null;
   if (!FEATURES[feature]) throw new Error(`Unknown usage feature "${feature}"`);
-  ins.run(Date.now(), agent || '', chat || '', provider, model, feature, input | 0, output | 0, cost, fixed ? (priced || 'provider') : price?.source || null, account || provider, String(fallback || '').slice(0, 300));
+  const { cost, source } = costOf({ provider, model, input, output, published, known, priced });
+  ins.run(Date.now(), agent || '', chat || '', provider, model, feature, input | 0, output | 0, cost, source, account || provider, String(fallback || '').slice(0, 300));
   return cost;
+}
+/** What a call cost and where that figure comes from: the cost known for the call itself, else its tokens at the model's price. */
+function costOf({ provider, model, input, output, published, known, priced }) {
+  if (known !== undefined && known !== null && Number.isFinite(Number(known))) return { cost: Number(known), source: priced || 'provider' };
+  const price = priceFor(provider, model, published);
+  return { cost: price ? (input * price.in + output * price.out) / 1e6 : null, source: price?.source || null };
 }
 
 const insTurn = db.prepare('INSERT INTO smart_turns (ts, agent, chat, tier, reason, cost, strong_cost) VALUES (?, ?, ?, ?, ?, ?, ?)');

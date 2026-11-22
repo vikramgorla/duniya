@@ -43,24 +43,30 @@ export function mediaSettings() {
   return { ...SETTINGS_DEFAULTS, ...s, imagePrices: { ...(s.imagePrices || {}) }, local: { ...SETTINGS_DEFAULTS.local, ...(s.local || {}) } };
 }
 const REF = /^[a-z][a-z0-9-]{1,30}:[A-Za-z0-9._:/@+-]{1,120}$/;
+// One setting of a patch, checked: the value to store, or a plain error.
+const modelRef = (message, field) => (v) => { const ref = String(v || '').trim(); if (ref && !REF.test(ref)) throw bad(message, field); return ref; };
+function imagePrices(prices) {
+  const out = {};
+  for (const [ref, v] of Object.entries(prices || {})) {
+    if (!REF.test(ref)) throw bad(`"${ref}" is not provider:model`, 'imagePrices');
+    if (v === '' || v == null) continue;
+    const n = Number(v); if (!(n >= 0 && n <= 10)) throw bad('Price per image: 0–10 USD', 'imagePrices');
+    out[ref] = n;
+  }
+  return out;
+}
+const MEDIA_FIELDS = {
+  visionFallback: modelRef('Vision fallback must be a model (provider:model) or empty', 'visionFallback'),
+  imageModel: modelRef('Image model must look like provider:model, or be empty for automatic', 'imageModel'),
+  voice: (v) => { if (!VOICES.includes(v)) throw bad(`Voice must be one of ${VOICES.join(', ')}`, 'voice'); return v; },
+  maxVoiceSeconds: (v) => { const n = Number(v); if (!Number.isInteger(n) || n < 10 || n > 1800) throw bad('Longest voice note: 10–1800 seconds', 'maxVoiceSeconds'); return n; },
+  imagePrices,
+};
 /** Validate and save a patch of the server's photo & voice settings. */
 export function setMediaSettings(patch = {}) {
   const cur = mediaSettings();
   const next = { ...cur };
-  if ('visionFallback' in patch) { const v = String(patch.visionFallback || '').trim(); if (v && !REF.test(v)) throw bad('Vision fallback must be a model (provider:model) or empty', 'visionFallback'); next.visionFallback = v; }
-  if ('imageModel' in patch) { const v = String(patch.imageModel || '').trim(); if (v && !REF.test(v)) throw bad('Image model must look like provider:model, or be empty for automatic', 'imageModel'); next.imageModel = v; }
-  if ('voice' in patch) { if (!VOICES.includes(patch.voice)) throw bad(`Voice must be one of ${VOICES.join(', ')}`, 'voice'); next.voice = patch.voice; }
-  if ('maxVoiceSeconds' in patch) { const n = Number(patch.maxVoiceSeconds); if (!Number.isInteger(n) || n < 10 || n > 1800) throw bad('Longest voice note: 10–1800 seconds', 'maxVoiceSeconds'); next.maxVoiceSeconds = n; }
-  if ('imagePrices' in patch) {
-    const out = {};
-    for (const [ref, v] of Object.entries(patch.imagePrices || {})) {
-      if (!REF.test(ref)) throw bad(`"${ref}" is not provider:model`, 'imagePrices');
-      if (v === '' || v == null) continue;
-      const n = Number(v); if (!(n >= 0 && n <= 10)) throw bad('Price per image: 0–10 USD', 'imagePrices');
-      out[ref] = n;
-    }
-    next.imagePrices = out;
-  }
+  for (const [field, checked] of Object.entries(MEDIA_FIELDS)) if (field in patch) next[field] = checked(patch[field]);
   if (patch.local) {
     const pick = (k) => (patch.local[k] !== undefined ? !!patch.local[k] : cur.local[k]);
     next.local = { listen: pick('listen'), speak: pick('speak') };

@@ -14,7 +14,7 @@
 // mark done, reopen, re-date or delete them there (and through the admin MCP / owner assistant); an agent's organizers
 // do the same for the promises of its chats from the chat (PROMISE_TOOLS), participants see their own.
 import { db, kvGet, kvSet, logMessage } from './db.js';
-import { clip, localParts } from './config.js';
+import { bad, clip, localParts } from './config.js';
 import { agentTz, ownerDay } from './owner-clock.js';
 import { usageTag } from './usage.js';
 import { activity } from './events.js';
@@ -56,17 +56,23 @@ const one = (id) => db.prepare('SELECT * FROM commitments WHERE id = ?').get(Mat
  * @param {{ agent?: string, person?: string, chat?: string, chats?: string[] | null, status?: string, limit?: number }} [f]
  */
 export function listCommitments({ agent = '', person = '', chat = '', chats = null, status = 'open', limit = 200 } = {}) {
-  if (!STATUSES.includes(status)) throw Object.assign(new Error(`status: ${STATUSES.join(', ')}`), { status: 400, field: 'status' });
+  if (!STATUSES.includes(status)) throw bad(`status: ${STATUSES.join(', ')}`, 'status');
+  if (chats && !chats.length) return [];
   const day = ownerDay();
-  const where = []; /** @type {(string|number)[]} */ const args = [];
-  if (status === 'overdue') { where.push("c.status = 'open' AND c.due <> '' AND c.due < ?"); args.push(day); } else if (status !== 'all') { where.push('c.status = ?'); args.push(status); }
-  if (agent) { where.push('c.agent = ?'); args.push(agent); }
-  if (person) { where.push('c.person = ?'); args.push(person); }
-  if (chat) { where.push('c.chat = ?'); args.push(chat); }
-  if (chats) { if (!chats.length) return []; where.push(`c.chat IN (${chats.map(() => '?').join(',')})`); args.push(...chats); }
-  const order = status === 'open' || status === 'overdue' ? "c.due = '', c.due, c.id DESC" : status === 'all' ? 'c.id DESC' : 'c.updated_at DESC';
+  const { where, args } = listFilter({ agent, person, chat, chats, status }, day);
   return db.prepare(`SELECT c.* FROM commitments c
-    ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY ${order} LIMIT ?`).all(...args, Math.min(Math.max(Number(limit) || 200, 1), 200)).map((r) => view(r, day));
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY ${LIST_ORDER[status] || 'c.updated_at DESC'} LIMIT ?`).all(...args, Math.min(Math.max(Number(limit) || 200, 1), 200)).map((r) => view(r, day));
+}
+const BY_DUE = "c.due = '', c.due, c.id DESC"; // dated first, by date; undated last
+const LIST_ORDER = { open: BY_DUE, overdue: BY_DUE, all: 'c.id DESC' };
+/** The conditions of a list and their values. */
+function listFilter(f, day) {
+  const where = []; /** @type {(string|number)[]} */ const args = [];
+  const add = (sql, ...values) => { where.push(sql); args.push(...values); };
+  if (f.status === 'overdue') add("c.status = 'open' AND c.due <> '' AND c.due < ?", day); else if (f.status !== 'all') add('c.status = ?', f.status);
+  for (const column of ['agent', 'person', 'chat']) if (f[column]) add(`c.${column} = ?`, f[column]);
+  if (f.chats) add(`c.chat IN (${f.chats.map(() => '?').join(',')})`, ...f.chats);
+  return { where, args };
 }
 /** One commitment (or null). */
 const getCommitment = (id) => { const r = one(id); return r ? view(r) : null; };
@@ -78,14 +84,18 @@ const getCommitment = (id) => { const r = one(id); return r ? view(r) : null; };
 export function updateCommitment(id, { status, what, due } = {}, by = '') {
   const r = one(id);
   if (!r) throw notFound();
-  if (status !== undefined && !['open', 'done', 'dropped'].includes(status)) throw Object.assign(new Error('status: open, done or dropped'), { status: 400, field: 'status' });
-  if (due !== undefined && due !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(String(due))) throw Object.assign(new Error('Due date like 2026-12-01'), { status: 400, field: 'due' });
-  if (what !== undefined && String(what).trim().length < 2) throw Object.assign(new Error('Say what was promised'), { status: 400, field: 'what' });
+  checkPatch({ status, what, due });
   const again = (status === 'open' && r.status !== 'open') || (due !== undefined && due !== r.due);
   db.prepare('UPDATE commitments SET status = ?, what = ?, due = ?, by = ?, followed_up_at = ?, updated_at = ? WHERE id = ?')
     .run(status ?? r.status, what !== undefined ? clip(String(what).trim(), 200) : r.what, due ?? r.due, String(by).slice(0, 60), again ? null : r.followed_up_at, Date.now(), r.id);
-  activity('config', { agent: r.agent, chat: r.chat, summary: `Promise ${status && status !== r.status ? (status === 'open' ? 'reopened' : `marked ${status}`) : 'changed'} (${by || 'owner'})` });
+  const moved = status && status !== r.status;
+  activity('config', { agent: r.agent, chat: r.chat, summary: `Promise ${!moved ? 'changed' : status === 'open' ? 'reopened' : `marked ${status}`} (${by || 'owner'})` });
   return view(one(r.id));
+}
+function checkPatch({ status, what, due }) {
+  if (status !== undefined && !['open', 'done', 'dropped'].includes(status)) throw bad('status: open, done or dropped', 'status');
+  if (due !== undefined && due !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(String(due))) throw bad('Due date like 2026-12-01', 'due');
+  if (what !== undefined && String(what).trim().length < 2) throw bad('Say what was promised', 'what');
 }
 /** Delete one (a mistake, or something nobody should see again). */
 export function deleteCommitment(id, by = '') {
@@ -146,32 +156,44 @@ const parse = (res, key) => { const t = res.content.filter((b) => b.type === 'te
  */
 export async function noteMessage(agent, msg, rowId) {
   if (!agent?.promises?.track || !msg.text || msg.fromMe || !isChatEnabled(msg.chat)) return;
-  const tz = agentTz(agent);
   try {
-    const open = db.prepare("SELECT id, who, what FROM commitments WHERE chat = ? AND status = 'open' ORDER BY id DESC LIMIT 20").all(msg.chat);
-    if (open.length && DONE.test(msg.text) && callsToday(agent.id) < MAX_PER_DAY) {
-      countCall(agent.id);
-      const res = await modelChat({ model: 'auto', purpose: 'background', maxTokens: 60, fallback: undefined, usage: usageTag('commitments', { agent: agent.id, chat: msg.chat }), system: JUDGE,
-        messages: [{ role: 'user', content: JSON.stringify({ message: { from: msg.senderName || 'someone', text: clip(msg.text, 500) }, open }) }] });
-      for (const id of parse(res, 'done').map(Number).filter((i) => open.some((o) => o.id === i))) {
-        db.prepare("UPDATE commitments SET status = 'done', by = 'chat', updated_at = ? WHERE id = ? AND status = 'open'").run(Date.now(), id);
-        activity('config', { agent: agent.id, chat: msg.chat, summary: 'A commitment was marked done from the chat' });
-      }
-    }
-    if (!PROMISE.test(msg.text) || callsToday(agent.id) >= MAX_PER_DAY) return;
-    countCall(agent.id);
-    const res = await modelChat({ model: 'auto', purpose: 'background', maxTokens: 150, fallback: undefined, usage: usageTag('commitments', { agent: agent.id, chat: msg.chat }), system: FIND,
-      messages: [{ role: 'user', content: `Today is ${localParts(tz).date} (${new Date().toLocaleDateString('en-GB', { weekday: 'long', timeZone: tz })}).\nMessage from ${msg.senderName || 'someone'}: ${clip(msg.text, 500)}` }] });
-    const now = Date.now();
-    for (const p of parse(res, 'promises').slice(0, 3)) {
-      const what = clip(String(p.what || '').trim(), 200);
-      if (what.length < 3) continue;
-      const due = /^\d{4}-\d{2}-\d{2}$/.test(String(p.due || '')) ? p.due : '';
-      db.prepare('INSERT INTO commitments (agent, chat, person, who, what, due, msg, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(agent.id, msg.chat, msg.personId || '', clip(msg.senderName || '', 80), what, due, rowId || null, now, now);
-      activity('config', { agent: agent.id, chat: msg.chat, summary: `Commitment noted${due ? `, due ${due}` : ''}` });
-    }
+    await markShownDone(agent, msg);
+    await notePromises(agent, msg, rowId);
   } catch (e) { activity('error', { agent: agent.id, chat: msg.chat, summary: `Commitments: ${e.message}` }); }
+}
+/** One short background question about a message; null when the agent has asked often enough today. */
+function ask(agent, msg, { system, maxTokens, content }) {
+  if (callsToday(agent.id) >= MAX_PER_DAY) return null;
+  countCall(agent.id);
+  return modelChat({ model: 'auto', purpose: 'background', maxTokens, fallback: undefined, usage: usageTag('commitments', { agent: agent.id, chat: msg.chat }), system, messages: [{ role: 'user', content }] });
+}
+/** Open promises of this chat that the message shows done are marked done. */
+async function markShownDone(agent, msg) {
+  const open = db.prepare("SELECT id, who, what FROM commitments WHERE chat = ? AND status = 'open' ORDER BY id DESC LIMIT 20").all(msg.chat);
+  if (!open.length || !DONE.test(msg.text)) return;
+  const res = await ask(agent, msg, { system: JUDGE, maxTokens: 60, content: JSON.stringify({ message: { from: msg.senderName || 'someone', text: clip(msg.text, 500) }, open }) });
+  if (!res) return;
+  for (const id of parse(res, 'done').map(Number).filter((i) => open.some((o) => o.id === i))) {
+    db.prepare("UPDATE commitments SET status = 'done', by = 'chat', updated_at = ? WHERE id = ? AND status = 'open'").run(Date.now(), id);
+    activity('config', { agent: agent.id, chat: msg.chat, summary: 'A commitment was marked done from the chat' });
+  }
+}
+/** The promises a message makes are noted (at most three). */
+async function notePromises(agent, msg, rowId) {
+  if (!PROMISE.test(msg.text)) return;
+  const tz = agentTz(agent);
+  const res = await ask(agent, msg, { system: FIND, maxTokens: 150,
+    content: `Today is ${localParts(tz).date} (${new Date().toLocaleDateString('en-GB', { weekday: 'long', timeZone: tz })}).\nMessage from ${msg.senderName || 'someone'}: ${clip(msg.text, 500)}` });
+  if (!res) return;
+  const now = Date.now();
+  for (const p of parse(res, 'promises').slice(0, 3)) {
+    const what = clip(String(p.what || '').trim(), 200);
+    if (what.length < 3) continue;
+    const due = /^\d{4}-\d{2}-\d{2}$/.test(String(p.due || '')) ? p.due : '';
+    db.prepare('INSERT INTO commitments (agent, chat, person, who, what, due, msg, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(agent.id, msg.chat, msg.personId || '', clip(msg.senderName || '', 80), what, due, rowId || null, now, now);
+    activity('config', { agent: agent.id, chat: msg.chat, summary: `Commitment noted${due ? `, due ${due}` : ''}` });
+  }
 }
 
 /** The gentle follow-up, written in code (no model): one line, the promise in their words. */
@@ -189,20 +211,28 @@ export async function commitmentsTick(now = Date.now()) {
   for (const c of db.prepare("SELECT * FROM commitments WHERE status = 'open' AND due <> '' AND due <= ? AND followed_up_at IS NULL ORDER BY due LIMIT 20").all(ownerDay(now))) {
     if (n >= PER_TICK) break;
     const agent = getAgent(c.agent);
-    const mode = agent?.promises?.followUp || 'chat';
     db.prepare('UPDATE commitments SET followed_up_at = ? WHERE id = ?').run(now, c.id); // once, whatever happens below
-    if (!agent?.enabled || !agent.promises?.track || mode === 'off') continue;
-    const target = mode === 'dm' ? chatsOfPerson(c.person).find((x) => !isGroup(x.chat) && channelOf(x.chat) && isChatEnabled(x.chat))?.chat : c.chat;
-    if (!target || !isChatEnabled(target)) continue;
-    const text = followText(c, isGroup(target));
-    try {
-      const sent = await ch.send(target, text);
-      logMessage({ chat: target, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
-      activity('message.out', { agent: agent.id, chat: target, summary: `${text} (follow-up on a commitment)` });
-      n++;
-    } catch (e) { activity('error', { agent: agent.id, chat: target, summary: `Commitment follow-up failed: ${e.message}` }); }
+    const target = followUpChat(c, agent);
+    if (target && await followUp(ch, agent, target, c)) n++;
   }
   return n;
+}
+/** Where the follow-up goes: the chat it was promised in or the person's direct chat; null when none may go out. */
+function followUpChat(c, agent) {
+  const mode = agent?.promises?.followUp || 'chat';
+  if (!agent?.enabled || !agent.promises?.track || mode === 'off') return null;
+  const target = mode === 'dm' ? chatsOfPerson(c.person).find((x) => !isGroup(x.chat) && channelOf(x.chat) && isChatEnabled(x.chat))?.chat : c.chat;
+  return target && isChatEnabled(target) ? target : null;
+}
+/** Send it and keep it with the chat's messages. False when it could not be sent (Activity says why). */
+async function followUp(ch, agent, target, c) {
+  const text = followText(c, isGroup(target));
+  try {
+    const sent = await ch.send(target, text);
+    logMessage({ chat: target, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
+    activity('message.out', { agent: agent.id, chat: target, summary: `${text} (follow-up on a commitment)` });
+    return true;
+  } catch (e) { activity('error', { agent: agent.id, chat: target, summary: `Commitment follow-up failed: ${e.message}` }); return false; }
 }
 
 // the morning brief (090): commitments due today or overdue

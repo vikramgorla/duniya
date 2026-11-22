@@ -33,16 +33,7 @@
  "src/core/brief.js": {
   "complexity": 1
  },
- "src/core/commitments.js": {
-  "complexity": 4
- },
- "src/core/contacts.js": {
-  "complexity": 2
- },
  "src/core/direct-chats.js": {
-  "complexity": 1
- },
- "src/core/events.js": {
   "complexity": 1
  },
  "src/core/fact-check.js": {
@@ -61,7 +52,7 @@
   "complexity": 3
  },
  "src/core/media-ai.js": {
-  "complexity": 2
+  "complexity": 1
  },
  "src/core/media.js": {
   "complexity": 1
@@ -69,13 +60,7 @@
  "src/core/owner-assistant.js": {
   "complexity": 1
  },
- "src/core/pace.js": {
-  "complexity": 1
- },
  "src/core/people.js": {
-  "complexity": 1
- },
- "src/core/person-insights.js": {
   "complexity": 1
  },
  "src/core/providers/claude-code.js": {
@@ -90,38 +75,20 @@
  "src/core/providers/openai-chat.js": {
   "complexity": 2
  },
- "src/core/releases.js": {
-  "complexity": 2
- },
- "src/core/scheduler.js": {
-  "complexity": 1
- },
  "src/core/tools.js": {
   "complexity": 1
  },
  "src/core/upkeep.js": {
   "complexity": 1
  },
- "src/core/usage.js": {
-  "complexity": 1
- },
  "src/core/webaccess.js": {
   "complexity": 2
- },
- "src/modules/orders/index.js": {
-  "complexity": 1
- },
- "src/modules/orders/tools.js": {
-  "complexity": 1
  },
  "src/modules/sending/audience.js": {
   "complexity": 1
  },
  "src/modules/sending/index.js": {
   "complexity": 2
- },
- "src/modules/surveys/index.js": {
-  "complexity": 1
  },
  "src/panel/admin-mcp.js": {
   "complexity": 1,
