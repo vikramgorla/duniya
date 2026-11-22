@@ -102,14 +102,6 @@
  "src/core/releases.js": {
   "complexity": 2
  },
- "src/core/router.js": {
-  "complexity": 6,
-  "max-lines-per-function": 2
- },
- "src/core/runner.js": {
-  "complexity": 1,
-  "max-lines-per-function": 1
- },
  "src/core/scheduler.js": {
   "complexity": 1
  },

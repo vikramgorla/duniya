@@ -19,7 +19,7 @@ export function findChrome() {
 async function startChrome() {
   for (let attempt = 1; ; attempt++) {
     const profile = mkdtempSync(join(tmpdir(), 'duniya-chrome-'));
-    const proc = spawn(findChrome(), ['--headless=new', '--no-sandbox', '--disable-gpu', '--hide-scrollbars', '--force-color-profile=srgb', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
+    const proc = spawn(findChrome(), ['--headless=new', '--no-sandbox', '--disable-gpu', '--hide-scrollbars', '--force-color-profile=srgb', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore', detached: true, env: { ...process.env, TMPDIR: profile } }); // its own process group (stopped as one); Chrome's scratch files go with the profile
     let exited = false; proc.on('exit', () => { exited = true; });
     const portFile = join(profile, 'DevToolsActivePort');
     for (let i = 0; i < 150 && !exited && !existsSync(portFile); i++) await sleep(100);
@@ -29,6 +29,12 @@ async function startChrome() {
     console.error(`Chrome did not start (try ${attempt}); trying again`);
     await sleep(1000 * attempt);
   }
+}
+/** Stop Chrome with its helper processes and remove its profile now (callers exit right after; a timer never ran). */
+function stopChrome(proc, profile) {
+  try { process.kill(-proc.pid, 'SIGKILL'); } catch { proc.kill('SIGKILL'); } // the group; the process alone where groups are not available
+  const drop = () => { try { rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }); return true; } catch { return false; } };
+  if (!drop()) process.once('exit', drop); // a helper was still writing: once more when this process ends
 }
 export async function launch() {
   const { proc, profile, text } = await startChrome();
@@ -45,7 +51,7 @@ export async function launch() {
   const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => { const i = ++id; waiting.set(i, { resolve, reject }); ws.send(JSON.stringify({ id: i, method, params, sessionId })); });
   /** Protocol events (e.g. Network.loadingFinished) of every page: on((msg) => …). */
   const on = (fn) => listeners.add(fn);
-  return { send, on, close: () => { ws.close(); proc.kill(); setTimeout(() => rmSync(profile, { recursive: true, force: true }), 500); } };
+  return { send, on, close: () => { ws.close(); stopChrome(proc, profile); } };
 }
 /** A page at `width` (phones < 600 px get touch + mobile emulation). Optional `height` and `scale` (device pixel ratio). */
 export async function newPage(cdp, { width, scheme, height, scale = 1 }) {

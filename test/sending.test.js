@@ -11,6 +11,7 @@ const owner = await t.login();
 after(() => t.close());
 const { TOOLS } = await import('../src/panel/admin-tools.js');
 const { upkeepTick } = await import('../src/core/upkeep.js');
+const { modulesIdle } = await import('../src/modules/index.js');
 const { localParts, env } = t.config;
 const api = async (m, p, b) => { const r = await t.api(owner, m, p, b); if (r.status >= 400) throw Object.assign(new Error(r.body.error || r.body), { status: r.status, field: r.body.field }); return r.body; };
 const x = { call: (m, p, b) => api(m, p, b) };
@@ -30,8 +31,7 @@ const sent = (chat) => t.sent.filter((m) => m.chat === chat);
 async function tick(now) {
   const before = t.sent.length;
   await upkeepTick(t.channel, now);
-  await new Promise((r) => setTimeout(r, 30));
-  for (let i = 0; i < 40 && (await api('GET', '/api/sending')).runs.some((r) => r.counts.sending); i++) await new Promise((r) => setTimeout(r, 25));
+  await modulesIdle(); // the send the tick started goes on after it: wait for it
   return t.sent.length - before;
 }
 const run = (id) => api('GET', `/api/sending/runs/${id}`);

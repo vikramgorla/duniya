@@ -114,212 +114,292 @@ export function extractConfirmId(text, field = 'confirm_id') {
 }
 
 /**
- * One agent turn for an agent. Returns reply text or null.
- * ctx: { agent, role, chat, senderName, requester, text, isGroup, source: 'whatsapp'|'panel'|'schedule' }
- * contextChat (panel tests, #37): the chat whose memory and model the test uses; `chat` stays the panel test chat.
+ * Spending caps (040): checked before the first model call of a turn (a turn that started finishes). Panel tests are
+ * never held back, so the owner can still try the agent. Returns the model for this turn, or null: it stays quiet.
  */
-export async function runAgent(ctx) {
-  const { agent, role, chat, senderName, text, isGroup } = ctx;
-  // Spending caps (040): checked before the first model call of a turn (a turn that started finishes). Panel tests
-  // are never held back, so the owner can still try the agent.
-  let model = chatModel(agent, ctx.contextChat || chat);
-  if (ctx.source !== 'panel') {
-    const budget = await checkBudget(agent, chat, { names: { chat: ctx.chatName } });
-    if (budget.action === 'quiet') {
-      ctx.silenceReason = 'budget';
-      countStat('budget', { agent: agent.id, chat });
-      silenceReason('budget', { chat, agent: agent.id, sender: ctx.senderName || '' });
-      return null;
-    }
-    if (budget.action === 'fallback') model = budget.model;
+async function modelWithinBudget(ctx) {
+  const { agent, chat } = ctx;
+  const model = chatModel(agent, ctx.contextChat || chat);
+  if (ctx.source === 'panel') return model;
+  const budget = await checkBudget(agent, chat, { names: { chat: ctx.chatName } });
+  if (budget.action === 'quiet') {
+    ctx.silenceReason = 'budget';
+    countStat('budget', { agent: agent.id, chat });
+    silenceReason('budget', { chat, agent: agent.id, sender: ctx.senderName || '' });
+    return null;
   }
-  const { defs, run, meta, services, sharing, natives } = await toolsFor(agent, role, { chat, owner: !!ctx.ownerTurn });
+  return budget.action === 'fallback' ? budget.model : model;
+}
+
+/** Hold a change for an organizer's "confirm CODE"; the code is added to the answer (finishTurn). */
+function holdForCode(t, { server, confirmTool, confirmId, tool, summary, detail = undefined }) {
+  const { agent, chat, requester } = t.ctx;
+  const code = newCode();
+  addPending({ code, agent: agent.id, server, confirmTool, confirmId, tool, chat, requester, summary: String(summary).slice(0, 500),
+    expires: Date.now() + (agent.confirm?.ttlMinutes || 9) * 60000 });
+  t.codes.push(code);
+  activity('confirm.created', { agent: agent.id, chat, summary: `${code}: ${tool}`, ...(detail ? { detail } : {}) });
+}
+
+/**
+ * ctx.hold, for the built-in tools that change things (people, modules). 079: a people change about someone other than
+ * the sender waits for an organizer's confirm code (like previews). 093 / 094: a change (not destructive, by its
+ * annotations) an organizer clearly asked for applies at once in clear / act (logged as changed without asking).
+ */
+const holdLocal = (t) => ({ kind, action, summary, tool = '', input = {}, risk = 'change', mode = '' }) => {
+  if (mayChangeWithoutAsking(t.ctx, risk, mode)) {
+    const text = applyLocal(kind, action, t.ctx.agent);
+    changedWithoutAsking(t.ctx, tool || `${kind}:${action.op}`, input, '');
+    return `Done (the organizer's clear request is their approval; no confirm code needed): ${text}`;
+  }
+  holdForCode(t, { server: `local:${kind}`, confirmTool: kind, confirmId: JSON.stringify(action), tool: `${kind}:${action.op}`, summary });
+  return `Held for an organizer's confirmation: ${summary}. The confirm code is added to your answer; say that it applies after confirm.`;
+};
+
+/** What the model reads as this turn's message: memory, lessons, which history is stored, the sender's card, the test
+ *  conversation so far, the message with the notes about its attachments, then notes for this turn only. */
+function turnMessage(ctx, { memory, card, notes }) {
+  const { agent, role, chat, senderName, text } = ctx;
+  const memoryChat = ctx.contextChat || chat;
+  const lessonsOn = agent.lessons?.enabled !== false;
+  // #91: say exactly what history is stored (WhatsApp turns, and panel tests that use a real chat's memory). In the
+  // user turn, not the system prompt, so the system prompt stays the same between turns.
+  const history = ctx.source === 'whatsapp' || ctx.contextChat ? historyNote(memoryChat, { excludeId: ctx.contextChat ? 0 : ctx.msgRowId || 0, tz: agent.timezone || env.timezone }) : '';
+  // #163: the panel test console sends its conversation so far (it is not stored as chat history)
+  const thread = Array.isArray(ctx.thread) && ctx.thread.length ? `Earlier in this test conversation:\n${ctx.thread.map((t) => `${t.from === 'agent' ? 'You' : senderName}: ${t.text}`).join('\n')}` : '';
+  const message = `New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}`;
+  // a message nobody addressed to the agent: it judges whether to answer (with the join-in lessons the owner approved)
+  const judge = ctx.unaddressed ? [JUDGE_NOTE, lessonsOn ? joinLessonsNote(agent, memoryChat) : ''].filter(Boolean).join('\n') : '';
+  // 089: lessons the owner approved, the most relevant to this message first (small budget)
+  const lessons = lessonsOn ? lessonsContext(agent, memoryChat, text) : '';
+  return [memory, lessons, history, card, thread, message, judge, ctx.turnNote, ctx.sharePlan?.note].filter(Boolean).join('\n\n');
+}
+
+/**
+ * Everything a turn needs before its first model call, as one object the steps below read and change: the tools, the
+ * message for the model (with memory and attachments), which model answers and how it may fall back, and what this
+ * turn holds, applies, looks up and spends.
+ */
+async function startTurn(ctx, budgetModel) {
+  const { agent, role, chat, senderName, text } = ctx;
+  const tools = await toolsFor(agent, role, { chat, owner: !!ctx.ownerTurn });
   // 094: sharing on its own — the message's moment in code; a line for this turn when one fits. Uses per service (limits).
-  const splan = sharePlan(ctx, sharing);
-  ctx.sharePlan = splan;
-  const uses = new Map(); ctx.uses = uses;
-  const codes = [];
-  // 079: a people change about someone other than the sender waits for an organizer's confirm code (like previews);
-  // 093 / 094: a change (not destructive, by its annotations) an organizer clearly asked for applies at once in clear / act (logged as changed without asking)
-  ctx.hold = ({ kind, action, summary, tool = '', input = {}, risk = 'change', mode = '' }) => {
-    if (mayChangeWithoutAsking(ctx, risk, mode)) {
-      const text = applyLocal(kind, action, agent);
-      changedWithoutAsking(ctx, tool || `${kind}:${action.op}`, input, '');
-      return `Done (the organizer's clear request is their approval; no confirm code needed): ${text}`;
-    }
-    const code = newCode();
-    addPending({ code, agent: agent.id, server: `local:${kind}`, confirmTool: kind, confirmId: JSON.stringify(action), tool: `${kind}:${action.op}`, chat,
-      requester: ctx.requester, summary: String(summary).slice(0, 500), expires: Date.now() + (agent.confirm?.ttlMinutes || 9) * 60000 });
-    codes.push(code);
-    activity('confirm.created', { agent: agent.id, chat, summary: `${code}: ${kind}:${action.op}` });
-    return `Held for an organizer's confirmation: ${summary}. The confirm code is added to your answer; say that it applies after confirm.`;
-  };
-  // 093: confirm ids previewed in this turn: applied at once (clear request) or waiting for a later yes
-  const applied = new Set(); const waiting = new Set();
+  ctx.sharePlan = sharePlan(ctx, tools.sharing);
+  ctx.uses = new Map();
   // 079: a short card about the sender from People (never message text), when the agent's People access allows it
   const card = ctx.personId ? senderCard(ctx.personId, peopleScope(agent, { owner: !!ctx.ownerTurn }), senderName) : '';
-  for (const err of meta.get('__errors') || []) activity('error', { agent: agent.id, chat, summary: err });
+  for (const err of tools.meta.get('__errors') || []) activity('error', { agent: agent.id, chat, summary: err });
 
   const memory = buildContext({ agent, chat: ctx.contextChat || chat, excludeId: ctx.msgRowId || 0 });
   // 088: Smart model choice — light for simple messages, strong when needed (rules first, a tiny classifier when unsure)
-  let smart = null;
+  let smart = null; let model = budgetModel;
   if (model === SMART) {
     smart = await chooseTier(agent, { text, ownerTurn: !!ctx.ownerTurn, attachments: (ctx.attachments || []).length > 0, source: ctx.source,
-      unaddressed: !!ctx.unaddressed, hasTools: defs.length > 0, contextChars: memory.length }, { chat });
+      unaddressed: !!ctx.unaddressed, hasTools: tools.defs.length > 0, contextChars: memory.length }, { chat });
     model = smart.model;
     ctx.tier = { tier: smart.tier, reason: smart.reason };
   }
-  // #91: say exactly what history is stored (WhatsApp turns, and panel tests that use a real chat's memory). In the
-  // user turn, not the system prompt, so the system prompt stays the same between turns.
-  const historyLine = ctx.source === 'whatsapp' || ctx.contextChat ? historyNote(ctx.contextChat || chat, { excludeId: ctx.contextChat ? 0 : ctx.msgRowId || 0, tz: agent.timezone || env.timezone }) : '';
   // Photos & voice (043): photos / PDFs go as image / document blocks to a model that can see them (or the vision
   // fallback model); otherwise a note asks the model to say kindly that it can't look at them.
   const plan = await planAttachments(model, ctx.attachments || []);
-  model = plan.model;
-  const notes = [ctx.mediaNote, plan.note].filter(Boolean).join('\n');
-  // #163: the panel test console sends its conversation so far (it is not stored as chat history)
-  const thread = Array.isArray(ctx.thread) && ctx.thread.length ? `Earlier in this test conversation:\n${ctx.thread.map((t) => `${t.from === 'agent' ? 'You' : senderName}: ${t.text}`).join('\n')}\n\n` : '';
-  // 089: lessons the owner approved, the most relevant to this message first (small budget); join-in lessons for judged turns
-  const lessons = agent.lessons?.enabled === false ? '' : lessonsContext(agent, ctx.contextChat || chat, text);
-  const joinNote = ctx.unaddressed && agent.lessons?.enabled !== false ? joinLessonsNote(agent, ctx.contextChat || chat) : '';
-  const turnText = `${memory ? `${memory}\n\n` : ''}${lessons ? `${lessons}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${card ? `${card}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}${ctx.unaddressed ? `\n\n${JUDGE_NOTE}${joinNote ? `\n${joinNote}` : ''}` : ''}${ctx.turnNote ? `\n\n${ctx.turnNote}` : ''}${splan?.note ? `\n\n${splan.note}` : ''}`;
-  const messages = [{
-    role: 'user',
-    content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText,
-  }];
-
-  let reply = '';
-  const usage = { input: 0, output: 0 };
+  const turnText = turnMessage(ctx, { memory, card, notes: [ctx.mediaNote, plan.note].filter(Boolean).join('\n') });
   // Fallback (042): per model call, keeping this turn's messages, so tools that already ran never run again and
   // nothing is sent before the turn ends. The account that answered stays first for the rest of the turn.
-  let fallback = effectiveFallback({ agent, chatPrefs: getChatPrefs(ctx.contextChat || chat) });
   // 088: a light answer does not fall back to other light models; if it fails, the strong model answers (with fallback)
-  const strongFallback = fallback;
-  if (smart?.tier === 'light') fallback = { ...fallback, enabled: false, chain: [] };
-  let cost = 0; let priced = true;
-  const sources = card ? [card] : []; // 088: what People and the modules said in this turn (for the self-check)
-  const turn = { ref: '' };
-  const failed = [];
-  // #67: while the turn carries photos / files, fallback only moves to models that can see them (then the vision
-  // fallback model). If none can answer, the turn is asked again without them and the model says so kindly.
-  let vision = plan.attachments.length ? visionCallOptions() : null;
-  const webSources = []; // 2.58: pages the provider's built-in web search cited
-  const mediaLinks = []; // 2.58.1: links in tool results that carry media: never pasted into the answer
+  const strongFallback = effectiveFallback({ agent, chatPrefs: getChatPrefs(ctx.contextChat || chat) });
+  /** @type {any} */
+  const t = {
+    ctx, ...tools, plan, smart, card, turnText, strongFallback,
+    model: plan.model,
+    fallback: smart?.tier === 'light' ? { ...strongFallback, enabled: false, chain: [] } : strongFallback,
+    messages: [{ role: 'user', content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText }],
+    // #67: while the turn carries photos / files, fallback only moves to models that can see them (then the vision
+    // fallback model). If none can answer, the turn is asked again without them and the model says so kindly.
+    vision: plan.attachments.length ? visionCallOptions() : null,
+    turn: { ref: '' }, failed: [],
+    reply: '', usage: { input: 0, output: 0 }, cost: 0, priced: true,
+    codes: [], // confirm codes this turn handed out
+    applied: new Set(), waiting: new Set(), // 093: confirm ids previewed in this turn: applied at once (clear request) or waiting for a later yes
+    sources: card ? [card] : [], // 088: what People and the modules said in this turn (for the self-check)
+    webSources: [], // 2.58: pages the provider's built-in web search cited
+    mediaLinks: [], // 2.58.1: links in tool results that carry media: never pasted into the answer
+  };
+  ctx.hold = holdLocal(t);
+  return t;
+}
 
-  for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-    let res;
-    try {
-      res = await modelChat({
-        model, purpose: 'agent', maxTokens: agent.maxTokens, usage: usageTag(turnFeature(ctx, smart), { agent: agent.id, chat }),
-        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName, chat, requester: ctx.requester, held: !!agent.confirm || defs.some((d) => /^(people|events|orders|sending)__/.test(d.name)), services, sharing }), tools: defs, natives, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
-      });
-    } catch (e) {
-      if (smart?.tier === 'light' && e.code !== 'aborted') { // 088: the light model failed: the strong one answers
-        smart = { ...smart, tier: 'strong', reason: 'the light model failed' };
-        ctx.tier = { tier: 'strong', reason: smart.reason };
-        model = tierModels(agent).strong; fallback = strongFallback; turn.ref = '';
-        round--;
-        continue;
-      }
-      if (vision && e.skipped?.length) {
-        vision = null;
-        messages[0] = { role: 'user', content: `${turnText}\n${noVisionNote(plan.attachments)}` };
-        activity('model.fallback', { agent: agent.id, chat, summary: `No model that sees photos could answer; asked ${e.skipped.map((s) => s.name).join(', ')} without the photo`, detail: { skipped: e.skipped.map((s) => s.ref) } });
-        round--;
-        continue;
-      }
-      if (e.failures?.length) ctx.fallback = { answeredBy: '', failed: [...failed, ...e.failures.filter((f) => f.reason !== 'unavailable').map(({ ref, name, reason }) => ({ ref, name, reason }))] };
-      const friendly = friendlyModelError(e);
-      if (!friendly) throw e;
-      activity('error', { agent: agent.id, chat, summary: `Model error: ${e.message}`, detail: { code: e.code, reason: e.fallbackReason, failures: e.failures } });
-      ctx.modelError = e.code || 'model_error'; // the router records why the agent could not really answer (#34)
-      return friendly;
+/**
+ * One model call. Returns { res }, { again: true } when the turn is asked again another way (the strong model after
+ * the light one failed; without the photo no model could see), or { friendly }: an error the agent explains itself.
+ */
+async function askModel(t) {
+  const { ctx } = t; const { agent, chat } = ctx;
+  try {
+    return { res: await modelChat({
+      model: t.model, purpose: 'agent', maxTokens: agent.maxTokens, usage: usageTag(turnFeature(ctx, t.smart), { agent: agent.id, chat }),
+      system: systemPrompt({ agent, role: ctx.role, isGroup: ctx.isGroup, chatName: ctx.chatName, chat, requester: ctx.requester,
+        held: !!agent.confirm || t.defs.some((d) => /^(people|events|orders|sending)__/.test(d.name)), services: t.services, sharing: t.sharing }),
+      tools: t.defs, natives: t.natives, messages: t.messages, fallback: t.fallback, turn: t.turn, onWait: ctx.onWait, ...(t.vision || {}),
+    }) };
+  } catch (e) {
+    if (t.smart?.tier === 'light' && e.code !== 'aborted') { // 088: the light model failed: the strong one answers
+      t.smart = { ...t.smart, tier: 'strong', reason: 'the light model failed' };
+      ctx.tier = { tier: 'strong', reason: t.smart.reason };
+      t.model = tierModels(agent).strong; t.fallback = t.strongFallback; t.turn.ref = '';
+      return { again: true };
     }
-    ctx.model = res.model;
-    ctx.answeredBy = res.answeredBy || res.model;
-    for (const f of res.failures || []) failed.push({ ref: f.ref, name: f.name, reason: f.reason });
-    if (failed.length) ctx.fallback = { answeredBy: ctx.answeredBy, model: res.model, failed };
-    usage.input += res.usage?.input_tokens || 0;
-    usage.output += res.usage?.output_tokens || 0;
-    if (res.cost == null) priced = false; else cost += res.cost;
-    reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
-    webSources.push(...(res.sources || []));
-    // 2.58: a long built-in web search paused the turn: hand the answer so far back and let the provider go on
-    if (res.stop_reason === 'pause_turn') { messages.push({ role: 'assistant', content: res.content }); continue; }
-    const calls = res.content.filter((b) => b.type === 'tool_use');
-    if (res.stop_reason !== 'tool_use' || !calls.length) break;
-
-    messages.push({ role: 'assistant', content: res.content });
-    const results = [];
-    for (const call of calls) {
-      const m = meta.get(call.name);
-      const started = Date.now();
-      // 094: the risk of this call from the tool's annotations (or the owner's override); limits stop a call in code
-      const risk = riskOf(m?.annotations, call.input, m?.override);
-      const why = m?.kind === 'mcp' ? limitStop(ctx, m.server, m.behaviour, uses) : '';
-      const out = why ? { isError: true, text: `Not used: ${m.server} has a limit (${why}). Answer without it.` }
-        : (m?.change === 'confirm' && confirmGate(ctx, call.input, applied, waiting)) || await runTool(run, m, call, { ...ctx, toolRisk: risk, toolMode: m?.behaviour?.changes || '' });
-      if (!out.isError && m?.kind === 'mcp' && m.annotations?.readOnlyHint === true) mediaLinks.push(...linksWithMedia(out.text));
-      let content = String(out.text ?? '').slice(0, 12000);
-      activity(out.isError ? 'tool.error' : 'tool.call', {
-        agent: agent.id, chat,
-        summary: `${toolPhrase(m?.fq || call.name)} (${Date.now() - started} ms)${out.isError ? ' failed' : ''}`, // 073: plain words, the raw name is in detail.tool
-        detail: { tool: m?.fq || call.name, input: call.input, output: content.slice(0, 2000), role },
-      });
-
-      const confirmId = !out.isError && m?.change === 'preview' ? extractConfirmId(out.text, agent.confirm?.idField || 'confirm_id') : null;
-      // the preview's risk is the risk of the tool that made it (a read-only preview still prepares a change)
-      if (confirmId && mayChangeWithoutAsking(ctx, risk === 'read' ? 'change' : risk, m.behaviour?.changes)) {
-        // 093: a clear request from an organizer is the approval: Duniya confirms it now (the model never has to)
-        const done = await m.conn.call(m.confirmTool, { [agent.confirm?.idField || 'confirm_id']: confirmId });
-        if (done.isError) content += `\n\nDuniya: applying it failed: ${done.text.slice(0, 300)}`;
-        else { applied.add(confirmId); content += `\n\n${appliedNote(done.text, m.undo)}`; changedWithoutAsking(ctx, m.fq, call.input, m.undo); }
-        content = content.split(confirmId).join('[applied]');
-      } else if (confirmId && !agent.confirm) {
-        waiting.add(confirmId); // 093: the model's own confirm of it is blocked in this turn (confirmGate)
-        content += `\n\n${WAIT_NOTE}`;
-      } else if (confirmId) { // the agent's own confirm settings: held for "confirm CODE"
-        const code = newCode();
-        const [server, confirmTool] = agent.confirm.tool.split(':');
-        addPending({
-          code, agent: agent.id, server, confirmTool, confirmId, tool: m.fq, chat,
-          requester: ctx.requester, summary: content.slice(0, 500),
-          expires: Date.now() + (agent.confirm.ttlMinutes || 9) * 60000,
-        });
-        codes.push(code);
-        content = content.split(confirmId).join('[held for organizer confirmation]');
-        activity('confirm.created', { agent: agent.id, chat, summary: `${code}: ${m.fq}`, detail: { input: call.input } });
-      }
-      if (!out.isError && /^(people|events|orders|surveys|sending):/.test(m?.fq || '')) sources.push(content);
-      results.push({ type: 'tool_result', tool_use_id: call.id, is_error: out.isError, content });
+    if (t.vision && e.skipped?.length) {
+      t.vision = null;
+      t.messages[0] = { role: 'user', content: `${t.turnText}\n${noVisionNote(t.plan.attachments)}` };
+      activity('model.fallback', { agent: agent.id, chat, summary: `No model that sees photos could answer; asked ${e.skipped.map((s) => s.name).join(', ')} without the photo`, detail: { skipped: e.skipped.map((s) => s.ref) } });
+      return { again: true };
     }
-    messages.push({ role: 'user', content: results });
+    if (e.failures?.length) ctx.fallback = { answeredBy: '', failed: [...t.failed, ...e.failures.filter((f) => f.reason !== 'unavailable').map(({ ref, name, reason }) => ({ ref, name, reason }))] };
+    const friendly = friendlyModelError(e);
+    if (!friendly) throw e;
+    activity('error', { agent: agent.id, chat, summary: `Model error: ${e.message}`, detail: { code: e.code, reason: e.fallbackReason, failures: e.failures } });
+    ctx.modelError = e.code || 'model_error'; // the router records why the agent could not really answer (#34)
+    return { friendly };
   }
+}
 
-  // 088: self-check — amounts, dates and counts from People and the modules are compared with this turn's records
-  if (reply && sources.length > (card ? 1 : 0) && agent.selfCheck !== false) {
-    const checked = await selfCheck({ agent, chat, ctx, reply, sources, model, fallback, turn, usage, text });
-    reply = checked.reply;
-    if (checked.cost == null) priced = false; else cost += checked.cost;
+/** What an answer of the model adds to the turn: who answered, what it cost, its text and the pages it cited. */
+function noteAnswer(t, res) {
+  const { ctx } = t;
+  ctx.model = res.model;
+  ctx.answeredBy = res.answeredBy || res.model;
+  for (const f of res.failures || []) t.failed.push({ ref: f.ref, name: f.name, reason: f.reason });
+  if (t.failed.length) ctx.fallback = { answeredBy: ctx.answeredBy, model: res.model, failed: t.failed };
+  t.usage.input += res.usage?.input_tokens || 0;
+  t.usage.output += res.usage?.output_tokens || 0;
+  if (res.cost == null) t.priced = false; else t.cost += res.cost;
+  t.reply = res.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+  t.webSources.push(...(res.sources || []));
+}
+
+/**
+ * A preview came back with a confirm id; the id never reaches the model. 093: a clear request from an organizer is the
+ * approval, so Duniya confirms it now (the model never has to). Without confirm settings it waits for a later yes (the
+ * model's own confirm of it is blocked in this turn, confirmGate). With the agent's confirm settings it is held for
+ * "confirm CODE". Returns the tool result the model reads.
+ */
+async function settlePreview(t, { m, call, risk, confirmId, content }) {
+  const { ctx } = t; const { agent } = ctx;
+  // the preview's risk is the risk of the tool that made it (a read-only preview still prepares a change)
+  if (mayChangeWithoutAsking(ctx, risk === 'read' ? 'change' : risk, m.behaviour?.changes)) {
+    const done = await m.conn.call(m.confirmTool, { [agent.confirm?.idField || 'confirm_id']: confirmId });
+    if (done.isError) return `${content}\n\nDuniya: applying it failed: ${done.text.slice(0, 300)}`.split(confirmId).join('[applied]');
+    t.applied.add(confirmId);
+    changedWithoutAsking(ctx, m.fq, call.input, m.undo);
+    return `${content}\n\n${appliedNote(done.text, m.undo)}`.split(confirmId).join('[applied]');
   }
-  // 094: [share: mood] tags never reach the chat; what is shared (asked for, or a moment's) goes out after the text
-  const tag = takeShareTag(reply);
-  reply = withSources(plainLinks(withoutMediaClutter(tag.text, mediaLinks)), webSources);
-  ctx.share = ctx.source === 'panel' ? null : shareAfterReply(ctx, splan, { reply, hint: tag.hint });
-  for (const code of codes) {
-    reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm?.ttlMinutes || 9} min).`;
-  }
-  ctx.usage = usage;
+  if (!agent.confirm) { t.waiting.add(confirmId); return `${content}\n\n${WAIT_NOTE}`; }
+  const [server, confirmTool] = agent.confirm.tool.split(':');
+  holdForCode(t, { server, confirmTool, confirmId, tool: m.fq, summary: content, detail: { input: call.input } });
+  return content.split(confirmId).join('[held for organizer confirmation]');
+}
+
+/** Run one tool call, unless a limit of its service or the confirm gate stops it in code (094, 093). */
+async function runGuarded(t, call, m, risk) {
+  const { ctx } = t;
+  const why = m?.kind === 'mcp' ? limitStop(ctx, m.server, m.behaviour, ctx.uses) : '';
+  if (why) return { isError: true, text: `Not used: ${m.server} has a limit (${why}). Answer without it.` };
+  const stopped = m?.change === 'confirm' ? confirmGate(ctx, call.input, t.applied, t.waiting) : null;
+  return stopped || runTool(t.run, m, call, { ...ctx, toolRisk: risk, toolMode: m?.behaviour?.changes || '' });
+}
+
+/** The Activity line of a tool call (073: in plain words; the raw name is in detail.tool). */
+function logToolCall(ctx, { m, call, out, content, started }) {
+  const { agent, chat, role } = ctx;
+  activity(out.isError ? 'tool.error' : 'tool.call', {
+    agent: agent.id, chat,
+    summary: `${toolPhrase(m?.fq || call.name)} (${Date.now() - started} ms)${out.isError ? ' failed' : ''}`, // 073: plain words, the raw name is in detail.tool
+    detail: { tool: m?.fq || call.name, input: call.input, output: content.slice(0, 2000), role },
+  });
+}
+
+/** One tool call of the model: the call (runGuarded), its Activity line, and what a preview leads to (settlePreview).
+ *  Returns the tool_result block for the model. */
+async function toolResult(t, call) {
+  const { ctx } = t;
+  const m = t.meta.get(call.name);
+  const started = Date.now();
+  // 094: the risk of this call from the tool's annotations (or the owner's override)
+  const risk = riskOf(m?.annotations, call.input, m?.override);
+  const out = await runGuarded(t, call, m, risk);
+  const failed = !!out.isError;
+  if (!failed && m?.kind === 'mcp' && m.annotations?.readOnlyHint === true) t.mediaLinks.push(...linksWithMedia(out.text));
+  let content = String(out.text ?? '').slice(0, 12000);
+  logToolCall(ctx, { m, call, out, content, started });
+  const confirmId = !failed && m?.change === 'preview' ? extractConfirmId(out.text, ctx.agent.confirm?.idField || 'confirm_id') : null;
+  if (confirmId) content = await settlePreview(t, { m, call, risk, confirmId, content });
+  if (!failed && /^(people|events|orders|surveys|sending):/.test(m?.fq || '')) t.sources.push(content);
+  return { type: 'tool_result', tool_use_id: call.id, is_error: out.isError, content };
+}
+
+/** The turn in Usage (088: light or strong, and what the strong model would have cost) and in Activity. */
+function recordTurn(t) {
+  const { ctx, smart, failed, usage } = t; const { agent, chat } = ctx;
   if (smart && ctx.source !== 'panel') {
-    const strong = smart.tier === 'strong' ? (priced ? cost : null) : refCost(strongRef(agent), usage.input, usage.output);
-    try { recordSmartTurn({ agent: agent.id, chat, tier: smart.tier, reason: smart.reason, cost: priced ? cost : null, strongCost: strong }); } catch { /* bookkeeping */ }
+    const strong = smart.tier === 'strong' ? (t.priced ? t.cost : null) : refCost(strongRef(agent), usage.input, usage.output);
+    try { recordSmartTurn({ agent: agent.id, chat, tier: smart.tier, reason: smart.reason, cost: t.priced ? t.cost : null, strongCost: strong }); } catch { /* bookkeeping */ }
   }
   const via = failed.length ? ` (after ${failed.map((f) => `${f.name}: ${REASON_TEXT[f.reason] || f.reason}`).join(', ')})` : '';
   // 072: the model as people know it ("Claude Haiku 5.5"), not its id
   const tierText = smart ? ` · ${smart.tier}: ${smart.reason}` : '';
   const detail = { ...(failed.length ? { fallback: failed } : {}), ...(smart ? { tier: smart.tier, reason: smart.reason } : {}), ...(ctx.check ? { check: ctx.check } : {}) };
   activity('model.usage', { agent: agent.id, chat, summary: `${modelName(String(ctx.model || agent.model).replace(/^[\w-]+:(?=.)/, ''))}: ${usage.input} in / ${usage.output} out${via}${tierText}`, detail: Object.keys(detail).length ? detail : undefined });
+}
+
+/** After the model's last answer: the self-check, what is shared, the confirm codes, the turn's record. Returns the reply or null. */
+async function finishTurn(t) {
+  const { ctx } = t; const { agent, chat } = ctx;
+  let { reply } = t;
+  // 088: self-check — amounts, dates and counts from People and the modules are compared with this turn's records
+  if (reply && t.sources.length > (t.card ? 1 : 0) && agent.selfCheck !== false) {
+    const checked = await selfCheck({ agent, chat, ctx, reply, sources: t.sources, model: t.model, fallback: t.fallback, turn: t.turn, usage: t.usage, text: ctx.text });
+    reply = checked.reply;
+    if (checked.cost == null) t.priced = false; else t.cost += checked.cost;
+  }
+  // 094: [share: mood] tags never reach the chat; what is shared (asked for, or a moment's) goes out after the text
+  const tag = takeShareTag(reply);
+  reply = withSources(plainLinks(withoutMediaClutter(tag.text, t.mediaLinks)), t.webSources);
+  ctx.share = ctx.source === 'panel' ? null : shareAfterReply(ctx, ctx.sharePlan, { reply, hint: tag.hint });
+  for (const code of t.codes) {
+    reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm?.ttlMinutes || 9} min).`;
+  }
+  ctx.usage = t.usage;
+  recordTurn(t);
   return reply.trim() || null;
+}
+
+/**
+ * One agent turn for an agent. Returns reply text or null.
+ * ctx: { agent, role, chat, senderName, requester, text, isGroup, source: 'whatsapp'|'panel'|'schedule' }
+ * contextChat (panel tests, #37): the chat whose memory and model the test uses; `chat` stays the panel test chat.
+ * The turn: the budget decides the model (or quiet) → startTurn → up to MAX_TOOL_ROUNDS rounds of "ask the model, run
+ * the tools it calls" → finishTurn.
+ */
+export async function runAgent(ctx) {
+  const budgetModel = await modelWithinBudget(ctx);
+  if (budgetModel === null) return null;
+  const t = await startTurn(ctx, budgetModel);
+  for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+    const asked = await askModel(t);
+    if (asked.again) { round--; continue; }
+    if (asked.friendly) return asked.friendly;
+    const { res } = asked;
+    noteAnswer(t, res);
+    // 2.58: a long built-in web search paused the turn: hand the answer so far back and let the provider go on
+    if (res.stop_reason === 'pause_turn') { t.messages.push({ role: 'assistant', content: res.content }); continue; }
+    const calls = res.content.filter((b) => b.type === 'tool_use');
+    if (res.stop_reason !== 'tool_use' || !calls.length) break;
+    t.messages.push({ role: 'assistant', content: res.content });
+    const results = [];
+    for (const call of calls) results.push(await toolResult(t, call));
+    t.messages.push({ role: 'user', content: results });
+  }
+  return finishTurn(t);
 }
 
 const FIX_NOTE = (wrong, hint) => `Fact check: these values in your answer are not in the records you looked up: ${wrong.join(', ')}.${hint ? ` The records say: ${hint}.` : ''} Rewrite your answer using only values from the tool results. Reply with the corrected answer only.`;
