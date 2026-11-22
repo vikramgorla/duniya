@@ -624,7 +624,7 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
 .dsum b { font: 650 var(--fs-l) var(--font-display); }
 .dreview .dcount { font: 600 var(--fs-s) var(--mono); padding: 2px 8px; border-radius: var(--radius-xs); box-shadow: none; }
 .dcard { border: 1px solid var(--line); border-radius: var(--radius-s); margin: 10px 0; background: var(--card); min-width: 0; }
-.card .dcard > summary { padding: 10px 14px; color: var(--ink); font-size: 14px; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+.dcard > summary, .card .dcard > summary { padding: 10px 14px; color: var(--ink); font-size: 14px; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; cursor: pointer; } /* also in a dialog, where no card styles the summary */
 .dcard > summary b { font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
 .dbody { padding: 0 14px var(--s3); min-width: 0; }
 .dseg { margin: 0 0 var(--s2); }
@@ -699,7 +699,7 @@ dialog.dlg:focus, dialog.dlg:focus-visible { outline: none; }
   .stat { font-size: 28px; }
   .drow { grid-template-columns: minmax(0, 1fr); }
   .dskip { min-height: 40px; }
-  .card .dcard > summary { padding: 10px var(--s3); }
+  .dcard > summary, .card .dcard > summary { padding: 10px var(--s3); }
   .dbody { padding: 0 var(--s3) var(--s3); }
   .seg.dseg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; overflow: visible; } .seg.dseg button { white-space: normal; line-height: 1.2; padding: 4px 6px; min-width: 0; }
   .tpl-chips { grid-template-columns: 1fr 1fr; } .tpl-chips .choice span { -webkit-line-clamp: 2; }

@@ -77,10 +77,15 @@ export async function newPage(cdp, { width, scheme, height, scale = 1 }) {
     await s('Page.navigate', { url });
     for (let i = 0; i < 100; i++) { await sleep(100); if (await evaluate('document.readyState').catch(() => '') === 'complete') break; }
   };
+  // A capture beyond the viewport lays the page out again, and an open dialog replays how it opens: the picture caught
+  // it nearly transparent, with the page showing through. An open dialog stands still for the picture.
+  const capture = async (params) => {
+    await evaluate("for (const d of document.querySelectorAll('dialog[open]')) d.style.setProperty('animation', 'none', 'important');");
+    return Buffer.from((await s('Page.captureScreenshot', params)).data, 'base64');
+  };
   const shot = async (file) => {
     const { cssContentSize: c } = await s('Page.getLayoutMetrics');
-    const { data } = await s('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width: Math.ceil(c.width), height: Math.ceil(c.height), scale: 1 } });
-    writeFileSync(file, Buffer.from(data, 'base64'));
+    writeFileSync(file, await capture({ format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width: Math.ceil(c.width), height: Math.ceil(c.height), scale: 1 } }));
   };
   /** Runs a constant function source with plain JSON arguments: data never becomes code. */
   const call = async (fn, ...args) => {
@@ -89,6 +94,6 @@ export async function newPage(cdp, { width, scheme, height, scale = 1 }) {
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
     return r.result.value;
   };
-  return { evaluate, call, goto, shot, send: s, close: () => cdp.send('Target.closeTarget', { targetId }) };
+  return { evaluate, call, goto, shot, capture, send: s, close: () => cdp.send('Target.closeTarget', { targetId }) };
 }
 

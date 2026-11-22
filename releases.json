@@ -27,7 +27,7 @@
         },
         {
           "type": "fixed",
-          "text": "Model pickers show a model’s name (“Claude · Claude Sonnet 5.5”) where they showed its internal id, Modules no longer says “about 0 MB”, and the choices of the morning brief line up on the left."
+          "text": "Model pickers show a model’s name (“Claude · Claude Sonnet 5.5”) where they showed its internal id, Modules no longer says “about 0 MB”, the choices of the morning brief line up on the left, and in “Change with AI” a section’s name and what changed in it no longer run together."
         },
         {
           "type": "fixed",
