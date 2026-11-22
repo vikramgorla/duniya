@@ -1,6 +1,13 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.58.2": {
+      "breaking": false,
+      "title": "Credits found for more services",
+      "changes": [
+        { "type": "fixed", "text": "Credits now show in the panel for services whose credit sits between a title and a link (like KLIPY's), from the next GIF shared." }
+      ]
+    },
     "2.58.1": {
       "breaking": false,
       "title": "Clean GIF messages",

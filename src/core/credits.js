@@ -2,14 +2,15 @@
 // Credits of media services (2.58.1). A service whose results are media (GIFs, stickers, pictures) usually returns a
 // credit with each result ("<title> · Powered by …"). Messages carry none of it: the credit lives in the panel (the
 // service's card and Settings → Help → Credits), and links to media never reach the chat. Nothing here knows a service:
-// the credit is the part all results of one search have in common (the title differs per result), from the standard
-// fields attribution / credit / credits.
+// the credit is the longest run of words all results of one search share (the title and the link differ per result),
+// from the standard fields attribution / credit / credits.
 import { clip } from './config.js';
 import { kvGet, kvSet } from './db.js';
 
 const KEY = 'media-credits'; // { service: credit }
 const CREDIT_MAX = 120;
 const MIN_RESULTS = 2; // one result cannot tell its title from the credit
+const ANY_LINK = /https?:\/\/\S+/g;
 const MEDIA_LINK = /https?:\/\/[^\s)"'<>]+\.(?:mp4|gif|webp|png|jpe?g|webm|mov)(?:\?[^\s)"'<>]*)?/gi;
 const TRAILING = /[\s·•|—–-]+$/; // separators left at the end of a line
 const SEPARATORS_ONLY = /^[\s·•|:—–\-()[\]_*]+$/; // a line nothing is left of
@@ -22,19 +23,19 @@ const read = () => { try { return JSON.parse(kvGet(KEY) || '{}'); } catch { retu
 /** { service: credit } of the media services that gave one. */
 export const serviceCredits = () => read();
 
-/** The words every credit ends with (else the words they all start with), without separators at its ends. */
+/** The longest run of words every credit has (links taken out first: they differ per result), separators trimmed. */
 function commonPart(credits) {
-  const words = credits.map((c) => c.split(/\s+/));
-  const shared = (pick) => {
-    const out = [];
-    for (let i = 0; ; i++) {
-      const w = pick(words[0], i);
-      if (w === undefined || !words.every((ws) => pick(ws, i) === w)) return out;
-      out.push(w);
+  const words = credits.map((c) => c.replace(ANY_LINK, ' ').split(/\s+/).filter(Boolean));
+  const has = (ws, run) => ws.some((_, i) => run.every((w, k) => ws[i + k] === w));
+  let best = [];
+  const [first, ...rest] = words;
+  for (let i = 0; i < first.length; i++) {
+    for (let j = first.length; j > i + best.length; j--) {
+      const run = first.slice(i, j);
+      if (rest.every((ws) => has(ws, run))) { best = run; break; }
     }
-  };
-  const tail = shared((ws, i) => ws[ws.length - 1 - i]).reverse().join(' ').replace(EDGE, '');
-  return tail || shared((ws, i) => ws[i]).join(' ').replace(EDGE, '');
+  }
+  return best.join(' ').replace(EDGE, '');
 }
 
 /** Learn a service's credit from the results of one search (kept when it changes). */
