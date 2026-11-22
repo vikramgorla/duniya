@@ -1,18 +1,21 @@
 // A fake Telegram Bot API (077) for tests and the demo panel: a `fetch` replacement, no network. Every call is recorded
 // in `calls` ({ method, params }); `push(update)` delivers an update to the waiting getUpdates; `failNext(method, err)`
-// makes the next call of a method fail ({ error_code, description, retry_after }); `files` maps file ids to bytes.
+// makes the next call of a method fail ({ error_code, description, retry_after, migrate_to_chat_id }); `files` maps file
+// ids to bytes. `down = true`: Telegram cannot be reached; `stall(n)`: the next n long polls get no answer at all;
+// `polls` counts the long polls.
 // Groups live in `chats` (id → { title, type, admins: [user], members: [user ids], permissions, invite_link }).
 export const FAKE_TOKEN = '7000000001:AAFakeTokenForTestsOnly_abcdefghijklmnopq';
 
 export function fakeBotApi({ token = FAKE_TOKEN, me = {} } = {}) {
   const bot = { id: 7000000001, is_bot: true, first_name: 'Family helper', username: 'family_helper_bot', can_join_groups: true, can_read_all_group_messages: false, ...me };
-  const f = { calls: [], updates: [], chats: new Map(), files: new Map(), failures: [], bot, token };
+  const f = { calls: [], updates: [], chats: new Map(), files: new Map(), failures: [], bot, token, down: false, polls: 0, stalled: 0 };
   let nextUpdate = 1; let nextMsg = 100; let waiter = null;
   const ok = (result) => new Response(JSON.stringify({ ok: true, result }), { status: 200, headers: { 'content-type': 'application/json' } });
   const err = (e) => new Response(JSON.stringify({ ok: false, error_code: e.error_code || 400, description: e.description || 'Bad Request: fake failure',
-    ...(e.retry_after ? { parameters: { retry_after: e.retry_after } } : {}) }), { status: e.error_code || 400 });
+    ...(e.retry_after || e.migrate_to_chat_id ? { parameters: { retry_after: e.retry_after, migrate_to_chat_id: e.migrate_to_chat_id } } : {}) }), { status: e.error_code || 400 });
   f.push = (update) => { f.updates.push({ update_id: nextUpdate++, ...update }); waiter?.(); };
   f.failNext = (method, e, times = 1) => { for (let i = 0; i < times; i++) f.failures.push({ method, e }); };
+  f.stall = (times) => { f.stalled = times; waiter?.(); };
   f.sent = (method) => f.calls.filter((c) => c.method === method).map((c) => c.params);
   f.group = (id, g) => { f.chats.set(String(id), { type: 'supergroup', admins: [], members: [], permissions: { can_send_messages: true, can_change_info: true }, ...g }); };
   const message = (params, extra = {}) => ({ message_id: nextMsg++, date: Math.floor(Date.now() / 1000), chat: { id: Number(params.chat_id) }, from: bot, ...extra });
@@ -27,6 +30,7 @@ export function fakeBotApi({ token = FAKE_TOKEN, me = {} } = {}) {
   }
 
   f.fetch = async (url, init = {}) => {
+    if (f.down) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
     const u = new URL(String(url));
     const file = /^\/file\/bot([^/]+)\/(.+)$/.exec(u.pathname);
     if (file) {
@@ -37,7 +41,7 @@ export function fakeBotApi({ token = FAKE_TOKEN, me = {} } = {}) {
     if (!m) return new Response('not found', { status: 404 });
     const [, tok, method] = m;
     const params = await paramsOf(init);
-    if (method !== 'getUpdates') f.calls.push({ method, params });
+    if (method === 'getUpdates') f.polls++; else f.calls.push({ method, params });
     if (tok !== f.token) return err({ error_code: 401, description: 'Unauthorized' });
     const i = f.failures.findIndex((x) => x.method === method);
     if (i >= 0) return err(f.failures.splice(i, 1)[0].e);
@@ -46,6 +50,7 @@ export function fakeBotApi({ token = FAKE_TOKEN, me = {} } = {}) {
       case 'getMe': return ok(bot);
       case 'deleteWebhook': return ok(true);
       case 'getUpdates': {
+        if (f.stalled > 0) { f.stalled--; throw Object.assign(new Error('The operation timed out'), { name: 'TimeoutError' }); }
         const ready = () => f.updates.filter((x) => x.update_id >= (params.offset || 0));
         if (!ready().length) {
           await new Promise((resolve) => { // like Telegram: answers [] after `timeout` seconds without updates

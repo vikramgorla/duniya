@@ -23,10 +23,6 @@
  "src/channels/hub.js": {
   "max-lines-per-function": 1
  },
- "src/channels/telegram/index.js": {
-  "complexity": 3,
-  "max-lines-per-function": 1
- },
  "src/channels/whatsapp/session.js": {
   "complexity": 3,
   "max-lines-per-function": 1

@@ -70,12 +70,14 @@ The owner links the same way: share your number with the bot, and if that number
 
 | | |
 |---|---|
-| **Same as WhatsApp** | answers, wake words, follow-ups, quick replies, FAQ, welcome for new members, memory, notes, polls (votes are counted), reactions, photos and voice notes in (up to 20 MB), pictures, files and voice replies out, locations, contact cards, edit and delete their messages, spending caps |
+| **Same as WhatsApp** | answers, wake words, follow-ups, quick replies, FAQ, welcome for new members, memory, notes, polls (votes are counted), reactions, photos and voice notes in (up to 20 MB), pictures, GIFs (they play, also from a `.gif` file), files and voice replies out, locations, contact cards, edit and delete their messages, spending caps |
 | **Group tools** (bot is admin) | rename, description, picture, *only admins send*, *only admins edit info*, invite link (show, reset), leave |
 | **Not on Telegram** | adding or removing people by phone number, profiles, blocking, earlier messages (bots can't read history), member tags, *approve new members* |
 
 Telegram accepts only some reaction emoji: agents' ✅ becomes 👌, for example. Long answers are split into several
-messages. If Telegram makes a group a *supergroup* (its id changes), the chat keeps its agent, settings and memory.
+messages. If Telegram makes a group a *supergroup* (its id changes), the chat keeps its agent, settings, memory and
+the schedules that post to it, also when that happened while the server was off. A group the bot was removed from
+leaves **Chats** by itself.
 
 ## Settings → Channels → Telegram
 
@@ -90,6 +92,9 @@ messages. If Telegram makes a group a *supergroup* (its id changes), the chat ke
 
 If the page says *Another program is reading this bot's messages*, the same token runs on a second server: stop it
 or make a new token. A webhook left by another tool is removed automatically.
+
+If Telegram cannot be reached (at the start or later), the page says so and the server keeps trying by itself;
+**Activity** has a line when the connection broke and one when it was back.
 
 Admin MCP: `list_channels` (with the bot's name and privacy mode), `set_channel_enabled`, `set_secret`
 (`TELEGRAM_BOT_TOKEN`), `set_telegram_dm_agent`.

@@ -7,7 +7,7 @@ import pino from 'pino';
 import QRCode from 'qrcode';
 import { rmSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { DATA_DIR, digits, fail } from '../../core/config.js';
+import { DATA_DIR, digits, fail, within } from '../../core/config.js';
 import { activity, bus } from '../../core/events.js';
 import { loadMedia, MAX_MEDIA_BYTES } from '../../core/media.js';
 import { savePoll, getPoll, kvGet, kvSet } from '../../core/db.js';
@@ -27,6 +27,7 @@ const AUTH_DIR = resolve(DATA_DIR, 'whatsapp-auth');
 // How long one question to WhatsApp (group details, a profile, …) may wait for its answer. Baileys waits 60 s by
 // default, and a question about a chat that does not exist may never be answered.
 const QUERY_TIMEOUT = 20 * 1000; // ms
+const VERSION_WAIT = 10 * 1000; // ms: the version lookup before each connect
 /** 066: a number's state in Activity, in plain words (the pill already says WhatsApp). */
 const STATUS_WORDS = { open: 'Connected', qr: 'Waiting for the QR scan', reconnecting: 'Reconnecting', starting: 'Starting', logged_out: 'Unlinked from the phone', closed: 'Disconnected' };
 // Media kinds whose words are a caption (the message is the media; its text is shown as "what it is").
@@ -89,7 +90,8 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
   async function open() {
     stopping = false;
     const { state: auth, saveCreds } = await authState(AUTH);
-    const { version } = await fetchVersion().catch(() => ({ version: undefined }));
+    // The WhatsApp Web version comes from the web; without an answer in time the socket opens with the built-in one.
+    const { version } = await within(fetchVersion(), VERSION_WAIT, 'The WhatsApp version lookup').catch(() => ({ version: undefined }));
     sock = makeSocket({
       auth, version, logger,
       browser: Browsers.ubuntu('Duniya'),

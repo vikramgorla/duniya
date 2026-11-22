@@ -1,6 +1,36 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.58.18": {
+      "breaking": false,
+      "title": "Telegram: a sturdier connection, groups that move or leave, paragraphs and GIFs",
+      "changes": [
+        {
+          "type": "improved",
+          "text": "Telegram: if Telegram cannot be reached when the server starts, it keeps trying by itself. Activity says when the connection broke and when it was back."
+        },
+        {
+          "type": "fixed",
+          "text": "Telegram: a group that became a supergroup while the server was off keeps its agent, settings and memory. Schedules limited to a chat follow it when its id changes."
+        },
+        {
+          "type": "fixed",
+          "text": "Telegram: a group the bot was removed from while the server was off leaves Chats, and one group that does not answer no longer holds up the others."
+        },
+        {
+          "type": "fixed",
+          "text": "Telegram: messages keep their paragraphs, and names in a welcome are linked at the right place."
+        },
+        {
+          "type": "improved",
+          "text": "Telegram: GIFs play (a .gif file was sent as a still picture)."
+        },
+        {
+          "type": "improved",
+          "text": "WhatsApp: connecting no longer waits long for a version lookup on the web."
+        }
+      ]
+    },
     "2.58.17": {
       "breaking": false,
       "title": "Tidier inside: model fallback and WhatsApp messages",

@@ -170,9 +170,11 @@ test('077: photos are downloaded through getFile (refused above the limit); a gr
   await assert.rejects(hub.downloadMedia(chat(-100500), 'PHOTO1', 30 * 1048576), (e) => e.status === 413);
 
   const notes = t.db.listMessages(chat(-100500), {}).length;
+  await t.agents.updateAgent('panduga', { schedules: [{ id: 'book', at: '09:00', days: 'mon', prompt: 'What are we reading?', chats: [chat(-100500)] }] }, 'test');
   fake.push({ message: { message_id: 1, date: 1, from: ANU, chat: { id: -100500, type: 'group', title: 'Book club' }, migrate_to_chat_id: -1009999 } });
   assert.ok(await until(() => t.agents.getAgent('panduga').chats.includes(chat(-1009999))));
   assert.ok(!t.agents.getAgent('panduga').chats.includes(chat(-100500)));
+  assert.deepEqual(t.agents.getAgent('panduga').schedules[0].chats, [chat(-1009999)], 'a schedule limited to this chat follows it');
   assert.equal(t.chatPrefs.isChatEnabled(chat(-1009999)), true, 'still on');
   assert.equal(t.db.listMessages(chat(-1009999), {}).length, notes, 'memory moved');
 });
@@ -210,4 +212,96 @@ test('087: an edited Telegram message updates the stored copy (marked edited); t
   assert.ok(t.db.editsOf([id]).has(id), 'marked edited');
   await hub.editMessage(c, '77', 'fixed text');
   assert.equal(fake.sent('editMessageText').at(-1).text, 'fixed text');
+});
+
+// ---- 2.58.18: what the audit of the adapter found ----
+const SUPER = -1009999; // the supergroup of the tests above (on, bound to an agent)
+const addedTo = (id, title) => {
+  fake.group(id, { title });
+  fake.push({ my_chat_member: { chat: { id, type: 'supergroup', title }, old_chat_member: { status: 'left' }, new_chat_member: { status: 'member' } } });
+  return until(async () => (await hub.listChats()).some((c) => c.id === chat(id)));
+};
+
+test('Telegram: a message keeps its paragraphs; only the bot\'s own @handle is cut out', async () => {
+  t.script.push([{ type: 'text', text: 'Noted.' }]);
+  const sends = fake.sent('sendMessage').length;
+  fake.say(RAVI, SUPER, 'hello @family_helper_bot two things:\n\n1. bring  chairs\n2. bring tea', { entities: [{ type: 'mention', offset: 6, length: 18 }] });
+  assert.ok(await until(() => fake.sent('sendMessage').length > sends));
+  assert.ok(t.db.listMessages(chat(SUPER), {}).some((m) => m.text === 'hello two things:\n\n1. bring  chairs\n2. bring tea'), 'as written, without the handle');
+});
+
+test('Telegram: a welcome links each name where it stands, also after bold text', async () => {
+  await hub.send(chat(SUPER), '*Welcome* @502 and @503!', { mentions: ['502', '503'] });
+  const m = fake.sent('sendMessage').at(-1);
+  assert.equal(m.text, 'Welcome Ravi and Zoe!');
+  assert.deepEqual(m.entities, [{ type: 'bold', offset: 0, length: 7 },
+    { type: 'text_mention', offset: 8, length: 4, user: { id: 502 } }, { type: 'text_mention', offset: 17, length: 3, user: { id: 503 } }]);
+});
+
+test('Telegram: a GIF goes out as an animation, so it plays', async () => {
+  const r = await hub.sendMedia(chat(SUPER), { kind: 'gif', base64: 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', mimetype: 'image/gif' });
+  assert.equal(fake.calls.at(-1).method, 'sendAnimation');
+  assert.ok(r.msgId && !r.asStill);
+});
+
+test('Telegram: upkeep gives every group its turn; a group the bot was removed from while the server was off leaves Chats', async () => {
+  while ((await hub.upkeep()).ok) { /* every group known so far is fresh */ }
+  assert.ok(await addedTo(-100701, 'Hikers') && await addedTo(-100702, 'Cooks'));
+  fake.failNext('getChat', { error_code: 500, description: 'Internal Server Error' });
+  const n = fake.calls.length;
+  assert.equal((await hub.upkeep()).ok, true);
+  assert.equal((await hub.upkeep()).ok, true);
+  const asked = fake.calls.slice(n).filter((c) => c.method === 'getChat').map((c) => c.params.chat_id);
+  assert.deepEqual([...asked].sort(), ['-100701', '-100702'], 'the group Telegram did not answer for waits; the other one is asked next');
+  assert.equal((await hub.upkeep()).ok, false, 'and it is not asked again at every tick');
+
+  assert.ok(await addedTo(-100703, 'Movers'));
+  fake.failNext('getChat', { error_code: 403, description: 'Forbidden: bot was kicked from the supergroup chat' });
+  await hub.upkeep();
+  assert.ok(!(await hub.listChats()).some((c) => c.id === chat(-100703)), 'gone from Chats');
+  assert.ok(t.db.listActivity({ chat: chat(-100703) }).some((a) => /The Telegram bot left “Movers”/.test(a.summary)));
+});
+
+test('Telegram: a group that became a supergroup while the server was off is followed at the next send', async () => {
+  assert.ok(await addedTo(-100704, 'Runners'));
+  await t.agents.bindChat(chat(-100704), 'panduga');
+  t.chatPrefs.setChatPrefs(chat(-100704), { enabled: true });
+  fake.failNext('sendMessage', { error_code: 400, description: 'Bad Request: group chat was upgraded to a supergroup chat', migrate_to_chat_id: -1007040 });
+  const n = fake.calls.length;
+  assert.ok((await hub.send(chat(-100704), 'Run at 7')).msgId);
+  assert.deepEqual(fake.calls.slice(n).filter((c) => c.method === 'sendMessage').map((c) => c.params.chat_id), ['-100704', '-1007040'], 'sent to the group\'s new id');
+  assert.ok(await until(() => t.agents.getAgent('panduga').chats.includes(chat(-1007040))), 'its agent moved with it');
+  assert.equal(t.chatPrefs.isChatEnabled(chat(-1007040)), true, 'still on');
+  await hub.send(chat(-100704), 'again');
+  assert.equal(fake.sent('sendMessage').at(-1).chat_id, '-1007040', 'a send that still names the old id goes straight to the new one');
+});
+
+test('Telegram: unreachable at the start is tried again; a webhook that stays and silent long polls show in the status, without a busy loop', async () => {
+  const { createTelegramAdapter } = await import('../src/channels/telegram/index.js');
+  const f = fakeBotApi();
+  const bot = createTelegramAdapter({ fetch: f.fetch, token: () => FAKE_TOKEN, api: 'https://api.telegram.test' });
+  const state = async () => (await bot.status());
+  f.down = true;
+  await bot.start({ onMessage: async () => {} });
+  assert.equal((await state()).status, 'error');
+  assert.match((await state()).lastError, /could not be reached/);
+  f.down = false;
+  assert.ok(await until(async () => (await state()).status === 'open', 6000), 'connects by itself once Telegram answers');
+  assert.equal((await state()).info.username, 'family_helper_bot');
+  const lines = t.db.listActivity({}).map((a) => a.summary);
+  assert.ok(lines.some((x) => /^Telegram connection: Telegram could not be reached/.test(x)) && lines.includes('Telegram is connected again'), 'Activity says when it broke and when it was back');
+
+  f.failNext('getUpdates', { error_code: 409, description: 'Conflict: can\'t use getUpdates method while webhook is active; use deleteWebhook to delete the webhook first' });
+  f.failNext('deleteWebhook', { error_code: 500, description: 'Internal Server Error' });
+  const polls = f.polls;
+  f.stall(0); // the waiting long poll ends; the next one meets the webhook
+  assert.ok(await until(async () => /webhook could not be removed/.test((await state()).lastError)));
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(f.polls - polls <= 2, `waits before it asks again (${f.polls - polls} long polls)`);
+  assert.ok(await until(async () => (await state()).status === 'open', 6000), 'and takes the bot back at the next try');
+
+  f.stall(3);
+  assert.ok(await until(async () => /has not answered/.test((await state()).lastError), 3000), 'three long polls in a row without any answer');
+  assert.ok(await until(async () => (await state()).status === 'open', 6000));
+  await bot.stop();
 });
