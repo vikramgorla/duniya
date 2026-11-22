@@ -7,11 +7,11 @@
 import { db, logMessage } from './db.js';
 import { digits, bad } from './config.js';
 import { TENANT, getSetting } from './store.js';
-import { getAgent, bindChat, agentForChat } from './agents.js';
+import { getAgent, bindChat, agentForChat, listAgents } from './agents.js';
 import { mergeChats } from './chat-merge.js';
 import { getChatPrefs, setChatPrefs, seenChats } from './chat-prefs.js';
 import { setCap } from './budget.js';
-import { personInfo } from './contacts.js';
+import { lidPhone, personInfo } from './contacts.js';
 import { activity } from './events.js';
 import { dmNoticeOnce, dmNoticePending } from './privacy-notice.js';
 import { putTtl, takeTtl } from './ttl-store.js';
@@ -78,13 +78,16 @@ function addAlias(alias, chat) {
 
 export const isChatAlias = (chat) => load().aliases.has(chat);
 
+/** The phone-form id of a direct chat WhatsApp delivers from a LID ('' for other chats, or without a phone). */
+function phoneFormOf(chat, phone) {
+  const { number, jid } = splitChat(chat);
+  const p = digits(phone);
+  return isLidJid(jid) && p ? chatKey(number, pnJid(p)) : '';
+}
 /** The phone-form chat of a direct message from a LID, when it has settings, an agent or a prepared entry: '' else. */
 function phoneTwin(msg) {
-  const { number, jid } = splitChat(msg.chat);
-  const phone = digits(msg.phone);
-  if (!isLidJid(jid) || !phone) return '';
-  const twin = chatKey(number, pnJid(phone));
-  return twin !== msg.chat && (load().prepared.has(twin) || hasOwnEntry(twin)) ? twin : '';
+  const twin = phoneFormOf(msg.chat, msg.phone);
+  return twin && (load().prepared.has(twin) || hasOwnEntry(twin)) ? twin : '';
 }
 
 /** The phone-form chat joins the LID chat WhatsApp uses: settings, agent, cap and memory; the prepared entry moves too. */
@@ -93,6 +96,29 @@ async function adoptTwin(twin, chat, phone) {
   db.prepare('UPDATE OR REPLACE direct_chats SET chat = ?, lid = ? WHERE tenant_id = ? AND chat = ?').run(chat, splitChat(chat).jid, TENANT, twin);
   reload();
   addAlias(twin, chat);
+}
+
+/** Phone-form direct chats that were set up: prepared, with settings, or with an agent. Empty once each joined its LID chat. */
+function setUpPhoneChats() {
+  const chats = [...load().prepared.keys(), ...db.prepare('SELECT chat FROM chat_prefs WHERE tenant_id = ?').all(TENANT).map((r) => r.chat), ...listAgents().flatMap((a) => a.chats)];
+  return new Set(chats.filter((c) => isDirect(c) && !isLidJid(splitChat(c).jid)));
+}
+/**
+ * A twin the server already knows about joins without waiting for the person's next message: a chat WhatsApp delivers
+ * from a LID whose phone-form chat was set up (the owner marked that one private, or gave it an agent). One pair per
+ * call (upkeep.js); returns the chat that stays, '' when there is none.
+ */
+export async function adoptKnownTwin() {
+  const waiting = setUpPhoneChats();
+  if (!waiting.size) return '';
+  for (const c of seenChats({ groups: false })) {
+    const phone = c.phone || lidPhone(splitChat(c.id).jid);
+    const twin = phoneFormOf(c.id, phone);
+    if (!waiting.has(twin)) continue;
+    await adoptTwin(twin, c.id, digits(phone));
+    return c.id;
+  }
+  return '';
 }
 
 /** The first message of a prepared chat: noted once (the panel stops showing it as waiting). */

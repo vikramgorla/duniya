@@ -210,6 +210,18 @@ test('044: Ask box API — sign-in required, history, long answers chunked for W
   assert.ok(sentTo(ownerDm).length - before >= 2, 'sent in several messages');
 });
 
+test('a question that needs more steps than one turn takes ends in plain words, after what the assistant had written', async () => {
+  const look = (i, text) => [...(text ? [{ type: 'text', text }] : []), { type: 'tool_use', id: `more${i}`, name: 'list_agents', input: {} }];
+  const rounds = ownerReqs().length;
+  for (let i = 0; i < 9; i++) t.script.push(look(i, i === 8 ? 'Two agents are on.' : ''));
+  const r = (await t.api(admin, 'POST', '/api/owner/ask', { question: 'check every agent, one by one' })).body;
+  assert.equal(ownerReqs().length - rounds, 9, 'nine rounds, then it stops asking the model');
+  assert.match(r.reply, /^Two agents are on\.\n\nI stopped here: this needs more steps than I take for one question\. What I did so far stands\./);
+  for (let i = 0; i < 9; i++) t.script.push(look(`b${i}`, ''));
+  const silent = (await t.api(admin, 'POST', '/api/owner/ask', { question: 'and again' })).body;
+  assert.match(silent.reply, /^I stopped here: this needs more steps/, 'never "I have no answer for that" after nine rounds of work');
+});
+
 test('044: privacy notice — posted once when a group is switched on; text change, 90 days, opt-out, DMs and off chats', async () => {
   const g = 'g5@g.us';
   const enc = encodeURIComponent;

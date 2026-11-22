@@ -44,6 +44,7 @@ const ROLE_RANK = { viewer: 1, admin: 2, owner: 3 };
 const LINK_TTL = 10 * 60000;
 const CONFIRM_TTL = 10 * 60000;
 const MAX_ROUNDS = 8;
+const OUT_OF_ROUNDS = 'I stopped here: this needs more steps than I take for one question. What I did so far stands. Ask me for the part that is still missing.';
 const CHUNK = 3000;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 // 060: secret values never pass through the assistant. Admin tools take no keys, passwords or passphrases (keys are
@@ -500,7 +501,7 @@ async function startTurn({ user, question, source, surface, onEvent, dm, signal 
   messages.push({ role: 'user', content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText });
   const t = { user, source, surface, dm, signal, emit, rec, plan, turnText, messages, model: plan.model, byName: new Map(tools.map((x) => [x.name, x])), defs: tools.map(toolDef),
     vision: plan.attachments.length ? visionCallOptions() : null, fallback: effectiveFallback({ agent: rec }), turn: { ref: '' },
-    held: [], links: [], reply: '', stopped: false,
+    held: [], links: [], reply: '', stopped: false, outOfRounds: false,
     partial: '', // 066: what was streamed in this round, kept when the asker presses Stop
     streaming: {} };
   // 047 (#83): with a stream listener, the model's text arrives token by token ({ type: 'delta', text }); when a stream
@@ -588,11 +589,13 @@ async function runRounds(t) {
     }
     t.messages.push({ role: 'user', content: results });
   }
+  t.outOfRounds = true;
 }
 
 /** The reply as the user gets it: the model's words, links its tools gave, and on WhatsApp the changes that wait for a confirm. */
 function finalReply(t) {
-  let reply = t.stopped ? `${t.reply ? `${t.reply}\n\n` : ''}(Stopped.)` : t.reply;
+  const cut = t.stopped ? '(Stopped.)' : t.outOfRounds ? OUT_OF_ROUNDS : '';
+  let reply = cut ? `${t.reply ? `${t.reply}\n\n` : ''}${cut}` : t.reply;
   reply = reply || (t.held.length ? 'Here is what I prepared:' : 'I have no answer for that.');
   for (const l of t.links) if (!reply.includes(l)) reply += `\n\n${l}`;
   if (t.source === 'panel') return reply;
