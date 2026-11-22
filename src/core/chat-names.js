@@ -16,7 +16,9 @@ const getSeen = db.prepare('SELECT name, phone FROM chats_seen WHERE tenant_id =
 const putName = db.prepare(`INSERT INTO chats_seen (tenant_id, chat, is_group, name) VALUES (?, ?, 1, ?)
   ON CONFLICT(tenant_id, chat) DO UPDATE SET name = excluded.name WHERE COALESCE(chats_seen.name, '') <> excluded.name`);
 const subjects = new Map(); // group → subject, so a known name costs no query
-const asked = new Map(); // group → when WhatsApp was last asked without an answer (asked again after 10 minutes)
+const asked = new Map(); // group → when WhatsApp was last asked without an answer
+const ASK_AGAIN = 10 * 60 * 1000; // ms before a group that did not answer is asked again
+const NAME_WAIT = 1500; // ms a list waits for names WhatsApp has not told us yet
 
 /** Remember group subjects WhatsApp told us ([{ id, name }]); the channel registry calls this for every lookup. */
 export function rememberGroupNames(list) {
@@ -43,19 +45,19 @@ export function chatLabel(id) {
 }
 
 /**
- * Names for many chats: groups not known yet are asked from WhatsApp once (then remembered; a group that does not
- * answer is asked again after 10 minutes at the earliest). Returns a Map id → name.
+ * Names for many chats. Groups not known yet are asked all at once and waited for at most NAME_WAIT; slower answers
+ * are remembered when they come, for the next load. Waiting for each in turn held the panel's Activity list for up to a
+ * minute per group that never answers (WhatsApp's query timeout). A group that did not answer is asked again after
+ * ASK_AGAIN at the earliest. Returns a Map id → name.
  */
 export async function chatLabels(ids, channel) {
-  const out = new Map();
-  for (const id of new Set([...(ids || [])].filter(Boolean).map(String))) {
-    if (isGroup(id) && chatLabel(id) === UNNAMED_GROUP && channel?.chatName && Date.now() - (asked.get(id) || 0) > 600000) {
-      asked.set(id, Date.now());
-      rememberGroupNames([{ id, name: await channel.chatName(id).catch(() => '') }]);
-    }
-    out.set(id, chatLabel(id));
+  const list = [...new Set([...(ids || [])].filter(Boolean).map(String))];
+  const ask = list.filter((id) => isGroup(id) && chatLabel(id) === UNNAMED_GROUP && channel?.chatName && Date.now() - (asked.get(id) || 0) > ASK_AGAIN);
+  if (ask.length) {
+    const answers = ask.map((id) => { asked.set(id, Date.now()); return channel.chatName(id).then((name) => rememberGroupNames([{ id, name }]), () => {}); });
+    await Promise.race([Promise.all(answers), new Promise((r) => setTimeout(r, NAME_WAIT).unref?.())]);
   }
-  return out;
+  return new Map(list.map((id) => [id, chatLabel(id)]));
 }
 
 /** Adds `chatName` to rows that have a `chat` (activity entries, silences, pending changes, usage rows…). */

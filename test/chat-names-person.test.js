@@ -40,6 +40,21 @@ test('073: a group only WhatsApp knows is named once, remembered, and never show
   assert.equal(rows.find((r) => r.chat === GROUP).chatName, 'Morges rides');
 });
 
+test('a group WhatsApp never answers for does not hold the Activity list; its name shows once it comes', async () => {
+  const SLOW = '120363000000000777@g.us';
+  const orig = t.channel.chatName;
+  let answer;
+  t.channel.chatName = (chat) => (chat === SLOW ? new Promise((r) => { answer = r; }) : orig(chat));
+  t.events.activity('config', { chat: SLOW, summary: 'a group with no name yet' });
+  const started = Date.now();
+  const first = (await t.api(owner, 'GET', `/api/activity?chat=${encodeURIComponent(SLOW)}`)).body[0];
+  assert.ok(Date.now() - started < 3000, 'answered without waiting for WhatsApp');
+  assert.equal(first.chatName, 'Unnamed group');
+  answer('Slow group'); await new Promise((r) => setImmediate(r));
+  assert.equal((await t.api(owner, 'GET', `/api/activity?chat=${encodeURIComponent(SLOW)}`)).body[0].chatName, 'Slow group', 'the late answer is remembered');
+  t.channel.chatName = orig;
+});
+
 test('073: activity (API and live stream), pending changes and usage by chat carry the chat name', async () => {
   t.events.activity('config', { chat: GROUP, summary: 'something about the group' });
   const a = (await t.api(owner, 'GET', `/api/activity?chat=${encodeURIComponent(GROUP)}`)).body[0];
