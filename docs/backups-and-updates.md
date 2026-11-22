@@ -96,6 +96,24 @@ loads the new version by itself at your next tap; nothing to refresh.
 
 </details>
 
+### A release that does not start
+
+On installer servers an update is watched while it starts. If the new release cannot start on your server (three
+tries in a row, each ending before it has run for a minute), the server puts the previous release back by itself and
+runs it again. Nothing for you to do, and no terminal.
+
+- You are told once, in plain words: **Activity**, the owner alert on WhatsApp, **Settings → Updates** and
+  `sudo duniya status`: which version did not start and which one runs again.
+- Your data is left as it is. The backup made before the update is named in the message.
+- *Install automatically* does not install that version again. The next release is installed as usual, and **Update**
+  still installs it when you choose so.
+
+> [!NOTE]
+> Docker installs are not watched: the image you run is your choice (`docker compose pull` / an older tag). The first
+> update that is watched is the one after v2.59.0.
+
+Admin MCP: `get_update_status` → `rolledBack`.
+
 ### Breaking releases need your decision
 
 A jump is *breaking* when the major version grows or a release in between is marked breaking in `releases.json`

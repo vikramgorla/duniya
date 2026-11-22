@@ -2,15 +2,17 @@
 // Updates (008, 045): check the git remote for new releases (tags) or main, apply via deploy/update.sh, optional auto
 // mode. 045: releases.json (read from the target with git) marks breaking releases; the status says what lies between
 // the installed and the available version and which release can be reached safely. Before every update a local backup
-// is made when a backup passphrase is set (the last N pre-update backups are kept).
+// is made when a backup passphrase is set (the last N pre-update backups are kept). 095: an installed update leaves a
+// note for the start guard (update-guard.js); a release that did not start and was rolled back is told here.
 import { execFile, spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { APP_VERSION, REPO, ROOT, bad, fail } from './config.js';
+import { APP_VERSION, DATA_DIR, REPO, ROOT, bad, fail } from './config.js';
 import { parseRepo, repoLinks, sameRepo } from './repo.js';
 import { getSetting, updateSettings, getSecret } from './store.js';
 import { kvGet, kvSet } from './db.js';
-import { activity } from './events.js';
+import { activity, recordFailure } from './events.js';
+import { GUARDED_INSTALL, noteUpdate, takeRollbackResult } from './update-guard.js';
 import { parseVersion, compareVersions, analyzeJump, readReleasesAt, normalizeReleases, releaseRange } from './releases.js';
 import { runBackup } from './backup/index.js';
 
@@ -201,8 +203,10 @@ export function applyUpdate({ root = appRoot, target, backup = true, by = '' } =
       }
     }
     state.phase = 'install';
+    const before = own ? await installedAt(root) : null;
     const r = await runUpdate({ root, target });
     if (own) {
+      if (r.code === 0) await noteInstalled({ root, target, before, backup: made?.file || null }).catch(recordFailure('The note for the start guard (the update is installed, but not guarded)'));
       saveResult({ ok: r.code === 0, target, log: r.log, backup: made?.file || null });
       activity(r.code === 0 ? 'system' : 'error', { summary: r.code === 0 ? `Updated to ${target || 'latest'}${made ? ` (backup ${made.file} first)` : ''}${by ? ` by ${by}` : ''}` : 'Update failed (previous version kept)', detail: r.log.slice(-2000) });
     }
@@ -210,6 +214,56 @@ export function applyUpdate({ root = appRoot, target, backup = true, by = '' } =
   })().finally(() => { if (own) inflight = null; });
   if (own) inflight = Object.assign(state, { promise });
   return promise;
+}
+
+// ---------------------------------------------------------------- the start guard (095)
+const lockOf = (root) => { try { return readFileSync(resolve(root, 'package-lock.json'), 'utf8'); } catch { return ''; /* no lockfile: nothing to install */ } };
+const versionAt = (root) => { try { return `v${JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).version}`; } catch { return ''; /* shown as "the new release" */ } };
+/** The commit and lockfile of a checkout (before an update); null when it cannot be told. */
+const installedAt = async (root) => { const commit = await git(['rev-parse', 'HEAD'], root).catch(() => ''); return commit ? { commit, lock: lockOf(root) } : null; };
+
+/** An update was installed: what the start guard needs to put the previous release back. Nothing when the code is the same. */
+async function noteInstalled({ root, target, before, backup }) {
+  if (installKind() !== GUARDED_INSTALL || !before) return;
+  const commit = await git(['rev-parse', 'HEAD'], root);
+  if (commit === before.commit) return; // already up to date
+  noteUpdate(DATA_DIR, { from: before.commit, fromVersion: runningVersion(), to: versionAt(root), target: target || 'latest', commit, deps: lockOf(root) !== before.lock, backup });
+}
+
+const savedRollback = () => { try { return JSON.parse(kvGet('updates:rolledBack') || 'null'); } catch { return null; /* unreadable: as if nothing was rolled back */ } };
+/**
+ * The rollback to show: the last one, while the server runs the version it was rolled back to (or, when putting it
+ * back failed, the version that did not start). { ok, error, from, to, target, commit, backup, starts, at, alerted }.
+ */
+export function rolledBack() {
+  const r = savedRollback();
+  if (!r) return null;
+  const running = runningVersion();
+  return r.to === running || (!r.ok && r.from === running) ? r : null;
+}
+/** What happened, in plain words (Activity, the owner alert, the WhatsApp answer to a confirmed update). */
+export function rollbackText(r) {
+  const tries = `${r.starts} ${r.starts === 1 ? 'try' : 'tries'}`;
+  if (!r.ok) return `The update to ${r.from} did not start on this server (${tries}), and putting ${r.to} back failed: ${r.error || 'unknown reason'}. Check the server: sudo duniya logs.`;
+  return `The update to ${r.from} did not start on this server (${tries}) and was rolled back: ${r.to} is running again. Your data was left as it is.`
+    + `${r.backup ? ` The backup made before the update is ${r.backup}.` : ''} Automatic updates will not install ${r.from} again; a newer release will be installed, and you can still choose Update.`;
+}
+/** At the start: a rollback the guard made is taken into the status and Activity; an old notice is cleared once another version runs. */
+export function takeRollback() {
+  const r = takeRollbackResult(DATA_DIR);
+  if (r) {
+    kvSet('updates:rolledBack', JSON.stringify({ ...r, alerted: false }));
+    activity('error', { summary: rollbackText(r) });
+  } else if (savedRollback() && !rolledBack()) kvSet('updates:rolledBack', 'null');
+  return r;
+}
+/** The owner was told (or cannot be): the alert is not sent again. */
+export function rollbackTold() { const r = savedRollback(); if (r) kvSet('updates:rolledBack', JSON.stringify({ ...r, alerted: true })); }
+/** Is `target` the release that did not start here and was rolled back (a tag; on main, the commit)? */
+export function isRolledBack(target, st) {
+  const r = rolledBack();
+  if (!r?.ok) return false;
+  return st.channel === 'main' ? !!st.latest && String(r.commit).startsWith(st.latest) : target === r.target;
 }
 
 function saveResult({ ok, target, log, backup }) {

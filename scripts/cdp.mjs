@@ -38,6 +38,8 @@ function stopChrome(proc, profile) {
 }
 export async function launch() {
   const { proc, profile, text } = await startChrome();
+  // Stopped from outside (Ctrl-C, a timeout): Chrome is a process group of its own and would stay behind with its profile.
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(sig, () => { stopChrome(proc, profile); process.exit(1); });
   const [port, path] = text.trim().split('\n');
   // Only a local DevTools endpoint written by the Chrome we just started.
   if (!/^\d{2,5}$/.test(port) || !/^\/devtools\/browser\/[A-Za-z0-9-]+$/.test(path)) throw new Error('Unexpected DevToolsActivePort content');

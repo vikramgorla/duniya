@@ -111,7 +111,7 @@ const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assis
  *  the last update with its backup, the settings and Restart service are only here. */
 function updatesPage() { const box = h('div', {}); renderUpdates(box, { page: updatesCard }); return box; }
 function updatesCard(u, { line, check, reviewBtn, updateBtn, docker }) {
-  const st = u.status || {}; const d = u.decision; const lr = st.lastResult;
+  const st = u.status || {}; const d = u.decision; const lr = st.lastResult; const rb = u.rolledBack;
   const mode = h('select', {}, ['notify', 'auto', 'off'].map((m) => h('option', { value: m, selected: u.settings.mode === m }, { notify: 'Notify me', auto: 'Install automatically', off: 'Off' }[m])));
   const channel = h('select', {}, ['stable', 'main'].map((m) => h('option', { value: m, selected: u.settings.channel === m }, m === 'stable' ? 'Stable releases' : 'Latest (main)')));
   const at = h('input', { type: 'time', value: u.settings.at, step: 60 });
@@ -125,7 +125,8 @@ function updatesCard(u, { line, check, reviewBtn, updateBtn, docker }) {
   return h('div', { class: 'card' }, h('h2', {}, 'Updates'),
     docker ? h('div', { class: 'note' }, 'Docker install: update with  docker compose pull && docker compose up -d') : null,
     h('div', { class: 'upd-main' }, line, notes),
-    lr ? h('p', { class: 'small muted' }, lr.ok ? `Last update: ${lr.from ? `${lr.from} → ` : ''}${lr.target} on ${time(lr.at)}${lr.backup ? ` · backup ${lr.backup}` : ''}` : `Last update failed on ${time(lr.at)}; the previous version kept running.`) : null,
+    rb ? h('div', { class: 'note bad' }, h('b', {}, rb.ok ? 'Rolled back. ' : 'Not rolled back. '), rb.text, ` (${time(rb.at)})`) // 095: instead of "Last update", which it undid
+      : lr ? h('p', { class: 'small muted' }, lr.ok ? `Last update: ${lr.from ? `${lr.from} → ` : ''}${lr.target} on ${time(lr.at)}${lr.backup ? ` · backup ${lr.backup}` : ''}` : `Last update failed on ${time(lr.at)}; the previous version kept running.`) : null,
     h('div', { class: 'row', style: 'margin-top:8px' }, reviewBtn, updateBtn, h('button', { class: 'btn small', onclick: check }, 'Check now'), h('a', { class: 'btn small ghost', href: '#settings/release-notes' }, 'Release notes')),
     h('div', { class: 'sblock' }, h('h3', {}, 'Settings'),
       h('div', { class: 'grid2' }, field('New versions', mode, 'Breaking releases always wait for your OK.'), field('Releases', channel), field('Install at', at), field('Backups before an update, keep', keep)),

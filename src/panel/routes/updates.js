@@ -1,19 +1,25 @@
 // @ts-check
 // Panel routes for updates (008, 045; owner only) and the installed release notes (065; everyone signed in).
 import { recordFailure } from '../../core/events.js';
-import { getUpdateSettings, setUpdateSettings, updateStatus, checkForUpdate, applyUpdate, installKind, updateRunning, backupConfigured, installedReleases, runningVersion, markSeen, updateSource, setUpdateSource } from '../../core/updates.js';
+import { getUpdateSettings, setUpdateSettings, updateStatus, checkForUpdate, applyUpdate, installKind, updateRunning, backupConfigured, installedReleases, runningVersion, markSeen, updateSource, setUpdateSource, rolledBack, rollbackText } from '../../core/updates.js';
 import { restartSoon } from '../../core/config.js';
 import { releaseRange } from '../../core/releases.js';
 import { pendingDecision, snoozeDecision, runConfirmedUpdate, setUpdateRestart } from '../../core/update-decision.js';
 
 const OWNER = { role: 'owner' };
+/** 095: what the panel and the admin MCP show about a rollback: { ok, from, to, at, backup, text } or null. */
+function rollbackNotice() {
+  const r = rolledBack();
+  return r ? { ok: !!r.ok, from: r.from, to: r.to, at: r.at, backup: r.backup || null, text: rollbackText(r) } : null;
+}
 
 export function updateRoutes(route, { restart = () => restartSoon(500) } = {}) {
   setUpdateRestart(restart);
   route('GET', '/api/updates', async () => {
     const install = installKind();
     return { settings: getUpdateSettings(), status: updateStatus(), install, running: updateRunning(), decision: pendingDecision(), backup: backupConfigured(),
-      source: install === 'docker' ? null : await updateSource() }; // 084: where updates come from
+      source: install === 'docker' ? null : await updateSource(), // 084: where updates come from
+      rolledBack: rollbackNotice() }; // 095: a release that did not start here and was put back
   }, OWNER);
   // 084: switch the update source (owner/name or a GitHub https URL); fetched first, put back when that fails
   route('PUT', '/api/updates/source', async ({ body, user }) => {

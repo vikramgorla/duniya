@@ -197,6 +197,8 @@ const commands = {
     line('Service', !rt ? yellow('not seen yet (is it running? try: duniya restart)')
       : rt.running ? green(`running · up ${ago(Date.now() - rt.startedAt)} · pid ${rt.pid} · ${rt.rssMb} MB`) : red(`not running · last seen ${ago(Date.now() - rt.at)} ago`));
     line('Address', process.env.PUBLIC_URL || dim('only on this machine (http://127.0.0.1:8080)'));
+    const undone = (await import('../src/core/updates.js')).rolledBack(); // 095
+    if (undone) line('Update', red(undone.ok ? `${undone.from} did not start here and was rolled back to ${undone.to}` : `${undone.from} did not start here; putting ${undone.to} back failed`));
     const nums = rt?.numbers || [];
     if (!nums.length) line('WhatsApp', dim('no numbers yet'));
     nums.forEach((n, i) => line(i ? '' : 'WhatsApp', `${n.label}: ${n.status === 'open' ? green(`connected${n.me ? ` as +${n.me}` : ''}`) : yellow(n.status === 'qr' ? 'waiting for the QR scan / pairing code' : n.status)}${rt.running ? '' : dim(' (last known)')}`));
