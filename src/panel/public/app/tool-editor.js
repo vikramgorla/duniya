@@ -39,7 +39,7 @@ const behaviourLine = (b, media) => [label(WHEN, b.when || 'useful'), b.changes 
  * state: the fields this level sets (a service's default, or an agent's override); `dflt`: what applies without one
  * (an agent: the service's default) — then every choice starts with "Default (…)". onChange after each edit.
  */
-export function behaviourEditor(state, { dflt = null, media = '', onChange = () => {}, open = false, onToggle = null } = {}) {
+export function behaviourEditor(state, { dflt = null, media = '', shared = null, onChange = () => {}, open = false, onToggle = null } = {}) {
   const set = (k, v) => { if (v === 'inherit' || v === '') delete state[k]; else state[k] = v; onChange(); now.textContent = behaviourLine({ ...(dflt || {}), ...state }, media) || 'When useful'; };
   const choice = (k, title, opts, fallback) => {
     const first = dflt ? [['inherit', `Default (${label(opts, dflt[k] || fallback) || 'agent'})`]] : k === 'changes' ? [['', 'Agent’s setting']] : [];
@@ -52,7 +52,8 @@ export function behaviourEditor(state, { dflt = null, media = '', onChange = () 
   return h('details', { class: 'behaviour', open, ontoggle: onToggle ? (e) => onToggle(e.target.open) : null }, h('summary', {}, h('span', { class: 'bh-title' }, h('b', {}, 'How it uses it'), now), h('span', { class: 'bh-change' }, 'Change')),
     h('div', { class: 'row spread' }, h('span', { class: 'small muted' }, 'Read-only tools never ask; tools that declare themselves destructive always ask.'), helpLink('tool-services.md#how-agents-use-a-service')),
     choice('when', 'When to use it', media || [state.when, dflt?.when].includes('often') ? WHEN : WHEN.slice(0, 3), 'useful'),
-    media ? h('p', { class: 'small muted' }, `Proactively: it adds one of its ${KIND_WORD[media]} on clear moments (celebrations, thanks, when asked). Often: also jokes, welcomes, praise. Never on serious topics; only mood and style words are searched.`) : null,
+    media ? h('p', { class: 'small muted' }, `Proactively: the AI adds one of its ${KIND_WORD[media]} where it clearly adds warmth (good news, festivals, thanks, when asked). Often: whenever the mood is light. Never on serious topics; only mood and style words are searched.`,
+      shared ? ` Last 7 days: ${shared.ai + shared.rule} shared (${shared.ai} picked by the AI).` : '') : null,
     text('note', 'Note (optional)', 'e.g. only for this year’s event', 200),
     choice('changes', 'Changes it makes', CHANGES, ''),
     media ? text('style', `Style of the ${KIND_WORD[media]} (optional)`, 'e.g. Telugu movie reactions', 120) : null,

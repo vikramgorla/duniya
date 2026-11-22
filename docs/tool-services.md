@@ -70,26 +70,29 @@ Duniya reads them:
    add style words (e.g. *Telugu movie reactions, Brahmanandam*). Or set it per agent on its **Tools** page.
 2. That's it: no prompt text needed.
 
-A hint alone is not enough for an extra like a GIF (models often just answer), so here Duniya makes it happen: it spots
-the moment in code, gives the agent one simple *share* step, and shares one itself when the agent answered with text
-only.
+**The AI decides, code keeps it safe.** A hint alone is not enough for an extra like a GIF (models often just
+answer), so with *Proactively* or *Often* the AI must make a choice at the end of **every** answer: a mood
+(`[share: festive lights]`) or `[share: none]`. It reads the whole conversation, so any culture, language or kind of
+good news counts — Diwali, Eid, an exam passed, a joke that landed — with no word list. The tag is never shown.
 
 | | Proactively | Often |
 |---|---|---|
-| Celebrations ("congrats!", 🎉), thanks said to the agent, "send a gif" | ✓ | ✓ |
-| Other thanks, welcomes, jokes (😂), praise ("well said"), settled plans ("all set") | | ✓ |
+| Where one clearly adds warmth: celebrations and festivals, good news, thanks to the agent, "send a gif" | ✓ | ✓ |
+| Whenever the mood is light: also thanks, welcomes, jokes, praise, settled plans | | ✓ |
 | Serious, worried, upset, safety or money topics ("accident", "sick", "refund") | never | never |
 
-- **One call.** The agent gets one action, *share media* with a mood ("party", "thank you"). Duniya searches the
+- **No extra call.** The choice is a few words at the end of the answer it writes anyway. Duniya searches the
   service with the mood and your style words and picks a result it did not post in that chat lately.
 - **One message.** A short answer (up to 500 characters) goes as the GIF's caption, with the service's credit in
   italics under it (KLIPY: *Powered by KLIPY*); a longer answer, or a sticker, goes first and the GIF right after it.
-- **Not up to the model alone.** Duniya spots the moment itself (also festival greetings: "happy Diwali") and asks
-  for one in that turn; when the model answers with text only, Duniya shares one anyway.
-- **One per moment.** At most one per answer, and none when one went out in that chat in the last few minutes.
-- **Who.** Everyone in the chat, once it is set to *Proactively* or *Often*: participants need neither the service's tools (a service
-  added from the Registry gives them none) nor *send media*; only its read-only media tool is used, and the agent's deny
-  list still wins.
+- **Code keeps the limits.** Serious topics never get one, whatever the AI picks; at most one per answer and none
+  shortly after another; the limits apply; only mood and style words are searched.
+- **A model that forgets the tag** falls back to simple rules (celebrations, festival greetings, thanks, requests; with
+  *Often* also jokes, welcomes, praise), so a weak model still behaves. The card shows the last 7 days: how many were
+  shared and how many the AI picked.
+- **Who.** Everyone in the chat, once it is set to *Proactively* or *Often*: participants need neither the service's
+  tools (a service added from the Registry gives them none) nor *send media*; only its read-only media tool is used,
+  and the agent's deny list still wins.
 - Which tools qualify: read-only (`readOnlyHint: true`), with media in its results (media fields such as `mp4Url` or
   `imageUrl` in its output schema, or pictures and GIF/MP4/WebP links in a result seen before) and a free-text input
   (`query`, `q`, `search`, …).

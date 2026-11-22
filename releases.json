@@ -1,6 +1,14 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.57.1": {
+      "breaking": false,
+      "title": "The AI picks the moment for a GIF",
+      "changes": [
+        { "type": "improved", "text": "With Proactively or Often, the AI decides at the end of every answer whether a GIF fits and which mood, so any celebration, festival or good news counts, in any language. Serious topics still never get one." },
+        { "type": "improved", "text": "The How it uses it card shows how many GIFs were shared in the last 7 days and how many the AI picked." }
+      ]
+    },
     "2.57.0": {
       "breaking": false,
       "title": "One setting for GIFs, in one message",

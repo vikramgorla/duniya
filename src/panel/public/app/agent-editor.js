@@ -379,7 +379,7 @@ function buildTools(x, { save }) {
     // services' tools arrive (a slow or signed-out service must never hide these settings, nor wipe an open tool grid)
     const box = h('div', {});
     const fill = () => { const i = sinfo.find((y) => y.service === key) || {};
-      box.replaceChildren(behaviourEditor(stateOf(key), { dflt: i.default || {}, media: i.media || '', onChange: () => commit(key),
+      box.replaceChildren(behaviourEditor(stateOf(key), { dflt: i.default || {}, media: i.media || '', shared: i.shared || null, onChange: () => commit(key),
         open: openFolds.has(key), onToggle: (on) => (on ? openFolds.add(key) : openFolds.delete(key)) })); }; // stays open when redrawn
     fill(); bhFill.set(key, fill);
     return box;
