@@ -14,6 +14,8 @@
 //   - read receipts (080): the ones that are due (pace.js; also drained on every incoming message)
 //   - modules that are on (081): their own bounded work (Orders: the owner's daily list of orders due soon)
 //   - agent apps (074): turns whose tool calls nobody answered are ended; idle app runtimes (Copilot) are stopped
+//   - one chat per person: a direct chat set up under the phone number joins the chat WhatsApp delivers from (its
+//     private id) as soon as both are known, one pair per tick (direct-chats.js)
 // Names and group refreshes are skipped while memory is tight (optional work, resources.js).
 import { optionalPaused } from './resources.js';
 import { enabledChats } from './chat-prefs.js';
@@ -33,6 +35,7 @@ import { modulesUpkeep } from '../modules/index.js';
 import { commitmentsTick } from './commitments.js';
 import { prefsTick } from './person-insights.js';
 import { namesTick } from './chat-names.js';
+import { adoptKnownTwin } from './direct-chats.js';
 
 const GROUP_EVERY_MS = 12 * 3600000;
 const DOWN_ALERT_MS = 15 * 60000;
@@ -74,6 +77,7 @@ export async function upkeepTick(channel, now = Date.now()) {
     try { pruneMerges(now); } catch { /* 078: retried next tick */ }
     try { appsTick(now); } catch { /* 074: agent apps — abandoned turns, idle runtimes; never blocks upkeep */ }
     await channelHealth(channel, now);
+    try { await adoptKnownTwin(); } catch { /* one chat under two ids: joined on the next tick, or at the person's next message */ }
     try { done.reads = await drainReads(channel, now); } catch { /* 080: retried next tick */ }
     try { done.retries = await historyRetryTick(now); } catch (e) { activity('error', { summary: `History retry failed: ${e.message}` }); }
     if (optionalPaused()) return { ...done, skipped: 'memory' };

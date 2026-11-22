@@ -75,9 +75,13 @@ const hhName = (id) => db.prepare('SELECT name FROM households WHERE tenant_id =
 const whoOf = (o) => (o.household ? hhName(o.household) : personName(o.person)?.name || 'Someone');
 const eventName = (id) => (id ? db.prepare('SELECT name FROM ev_events WHERE tenant_id = ? AND id = ?').get(TENANT, id)?.name || '' : '');
 const linesOf = (id) => db.prepare('SELECT item, qty, price FROM ord_lines WHERE tenant_id = ? AND ord = ? ORDER BY n').all(TENANT, id);
-const view = (o, full = false) => ({ id: o.id, person: o.person, household: o.household, who: whoOf(o), event: o.event, eventName: eventName(o.event), title: o.title || eventName(o.event) || 'Order',
-  currency: o.currency, total: o.total, paid: o.paid, left: Math.max(0, o.total - o.paid), due: o.due, status: o.status, overdue: ['open', 'part'].includes(o.status) && !!o.due && o.due < today(),
-  note: o.note, createdAt: o.created_at, ...(full ? { lines: linesOf(o.id), payments: db.prepare('SELECT id, amount, at, method, note, by FROM ord_payments WHERE tenant_id = ? AND ord = ? ORDER BY at, created_at').all(TENANT, o.id) } : {}) });
+const paymentsOf = (id) => db.prepare('SELECT id, amount, at, method, note, by FROM ord_payments WHERE tenant_id = ? AND ord = ? ORDER BY at, created_at').all(TENANT, id);
+function view(o, full = false) {
+  const ofEvent = eventName(o.event);
+  return { id: o.id, person: o.person, household: o.household, who: whoOf(o), event: o.event, eventName: ofEvent, title: o.title || ofEvent || 'Order',
+    currency: o.currency, total: o.total, paid: o.paid, left: Math.max(0, o.total - o.paid), due: o.due, status: o.status, overdue: ['open', 'part'].includes(o.status) && !!o.due && o.due < today(),
+    note: o.note, createdAt: o.created_at, ...(full ? { lines: linesOf(o.id), payments: paymentsOf(o.id) } : {}) };
+}
 export function getOrder(id) { const o = row(id); if (!o) throw fail('No such order', 404); return view(o, true); }
 const notePeople = (o, text) => { const ids = o.household ? (() => { try { return getHousehold(o.household).members.filter((m) => m.role === 'adult').map((m) => m.person); } catch { return []; } })() : [o.person]; for (const p of ids.filter(Boolean)) addEvent(p, text); };
 

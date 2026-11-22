@@ -171,8 +171,23 @@ test('077: photos are downloaded through getFile (refused above the limit); a gr
 
   const notes = t.db.listMessages(chat(-100500), {}).length;
   await t.agents.updateAgent('panduga', { schedules: [{ id: 'book', at: '09:00', days: 'mon', prompt: 'What are we reading?', chats: [chat(-100500)] }] }, 'test');
+  // both ids have rows with the same key: its own memory, a tag for the same member, a reaction to the same message
+  const [oldId, newId] = [chat(-100500), chat(-1009999)];
+  const sql = t.db.db;
+  t.db.setChatMemory(oldId, 'They read one book a month.', 5);
+  t.db.setChatMemory(newId, 'The supergroup starts here.', 0);
+  t.db.addNote({ chat: oldId, agent: 'panduga', text: 'Next book: Malgudi Days', author: 'Anu', role: 'organizer' });
+  for (const id of [oldId, newId]) {
+    sql.prepare('INSERT OR REPLACE INTO member_tags (chat, member, label) VALUES (?, ?, ?)').run(id, 'tg:77', id === oldId ? 'host' : 'reader');
+    t.db.saveReaction({ chat: id, msgId: 'r1', sender: 'tg:77', name: 'Anu', emoji: id === oldId ? '👍' : '🎉' });
+  }
   fake.push({ message: { message_id: 1, date: 1, from: ANU, chat: { id: -100500, type: 'group', title: 'Book club' }, migrate_to_chat_id: -1009999 } });
   assert.ok(await until(() => t.agents.getAgent('panduga').chats.includes(chat(-1009999))));
+  const under = (id) => ['messages', 'wa_reactions', 'wa_polls', 'chat_memory', 'notes', 'member_tags'].map((table) => sql.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE chat = ?`).get(id).n);
+  assert.deepEqual(under(oldId), [0, 0, 0, 0, 0, 0], 'nothing is left under the old id');
+  assert.equal(t.db.getChatMemory(newId).summary, 'The supergroup starts here.', 'the memory of the id in use stays');
+  assert.deepEqual(t.db.listNotes(newId).map((n) => n.text), ['Next book: Malgudi Days'], 'what only the old id had moves');
+  assert.equal(sql.prepare('SELECT emoji FROM wa_reactions WHERE chat = ? AND msg_id = ?').get(newId, 'r1').emoji, '🎉');
   assert.ok(!t.agents.getAgent('panduga').chats.includes(chat(-100500)));
   assert.deepEqual(t.agents.getAgent('panduga').schedules[0].chats, [chat(-1009999)], 'a schedule limited to this chat follows it');
   assert.equal(t.chatPrefs.isChatEnabled(chat(-1009999)), true, 'still on');

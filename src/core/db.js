@@ -218,18 +218,23 @@ export function searchNotes(chats, query, limit = 20) {
 }
 export const deleteAgentNotes = (agent) => db.prepare('DELETE FROM notes WHERE chat = ?').run(`agent:${agent}`).changes;
 
-/** 077: a chat's stored messages, reactions, polls, memory, notes and tags move to its new id (Telegram supergroups). */
+/** What is stored per chat, by chat id: moved when the chat gets a new id, removed when its memory is erased. */
+const CHAT_TABLES = ['messages', 'wa_reactions', 'wa_polls', 'chat_memory', 'notes', 'member_tags'];
+
+/**
+ * 077: a chat's stored messages, reactions, polls, memory, notes and tags move to its new id (a Telegram supergroup, a
+ * person's private id on WhatsApp). Where the new id has a row of its own (its memory, a tag for the same member) that
+ * one stays; the old id's is removed, so nothing is left under an id that no lookup or erase reaches any more.
+ */
 export function moveChatData(from, to) {
-  for (const t of ['messages', 'wa_reactions', 'wa_polls', 'chat_memory', 'notes', 'member_tags']) db.prepare(`UPDATE OR IGNORE ${t} SET chat = ? WHERE chat = ?`).run(to, from);
+  for (const t of CHAT_TABLES) {
+    db.prepare(`UPDATE OR IGNORE ${t} SET chat = ? WHERE chat = ?`).run(to, from);
+    db.prepare(`DELETE FROM ${t} WHERE chat = ?`).run(from);
+  }
 }
 
 export function eraseChat(chat) {
-  db.prepare('DELETE FROM messages WHERE chat = ?').run(chat);
-  db.prepare('DELETE FROM wa_reactions WHERE chat = ?').run(chat);
-  db.prepare('DELETE FROM wa_polls WHERE chat = ?').run(chat);
-  db.prepare('DELETE FROM chat_memory WHERE chat = ?').run(chat);
-  db.prepare('DELETE FROM notes WHERE chat = ?').run(chat);
-  db.prepare('DELETE FROM member_tags WHERE chat = ?').run(chat);
+  for (const t of CHAT_TABLES) db.prepare(`DELETE FROM ${t} WHERE chat = ?`).run(chat);
 }
 
 // ---- activity log (what the panel shows) ----

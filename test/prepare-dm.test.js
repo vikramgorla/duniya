@@ -147,6 +147,26 @@ test('a chat set up on its chat page under the phone number (no prepared entry) 
   assert.ok(!t.agents.getAgent('helper').chats.includes(phoneChat));
 });
 
+test('a chat set up under the number after WhatsApp already wrote from the private id joins it by itself, without a new message', async () => {
+  const { upkeepTick } = await import('../src/core/upkeep.js');
+  const phoneChat = '41790000730@s.whatsapp.net'; const lid = 'v730@lid';
+  await sessions.main.handler(dm({ chat: lid, phone: '41790000730', senderJid: lid, text: 'anyone there?' })); // seen, off: nothing stored
+  t.chatPrefs.setChatPrefs(lid, { enabled: true }); await t.agents.bindChat(lid, 'helper'); // switched on where the messages are
+  t.script.push([{ type: 'text', text: 'Here now.' }]);
+  await sessions.main.handler(dm({ chat: lid, phone: '41790000730', senderJid: lid, text: 'hello' }));
+  t.chatPrefs.setChatPrefs(phoneChat, { enabled: true, private: true }); await t.agents.bindChat(phoneChat, 'helper'); // …and private under the number
+  assert.equal(oa.isVisible(lid), true, 'before: the chat with the messages is not private');
+  await upkeepTick(t.channel);
+  const row = await chatRow(lid);
+  assert.deepEqual([row.agent, row.enabled, row.private], ['helper', true, true], 'private where the messages are');
+  assert.equal(oa.isVisible(lid), false);
+  assert.ok(!(await chatRow(phoneChat)), 'one chat, not two');
+  assert.deepEqual(t.agents.getAgent('helper').chats.filter((c) => c.includes('730')), [lid]);
+  assert.ok(t.db.listActivity({ limit: 20 }).some((a) => /Direct chat with \+41790000730: WhatsApp now writes from its private id/.test(a.summary)));
+  assert.equal(stored(lid).length, 2, 'its messages stay');
+  assert.deepEqual(await upkeepTick(t.channel).then(() => dc.adoptKnownTwin()), '', 'nothing left to join');
+});
+
 test('049: a number that is not on WhatsApp gets a warning but is still prepared', async () => {
   const r = await prepare({ phone: '+41 79 000 09 91', agent: 'helper' });
   assert.equal(r.status, 200);
