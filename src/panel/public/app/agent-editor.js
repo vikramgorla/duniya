@@ -426,9 +426,10 @@ function buildTools(x, { save }) {
       onchange: (e) => { setB(key, tools, role, t.name, e.target.checked); drawB(box, key, tools); } }), ` ${ROLE_LABEL[role]}`))))))) : h('p', { class: 'small muted' }, 'None.'));
   const modBox = h('div', {});
   const ready = Promise.all([api('GET', `/api/agents/${x.enc}/connections`).catch(() => []), api('GET', `/api/agents/${x.enc}/local`).catch(() => []), api('GET', '/api/whatsapp/tools').catch(() => []),
-    can('admin') ? api('GET', '/api/tool-services/registry/settings').catch(() => null) : null, bi ? [] : api('GET', '/api/modules/tools').catch(() => []),
-    bi ? [] : api('GET', `/api/agents/${x.enc}/services`).catch(() => [])]).then(([cn, lo, wa, reg, mods, sv]) => {
-    conns = cn; locals = lo; waTools = bi ? wa.filter((t) => t.owner) : wa; registry = reg; sinfo = sv;
+    can('admin') ? api('GET', '/api/tool-services/registry/settings').catch(() => null) : null, bi ? [] : api('GET', '/api/modules/tools').catch(() => [])]).then(([cn, lo, wa, reg, mods]) => {
+    conns = cn; locals = lo; waTools = bi ? wa.filter((t) => t.owner) : wa; registry = reg;
+    // 094: how it uses each service needs the services' tools (a slow service must not hold up the page): drawn when they arrive
+    if (!bi) api('GET', `/api/agents/${x.enc}/services`).then((sv) => { sinfo = sv; drawServers(); drawGlobals(); }, () => {});
     drawServers(); drawGlobals(); drawB(waBox, 'whatsapp', waTools);
     modBox.replaceChildren(...mods.map((m) => { const box = h('div', {}); drawB(box, m.id, m.tools); return block(m.label, h('p', { class: 'small muted' }, 'A module (Settings → Modules). Registrations, duties, payments and sends for someone else wait for an organizer\'s confirm code.'), box); }));
     addRow.replaceChildren(browseButton({ target: x.id, targetName: c.name || x.id, onAdded: () => location.reload() }, registry),

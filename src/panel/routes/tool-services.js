@@ -38,7 +38,10 @@ export function toolServiceRoutes(route) {
   route('GET', '/api/tool-services', async () => {
     const agents = listAgents();
     return Promise.all(listGlobalRows().map(async (r) => ({ ...globalView(r, agents),
-      media: await serviceMedia(r.name, { listTools: () => serverConnection(r.config, { scope: GLOBAL_SCOPE, key: r.name, role: 'organizer', where: 'Settings → Tool services' }).listTools() }) })));
+      media: await serviceMedia(r.name, { listTools: () => { // a local service is not started just to show this page
+        const conn = serverConnection(r.config, { scope: GLOBAL_SCOPE, key: r.name, role: 'organizer', where: 'Settings → Tool services' });
+        return r.config.type === 'local' && !conn.tools ? [] : conn.listTools();
+      } }) })));
   });
 
   route('PUT', '/api/tool-services/:name', async (req, res, body, q, p, user) => {

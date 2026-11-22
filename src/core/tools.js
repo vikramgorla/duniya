@@ -105,7 +105,12 @@ export const serviceMedia = (key, conn) => describeTools(key, conn).then((tools)
 /** 094: an agent's services with its own settings, the service's default and the tools (its Tools page). */
 export async function agentServices(agent) {
   return Promise.all(Object.entries(effectiveServers(agent)).map(async ([key, srv]) => {
-    const tools = await describeTools(key, connectionFor(agent, key, 'organizer')).catch(() => null);
+    let tools = null; // a service that is not signed in or does not answer: no tools listed
+    try {
+      const conn = connectionFor(agent, key, 'organizer');
+      // a local service is never started just to show this page: only one that is running already lists its tools
+      if (srv.type !== 'local' || conn.tools) tools = await describeTools(key, conn);
+    } catch { /* shown as not reachable */ }
     return { service: key, global: !!srv.global, own: agent.services?.[key] || {}, default: srv.behaviour || {}, tools, media: tools?.find((t) => t.media)?.media || '' };
   }));
 }
