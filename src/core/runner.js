@@ -128,7 +128,7 @@ export async function runAgent(ctx) {
   const uses = new Map(); ctx.uses = uses;
   const codes = [];
   // 079: a people change about someone other than the sender waits for an organizer's confirm code (like previews);
-  // 093: a low-risk one an organizer clearly asked for applies at once in clear / act (logged as changed without asking)
+  // 093: 094: a change (not destructive, by its annotations) an organizer clearly asked for applies at once in clear / act (logged as changed without asking)
   ctx.hold = ({ kind, action, summary, tool = '', input = {}, risk = 'change', mode = '' }) => {
     if (mayChangeWithoutAsking(ctx, risk, mode)) {
       const text = applyLocal(kind, action, agent);
@@ -335,7 +335,7 @@ async function selfCheck({ agent, chat, ctx, reply, sources, model, fallback, tu
   return { reply: ok ? out : PLAIN, cost };
 }
 
-/** A held People or module change, carried out (after "confirm XXXX", or at once for a clear low-risk request). */
+/** A held People or module change, carried out (after "confirm XXXX", or at once for a clear request for a change that is not destructive). */
 const applyLocal = (kind, action, agent) => (kind === 'people' ? applyPeopleAction(action, agent) : applyModuleAction(kind, action, agent));
 /** 093: Activity entry for a change made without an extra confirmation (the owner sees every one; never message text). */
 function changedWithoutAsking(ctx, fq, input, undo) {
@@ -345,7 +345,7 @@ function changedWithoutAsking(ctx, fq, input, undo) {
 /**
  * 093: the model calls a service's confirm tool itself. Allowed only for a preview shown in an earlier message that the
  * sender now clearly agrees to ("yes", "ok", "go ahead" …) on a live message (a "yes" without the wake word too); a preview from this same turn waits (ask
- * mode, high risk, not an organizer). Returns the refusal, or null when the call may run.
+ * mode, destructive, not an organizer). Returns the refusal, or null when the call may run.
  */
 function confirmGate(ctx, input, applied, waiting) {
   const ids = Object.values(input || {}).filter((v) => typeof v === 'string');
