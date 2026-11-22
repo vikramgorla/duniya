@@ -29,7 +29,8 @@ before(async () => {
   t = await setup();
   owner = await t.login();
   const { startRuntimeFile } = await import('../src/core/runtime.js');
-  t.channel.status = async () => ({ status: 'open', me: '41790000099:1@s.whatsapp.net', numbers: [{ id: 'main', label: 'Main', status: 'open', me: '41790000099:1@s.whatsapp.net' }] });
+  t.channel.accounts = async () => [{ key: 'whatsapp:main', channel: 'whatsapp', app: 'WhatsApp', label: 'Main', status: 'open', lastError: '', me: '41790000099:1@s.whatsapp.net' },
+    { key: 'telegram:77', channel: 'telegram', app: 'Telegram', label: '@duniya_bot', status: 'connecting', lastError: 'not reachable', me: '' }];
   await startRuntimeFile(t.channel).write();
 });
 after(() => t.close());
@@ -152,7 +153,7 @@ test('029: status shows version, uptime, WhatsApp numbers and agents; doctor che
   assert.equal(s.code, 0, s.err);
   assert.match(s.out, /Duniya v\d+\.\d+\.\d+/);
   assert.match(s.out, /running · up \d+s · pid \d+/);
-  assert.match(s.out, /Main: connected as \+41790000099/);
+  assert.match(s.out, /Channels\s+WhatsApp Main: connected as \+41790000099\n\s+Telegram @duniya_bot: connecting/, 'every channel\'s accounts');
   assert.match(s.out, /2 on, 0 off/); assert.match(s.out, /Panduga/);
   // 095: a release that did not start and was rolled back is named, while the server runs the version it went back to
   t.db.kvSet('updates:rolledBack', JSON.stringify({ ok: true, from: 'v99.0.0', to: t.config.APP_VERSION, target: 'v99.0.0', starts: 3, at: Date.now(), alerted: true }));
@@ -162,6 +163,7 @@ test('029: status shows version, uptime, WhatsApp numbers and agents; doctor che
   const d = await duniya(['doctor']);
   assert.match(d.out, /✓ Service running/);
   assert.match(d.out, /✓ Panel answers on 127\.0\.0\.1:\d+/);
+  assert.match(d.out, /✓ WhatsApp Main connected\n! Telegram @duniya_bot: connecting/);
   assert.match(d.out, /! No public address[\s\S]*→ Re-run the installer/);
   assert.match(d.out, /Disk: .* free/);
   const sc = await duniya(['show-setup-code']);

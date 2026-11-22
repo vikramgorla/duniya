@@ -96,8 +96,15 @@ test('merge moves everything, is owner only, suggested on a verified number, and
   const tg = people.listPeople({ q: 'Ravi TG' })[0];
   await api('PUT', `/api/people/${tg.id}/tags`, { tags: ['telegram-only', 'badminton'] });
   await api('POST', `/api/people/${tg.id}/notes`, { text: 'Met at the club' });
+  // what was learned about the Telegram person: a promise, a suggested tie, their language (set by the owner)
+  const sql = t.db.db; await import('../src/core/commitments.js'); await import('../src/core/person-insights.js');
+  sql.prepare("INSERT INTO commitments (agent, chat, person, who, what, due, status, by, created_at, updated_at) VALUES ('panduga', 'g1@g.us', ?, 'Ravi TG', 'bring the rackets', '', 'open', 'agent', 1, 1)").run(tg.id);
+  sql.prepare("INSERT INTO tie_suggestions (key, person, kind, name, word, created_at) VALUES ('k1', ?, 'sibling', 'Mia', 'sister', 1)").run(tg.id);
+  sql.prepare("INSERT INTO person_prefs (person, lang, lang_set) VALUES (?, 'te', 1)").run(tg.id);
+  const learned = (id) => [sql.prepare('SELECT COUNT(*) AS n FROM commitments WHERE person = ?').get(id).n, sql.prepare('SELECT COUNT(*) AS n FROM tie_suggestions WHERE person = ?').get(id).n, sql.prepare('SELECT lang FROM person_prefs WHERE person = ?').get(id)?.lang || ''];
   assert.equal((await t.api(admin, 'POST', `/api/people/${ravi.id}/merge`, { other: tg.id })).status, 403, 'admins cannot merge');
   const m = await api('POST', `/api/people/${ravi.id}/merge`, { other: tg.id });
+  assert.deepEqual([learned(ravi.id), learned(tg.id)], [[1, 1, 'te'], [0, 0, '']], 'promises, suggested ties and preferences follow: nothing stays under the id that is gone');
   assert.ok(m.undoUntil > Date.now() + 29 * 86400000);
   const page = await api('GET', `/api/people/${ravi.id}`);
   assert.deepEqual(page.apps, ['telegram', 'whatsapp']);
@@ -114,6 +121,7 @@ test('merge moves everything, is owner only, suggested on a verified number, and
   assert.deepEqual([back.apps, back.tags], [['telegram'], ['badminton', 'telegram-only']]);
   assert.ok(back.timeline.some((n) => n.text === 'Met at the club'));
   assert.equal(people.personFor({ channel: 'telegram', externalId: '5001' }), tg.id);
+  assert.deepEqual([learned(ravi.id), learned(tg.id)], [[0, 0, ''], [1, 1, 'te']], 'and comes back with the person');
   assert.equal((await t.api(owner, 'POST', `/api/people/merges/${m.merge}/undo`)).status, 404, 'undone once');
   // a second verified number keeps the person's own number and is suggested for a merge on evidence
   people.personFor({ channel: 'telegram', externalId: '5002', phone: '41790000313' }); // Anu shares her number on Telegram
@@ -140,8 +148,18 @@ test('export has everything about one person; erase removes their messages, note
   assert.ok(e.ties.length >= 2 && e.households.length === 1 && e.lists.length === 1);
   assert.equal((await t.api(admin, 'GET', `/api/people/${ravi.id}/export`)).status, 403);
   assert.equal((await t.api(admin, 'DELETE', `/api/people/${ravi.id}`)).status, 403);
+  // known in a group only by WhatsApp's private id (no number there), with a tag and a profile name under that id
+  const sql = t.db.db; const lid = '777000111@lid'; const dm = '41790000312@s.whatsapp.net';
+  people.personFor({ channel: 'whatsapp', externalId: lid, person: ravi.id });
+  sql.prepare("UPDATE identities SET person = ? WHERE tenant_id = 'default' AND external_id = ?").run(ravi.id, lid);
+  sql.prepare("INSERT OR REPLACE INTO member_tags (chat, member, label) VALUES ('g1@g.us', ?, 'coach')").run(lid);
+  sql.prepare("INSERT OR REPLACE INTO contact_lids (tenant_id, lid, push_name, updated_at) VALUES ('default', ?, 'Ravi C', 1)").run(lid);
+  t.chatPrefs.noteChat({ chat: dm, isGroup: false, name: 'Ravi Chary', phone: '41790000312' });
+  people.forgetPeopleCache();
   const c = await api('DELETE', `/api/people/${ravi.id}`);
   assert.ok(c.messages >= 2 && c.ties >= 2 && c.households === 1);
+  assert.deepEqual([sql.prepare('SELECT COUNT(*) AS n FROM member_tags WHERE member = ?').get(lid).n, sql.prepare('SELECT COUNT(*) AS n FROM contact_lids WHERE lid = ?').get(lid).n,
+    sql.prepare('SELECT name FROM chats_seen WHERE chat = ?').get(dm)?.name], [0, 0, ''], 'also what is stored under an app id without a number, and their name on the chat list');
   assert.equal(t.db.db.prepare("SELECT COUNT(*) n FROM messages WHERE sender = '41790000312'").get().n, 0);
   assert.equal((await t.api(owner, 'GET', `/api/people/${ravi.id}`)).status, 404);
   const mia = people.listPeople({ q: 'Mia' })[0];

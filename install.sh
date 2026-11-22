@@ -458,6 +458,12 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 
+# --admin-password was needed once, to create the owner on the first start. The app has started (the owner exists, or
+# the password was not usable and a setup code was made), and nothing reads it again: it is not kept on disk.
+if [ "$HEALTHY" -eq 1 ] && grep -q '^ADMIN_PASSWORD=.' "$CONF_DIR/app.env"; then
+  sed -i 's/^ADMIN_PASSWORD=.*/ADMIN_PASSWORD=/' "$CONF_DIR/app.env"
+fi
+
 # ffmpeg (043: voice notes, on-server speech) is large; install it after the panel is up so the first start is quick.
 if ! command -v ffmpeg >/dev/null; then
   say "Installing ffmpeg (voice notes) in the background"

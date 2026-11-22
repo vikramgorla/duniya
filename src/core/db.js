@@ -218,24 +218,27 @@ export function searchNotes(chats, query, limit = 20) {
 }
 export const deleteAgentNotes = (agent) => db.prepare('DELETE FROM notes WHERE chat = ?').run(`agent:${agent}`).changes;
 
-/** What is stored per chat, by chat id: moved when the chat gets a new id, removed when its memory is erased. */
-const CHAT_TABLES = ['messages', 'wa_reactions', 'wa_polls', 'chat_memory', 'notes', 'member_tags'];
+/** What "Erase memory" removes for a chat: its stored messages, reactions, polls, summary, notes and member tags. */
+const MEMORY_TABLES = ['messages', 'wa_reactions', 'wa_polls', 'chat_memory', 'notes', 'member_tags'];
+/** Every table that keeps rows per chat: the ones with a column named `chat`, the app's and those of the modules that are loaded. */
+const chatTables = () => db.prepare("SELECT m.name AS name FROM sqlite_master m JOIN pragma_table_info(m.name) c ON c.name = 'chat' WHERE m.type = 'table'").all().map((r) => r.name);
 
 /**
- * 077: a chat's stored messages, reactions, polls, memory, notes and tags move to its new id (a Telegram supergroup, a
- * person's private id on WhatsApp). Where the new id has a row of its own (a tag for the same member, its summary:
- * chat-merge.js joins the two texts first) that one stays; the old id's is removed, so nothing is left under an id
- * that no lookup or erase reaches any more.
+ * 077: a chat got a new id (a Telegram supergroup, a person's private id on WhatsApp): every row kept for it moves,
+ * in whatever table (messages and memory, promises, who is in the chat, usage, Activity …; a new table with a `chat`
+ * column is covered by itself). Where the new id has a row with the same key (a tag for the same member, its own
+ * settings: chat-merge.js combines those first) that one stays and the old id's is removed, so nothing is left under
+ * an id that no lookup or erase reaches any more.
  */
 export function moveChatData(from, to) {
-  for (const t of CHAT_TABLES) {
+  for (const t of chatTables()) {
     db.prepare(`UPDATE OR IGNORE ${t} SET chat = ? WHERE chat = ?`).run(to, from);
     db.prepare(`DELETE FROM ${t} WHERE chat = ?`).run(from);
   }
 }
 
 export function eraseChat(chat) {
-  for (const t of CHAT_TABLES) db.prepare(`DELETE FROM ${t} WHERE chat = ?`).run(chat);
+  for (const t of MEMORY_TABLES) db.prepare(`DELETE FROM ${t} WHERE chat = ?`).run(chat);
 }
 
 // ---- activity log (what the panel shows) ----

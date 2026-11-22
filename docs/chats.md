@@ -101,8 +101,9 @@ chat's newest message). When you switch a chat **on**, the server asks your phon
 The chat shows **Waiting for the first message** until the person writes; that message goes straight to the agent.
 **One chat per person.** WhatsApp often writes from a private id (`…@lid`) instead of the phone number. When it
 does, a chat set up under the number (here, or switched on from its chat page) joins the chat WhatsApp uses: the
-agent, on/off, *Private to members* (kept if either had it), model, spending cap and memory move with it, and the
-number keeps pointing to it. That happens within a minute of the server knowing both, also when the person has
+agent, on/off, *Private to members* (kept if either had it), model, spending cap and everything kept for the chat
+(memory, promises, who is in it, what it cost this month, its lines in Activity) move with it, and the number keeps
+pointing to it. That happens within a minute of the server knowing both, also when the person has
 not written since: you never see the same person twice in Chats for long, and *Private to members* set on one
 holds for the chat with the messages. If both had a summary, the agent keeps both. Nothing stays stored under the
 old id. Nothing to switch on twice; Activity

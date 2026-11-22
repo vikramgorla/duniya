@@ -182,10 +182,20 @@ test('077: photos are downloaded through getFile (refused above the limit); a gr
     sql.prepare('INSERT OR REPLACE INTO member_tags (chat, member, label) VALUES (?, ?, ?)').run(id, 'tg:77', id === oldId ? 'host' : 'reader');
     t.db.saveReaction({ chat: id, msgId: 'r1', sender: 'tg:77', name: 'Anu', emoji: id === oldId ? '👍' : '🎉' });
   }
+  sql.prepare("INSERT INTO commitments (agent, chat, person, who, what, due, status, by, created_at, updated_at) VALUES ('panduga', ?, '', 'Anu', 'bring the book', '', 'open', 'agent', 1, 1)").run(oldId);
+  sql.prepare("INSERT INTO person_chats (tenant_id, person, chat, wrote, member, last_at) VALUES ('default', 'p_reader', ?, 1, 1, 1)").run(oldId);
+  sql.prepare("INSERT INTO usage (ts, agent, chat, provider, model, kind, input, output, cost, priced, account, fallback) VALUES (1, 'moved', ?, 'anthropic', 'm', 'reply', 1, 1, NULL, NULL, 'anthropic', '')").run(oldId);
   fake.push({ message: { message_id: 1, date: 1, from: ANU, chat: { id: -100500, type: 'group', title: 'Book club' }, migrate_to_chat_id: -1009999 } });
   assert.ok(await until(() => t.agents.getAgent('panduga').chats.includes(chat(-1009999))));
-  const under = (id) => ['messages', 'wa_reactions', 'wa_polls', 'chat_memory', 'notes', 'member_tags'].map((table) => sql.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE chat = ?`).get(id).n);
-  assert.deepEqual(under(oldId), [0, 0, 0, 0, 0, 0], 'nothing is left under the old id');
+  // every table that keeps rows per chat, whatever it is for
+  const perChat = sql.prepare("SELECT m.name AS name FROM sqlite_master m JOIN pragma_table_info(m.name) c ON c.name = 'chat' WHERE m.type = 'table'").all().map((r) => r.name);
+  assert.ok(['messages', 'commitments', 'person_chats', 'usage', 'activity'].every((x) => perChat.includes(x)), perChat.join(' '));
+  const left = perChat.filter((table) => sql.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE chat = ?`).get(oldId).n);
+  assert.deepEqual(left, [], 'nothing is left under the old id, in any table');
+  const { listCommitments } = await import('../src/core/commitments.js');
+  assert.deepEqual(listCommitments({ chat: newId }).map((c) => c.what), ['bring the book'], 'an open promise follows the chat');
+  assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM person_chats WHERE chat = ? AND person = 'p_reader'").get(newId).n, 1, 'who is in the chat');
+  assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM usage WHERE chat = ? AND agent = 'moved'").get(newId).n, 1, 'what the chat cost so far');
   const memory = t.db.getChatMemory(newId);
   assert.equal(memory.summary, 'They read one book a month.\n\nThe supergroup starts here.', 'both summaries are kept, the older first');
   assert.equal(memory.upto_id, 5, 'summarised up to the earlier mark: the next summary misses no message');

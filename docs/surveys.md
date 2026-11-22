@@ -25,8 +25,9 @@ a time, or with their own link.**
 2. **Title** and an **Intro** (optional; the link page shows it).
 3. For each question: the text, the **Answer** (one choice, several choices, a number, short text), its choices, and
    **Needs an answer** on or off. **+ Question** adds one.
-4. **Create survey**. **⋯ → Edit…** changes it later. Once people have answered, you can reword questions and choices,
-   but not add, remove or change their kind (that would mix up the answers).
+4. **Create survey**. **⋯ → Edit…** changes it later. Once people have answered, you can reword questions and choices
+   (the answers go with a reworded choice) and add a choice at the end, but not add or remove questions, change their
+   kind or remove a choice (that would mix up the answers).
 
 ## Send it
 

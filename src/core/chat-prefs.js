@@ -75,9 +75,6 @@ export function mergeChatPrefs(from, to) {
       enabled: a.enabled || !!b?.enabled, private: a.private || !!b?.private, noticeOff: a.noticeOff || !!b?.noticeOff });
     db.prepare('DELETE FROM chat_prefs WHERE tenant_id = ? AND chat = ?').run(TENANT, from);
   }
-  for (const t of ['chats_seen', 'privacy_notices']) {
-    try { db.prepare(`UPDATE OR IGNORE ${t} SET chat = ? WHERE tenant_id = ? AND chat = ?`).run(to, TENANT, from); db.prepare(`DELETE FROM ${t} WHERE tenant_id = ? AND chat = ?`).run(TENANT, from); } catch { /* table not created in this process */ }
-  }
   cache.delete(from); cache.delete(to);
 }
 export const allChatPrefs = () => Object.fromEntries(db.prepare('SELECT chat, model, logging, enabled, fallback, private, notice_off, welcome FROM chat_prefs WHERE tenant_id = ?').all(TENANT)

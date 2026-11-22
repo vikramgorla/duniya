@@ -161,12 +161,12 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     return out;
   }
 
-  /** Every account of every running channel, for the connection watch (upkeep.js): { key, channel, app, label, status, lastError }. */
+  /** Every account of every running channel, for the connection watch (upkeep.js) and `duniya status`: { key, channel, app, label, status, lastError, me }. */
   async function accounts() {
     const out = [];
     for (const [id, { adapter: a }] of live) {
       const st = await a.status().catch((e) => ({ numbers: [{ id, status: 'error', lastError: e.message }] }));
-      for (const n of st.numbers || []) out.push({ key: `${id}:${n.id}`, channel: id, app: label(id), label: n.label || n.id, status: n.status, lastError: n.lastError || '' });
+      for (const n of st.numbers || []) out.push({ key: `${id}:${n.id}`, channel: id, app: label(id), label: n.label || n.id, status: n.status, lastError: n.lastError || '', me: n.me || '' });
     }
     return out;
   }

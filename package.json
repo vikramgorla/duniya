@@ -1,6 +1,6 @@
 {
   "name": "duniya",
-  "version": "2.60.4",
+  "version": "2.60.5",
   "private": true,
   "description": "Self-hosted AI agents for WhatsApp and Telegram groups and chats: any model, MCP tools, People, events and orders, admin panel.",
   "license": "MIT",

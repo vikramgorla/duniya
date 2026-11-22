@@ -65,18 +65,42 @@ const cleanQuestions = (list) => {
   const ids = new Set(); for (const q of qs) { while (ids.has(q.id)) q.id = `${q.id}x`; ids.add(q.id); }
   return qs;
 };
+/**
+ * People have answered: questions keep their number and kind, and a question's choices keep their places (reword
+ * one, or add one at the end), because an answer is stored as the words of the choice.
+ */
+function checkAnswered(before, after) {
+  if (JSON.stringify(after.map((q) => [q.id, q.kind])) !== JSON.stringify(before.map((q) => [q.id, q.kind]))) {
+    throw fail('People have answered already: you can reword questions and choices, but not add, remove or change their kind', 409, { field: 'questions' });
+  }
+  const short = after.find((q, i) => q.options.length < before[i].options.length);
+  if (short) throw fail(`"${short.text}": people have answered already, so a choice cannot be removed. Reword it, or add one at the end`, 409, { field: 'questions' });
+}
+/** Reworded choices take their answers along (all of a question's at once, so two choices can swap their words). */
+function rewordAnswers(survey, before, after) {
+  for (const [i, q] of after.entries()) {
+    const words = new Map(before[i].options.map((o, n) => [o, q.options[n]]).filter(([o, n]) => o !== n));
+    if (!words.size) continue;
+    const put = db.prepare('UPDATE srv_answers SET value = ? WHERE tenant_id = ? AND survey = ? AND person = ? AND q = ?');
+    for (const r of db.prepare('SELECT person, value FROM srv_answers WHERE tenant_id = ? AND survey = ? AND q = ?').all(TENANT, survey, q.id)) {
+      const v = JSON.parse(r.value);
+      const next = JSON.stringify(Array.isArray(v) ? v.map((x) => words.get(x) ?? x) : words.get(v) ?? v);
+      if (next !== r.value) put.run(next, TENANT, survey, r.person, q.id);
+    }
+  }
+}
 /** Create or change a survey: { id?, title, intro, questions: [{ text, kind, options, required }], status }. */
 export function saveSurvey(body = {}, by = 'panel') {
   const cur = body.id ? getSurvey(body.id) : null;
   const title = clip(body.title ?? cur?.title, 80);
   if (!title) throw fail('A survey needs a title', 400, { field: 'title' });
   const questions = body.questions !== undefined ? cleanQuestions(body.questions) : cur?.questions || cleanQuestions([]);
-  if (cur && body.questions !== undefined && answered(cur.id) && JSON.stringify(questions.map((q) => [q.id, q.kind])) !== JSON.stringify(cur.questions.map((q) => [q.id, q.kind]))) {
-    throw fail('People have answered already: you can reword questions and choices, but not add, remove or change their kind', 409, { field: 'questions' });
-  }
+  const keepAnswers = !!cur && body.questions !== undefined && answered(cur.id);
+  if (keepAnswers) checkAnswered(cur.questions, questions);
   const status = ['open', 'closed'].includes(body.status) ? body.status : cur?.status || 'open';
   const vals = [title, clip(body.intro ?? cur?.intro ?? '', 400), JSON.stringify(questions), status];
   const id = cur?.id || rid('sv');
+  if (keepAnswers) rewordAnswers(id, cur.questions, questions);
   if (cur) db.prepare('UPDATE srv_surveys SET title = ?, intro = ?, questions = ?, status = ? WHERE tenant_id = ? AND id = ?').run(...vals, TENANT, id);
   else db.prepare('INSERT INTO srv_surveys (title, intro, questions, status, tenant_id, id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(...vals, TENANT, id, Date.now());
   activity('config', { summary: `Survey ${cur ? 'changed' : 'created'}: ${title} (${by})` });
@@ -134,7 +158,8 @@ function checkAnswer(q, value) {
   }
   if (q.kind === 'text') { const t = clip(value, 500); if (!t) throw fail(`"${q.text}": write an answer`, 400, { field: q.id }); return t; }
   const pick = (v) => { const t = s(v).toLowerCase(); const n = Number(t); return q.options.find((o) => o.toLowerCase() === t) || (Number.isInteger(n) && n >= 1 && n <= q.options.length ? q.options[n - 1] : '') || q.options.find((o) => o.toLowerCase().startsWith(t) && t); };
-  const vals = (Array.isArray(value) ? value : q.kind === 'multi' ? s(value).split(/\s*[,;]\s*|\s+and\s+/i) : [value]).filter((v) => s(v));
+  const whole = q.options.find((o) => o.toLowerCase() === s(value).toLowerCase()); // "Salt and pepper" is one choice, not two
+  const vals = (Array.isArray(value) ? value : q.kind === 'multi' && !whole ? s(value).split(/\s*[,;]\s*|\s+and\s+/i) : [value]).filter((v) => s(v));
   const picked = [...new Set(vals.map(pick))];
   if (!picked.length || picked.some((x) => !x)) throw fail(`"${q.text}": choose ${q.kind === 'multi' ? 'one or more of' : 'one of'} ${q.options.join(', ')}`, 400, { field: q.id });
   if (q.kind === 'single' && picked.length > 1) throw fail(`"${q.text}": choose just one`, 400, { field: q.id });
