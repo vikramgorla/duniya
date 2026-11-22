@@ -8,6 +8,7 @@ import { onOAuthChange } from './mcp-oauth.js';
 import { onGlobalMcpChange } from './global-mcp.js';
 import { maxLocalServices, serverSize, onMemoryPressure } from './resources.js';
 import { activity } from './events.js';
+import { within as withinTime } from './config.js';
 
 const TOOLS_TTL = 10 * 60 * 1000;
 const FAIL_TTL = 60 * 1000;
@@ -61,9 +62,7 @@ class McpConnection {
     this.listing ||= this.fetchTools().finally(() => { this.listing = null; });
     if (this.tools) return this.tools; // stale: use it now, the fresh list replaces it when it comes
     if (!within) return this.listing;
-    let timer;
-    const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('The tool service did not answer in time')), within); });
-    try { return await Promise.race([this.listing, late]); } finally { clearTimeout(timer); }
+    return withinTime(this.listing, within, 'The tool service');
   }
 
   async fetchTools() {

@@ -31,6 +31,8 @@ test('073: a group only WhatsApp knows is named once, remembered, and never show
   t.channel.chatName = orig;
   // a group nobody can name, a person, a hidden number and another number's group: names, never ids
   assert.equal(names.chatLabel('999@g.us'), 'Unnamed group');
+  assert.equal(names.chatLabel(`panel:mochi:${GROUP}`), 'Panel test in Morges rides', 'the test console, in words');
+  assert.equal(names.chatLabel('panel:mochi'), 'Panel test');
   assert.equal(names.chatLabel('41790000777@s.whatsapp.net'), '+41790000777');
   assert.equal(names.chatLabel('55555@lid'), 'Unknown (hidden number)');
   names.rememberGroupNames([{ id: 'shop#777@g.us', name: 'Shop team' }]);

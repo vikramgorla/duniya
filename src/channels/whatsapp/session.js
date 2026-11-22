@@ -24,6 +24,9 @@ const NAMES_FIRST_MS = Number(process.env.NAMES_REFRESH_FIRST_MS ?? 30000);
 const NAMES_EVERY_MS = 24 * 3600000;
 const NAMES_MIN_GAP_MS = 10 * 60000;
 const AUTH_DIR = resolve(DATA_DIR, 'whatsapp-auth');
+// How long one question to WhatsApp (group details, a profile, …) may wait for its answer. Baileys waits 60 s by
+// default, and a question about a chat that does not exist may never be answered.
+const QUERY_TIMEOUT = 20 * 1000; // ms
 /** 066: a number's state in Activity, in plain words (the pill already says WhatsApp). */
 const STATUS_WORDS = { open: 'Connected', qr: 'Waiting for the QR scan', reconnecting: 'Reconnecting', starting: 'Starting', logged_out: 'Unlinked from the phone', closed: 'Disconnected' };
 
@@ -85,6 +88,7 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
       auth, version, logger,
       browser: Browsers.ubuntu('Duniya'),
       markOnlineOnConnect: false,
+      defaultQueryTimeoutMs: QUERY_TIMEOUT,
       syncFullHistory: false,
       cachedGroupMetadata: async (jid) => groupCache.get(jid)?.meta,
       // Baileys asks for a message it sent when a recipient needs it re-sent; we keep polls (for votes) only.

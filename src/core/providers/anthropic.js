@@ -9,6 +9,7 @@ export const RECOMMENDED = { agent: 'claude-sonnet-5-5', background: 'claude-hai
 const WEB_SEARCH = { type: 'web_search_20250305', name: 'web_search' };
 const SEARCHES_PER_CALL = 3;
 const SEARCH_PRICE_USD = 0.01;
+const ANSWER_TIMEOUT = 3 * 60 * 1000; // ms for one model call (the SDK waits 10 min); the fallback chain takes over after
 
 const clients = new Map(); // secret name -> { key, client }
 onSecretChange((n) => clients.delete(n));
@@ -21,7 +22,7 @@ export function anthropicAdapter(secret = SECRET) {
     const hit = clients.get(secret);
     if (hit?.key === apiKey) return hit.client;
     // maxRetries 0: the fallback chain (042) decides what happens after a failure, not the SDK.
-    const client = new Anthropic({ apiKey, maxRetries: 0 });
+    const client = new Anthropic({ apiKey, maxRetries: 0, timeout: ANSWER_TIMEOUT });
     clients.set(secret, { key: apiKey, client });
     return client;
   };

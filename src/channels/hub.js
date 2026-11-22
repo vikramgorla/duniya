@@ -15,7 +15,7 @@
 // quoted, mentioned, replyToAgent, mediaInfo?, fetchMedia?, raw }.
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { DATA_DIR, fail } from '../core/config.js';
+import { DATA_DIR, fail, within } from '../core/config.js';
 import { getSecret, getSetting, onSecretChange, updateSettings } from '../core/store.js';
 import { activity, bus } from '../core/events.js';
 import { noteChat } from '../core/chat-prefs.js';
@@ -38,6 +38,11 @@ const CHAT_ACTIONS = ['send', 'groupMembers', 'refreshGroup', 'sendMedia', 'send
   'groupDescription', 'groupPicture', 'groupSettings', 'groupLeave', 'profile', 'block', 'unblock', 'setProfileName', 'setProfileStatus', 'askForPhone'];
 /** WhatsApp's own account actions (QR, pairing code, numbers), used by the WhatsApp channel page and the admin MCP. */
 const WHATSAPP_ACTIONS = ['pair', 'logout', 'restart', 'renameNumber', 'removeNumber', 'lookupNumber', 'groupCreate', 'refreshNames'];
+// Reads a screen, a list or a reply waits for: bounded at READ_WAIT, so a channel that does not answer (a group that
+// does not exist, a socket half gone) fails in plain words instead of holding the panel or a turn. Sends, uploads and
+// group changes are not cut off here: they may legitimately take longer, and the channel bounds them itself.
+const READS = new Set(['groupMembers', 'groupInfo', 'groupInviteLink', 'groupParticipants', 'profile', 'fetchHistory', 'lookupNumber']);
+const READ_WAIT = 10 * 1000; // ms
 const MB = 1048576;
 const MEASURE_AFTER_MS = 60000;
 
@@ -98,10 +103,10 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     actions[name] = async (chat, ...args) => {
       const a = route(chat);
       if (typeof a[name] !== 'function') throw fail(`${label(channelOf(chat))} cannot ${name}`, 501);
-      return a[name](chat, ...args);
+      return READS.has(name) ? within(a[name](chat, ...args), READ_WAIT, label(channelOf(chat))) : a[name](chat, ...args);
     };
   }
-  for (const name of WHATSAPP_ACTIONS) actions[name] = (...args) => adapter('whatsapp')[name](...args);
+  for (const name of WHATSAPP_ACTIONS) actions[name] = (...args) => (READS.has(name) ? within(adapter('whatsapp')[name](...args), READ_WAIT, 'WhatsApp') : adapter('whatsapp')[name](...args));
 
   /** One row per channel for the panel, Health and the admin MCP. */
   async function channels() {
@@ -154,12 +159,13 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     },
     async typing(chat) { try { await route(chat).typing?.(chat); } catch { /* best effort */ } },
     async chatName(chat) { // 073: every subject a channel tells us is remembered for the one chat-name resolver
-      try { const name = await route(chat).chatName?.(chat); rememberGroupNames([{ id: chat, name }]); return name || ''; } catch { return ''; }
+      try { const name = await within(Promise.resolve(route(chat).chatName?.(chat)), READ_WAIT, 'chat name'); rememberGroupNames([{ id: chat, name }]); return name || ''; } catch { return ''; }
     },
-    async isMember(chat, phone, senderJid) { try { return !!(await route(chat).isMember?.(chat, phone, senderJid)); } catch { return false; } },
+    async isMember(chat, phone, senderJid) { try { return !!(await within(Promise.resolve(route(chat).isMember?.(chat, phone, senderJid)), READ_WAIT, 'member check')); } catch { return false; } },
     async listChats() {
       const out = [];
-      for (const { adapter: a } of live.values()) out.push(...await a.listChats().catch(() => []));
+      const lists = await Promise.all([...live.values()].map(({ adapter: a }) => within(a.listChats(), READ_WAIT, 'chat list').catch(() => [])));
+      for (const l of lists) out.push(...l);
       rememberGroupNames(out);
       return out;
     },

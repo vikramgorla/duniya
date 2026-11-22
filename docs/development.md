@@ -72,6 +72,11 @@ The owner runs the latest version on one server, so the code carries nothing for
    screens load through `api()`, whose screen-data cache is dropped by any change or live event. Simple switches update
    the screen at once and put the old state back when the server refuses. The shell and its modules are served from
    memory, compressed, with ETag/304; screens load on their first visit ([Panel modules](#panel-modules)).
+9. **Never wait on the outside for good:** anything a screen, a list or a reply waits for from a channel, a model, a
+   tool service or the web has a deadline. Use `within(promise, ms, who)` from `src/core/config.js` (it fails as
+   "<who> did not answer in time", status 504) or `AbortSignal.timeout(ms)` for `fetch`. Reads through the channel hub
+   are bounded already (`READ_WAIT`); names and other extras load in parallel with a short cap and fill in later.
+   Only real chat ids reach a channel: the test console's chats (`testChatId`) belong to none.
 
 ## Panel modules
 
