@@ -37,7 +37,7 @@ test('a chat that is off: history at linking and live messages keep only the new
   assert.equal(k.msgId, 'live-off');
   const row = db.prepare('SELECT * FROM chats_seen WHERE chat = ?').get(G);
   assert.ok(!JSON.stringify(row).includes('hello while off') && !JSON.stringify(row).includes('earlier message'), 'no text in metadata');
-  assert.equal(row.name, null, 'no sender names');
+  assert.ok(!row.name || row.name === 'Panduga families', 'at most the group’s own subject, never a sender’s name');
   // a chat known only from history stays off the People list
   await t.onHistory([t.msg({ chat: '41790000777@s.whatsapp.net', isGroup: false, msgId: 'dm1', text: 'private', ts: Date.now() - DAY })]);
   assert.ok(t.chatPrefs.latestKey('41790000777@s.whatsapp.net'));

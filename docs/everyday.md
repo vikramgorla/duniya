@@ -84,7 +84,7 @@ The panel installs on your home screen and opens full screen like an app: nothin
 
 - A **tab bar** at your thumb: Overview, Chats, Agents, Activity and **More** (every other screen, Find anything,
   Refresh and your account). Questions open as sheets from the bottom; switching off shows **Undo**.
-- Pull down to refresh; on a screen stuck loading, that starts the panel afresh. Back from the background, it
+- Pull down to refresh. Back from the background, it
   reconnects and redraws by itself, and after a server update it loads the new version at your next tap.
 - Light and dark mode follow the phone; it works with a screen reader and a keyboard too.
 - Nothing is stored on the phone except the sign-in cookie. Alerts come in WhatsApp from the

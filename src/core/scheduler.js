@@ -12,6 +12,9 @@ import { upkeepTick } from './upkeep.js';
 
 const dayMatches = (days, day) => !days || days === 'daily' || days.split(',').map((d) => d.trim().toLowerCase()).includes(day);
 
+// Posts in progress, in memory only: stored as "running", a restart in that minute (an update) left the post marked
+// for good and it never went out that day. Only outcomes are stored ('1', 'fail:<n>').
+const running = new Set();
 /** Run one schedule now. Returns [{chat, reply}] */
 export async function runSchedule(agent, sched, channel, { force = false } = {}) {
   const { date } = localParts(agent.timezone || env.timezone);
@@ -24,8 +27,8 @@ export async function runSchedule(agent, sched, channel, { force = false } = {})
     const key = `sched:${agent.id}:${sched.id}:${chat}:${date}`;
     const was = kvGet(key) || '';
     const fails = Number(was.match(/^fail:(\d)$/)?.[1] || 0);
-    if (!force && was && !(fails && fails < 3)) continue;
-    kvSet(key, 'running');
+    if (running.has(key) || (!force && was && !(fails && fails < 3))) continue;
+    running.add(key);
     try {
       const reply = await runAgent({
         agent, role: 'participant', chat, senderName: 'scheduler', requester: 'scheduler',
@@ -43,7 +46,7 @@ export async function runSchedule(agent, sched, channel, { force = false } = {})
     } catch (e) {
       kvSet(key, `fail:${fails + 1}`);
       activity('error', { agent: agent.id, chat, summary: `Schedule ${sched.id} failed: ${e.message}` });
-    }
+    } finally { running.delete(key); }
   }
   return results;
 }

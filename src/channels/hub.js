@@ -43,6 +43,18 @@ const WHATSAPP_ACTIONS = ['pair', 'logout', 'restart', 'renameNumber', 'removeNu
 // group changes are not cut off here: they may legitimately take longer, and the channel bounds them itself.
 const READS = new Set(['groupMembers', 'groupInfo', 'groupInviteLink', 'groupParticipants', 'profile', 'fetchHistory', 'lookupNumber']);
 const READ_WAIT = 10 * 1000; // ms
+// Sends an adapter refused because it is offline right now (`offline` on the error: nothing left the server) are tried
+// again while it reconnects, so an answer that is already written is not lost to a short drop.
+const SENDS = new Set(['send', 'sendMedia', 'sendPoll', 'sendLocation', 'sendContact']);
+const RESEND_AFTER = [2000, 5000, 10000]; // ms between tries
+const pause = (ms) => new Promise((r) => { setTimeout(r, ms); });
+async function whileOffline(run) {
+  for (const wait of RESEND_AFTER) {
+    try { return await run(); } catch (e) { if (!e?.offline) throw e; }
+    await pause(wait);
+  }
+  return run();
+}
 const MB = 1048576;
 const MEASURE_AFTER_MS = 60000;
 
@@ -103,6 +115,7 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     actions[name] = async (chat, ...args) => {
       const a = route(chat);
       if (typeof a[name] !== 'function') throw fail(`${label(channelOf(chat))} cannot ${name}`, 501);
+      if (SENDS.has(name)) return whileOffline(() => route(chat)[name](chat, ...args)); // route again: the adapter may have been reloaded
       return READS.has(name) ? within(a[name](chat, ...args), READ_WAIT, label(channelOf(chat))) : a[name](chat, ...args);
     };
   }

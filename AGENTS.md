@@ -43,8 +43,8 @@ already has it) and tick it honestly; write "n/a" with a reason when an item doe
 - [ ] Background work rides on the existing scheduler tick (`src/core/upkeep.js`) or on events, bounded per tick and
       skipped while memory is tight; no new timers or intervals per feature, chat or number.
 - [ ] Nothing waits on the outside for good: every wait on a channel, model, tool service or the web has a deadline
-      (`within()` in `src/core/config.js`, `AbortSignal.timeout` for `fetch`); screens and lists never wait on extras
-      (names, previews) longer than a short cap; only real chat ids reach a channel.
+      (`within()` in `src/core/config.js`, `AbortSignal.timeout` for `fetch`); screens and lists never ask a channel for
+      extras (names, previews): they read what is stored, and upkeep fills the gaps; only real chat ids reach a channel.
 - [ ] New queries pass `npm run check:perf` (also in `ci-checks.mjs`): no full scans of large tables on hot paths, time
       budgets in `scripts/check-perf.mjs` met; a new hot path is added to its workload; a budget is raised (or a scan
       allowed) only with a reason; index sizes stated in the PR.

@@ -14,7 +14,7 @@ export function promiseRoutes(route, { channel } = {}) {
   const person = (ref) => { const p = personByRef(decodeURIComponent(ref)); if (!p) throw Object.assign(new Error('No such person'), { status: 404 }); return p; };
   route('GET', '/api/commitments', async (req, res, body, q) => {
     const list = listCommitments({ agent: q.get('agent') || '', person: q.get('person') || '', chat: q.get('chat') || '', status: q.get('status') || 'open' });
-    const names = await chatLabels([...new Set(list.map((c) => c.chat))], channel);
+    const names = chatLabels([...new Set(list.map((c) => c.chat))]);
     const agents = new Map(listAgents().filter((a) => !isBuiltin(a)).map((a) => [a.id, a.name]));
     return list.map((c) => ({ ...c, chatName: names.get(c.chat), agentName: agents.get(c.agent) || c.agent }));
   }, admin);

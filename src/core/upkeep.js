@@ -5,6 +5,7 @@
 //   - address-book names: the channel refreshes a number's contact names when due (after connect, then daily)
 //   - group member lists of chats that are on: up to 2 groups whose refresh is due (on start, after a member change,
 //     then every 12 h) — learns LID↔phone pairs (the member list carries no tags, #117)
+//   - group names a list showed as "Unnamed group": up to 3 asked per tick (chat-names.js)
 //   - retention and health (069): free disk space every tick; old data pruned in bounded batches at most hourly
 //     (retention.js) — also while memory is tight (pruning makes things smaller); a WhatsApp number that keeps
 //     reconnecting for 15 minutes is reported to the owner once
@@ -31,6 +32,7 @@ import { drainReads } from './pace.js';
 import { modulesUpkeep } from '../modules/index.js';
 import { commitmentsTick } from './commitments.js';
 import { prefsTick } from './person-insights.js';
+import { namesTick } from './chat-names.js';
 
 const GROUP_EVERY_MS = 12 * 3600000;
 const DOWN_ALERT_MS = 15 * 60000;
@@ -71,6 +73,7 @@ export async function upkeepTick(channel, now = Date.now()) {
     try { done.retries = await historyRetryTick(now); } catch (e) { activity('error', { summary: `History retry failed: ${e.message}` }); }
     if (optionalPaused()) return { ...done, skipped: 'memory' };
     try { done.names = !!(await channel?.upkeep?.())?.ok; } catch { /* the channel reports its own failures */ }
+    try { await namesTick(channel, now); } catch { /* group names lists were missing; asked again later */ }
     try { await rebuildStaleSummary(agentForChat); } catch { /* #178: retried next tick */ }
     try { await modulesUpkeep(now); } catch { /* 081: each module reports its own failures */ }
     try { await commitmentsTick(now); } catch { /* 091: a few due follow-ups per tick; retried next tick */ }

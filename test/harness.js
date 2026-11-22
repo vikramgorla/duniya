@@ -346,6 +346,8 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
   // #10: chats are off by default. Tests written before that switch on the chats they use; tests about the
   // allow-list switch chats off explicitly (or pass { chatsOn: false }).
   t.chatPrefs = await import('../src/core/chat-prefs.js');
+  // as the real channel does when it connects or a group changes: the groups it is in are known by name
+  (await import('../src/core/chat-names.js')).rememberGroupNames(await t.channel.listChats());
   if (chatsOn !== false) {
     for (const c of [...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `g${n}@g.us`), 'shop#g-shop@g.us', 'shop#41790000555@s.whatsapp.net',
       ...[1, 2, 3, 4, 5, 9].map((n) => `4179000000${n}@s.whatsapp.net`)]) t.chatPrefs.setChatPrefs(c, { enabled: true });

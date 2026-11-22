@@ -2,7 +2,7 @@
 // Panel routes (089): an agent's lessons (list, add, approve, edit, scope, delete) and feedback on when it joins in.
 // Admins; lessons are proposed by the server from 👎 ratings, the owner's corrections and join-in feedback.
 import { getAgent, isBuiltin } from '../../core/agents.js';
-import { chatLabels } from '../../core/chat-names.js';
+import { chatLabel, chatLabels } from '../../core/chat-names.js';
 import { db } from '../../core/db.js';
 import { addLesson, deleteLesson, joinFeedback, listLessons, updateLesson } from '../../core/lessons.js';
 
@@ -16,9 +16,9 @@ export function lessonRoutes(route, { channel } = {}) {
   route('GET', '/api/agents/:id/lessons', async (req, res, body, q, p) => {
     const a = agentOf(p);
     const r = listLessons(a.id);
-    const names = await chatLabels([...new Set([...r.proposed, ...r.active, ...r.feedback].map((l) => l.chat).filter(Boolean))], channel);
+    const names = chatLabels([...new Set([...r.proposed, ...r.active, ...r.feedback].map((l) => l.chat).filter(Boolean))]);
     const named = (l) => ({ ...l, ...(l.chat ? { chatName: names.get(l.chat) } : {}) });
-    return { settings: a.lessons, chats: await chatLabels(a.chats, channel).then((m) => a.chats.map((c) => ({ id: c, name: m.get(c) }))),
+    return { settings: a.lessons, chats: a.chats.map((c) => ({ id: c, name: chatLabel(c) })),
       proposed: r.proposed.map(named), active: r.active.map(named), feedback: r.feedback.map(named) };
   }, { role: 'admin' });
   route('POST', '/api/agents/:id/lessons', async (req, res, body, q, p, user) => [201, addLesson(agentOf(p).id, body, user.username)], { role: 'admin' });

@@ -16,18 +16,22 @@ const x = { call: async (m, p, b) => { const r = await t.api(owner, m, p, b); if
 const tool = (name, a = {}) => TOOLS.find((y) => y.name === name).run(a, x);
 
 const GROUP = '120363169191099017@g.us'; // a group WhatsApp knows but the app has never listed
-test('073: a group only WhatsApp knows is named once, remembered, and never shown as its id', async () => {
+test('073: a group only WhatsApp knows is named in the background, remembered, and never shown as its id', async () => {
   let asks = 0;
   const orig = t.channel.chatName;
   t.channel.chatName = async (chat) => { if (chat === GROUP) { asks++; return 'Morges rides'; } return orig(chat); };
   silenceReason('not_addressed', { chat: GROUP, agent: 'panduga', sender: 'Ravi' });
-  const s = (await t.api(owner, 'GET', '/api/silences')).body.silences.find((r) => r.chat === GROUP);
-  assert.equal(s.chatName, 'Morges rides', 'the silences API names the group');
-  assert.equal(asks, 1);
+  const silence = async () => (await t.api(owner, 'GET', '/api/silences')).body.silences.find((r) => r.chat === GROUP);
+  assert.equal((await silence()).chatName, 'Unnamed group', 'a list never asks WhatsApp: no name yet, never the id');
+  assert.equal(asks, 0);
+  assert.equal(await names.namesTick(t.channel), 1, 'upkeep asks for the name the list was missing');
+  assert.equal((await silence()).chatName, 'Morges rides');
   // remembered: WhatsApp is not asked again, and the name survives WhatsApp being offline
+  assert.equal(await names.namesTick(t.channel), 0);
   t.channel.chatName = async () => '';
-  assert.equal((await t.api(owner, 'GET', '/api/silences')).body.silences.find((r) => r.chat === GROUP).chatName, 'Morges rides');
+  assert.equal((await silence()).chatName, 'Morges rides');
   assert.equal(names.chatLabel(GROUP), 'Morges rides');
+  assert.equal(asks, 1);
   t.channel.chatName = orig;
   // a group nobody can name, a person, a hidden number and another number's group: names, never ids
   assert.equal(names.chatLabel('999@g.us'), 'Unnamed group');
@@ -42,18 +46,20 @@ test('073: a group only WhatsApp knows is named once, remembered, and never show
   assert.equal(rows.find((r) => r.chat === GROUP).chatName, 'Morges rides');
 });
 
-test('a group WhatsApp never answers for does not hold the Activity list; its name shows once it comes', async () => {
-  const SLOW = '120363000000000777@g.us';
+test('a group WhatsApp does not name is asked again only after ten minutes, a few groups per tick', async () => {
+  const quiet = Array.from({ length: 5 }, (_, i) => `12036300000000077${i}@g.us`);
   const orig = t.channel.chatName;
-  let answer;
-  t.channel.chatName = (chat) => (chat === SLOW ? new Promise((r) => { answer = r; }) : orig(chat));
-  t.events.activity('config', { chat: SLOW, summary: 'a group with no name yet' });
-  const started = Date.now();
-  const first = (await t.api(owner, 'GET', `/api/activity?chat=${encodeURIComponent(SLOW)}`)).body[0];
-  assert.ok(Date.now() - started < 3000, 'answered without waiting for WhatsApp');
-  assert.equal(first.chatName, 'Unnamed group');
-  answer('Slow group'); await new Promise((r) => setImmediate(r));
-  assert.equal((await t.api(owner, 'GET', `/api/activity?chat=${encodeURIComponent(SLOW)}`)).body[0].chatName, 'Slow group', 'the late answer is remembered');
+  const askedFor = [];
+  t.channel.chatName = async (chat) => { askedFor.push(chat); return ''; };
+  for (const chat of quiet) t.events.activity('config', { chat, summary: 'a group with no name yet' });
+  const rows = (await t.api(owner, 'GET', '/api/activity?limit=5')).body;
+  assert.ok(rows.every((r) => r.chatName === 'Unnamed group'));
+  const now = Date.now();
+  assert.equal(await names.namesTick(t.channel, now), 3, 'bounded per tick');
+  assert.equal(await names.namesTick(t.channel, now + 30000), 2, 'the rest on the next tick');
+  assert.equal(await names.namesTick(t.channel, now + 60000), 0, 'not asked again so soon');
+  assert.equal(await names.namesTick(t.channel, now + 11 * 60000), 3, 'asked again after ten minutes');
+  assert.equal(new Set(askedFor).size, 5);
   t.channel.chatName = orig;
 });
 

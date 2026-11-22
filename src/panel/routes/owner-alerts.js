@@ -9,7 +9,7 @@ import { activity } from '../../core/events.js';
 export function ownerAlertRoutes(route, { channel } = {}) {
   // ---------- spending caps ----------
   route('GET', '/api/budget', async () => {
-    const chats = await chatLabels(listCaps().filter((c) => c.scope === 'chat').map((c) => c.id), channel);
+    const chats = chatLabels(listCaps().filter((c) => c.scope === 'chat').map((c) => c.id));
     const agents = new Map(listAgents().map((a) => [a.id, a.name]));
     return { ...budgetOverview({ agentName: (id) => agents.get(id) || `${id} (deleted)`, chatName: (id) => chats.get(id) }), alertsTo: ownerNumber() };
   });
