@@ -123,12 +123,13 @@ export async function fakeWhatsAppHub(factory) {
 }
 
 /**
- * Answer one MCP request (streamable HTTP, JSON responses) with a fresh fake server: `tools` are names,
+ * Answer one MCP request (streamable HTTP, JSON responses) with a fresh fake server: `tools` are names (or { name, annotations }),
  * `call(name, args)` returns the text result. For tests that host MCP next to their own OAuth endpoints.
  */
 export async function serveFakeMcp(req, res, raw, { name = 'fake', tools = [], call = () => 'ok' } = {}) {
   const s = new Server({ name, version: '1' }, { capabilities: { tools: {} } });
-  s.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools.map((n) => ({ name: n, description: n, inputSchema: { type: 'object', properties: {} } })) }));
+  // a tool is a name, or { name, annotations } (094: what it declares decides its risk)
+  s.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools.map((x) => (typeof x === 'string' ? { name: x } : x)).map((x) => ({ description: x.name, inputSchema: { type: 'object', properties: {} }, ...x })) }));
   s.setRequestHandler(CallToolRequestSchema, async (r) => ({ content: [{ type: 'text', text: call(r.params.name, r.params.arguments || {}) }] }));
   const tr = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await s.connect(tr);
@@ -192,7 +193,9 @@ export async function setup({ bindings = {}, env = {}, seed = true, extend = nul
 
   const fakeMcp = () => {
     const s = new Server({ name: 'fake', version: '1' }, { capabilities: { tools: {} } });
-    const tool = (name) => ({ name, description: name, inputSchema: { type: 'object', properties: {} } });
+    // 094: what each tool declares (MCP annotations) decides its risk; assigning a room is someone else's booking
+    const ANN = { agenda_list: { readOnlyHint: true }, registrations_list: { readOnlyHint: true }, whoami: { readOnlyHint: true }, room_assign_preview: { readOnlyHint: false, destructiveHint: true } };
+    const tool = (name) => ({ name, description: name, inputSchema: { type: 'object', properties: {} }, ...(ANN[name] ? { annotations: ANN[name] } : {}) });
     s.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: ['whoami', 'agenda_list', 'registrations_list', 'room_assign_preview', 'confirm'].map(tool) }));
     s.setRequestHandler(CallToolRequestSchema, async (req) => {
       t.mcpCalls.push(req.params);

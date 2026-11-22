@@ -10,11 +10,11 @@ export const ROLE_LABEL = { organizer: 'Organizers', participant: 'Participants'
 export const serverState = (key, sv) => markSaved({ key, type: sv.type || 'remote', url: sv.url || '', auth: sv.auth || (key ? 'token' : 'oauth'),
   org: sv.tokens?.organizer || '', part: sv.tokens?.participant || '', headers: kvLines(sv.headers, ': '), oauthId: sv.oauthClient?.id || '', oauthSecret: sv.oauthClient?.secret || '',
   pkg: sv.package || '', args: (sv.args || []).join('\n'), env: kvLines(sv.env, '='), allowScripts: !!sv.allowScripts,
-  defaults: { organizer: [...(sv.defaults?.organizer || ['*'])], participant: [...(sv.defaults?.participant || [])] }, reactions: { media: 'auto', mode: 'off', style: '', ...(sv.reactions || {}) } });
+  defaults: { organizer: [...(sv.defaults?.organizer || ['*'])], participant: [...(sv.defaults?.participant || [])] }, behaviour: structuredClone(sv.behaviour || {}) });
 export function markSaved(s) { s.savedUrl = s.url; s.savedAuth = s.auth; s.savedType = s.type; s.savedPkg = s.pkg; s.isNew = !s.key; return s; }
 export const serverConfig = (s) => (s.type === 'local'
-  ? { type: 'local', package: s.pkg, args: splitLines(s.args), env: parseKv(s.env, '='), allowScripts: s.allowScripts, reactions: s.reactions }
-  : { type: 'remote', url: s.url, auth: s.auth, tokens: s.auth === 'token' ? { organizer: s.org, participant: s.part } : {}, headers: parseKv(s.headers, ':'), reactions: s.reactions,
+  ? { type: 'local', package: s.pkg, args: splitLines(s.args), env: parseKv(s.env, '='), allowScripts: s.allowScripts, behaviour: s.behaviour }
+  : { type: 'remote', url: s.url, auth: s.auth, tokens: s.auth === 'token' ? { organizer: s.org, participant: s.part } : {}, headers: parseKv(s.headers, ':'), behaviour: s.behaviour,
     ...(s.auth === 'oauth' && s.oauthId ? { oauthClient: { id: s.oauthId, secret: s.oauthSecret } } : {}) });
 /** A segmented choice (one of a few values), pressed state kept in place. */
 export const seg = (label, options, value, onPick) => {
@@ -23,24 +23,46 @@ export const seg = (label, options, value, onPick) => {
     onclick: (e) => { onPick(v); el.querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === e.currentTarget); x.setAttribute('aria-pressed', String(x === e.currentTarget)); }); } }, l)));
   return el;
 };
-// 094: reaction media services (GIFs, stickers) used on their own: off | sometimes | often, one line each
-export const REACTION_CHOICES = [['off', 'Off'], ['sometimes', 'Sometimes'], ['often', 'Often']];
-const KIND_WORD = { gif: 'GIFs', sticker: 'stickers', image: 'memes' };
+// 094: how a service is used — the same editor for a service's default (Settings) and an agent's override (its Tools page)
+const WHEN = [['asked', 'Only when asked'], ['useful', 'When useful'], ['proactive', 'Proactively']];
+const CHANGES = [['ask', 'Ask first'], ['clear', 'Clear requests'], ['act', 'Act and report']];
+const SHARE = [['off', 'Off'], ['sometimes', 'Sometimes'], ['often', 'Often']];
+const WHERE = [['all', 'Groups and direct'], ['dm', 'Direct only']];
+const KIND_WORD = { gif: 'GIFs', sticker: 'stickers', image: 'pictures' };
+const label = (opts, v) => (opts.find((o) => o[0] === v) || [])[1] || v;
+/** One line for a service's settings (the row's summary). */
+export const behaviourLine = (b, media) => [label(WHEN, b.when || 'useful'), b.changes ? `changes: ${label(CHANGES, b.changes).toLowerCase()}` : '',
+  media && b.share && b.share !== 'off' ? `shares ${KIND_WORD[media]} ${b.share}` : '', b.perReply || b.perDay ? 'limits' : '', b.where === 'dm' ? 'direct only' : ''].filter(Boolean).join(' · ');
 /**
- * "Use on its own" for a reaction media service: a segmented choice and style keywords. state: { mode, style };
- * dflt: the service's default ({ mode }) on an agent (adds "Default"), none in Settings.
+ * How it uses a service: when, changes, share on its own (only `media`: a read-only tool that returns media), limits.
+ * state: the fields this level sets (a service's default, or an agent's override); `dflt`: what applies without one
+ * (an agent: the service's default) — then every choice starts with "Default (…)". onChange after each edit.
  */
-export function reactionChoice(state, kind, dflt = null, onChange = () => {}) {
-  const opts = [...(dflt ? [['inherit', `Default (${dflt.mode})`]] : []), ...REACTION_CHOICES];
-  const choice = seg('Use on its own', opts, state.mode, (v) => { state.mode = v; onChange(); });
-  const style = h('input', { value: state.style || '', maxlength: 200, disabled: !can('admin'), placeholder: dflt?.style || 'e.g. Telugu movie reactions, Brahmanandam', oninput: (e) => { state.style = e.target.value; onChange(); } });
-  return h('div', { class: 'reaction-use' }, h('div', { class: 'row spread' }, h('b', {}, `Use on its own · ${KIND_WORD[kind] || 'reactions'}`), helpLink('tool-services.md#reactions-gifs-and-stickers')), choice,
-    h('p', { class: 'small muted' }, 'Sometimes: celebrations, thanks to it, when asked. Often: also thanks, welcomes, jokes and praise. Never on serious topics; only mood words are searched.'),
-    field('Style keywords (optional)', style));
+export function behaviourEditor(state, { dflt = null, media = '', onChange = () => {} } = {}) {
+  const set = (k, v) => { if (v === 'inherit' || v === '') delete state[k]; else state[k] = v; onChange(); };
+  const choice = (k, title, opts, fallback) => {
+    const first = dflt ? [['inherit', `Default (${label(opts, dflt[k] || fallback) || 'agent'})`]] : k === 'changes' ? [['', 'Agent’s setting']] : [];
+    return field(title, seg(title, [...first, ...opts], state[k] ?? (dflt ? 'inherit' : k === 'changes' ? '' : fallback), (v) => set(k, v)));
+  };
+  const text = (k, title, ph, max) => field(title, h('input', { value: state[k] || '', maxlength: max, disabled: !can('admin'), placeholder: dflt?.[k] || ph, oninput: (e) => set(k, e.target.value.trim()) }));
+  const num = (k, title) => field(title, h('input', { type: 'number', min: 0, max: 1000, value: state[k] ?? '', disabled: !can('admin'), placeholder: dflt ? String(dflt[k] || 'no limit') : 'no limit',
+    oninput: (e) => set(k, e.target.value === '' ? '' : Math.max(0, Number(e.target.value) || 0)) }));
+  return h('details', { class: 'behaviour' }, h('summary', {}, h('b', {}, 'How it uses it'), h('span', { class: 'small muted' }, ` · ${behaviourLine({ ...(dflt || {}), ...state }, media) || 'When useful'}`)),
+    h('div', { class: 'row spread' }, h('span', { class: 'small muted' }, 'Read-only tools never ask; tools that declare themselves destructive always ask.'), helpLink('tool-services.md#how-agents-use-a-service')),
+    choice('when', 'When to use it', WHEN, 'useful'), text('note', 'Note (optional)', 'e.g. only for this year’s event', 200),
+    choice('changes', 'Changes it makes', CHANGES, ''),
+    media ? h('div', {}, choice('share', `Share ${KIND_WORD[media]} on its own`, SHARE, 'off'), text('style', 'Style words (optional)', 'e.g. Telugu movie reactions', 120),
+      h('p', { class: 'small muted' }, 'Sometimes: celebrations, thanks to it, when asked. Often: also thanks, welcomes, jokes, praise. Never on serious topics; only mood and style words are searched.')) : null,
+    h('div', { class: 'grid2' }, num('perReply', 'Most uses per reply'), num('perDay', 'Most uses per day')),
+    choice('where', 'Where results may be posted', WHERE, 'all'));
 }
+const RISK_WORD = { read: 'Read', change: 'Change', destructive: 'Destructive' };
+/** The per-tool risk override (a select: what the tool declares, or read / change / destructive). risk: { get, set }. */
+const riskSelect = (t, risk) => h('select', { 'aria-label': `${t.name}: risk`, disabled: !can('admin'), onchange: (e) => risk.set(t.name, e.target.value) },
+  [['auto', `${RISK_WORD[t.risk] || 'Change'}${t.annotated ? '' : ' (not declared)'}`], ...Object.entries(RISK_WORD).map(([v, l]) => [v, `${l} (override)`])].map(([v, l]) => h('option', { value: v, selected: (risk.get(t.name) || 'auto') === v }, l)));
 /** Tools of a service with a tick per role, an all/none tick per role and "Everyone: all tools" (#165).
  * rules: { has(role, tool), write(role, tools ticked, all tools) }. */
-export function toolGrid(box, tools, rules) {
+export function toolGrid(box, tools, rules, risk = null) {
   const ROLES = ['participant', 'organizer'];
   const on = Object.fromEntries(ROLES.map((r) => [r, new Set(tools.filter((t) => rules.has(r, t.name)).map((t) => t.name))]));
   const save = (role) => rules.write(role, tools.filter((t) => on[role].has(t.name)).map((t) => t.name), tools);
@@ -50,15 +72,16 @@ export function toolGrid(box, tools, rules) {
     h('div', { class: 'row', style: 'gap:6px;margin-top:8px' }, h('span', { class: 'small muted' }, `${tools.length} tools`),
       ...ROLES.map((r) => tick(on[r].size === tools.length, `All tools: ${ROLE_LABEL[r]}`, (e) => all(r, e.target.checked), on[r].size && on[r].size < tools.length, ` All: ${ROLE_LABEL[r]}`)),
       can('admin') ? h('button', { class: 'btn small', type: 'button', disabled: ROLES.every((r) => on[r].size === tools.length), onclick: () => { for (const r of ROLES) { on[r] = new Set(tools.map((t) => t.name)); save(r); } draw(); } }, 'Everyone: all tools') : null),
-    h('table', { class: 'stack flat' }, h('thead', {}, h('tr', {}, h('th', {}, 'Tool'), ...ROLES.map((r) => h('th', { class: 'c' }, ROLE_LABEL[r])))),
+    h('table', { class: 'stack flat' }, h('thead', {}, h('tr', {}, h('th', {}, 'Tool'), ...ROLES.map((r) => h('th', { class: 'c' }, ROLE_LABEL[r])), risk ? h('th', {}, 'Risk') : null)),
       h('tbody', {}, tools.map((t) => h('tr', {}, h('td', { 'data-label': '' }, h('b', {}, t.name), h('div', { class: 'small muted' }, t.description)),
         ...ROLES.map((r) => h('td', { class: 'c', 'data-label': ROLE_LABEL[r] },
-          tick(on[r].has(t.name), `${t.name}: ${ROLE_LABEL[r]}`, (e) => { if (e.target.checked) on[r].add(t.name); else on[r].delete(t.name); save(r); draw(); }))))))));
+          tick(on[r].has(t.name), `${t.name}: ${ROLE_LABEL[r]}`, (e) => { if (e.target.checked) on[r].add(t.name); else on[r].delete(t.name); save(r); draw(); }))),
+        risk ? h('td', { 'data-label': 'Risk' }, riskSelect(t, risk)) : null)))));
   draw();
 }
 /**
  * One tool service as a fieldset. o: { base (API prefix with /probe, /discover, /connections, /local), conns, locals,
- * isOwner, save() → saved?, saveHint, rules (see toolGrid), redraw(), remove(), keyLocked, extra (elements after the form) }.
+ * isOwner, save() → saved?, saveHint, rules and risk (see toolGrid), redraw(), remove(), keyLocked, extra (elements after the form) }.
  */
 export function toolServiceEditor(s, o) {
   const enc = encodeURIComponent;
@@ -110,7 +133,7 @@ export function toolServiceEditor(s, o) {
         h('input', { value: s.oauthSecret, placeholder: 'Client secret as ${SECRET} (optional)', oninput: (e) => (s.oauthSecret = e.target.value.trim()) }))) : null);
   const discoverButton = (reqBody) => h('button', { class: 'btn small', onclick: async () => {
     const tools = await tryApi(() => api('POST', `${o.base}/discover`, reqBody));
-    if (tools) toolGrid(grid, tools, o.rules);
+    if (tools) toolGrid(grid, tools, o.rules, o.risk);
   } }, 'Discover tools');
   const legend = h('legend', {}, s.key || 'new tool service');
   if (s.type === 'local') {

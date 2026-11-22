@@ -6,7 +6,7 @@ import { channelItems, channelPage } from './channels.js';
 import { listDetail } from './listdetail.js';
 import { releaseList } from './releases.js';
 import { SETTINGS_SECTIONS, SIZE_LABEL, SMALL_MODE_LINK, helpLink, loadModels, modelSelect, openAgent, plural } from './shared.js';
-import { globRe, markSaved, reactionChoice, serverConfig, serverState, toolServiceEditor } from './tool-editor.js';
+import { behaviourEditor, globRe, markSaved, serverConfig, serverState, toolServiceEditor } from './tool-editor.js';
 import { renderUpdates } from './updates.js';
 /** Settings → Secrets (062: was its own tab). Redraws itself after a change. */
 async function secretsCard() {
@@ -305,16 +305,12 @@ async function toolServicesCard() {
           g.agents.replacedBy.length ? h('span', { class: 'pill warn' }, `replaced by own service in ${g.agents.replacedBy.join(', ')}`) : null,
           g.needs?.length ? h('span', { class: 'pill warn' }, `set in Settings → Secrets: ${g.needs.join(', ')}`) : null) : null;
         const canEdit = can('admin') && (isOwner || it.s.savedType !== 'local');
-        // 094: a service that finds GIFs or stickers: the default "Use on its own" for every agent; whether it counts as one
-        const rx = it.s.reactions;
-        const media = h('select', { 'aria-label': 'Finds GIFs or stickers', disabled: !canEdit, onchange: (e) => { rx.media = e.target.value; } },
-          [['auto', 'Detect from its tools'], ['on', 'Yes'], ['off', 'No']].map(([v, l]) => h('option', { value: v, selected: rx.media === v }, l)));
         const extra = h('div', {}, status,
           h('div', { class: 'small muted' }, `Defaults: organizers ${sum(it.s, 'organizer')}; participants ${sum(it.s, 'participant')}. Discover tools to change them.`),
-          g?.reaction ? reactionChoice(rx, g.reaction.kind) : null,
-          h('details', { class: 'small' }, h('summary', {}, 'Finds GIFs or stickers'), field('Use it for reactions', media)),
+          behaviourEditor(it.s.behaviour, { media: g?.media || '' }), // 094: how every agent uses it unless an agent says otherwise
           canEdit ? h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn small primary', onclick: () => saveOne(it) }, it.s.isNew ? 'Add for all agents' : 'Save')) : null);
-        return toolServiceEditor(it.s, { base: '/api/tool-services', conns, locals, isOwner, save: () => saveOne(it), saveHint: 'Save to connect', rules: defaultsRules(it.s),
+        const risk = { get: (n) => it.s.behaviour.tools?.[n], set: (n, v) => { const t = { ...(it.s.behaviour.tools || {}) }; if (v === 'auto') delete t[n]; else t[n] = v; it.s.behaviour.tools = t; } };
+        return toolServiceEditor(it.s, { base: '/api/tool-services', conns, locals, isOwner, save: () => saveOne(it), saveHint: 'Save to connect', rules: defaultsRules(it.s), risk,
           redraw: draw, remove: () => removeOne(it), keyLocked: !it.s.isNew, extra });
       }),
       can('admin') ? h('div', { class: 'row', style: 'margin-top:8px' }, browseButton({ target: 'all', targetName: 'all agents', onAdded: () => renderSettings() }, reg),

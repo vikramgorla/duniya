@@ -100,10 +100,10 @@ export function moduleRules(agent, role, m) {
   return role === 'organizer' ? [`${m.id}:*`] : m.tools.filter((t) => t.participantDefault).map((t) => `${m.id}:${t.name}`);
 }
 
-/** A change about the sender happens now; anything else goes to the runner's confirm gate (093: low risk may apply at once). */
+/** A change about the sender happens now; anything else goes to the runner's confirm gate (094: a change, not a destructive one, may apply at once). */
 export function changeOrHold(ctx, kind, action, summary, { self = false } = {}) {
   if (self || !ctx.hold) return live.get(kind)?.manifest.apply(action, ctx.agent);
-  return ctx.hold({ kind, action, summary, tool: ctx.toolFq, input: ctx.toolInput });
+  return ctx.hold({ kind, action, summary, tool: ctx.toolFq, input: ctx.toolInput, risk: ctx.toolRisk, mode: ctx.toolMode });
 }
 /** Apply a held module change (runner, after "confirm XXXX"). */
 export function applyModuleAction(kind, action, agent) {

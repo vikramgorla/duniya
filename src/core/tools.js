@@ -14,8 +14,9 @@ import { capsOf } from '../channels/index.js';
 import { mediaTools, imageToolAllowed } from './media-ai.js';
 import { liveModules, moduleRules } from '../modules/index.js';
 import { promiseTools } from './commitments.js';
-import { changeTools } from './autonomy.js';
-import { reactionTool, reactionSettings, reactionToolDef } from './reactions.js';
+import { changeTools, riskOf } from './autonomy.js';
+import { behaviourOf } from './tool-behaviour.js';
+import { mediaTool, shareToolDef } from './sharing.js';
 
 
 const exposedName = (server, tool) => `${server}__${tool}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
@@ -87,24 +88,26 @@ function serverAllow(srv, key, allow, role) {
   return explicit.length ? explicit : (srv.defaults?.[role] || []).map((g) => `${key}:${g}`);
 }
 
-/** 094: the reaction search tool of a service ({ tool, kind, … } or null); `conn()` gives its connection. Never throws. */
-export async function detectReaction(srv, conn) {
-  if (srv?.reactions?.media === 'off') return null;
+/** 094: a service's tools within 5 s (a slow or unreachable service does not hold up a panel page). */
+async function listWithin(conn) {
   let timer;
-  try {
-    const slow = new Promise((resolve, reject) => { timer = setTimeout(() => reject(new Error('timeout')), 5000); });
-    return reactionTool(await Promise.race([conn().listTools(), slow]), srv?.reactions?.media);
-  } catch { return null; } finally { clearTimeout(timer); }
+  const slow = new Promise((resolve, reject) => { timer = setTimeout(() => reject(new Error('The tool service did not answer in time')), 5000); });
+  try { return await Promise.race([conn.listTools(), slow]); } finally { clearTimeout(timer); }
 }
-/** 094: an agent's reaction media services with its own choice and the service's default (its Tools page). */
-export async function reactionServicesOf(agent) {
-  const out = [];
-  for (const [key, srv] of Object.entries(effectiveServers(agent))) {
-    const rt = await detectReaction(srv, () => connectionFor(agent, key, 'organizer'));
-    if (rt) out.push({ service: key, global: !!srv.global, kind: rt.kind, tool: rt.tool, own: { mode: 'inherit', style: '', ...(agent.reactions?.[key] || {}) },
-      default: { mode: srv.reactions?.mode || 'off', style: srv.reactions?.style || '' } });
-  }
-  return out;
+/** 094: a service's tools as the panel shows them: name, description, risk from its annotations, shareable media. */
+export async function describeTools(key, conn) {
+  const tools = await listWithin(conn);
+  const media = mediaTool(key, tools);
+  return tools.map((t) => ({ name: t.name, description: (t.description || '').slice(0, 300), risk: riskOf(t.annotations || {}), annotated: !!t.annotations, ...(media?.tool === t.name ? { media: media.kind } : {}) }));
+}
+/** 094: the media kind a service can share on its own ('' when none, or when it cannot be reached). */
+export const serviceMedia = (key, conn) => describeTools(key, conn).then((tools) => tools.find((t) => t.media)?.media || '', () => '');
+/** 094: an agent's services with its own settings, the service's default and the tools (its Tools page). */
+export async function agentServices(agent) {
+  return Promise.all(Object.entries(effectiveServers(agent)).map(async ([key, srv]) => {
+    const tools = await describeTools(key, connectionFor(agent, key, 'organizer')).catch(() => null);
+    return { service: key, global: !!srv.global, own: agent.services?.[key] || {}, default: srv.behaviour || {}, tools, media: tools?.find((t) => t.media)?.media || '' };
+  }));
 }
 
 /** Organizer-level connection (used to apply confirmed changes). */
@@ -112,7 +115,7 @@ export const organizerConnection = (agent, serverKey) => connectionFor(agent, se
 
 /**
  * Build the tool list for an agent + role, in a chat (075: chat tools only as far as the chat's channel can do them;
- * no chat = the test console). `owner` (079): the sender is the owner (People tools with owner-level access). Returns { defs: [Anthropic tool defs], run: (name, input, ctx) => {isError, text}, meta: Map, reactions: [reaction media services on for it] }
+ * no chat = the test console). `owner` (079): the sender is the owner (People tools with owner-level access). Returns { defs: [Anthropic tool defs], run: (name, input, ctx) => {isError, text}, meta: Map, services: [{ key, behaviour }], sharing: [services that share media on their own] }
  */
 export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
   const allow = agent.tools[role] || [];
@@ -120,36 +123,36 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
   if (agent.confirm?.tool) deny.push(agent.confirm.tool); // confirming is never the model's job
   const defs = [];
   const meta = new Map();
+  const services = []; // 094: { key, behaviour } of each service it may use
+  const sharing = []; // 094: services whose media results it shares on its own
 
-  const reactions = []; // 094: reaction media services this agent uses on its own (send_reaction, every role)
   for (const [serverKey, srv] of Object.entries(effectiveServers(agent))) {
     const sAllow = serverAllow(srv, serverKey, allow, role);
-    const rs = reactionSettings(agent, serverKey, srv);
-    const forRole = sAllow.some((r) => r.startsWith(`${serverKey}:`));
-    if (!forRole && rs.mode === 'off') continue; // nothing of it allowed for this role
+    if (!sAllow.some((r) => r.startsWith(`${serverKey}:`))) continue; // nothing of it allowed for this role
     let conn;
     let tools;
     try {
-      conn = connectionFor(agent, serverKey, forRole ? role : 'organizer');
+      conn = connectionFor(agent, serverKey, role);
       tools = await conn.listTools();
     } catch (e) {
       meta.set('__errors', [...(meta.get('__errors') || []), e.message]);
       continue;
     }
-    const rt = rs.mode === 'off' ? null : reactionTool(tools, srv.reactions?.media);
-    if (rt) reactions.push({ key: serverKey, ...rt, ...rs, conn });
-    if (!forRole) continue;
     const pair = changeTools(agent, serverKey, tools.map((t) => t.name)); // 093: preview → confirm tools of this service
-    for (const t of tools) {
+    const b = behaviourOf(agent, serverKey, srv); // 094: when, changes, sharing, limits of this service for the agent
+    services.push({ key: serverKey, behaviour: b });
+    const mine = tools.filter((t) => matchesAny(`${serverKey}:${t.name}`, sAllow) && !matchesAny(`${serverKey}:${t.name}`, deny));
+    const mt = b.share === 'off' ? null : mediaTool(serverKey, mine);
+    if (mt) sharing.push({ key: serverKey, ...mt, share: b.share, style: b.style, behaviour: b, conn });
+    for (const t of mine) {
       const fq = `${serverKey}:${t.name}`;
-      if (!matchesAny(fq, sAllow) || matchesAny(fq, deny)) continue;
       const name = exposedName(serverKey, t.name);
       defs.push({
         name,
         description: (t.description || '').slice(0, 1000),
         input_schema: t.inputSchema || { type: 'object', properties: {} },
       });
-      meta.set(name, { kind: 'mcp', server: serverKey, tool: t.name, fq, conn, global: !!srv.global, annotations: t.annotations || {},
+      meta.set(name, { kind: 'mcp', server: serverKey, tool: t.name, fq, conn, global: !!srv.global, annotations: t.annotations || {}, behaviour: b, override: b.tools[t.name] || '',
         change: t.name === pair.confirm ? 'confirm' : pair.preview(t.name) ? 'preview' : '', confirmTool: pair.confirm, undo: pair.undo ? `${serverKey}:${pair.undo}` : '' });
     }
   }
@@ -161,7 +164,8 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
       if (!t.roles.includes(role) || (allowRules && !matchesAny(fq, allowRules)) || matchesAny(fq, deny)) continue;
       const name = exposedName(kind, t.name);
       defs.push({ name, description: t.description, input_schema: t.input_schema });
-      meta.set(name, { kind: 'local', fq, tool: t });
+      const b = behaviourOf(agent, kind, null); // Duniya's own tools: the same risk path (their annotations, the agent's changes)
+      meta.set(name, { kind: 'local', fq, tool: t, annotations: t.annotations || {}, behaviour: b, override: b.tools[t.name] || '' });
     }
   };
 
@@ -184,8 +188,8 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
   // this role (organizers on, participants off by default); the deny list always wins.
   if (chatChannel() && (!capsOf(chat) || capsOf(chat).media) && await imageToolAllowed(agent, role).catch(() => false)) addLocal('media', mediaTools, null);
 
-  // Reactions (094): one call picks the mood; code searches the service and sends after the text (chats that take media)
-  if (reactions.length && chatChannel() && (!capsOf(chat) || capsOf(chat).media)) addLocal('whatsapp', [reactionToolDef(reactions)], null);
+  // Share on its own (094): one call picks the mood; code searches the service and posts after the text (chats that take media)
+  if (sharing.length && chatChannel() && (!capsOf(chat) || capsOf(chat).media)) addLocal('whatsapp', [shareToolDef(sharing)], null);
 
   async function run(name, input, ctx) {
     const m = meta.get(name);
@@ -199,5 +203,5 @@ export async function toolsFor(agent, role, { chat = '', owner = false } = {}) {
     }
   }
 
-  return { defs, run, meta, reactions };
+  return { defs, run, meta, services, sharing };
 }

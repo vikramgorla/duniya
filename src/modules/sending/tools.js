@@ -34,7 +34,7 @@ async function audienceOf({ to, name = '' }) {
 
 export const sendingTools = [
   {
-    name: 'stop_messages', roles: ['organizer', 'participant'], participantDefault: true,
+    name: 'stop_messages', annotations: { readOnlyHint: false, destructiveHint: false }, roles: ['organizer', 'participant'], participantDefault: true,
     description: 'The sender does not want messages from lists any more (they said stop, unsubscribe, "don\'t send me these", in any language). Records it in code; reply with the text this returns.',
     input_schema: { type: 'object', properties: {} },
     async run(args, ctx) {
@@ -44,7 +44,7 @@ export const sendingTools = [
     },
   },
   {
-    name: 'sending_status', roles: ['organizer'],
+    name: 'sending_status', annotations: { readOnlyHint: true }, roles: ['organizer'],
     description: 'Messages sent to lists (organizers): the latest runs with their state and counts (sent, replied, skipped, waiting, failed).',
     input_schema: { type: 'object', properties: {} },
     async run() {
@@ -54,7 +54,7 @@ export const sendingTools = [
     },
   },
   {
-    name: 'send_to_list', roles: ['organizer'],
+    name: 'send_to_list', annotations: { readOnlyHint: false, destructiveHint: true }, roles: ['organizer'],
     description: 'Prepare a message to people (organizers): a list, a tag, a household, the people registered for an event, or people with an open order (optionally of one event). Each person gets their own wording of the message; it may use {first_name}, {household}, and for events {event}, {date}, {place}, {people}, for open orders {amount}, {due}, {ways_to_pay}. Only people who agreed to the purpose get it. Nothing is sent until an organizer confirms the code; tell them the preview.',
     input_schema: { type: 'object', properties: {
       to: { type: 'string', enum: ['list', 'tag', 'household', 'event', 'orders'] }, name: { type: 'string', description: 'The list, tag, household or event (for orders: optional event)' },

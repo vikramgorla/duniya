@@ -9,7 +9,7 @@ import { listGlobalRows, getGlobalServer, saveGlobalServer, removeGlobalServer }
 import { probeServer, startSignIn, listConnections, disconnect, deleteServerConnections, OAUTH_ROLES, GLOBAL_SCOPE } from '../../core/mcp-oauth.js';
 import { installPackage, installedInfo, localServiceCheck } from '../../core/mcp-local.js';
 import { resetMcpPool, mcpConnection } from '../../core/mcp.js';
-import { serverConnection, oauthClientOf, detectReaction } from '../../core/tools.js';
+import { serverConnection, oauthClientOf, describeTools, serviceMedia } from '../../core/tools.js';
 import { referencedSecrets } from '../../core/schema.js';
 import { getSecret } from '../../core/store.js';
 import { isHttps } from '../http.js';
@@ -20,7 +20,6 @@ const ownerOnly = (user, ...configs) => {
     throw fail('Only the owner can add, change or remove local tool services (they run code on this server)', 403);
   }
 };
-const toolList = (tools) => tools.map((t) => ({ name: t.name, description: (t.description || '').slice(0, 300) }));
 
 /** One global service as the panel and the admin tools see it (secret references, never values). */
 function globalView(row, agents = listAgents()) {
@@ -35,11 +34,11 @@ function globalView(row, agents = listAgents()) {
 
 export function toolServiceRoutes(route) {
   registryRoutes(route); // 052: browse the MCP Registry and add from it
-  // 094: `reaction`: the service finds reaction media (GIFs, stickers) — its search tool and media kind — or null
+  // 094: `media`: the kind of media a read-only tool of it returns ('' = none), so it can be shared on its own
   route('GET', '/api/tool-services', async () => {
     const agents = listAgents();
     return Promise.all(listGlobalRows().map(async (r) => ({ ...globalView(r, agents),
-      reaction: await detectReaction(r.config, () => serverConnection(r.config, { scope: GLOBAL_SCOPE, key: r.name, role: 'organizer', where: 'Settings → Tool services' })) })));
+      media: await serviceMedia(r.name, { listTools: () => serverConnection(r.config, { scope: GLOBAL_SCOPE, key: r.name, role: 'organizer', where: 'Settings → Tool services' }).listTools() }) })));
   });
 
   route('PUT', '/api/tool-services/:name', async (req, res, body, q, p, user) => {
@@ -72,13 +71,13 @@ export function toolServiceRoutes(route) {
   route('POST', '/api/tool-services/discover', async (req, res, body) => {
     const saved = body.server ? getGlobalServer(String(body.server)) : null;
     if (saved && (body.auth === 'oauth' || body.type === 'local' || !body.url)) {
-      return toolList(await serverConnection(saved, { scope: GLOBAL_SCOPE, key: body.server, role: 'organizer', where: 'Settings → Tool services' }).listTools());
+      return describeTools(body.server, serverConnection(saved, { scope: GLOBAL_SCOPE, key: body.server, role: 'organizer', where: 'Settings → Tool services' }));
     }
     if (body.auth === 'oauth' || body.type === 'local') return [400, { error: 'Save the tool service first' }];
     const url = interpolate(String(body.url || ''));
     if (!url) return [400, { error: 'URL is empty (is its secret set?)' }];
     const headers = interpolate(body.headers && typeof body.headers === 'object' ? body.headers : {});
-    return toolList(await mcpConnection(url, { token: interpolate(String(body.token || '')), headers }).listTools());
+    return describeTools(String(body.server || ''), mcpConnection(url, { token: interpolate(String(body.token || '')), headers }));
   });
 
   route('GET', '/api/tool-services/local', async () => listGlobalRows().filter((r) => r.config.type === 'local').map(({ name, config }) => {

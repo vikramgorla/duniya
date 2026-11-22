@@ -107,7 +107,7 @@ export const TOOLS = [
     input: { id: str('New agent id (lowercase letters, digits, -). Optional: derived from the name'), template: str('Template id (optional)'), config: obj('Configuration fields (optional, override the template)') },
     run: (a, x) => x.call('POST', '/api/agents', { id: a.id, template: a.template, config: a.config || {} }) },
   { name: 'update_agent', calls: [['PUT', '/api/agents/x']],
-    description: 'Change fields of an agent (only the fields given change), e.g. { "prompt": "…", "triggers": ["silku", "!help"], "model": "auto" } or { "groupReplies": "followups" | "wake" | "auto" } (in groups: when woken and replies right after it speaks, only when woken, or whenever a message is for it) or { "fallback": { "mode": "off" } } (model fallback: inherit | on | off, optional "chain") or { "model": "smart", "modelTiers": { "light": "", "strong": "" } } (Auto: light for simple, strong when needed; empty tiers = Settings → Models) or { "promises": { "track": true, "followUp": "chat" | "dm" | "off" } } (notice promises in its chats and remind when due) or { "cues": true } (suggest family ties in People from what people say) or { "lessons": { "enabled": true, "autoApprove": false } } (learn lessons from the owner\'s corrections; save them without asking) or { "autonomy": "ask" | "clear" | "act" } (how sure before changing things: ask = show the preview and wait for a yes; clear = default, an organizer\'s clear request is the approval, deletes and other people\'s money, registrations and duties still ask; act = also reasonable inferred changes; optional "risk": { "low": ["server:tool"], "high": [...] } overrides which changes count as low risk) or { "selfCheck": false } (stop checking amounts, dates and counts against People and modules before sending) or { "peopleAccess": "own" | "everyone" | "off", "peopleLists": ["l_…"] } (which people its People tools and sender cards may see: its own chats plus shared lists, everyone in People, or nobody) or { "organizers": [phone, "p_…" person, "l_…" list] } (roles follow a person on every app). Returns the agent and any warnings. For owner-assistant, how it is reached and its permissions are fixed in code (chats, triggers, people, confirm, quick answers are ignored); alerts: { to: "+41…" } sets where owner alerts go (owner only).',
+    description: 'Change fields of an agent (only the fields given change), e.g. { "prompt": "…", "triggers": ["silku", "!help"], "model": "auto" } or { "groupReplies": "followups" | "wake" | "auto" } (in groups: when woken and replies right after it speaks, only when woken, or whenever a message is for it) or { "fallback": { "mode": "off" } } (model fallback: inherit | on | off, optional "chain") or { "model": "smart", "modelTiers": { "light": "", "strong": "" } } (Auto: light for simple, strong when needed; empty tiers = Settings → Models) or { "promises": { "track": true, "followUp": "chat" | "dm" | "off" } } (notice promises in its chats and remind when due) or { "cues": true } (suggest family ties in People from what people say) or { "lessons": { "enabled": true, "autoApprove": false } } (learn lessons from the owner\'s corrections; save them without asking) or { "autonomy": "ask" | "clear" | "act" } (how sure before changing things: ask = show the preview and wait for a yes; clear = default, an organizer\'s clear request is the approval, tools that declare themselves destructive still ask; act = also reasonable inferred changes; a tool service can differ: set_tool_behaviour) or { "selfCheck": false } (stop checking amounts, dates and counts against People and modules before sending) or { "peopleAccess": "own" | "everyone" | "off", "peopleLists": ["l_…"] } (which people its People tools and sender cards may see: its own chats plus shared lists, everyone in People, or nobody) or { "organizers": [phone, "p_…" person, "l_…" list] } (roles follow a person on every app). Returns the agent and any warnings. For owner-assistant, how it is reached and its permissions are fixed in code (chats, triggers, people, confirm, quick answers are ignored); alerts: { to: "+41…" } sets where owner alerts go (owner only).',
     input: { agent_id: str('Agent id'), changes: obj('Fields to change') }, required: ['agent_id', 'changes'],
     run: (a, x) => x.call('PUT', `/api/agents/${enc(a.agent_id)}`, a.changes || {}) },
   // 089: lessons from the owner's corrections
@@ -666,29 +666,37 @@ export const TOOLS = [
     description: 'Tool services (MCP servers) defined once for all agents: their settings (secret names, never values), default tools per role, and which agents use them, switched them off (opted out) or replace them with their own service of the same name.',
     input: {},
     run: (a, x) => x.call('GET', '/api/tool-services') },
-  // 094: reaction media services (GIFs, stickers) used on their own — per agent, or the service's default for all agents
-  { name: 'set_reactions', calls: [['GET', '/api/agents/x'], ['PUT', '/api/agents/x'], ['GET', '/api/tool-services'], ['PUT', '/api/tool-services/x']],
-    description: 'How much a reaction media tool service (one that finds GIFs or stickers, e.g. "gifs"; list_global_tool_services shows "reaction" for them, get_agent_reactions per agent) is used on its own: mode off | sometimes (real celebrations, thanks to the agent, when asked) | often (thanks, celebrations, welcomes, jokes, praise, settled plans) and style keywords added to every search (e.g. "Telugu movie reactions, Brahmanandam"). With agent_id: that agent (mode "inherit" = the service\'s default); without: the global service\'s default for every agent, and media (auto | on | off) says whether the service counts as reaction media at all. Only mood keywords and the style go to the service, never names.',
-    input: { agent_id: str('Agent id (optional; empty = the global service\'s default)'), service: str('Tool service name, e.g. gifs'), mode: { type: 'string', enum: ['inherit', 'off', 'sometimes', 'often'] },
-      style: str('Style keywords (optional; empty clears)'), media: { type: 'string', enum: ['auto', 'on', 'off'], description: 'Global service only: is it reaction media (auto = by its tools)' } }, required: ['service'],
+  // 094: how each tool service is used — a service's default for every agent, overridable per agent
+  { name: 'get_tool_behaviour', readOnly: true, calls: [['GET', '/api/agents/x/services'], ['GET', '/api/tool-services']],
+    description: 'How tool services are used. With agent_id: each service the agent can use, with its own settings ("own", only what differs), the service\'s default and the tools (name, risk from the tool\'s annotations: read | change | destructive, and "media" for a read-only tool whose results are media and can be shared on its own). Without agent_id: the global services\' defaults. Settings: when (asked | useful | proactive), note, changes (ask | clear | act; empty = the agent\'s "How sure before changing things"), share (off | sometimes | often), style, perReply, perDay (0 = no limit), where (all | dm), tools ({ tool: read | change | destructive } overrides).',
+    input: { agent_id: str('Agent id (optional)') },
+    run: async (a, x) => (a.agent_id ? x.call('GET', `/api/agents/${enc(a.agent_id)}/services`)
+      : (await x.call('GET', '/api/tool-services')).map((g) => ({ service: g.name, default: g.config.behaviour || {} }))) },
+  { name: 'set_tool_behaviour', calls: [['GET', '/api/agents/x'], ['PUT', '/api/agents/x'], ['GET', '/api/tool-services'], ['PUT', '/api/tool-services/x']],
+    description: 'Change how a tool service is used: with agent_id for that agent ("inherit" or "" = back to the service\'s default), without for the global service\'s default for every agent. Fields (only those given change): when: asked (only when someone asks for that kind of thing) | useful (the agent decides) | proactive (looks for chances); note: a short instruction in the owner\'s words; changes: ask | clear | act (overrides the agent\'s "How sure before changing things" for this service; destructive tools always ask, read-only ones never do); share: off | sometimes | often (post media results on its own — only for read-only tools that return media) with style words added to every search (only mood and style words go to the service, never names); per_reply, per_day: most uses (0 = no limit); where: all | dm (results only in direct messages); tools: { "<tool>": "read" | "change" | "destructive" | "auto" } when a service declares a tool wrongly.',
+    input: { agent_id: str('Agent id (optional)'), service: str('Tool service name'), when: { type: 'string', enum: ['inherit', 'asked', 'useful', 'proactive'] }, note: str('Short note (optional)'),
+      changes: { type: 'string', enum: ['inherit', 'ask', 'clear', 'act'] }, share: { type: 'string', enum: ['inherit', 'off', 'sometimes', 'often'] }, style: str('Style words (optional)'),
+      per_reply: int('Most uses per reply (0 = no limit)', { minimum: 0, maximum: 1000 }), per_day: int('Most uses per day (0 = no limit)', { minimum: 0, maximum: 1000 }),
+      where: { type: 'string', enum: ['inherit', 'all', 'dm'] }, tools: obj('Per-tool risk overrides') }, required: ['service'],
     run: async (a, x) => {
-      const pick = (cur) => ({ ...cur, ...(a.mode !== undefined ? { mode: a.mode } : {}), ...(a.style !== undefined ? { style: a.style } : {}) });
+      const patch = (cur) => {
+        const out = { ...cur, tools: { ...(cur.tools || {}), ...(a.tools || {}) } };
+        for (const [k, f] of [['when', 'when'], ['note', 'note'], ['changes', 'changes'], ['share', 'share'], ['style', 'style'], ['per_reply', 'perReply'], ['per_day', 'perDay'], ['where', 'where']]) {
+          if (a[k] === undefined) continue;
+          if (a[k] === 'inherit' || a[k] === '') delete out[f]; else out[f] = a[k];
+        }
+        return out;
+      };
       if (a.agent_id) {
-        const cur = (await x.call('GET', `/api/agents/${enc(a.agent_id)}`)).config?.reactions || {};
-        const r = await x.call('PUT', `/api/agents/${enc(a.agent_id)}`, { reactions: { ...cur, [a.service]: pick(cur[a.service] || { mode: 'inherit', style: '' }) } });
-        return { agent: r.id, reactions: r.config?.reactions };
+        const cur = (await x.call('GET', `/api/agents/${enc(a.agent_id)}`)).config?.services || {};
+        const r = await x.call('PUT', `/api/agents/${enc(a.agent_id)}`, { services: { ...cur, [a.service]: patch(cur[a.service] || {}) } });
+        return { agent: r.id, service: a.service, settings: r.config?.services?.[a.service] || {} };
       }
       const g = (await x.call('GET', '/api/tool-services')).find((s) => s.name === a.service);
       if (!g) throw new Error(`No global tool service named ${a.service}`);
-      if (a.mode === 'inherit') throw new Error('"inherit" is for an agent; a service\'s default is off, sometimes or often');
-      const reactions = { ...pick(g.config.reactions || {}), ...(a.media ? { media: a.media } : {}) };
-      const r = await x.call('PUT', `/api/tool-services/${enc(a.service)}`, { ...g.config, reactions });
-      return { service: r.name, reactions: r.config?.reactions };
+      const r = await x.call('PUT', `/api/tool-services/${enc(a.service)}`, { ...g.config, behaviour: patch(g.config.behaviour || {}) });
+      return { service: r.name, default: r.config?.behaviour || {} };
     } },
-  { name: 'get_agent_reactions', readOnly: true, calls: [['GET', '/api/agents/x/reactions']],
-    description: 'An agent\'s reaction media services (GIFs, stickers): the media kind, its own "use on its own" choice (inherit | off | sometimes | often, style) and the service\'s default.',
-    input: { agent_id: str('Agent id') }, required: ['agent_id'],
-    run: (a, x) => x.call('GET', `/api/agents/${enc(a.agent_id)}/reactions`) },
   { name: 'add_global_tool_service', openWorld: true, risky: true, calls: [['PUT', '/api/tool-services/x']],
     description: 'Add (or replace) a tool service available to every agent. config: remote { url, auth: "none" | "token" | "oauth", tokens: { organizer, participant } as ${SECRET} references, headers } or local { type: "local", package, args, env, allowScripts } (local: owner only). defaults: tool-name globs per role used where an agent has no explicit "<name>:" rules, e.g. { "organizer": ["*"], "participant": ["agenda_*"] } (default: organizers all, participants none). OAuth services still need Connect in the panel (Settings → Tool services). An agent opts out with update_agent { "globalMcp": { "disabled": ["<name>"] } }. Needs confirm_action.',
     input: { name: str('Service name (lowercase letters, digits, _)'), config: obj('Service settings, optionally with "defaults"') }, required: ['name', 'config'],

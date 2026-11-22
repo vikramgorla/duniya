@@ -199,7 +199,7 @@ const scopeSchema = { type: 'string', enum: ['chat', 'agent'], description: 'cha
 
 export const memoryTools = [
   {
-    name: 'remember',
+    name: 'remember', annotations: { readOnlyHint: false, destructiveHint: false },
     description: 'Save a note for the future (a fact, decision, preference or reminder someone asked you to remember). Keep it short and self-contained. Use scope "agent" only when an organizer wants it known in all chats of this agent.',
     input_schema: { type: 'object', properties: { text: { type: 'string', minLength: 1, maxLength: 500 }, scope: scopeSchema }, required: ['text'] },
     roles: ['organizer', 'participant'],
@@ -214,7 +214,7 @@ export const memoryTools = [
     },
   },
   {
-    name: 'list_notes',
+    name: 'list_notes', annotations: { readOnlyHint: true },
     description: 'List the saved notes: this chat\'s notes and the notes this agent shares across its chats.',
     input_schema: { type: 'object', properties: {} },
     roles: ['organizer', 'participant'],
@@ -223,7 +223,7 @@ export const memoryTools = [
     },
   },
   {
-    name: 'find_notes',
+    name: 'find_notes', annotations: { readOnlyHint: true },
     description: 'Find saved notes (this chat and shared) containing a word or phrase, e.g. "what did we save about the car?".',
     input_schema: { type: 'object', properties: { query: { type: 'string', minLength: 2, maxLength: 100 } }, required: ['query'] },
     roles: ['organizer', 'participant'],
@@ -233,7 +233,7 @@ export const memoryTools = [
     },
   },
   {
-    name: 'update_note',
+    name: 'update_note', annotations: { readOnlyHint: false, destructiveHint: false },
     description: 'Replace the text of a saved note by its id (organizers only), e.g. when a saved fact changed.',
     input_schema: { type: 'object', properties: { id: { type: 'integer' }, text: { type: 'string', minLength: 1, maxLength: 500 } }, required: ['id', 'text'] },
     roles: ['organizer'],
@@ -246,7 +246,7 @@ export const memoryTools = [
     },
   },
   {
-    name: 'forget',
+    name: 'forget', annotations: { readOnlyHint: false, destructiveHint: true },
     description: 'Delete a saved note (this chat or shared) by its id (organizers only).',
     input_schema: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
     roles: ['organizer'],
@@ -258,7 +258,7 @@ export const memoryTools = [
     },
   },
   {
-    name: 'search_history',
+    name: 'search_history', annotations: { readOnlyHint: true },
     description: 'Search older messages of this chat by keyword when the answer is not in the recent messages, notes or summary.',
     input_schema: {
       type: 'object',

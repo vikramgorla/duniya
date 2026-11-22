@@ -100,7 +100,7 @@ const inScope = (c, ctx) => !!c && (ctx.agent.chats || []).includes(c.chat) && (
 const toolView = (c, ctx) => ({ id: c.id, who: c.who || 'someone', what: c.what, due: c.due || null, status: c.overdue ? 'overdue' : c.status, inThisChat: c.chat === ctx.chat });
 /** Organizers: the promises of the agent's chats, and they mark done, reopen, re-date or drop them; participants: their own, and mark them done. */
 export const promiseTools = [
-  { name: 'list_promises', roles: ['organizer', 'participant'],
+  { name: 'list_promises', annotations: { readOnlyHint: true }, roles: ['organizer', 'participant'],
     description: 'Promises people made in this agent\'s chats (who, what, due date, open / overdue / done). Organizers see all of them; anyone else sees their own. status: open (default), overdue or done.',
     input_schema: { type: 'object', properties: { status: { type: 'string', enum: ['open', 'overdue', 'done'] } } },
     run: (a, ctx) => {
@@ -108,7 +108,7 @@ export const promiseTools = [
       const list = listCommitments({ chats: ctx.agent.chats || [], person: ctx.role === 'organizer' ? '' : ctx.personId, status: a.status || 'open', limit: 30 });
       return list.length ? list.map((c) => toolView(c, ctx)) : 'No promises.';
     } },
-  { name: 'update_promise', roles: ['organizer', 'participant'],
+  { name: 'update_promise', annotations: { readOnlyHint: false, destructiveHint: false }, roles: ['organizer', 'participant'],
     description: 'Change a promise (its id from list_promises). Organizers: status done, open (reopen) or dropped, and the due date (YYYY-MM-DD, empty for none). Anyone else: only mark their own promise done.',
     input_schema: { type: 'object', properties: { id: { type: 'integer' }, status: { type: 'string', enum: ['done', 'open', 'dropped'] }, due: { type: 'string', description: 'YYYY-MM-DD or empty' } }, required: ['id'] },
     run: (a, ctx) => {

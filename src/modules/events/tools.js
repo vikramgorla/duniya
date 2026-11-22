@@ -36,7 +36,7 @@ const ev = { type: 'string', description: 'Event name (or part of it) or id' };
 
 export const eventTools = [
   {
-    name: 'list_events', roles: ['organizer', 'participant'], participantDefault: true,
+    name: 'list_events', annotations: { readOnlyHint: true }, roles: ['organizer', 'participant'], participantDefault: true,
     description: 'Upcoming events: name, dates, place, places left, registration deadline, whether an organizer confirms registrations, and prices.',
     input_schema: { type: 'object', properties: {} },
     async run() {
@@ -48,7 +48,7 @@ export const eventTools = [
     },
   },
   {
-    name: 'show_event', roles: ['organizer', 'participant'], participantDefault: true,
+    name: 'show_event', annotations: { readOnlyHint: true }, roles: ['organizer', 'participant'], participantDefault: true,
     description: 'One event: details, how many are registered (adults, kids), places left, duties with open places, and the sender\'s own registration.',
     input_schema: { type: 'object', properties: { event: ev }, required: ['event'] },
     async run({ event }, ctx) {
@@ -59,7 +59,7 @@ export const eventTools = [
     },
   },
   {
-    name: 'register', roles: ['organizer', 'participant'], participantDefault: true,
+    name: 'register', annotations: { readOnlyHint: false, destructiveHint: false }, roles: ['organizer', 'participant'], participantDefault: true,
     description: 'Register the sender ("me") or the sender\'s household for an event. Household: adults and kids default to its members. Pending when the event needs an organizer\'s confirmation; waiting list when full. Registering again changes the numbers.',
     input_schema: { type: 'object', properties: { event: ev, for: { type: 'string', enum: ['me', 'household'], description: 'me, or my household (default: what the event asks for)' }, adults: n, kids: n, notes: { type: 'string', maxLength: 300, description: 'e.g. vegetarian, arrives late' } }, required: ['event'] },
     async run({ event, for: who, adults, kids, notes = '' }, ctx) {
@@ -71,7 +71,7 @@ export const eventTools = [
     },
   },
   {
-    name: 'cancel_my_registration', roles: ['organizer', 'participant'], participantDefault: true,
+    name: 'cancel_my_registration', annotations: { readOnlyHint: false, destructiveHint: false }, roles: ['organizer', 'participant'], participantDefault: true,
     description: 'Cancel the sender\'s (or their household\'s) registration for an event. Someone on the waiting list may get the place.',
     input_schema: { type: 'object', properties: { event: ev }, required: ['event'] },
     async run({ event }, ctx) {
@@ -81,7 +81,7 @@ export const eventTools = [
     },
   },
   {
-    name: 'take_duty', roles: ['organizer', 'participant'], participantDefault: true,
+    name: 'take_duty', annotations: { readOnlyHint: false, destructiveHint: false }, roles: ['organizer', 'participant'], participantDefault: true,
     description: 'The sender takes a duty at an event (by task name), if it still needs people.',
     input_schema: { type: 'object', properties: { event: ev, duty: { type: 'string', description: 'Task name' } }, required: ['event', 'duty'] },
     async run({ event, duty }, ctx) {
@@ -90,7 +90,7 @@ export const eventTools = [
     },
   },
   {
-    name: 'registration_list', roles: ['organizer'],
+    name: 'registration_list', annotations: { readOnlyHint: true }, roles: ['organizer'],
     description: 'Who is registered for an event (organizers): each registration with adults, kids, notes and status, and the counts. Filter by status.',
     input_schema: { type: 'object', properties: { event: ev, status: { type: 'string', enum: ['registered', 'waiting', 'pending', 'cancelled'] } }, required: ['event'] },
     async run({ event, status = '' }) {
@@ -101,7 +101,7 @@ export const eventTools = [
   },
   // 090: ask your data — questions across events (organizers and the owner assistant)
   {
-    name: 'compare_events', roles: ['organizer'],
+    name: 'compare_events', annotations: { readOnlyHint: true }, roles: ['organizer'],
     description: 'Who registered for (or came to) one event but has not registered for another (organizers), e.g. "which families came last year but haven\'t registered?". Names, with how many adults and kids they were.',
     input_schema: { type: 'object', properties: { came_to: { ...ev, description: 'The earlier event (name, part of it, or id)' }, not_registered_for: { ...ev, description: 'The event they have not registered for' },
       attended_only: { type: 'boolean', description: 'Only those marked as attended' } }, required: ['came_to', 'not_registered_for'] },
@@ -112,7 +112,7 @@ export const eventTools = [
     },
   },
   {
-    name: 'duty_history', roles: ['organizer'],
+    name: 'duty_history', annotations: { readOnlyHint: true }, roles: ['organizer'],
     description: 'Who usually takes a kind of duty (organizers), e.g. "who usually volunteers for cooking?": people with how many times they took duties whose task matches the words, across all events, most first.',
     input_schema: { type: 'object', properties: { task: { type: 'string', description: 'Words of the task, e.g. cooking' } }, required: ['task'] },
     async run({ task }) {
@@ -121,7 +121,7 @@ export const eventTools = [
     },
   },
   {
-    name: 'register_someone', roles: ['organizer'],
+    name: 'register_someone', annotations: { readOnlyHint: false, destructiveHint: true }, roles: ['organizer'],
     description: 'Register a person or a household (by name) for an event (organizers). Waits for an organizer\'s confirm code. Organizers are not held back by the deadline.',
     input_schema: { type: 'object', properties: { event: ev, who: { type: 'string', description: 'Person (name, number, id) or household name' }, adults: n, kids: n, notes: { type: 'string', maxLength: 300 } }, required: ['event', 'who'] },
     async run({ event, who, adults, kids, notes = '' }, ctx) {
@@ -130,7 +130,7 @@ export const eventTools = [
     },
   },
   {
-    name: 'update_registration', roles: ['organizer'],
+    name: 'update_registration', annotations: { readOnlyHint: false, destructiveHint: true }, roles: ['organizer'],
     description: 'Confirm a pending registration (status registered), move it to the waiting list, or cancel it (organizers). Waits for an organizer\'s confirm code.',
     input_schema: { type: 'object', properties: { event: ev, who: { type: 'string', description: 'Person or household name' }, status: { type: 'string', enum: ['registered', 'waiting', 'cancelled'] } }, required: ['event', 'who', 'status'] },
     async run({ event, who, status }, ctx) {
@@ -141,7 +141,7 @@ export const eventTools = [
     },
   },
   {
-    name: 'assign_duty', roles: ['organizer'],
+    name: 'assign_duty', annotations: { readOnlyHint: false, destructiveHint: true }, roles: ['organizer'],
     description: 'Give a duty at an event to a person (organizers). Waits for an organizer\'s confirm code.',
     input_schema: { type: 'object', properties: { event: ev, duty: { type: 'string' }, who: { type: 'string', description: 'Person (name, number, id)' } }, required: ['event', 'duty', 'who'] },
     async run({ event, duty, who }, ctx) {

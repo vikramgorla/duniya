@@ -3,7 +3,7 @@
 // note, tag, add to a list. They replace the contacts__* tools of 078. Access is decided in code (people-access.js):
 // only people the agent may see (its own chats, lists shared with it, or everyone; owner turns see everyone), never
 // hidden people; participants only the people the owner marked Shared. Changes are for organizers, and a change to
-// anyone other than the sender goes to the runner's confirm gate (093: notes, tags and lists are low risk). Merge, hide and
+// anyone other than the sender goes to the runner's confirm gate (094: risk from each tool's annotations). Merge, hide and
 // erase are never agent tools.
 import { fail, clip, digits } from './config.js';
 import { addNote, householdsOf, listLists, listPeople, listsOf, personById, personByRef, seenNameOf, setListMember, setTags, tagsOf, tiesOf, timeline } from './people.js';
@@ -39,10 +39,10 @@ function visible(ref, ctx) {
   return p;
 }
 const short = (p, org) => ({ id: p.id, name: nameFor(p), ...(p.nickname ? { nickname: p.nickname } : {}), ...(p.phone ? { phone: `+${p.phone}` } : {}), ...(org ? { tags: tagsOf(p.id) } : {}) });
-/** A change to someone other than the sender goes to the runner's confirm gate (093: low risk may apply at once). */
+/** A change to someone other than the sender goes to the runner's confirm gate (094: a change, not a destructive one, may apply at once). */
 function change(p, ctx, action, summary) {
   if (p.id === ctx.personId || !ctx.hold) return applyPeopleAction(action, ctx.agent);
-  return ctx.hold({ kind: 'people', action, summary, tool: ctx.toolFq, input: ctx.toolInput });
+  return ctx.hold({ kind: 'people', action, summary, tool: ctx.toolFq, input: ctx.toolInput, risk: ctx.toolRisk, mode: ctx.toolMode });
 }
 
 /** Carry out a people change (now, or after "confirm XXXX"). Returns a short result. */
@@ -61,7 +61,7 @@ export function applyPeopleAction(action, agent) {
 
 export const peopleTools = [
   {
-    name: 'find_person',
+    name: 'find_person', annotations: { readOnlyHint: true },
     description: 'Find people in People by name, nickname, number or tag. Only people this agent may see (from its chats or lists shared with it).',
     input_schema: { type: 'object', properties: { query: { type: 'string', minLength: 2, maxLength: 60 } }, required: ['query'] },
     roles: ['organizer', 'participant'],
@@ -73,7 +73,7 @@ export const peopleTools = [
     },
   },
   {
-    name: 'get_person',
+    name: 'get_person', annotations: { readOnlyHint: true },
     description: 'A person\'s card: name, nickname, number, birthday, households, family ties, tags, lists and the latest notes. Never message text.',
     input_schema: { type: 'object', properties: { person: { type: 'string', description: 'Person id (p_…), number or name' } }, required: ['person'] },
     roles: ['organizer', 'participant'],
@@ -90,7 +90,7 @@ export const peopleTools = [
     },
   },
   {
-    name: 'add_note',
+    name: 'add_note', annotations: { readOnlyHint: false, destructiveHint: false },
     description: 'Add a short note to a person (marked as written by this agent; organizers). Never copy message text into it. A note about someone other than the sender may wait for an organizer\'s confirm code (the agent\'s setting decides).',
     input_schema: { type: 'object', properties: { person: { type: 'string' }, text: { type: 'string', maxLength: 500 } }, required: ['person', 'text'] },
     roles: ['organizer'],
@@ -101,7 +101,7 @@ export const peopleTools = [
     },
   },
   {
-    name: 'tag_person',
+    name: 'tag_person', annotations: { readOnlyHint: false, destructiveHint: false },
     description: 'Add or remove tags of a person (free words, e.g. "driver"; organizers). Changes to someone other than the sender may wait for an organizer\'s confirm code (the agent\'s setting decides).',
     input_schema: { type: 'object', properties: { person: { type: 'string' }, add: { type: 'array', items: { type: 'string' } }, remove: { type: 'array', items: { type: 'string' } } }, required: ['person'] },
     roles: ['organizer'],
@@ -114,7 +114,7 @@ export const peopleTools = [
     },
   },
   {
-    name: 'add_to_list',
+    name: 'add_to_list', annotations: { readOnlyHint: false, destructiveHint: false },
     description: 'Add a person to one of the owner\'s named lists (by list name; organizers). Someone other than the sender may wait for an organizer\'s confirm code (the agent\'s setting decides).',
     input_schema: { type: 'object', properties: { person: { type: 'string' }, list: { type: 'string', description: 'List name' } }, required: ['person', 'list'] },
     roles: ['organizer'],

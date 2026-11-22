@@ -36,7 +36,7 @@ function orderOf(who, event, ctx, { refund = false } = {}) {
 
 export const orderTools = [
   {
-    name: 'what_do_i_owe', roles: ['organizer', 'participant'], participantDefault: true,
+    name: 'what_do_i_owe', annotations: { readOnlyHint: true }, roles: ['organizer', 'participant'], participantDefault: true,
     description: 'The sender\'s open orders (their own and their household\'s): what for, total, paid, left, due date, and the ways to pay.',
     input_schema: { type: 'object', properties: {} },
     async run(args, ctx) {
@@ -46,7 +46,7 @@ export const orderTools = [
     },
   },
   {
-    name: 'who_has_not_paid', roles: ['organizer'],
+    name: 'who_has_not_paid', annotations: { readOnlyHint: true }, roles: ['organizer'],
     description: 'Orders not fully paid (organizers), for one event or all, with who, how much is left, due dates, and the totals (collected, open).',
     input_schema: { type: 'object', properties: { event: ev } },
     async run({ event }) {
@@ -58,7 +58,7 @@ export const orderTools = [
     },
   },
   {
-    name: 'mark_paid', roles: ['organizer'],
+    name: 'mark_paid', annotations: { readOnlyHint: false, destructiveHint: true }, roles: ['organizer'],
     description: 'Record a payment for a person\'s or household\'s open order (organizers): amount (default: all that is left) and method (one of the owner\'s payment methods). Waits for an organizer\'s confirm code. Duniya records payments; it never takes money.',
     input_schema: { type: 'object', properties: { who: { type: 'string', description: 'Person or household name' }, event: ev, amount: { type: 'number', minimum: 0.01 }, method: { type: 'string' } }, required: ['who'] },
     async run({ who, event, amount, method = '' }, ctx) {
@@ -69,7 +69,7 @@ export const orderTools = [
     },
   },
   {
-    name: 'refund', roles: ['organizer'],
+    name: 'refund', annotations: { readOnlyHint: false, destructiveHint: true }, roles: ['organizer'],
     description: 'Record money given back for a person\'s or household\'s order (organizers): amount (default: all that was paid). Waits for an organizer\'s confirm code.',
     input_schema: { type: 'object', properties: { who: { type: 'string' }, event: ev, amount: { type: 'number', minimum: 0.01 }, method: { type: 'string' } }, required: ['who'] },
     async run({ who, event, amount, method = '' }, ctx) {

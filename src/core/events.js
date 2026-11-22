@@ -17,7 +17,7 @@ const trim = (v, n = 4000) => {
 /**
  * Record an activity entry.
  * type: message.in | message.out | tool.call | tool.error | confirm.created | confirm.applied |
- *       confirm.cancelled | change.auto (093: changed without asking) | channel.status | agent.updated | schedule.run | error | system
+ *       confirm.cancelled | change.auto (093: changed without asking) | limit (094: a tool service limit stopped a use) | channel.status | agent.updated | schedule.run | error | system
  */
 // ---------- what gets logged (011) ----------
 export const LOG_CATEGORIES = {

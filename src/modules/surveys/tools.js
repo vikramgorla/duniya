@@ -18,7 +18,7 @@ const mine = (ctx, ref) => {
 
 export const surveyTools = [
   {
-    name: 'my_surveys', roles: ['organizer', 'participant'], participantDefault: true,
+    name: 'my_surveys', annotations: { readOnlyHint: true }, roles: ['organizer', 'participant'], participantDefault: true,
     description: 'The surveys the sender was asked to answer and has not finished, each with the next question (text, kind, choices). Ask questions one at a time.',
     input_schema: { type: 'object', properties: {} },
     async run(args, ctx) {
@@ -28,7 +28,7 @@ export const surveyTools = [
     },
   },
   {
-    name: 'answer_survey', roles: ['organizer', 'participant'], participantDefault: true,
+    name: 'answer_survey', annotations: { readOnlyHint: false, destructiveHint: false }, roles: ['organizer', 'participant'], participantDefault: true,
     description: 'Record the sender\'s answer to a survey question (one at a time, as they say it: a choice by its words or number, several choices separated by commas, a short text or a number), or skip an optional one. Returns the next question to ask, or that they are done (thank them).',
     input_schema: { type: 'object', properties: { survey: { type: 'string', description: 'Survey title (optional when they have one open)' }, question: { type: 'string', description: 'Question id, e.g. q1' },
       answer: { type: 'string' }, skip: { type: 'boolean', description: 'Skip an optional question' } }, required: ['question'] },
@@ -39,7 +39,7 @@ export const surveyTools = [
     },
   },
   {
-    name: 'survey_results', roles: ['organizer'],
+    name: 'survey_results', annotations: { readOnlyHint: true }, roles: ['organizer'],
     description: 'Results of a survey (organizers): how many were asked, started and finished; per question the counts per choice, the average of numbers, the latest short texts; and who answered what (people this agent may see).',
     input_schema: { type: 'object', properties: { survey: { type: 'string', description: 'Survey title or id' } }, required: ['survey'] },
     async run({ survey }, ctx) {
