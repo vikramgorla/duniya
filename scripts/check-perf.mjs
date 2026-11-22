@@ -39,7 +39,7 @@ const BUDGETS = {
   "who hasn't paid (agent tool)": 15, // 081: orders__who_has_not_paid for one event, with totals
   'sending run page': 12, // 082: GET /api/sending/runs/:id (counts, 500 of 2,000 recipients)
   'sending history': 15, // 082: GET /api/sending (the newest 50 runs with counts, saved audiences)
-  'sending recipients of an event': 20, // 082: the recipients query of a preview (registered households → one adult who agreed, consent, app, chat) for one event
+  'sending recipients of an event': 30, // raised from 20 (2.58.1): ~7 ms locally but 24–28 ms on GitHub's runners, failing CI twice; the plan check still guards scans. 082: the recipients query of a preview (registered households → one adult who agreed, consent, app, chat) for one event
   'survey results': 90, // 083: GET /api/surveys/:id (totals of 4 questions over 3,000 answers each, 500 people with their answers)
   'campaign page': 15, // 083: GET /api/sending/campaigns/:id (steps with their runs' counts)
   'survey link page': 10, // 083: GET /s/<token> (the public page: token → survey, the person's answers)
