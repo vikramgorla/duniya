@@ -154,6 +154,11 @@ test('029: status shows version, uptime, WhatsApp numbers and agents; doctor che
   assert.match(s.out, /running · up \d+s · pid \d+/);
   assert.match(s.out, /Main: connected as \+41790000099/);
   assert.match(s.out, /2 on, 0 off/); assert.match(s.out, /Panduga/);
+  // 095: a release that did not start and was rolled back is named, while the server runs the version it went back to
+  t.db.kvSet('updates:rolledBack', JSON.stringify({ ok: true, from: 'v99.0.0', to: t.config.APP_VERSION, target: 'v99.0.0', starts: 3, at: Date.now(), alerted: true }));
+  assert.match((await duniya(['status'])).out, new RegExp(`Update\\s+v99\\.0\\.0 did not start here and was rolled back to ${t.config.APP_VERSION.replaceAll('.', '\\.')}`));
+  t.db.kvSet('updates:rolledBack', 'null');
+  assert.doesNotMatch((await duniya(['status'])).out, /did not start/);
   const d = await duniya(['doctor']);
   assert.match(d.out, /✓ Service running/);
   assert.match(d.out, /✓ Panel answers on 127\.0\.0\.1:\d+/);

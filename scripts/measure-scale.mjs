@@ -31,7 +31,7 @@ if (process.argv[2] === '--startup') {
   await new Promise((r) => (panel.listening ? r() : panel.once('listening', r)));
   const ready = performance.now() - t0;
   const { startScheduler } = await import('../src/core/scheduler.js');
-  void startScheduler; // imported like src/index.js does; not started (no timers in a measurement)
+  void startScheduler; // imported like src/app.js does; not started (no timers in a measurement)
   process.stdout.write(JSON.stringify({ readyMs: Math.round(ready), rssMb: mb(process.memoryUsage().rss) }));
   process.exit(0);
 }

@@ -195,7 +195,7 @@
   "complexity": 1
  },
  "src/panel/public/app/updates.js": {
-  "complexity": 2
+  "complexity": 1
  },
  "src/panel/routes/agents.js": {
   "complexity": 1,

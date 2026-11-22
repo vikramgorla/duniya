@@ -1,6 +1,25 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.59.0": {
+      "breaking": false,
+      "title": "A release that does not start is rolled back by itself",
+      "summary": "On installer servers an update is watched while it starts. If the new release cannot start (three tries), the server puts the previous one back and tells you. The first update that is watched is the one after this release.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "A release that does not start on your server is rolled back by itself: the previous version runs again, no terminal needed."
+        },
+        {
+          "type": "new",
+          "text": "You are told what happened: Activity, the owner alert on WhatsApp, Settings → Updates and “duniya status”. Your data is left as it is."
+        },
+        {
+          "type": "improved",
+          "text": "Automatic updates do not install a release again that did not start; the next release is installed as usual, and Update still works by hand."
+        }
+      ]
+    },
     "2.58.18": {
       "breaking": false,
       "title": "Telegram: a sturdier connection, groups that move or leave, paragraphs and GIFs",

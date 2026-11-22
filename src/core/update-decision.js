@@ -6,13 +6,16 @@
 // - Confirm on the panel (dialog) or with "confirm ABCD" on WhatsApp: backup (when configured) → update → restart. A
 //   WhatsApp confirmation is answered again after the restart (a pending report is kept in kv).
 // - The owner can snooze the notice (reminded again after 7 days) or dismiss it (until a newer breaking release).
+// - 095: a release that did not start and was rolled back (update-guard.js) is told to the owner once, and the
+//   automatic round does not install it again.
 import { randomInt } from 'node:crypto';
 import { env, fail, restartSoon } from './config.js';
 import { phoneChat } from '../channels/index.js';
 import { kvGet, kvSet } from './db.js';
 import { getUser } from './store.js';
 import { activity, recordFailure } from './events.js';
-import { updateStatus, checkForUpdate, applyUpdate, getUpdateSettings, installKind, runningVersion, backupConfigured, installedReleases } from './updates.js';
+import { updateStatus, checkForUpdate, applyUpdate, getUpdateSettings, installKind, runningVersion, backupConfigured, installedReleases,
+  rolledBack, rollbackText, rollbackTold, isRolledBack } from './updates.js';
 import { releaseRange } from './releases.js';
 import { sendOwnerAlert, ownerNumber } from './owner-alerts.js';
 import { listLinks, registerConfirmHandler } from './owner-assistant.js';
@@ -22,6 +25,7 @@ const DAY = 86400000;
 const SNOOZE_DAYS = 7;
 const CODE_TTL = 3 * DAY;
 const REPORT_TTL = 2 * DAY;
+const ALERT_TRIES = 6; // rounds (10 minutes apart) in which the alert about a rollback is tried
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 const readKv = (k, d) => { try { return JSON.parse(kvGet(k) || 'null') ?? d; } catch { return d; } };
@@ -166,13 +170,29 @@ export async function deliverUpdateReport(now = Date.now()) {
   if (!ch) return false;
   const running = runningVersion();
   const ok = running !== rec.from;
+  const undone = !ok && rolledBack()?.target === rec.target ? rolledBack() : null; // 095: it did not start and was put back
   const news = ok ? releaseRange(installedReleases(), rec.from, running).slice(0, 3).map((n) => `- v${n.version}: ${n.title}`) : []; // 065
   const text = ok ? `✓ Updated to ${running} (from ${rec.from}). Everything restarted.${rec.backup ? ` Backup made first: ${rec.backup}.` : ''}${news.length ? `\n\nWhat's new:\n${news.join('\n')}\nAll changes: panel → Settings → Release notes.` : ''}`
-    : `The update to ${rec.target} did not finish: still running ${running}. Check Overview → Server → Updates.`;
+    : undone ? rollbackText(undone)
+      : `The update to ${rec.target} did not finish: still running ${running}. Check Overview → Server → Updates.`;
   try { await ch.send(rec.chat, text); } catch { return false; }
+  if (undone && rec.chat === phoneChat(ownerNumber())) rollbackTold(); // the alert would say the same in the same chat
   kvSet('updates:report', 'null');
   activity('system', { summary: `Update result sent on WhatsApp: ${ok ? `running ${running}` : 'not finished'}` });
   return true;
+}
+
+/**
+ * 095: the owner hears once that a release did not start and was rolled back. Tried at each round until it went out
+ * (the channel may still be connecting after the start), ALERT_TRIES times at most.
+ */
+async function deliverRollbackAlert() {
+  const r = rolledBack();
+  if (!r || r.alerted) return;
+  const tries = Number(kvGet('updates:rollbackAlertTries') || 0) + 1;
+  const sent = await sendOwnerAlert(rollbackText(r), { kind: 'update rolled back' });
+  // sent, nowhere to send it (no alert number: Activity has the line), or tried long enough
+  if (sent.sent || !sent.to || tries >= ALERT_TRIES) { rollbackTold(); kvSet('updates:rollbackAlertTries', '0'); } else kvSet('updates:rollbackAlertTries', String(tries));
 }
 
 // ---------------------------------------------------------------- scheduler
@@ -182,6 +202,7 @@ const today = (d) => d.toLocaleDateString('en-CA', { timeZone: env.timezone });
 /** One scheduler round (exported for tests). */
 export async function updateTick({ now = new Date() } = {}) {
   await deliverUpdateReport(now.getTime()).catch(recordFailure('The update result message'));
+  await deliverRollbackAlert().catch(recordFailure('The alert that an update was rolled back'));
   const s = getUpdateSettings();
   if (s.mode === 'off') return { action: 'off' };
   const st0 = updateStatus();
@@ -190,6 +211,7 @@ export async function updateTick({ now = new Date() } = {}) {
   if (s.mode !== 'auto' || !st.available) return { action: 'none', breaking: !!st.breaking };
   const target = st.breaking ? st.safeTarget : st.target;
   if (!target) return { action: 'waiting', breaking: true };
+  if (isRolledBack(target, st)) return { action: 'rolled_back', target }; // 095: it did not start here; a newer release is installed, this one is not
   if (hhmm(now) < s.at || kvGet('updates:autoDay') === today(now)) return { action: 'later', target };
   kvSet('updates:autoDay', today(now));
   const r = await applyUpdate({ target, by: 'automatic update' });

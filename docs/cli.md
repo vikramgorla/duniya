@@ -18,7 +18,7 @@ docker compose exec app duniya help   # Docker
 | `create-user <name> --role admin\|viewer\|owner`, `list-users`, `set-role`, `remove-user` | manage panel accounts |
 | `enable-password-login` | passwords back on if "Only allow Sign in with Google" locked you out |
 | `show-setup-code` | the one-time code that creates the first owner |
-| `status` | version, uptime, WhatsApp numbers, agents, last backup |
+| `status` | version, uptime, WhatsApp numbers, agents, last backup; an update that did not start and was rolled back |
 | `doctor` | checks DNS, HTTPS, ports, disk, memory, swap and prints fixes |
 | `backup-now`, `restart`, `logs [-f]` | maintenance |
 | `update [--check] [--breaking]` | newest release that needs no decision, backup first; `--breaking` also crosses a breaking release; also refreshes the root maintenance helper (OS updates) |

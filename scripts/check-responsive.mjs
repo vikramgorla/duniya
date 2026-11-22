@@ -68,6 +68,13 @@ const UPDATE_AVAILABLE = `const f0 = window.fetch; window.fetch = async (u, o) =
     const notes = (await (await f0('/api/releases?from=v2.22.0')).json()).versions;
     return new Response(JSON.stringify({ ...j, decision: null, status: { ...j.status, current: 'v2.22.0', available: true, latest: 'v' + notes[0].version, target: 'v' + notes[0].version, breaking: false, steps: [], notes, safeTarget: 'v' + notes[0].version } })); }
   return r; };`;
+// 095: pretend the newest release did not start on this server and was put back.
+const UPDATE_ROLLED_BACK = `const f0 = window.fetch; window.fetch = async (u, o) => { const r = await f0(u, o);
+  if (String(u) === '/api/updates' && (!o || !o.method || o.method === 'GET')) { const j = await r.clone().json();
+    const text = 'The update to v2.60.0 did not start on this server (3 tries) and was rolled back: ' + j.status.current + ' is running again. Your data was left as it is. The backup made before the update is duniya-20261122-040003-512.dbk. Automatic updates will not install v2.60.0 again; a newer release will be installed, and you can still choose Update.';
+    return new Response(JSON.stringify({ ...j, decision: null, status: { ...j.status, available: true, latest: 'v2.60.0', target: 'v2.60.0', breaking: false, steps: [], notes: [], safeTarget: 'v2.60.0' },
+      rolledBack: { ok: true, from: 'v2.60.0', to: j.status.current, at: Date.now() - 3 * 3600000, backup: 'duniya-20261122-040003-512.dbk', text } })); }
+  return r; };`;
 const WHATS_NEW = "S.status.whatsNew = { from: 'v2.24.0', to: S.status.version.split(' ')[0] }; show('overview'); await T.wait(400);";
 // 052: the Add answer of Browse tool services, without changing the demo data (states run several times).
 const REGISTRY_ADDED = `const f1 = window.fetch; window.fetch = async (u, o) => {
@@ -116,6 +123,8 @@ const STATES = [
   { name: 'overview-update-available', hash: 'overview', before: UPDATE_AVAILABLE, wait: 1500 },
   { name: 'settings-updates', hash: 'settings/updates', wait: 2000 },
   { name: 'settings-updates-available', hash: 'settings/updates', before: UPDATE_AVAILABLE, wait: 2000 },
+  { name: 'overview-update-rolled-back', hash: 'overview', before: UPDATE_ROLLED_BACK, wait: 1500 }, // 095
+  { name: 'settings-updates-rolled-back', hash: 'settings/updates', before: UPDATE_ROLLED_BACK, wait: 2000 },
   // 073: no focus ring after a tap or click, even when focus moves by script (Chrome on Android); a ring for the keyboard
   { name: 'focus-ring-touch', hash: 'overview', wait: 1500, js: FOCUS_RINGS },
   { name: 'activity', hash: 'activity', js: "document.querySelector('#feed .fitem')?.click(); await T.wait(300);" },

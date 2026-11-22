@@ -94,7 +94,7 @@ export function dueAt(at, hhmm, late = 30) {
   return d >= 0 && d <= late;
 }
 export const iso = (ts) => (ts ? new Date(ts).toISOString() : null);
-/** 069: restart the app after `ms` through the graceful shutdown (src/index.js); systemd or Docker starts it again. */
+/** 069: restart the app after `ms` through the graceful shutdown (src/app.js); systemd or Docker starts it again. */
 export const restartSoon = (ms = 500) => setTimeout(() => process.kill(process.pid, 'SIGTERM'), ms);
 
 /** Small JSON file store with atomic writes. */
