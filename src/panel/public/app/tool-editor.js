@@ -38,7 +38,7 @@ const behaviourLine = (b, media) => [label(WHEN, b.when || 'useful'), b.changes 
  * state: the fields this level sets (a service's default, or an agent's override); `dflt`: what applies without one
  * (an agent: the service's default) — then every choice starts with "Default (…)". onChange after each edit.
  */
-export function behaviourEditor(state, { dflt = null, media = '', onChange = () => {} } = {}) {
+export function behaviourEditor(state, { dflt = null, media = '', onChange = () => {}, open = false, onToggle = null } = {}) {
   const set = (k, v) => { if (v === 'inherit' || v === '') delete state[k]; else state[k] = v; onChange(); };
   const choice = (k, title, opts, fallback) => {
     const first = dflt ? [['inherit', `Default (${label(opts, dflt[k] || fallback) || 'agent'})`]] : k === 'changes' ? [['', 'Agent’s setting']] : [];
@@ -47,7 +47,7 @@ export function behaviourEditor(state, { dflt = null, media = '', onChange = () 
   const text = (k, title, ph, max) => field(title, h('input', { value: state[k] || '', maxlength: max, disabled: !can('admin'), placeholder: dflt?.[k] || ph, oninput: (e) => set(k, e.target.value.trim()) }));
   const num = (k, title) => field(title, h('input', { type: 'number', min: 0, max: 1000, value: state[k] ?? '', disabled: !can('admin'), placeholder: dflt ? String(dflt[k] || 'no limit') : 'no limit',
     oninput: (e) => set(k, e.target.value === '' ? '' : Math.max(0, Number(e.target.value) || 0)) }));
-  return h('details', { class: 'behaviour' }, h('summary', {}, h('b', {}, 'How it uses it'), h('span', { class: 'small muted' }, ` · ${behaviourLine({ ...(dflt || {}), ...state }, media) || 'When useful'}`)),
+  return h('details', { class: 'behaviour', open, ontoggle: onToggle ? (e) => onToggle(e.target.open) : null }, h('summary', {}, h('b', {}, 'How it uses it'), h('span', { class: 'small muted' }, ` · ${behaviourLine({ ...(dflt || {}), ...state }, media) || 'When useful'}`)),
     h('div', { class: 'row spread' }, h('span', { class: 'small muted' }, 'Read-only tools never ask; tools that declare themselves destructive always ask.'), helpLink('tool-services.md#how-agents-use-a-service')),
     choice('when', 'When to use it', WHEN, 'useful'), text('note', 'Note (optional)', 'e.g. only for this year’s event', 200),
     choice('changes', 'Changes it makes', CHANGES, ''),

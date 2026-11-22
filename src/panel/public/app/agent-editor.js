@@ -364,7 +364,7 @@ function buildTools(x, { save }) {
   const confirm = { on: !!c.confirm, preview: c.confirm?.preview || '', tool: c.confirm?.tool || '', idField: c.confirm?.idField || 'confirm_id', ttl: c.confirm?.ttlMinutes || 9 };
   let autonomy = c.autonomy || 'clear';
   // 094: how it uses each service (only what differs from the service's default); the services' tools and defaults load with the page
-  const services = structuredClone(c.services || {}); let sinfo = [];
+  const services = structuredClone(c.services || {}); let sinfo = []; const openFolds = new Set();
   const states = {}; // one editable object per service, put into `services` while it sets something
   const stateOf = (key) => (states[key] ||= services[key] || {});
   const commit = (key) => {
@@ -373,8 +373,12 @@ function buildTools(x, { save }) {
     if (Object.keys(st).length) services[key] = st; else delete services[key];
   };
   const behaviourBox = (key) => {
-    const i = sinfo.find((x) => x.service === key);
-    return bi || !i ? null : behaviourEditor(stateOf(key), { dflt: i.default, media: i.media, onChange: () => commit(key) });
+    if (bi) return null;
+    // shown at once with the service defaults; whether it shares media (and the service's own defaults) fill in when the
+    // services' tools arrive (a slow or signed-out service must never hide these settings)
+    const i = sinfo.find((x) => x.service === key) || {};
+    return behaviourEditor(stateOf(key), { dflt: i.default || {}, media: i.media || '', onChange: () => commit(key),
+      open: openFolds.has(key), onToggle: (on) => (on ? openFolds.add(key) : openFolds.delete(key)) }); // stays open when redrawn
   };
   const riskOf = (key) => ({ get: (name) => stateOf(key).tools?.[name],
     set: (name, v) => { const st = stateOf(key); st.tools = { ...(st.tools || {}) }; if (v === 'auto') delete st.tools[name]; else st.tools[name] = v; commit(key); } });
