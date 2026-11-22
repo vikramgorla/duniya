@@ -22,6 +22,7 @@ const ASK_AGAIN = 10 * 60 * 1000; // ms before a group that did not answer is as
 const NAMES_PER_TICK = 3; // groups asked per upkeep tick
 const WANTED_MAX = 500; // groups waiting for a name, at most
 const wanted = new Set(); // groups a list showed without a name
+let listedAt = 0; // when the channels were last asked for all their groups because a name was missing
 
 /** Remember group subjects WhatsApp told us ([{ id, name }]); the channel registry calls this for every lookup. */
 export function rememberGroupNames(list) {
@@ -66,7 +67,9 @@ export function chatLabels(ids) {
 /** Upkeep: ask the channel for a few names lists were missing (the hub remembers every answer). A group that does not
  *  answer is asked again after ASK_AGAIN at the earliest. Returns how many were asked. */
 export async function namesTick(channel, now = Date.now()) {
-  if (typeof channel?.chatName !== 'function') return 0;
+  if (!wanted.size || typeof channel?.chatName !== 'function') return 0;
+  // one list of the channel's groups names most of them at once; what is still missing is asked one by one
+  if (channel.listChats && now - listedAt > ASK_AGAIN) { listedAt = now; rememberGroupNames(await channel.listChats().catch(() => [])); }
   const due = [...wanted].filter((id) => now - (asked.get(id) || 0) > ASK_AGAIN).slice(0, NAMES_PER_TICK);
   await Promise.all(due.map(async (id) => {
     asked.set(id, now);

@@ -16,13 +16,16 @@ const { applyPendingRestore, takeRestoreResult } = await import('../src/core/res
 
 // ---------- a storage service that can be down ----------
 const store = { down: 0, puts: [] };
+// ---------- a GitHub that never answers ----------
+const hung = { asked: 0 };
+const silentGitHub = http.createServer(() => { hung.asked++; /* no answer */ }).listen(0);
 const storage = http.createServer(async (req, res) => {
   const chunks = []; for await (const c of req) chunks.push(c);
   if (req.method === 'PUT' && store.down > 0) { store.down--; res.writeHead(503); return res.end('<Error><Code>SlowDown</Code></Error>'); }
   if (req.method === 'PUT') { store.puts.push(decodeURIComponent(new URL(req.url, 'http://x').pathname)); res.writeHead(200); return res.end(); }
   res.writeHead(200); res.end('<ListBucketResult></ListBucketResult>');
 }).listen(0);
-after(() => { storage.close(); t.close(); });
+after(() => { storage.close(); silentGitHub.closeAllConnections(); silentGitHub.close(); t.close(); });
 
 const put = (dir, files) => { for (const [name, text] of Object.entries(files)) { mkdirSync(join(dir, name, '..'), { recursive: true }); writeFileSync(join(dir, name), text); } };
 const read = (dir, name) => readFileSync(join(dir, name), 'utf8');
@@ -105,4 +108,18 @@ test('work files a backup left behind when the app was stopped are removed by th
   const r = await backup.runBackup({ reason: 'manual' });
   assert.equal(r.results.local, 'ok');
   assert.deepEqual(readdirSync(backup.LOCAL_DIR).filter((f) => !f.endsWith('.dbk')), [], 'only finished backups remain');
+});
+
+test('the Backups screen never waits for GitHub: the account of a saved token is stored with it', async () => {
+  process.env.GITHUB_API_BASE = `http://127.0.0.1:${silentGitHub.address().port}`;
+  t.store.setSecret('GITHUB_BACKUP_TOKEN', 'ghp_saved_earlier');
+  const load = async () => { const at = Date.now(); const r = await t.api(owner, 'GET', '/api/backups'); return { ms: Date.now() - at, github: r.body.github }; };
+  const first = await load();
+  assert.ok(first.ms < 2000, `answered in ${first.ms} ms while GitHub is silent`);
+  assert.deepEqual([first.github.connected, first.github.via, first.github.login], [true, 'token', ''], 'connected; the name is looked up in the background');
+  await t.waitFor(() => hung.asked === 1); // the one look-up, in the background
+  backup.updateBackupSettings({ githubLogin: 'vikramgorla' }); // as saving the token does
+  const second = await load();
+  assert.equal(second.github.login, 'vikramgorla');
+  assert.equal(hung.asked, 1, 'a stored name is never looked up again');
 });

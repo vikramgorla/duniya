@@ -76,7 +76,9 @@ The owner runs the latest version on one server, so the code carries nothing for
    tool service or the web has a deadline. Use `within(promise, ms, who)` from `src/core/config.js` (it fails as
    "<who> did not answer in time", status 504) or `AbortSignal.timeout(ms)` for `fetch`. Reads through the channel hub
    are bounded already (`READ_WAIT`); lists read chat names from what is stored, and a missing one is learned on the
-   upkeep tick (`namesTick`). A send refused while a channel reconnects is tried again by the hub; a tool call that
+   upkeep tick (`namesTick`); the hub lists each channel's groups once after a start and keeps the last list, so the
+   Chats screen shows it at once when a channel is slow. What a screen shows of an outside account (the GitHub account
+   of a backup token) is stored when it is saved, never looked up while the screen loads. A send refused while a channel reconnects is tried again by the hub; a tool call that
    timed out is never sent twice. A programming error in a panel route is a 500 that is kept in Activity.
    Only real chat ids reach a channel: the test console's chats (`testChatId`) belong to none.
 

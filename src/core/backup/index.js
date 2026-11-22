@@ -21,6 +21,7 @@ const DEFAULTS = {
   github: { enabled: false, repo: '', branch: '', path: 'backups' },
   s3: { enabled: false, endpoint: '', region: 'auto', bucket: '', prefix: 'duniya/' },
   githubClientId: '',
+  githubLogin: '', // the account of the saved token (shown on the Backups screen)
   githubApp: null, // 019: { id, slug, name, owner, htmlUrl, clientId, createdAt, installationId?, account? }
 };
 
