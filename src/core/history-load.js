@@ -12,7 +12,7 @@ import { getSetting } from './store.js';
 import { isChatEnabled, latestKey } from './chat-prefs.js';
 import { oldestStoredMessage, insertEarlierMessages, kvGet, kvSet } from './db.js';
 import { agentForChat } from './agents.js';
-import { activity } from './events.js';
+import { activity, recordFailure } from './events.js';
 import { summarizeAfterLoad } from './memory.js';
 
 const PAGE_SIZE = 50; // WhatsApp sends at most 50 messages per on-demand request
@@ -55,7 +55,7 @@ async function runRetry(chat) {
   if (!r) return false;
   if (!isChatEnabled(chat)) { dropRetry(chat); return false; }
   if (typeof channel?.fetchHistory !== 'function' || loads.get(chat)?.state === 'loading') return false;
-  await loadChatHistory(chat, { count: r.requested, by: 'automatic retry', reason: 'retry', attempt: r.attempt + 1 }).catch(() => {});
+  await loadChatHistory(chat, { count: r.requested, by: 'automatic retry', reason: 'retry', attempt: r.attempt + 1 }).catch(() => {}); // loadChatHistory keeps why it failed with the load; it is tried again
   return true;
 }
 /** Shared upkeep tick: run the retries that are due (a few per tick). Returns how many ran. */
@@ -133,7 +133,7 @@ function finish(chat, l, state, error = '') {
   const agent = agentForChat(chat);
   activity('memory.history', { agent: agent?.id || '', chat,
     summary: state === 'loaded' && !l.loaded ? 'The phone answered other chats but had no earlier messages for this one' : state === 'loaded' ? `Loaded ${l.loaded} earlier message${l.loaded === 1 ? '' : 's'} from the phone` : state === 'no_response' ? ((l.attempt || 0) >= RETRY_BACKOFF_MS.length ? `The phone sent nothing earlier after ${RETRY_BACKOFF_MS.length + 1} tries: there may be nothing earlier, or the messages were deleted on the phone. Stopped; Load earlier tries again` : 'The phone did not send earlier messages (it may be offline); retrying automatically') : `Loading earlier messages failed: ${error}; retrying automatically` });
-  if (l.ids.length) summarizeAfterLoad(chat, agent, l.ids).catch(() => {});
+  if (l.ids.length) summarizeAfterLoad(chat, agent, l.ids).catch(recordFailure('Summarising', { chat }));
   if (state === 'loaded') dropRetry(chat);
   else if (state === 'no_response' || state === 'failed') planRetry(chat, l, l.attempt || 0);
 }
@@ -193,13 +193,13 @@ export function storeLoadedBatch(chat, rows) {
   if (!ours) {
     if (stored.length) {
       activity('memory.history', { agent: agentForChat(chat)?.id || '', chat, summary: `Stored ${stored.length} earlier message${stored.length === 1 ? '' : 's'} the phone sent` });
-      summarizeAfterLoad(chat, agentForChat(chat), stored.map((r) => r.id)).catch(() => {});
+      summarizeAfterLoad(chat, agentForChat(chat), stored.map((r) => r.id)).catch(recordFailure('Summarising', { chat }));
     }
     return stored.length;
   }
   l.loaded += stored.length; l.ids.push(...stored.map((r) => r.id));
   if (l.state !== 'loading') { // a late chunk of a finished load
-    if (stored.length) { l.state = 'loaded'; delete l.error; summarizeAfterLoad(chat, agentForChat(chat), stored.map((r) => r.id)).catch(() => {}); }
+    if (stored.length) { l.state = 'loaded'; delete l.error; summarizeAfterLoad(chat, agentForChat(chat), stored.map((r) => r.id)).catch(recordFailure('Summarising', { chat })); }
     return stored.length;
   }
   const oldest = [...rows].sort((a, b) => (a.ts || 0) - (b.ts || 0))[0];

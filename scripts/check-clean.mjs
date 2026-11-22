@@ -20,16 +20,19 @@ const CLEAN_RULES = {
   'max-lines': ['error', { max: 800, ...lines }], // one file, one topic
 };
 
+// Clean code rule 8 (errors are explicit): a failure that is thrown away says why on the same line, or is recorded
+// (`.catch(recordFailure('…'))`, src/core/events.js). Counted like the rules above, as "silent-catch".
+const SILENT_CATCH = /\.catch\(\(\) => \{\s*\}\)(?![^\n]*(\/\/|\/\*))/g;
+
 /** { file: { rule: count } } of clean-code breaks in src/, scripts/ and bin/. */
 async function breaks() {
   const eslint = new ESLint({ cwd: root, overrideConfig: { rules: CLEAN_RULES } });
   const out = {};
   for (const r of await eslint.lintFiles(['src', 'scripts', 'bin'])) {
-    for (const m of r.messages) {
-      if (!CLEAN_RULES[m.ruleId]) continue;
-      const f = relative(root, r.filePath);
-      (out[f] ||= {})[m.ruleId] = (out[f][m.ruleId] || 0) + 1;
-    }
+    const f = relative(root, r.filePath);
+    for (const m of r.messages) if (CLEAN_RULES[m.ruleId]) (out[f] ||= {})[m.ruleId] = (out[f][m.ruleId] || 0) + 1;
+    const silent = (readFileSync(r.filePath, 'utf8').match(SILENT_CATCH) || []).length;
+    if (silent) (out[f] ||= {})['silent-catch'] = silent;
   }
   return out;
 }
@@ -43,6 +46,7 @@ export async function checkClean() {
   for (const [f, rules] of Object.entries(now)) {
     for (const [rule, n] of Object.entries(rules)) {
       const was = base[f]?.[rule] || 0;
+      if (n > was && rule === 'silent-catch') { errors.push(`${f}: ${n - was} new failure${n - was === 1 ? '' : 's'} thrown away without a reason (an empty .catch: say why it is safe on the same line, or record it with recordFailure('…'))`); continue; }
       if (n > was) errors.push(`${f}: ${n - was} new ${rule} break${n - was === 1 ? '' : 's'} (split the function, return early, pass an object; npx eslint --rule '{"${rule}":${JSON.stringify(CLEAN_RULES[rule])}}' ${f})`);
     }
   }

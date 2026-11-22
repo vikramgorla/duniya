@@ -194,7 +194,7 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
   function syncContacts(list) {
     for (const c of list) if (c?.lid && c?.phoneNumber) safe(() => mapLid(c.lid, c.phoneNumber));
     safe(() => syncWhatsAppContacts(list));
-    resolveLids().catch(() => {});
+    resolveLids().catch(() => {}); // optional: a private id without a phone number stays as it is and is asked again later
   }
   let resolving = false;
   async function resolveLids() {
@@ -659,7 +659,7 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
       if (!isJidGroup(chat) || state.status !== 'open') return '';
       try { return (await groupMeta(chat)).subject || ''; } catch { return ''; }
     },
-    async typing(chat) { await sock?.sendPresenceUpdate('composing', chat).catch(() => {}); },
+    async typing(chat) { await sock?.sendPresenceUpdate('composing', chat).catch(() => {}); }, // a courtesy: the answer goes out without it
     /** The groups this number is in; while it reconnects, the ones it last listed. */
     async listChats() {
       if (state.status !== 'open') return groupList;

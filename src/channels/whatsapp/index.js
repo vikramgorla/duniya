@@ -119,7 +119,7 @@ export function createWhatsAppAdapter({ factory = createWhatsAppSession } = {}) 
       return out;
     },
     /** 069: graceful shutdown, 075: switched off: every number's socket closes (still linked), no reconnect. */
-    async stop() { for (const ch of sessions.values()) await ch.stop?.().catch(() => {}); },
+    async stop() { for (const ch of sessions.values()) await ch.stop?.().catch(() => {}); }, // the other numbers still close
     pair: (phone, number) => byNumber(number).pair(phone),
     logout: (number) => byNumber(number).logout(),
     restart: (number) => byNumber(number).restart(),

@@ -11,7 +11,7 @@ import { env, fail, restartSoon } from './config.js';
 import { phoneChat } from '../channels/index.js';
 import { kvGet, kvSet } from './db.js';
 import { getUser } from './store.js';
-import { activity } from './events.js';
+import { activity, recordFailure } from './events.js';
 import { updateStatus, checkForUpdate, applyUpdate, getUpdateSettings, installKind, runningVersion, backupConfigured, installedReleases } from './updates.js';
 import { releaseRange } from './releases.js';
 import { sendOwnerAlert, ownerNumber } from './owner-alerts.js';
@@ -131,7 +131,7 @@ export async function runConfirmedUpdate({ by = '', backup = true, reportTo = ''
     if (reportTo) kvSet('updates:report', JSON.stringify({ chat: reportTo, target: st.target, from, backup: r.backup, at: Date.now() }));
     restartFn();
   } else if (reportTo) {
-    await chatChannel()?.send(reportTo, `The update to ${st.target} was not installed; still running ${from}. ${r.code === 2 ? r.log : 'Details: Overview → Server → Updates.'}`).catch(() => {});
+    await chatChannel()?.send(reportTo, `The update to ${st.target} was not installed; still running ${from}. ${r.code === 2 ? r.log : 'Details: Overview → Server → Updates.'}`).catch(recordFailure('The message that the update was not installed', { chat: reportTo }));
   }
   return { ...r, target: st.target, from };
 }
@@ -152,7 +152,7 @@ async function resolveUpdateConfirm({ user, code, cancel = false, surface = '' }
   if (installKind() === 'docker') return 'This server runs in Docker: update the image on the host (docker compose pull && docker compose up -d).';
   const chat = String(surface).slice('whatsapp:'.length);
   runConfirmedUpdate({ by: `${user.username} (WhatsApp)`, backup: true, reportTo: chat })
-    .catch((e) => chatChannel()?.send(chat, `The update did not start: ${e.message}`).catch(() => {}));
+    .catch((e) => chatChannel()?.send(chat, `The update did not start: ${e.message}`).catch(recordFailure('The message that the update did not start', { chat })));
   return `Starting: ${backupConfigured() ? 'backup, then ' : ''}update to ${c.target}. The agents pause for 1–2 minutes; I will message you here when it is back.`;
 }
 registerConfirmHandler(resolveUpdateConfirm);
@@ -181,7 +181,7 @@ const today = (d) => d.toLocaleDateString('en-CA', { timeZone: env.timezone });
 
 /** One scheduler round (exported for tests). */
 export async function updateTick({ now = new Date() } = {}) {
-  await deliverUpdateReport(now.getTime()).catch(() => {});
+  await deliverUpdateReport(now.getTime()).catch(recordFailure('The update result message'));
   const s = getUpdateSettings();
   if (s.mode === 'off') return { action: 'off' };
   const st0 = updateStatus();

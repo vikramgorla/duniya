@@ -91,7 +91,7 @@ function cancelLogin() { try { login?.child?.kill('SIGTERM'); } catch { /* gone 
 
 export async function disconnect() {
   cancelLogin();
-  if (installed()) await appExec(app, ['logout'], { env: env(), timeoutMs: 20000 }).catch(() => {});
+  if (installed()) await appExec(app, ['logout'], { env: env(), timeoutMs: 20000 }).catch(() => {}); // its sign-in is removed below either way
   removeApp(ID);
 }
 

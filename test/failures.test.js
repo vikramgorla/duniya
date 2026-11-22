@@ -44,3 +44,15 @@ test('a tool call that timed out is not sent again (the service may still be doi
   await conn.call('book_room', {});
   assert.equal(calls, 2, 'one more try on a fresh connection');
 });
+
+test('work nobody waits for keeps its failure: a courtesy message that cannot be sent is in Activity, in plain words', async () => {
+  const queue = await import('../src/core/media-queue.js');
+  queue.registerJobHandler('test-broken', { async run() { throw Object.assign(new Error('the picture service is down'), { permanent: true }); },
+    async failed(p, job) { throw new Error(`could not tell ${job.chat}`); } });
+  queue.startQueue();
+  queue.enqueue({ kind: 'test-broken', chat: 'g1@g.us', payload: {} });
+  await queue.drain();
+  const errors = (await t.api(owner, 'GET', '/api/activity?type=error')).body.map((a) => a.summary);
+  assert.ok(errors.some((x) => /^Media job test-broken failed: the picture service is down/.test(x)), 'the job');
+  assert.ok(errors.some((x) => x === 'The apology after a failed request failed: could not tell g1@g.us'), 'and the apology that could not be sent');
+});

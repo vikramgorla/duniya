@@ -66,7 +66,9 @@ The owner runs the latest version on one server, so the code carries nothing for
    export something only when the app uses it.
 7. **Clean code** ([AGENTS.md](../AGENTS.md#clean-code)): small single-purpose functions, early returns, meaningful
    names, named constants, generic rules. `npm run check:clean` (also in `ci-checks.mjs`) fails on a new break of the
-   function size, branch, nesting, parameter and file-length rules; older code is listed in
+   function size, branch, nesting, parameter and file-length rules, and on a failure thrown away without a reason (an
+   empty `.catch(() => {})`: record it with `recordFailure('what it was')` from `src/core/events.js`, or say on the same
+   line why it is safe); older code is listed in
    `scripts/clean-baseline.json`, which only goes down (`npm run clean:baseline` lowers it after a cleanup).
 8. **Keep the panel snappy:** no new polling. The status and activity arrive over `/api/events` (server-sent events);
    screens load through `api()`, whose screen-data cache is dropped by any change or live event. Simple switches update

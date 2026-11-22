@@ -17,7 +17,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DATA_DIR, fail, within } from '../core/config.js';
 import { getSecret, getSetting, onSecretChange, updateSettings } from '../core/store.js';
-import { activity, bus } from '../core/events.js';
+import { activity, bus, recordFailure } from '../core/events.js';
 import { noteChat } from '../core/chat-prefs.js';
 import { rememberGroupNames } from '../core/chat-names.js';
 import { CHANNELS, channelInfo, channelOf } from './index.js';
@@ -169,7 +169,7 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     updateSettings({ channelsOff: on ? off : [...off, id] });
     if (on) { FIRST_ACCOUNT[id]?.(); await load(id); } else {
       const l = live.get(id); live.delete(id); lastChats.delete(id);
-      await l?.adapter.stop().catch(() => {});
+      await l?.adapter.stop().catch(() => {}); // it is dropped either way
       bus.emit('status');
     }
     activity('config', { summary: `${label(id)} switched ${on ? 'on' : 'off'}${by ? ` (${by})` : ''}` });
@@ -181,9 +181,9 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     const c = CHANNELS.find((x) => x.secret?.name === name);
     if (!c) return;
     const l = live.get(c.id); live.delete(c.id); lastChats.delete(c.id);
-    await l?.adapter.stop().catch(() => {});
+    await l?.adapter.stop().catch(() => {}); // it is dropped either way
     errors.delete(c.id);
-    if (setUp(c.id) && !offList().includes(c.id)) await load(c.id).catch(() => {});
+    if (setUp(c.id) && !offList().includes(c.id)) await load(c.id).catch(() => {}); // load() records why a channel did not start
     else bus.emit('status');
   }
 
@@ -192,9 +192,9 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
     /** Start every channel that is set up and on. */
     async start(h) {
       handlers = h;
-      onSecretChange((name) => { secretChanged(name).catch(() => {}); });
+      onSecretChange((name) => { secretChanged(name).catch(recordFailure('Restarting a channel after its token changed')); });
       for (const l of live.values()) await l.adapter.start(wrapped()); // switched on in the panel before the app finished starting
-      for (const c of CHANNELS) if (setUp(c.id) && !offList().includes(c.id)) await load(c.id).catch(() => {});
+      for (const c of CHANNELS) if (setUp(c.id) && !offList().includes(c.id)) await load(c.id).catch(() => {}); // load() records why a channel did not start
     },
     async typing(chat) { try { await route(chat).typing?.(chat); } catch { /* best effort */ } },
     async chatName(chat) { // 073: every subject a channel tells us is remembered for the one chat-name resolver
@@ -227,6 +227,6 @@ export function createHub({ loaders = DEFAULT_LOADERS } = {}) {
       return r || { ok: false, reason: 'not_due' };
     },
     /** 069: graceful shutdown: every channel closes its connections. */
-    async stop() { for (const l of live.values()) await l.adapter.stop().catch(() => {}); },
+    async stop() { for (const l of live.values()) await l.adapter.stop().catch(() => {}); }, // the app is stopping: the other channels still close
   };
 }

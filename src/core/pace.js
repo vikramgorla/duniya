@@ -96,7 +96,7 @@ export function queueRead(msg, now = Date.now()) {
 async function markChat(channel, chat) {
   const refs = [];
   for (let i = reads.length - 1; i >= 0; i--) if (reads[i].chat === chat) refs.unshift(reads.splice(i, 1)[0].ref);
-  if (refs.length && isChatEnabled(chat)) await channel.markRead?.(chat, refs).catch(() => {});
+  if (refs.length && isChatEnabled(chat)) await channel.markRead?.(chat, refs).catch(() => {}); // blue ticks are a courtesy: nothing depends on them
 }
 
 /** Send the read receipts that are due, a few chats at a time (incoming messages and the upkeep tick call this). */

@@ -277,8 +277,7 @@ export async function backupTick({ now = Date.now(), appVersion = '' } = {}) {
   run.done = !problem;
   kvSet('backup:run', JSON.stringify(run));
   if (problem && run.tries >= TRIES) {
-    sendOwnerAlert(`Duniya: the scheduled backup failed ${TRIES} times (${problem}). ${run.local ? 'The copy on the server was made; the copy off the server is missing.' : 'No backup was made.'} Check Backups in the panel.`, { kind: 'backup' })
-      .catch(() => {}); // sendOwnerAlert records its own failure in Activity
+    sendOwnerAlert(`Duniya: the scheduled backup failed ${TRIES} times (${problem}). ${run.local ? 'The copy on the server was made; the copy off the server is missing.' : 'No backup was made.'} Check Backups in the panel.`, { kind: 'backup' }); // never throws: it records its own failure
   }
   return { ...run, problem };
 }

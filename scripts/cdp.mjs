@@ -63,7 +63,7 @@ export async function newPage(cdp, { width, scheme, height, scale = 1 }) {
   if (phone) await s('Emulation.setTouchEmulationEnabled', { enabled: true });
   await s('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });
   await s('Page.enable');
-  await s('Page.setLifecycleEventsEnabled', { enabled: true }).catch(() => {});
+  await s('Page.setLifecycleEventsEnabled', { enabled: true }).catch(() => {}); // older Chrome: the page loads without these events
   const evaluate = async (expression) => {
     const r = await s('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);

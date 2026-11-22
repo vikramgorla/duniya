@@ -49,7 +49,7 @@ async function channelHealth(channel, now) {
       d.alerted = true;
       const text = `WhatsApp number ${n.label || n.id} has been reconnecting for ${Math.round((now - d.since) / 60000)} minutes${n.lastError ? ` (${n.lastError})` : ''}. It keeps retrying by itself; if it stays down, check the server's internet connection or restart the app on the Server screen.`;
       activity('error', { summary: text });
-      sendOwnerAlert(`Duniya: ${text}`, { kind: 'whatsapp' }).catch(() => {});
+      sendOwnerAlert(`Duniya: ${text}`, { kind: 'whatsapp' }); // never throws: it records its own failure
     }
   }
 }

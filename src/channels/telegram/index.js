@@ -12,7 +12,7 @@
 // - Chat ids: "tg:<bot id>#<chat id>"; WhatsApp markup is sent as Telegram entities (format.js).
 import { clip, digits, fail } from '../../core/config.js';
 import { getSecret, getSetting } from '../../core/store.js';
-import { activity, bus } from '../../core/events.js';
+import { activity, bus, recordFailure } from '../../core/events.js';
 import { kvGet, kvSet, savePoll, pollByRef } from '../../core/db.js';
 import { seenChats } from '../../core/chat-prefs.js';
 import { chatLabel, rememberGroupNames } from '../../core/chat-names.js';
@@ -104,7 +104,7 @@ export function createTelegramAdapter({ fetch: doFetch = globalThis.fetch, token
         }
       }
     });
-    const tail = run.catch(() => {});
+    const tail = run.catch(() => {}); // the caller of `run` gets its failure; the queue only needs to know it ended
     queues.set(native, tail);
     tail.then(() => { if (queues.get(native) === tail) queues.delete(native); });
     return run;
@@ -131,7 +131,7 @@ export function createTelegramAdapter({ fetch: doFetch = globalThis.fetch, token
     personFor({ channel: 'telegram', externalId: String(m.from.id), phone });
     activity('config', { chat: key(native), summary: `${nameOf(m.from) || 'Someone'} linked their phone number to Telegram` });
     await queued(native, () => call('sendMessage', { chat_id: native, reply_markup: { remove_keyboard: true },
-      text: 'Thanks, your number is linked. I now know you here as on WhatsApp, with the same roles.' })).catch(() => {});
+      text: 'Thanks, your number is linked. I now know you here as on WhatsApp, with the same roles.' })).catch(recordFailure('The Telegram note that the number is linked'));
     return true;
   }
 
@@ -216,8 +216,8 @@ export function createTelegramAdapter({ fetch: doFetch = globalThis.fetch, token
     let text = textOf(m);
     const cmd = /^\/(start|help)(@\w+)?(\s|$)/i.exec(text);
     if (!group && cmd?.[1].toLowerCase() === 'start') { // a direct chat always opens with /start
-      if (phoneOf(m.from.id)) await queued(native, () => call('sendMessage', { chat_id: native, text: `Hi ${nameOf(m.from) || 'there'}! Write your question and I’ll answer.` })).catch(() => {});
-      else await offerShare(native, `Hi ${nameOf(m.from) || 'there'}! I’m ${me.first_name}. Tap “${SHARE_BUTTON}” below so I know who you are (the same person as on WhatsApp, with the same roles). Or just write your question.`).catch(() => {});
+      if (phoneOf(m.from.id)) await queued(native, () => call('sendMessage', { chat_id: native, text: `Hi ${nameOf(m.from) || 'there'}! Write your question and I’ll answer.` })).catch(recordFailure('The Telegram greeting'));
+      else await offerShare(native, `Hi ${nameOf(m.from) || 'there'}! I’m ${me.first_name}. Tap “${SHARE_BUTTON}” below so I know who you are (the same person as on WhatsApp, with the same roles). Or just write your question.`).catch(recordFailure('The Telegram greeting'));
       return;
     }
     // mentions: "@bot" (entity) or a text mention of the bot; the "@bot" itself is dropped from the text
@@ -296,7 +296,7 @@ export function createTelegramAdapter({ fetch: doFetch = globalThis.fetch, token
         if (e.tg === 0 && /TimeoutError|AbortError/.test(e.message)) continue; // a long poll that outlived its wait: ask again
         if (e.tg === 401 || e.tg === 404) { setState('error', 'Telegram did not accept the bot token. Paste the token from @BotFather again (Replace token).'); return; }
         if (e.tg === 409 && /webhook/i.test(e.message)) { // another setup sends this bot's updates to a webhook: take them back
-          await call('deleteWebhook', {}).then(() => activity('config', { summary: 'Telegram: the bot had a webhook; it now delivers to this server' })).catch(() => {});
+          await call('deleteWebhook', {}).then(() => activity('config', { summary: 'Telegram: the bot had a webhook; it now delivers to this server' })).catch(recordFailure('Taking the Telegram bot back from a webhook'));
           continue;
         }
         setState('error', e.tg === 409 ? 'Another program is reading this bot’s messages (a second server with the same token?). Stop it, or create a new token.' : e.message);
@@ -356,7 +356,7 @@ export function createTelegramAdapter({ fetch: doFetch = globalThis.fetch, token
         throw e;
       }
       setState('open'); // the token works; the long poll keeps it so, or reports what went wrong
-      pollLoop(ctl.signal).catch(() => {});
+      pollLoop(ctl.signal).catch(recordFailure('The Telegram connection'));
     },
     async stop() { ctl.abort(); setState('stopped'); queues.clear(); groups.clear(); names.clear(); asked.clear(); },
     async status() {
@@ -375,8 +375,8 @@ export function createTelegramAdapter({ fetch: doFetch = globalThis.fetch, token
       return { ok: true };
     },
     async chatName(chat) { const n = nativeOf(chat); return Number(n) < 0 ? (groups.get(n)?.title || (await group(n).catch(() => null))?.title || '') : ''; },
-    async typing(chat) { const n = nativeOf(chat); await call('sendChatAction', { chat_id: n, action: 'typing' }).catch(() => {}); },
-    async presence(chat) { await call('sendChatAction', { chat_id: nativeOf(chat), action: 'typing' }).catch(() => {}); return { ok: true }; },
+    async typing(chat) { const n = nativeOf(chat); await call('sendChatAction', { chat_id: n, action: 'typing' }).catch(() => {}); }, // a courtesy: the answer goes out without it
+    async presence(chat) { await call('sendChatAction', { chat_id: nativeOf(chat), action: 'typing' }).catch(() => {}); return { ok: true }; }, // a courtesy, as above
     async isMember(chat, phone, senderJid) {
       const n = nativeOf(chat);
       const user = /^\d+$/.test(String(senderJid || '')) ? String(senderJid) : identityByPhone('telegram', phone);

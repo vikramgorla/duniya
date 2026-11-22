@@ -110,7 +110,7 @@ export function recordSuccess(id, { name = id } = {}) {
   states.delete(id);
   deleteTtl(KIND, id);
   activity('model.provider', { summary: `${name} is answering again (was paused ${Math.max(1, Math.round((now() - s.since) / 60000))} min: ${why(s)})`, detail: { account: id, recovered: true } });
-  if (s.alerted) sendOwnerAlert(`Duniya: ${name} is answering again.`, { kind: 'provider' }).catch(() => {});
+  if (s.alerted) sendOwnerAlert(`Duniya: ${name} is answering again.`, { kind: 'provider' }); // never throws: it records its own failure
 }
 
 /** Forget an account's state (credentials changed, account removed). */
@@ -125,7 +125,7 @@ function maybeAlert(id, s, name) {
   const text = s.needsReconnect
     ? `Duniya: ${name} needs to be reconnected (sign-in expired or key rejected). Open Models in the panel and reconnect it. Other connected providers answer meanwhile.`
     : `Duniya: ${name} has been failing for ${Math.round((now() - s.since) / 60000)} minutes (${why(s)}). ${s.until > now() ? `It is paused until ${hhmm(s.until)}; ` : ''}other connected providers answer meanwhile. See Models in the panel.`;
-  sendOwnerAlert(text, { kind: 'provider' }).catch(() => {});
+  sendOwnerAlert(text, { kind: 'provider' }); // never throws: it records its own failure
 }
 
 let lastAllFailed = 0;
@@ -134,7 +134,7 @@ export function allFailed(summary) {
   activity('error', { summary: `No AI provider could answer: ${summary}` });
   if (now() - lastAllFailed < ALL_FAILED_ALERT_MS) return false;
   lastAllFailed = now();
-  sendOwnerAlert(`Duniya: no AI provider could answer (${summary}). Agents can't reply until one works again. Check Models in the panel.`, { kind: 'provider' }).catch(() => {});
+  sendOwnerAlert(`Duniya: no AI provider could answer (${summary}). Agents can't reply until one works again. Check Models in the panel.`, { kind: 'provider' }); // never throws: it records its own failure
   return true;
 }
 export const resetAllFailedAlert = () => { lastAllFailed = 0; };

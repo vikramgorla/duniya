@@ -1,5 +1,6 @@
 // @ts-check
 // Panel routes for updates (008, 045; owner only) and the installed release notes (065; everyone signed in).
+import { recordFailure } from '../../core/events.js';
 import { getUpdateSettings, setUpdateSettings, updateStatus, checkForUpdate, applyUpdate, installKind, updateRunning, backupConfigured, installedReleases, runningVersion, markSeen, updateSource, setUpdateSource } from '../../core/updates.js';
 import { restartSoon } from '../../core/config.js';
 import { releaseRange } from '../../core/releases.js';
@@ -37,7 +38,7 @@ export function updateRoutes(route, { restart = () => restartSoon(500) } = {}) {
     const backup = body.backup !== false;
     if (body.breaking === true) {
       // Runs in the background; the panel polls GET /api/updates (running → new version after the restart).
-      runConfirmedUpdate({ by: user?.username || 'owner', backup }).catch(() => {});
+      runConfirmedUpdate({ by: user?.username || 'owner', backup }).catch(recordFailure('The update'));
       await new Promise((r) => setImmediate(r));
       return { started: true, target: st.target, running: updateRunning() };
     }

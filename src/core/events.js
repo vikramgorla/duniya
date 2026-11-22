@@ -98,3 +98,11 @@ export function activity(type, { agent, chat, summary, detail } = {}) {
   if (type === 'error') console.error(`[${oneLine(agent || 'core')}] ${oneLine(entry.summary)}`);
   return entry;
 }
+
+/**
+ * For `.catch()` on work nobody waits for (a courtesy message, a background step): the failure is kept in Activity in
+ * plain words ("<what> failed: <reason>") instead of being lost. `what` names the work, never message contents.
+ */
+export const recordFailure = (what, { agent = '', chat = '' } = {}) => (e) => {
+  try { activity('error', { agent, chat, summary: `${what} failed: ${e?.message || e}` }); } catch { /* the log itself is unavailable (the app is stopping) */ }
+};

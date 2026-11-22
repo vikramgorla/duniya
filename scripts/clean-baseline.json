@@ -153,7 +153,11 @@
   "complexity": 2
  },
  "src/panel/public/app/chats.js": {
-  "complexity": 1
+  "complexity": 1,
+  "silent-catch": 2
+ },
+ "src/panel/public/app/core.js": {
+  "silent-catch": 1
  },
  "src/panel/public/app/diff.js": {
   "complexity": 1
@@ -169,23 +173,28 @@
   "max-lines-per-function": 1
  },
  "src/panel/public/app/overview.js": {
-  "complexity": 1
+  "complexity": 1,
+  "silent-catch": 3
  },
  "src/panel/public/app/people.js": {
-  "complexity": 2
+  "complexity": 2,
+  "silent-catch": 2
  },
  "src/panel/public/app/promises.js": {
-  "complexity": 1
+  "complexity": 1,
+  "silent-catch": 1
  },
  "src/panel/public/app/registry.js": {
   "max-lines-per-function": 1
  },
  "src/panel/public/app/server.js": {
-  "complexity": 2
+  "complexity": 2,
+  "silent-catch": 1
  },
  "src/panel/public/app/settings.js": {
   "complexity": 3,
-  "max-lines-per-function": 2
+  "max-lines-per-function": 2,
+  "silent-catch": 4
  },
  "src/panel/public/app/tool-editor.js": {
   "complexity": 1

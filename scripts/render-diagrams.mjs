@@ -125,7 +125,7 @@ async function verify(cdp, newPage, names, gridFile) {
     document.body.style.cssText = 'margin:0;padding:24px;background:#0d1117;font:14px sans-serif;color:#e6edf3;display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start';
     const out = [];
     for (const { n, url } of items) {
-      const img = new Image(); img.src = url; await img.decode().catch(() => {});
+      const img = new Image(); img.src = url; await img.decode().catch(() => {}); // a picture that does not decode is drawn as it is
       const fig = document.createElement('figure'); fig.style.cssText = 'margin:0;display:flex;flex-direction:column;gap:6px';
       const cap = document.createElement('figcaption'); cap.textContent = n + ' (' + img.naturalWidth + ' x ' + img.naturalHeight + ', shown at phone width 343 px and at ' + Math.min(720, img.naturalWidth) + ' px)';
       const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:16px;align-items:flex-start';
