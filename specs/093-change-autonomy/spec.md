@@ -24,7 +24,8 @@ agent asked "Shall I save?" five times: its prompt said a request is not approva
 - clear / act + organizer (or owner) + live addressed turn + low risk → applied at once (Duniya confirms remote previews
   itself; module / People holds apply without a code). Otherwise: Duniya's holds keep `confirm CODE`; a model's
   same-turn confirm of a remote preview is blocked, and allowed only after a later explicit yes.
-- Test console, schedules and messages the agent joined by itself never apply without asking.
+- Test console and schedules never apply without asking; follow-ups without the wake word (judged turns) count, so
+  "should go to the shopping list" and "Yes" work as in the real conversation (2.54.1).
 - Activity type `change.auto` with the tool, input, role and undo tool; `#activity/type=change.auto`; admin MCP
   `update_agent` (`autonomy`, `risk`) and `list_activity` (`type`); the owner assistant sets it through `update_agent`.
 - Tests with fakes: the Killi replay, tweak, unclear, delete, participant, ask mode, a fake preview / confirm service

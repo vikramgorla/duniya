@@ -78,6 +78,24 @@ test('the Killi conversation: a clear request is previewed and applied in the sa
   assert.match(lastResult(), /Already applied/);
 });
 
+test('follow-ups without the wake word count: a tweak is applied, and a plain "Yes" confirms a waiting delete', async () => {
+  await t.agents.updateAgent('silk', { groupReplies: 'followups' });
+  fresh();
+  t.script.push([use('shopping_item_preview', { item: 'Killi' })], [{ type: 'text', text: 'Added Killi to the tracker.' }]);
+  await say(ORG, 'silku add Killi to tracker');
+  t.script.push([use('shopping_item_preview', { item: 'Killi', list: 'shopping' })], [{ type: 'text', text: 'Moved Killi to the shopping list.' }]);
+  await say(ORG, 'should go to shopping list');
+  assert.match(t.userTurn(t.claudeReqs.length - 2), /did not use your wake word/, 'a judged follow-up');
+  assert.equal(confirms().length, 2, 'the follow-up tweak was applied without asking');
+  t.script.push([use('agenda_delete_preview', { item: 'Puja' })], [{ type: 'text', text: 'Delete Puja from the agenda?' }]);
+  await say(ORG, 'and remove puja from the agenda');
+  assert.equal(confirms().length, 2);
+  t.script.push([use('confirm', { confirm_id: `cf_${seq}` })], [{ type: 'text', text: 'Deleted.' }]);
+  await say(ORG, 'Yes');
+  assert.equal(confirms().length, 3, 'a plain yes confirms it');
+  await t.agents.updateAgent('silk', { groupReplies: 'wake' });
+});
+
 test('an unclear request gets one question and changes nothing', async () => {
   fresh();
   t.script.push([{ type: 'text', text: 'Which list should Killi go to: shopping or the tracker?' }]);
@@ -116,6 +134,7 @@ test('a participant asks: their preview waits and a same-turn confirm is blocked
 
 test('Ask first: the preview waits for a later yes even for a clear, low-risk request', async () => {
   await t.agents.updateAgent('silk', { autonomy: 'ask' });
+  const autoBefore = autoEntries().length;
   fresh();
   t.script.push([use('shopping_item_preview', { item: 'Killi' })], [use('confirm', { confirm_id: `cf_${seq + 1}` })], [{ type: 'text', text: 'Shall I save Killi?' }]);
   await say(ORG, 'silku add Killi to the shopping list');
@@ -124,7 +143,7 @@ test('Ask first: the preview waits for a later yes even for a clear, low-risk re
   t.script.push([use('confirm', { confirm_id: `cf_${seq}` })], [{ type: 'text', text: 'Saved.' }]);
   await say(ORG, 'silku Yes');
   assert.equal(confirms().length, 1);
-  assert.equal(autoEntries().filter((a) => a.agent === 'silk').length, 3, 'a confirmed yes is not "without asking"');
+  assert.equal(autoEntries().length, autoBefore, 'a confirmed yes is not "without asking"');
   await t.agents.updateAgent('silk', { autonomy: 'act' });
   t.script.push([{ type: 'text', text: 'ok' }]);
   await say(ORG, 'silku hi');
