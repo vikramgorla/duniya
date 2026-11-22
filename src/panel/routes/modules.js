@@ -15,69 +15,69 @@ const slug = (s) => String(s || 'export').toLowerCase().replace(/[^a-z0-9]+/g, '
 export function moduleRoutes(route) {
   const admin = { role: /** @type {'admin'} */ ('admin') };
   route('GET', '/api/modules', async () => ({ modules: moduleRows(), methods: liveModules().some((m) => m.id === 'orders') ? (await need('orders')).paymentMethods() : null }), { role: 'viewer' });
-  route('PUT', '/api/modules/:id', async (req, res, body, q, p, user) => {
+  route('PUT', '/api/modules/:id', async ({ body, params, user }) => {
     if (typeof body.on !== 'boolean') return [400, { error: 'on must be true or false', field: 'on' }];
-    return { modules: await setModuleOn(p.id, body.on, user.username) };
+    return { modules: await setModuleOn(params.id, body.on, user.username) };
   }, admin);
   // the tools of the modules that are on, for an agent's tool list (all / none per role, like WhatsApp actions)
   route('GET', '/api/modules/tools', async () => liveModules().map((m) => ({ id: m.id, label: MODULES.find((x) => x.id === m.id)?.label || m.id, line: MODULES.find((x) => x.id === m.id)?.line || '', changes: m.tools.some((t) => t.annotations?.readOnlyHint !== true),
     tools: m.tools.map((t) => ({ name: t.name, description: t.description, organizerOnly: !t.roles.includes('participant'), participantDefault: !!t.participantDefault })) })), { role: 'viewer' });
-  route('PUT', '/api/orders/methods', async (req, res, body, q, p, user) => ({ methods: (await need('orders')).setPaymentMethods(body.methods, user.username) }), admin);
+  route('PUT', '/api/orders/methods', async ({ body, user }) => ({ methods: (await need('orders')).setPaymentMethods(body.methods, user.username) }), admin);
 
   // ---------- Events ----------
   const ev = () => need('events');
-  route('GET', '/api/module/events', async (req, res, body, q) => (await ev()).listEvents({ past: q.get('past') === '1' }), admin);
-  route('POST', '/api/module/events', async (req, res, body, q, p, user) => [201, (await ev()).saveEvent({ ...body, id: undefined }, user.username)], admin);
-  route('GET', '/api/module/events/:id', async (req, res, body, q, p) => ({ ...(await ev()).eventPage(p.id), modules: moduleSections('event', p.id) }), admin);
-  route('PUT', '/api/module/events/:id', async (req, res, body, q, p, user) => (await ev()).saveEvent({ ...body, id: p.id }, user.username), admin);
-  route('DELETE', '/api/module/events/:id', async (req, res, body, q, p, user) => (await ev()).deleteEvent(p.id, user.username), admin);
-  route('GET', '/api/module/events/:id/csv', async (req, res, body, q, p) => { const m = await ev(); return sendCsv(res, `${slug(m.getEvent(p.id).name)}-registrations`, m.csvRows(p.id)); }, admin);
-  route('POST', '/api/module/events/:id/registrations', async (req, res, body, q, p, user) => [201, (await ev()).register({ ...body, event: p.id }, { by: user.username, organizer: true })], admin);
-  route('PUT', '/api/module/registrations/:id', async (req, res, body, q, p, user) => (await ev()).updateRegistration(p.id, body, user.username), admin);
-  route('POST', '/api/module/events/:id/duties', async (req, res, body, q, p, user) => (await ev()).saveDuty({ ...body, id: '', event: p.id }, user.username), admin);
-  route('PUT', '/api/module/duties/:id', async (req, res, body, q, p, user) => (await ev()).saveDuty({ ...body, id: p.id }, user.username), admin);
-  route('DELETE', '/api/module/duties/:id', async (req, res, body, q, p) => (await ev()).deleteDuty(p.id), admin);
-  route('PUT', '/api/module/duties/:id/people/:person', async (req, res, body, q, p, user) => (await ev()).takeDuty(p.id, p.person, user.username, body.on !== false), admin);
+  route('GET', '/api/module/events', async ({ query }) => (await ev()).listEvents({ past: query.get('past') === '1' }), admin);
+  route('POST', '/api/module/events', async ({ body, user }) => [201, (await ev()).saveEvent({ ...body, id: undefined }, user.username)], admin);
+  route('GET', '/api/module/events/:id', async ({ params }) => ({ ...(await ev()).eventPage(params.id), modules: moduleSections('event', params.id) }), admin);
+  route('PUT', '/api/module/events/:id', async ({ body, params, user }) => (await ev()).saveEvent({ ...body, id: params.id }, user.username), admin);
+  route('DELETE', '/api/module/events/:id', async ({ params, user }) => (await ev()).deleteEvent(params.id, user.username), admin);
+  route('GET', '/api/module/events/:id/csv', async ({ res, params }) => { const m = await ev(); return sendCsv(res, `${slug(m.getEvent(params.id).name)}-registrations`, m.csvRows(params.id)); }, admin);
+  route('POST', '/api/module/events/:id/registrations', async ({ body, params, user }) => [201, (await ev()).register({ ...body, event: params.id }, { by: user.username, organizer: true })], admin);
+  route('PUT', '/api/module/registrations/:id', async ({ body, params, user }) => (await ev()).updateRegistration(params.id, body, user.username), admin);
+  route('POST', '/api/module/events/:id/duties', async ({ body, params, user }) => (await ev()).saveDuty({ ...body, id: '', event: params.id }, user.username), admin);
+  route('PUT', '/api/module/duties/:id', async ({ body, params, user }) => (await ev()).saveDuty({ ...body, id: params.id }, user.username), admin);
+  route('DELETE', '/api/module/duties/:id', async ({ params }) => (await ev()).deleteDuty(params.id), admin);
+  route('PUT', '/api/module/duties/:id/people/:person', async ({ body, params, user }) => (await ev()).takeDuty(params.id, params.person, user.username, body.on !== false), admin);
 
   // ---------- Orders and payments ----------
   const ord = () => need('orders');
   const filter = (q) => ({ status: q.get('status') || 'open', event: q.get('event') || '' });
-  route('GET', '/api/orders', async (req, res, body, q) => (await ord()).ordersPage(filter(q)), admin);
-  route('GET', '/api/orders/csv', async (req, res, body, q) => sendCsv(res, `orders-${filter(q).status}`, (await ord()).csvRows(filter(q))), admin);
-  route('POST', '/api/orders', async (req, res, body, q, p, user) => [201, (await ord()).createOrder(body, user.username)], admin);
-  route('GET', '/api/orders/:id', async (req, res, body, q, p) => { const m = await ord(); return { ...m.getOrder(p.id), methods: m.paymentMethods() }; }, admin);
-  route('PUT', '/api/orders/:id', async (req, res, body, q, p, user) => (await ord()).updateOrder(p.id, body, user.username), admin);
-  route('DELETE', '/api/orders/:id', async (req, res, body, q, p, user) => (await ord()).deleteOrder(p.id, user.username), admin);
-  route('POST', '/api/orders/:id/payments', async (req, res, body, q, p, user) => [201, (await ord()).addPayment(p.id, body, user.username)], admin);
-  route('DELETE', '/api/orders/:id/payments/:pay', async (req, res, body, q, p, user) => (await ord()).removePayment(p.id, p.pay, user.username), admin);
+  route('GET', '/api/orders', async ({ query }) => (await ord()).ordersPage(filter(query)), admin);
+  route('GET', '/api/orders/csv', async ({ res, query }) => sendCsv(res, `orders-${filter(query).status}`, (await ord()).csvRows(filter(query))), admin);
+  route('POST', '/api/orders', async ({ body, user }) => [201, (await ord()).createOrder(body, user.username)], admin);
+  route('GET', '/api/orders/:id', async ({ params }) => { const m = await ord(); return { ...m.getOrder(params.id), methods: m.paymentMethods() }; }, admin);
+  route('PUT', '/api/orders/:id', async ({ body, params, user }) => (await ord()).updateOrder(params.id, body, user.username), admin);
+  route('DELETE', '/api/orders/:id', async ({ params, user }) => (await ord()).deleteOrder(params.id, user.username), admin);
+  route('POST', '/api/orders/:id/payments', async ({ body, params, user }) => [201, (await ord()).addPayment(params.id, body, user.username)], admin);
+  route('DELETE', '/api/orders/:id/payments/:pay', async ({ params, user }) => (await ord()).removePayment(params.id, params.pay, user.username), admin);
   // 082: payment reminders to people (through Lists and sending): the message to start from, automatic ones per event
-  route('GET', '/api/order-reminders', async (req, res, body, q) => { const m = await ord(); return { template: m.reminderTemplate(q.get('event') || ''), auto: m.autoReminders() }; }, admin);
-  route('PUT', '/api/order-reminders/:event', async (req, res, body, q, p, user) => ({ auto: (await ord()).setAutoReminders(p.event, body, user.username) }), admin);
+  route('GET', '/api/order-reminders', async ({ query }) => { const m = await ord(); return { template: m.reminderTemplate(query.get('event') || ''), auto: m.autoReminders() }; }, admin);
+  route('PUT', '/api/order-reminders/:event', async ({ body, params, user }) => ({ auto: (await ord()).setAutoReminders(params.event, body, user.username) }), admin);
 
   // ---------- Lists and sending (082) ----------
   const snd = () => need('sending');
   route('GET', '/api/sending', async () => { const m = await snd(); return { runs: m.listRuns(), filters: m.listFilters(), campaigns: (await import('../../modules/sending/campaigns.js')).listCampaigns() }; }, admin);
-  route('POST', '/api/sending/preview', async (req, res, body, q, p, user) => (await snd()).preview(body, user.username), admin);
-  route('GET', '/api/sending/runs/:id', async (req, res, body, q, p) => (await snd()).runPage(p.id, q.get('status') || ''), admin);
-  route('POST', '/api/sending/runs/:id/start', async (req, res, body, q, p, user) => (await snd()).startRun(p.id, user.username), admin);
-  route('PUT', '/api/sending/runs/:id', async (req, res, body, q, p, user) => (await snd()).controlRun(p.id, String(body.action || ''), user.username), admin);
-  route('POST', '/api/sending/filters', async (req, res, body) => [201, (await snd()).saveFilter(body)], admin);
-  route('DELETE', '/api/sending/filters/:id', async (req, res, body, q, p) => (await snd()).deleteFilter(p.id), admin);
+  route('POST', '/api/sending/preview', async ({ body, user }) => (await snd()).preview(body, user.username), admin);
+  route('GET', '/api/sending/runs/:id', async ({ query, params }) => (await snd()).runPage(params.id, query.get('status') || ''), admin);
+  route('POST', '/api/sending/runs/:id/start', async ({ params, user }) => (await snd()).startRun(params.id, user.username), admin);
+  route('PUT', '/api/sending/runs/:id', async ({ body, params, user }) => (await snd()).controlRun(params.id, String(body.action || ''), user.username), admin);
+  route('POST', '/api/sending/filters', async ({ body }) => [201, (await snd()).saveFilter(body)], admin);
+  route('DELETE', '/api/sending/filters/:id', async ({ params }) => (await snd()).deleteFilter(params.id), admin);
   // 083: campaigns (sequences of sends, confirmed once)
   const cmp = async () => { await snd(); return import('../../modules/sending/campaigns.js'); };
-  route('POST', '/api/sending/campaigns/preview', async (req, res, body, q, p, user) => (await cmp()).campaignPreview(body, user.username), admin);
-  route('GET', '/api/sending/campaigns/:id', async (req, res, body, q, p) => (await cmp()).getCampaign(p.id), admin);
-  route('POST', '/api/sending/campaigns/:id/start', async (req, res, body, q, p, user) => (await cmp()).startCampaign(p.id, user.username), admin);
-  route('PUT', '/api/sending/campaigns/:id', async (req, res, body, q, p, user) => (await cmp()).controlCampaign(p.id, String(body.action || ''), user.username), admin);
+  route('POST', '/api/sending/campaigns/preview', async ({ body, user }) => (await cmp()).campaignPreview(body, user.username), admin);
+  route('GET', '/api/sending/campaigns/:id', async ({ params }) => (await cmp()).getCampaign(params.id), admin);
+  route('POST', '/api/sending/campaigns/:id/start', async ({ params, user }) => (await cmp()).startCampaign(params.id, user.username), admin);
+  route('PUT', '/api/sending/campaigns/:id', async ({ body, params, user }) => (await cmp()).controlCampaign(params.id, String(body.action || ''), user.username), admin);
 
   // ---------- Surveys (083) ----------
   const srv = () => need('surveys');
-  route('GET', '/api/surveys', async (req) => { const m = await srv(); m.noteBase(baseUrl(req)); return m.listSurveys(); }, admin);
-  route('POST', '/api/surveys', async (req, res, body, q, p, user) => [201, (await srv()).saveSurvey({ ...body, id: undefined }, user.username)], admin);
-  route('GET', '/api/surveys/:id', async (req, res, body, q, p) => (await srv()).results(p.id), admin);
-  route('PUT', '/api/surveys/:id', async (req, res, body, q, p, user) => (await srv()).saveSurvey({ ...body, id: p.id }, user.username), admin);
-  route('DELETE', '/api/surveys/:id', async (req, res, body, q, p, user) => (await srv()).deleteSurvey(p.id, user.username), admin);
-  route('GET', '/api/surveys/:id/csv', async (req, res, body, q, p) => { const m = await srv(); return sendCsv(res, `${slug(m.getSurvey(p.id).title)}-answers`, m.csvRows(p.id)); }, admin);
+  route('GET', '/api/surveys', async ({ req }) => { const m = await srv(); m.noteBase(baseUrl(req)); return m.listSurveys(); }, admin);
+  route('POST', '/api/surveys', async ({ body, user }) => [201, (await srv()).saveSurvey({ ...body, id: undefined }, user.username)], admin);
+  route('GET', '/api/surveys/:id', async ({ params }) => (await srv()).results(params.id), admin);
+  route('PUT', '/api/surveys/:id', async ({ body, params, user }) => (await srv()).saveSurvey({ ...body, id: params.id }, user.username), admin);
+  route('DELETE', '/api/surveys/:id', async ({ params, user }) => (await srv()).deleteSurvey(params.id, user.username), admin);
+  route('GET', '/api/surveys/:id/csv', async ({ res, params }) => { const m = await srv(); return sendCsv(res, `${slug(m.getSurvey(params.id).title)}-answers`, m.csvRows(params.id)); }, admin);
   // the public page behind a person's link: no login; the token is the key; a plain form, every text escaped
   const pageLimit = limiter(30);
   const surveyPage = async (req, res, p, form = null) => {
@@ -103,6 +103,6 @@ export function moduleRoutes(route) {
     return html(s.title, `<h1>${esc(s.title)}</h1>${s.intro ? `<p>${esc(s.intro)}</p>` : ''}${error ? `<p class="note bad" role=alert>${esc(error)}</p>` : ''}
 <form method=post>${s.questions.map(field).join('')}<div class=actions><button type=submit>Send my answers</button></div></form><p class=small>Only the people who run this survey see your answers.</p>`, error ? 400 : 200);
   };
-  route('GET', '/s/:token', async (req, res, body, q, p) => surveyPage(req, res, p), { public: true });
-  route('POST', '/s/:token', async (req, res, body, q, p) => surveyPage(req, res, p, body), { public: true, form: true });
+  route('GET', '/s/:token', async ({ req, res, params }) => surveyPage(req, res, params), { public: true });
+  route('POST', '/s/:token', async ({ req, res, body, params }) => surveyPage(req, res, params, body), { public: true, form: true });
 }

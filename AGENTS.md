@@ -183,7 +183,7 @@ CI enforces the measurable ones (`npm run check:clean`, also in `node scripts/ci
 | `src/panel/server.js`, `http.js`, `routes/` | Panel HTTP API: `server.js` is the router (role gates, CSRF guard) and registers `routes/<area>.js` (`auth`, `status`, `agents`, `chats`, `contacts`, `system`, one per feature) |
 | `src/panel/assets.js`, `module-graph.js` | The panel's static files from memory: content-hash URLs, import map (its hash in the CSP), first-screen preload |
 | `src/panel/public/` | The panel UI: `index.html` (shell), `app/*.js` native ES modules (`core.js`, `main.js`, one per screen, loaded on first visit; see `docs/development.md#panel-modules`), `app/styles.css`; `manifest.webmanifest` and `icons/` make it installable on phones |
-| `src/panel/admin-mcp.js`, `admin-tools.js`, `src/core/admin-oauth.js` | Admin MCP server and its OAuth 2.1 |
+| `src/panel/admin-mcp.js`, `admin-tools.js` (+ `admin-tools/`: the tools, one file per area), `src/core/admin-oauth.js` | Admin MCP server and its OAuth 2.1 |
 | `bin/duniya.js`, `deploy/duniya` | `duniya` CLI |
 | `install.sh`, `deploy/`, `infra/oci/`, `infra/gcp/`, `Dockerfile` | Installer, root maintenance helper (`deploy/ops/`), OCI stack, GCP script, Docker |
 | `templates/` | Agent templates (JSON) |

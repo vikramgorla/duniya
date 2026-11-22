@@ -39,75 +39,75 @@ export function agentRoutes(route, { channel } = {}) {
   // ---------- agents ----------
   route('GET', '/api/templates', async () => listTemplates());
   route('GET', '/api/agents', async () => listAgents().map(agentView));
-  route('POST', '/api/agents', async (req, res, body, q, p, user) => {
+  route('POST', '/api/agents', async ({ body, user }) => {
     const base = body.template ? templateConfig(body.template) : {};
     guardLocal(user, {}, { ...base, ...(body.config || {}) });
     const { agent, warnings } = await createAgent({ id: body.id, config: { ...base, ...(body.config || {}) }, by: user.username });
     return [201, { ...agentView(agent), warnings }];
   });
-  route('POST', '/api/agents/import', async (req, res, body, q, p, user) => {
+  route('POST', '/api/agents/import', async ({ body, user }) => {
     guardLocal(user, {}, body?.config);
     const { agent, warnings } = await importAgent(body, user.username);
     return [201, { ...agentView(agent), warnings }];
   });
   route('POST', '/api/agents/reload', async () => { await loadAgents(); await resetMcpPool(); activity('system', { summary: 'Agents reloaded' }); return listAgents().map(agentView); });
-  route('GET', '/api/agents/:id', async (req, res, body, q, p) => { const b = getAgent(p.id); return b ? { ...agentView(b), ...(isBuiltin(p.id) ? {} : { review: reviewCounts(p.id), lessonsToApprove: proposedCount(p.id) }) } : [404, { error: 'Not found' }]; });
+  route('GET', '/api/agents/:id', async ({ params }) => { const b = getAgent(params.id); return b ? { ...agentView(b), ...(isBuiltin(params.id) ? {} : { review: reviewCounts(params.id), lessonsToApprove: proposedCount(params.id) }) } : [404, { error: 'Not found' }]; });
   // 070: Review & teach. The agent's answers with the message that asked (admins, like stored messages; private chats
   // left out); the first page of a look is recorded in Activity. Ratings: 1, -1 or 0 (clear).
-  route('GET', '/api/agents/:id/review', async (req, res, body, q, p, user) => {
-    const b = getAgent(p.id);
-    if (!b || isBuiltin(p.id)) return [404, { error: 'Not found' }];
-    const rows = listAnswers(p.id, { before: q.get('before'), only: q.get('only') || '', limit: 21 });
+  route('GET', '/api/agents/:id/review', async ({ query, params, user }) => {
+    const b = getAgent(params.id);
+    if (!b || isBuiltin(params.id)) return [404, { error: 'Not found' }];
+    const rows = listAnswers(params.id, { before: query.get('before'), only: query.get('only') || '', limit: 21 });
     const names = chatLabels(rows.map((r) => r.chat));
-    if (!q.get('before')) activity('config', { agent: p.id, summary: `Answers of ${b.name} reviewed by ${user.username}` });
+    if (!query.get('before')) activity('config', { agent: params.id, summary: `Answers of ${b.name} reviewed by ${user.username}` });
     const judged = judgedOf(rows.map((r) => r.id)); // 089: answers to messages it judged by itself
     return {
-      counts: reviewCounts(p.id), more: rows.length > 20,
+      counts: reviewCounts(params.id), more: rows.length > 20,
       answers: rows.slice(0, 20).map(({ question: qn, ...r }) => ({ ...r, chatName: names.get(r.chat), ...(judged.has(r.id) ? { judged: true } : {}),
         question: qn && { text: qn.text, ts: qn.ts, name: personInfo({ phone: qn.sender, jid: qn.senderJid, fallbackName: qn.name }).label } })),
     };
   }, { role: 'admin' });
-  route('PUT', '/api/agents/:id/review/:msg', async (req, res, body, q, p, user) => {
-    const agent = getAgent(p.id);
-    if (!agent || isBuiltin(p.id)) return [404, { error: 'Not found' }];
-    const r = rateAnswer(p.id, p.msg, body.rating, user.username);
+  route('PUT', '/api/agents/:id/review/:msg', async ({ body, params, user }) => {
+    const agent = getAgent(params.id);
+    if (!agent || isBuiltin(params.id)) return [404, { error: 'Not found' }];
+    const r = rateAnswer(params.id, params.msg, body.rating, user.username);
     // 089: a 👎 proposes a lesson (in the background); 👍 on an answer to a judged message counts as good join-in feedback
-    const ans = r.rating ? listAnswers(p.id, { before: r.id + 1, limit: 1 })[0] : null;
+    const ans = r.rating ? listAnswers(params.id, { before: r.id + 1, limit: 1 })[0] : null;
     if (ans && r.rating < 0) lessonFromThumbsDown(agent, { msg: ans.id, chat: ans.chat, question: ans.question?.text || '', answer: ans.text, by: user.username })?.catch(() => {});
     if (ans && r.rating > 0 && judgedOf([ans.id]).has(ans.id)) joinFeedback(agent, { chat: ans.chat, kind: 'good', msg: ans.id, by: user.username });
-    return { ...r, counts: reviewCounts(p.id), ...(r.rating < 0 && agent.lessons?.enabled !== false ? { proposing: true } : {}) };
+    return { ...r, counts: reviewCounts(params.id), ...(r.rating < 0 && agent.lessons?.enabled !== false ? { proposing: true } : {}) };
   }, { role: 'admin' });
-  route('PUT', '/api/agents/:id', async (req, res, body, q, p, user) => {
-    const before = getAgent(p.id);
+  route('PUT', '/api/agents/:id', async ({ body, params, user }) => {
+    const before = getAgent(params.id);
     if (body.mcpServers !== undefined) guardLocal(user, before, body);
     // 059: where owner alerts go is the owner's choice (as under the old Settings → Owner alerts)
     if (body.alerts !== undefined && user.role !== 'owner' && digits(body.alerts?.to || '') !== (before?.alerts?.to || '')) return [403, { error: 'Only the owner can change where alerts go', field: 'alerts.to' }];
-    const { agent, warnings } = await updateAgent(p.id, body, user.username);
+    const { agent, warnings } = await updateAgent(params.id, body, user.username);
     return { ...agentView(agent), warnings };
   });
-  route('DELETE', '/api/agents/:id', async (req, res, body, q, p, user) => { deleteAgent(p.id, user.username); return { ok: true }; });
-  route('POST', '/api/agents/:id/duplicate', async (req, res, body, q, p, user) => {
-    const src = getAgent(p.id);
+  route('DELETE', '/api/agents/:id', async ({ params, user }) => { deleteAgent(params.id, user.username); return { ok: true }; });
+  route('POST', '/api/agents/:id/duplicate', async ({ body, params, user }) => {
+    const src = getAgent(params.id);
     if (!src) return [404, { error: 'Not found' }];
     const { id, updatedAt, ...config } = src;
     guardLocal(user, {}, config);
     const { agent } = await createAgent({ id: body.id, config: { ...config, name: `${config.name} (copy)`, chats: [] }, by: user.username });
     return [201, agentView(agent)];
   });
-  route('GET', '/api/agents/:id/export', async (req, res, body, q, p) => {
-    const doc = exportAgent(p.id);
-    send(res, 200, JSON.stringify(doc, null, 2), { 'content-type': 'application/json', 'content-disposition': `attachment; filename="${p.id}.agent.json"` });
+  route('GET', '/api/agents/:id/export', async ({ res, params }) => {
+    const doc = exportAgent(params.id);
+    send(res, 200, JSON.stringify(doc, null, 2), { 'content-type': 'application/json', 'content-disposition': `attachment; filename="${params.id}.agent.json"` });
     return null;
   });
   // ---------- people & roles (015) ----------
   // Members of the agent's groups with their role. When no organizers are set yet, WhatsApp group admins are suggested.
-  route('GET', '/api/agents/:id/people', async (req, res, body, q, p) => {
-    const agent = getAgent(p.id);
+  route('GET', '/api/agents/:id/people', async ({ params }) => {
+    const agent = getAgent(params.id);
     if (!agent) return [404, { error: 'Not found' }];
     return peopleOf(agent);
   });
   // ---------- AI helper (016) ----------
-  route('POST', '/api/ai/agent-draft', async (req, res, body, q, p, user) => {
+  route('POST', '/api/ai/agent-draft', async ({ body, user }) => {
     const agent = body.agentId ? getAgent(String(body.agentId)) : null;
     if (body.agentId && !agent) return [404, { error: 'Agent not found' }];
     const people = agent ? (await peopleOf(agent)).groups.flatMap((g) => g.members.filter((m) => m.phone).map((m) => ({ group: g.name, name: m.name, phone: m.phone, groupAdmin: m.admin }))) : [];
@@ -144,63 +144,63 @@ export function agentRoutes(route, { channel } = {}) {
   }
 
   // ---------- tool service sign-in (009) ----------
-  route('POST', '/api/agents/:id/probe', async (req, res, body) => {
+  route('POST', '/api/agents/:id/probe', async ({ body }) => {
     const url = interpolate(String(body.url || '')).trim();
     if (!url) return [400, { error: 'Enter the tool service URL first' }];
     return probeServer(url);
   });
-  route('GET', '/api/agents/:id/local', async (req, res, body, q, p) => {
-    const agent = getAgent(p.id);
+  route('GET', '/api/agents/:id/local', async ({ params }) => {
+    const agent = getAgent(params.id);
     if (!agent) return [404, { error: 'Not found' }];
     return Object.entries(agent.mcpServers || {}).filter(([, v]) => v.type === 'local').map(([server, v]) => {
       const i = installedInfo(v.package, v.allowScripts);
       return { server, package: v.package, blocked: localServiceCheck().reason || null, installed: i ? { name: i.name, version: i.version, at: i.at } : null };
     });
   });
-  route('POST', '/api/agents/:id/local/:server/install', async (req, res, body, q, p, user) => {
-    const srv = getAgent(p.id)?.mcpServers?.[p.server];
+  route('POST', '/api/agents/:id/local/:server/install', async ({ body, params, user }) => {
+    const srv = getAgent(params.id)?.mcpServers?.[params.server];
     if (!srv || srv.type !== 'local') return [404, { error: 'Save the agent with this local tool service first' }];
     const i = await installPackage(srv.package, { allowScripts: srv.allowScripts, fresh: !!body.fresh, by: user.username });
     await resetMcpPool();
     return { name: i.name, version: i.version, at: i.at };
   }, { role: 'owner' });
   // 094: its tool services: its own settings, each service's default, the tools (risk from annotations, media)
-  route('GET', '/api/agents/:id/services', async (req, res, body, q, p) => {
-    const agent = getAgent(p.id);
+  route('GET', '/api/agents/:id/services', async ({ params }) => {
+    const agent = getAgent(params.id);
     return agent ? agentServices(agent) : [404, { error: 'Not found' }];
   });
-  route('GET', '/api/agents/:id/connections', async (req, res, body, q, p) => listConnections(p.id));
-  route('POST', '/api/agents/:id/connections/:server/:role', async (req, res, body, q, p, user) => {
-    const agent = getAgent(p.id);
-    const srv = agent?.mcpServers?.[p.server];
+  route('GET', '/api/agents/:id/connections', async ({ params }) => listConnections(params.id));
+  route('POST', '/api/agents/:id/connections/:server/:role', async ({ req, params, user }) => {
+    const agent = getAgent(params.id);
+    const srv = agent?.mcpServers?.[params.server];
     if (!srv) return [404, { error: 'Save the agent with this tool service first' }];
     if (srv.auth !== 'oauth') return [400, { error: 'This tool service is not set to Sign in' }];
-    if (!OAUTH_ROLES.includes(p.role)) return [400, { error: 'Unknown role' }];
+    if (!OAUTH_ROLES.includes(params.role)) return [400, { error: 'Unknown role' }];
     const url = interpolate(srv.url);
     if (!url) return [400, { error: 'The tool service URL is empty' }];
     const redirectUri = `${isHttps(req) ? 'https' : 'http'}://${req.headers.host}/oauth/mcp/callback`;
-    return startSignIn({ agentId: agent.id, server: p.server, role: p.role, url, redirectUri, by: user.username, client: oauthClientOf(interpolate(srv)) });
+    return startSignIn({ agentId: agent.id, server: params.server, role: params.role, url, redirectUri, by: user.username, client: oauthClientOf(interpolate(srv)) });
   });
-  route('DELETE', '/api/agents/:id/connections/:server/:role', async (req, res, body, q, p, user) => {
-    disconnectOAuth(p.id, p.server, p.role, user.username);
+  route('DELETE', '/api/agents/:id/connections/:server/:role', async ({ params, user }) => {
+    disconnectOAuth(params.id, params.server, params.role, user.username);
     return { ok: true };
   });
   // The browser comes back here from the service. SameSite=Strict means no session cookie on this cross-site
   // navigation: the single-use state proves the sign-in was started by an admin; the page then returns to the panel.
-  route('GET', '/oauth/mcp/callback', async (req, res, body, q) => {
+  route('GET', '/oauth/mcp/callback', async ({ res, query }) => {
     let ok = true; let msg; let agentId;
     try {
-      const r = await finishSignIn({ state: q.get('state'), code: q.get('code'), error: q.get('error'), errorDescription: q.get('error_description') });
+      const r = await finishSignIn({ state: query.get('state'), code: query.get('code'), error: query.get('error'), errorDescription: query.get('error_description') });
       agentId = r.agentId; msg = `Connected ${r.server} for ${r.role}s.`;
     } catch (e) { ok = false; msg = e.message; agentId = e.agentId || ''; }
     const back = agentId === GLOBAL_SCOPE ? '/#settings' : agentId ? `/#agents/${encodeURIComponent(agentId)}` : '/';
     return resultPage(res, { ok, title: ok ? 'Connected' : 'Sign-in did not complete', message: msg, back, autoMs: 1000 });
   }, { public: true });
 
-  route('POST', '/api/agents/:id/discover', async (req, res, body, q, p) => {
+  route('POST', '/api/agents/:id/discover', async ({ body, params }) => {
     let url; let token;
     if (body.auth === 'oauth' || body.type === 'local') {
-      const agent = getAgent(p.id);
+      const agent = getAgent(params.id);
       const saved = agent?.mcpServers?.[body.server];
       if (!saved || (body.type === 'local' ? saved.type !== 'local' : saved.auth !== 'oauth')) {
         return [400, { error: body.type === 'local' ? 'Save the agent with this local tool service first' : 'Save the agent and connect the tool service first' }];
@@ -208,7 +208,7 @@ export function agentRoutes(route, { channel } = {}) {
       return describeTools(organizerConnection(agent, body.server), { fresh: true });
     }
     if (body.url) { url = interpolate(String(body.url)); token = interpolate(String(body.token || '')); } else {
-      const agent = getAgent(p.id);
+      const agent = getAgent(params.id);
       const srv = agent?.mcpServers?.[body.server];
       if (!srv) return [404, { error: 'Unknown tool service' }];
       url = interpolate(srv.url); token = interpolate(srv.tokens?.organizer || '');
@@ -217,8 +217,8 @@ export function agentRoutes(route, { channel } = {}) {
     const headers = interpolate(body.headers && typeof body.headers === 'object' ? body.headers : {});
     return describeTools(mcpConnection(url, { token, headers }), { fresh: true });
   });
-  route('POST', '/api/agents/:id/test', async (req, res, body, q, p) => {
-    const agent = getAgent(p.id);
+  route('POST', '/api/agents/:id/test', async ({ body, params }) => {
+    const agent = getAgent(params.id);
     if (!agent) return [404, { error: 'Not found' }];
     if (isBuiltin(agent)) return [400, { error: 'Try the owner assistant in the Ask box on Overview or in your WhatsApp chat' }]; // 059
     const role = body.role === 'organizer' ? 'organizer' : 'participant';
@@ -226,7 +226,7 @@ export function agentRoutes(route, { channel } = {}) {
     const pick = body.chat && body.chat !== 'new' ? String(body.chat) : '';
     if (pick && !agent.chats.includes(pick)) return [400, { error: 'Choose one of this agent’s chats, or a new direct chat', field: 'chat' }];
     const isGroup = pick ? isGroupChat(pick) : false;
-    const chat = testChatId(p.id, pick);
+    const chat = testChatId(params.id, pick);
     const text = String(body.text || '').slice(0, 4000);
     const confirm = await handleConfirmCommand({ agent, text, role, chat });
     if (confirm !== undefined) return { reply: confirm };
@@ -249,23 +249,23 @@ export function agentRoutes(route, { channel } = {}) {
     activity('message.out', { agent: agent.id, chat, summary: reply || '(no reply)' });
     return { reply, path: 'model', usage: ctx.usage, model: ctx.model, answeredBy: ctx.answeredBy || '', fallback: ctx.fallback || null, ...(ctx.tier ? { tier: ctx.tier } : {}), ...(ctx.check ? { check: ctx.check } : {}), role, chat: pick || 'new', ...(pick ? { chatOn: isChatEnabled(pick) } : {}) };
   });
-  route('POST', '/api/agents/:id/schedules/:sid/run', async (req, res, body, q, p) => {
-    const agent = getAgent(p.id);
-    const s = agent?.schedules.find((x) => x.id === decodeURIComponent(p.sid));
+  route('POST', '/api/agents/:id/schedules/:sid/run', async ({ params }) => {
+    const agent = getAgent(params.id);
+    const s = agent?.schedules.find((x) => x.id === decodeURIComponent(params.sid));
     if (!s) return [404, { error: 'Not found' }];
     return runSchedule(agent, s, channel, { force: true });
   });
 
   // Shared agent memory (#8): notes an agent keeps across all its chats.
-  route('GET', '/api/agents/:id/memory', async (req, res, body, q, p) => {
-    if (!getAgent(p.id)) return [404, { error: 'Not found' }];
-    return { notes: listNotes(`agent:${p.id}`).map((n) => ({ id: n.id, text: n.text, author: n.author, role: n.role, ts: n.ts })) };
+  route('GET', '/api/agents/:id/memory', async ({ params }) => {
+    if (!getAgent(params.id)) return [404, { error: 'Not found' }];
+    return { notes: listNotes(`agent:${params.id}`).map((n) => ({ id: n.id, text: n.text, author: n.author, role: n.role, ts: n.ts })) };
   });
-  route('DELETE', '/api/notes/:id', async (req, res, body, q, p, user) => {
-    const note = getNote(p.id);
+  route('DELETE', '/api/notes/:id', async ({ params, user }) => {
+    const note = getNote(params.id);
     if (!note) return [404, { error: 'Not found' }];
-    deleteNote(p.id);
-    activity('memory.note.removed', { chat: note.chat, summary: `#${p.id} (panel, ${user.username})` });
+    deleteNote(params.id);
+    activity('memory.note.removed', { chat: note.chat, summary: `#${params.id} (panel, ${user.username})` });
     return { ok: true };
   });
 }

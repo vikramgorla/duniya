@@ -117,8 +117,11 @@ The panel is one dependency-free app in native ES modules: no framework, no bund
 Routes live in `src/panel/routes/<area>.js` (`auth`, `status`, `agents`, `chats`, `people`, `system`, and one per
 feature), each exporting `<area>Routes(route, { channel })`. `src/panel/server.js` registers them in one place and keeps
 only the router (role gates, the JSON-only CSRF guard), the admin MCP's in-process calls and the static files. A handler
+gets one object and names what it needs, `route('PUT', '/api/things/:id', async ({ params, body, user }) => …)`: `req`,
+`res`, `body` (parsed JSON), `query` (the URL's search parameters), `params` (the `:name` parts) and `user`. It
 returns the JSON answer, `[status, answer]`, or throws `fail(message, status)` / `bad(message, field)`
-(`src/core/config.js`); the router turns the error into `{ error, field, code }` with that status.
+(`src/core/config.js`); the router turns the error into `{ error, field, code }` with that status. An error that is a
+bug (a `TypeError`, not a refused request) is answered as 500 and kept in Activity.
 
 ## Adding a channel
 

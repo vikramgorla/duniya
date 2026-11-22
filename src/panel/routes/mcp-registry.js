@@ -28,19 +28,19 @@ const toolDefaults = (tools) => tools.map((t) => ({
 
 export function registryRoutes(route) {
   route('GET', '/api/tool-services/registry/settings', async () => registrySettings());
-  route('PUT', '/api/tool-services/registry/settings', async (req, res, body, q, p, user) => {
+  route('PUT', '/api/tool-services/registry/settings', async ({ body, user }) => {
     const s = saveRegistrySettings({ enabled: body.enabled, baseUrl: body.baseUrl });
     activity('config', { summary: `MCP Registry browsing ${s.enabled ? 'on' : 'off'} (${s.official ? 'official registry' : s.baseUrl}) by ${user.username}` });
     return s;
   }, { role: 'owner' });
 
-  route('GET', '/api/tool-services/registry', async (req, res, body, q) => searchRegistry({ q: q.get('q') || '', limit: q.get('limit') || 20, cursor: q.get('cursor') || '' }), { role: 'admin' });
+  route('GET', '/api/tool-services/registry', async ({ query }) => searchRegistry({ q: query.get('q') || '', limit: query.get('limit') || 20, cursor: query.get('cursor') || '' }), { role: 'admin' });
 
   // One entry with what the Add form needs: both ways to run it, their fields, a suggested name, and what this user
   // and this server allow.
-  route('GET', '/api/tool-services/registry/server', async (req, res, body, q, p, user) => {
-    const entry = await getRegistryServer(q.get('name'), q.get('version') || 'latest');
-    const key = validKey(q.get('key') || '') ? q.get('key') : suggestKey(entry.name);
+  route('GET', '/api/tool-services/registry/server', async ({ query, user }) => {
+    const entry = await getRegistryServer(query.get('name'), query.get('version') || 'latest');
+    const key = validKey(query.get('key') || '') ? query.get('key') : suggestKey(entry.name);
     const local = localRegistryCheck();
     const fields = (kind) => addFields(entry, kind, key).map((f) => ({ ...f, stored: !!(f.secretName && getSecret(f.secretName)) }));
     return {
@@ -53,7 +53,7 @@ export function registryRoutes(route) {
     };
   }, { role: 'admin' });
 
-  route('POST', '/api/tool-services/registry/add', async (req, res, body, q, p, user) => {
+  route('POST', '/api/tool-services/registry/add', async ({ body, user }) => {
     const entry = await getRegistryServer(body.server, body.version || 'latest');
     if (!entry.can.any) return err(400, `${entry.title} cannot run here: ${entry.can.reason}`, { code: 'unsupported' });
     const kind = body.kind || (entry.can.remote !== null ? 'remote' : 'local');

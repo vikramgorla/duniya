@@ -78,66 +78,66 @@ function bindingCookie(req, value, maxAge) {
 
 export function googleRoutes(route) {
   // ---------- owner setup ----------
-  route('GET', '/api/auth/google', async (req) => ({ ...googleConfig(), ready: googleReady(), ...googleUrls(req), addresses: panelAddresses(req) }), OWNER);
-  route('PUT', '/api/auth/google', async (req, res, body, q, p, user) => {
+  route('GET', '/api/auth/google', async ({ req }) => ({ ...googleConfig(), ready: googleReady(), ...googleUrls(req), addresses: panelAddresses(req) }), OWNER);
+  route('PUT', '/api/auth/google', async ({ req, body, user }) => {
     const c = saveGoogleConfig({ clientId: body.clientId, clientSecret: body.clientSecret, enabled: body.enabled });
     activity('config', { summary: `Sign in with Google ${c.enabled ? 'settings saved' : 'turned off'} by ${user.username}` });
     if (!googleReady()) setGoogleOnly(false, { by: user.username, source: 'auto' }); // never leave nobody able to sign in
     return { ...c, ready: googleReady(), ...googleUrls(req), addresses: panelAddresses(req) };
   }, OWNER);
-  route('DELETE', '/api/auth/google', async (req, res, body, q, p, user) => {
+  route('DELETE', '/api/auth/google', async ({ user }) => {
     removeGoogleConfig();
     activity('config', { summary: `Sign in with Google removed by ${user.username}` });
     setGoogleOnly(false, { by: user.username, source: 'auto' });
     return { ok: true };
   }, OWNER);
-  route('POST', '/api/auth/google/test', async (req) => testGoogle(googleUrls(req).redirectUri), OWNER);
+  route('POST', '/api/auth/google/test', async ({ req }) => testGoogle(googleUrls(req).redirectUri), OWNER);
 
   // ---------- only Google (028) ----------
-  route('GET', '/api/auth/signin', async (req, res, body, q, p, user) => googleOnlyState(user), OWNER);
-  route('PUT', '/api/auth/signin', async (req, res, body, q, p, user) => {
+  route('GET', '/api/auth/signin', async ({ user }) => googleOnlyState(user), OWNER);
+  route('PUT', '/api/auth/signin', async ({ body, user }) => {
     setGoogleOnly(!!body.googleOnly, { user, source: 'panel' });
     return googleOnlyState(user);
   }, OWNER);
 
   // ---------- linking ----------
   const NO_UNLINK = 'Only Sign in with Google is allowed (Settings → Sign-in): unlinking would lock this account out. Switch password sign-in back on first.';
-  route('DELETE', '/api/me/google', async (req, res, body, q, p, user) => {
+  route('DELETE', '/api/me/google', async ({ user }) => {
     if (!passwordLoginAllowed()) return [400, { error: NO_UNLINK }];
     const u = unlinkGoogle(user.id);
     activity('config', { summary: `${user.username} unlinked their Google account` });
     return u;
   }, { role: 'viewer' });
-  route('DELETE', '/api/users/:id/google', async (req, res, body, q, p, user) => {
+  route('DELETE', '/api/users/:id/google', async ({ params, user }) => {
     if (!passwordLoginAllowed()) return [400, { error: NO_UNLINK }];
-    const u = unlinkGoogle(p.id);
+    const u = unlinkGoogle(params.id);
     activity('config', { summary: `Google unlinked from ${u.username} by ${user.username}` });
     return u;
   }, OWNER);
 
   // ---------- invites ----------
-  route('GET', '/api/invites', async (req) => ({ invites: listInvites(), panelUrl: publicBase(req), googleReady: googleReady() }), OWNER);
-  route('POST', '/api/invites', async (req, res, body, q, p, user) => {
+  route('GET', '/api/invites', async ({ req }) => ({ invites: listInvites(), panelUrl: publicBase(req), googleReady: googleReady() }), OWNER);
+  route('POST', '/api/invites', async ({ body, user }) => {
     const i = createInvite({ email: body.email, role: body.role || 'admin', by: user.username });
     activity('config', { summary: `Invite for ${i.email} (${i.role}) by ${user.username}` });
     return [201, i];
   }, OWNER);
-  route('POST', '/api/invites/:id/renew', async (req, res, body, q, p, user) => {
-    const i = renewInvite(p.id);
+  route('POST', '/api/invites/:id/renew', async ({ params, user }) => {
+    const i = renewInvite(params.id);
     activity('config', { summary: `Invite for ${i.email} renewed by ${user.username}` });
     return i;
   }, OWNER);
-  route('DELETE', '/api/invites/:id', async (req, res, body, q, p, user) => {
-    const i = revokeInvite(p.id);
+  route('DELETE', '/api/invites/:id', async ({ params, user }) => {
+    const i = revokeInvite(params.id);
     activity('config', { summary: `Invite for ${i.email} revoked by ${user.username}` });
     return { ok: true };
   }, OWNER);
 
   // ---------- the browser flow ----------
-  route('GET', '/auth/google/start', async (req, res, body, q) => {
+  route('GET', '/auth/google/start', async ({ req, res, query }) => {
     const ip = clientIp(req);
     if (startLimit(ip)) return resultPage(res, { ok: false, status: 429, title: 'Too many attempts', message: 'Wait a minute and try again.' });
-    const mode = q.get('mode') === 'link' ? 'link' : 'login';
+    const mode = query.get('mode') === 'link' ? 'link' : 'login';
     let userId = null;
     if (mode === 'link') {
       const me = sessionUser(cookie(req, 'duniya_session'));
@@ -156,13 +156,13 @@ export function googleRoutes(route) {
   // Google sends the browser back here (a cross-site navigation, so the SameSite=Strict session cookie is absent):
   // state + PKCE + the Lax binding cookie prove this is the sign-in we started; the session cookie set here is
   // used by the same-origin navigation the result page makes.
-  route('GET', '/auth/google/callback', async (req, res, body, q) => {
+  route('GET', '/auth/google/callback', async ({ req, res, query }) => {
     const ip = clientIp(req);
     const clear = bindingCookie(req, '', 0);
     if (callbackLimit(ip)) return resultPage(res, { ok: false, status: 429, title: 'Too many attempts', message: 'Wait a minute and try again.' });
     let mode = 'login';
     try {
-      const r = await finishGoogle({ state: q.get('state'), code: q.get('code'), error: q.get('error'), binding: cookie(req, 'duniya_oidc') });
+      const r = await finishGoogle({ state: query.get('state'), code: query.get('code'), error: query.get('error'), binding: cookie(req, 'duniya_oidc') });
       mode = r.mode;
       if (r.mode === 'link') {
         const u = linkCurrentUser(r.userId, r.claims);
@@ -180,7 +180,7 @@ export function googleRoutes(route) {
       mode = e.mode || mode;
       activity('system', { summary: `Panel sign-in with Google failed from ${ip}: ${e.message}` });
       res.setHeader('set-cookie', clear);
-      const why = addressProblem(req, e, { googleError: q.get('error'), bindingCookie: cookie(req, 'duniya_oidc') });
+      const why = addressProblem(req, e, { googleError: query.get('error'), bindingCookie: cookie(req, 'duniya_oidc') });
       if (why) return addressHelpPage(req, res, { ...why, mode, message: e.message });
       return resultPage(res, { ok: false, status: e.status === 403 ? 403 : 400, title: mode === 'link' ? 'Linking did not complete' : 'Sign-in did not complete', message: e.message, back: mode === 'link' ? '/#settings' : '/' });
     }

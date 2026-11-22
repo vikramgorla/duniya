@@ -149,11 +149,7 @@
  },
  "src/panel/admin-mcp.js": {
   "complexity": 1,
-  "max-lines-per-function": 1,
-  "max-params": 3
- },
- "src/panel/admin-tools.js": {
-  "max-lines": 1
+  "max-lines-per-function": 1
  },
  "src/panel/public/app/ai-helper.js": {
   "complexity": 1
@@ -162,12 +158,10 @@
   "complexity": 1
  },
  "src/panel/public/app/backups.js": {
-  "complexity": 2,
-  "max-params": 1
+  "complexity": 2
  },
  "src/panel/public/app/chats.js": {
-  "complexity": 1,
-  "max-params": 1
+  "complexity": 1
  },
  "src/panel/public/app/diff.js": {
   "complexity": 1
@@ -209,78 +203,19 @@
  },
  "src/panel/routes/agents.js": {
   "complexity": 1,
-  "max-lines-per-function": 1,
-  "max-params": 12
- },
- "src/panel/routes/auth.js": {
-  "max-params": 3
+  "max-lines-per-function": 1
  },
  "src/panel/routes/backups.js": {
-  "max-lines-per-function": 1,
-  "max-params": 9
+  "max-lines-per-function": 1
  },
  "src/panel/routes/chats.js": {
-  "max-lines-per-function": 1,
-  "max-params": 12
- },
- "src/panel/routes/direct-chats.js": {
-  "max-params": 2
- },
- "src/panel/routes/google.js": {
-  "max-params": 9
- },
- "src/panel/routes/insights.js": {
-  "max-params": 1
- },
- "src/panel/routes/lessons.js": {
-  "max-params": 3
- },
- "src/panel/routes/links.js": {
-  "max-params": 4
+  "max-lines-per-function": 1
  },
  "src/panel/routes/mcp-registry.js": {
-  "complexity": 1,
-  "max-params": 3
- },
- "src/panel/routes/media.js": {
-  "max-params": 3
- },
- "src/panel/routes/modules.js": {
-  "max-params": 25
- },
- "src/panel/routes/owner-alerts.js": {
-  "max-params": 1
- },
- "src/panel/routes/owner-assistant.js": {
-  "max-params": 14
- },
- "src/panel/routes/pace.js": {
-  "max-params": 1
- },
- "src/panel/routes/people.js": {
-  "max-params": 9
- },
- "src/panel/routes/promises.js": {
-  "max-params": 4
+  "complexity": 1
  },
  "src/panel/routes/providers.js": {
-  "max-lines-per-function": 1,
-  "max-params": 21
- },
- "src/panel/routes/status.js": {
-  "max-params": 5
- },
- "src/panel/routes/system.js": {
-  "max-params": 7
- },
- "src/panel/routes/tool-services.js": {
-  "max-params": 5
- },
- "src/panel/routes/updates.js": {
-  "max-params": 4
- },
- "src/panel/routes/web.js": {
-  "max-params": 7
+  "max-lines-per-function": 1
  },
  "src/panel/server.js": {
   "complexity": 1

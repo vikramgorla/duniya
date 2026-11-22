@@ -46,34 +46,34 @@ export function toolServiceRoutes(route) {
     return [r.name, r.config.type === 'local' && !conn.tools ? '' : await serviceMedia(conn)];
   }))));
 
-  route('PUT', '/api/tool-services/:name', async (req, res, body, q, p, user) => {
-    const before = getGlobalServer(p.name);
+  route('PUT', '/api/tool-services/:name', async ({ body, params, user }) => {
+    const before = getGlobalServer(params.name);
     ownerOnly(user, before, body);
-    const { config, created } = saveGlobalServer(p.name, body, user.username);
-    return [created ? 201 : 200, globalView({ ...listGlobalRows().find((r) => r.name === p.name), config })];
+    const { config, created } = saveGlobalServer(params.name, body, user.username);
+    return [created ? 201 : 200, globalView({ ...listGlobalRows().find((r) => r.name === params.name), config })];
   });
 
-  route('DELETE', '/api/tool-services/:name', async (req, res, body, q, p, user) => {
-    const before = getGlobalServer(p.name);
-    if (!before) return [404, { error: `No global tool service named ${p.name}` }];
+  route('DELETE', '/api/tool-services/:name', async ({ params, user }) => {
+    const before = getGlobalServer(params.name);
+    if (!before) return [404, { error: `No global tool service named ${params.name}` }];
     ownerOnly(user, before);
-    removeGlobalServer(p.name, user.username);
-    deleteServerConnections(GLOBAL_SCOPE, p.name);
+    removeGlobalServer(params.name, user.username);
+    deleteServerConnections(GLOBAL_SCOPE, params.name);
     // Forget the agents' opt-outs, so a later service with the same name starts switched on everywhere.
     for (const a of listAgents()) {
       const off = a.globalMcp?.disabled || [];
-      if (off.includes(p.name)) await updateAgent(a.id, { globalMcp: { disabled: off.filter((k) => k !== p.name) } }, user.username);
+      if (off.includes(params.name)) await updateAgent(a.id, { globalMcp: { disabled: off.filter((k) => k !== params.name) } }, user.username);
     }
     return { ok: true };
   });
 
-  route('POST', '/api/tool-services/probe', async (req, res, body) => {
+  route('POST', '/api/tool-services/probe', async ({ body }) => {
     const url = interpolate(String(body.url || '')).trim();
     if (!url) return [400, { error: 'Enter the tool service URL first' }];
     return probeServer(url);
   });
 
-  route('POST', '/api/tool-services/discover', async (req, res, body) => {
+  route('POST', '/api/tool-services/discover', async ({ body }) => {
     const saved = body.server ? getGlobalServer(String(body.server)) : null;
     if (saved && (body.auth === 'oauth' || body.type === 'local' || !body.url)) {
       return describeTools(serverConnection(saved, { scope: GLOBAL_SCOPE, key: body.server, role: 'organizer', where: 'Settings → Tool services' }), { fresh: true });
@@ -89,8 +89,8 @@ export function toolServiceRoutes(route) {
     const i = installedInfo(config.package, config.allowScripts);
     return { server: name, package: config.package, blocked: localServiceCheck().reason || null, installed: i ? { name: i.name, version: i.version, at: i.at } : null };
   }));
-  route('POST', '/api/tool-services/local/:server/install', async (req, res, body, q, p, user) => {
-    const srv = getGlobalServer(p.server);
+  route('POST', '/api/tool-services/local/:server/install', async ({ body, params, user }) => {
+    const srv = getGlobalServer(params.server);
     if (!srv || srv.type !== 'local') return [404, { error: 'Save this local tool service first' }];
     const i = await installPackage(srv.package, { allowScripts: srv.allowScripts, fresh: !!body.fresh, by: user.username });
     await resetMcpPool();
@@ -99,18 +99,18 @@ export function toolServiceRoutes(route) {
 
   // OAuth sign-ins of global services: one per service and role, shared by every agent.
   route('GET', '/api/tool-services/connections', async () => listConnections(GLOBAL_SCOPE));
-  route('POST', '/api/tool-services/connections/:server/:role', async (req, res, body, q, p, user) => {
-    const srv = getGlobalServer(p.server);
+  route('POST', '/api/tool-services/connections/:server/:role', async ({ req, params, user }) => {
+    const srv = getGlobalServer(params.server);
     if (!srv) return [404, { error: 'Save the tool service first' }];
     if (srv.auth !== 'oauth') return [400, { error: 'This tool service is not set to Sign in' }];
-    if (!OAUTH_ROLES.includes(p.role)) return [400, { error: 'Unknown role' }];
+    if (!OAUTH_ROLES.includes(params.role)) return [400, { error: 'Unknown role' }];
     const url = interpolate(srv.url);
     if (!url) return [400, { error: 'The tool service URL is empty' }];
     const redirectUri = `${isHttps(req) ? 'https' : 'http'}://${req.headers.host}/oauth/mcp/callback`;
-    return startSignIn({ agentId: GLOBAL_SCOPE, server: p.server, role: p.role, url, redirectUri, by: user.username, client: oauthClientOf(interpolate(srv)) });
+    return startSignIn({ agentId: GLOBAL_SCOPE, server: params.server, role: params.role, url, redirectUri, by: user.username, client: oauthClientOf(interpolate(srv)) });
   });
-  route('DELETE', '/api/tool-services/connections/:server/:role', async (req, res, body, q, p, user) => {
-    disconnect(GLOBAL_SCOPE, p.server, p.role, user.username);
+  route('DELETE', '/api/tool-services/connections/:server/:role', async ({ params, user }) => {
+    disconnect(GLOBAL_SCOPE, params.server, params.role, user.username);
     return { ok: true };
   });
 }

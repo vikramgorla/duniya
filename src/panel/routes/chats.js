@@ -65,8 +65,8 @@ export function chatRoutes(route, { channel } = {}) {
       try { await loadChatHistory(chat, { by: user.username, reason: 'switch_on' }); } catch (e) { activity('memory.history', { chat, summary: `Could not ask the phone for earlier messages: ${e.message}` }); }
     }
   };
-  route('PUT', '/api/chats/:chat/prefs', async (req, res, body, q, p, user) => {
-    const chat = decodeURIComponent(p.chat);
+  route('PUT', '/api/chats/:chat/prefs', async ({ body, params, user }) => {
+    const chat = decodeURIComponent(params.chat);
     const wasOn = isChatEnabled(chat);
     // 044: "private to members" and the privacy-notice opt-out are recorded like every chat setting.
     if (body.noticeOff !== undefined) setChatNoticeOff(chat, !!body.noticeOff, user.username);
@@ -84,14 +84,14 @@ export function chatRoutes(route, { channel } = {}) {
     return { ...out, history: historyStatus(chat) };
   });
   // #91: "Load recent messages": ask the linked phone for earlier messages of a chat that is on (status by polling).
-  route('GET', '/api/chats/:chat/history', async (req, res, body, q, p) => ({ status: historyStatus(decodeURIComponent(p.chat)), count: historyLoadCount() }));
-  route('POST', '/api/chats/:chat/history', async (req, res, body, q, p, user) => {
-    const chat = decodeURIComponent(p.chat);
+  route('GET', '/api/chats/:chat/history', async ({ params }) => ({ status: historyStatus(decodeURIComponent(params.chat)), count: historyLoadCount() }));
+  route('POST', '/api/chats/:chat/history', async ({ body, params, user }) => {
+    const chat = decodeURIComponent(params.chat);
     const status = await loadChatHistory(chat, { count: body.count, by: user.username, reason: 'button' });
     return { status };
   }, { role: 'admin' });
   // 062: `enable: true` also switches the chat on (choosing an agent for a chat means it should answer there).
-  route('POST', '/api/chats/bind', async (req, res, body, q, p, user) => {
+  route('POST', '/api/chats/bind', async ({ body, user }) => {
     const chat = String(body.chat);
     await bindChat(chat, body.agent || null, user.username);
     if (!body.enable || !body.agent || isChatEnabled(chat)) return { ok: true, enabled: isChatEnabled(chat) };
@@ -100,12 +100,12 @@ export function chatRoutes(route, { channel } = {}) {
     return { ok: true, enabled: true, history: historyStatus(chat) };
   });
   // Stored messages of a chat (024): admins and owners only; each look is recorded.
-  route('GET', '/api/chats/:chat/messages', async (req, res, body, q, p, user) => {
-    const chat = decodeURIComponent(p.chat);
+  route('GET', '/api/chats/:chat/messages', async ({ query, params, user }) => {
+    const chat = decodeURIComponent(params.chat);
     const tags = tagsInChat(chat);
     // 057: the sender as the panel knows them (own / address-book name), with their group tag; raw ids are not returned
     // 072: an agent's answer carries its rating (the same as in Review); answers in chats private to members are not rated
-    const list = listMessages(chat, { before: q.get('before'), limit: q.get('limit'), q: q.get('q') || '', around: q.get('around') });
+    const list = listMessages(chat, { before: query.get('before'), limit: query.get('limit'), q: query.get('q') || '', around: query.get('around') });
     const rated = ratingsOf(list.filter((m) => m.fromAgent).map((m) => m.id));
     const rateable = !isChatPrivate(chat);
     const jids = new Map(list.map((m) => [m.id, m.senderJid]));
@@ -113,25 +113,25 @@ export function chatRoutes(route, { channel } = {}) {
     const judged = judgedOf(list.filter((m) => m.fromAgent).map((m) => m.id)); // 089: answers it gave by itself (feedback on joining in) // 087: edited messages say so; agent answers say whether they can still be edited
     const rows = list.map(({ senderJid: _jid, ...m }) => ({ ...m, ...(edits.has(m.id) ? { edited: edits.get(m.id).ts } : {}) })).map((m) => (m.fromAgent ? { ...m, rating: rated.get(m.id) || 0, rateable: rateable && !!m.agent && m.id > 0, editable: editWindow(chat, m.ts).open && m.id > 0, ...(judged.has(m.id) ? { judged: true } : {}) }
       : { ...m, name: personInfo({ phone: m.sender, jid: jids.get(m.id), fallbackName: m.name }).label, ...(memberTag(chat, { phone: m.sender, jid: jids.get(m.id) }, tags) ? { tag: memberTag(chat, { phone: m.sender, jid: jids.get(m.id) }, tags) } : {}) }));
-    if (!q.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${q.get('q') ? ` (search “${String(q.get('q')).slice(0, 40)}”)` : ''}` });
+    if (!query.get('before')) activity('config', { chat, summary: `Stored messages viewed by ${user.username}${query.get('q') ? ` (search “${String(query.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;
   }, { role: 'admin' });
   // #178: delete one stored message (admins and owners); the agent forgets it (the chat summary is rebuilt). WhatsApp is unchanged.
-  route('DELETE', '/api/chats/:chat/messages/:id', async (req, res, body, q, p, user) => {
-    const chat = decodeURIComponent(p.chat);
-    if (!deleteStoredMessage(chat, Number(p.id))) throw Object.assign(new Error('Message not found'), { status: 404 });
+  route('DELETE', '/api/chats/:chat/messages/:id', async ({ params, user }) => {
+    const chat = decodeURIComponent(params.chat);
+    if (!deleteStoredMessage(chat, Number(params.id))) throw Object.assign(new Error('Message not found'), { status: 404 });
     forgetChanged(chat);
     activity('config', { chat, summary: `A stored message was deleted by ${user.username}` });
     return { ok: true };
   }, { role: 'admin' });
   // 087: the owner edits one of an agent's sent messages (within the channel's edit window: WhatsApp 15 minutes). The
   // stored copy changes and is marked edited; the summary is rebuilt. After the window: 409 code edit_window.
-  route('PUT', '/api/chats/:chat/messages/:id', async (req, res, body, q, p, user) => {
-    const chat = decodeURIComponent(p.chat);
+  route('PUT', '/api/chats/:chat/messages/:id', async ({ body, params, user }) => {
+    const chat = decodeURIComponent(params.chat);
     const text = String(body.text ?? '').trim();
     if (!text) throw fail('Write the new text', 400, { field: 'text' });
     if (text.length > 4000) throw fail('At most 4000 characters', 400, { field: 'text' });
-    const row = db.prepare('SELECT * FROM messages WHERE chat = ? AND id = ?').get(chat, Number(p.id));
+    const row = db.prepare('SELECT * FROM messages WHERE chat = ? AND id = ?').get(chat, Number(params.id));
     if (!row) throw fail('Message not found', 404);
     if (!row.from_agent) throw fail('Only messages an agent sent can be edited', 400);
     try { await editOwnMessage(chat, row, text, user.username); } catch (e) { throw fail(e.message, e.status || 502, e.code ? { code: e.code } : {}); }
@@ -139,12 +139,12 @@ export function chatRoutes(route, { channel } = {}) {
     return { ok: true, id: row.id, text };
   }, { role: 'admin' });
   // 087: after the edit window: a correction goes out as a new message that quotes the original, from the chat's agent.
-  route('POST', '/api/chats/:chat/messages/:id/correction', async (req, res, body, q, p, user) => {
-    const chat = decodeURIComponent(p.chat);
+  route('POST', '/api/chats/:chat/messages/:id/correction', async ({ body, params, user }) => {
+    const chat = decodeURIComponent(params.chat);
     const text = String(body.text ?? '').trim();
     if (!text) throw fail('Write the correction', 400, { field: 'text' });
     if (text.length > 4000) throw fail('At most 4000 characters', 400, { field: 'text' });
-    const row = db.prepare('SELECT * FROM messages WHERE chat = ? AND id = ?').get(chat, Number(p.id));
+    const row = db.prepare('SELECT * FROM messages WHERE chat = ? AND id = ?').get(chat, Number(params.id));
     if (!row?.from_agent) throw fail('Message not found', 404);
     if (!isChatEnabled(chat)) throw fail('This chat is off; switch it on first', 409);
     const sent = await channel.send(chat, text, row.msg_id ? { quote: { msgId: row.msg_id, fromMe: true, text: row.text } } : {});
@@ -154,13 +154,13 @@ export function chatRoutes(route, { channel } = {}) {
   }, { role: 'admin' });
   // 070: Search messages across chats. Owner only; the chats the owner assistant may read (on, not private to
   // members); newest first, 30 at a time (`before` = the last id). Each search is recorded like a look at messages.
-  route('GET', '/api/search/messages', async (req, res, body, q, p, user) => {
-    const query = String(q.get('q') || '').trim().slice(0, 100);
-    if (query.length < 2) return { results: [], more: false };
+  route('GET', '/api/search/messages', async ({ query, user }) => {
+    const words = String(query.get('q') || '').trim().slice(0, 100);
+    if (words.length < 2) return { results: [], more: false };
     const chats = visibleChats();
-    const rows = searchStored({ chats, query, before: q.get('before'), limit: 31 });
+    const rows = searchStored({ chats, query: words, before: query.get('before'), limit: 31 });
     const names = chatLabels(rows.slice(0, 30).map((m) => m.chat));
-    if (!q.get('before')) activity('config', { summary: `Messages searched by ${user.username} (“${query.slice(0, 40)}”, ${rows.length > 30 ? '30+' : rows.length} found in ${chats.length} chats)` });
+    if (!query.get('before')) activity('config', { summary: `Messages searched by ${user.username} (“${words.slice(0, 40)}”, ${rows.length > 30 ? '30+' : rows.length} found in ${chats.length} chats)` });
     return {
       chats: chats.length, more: rows.length > 30,
       results: rows.slice(0, 30).map((m) => ({ id: m.id, chat: m.chat, chatName: names.get(m.chat), ts: m.ts, agent: m.agent || '', fromAgent: !!m.from_agent,
@@ -177,28 +177,28 @@ export function chatRoutes(route, { channel } = {}) {
     return chat;
   };
   const waLog = (chat, user, summary, detail) => activity('whatsapp.action', { agent: agentForChat(chat)?.id || '', chat, summary: `${summary} (panel, ${user.username})`, detail: { ...detail, by: user.username, source: 'panel' } });
-  route('GET', '/api/chats/:chat/whatsapp', async (req, res, body, q, p) => {
-    const chat = waGroup(p);
+  route('GET', '/api/chats/:chat/whatsapp', async ({ params }) => {
+    const chat = waGroup(params);
     const g = await channel.groupInfo(chat);
     const names = namesInChat(chat);
     const tags = tagsInChat(chat);
     return { ...g, participants: g.participants.map((m) => ({ ...m, ...personView({ phone: m.phone, jid: m.jid, fallbackName: names[m.phone] }, chat, tags) }))
       .sort((a, b) => ((ADMIN_RANK[b.admin] || 0) - (ADMIN_RANK[a.admin] || 0)) || (a.name || a.phone || '~').localeCompare(b.name || b.phone || '~')) };
   }, { role: 'admin' });
-  route('GET', '/api/chats/:chat/whatsapp/invite', async (req, res, body, q, p, user) => {
-    const chat = waGroup(p);
+  route('GET', '/api/chats/:chat/whatsapp/invite', async ({ params, user }) => {
+    const chat = waGroup(params);
     const r = await channel.groupInviteLink(chat);
     waLog(chat, user, 'Invite link viewed', { tool: 'group_invite_link' });
     return r;
   }, { role: 'admin' });
-  route('POST', '/api/chats/:chat/whatsapp/invite/revoke', async (req, res, body, q, p, user) => {
-    const chat = waGroup(p);
+  route('POST', '/api/chats/:chat/whatsapp/invite/revoke', async ({ params, user }) => {
+    const chat = waGroup(params);
     const r = await channel.groupRevokeInvite(chat);
     waLog(chat, user, 'Invite link reset', { tool: 'revoke_invite_link' });
     return r;
   });
-  route('PUT', '/api/chats/:chat/whatsapp', async (req, res, body, q, p, user) => {
-    const chat = waGroup(p);
+  route('PUT', '/api/chats/:chat/whatsapp', async ({ body, params, user }) => {
+    const chat = waGroup(params);
     const done = [];
     if (typeof body.subject === 'string') {
       if (!body.subject.trim()) return [400, { error: 'The group name cannot be empty', field: 'subject' }];
@@ -215,11 +215,11 @@ export function chatRoutes(route, { channel } = {}) {
     waLog(chat, user, `Group updated: ${done.join(', ')}`, { tool: 'update_group', input: body });
     return { ok: true, changed: done };
   });
-  route('GET', '/api/chats/:chat/memory', async (req, res, body, q, p) => memoryView(decodeURIComponent(p.chat)));
-  route('POST', '/api/chats/:chat/memory/summarize', async (req, res, body, q, p) => {
-    const chat = decodeURIComponent(p.chat);
+  route('GET', '/api/chats/:chat/memory', async ({ params }) => memoryView(decodeURIComponent(params.chat)));
+  route('POST', '/api/chats/:chat/memory/summarize', async ({ params }) => {
+    const chat = decodeURIComponent(params.chat);
     const summary = await maybeSummarize(chat, agentForChat(chat), { force: true });
     return { summary: summary ?? memoryView(chat).summary };
   });
-  route('DELETE', '/api/chats/:chat/memory', async (req, res, body, q, p, user) => { eraseChatMemory(decodeURIComponent(p.chat), user.username); return { ok: true }; });
+  route('DELETE', '/api/chats/:chat/memory', async ({ params, user }) => { eraseChatMemory(decodeURIComponent(params.chat), user.username); return { ok: true }; });
 }

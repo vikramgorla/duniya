@@ -53,23 +53,23 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
       s3: { keysSet: !!(getSecret('S3_ACCESS_KEY_ID') && getSecret('S3_SECRET_ACCESS_KEY')) },
     };
   }, OWNER);
-  route('PUT', '/api/backups/settings', async (req, res, body, q, p, user) => {
+  route('PUT', '/api/backups/settings', async ({ body, user }) => {
     const s = updateBackupSettings(body);
     activity('backup.settings', { summary: `Backup settings updated by ${user.username}` });
     return s;
   }, OWNER);
-  route('PUT', '/api/backups/passphrase', async (req, res, body) => { setPassphrase(body.passphrase); return { ok: true }; }, OWNER);
+  route('PUT', '/api/backups/passphrase', async ({ body }) => { setPassphrase(body.passphrase); return { ok: true }; }, OWNER);
   route('POST', '/api/backups/run', async () => runBackup({ reason: 'manual' }), OWNER);
-  route('GET', '/api/backups/list', async (req, res, body, q) => listBackups(q.get('source') || 'local'), OWNER);
-  route('GET', '/api/backups/download/:file', async (req, res, body, q, p) => {
-    const path = await fetchBackup('local', p.file);
-    res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-disposition': `attachment; filename="${p.file}"`, 'cache-control': 'no-store' });
+  route('GET', '/api/backups/list', async ({ query }) => listBackups(query.get('source') || 'local'), OWNER);
+  route('GET', '/api/backups/download/:file', async ({ res, params }) => {
+    const path = await fetchBackup('local', params.file);
+    res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-disposition': `attachment; filename="${params.file}"`, 'cache-control': 'no-store' });
     createReadStream(path).pipe(res);
     return null;
   }, OWNER);
   // 060: without a passphrase the server's stored one is used (the owner assistant and AI assistants never see one);
   // check: true only opens the backup (the restore preview). A backup that does not open points to the Backups page.
-  route('POST', '/api/backups/restore', async (req, res, body, q, p, user) => {
+  route('POST', '/api/backups/restore', async ({ req, body, user }) => {
     const stored = !body.passphrase;
     const passphrase = String(body.passphrase || '') || getSecret('BACKUP_PASSPHRASE');
     const panel = `${baseUrl(req)}/#backups`;
@@ -92,7 +92,7 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
   }, OWNER);
   // 019: restore from a file on the owner's computer. The file is streamed to disk (max BACKUP_UPLOAD_MAX_MB);
   // the passphrase is sent separately with /api/backups/restore { source: 'upload', upload }.
-  route('POST', '/api/backups/upload', async (req, res, body, q, p, user) => {
+  route('POST', '/api/backups/upload', async ({ req, user }) => {
     const r = await receiveUpload(req, { magic: MAGIC });
     activity('backup.settings', { summary: `Backup file "${fileLabel(req)}" uploaded (${Math.round(r.size / 1024)} KB) by ${user.username}` });
     return r;
@@ -100,13 +100,13 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
 
   // ---------- fresh install: restore instead of creating an owner (019) ----------
   // Only while no account exists, and only with the one-time setup code from the installer/server log.
-  route('POST', '/api/setup/upload', async (req) => {
+  route('POST', '/api/setup/upload', async ({ req }) => {
     if (countUsers() > 0) { req.resume(); return [409, { error: 'This server is already set up. Sign in and use Backups → Restore.' }]; }
     if (setupLimit(clientIp(req))) { req.resume(); return [429, { error: 'Too many attempts, wait a minute' }]; }
     if (!checkSetupCode(req.headers['x-setup-code'])) { req.resume(); return [403, { error: 'Wrong setup code (see the installer output or the server log)' }]; }
     return receiveUpload(req, { magic: MAGIC });
   }, { public: true, raw: true });
-  route('POST', '/api/setup/restore', async (req, res, body) => {
+  route('POST', '/api/setup/restore', async ({ req, body }) => {
     if (countUsers() > 0) return [409, { error: 'This server is already set up. Sign in and use Backups → Restore.' }];
     if (setupLimit(clientIp(req))) return [429, { error: 'Too many attempts, wait a minute' }];
     if (!checkSetupCode(body.code)) return [403, { error: 'Wrong setup code (see the installer output or the server log)' }];
@@ -124,7 +124,7 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
     device = { clientId, deviceCode: d.deviceCode, expiresAt: Date.now() + d.expiresIn * 1000 };
     return { userCode: d.userCode, verificationUri: d.verificationUri, expiresIn: d.expiresIn, interval: d.interval };
   }, OWNER);
-  route('POST', '/api/backups/github/poll', async (req, res, body, q, p, user) => {
+  route('POST', '/api/backups/github/poll', async ({ user }) => {
     if (!device || Date.now() > device.expiresAt) return { status: 'expired' };
     const r = await github.devicePoll(device.clientId, device.deviceCode);
     if (!r.token) return { status: r.status };
@@ -134,7 +134,7 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
     activity('backup.settings', { summary: `GitHub connected for backups as ${login} by ${user.username}` });
     return { status: 'connected', login };
   }, OWNER);
-  route('PUT', '/api/backups/github/token', async (req, res, body, q, p, user) => {
+  route('PUT', '/api/backups/github/token', async ({ body, user }) => {
     const token = String(body.token || '').trim();
     const login = await github.whoami(token);
     if (!login) return [400, { error: 'Token rejected by GitHub' }];
@@ -142,7 +142,7 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
     activity('backup.settings', { summary: `GitHub token saved for ${login} by ${user.username}` });
     return { login };
   }, OWNER);
-  route('POST', '/api/backups/github/create-repo', async (req, res, body) => {
+  route('POST', '/api/backups/github/create-repo', async ({ body }) => {
     const token = getSecret('GITHUB_BACKUP_TOKEN');
     if (!token) return [400, { error: 'Connect GitHub first' }];
     const name = String(body.name || 'duniya-backups');
@@ -157,7 +157,7 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
     if (!getBackupSettings().githubApp?.installationId) updateBackupSettings({ github: { enabled: false } });
     return { ok: true };
   }, OWNER);
-  route('PUT', '/api/backups/github/client-id', async (req, res, body) => {
+  route('PUT', '/api/backups/github/client-id', async ({ body }) => {
     const id = String(body.clientId || '').trim();
     if (id && !/^[\w.-]{10,60}$/.test(id)) return [400, { error: 'Invalid client id', field: 'clientId' }];
     updateBackupSettings({ githubClientId: id });
@@ -166,12 +166,12 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
 
   // ---------- GitHub App via the manifest flow (019) ----------
   // The panel opens this page in the browser; it posts the manifest to GitHub (a form POST is the only way).
-  route('GET', '/backups/github-app/new', async (req, res, body, q, p, user) => {
+  route('GET', '/backups/github-app/new', async ({ req, res, query, user }) => {
     const base = publicBase(req);
     const state = randomBytes(18).toString('base64url');
     for (const [k, v] of manifestStates) if (v.expires < Date.now()) manifestStates.delete(k);
     manifestStates.set(state, { expires: Date.now() + 3600000, by: user.username });
-    const org = String(q.get('org') || '').trim();
+    const org = String(query.get('org') || '').trim();
     if (org && !/^[a-z0-9-]{1,39}$/i.test(org)) return resultPage(res, { ok: false, title: 'Invalid organization name', message: 'Use the organization’s short name as in github.com/NAME.', back: '/#backups' });
     const manifest = github.appManifest({ name: `Duniya backups ${randomBytes(3).toString('hex')}`, baseUrl: base });
     const action = github.manifestFormUrl(state, org);
@@ -186,12 +186,12 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
   }, OWNER);
   // GitHub sends the browser back with ?code&state (cross-site: no session cookie; the single-use state proves
   // the owner started it). The code is exchanged for the app's id and private key within the hour.
-  route('GET', '/backups/github-app/callback', async (req, res, body, q) => {
-    const st = manifestStates.get(String(q.get('state') || ''));
-    manifestStates.delete(String(q.get('state') || ''));
+  route('GET', '/backups/github-app/callback', async ({ res, query }) => {
+    const st = manifestStates.get(String(query.get('state') || ''));
+    manifestStates.delete(String(query.get('state') || ''));
     if (!st || st.expires < Date.now()) return resultPage(res, { ok: false, title: 'Link expired', message: 'This GitHub app link expired or was already used. Start again from Backups.', back: '/#backups' });
     try {
-      const app = await github.convertManifest(q.get('code'));
+      const app = await github.convertManifest(query.get('code'));
       setSecret(APP_KEY_SECRET, app.pem);
       resetAppToken();
       const { pem, ...info } = app;
@@ -204,9 +204,9 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
     }
   }, { public: true });
   // GitHub's "setup URL" after installing the app: just return to the panel, which checks the installation.
-  route('GET', '/backups/github-app/installed', async (req, res) => resultPage(res, { ok: true, title: 'App installed', message: 'Opening Backups to finish…', back: '/#backups', autoMs: 800 }), { public: true });
+  route('GET', '/backups/github-app/installed', async ({ res }) => resultPage(res, { ok: true, title: 'App installed', message: 'Opening Backups to finish…', back: '/#backups', autoMs: 800 }), { public: true });
 
-  route('POST', '/api/backups/github-app/check', async (req, res, body, q, p, user) => {
+  route('POST', '/api/backups/github-app/check', async ({ user }) => {
     const s = getBackupSettings();
     const app = s.githubApp;
     const pem = getSecret(APP_KEY_SECRET);
@@ -229,7 +229,7 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
     if (!app.installationId || patch.github) activity('backup.settings', { summary: `GitHub app installed on ${known.join(', ') || 'no repositories'}${patch.github ? `; backing up to ${known[0]}` : ''} (${user.username})` });
     return { ...appView(), repo: getBackupSettings().github.repo, enabled: getBackupSettings().github.enabled };
   }, OWNER);
-  route('PUT', '/api/backups/github-app/repo', async (req, res, body, q, p, user) => {
+  route('PUT', '/api/backups/github-app/repo', async ({ body, user }) => {
     const app = getBackupSettings().githubApp;
     const repo = String(body.repo || '').trim();
     if (!app?.installationId) return [400, { error: 'Install the GitHub app first' }];
@@ -238,7 +238,7 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
     activity('backup.settings', { summary: `Backing up to ${repo} through the GitHub app (${user.username})` });
     return { ok: true, repo };
   }, OWNER);
-  route('DELETE', '/api/backups/github-app', async (req, res, body, q, p, user) => {
+  route('DELETE', '/api/backups/github-app', async ({ user }) => {
     const app = getBackupSettings().githubApp;
     setSecret(APP_KEY_SECRET, '');
     resetAppToken();
@@ -249,12 +249,12 @@ export function backupRoutes(route, { restart = () => restartSoon(500) } = {}) {
   }, OWNER);
 
   // S3
-  route('PUT', '/api/backups/s3/keys', async (req, res, body) => {
+  route('PUT', '/api/backups/s3/keys', async ({ body }) => {
     setSecret('S3_ACCESS_KEY_ID', String(body.accessKeyId || ''));
     setSecret('S3_SECRET_ACCESS_KEY', String(body.secretAccessKey || ''));
     return { ok: true };
   }, OWNER);
-  route('POST', '/api/backups/test/:dest', async (req, res, body, q, p) => {
-    try { await listBackups(p.dest); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
+  route('POST', '/api/backups/test/:dest', async ({ params }) => {
+    try { await listBackups(params.dest); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
   }, OWNER);
 }

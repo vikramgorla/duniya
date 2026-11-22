@@ -72,9 +72,15 @@ export function startPanel({ channel, extend = [] }) {
   bootstrapAuth();
   setChatChannel(channel);
   const routes = [];
-  /** opts.role: minimum role (default: viewer for GET, admin otherwise). opts.public: no auth. */
-  /** opts.raw: the handler reads the (binary) request body itself; see uploadAllowed() for the CSRF guard. */
-  /** opts.form (083, public pages): the body is a same-origin HTML form (URLSearchParams); see formAllowed(). */
+  /**
+   * Register a route. The handler gets one object and names what it needs: `req`, `res` (to answer by itself: return
+   * null), `body` (parsed JSON; a URLSearchParams for opts.form), `query` (the URL's search parameters), `params` (the
+   * `:name` parts of the pattern) and `user` (the signed-in user; undefined on public routes). It returns the answer
+   * (JSON, 200), `[status, answer]`, or throws `fail(message, status)`.
+   * opts.role: minimum role (default: viewer for GET, admin otherwise). opts.public: no auth.
+   * opts.raw: the handler reads the (binary) request body itself; see uploadAllowed() for the CSRF guard.
+   * opts.form (083, public pages): the body is a same-origin HTML form; see formAllowed().
+   */
   const route = (method, pattern, handler, opts = {}) => routes.push({
     method, handler, public: !!opts.public, raw: !!opts.raw, form: !!opts.form,
     role: opts.role || (method === 'GET' ? 'viewer' : 'admin'),
@@ -131,7 +137,7 @@ export function startPanel({ channel, extend = [] }) {
       write(c) { chunks.push(Buffer.from(c)); return true; },
       end(c) { if (c) chunks.push(Buffer.from(c)); },
     };
-    let out = await r.handler(req, res, body ?? {}, url.searchParams, url.pathname.match(r.re).groups || {}, user);
+    let out = await r.handler({ req, res, body: body ?? {}, query: url.searchParams, params: url.pathname.match(r.re).groups || {}, user });
     let status = 200;
     if (out === null) {
       status = res.statusCode;
@@ -179,7 +185,7 @@ export function startPanel({ channel, extend = [] }) {
         return send(res, 415, { error: 'JSON required' }); // CSRF guard (with SameSite=Strict)
       }
       const body = req.method === 'GET' || r.raw ? {} : await readBody(req, r.form);
-      const out = await r.handler(req, res, body, url.searchParams, url.pathname.match(r.re).groups || {}, user);
+      const out = await r.handler({ req, res, body, query: url.searchParams, params: url.pathname.match(r.re).groups || {}, user });
       if (out === null) return;
       if (Array.isArray(out) && typeof out[0] === 'number' && out.length === 2) return send(res, out[0], out[1]);
       return send(res, 200, out ?? { ok: true });

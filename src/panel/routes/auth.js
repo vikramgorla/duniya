@@ -38,12 +38,12 @@ export function bootstrapAuth() {
 export function authRoutes(route, { channel } = {}) {
   // ---------- session / setup ----------
   // 063: ?status=1 adds the status for a signed-in user, so the panel's first screen needs one round trip, not two
-  route('GET', '/api/session', async (req, res, body, q) => {
+  route('GET', '/api/session', async ({ req, query }) => {
     const user = requestUser(req);
     return { authed: !!user, user, needsSetup: countUsers() === 0, google: googleReady(), passwordLogin: passwordLoginAllowed(),
-      ...(user && q.get('status') === '1' ? { status: await statusFor(user, channel) } : {}) };
+      ...(user && query.get('status') === '1' ? { status: await statusFor(user, channel) } : {}) };
   }, { public: true });
-  route('POST', '/api/setup', async (req, res, body) => {
+  route('POST', '/api/setup', async ({ req, res, body }) => {
     if (countUsers() > 0) return [409, { error: 'Already set up' }];
     if (rateLimitLogin(clientIp(req))) return [429, { error: 'Too many attempts, wait a minute' }];
     if (!checkSetupCode(body.code)) return [403, { error: 'Wrong setup code (see the server log or installer output)' }];
@@ -53,7 +53,7 @@ export function authRoutes(route, { channel } = {}) {
     setSessionCookie(req, res, user.id);
     return { ok: true, user };
   }, { public: true });
-  route('POST', '/api/login', async (req, res, body) => {
+  route('POST', '/api/login', async ({ req, res, body }) => {
     const ip = clientIp(req);
     if (rateLimitLogin(ip)) return [429, { error: 'Too many attempts, wait a minute' }];
     if (!passwordLoginAllowed()) { activity('system', { summary: `Password sign-in refused for "${body.username || 'admin'}" from ${ip} (only Google allowed)` }); return [403, { error: 'Password sign-in is switched off. Use Sign in with Google.' }]; }
@@ -63,12 +63,12 @@ export function authRoutes(route, { channel } = {}) {
     activity('system', { summary: `Panel login: ${user.username} from ${ip}` });
     return { ok: true, user };
   }, { public: true });
-  route('POST', '/api/logout', async (req, res) => {
+  route('POST', '/api/logout', async ({ req, res }) => {
     deleteSession(cookie(req, 'duniya_session'));
     res.setHeader('set-cookie', 'duniya_session=; Path=/; Max-Age=0');
     return { ok: true };
   }, { role: 'viewer' });
-  route('POST', '/api/password', async (req, res, body, q, p, user) => {
+  route('POST', '/api/password', async ({ body, user }) => {
     // Accounts created from a Google invite have no password yet: they may set one (a fallback if Google is off).
     if (user.hasPassword && !authenticate(user.username, String(body.current || ''))) return [400, { error: 'Current password is wrong' }];
     updateUser(user.id, { password: String(body.next || '') });
@@ -77,10 +77,10 @@ export function authRoutes(route, { channel } = {}) {
   }, { role: 'viewer' });
   // ---------- users (owner) ----------
   route('GET', '/api/users', async () => listUsers(), { role: 'owner' });
-  route('PUT', '/api/users/:id', async (req, res, body, q, p, user) => {
-    const u = updateUser(p.id, body); activity('system', { summary: `User ${u.username} updated by ${user.username}` }); return u;
+  route('PUT', '/api/users/:id', async ({ body, params, user }) => {
+    const u = updateUser(params.id, body); activity('system', { summary: `User ${u.username} updated by ${user.username}` }); return u;
   }, { role: 'owner' });
-  route('DELETE', '/api/users/:id', async (req, res, body, q, p, user) => {
-    deleteUser(p.id); activity('system', { summary: `User #${p.id} removed by ${user.username}` }); return { ok: true };
+  route('DELETE', '/api/users/:id', async ({ params, user }) => {
+    deleteUser(params.id); activity('system', { summary: `User #${params.id} removed by ${user.username}` }); return { ok: true };
   }, { role: 'owner' });
 }

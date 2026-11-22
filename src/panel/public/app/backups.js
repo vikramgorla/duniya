@@ -63,13 +63,15 @@ export async function renderBackups() {
   // 064: list → page, like Models and Settings: each place a backup goes, with its state on the row
   const pages = { schedule: scheduleCard, local: localCard, github: githubCard(b, s, saveSettings), s3: s3Card, restore: restoreCard(b, s) };
   const SCHED = { hourly: 'every hour', '6h': 'every 6 hours', daily: 'daily', weekly: 'weekly' };
-  const row = (id, name, sub, ic, cls, st = '') => ({ id, name, sub, mark: h('span', { class: `lmark ${cls}`, 'aria-hidden': 'true' }, icon(ic)), status: st ? h('span', { class: `dot ${st}`, 'aria-hidden': 'true' }) : null });
+  const row = ({ id, name, sub, icon: ic, color, state = '' }) => ({ id, name, sub, mark: h('span', { class: `lmark ${color}`, 'aria-hidden': 'true' }, icon(ic)), status: state ? h('span', { class: `dot ${state}`, 'aria-hidden': 'true' }) : null });
+  const scheduleSub = !b.passphraseSet ? 'Set a passphrase first' : s.enabled ? `On · ${SCHED[s.schedule] || s.schedule}${s.schedule === 'daily' || s.schedule === 'weekly' ? ` at ${s.at}` : ''}` : 'Off';
+  const localSub = b.local.length ? `${b.local.length} ${b.local.length === 1 ? 'backup' : 'backups'}${last?.at ? ` · last ${time(last.at)}` : ''}` : 'No backups yet';
   $('#main').replaceChildren(listDetail({ screen: 'backups', title: 'Backups', page: (id) => pages[id], groups: [
-    { title: 'Backups', items: [row('schedule', 'Schedule', !b.passphraseSet ? 'Set a passphrase first' : s.enabled ? `On · ${SCHED[s.schedule] || s.schedule}${s.schedule === 'daily' || s.schedule === 'weekly' ? ` at ${s.at}` : ''}` : 'Off', 'pending', 'c4', b.passphraseSet && s.enabled ? 'ok' : 'warn'),
-      row('local', 'This server', b.local.length ? `${b.local.length} ${b.local.length === 1 ? 'backup' : 'backups'}${last?.at ? ` · last ${time(last.at)}` : ''}` : 'No backups yet', 'server', 'c0'),
-      row('github', 'GitHub', s.github.enabled ? 'On' : 'Off', 'backups', 'c0', s.github.enabled ? 'ok' : ''),
-      row('s3', 'S3 storage', s.s3.enabled ? 'On' : 'Off', 'backups', 'c3', s.s3.enabled ? 'ok' : '')] },
-    { title: 'Restore', items: [row('restore', 'Restore a backup', 'From this server, GitHub, S3 or a file', 'back', 'c1')] }] }));
+    { title: 'Backups', items: [row({ id: 'schedule', name: 'Schedule', sub: scheduleSub, icon: 'pending', color: 'c4', state: b.passphraseSet && s.enabled ? 'ok' : 'warn' }),
+      row({ id: 'local', name: 'This server', sub: localSub, icon: 'server', color: 'c0' }),
+      row({ id: 'github', name: 'GitHub', sub: s.github.enabled ? 'On' : 'Off', icon: 'backups', color: 'c0', state: s.github.enabled ? 'ok' : '' }),
+      row({ id: 's3', name: 'S3 storage', sub: s.s3.enabled ? 'On' : 'Off', icon: 'backups', color: 'c3', state: s.s3.enabled ? 'ok' : '' })] },
+    { title: 'Restore', items: [row({ id: 'restore', name: 'Restore a backup', sub: 'From this server, GitHub, S3 or a file', icon: 'back', color: 'c1' })] }] }));
   if (b.github.app.app && !b.github.app.installed && Date.now() - ghAutoChecked > 15000) { ghAutoChecked = Date.now(); checkGithubApp(true); }
 }
 

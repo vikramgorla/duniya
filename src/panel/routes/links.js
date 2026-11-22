@@ -36,7 +36,7 @@ function signupUser(token) {
 
 export function linkRoutes(route, { invoke }) {
   // ---------- enter a secret ----------
-  route('POST', '/api/secret-links', async (req, res, body, q, p, user) => {
+  route('POST', '/api/secret-links', async ({ req, body, user }) => {
     let target;
     if (body.account) {
       const acc = accountById(String(body.account));
@@ -54,11 +54,11 @@ export function linkRoutes(route, { invoke }) {
     return { for: target.label, link: linkUrl(baseUrl(req), 'secret', token), expiresAt };
   });
   // Tokens travel in the request body, never in a URL path (no access logs, no URL built from user input).
-  route('POST', '/api/secret-links/open', async (req, res, body) => {
+  route('POST', '/api/secret-links/open', async ({ body }) => {
     const d = peekLink('secret', String(body.token || ''));
     return d ? { for: d.label, askedBy: d.byName, expiresAt: d.expiresAt } : [404, { error: GONE }];
   }, { role: 'admin' });
-  route('POST', '/api/secret-links/use', async (req, res, body, q, p, user) => {
+  route('POST', '/api/secret-links/use', async ({ body, user }) => {
     const token = String(body.token || '');
     const d = peekLink('secret', token);
     if (!d) return [404, { error: GONE }];
@@ -73,27 +73,27 @@ export function linkRoutes(route, { invoke }) {
   }, { role: 'admin' });
 
   // ---------- sign-up links for new users ----------
-  route('POST', '/api/users', async (req, res, body, q, p, user) => {
+  route('POST', '/api/users', async ({ req, body, user }) => {
     if (!passwordLoginAllowed()) return [400, { error: NO_PASSWORDS }];
     const noPassword = !body.password;
     const u = createUser({ username: body.username, email: body.email, role: body.role, password: body.password, noPassword });
     activity('system', { summary: `User ${u.username} (${u.role}) added by ${user.username}${noPassword ? ' (sets their own password)' : ''}` });
     return noPassword ? { ...u, signup: signupLink(req, u, user) } : u;
   }, OWNER);
-  route('POST', '/api/users/:id/signup-link', async (req, res, body, q, p, user) => {
+  route('POST', '/api/users/:id/signup-link', async ({ req, params, user }) => {
     if (!passwordLoginAllowed()) return [400, { error: NO_PASSWORDS }];
-    const u = getUser(p.id);
+    const u = getUser(params.id);
     if (!u) return [404, { error: 'User not found' }];
     if (u.disabled) return [400, { error: `${u.username} is disabled: enable the account first` }];
     return signupLink(req, u, user);
   }, OWNER);
-  route('POST', '/api/signup/open', async (req, res, body) => {
+  route('POST', '/api/signup/open', async ({ req, body }) => {
     if (signupLimit(clientIp(req))) return [429, { error: 'Too many attempts, wait a minute' }];
     const token = String(body.token || '');
     const u = signupUser(token);
     return u ? { username: u.username, role: u.role, expiresAt: peekLink('signup', token).expiresAt } : [404, { error: GONE }];
   }, { public: true });
-  route('POST', '/api/signup', async (req, res, body) => {
+  route('POST', '/api/signup', async ({ req, res, body }) => {
     const token = String(body.token || '');
     if (signupLimit(clientIp(req))) return [429, { error: 'Too many attempts, wait a minute' }];
     if (!passwordLoginAllowed()) return [403, { error: 'Password sign-in is switched off. Use Sign in with Google.' }];
