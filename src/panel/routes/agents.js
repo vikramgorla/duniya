@@ -21,7 +21,7 @@ import { listAnswers, rateAnswer, reviewCounts } from '../../core/review.js';
 import { joinFeedback, judgedOf, lessonFromThumbsDown, proposedCount } from '../../core/lessons.js';
 import { runSchedule } from '../../core/scheduler.js';
 import { interpolate } from '../../core/store.js';
-import { oauthClientOf, organizerConnection } from '../../core/tools.js';
+import { oauthClientOf, organizerConnection, reactionServicesOf } from '../../core/tools.js';
 import { isGroup as isGroupChat } from '../../channels/index.js';
 import { isHttps, resultPage, send } from '../http.js';
 
@@ -164,6 +164,11 @@ export function agentRoutes(route, { channel } = {}) {
     await resetMcpPool();
     return { name: i.name, version: i.version, at: i.at };
   }, { role: 'owner' });
+  // 094: its reaction media services (GIFs, stickers) with its "Use on its own" choice and the service's default
+  route('GET', '/api/agents/:id/reactions', async (req, res, body, q, p) => {
+    const agent = getAgent(p.id);
+    return agent ? reactionServicesOf(agent) : [404, { error: 'Not found' }];
+  });
   route('GET', '/api/agents/:id/connections', async (req, res, body, q, p) => listConnections(p.id));
   route('POST', '/api/agents/:id/connections/:server/:role', async (req, res, body, q, p, user) => {
     const agent = getAgent(p.id);

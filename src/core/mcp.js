@@ -68,7 +68,7 @@ class McpConnection {
         if (!this.client) await this.connect();
         const res = await this.client.callTool({ name, arguments: args || {} });
         const text = /** @type {any[]} */ (res.content || []).map((c) => (c.type === 'text' ? c.text : JSON.stringify(c))).join('\n');
-        return { isError: !!res.isError, text };
+        return { isError: !!res.isError, text, data: res.structuredContent || null }; // data: the structured result, when the service gives one
       } catch (e) {
         await this.close();
         if (e.reconnect || attempt === 1) return { isError: true, text: `Tool error: ${e.message}` };

@@ -26,6 +26,7 @@ import { faqContext } from './quick.js';
 import { peopleScope, senderCard } from './people-access.js';
 import { applyPeopleAction } from './people-tools.js';
 import { applyModuleAction } from '../modules/index.js';
+import { reactionPlan, reactionsNote, takeReactionTag, reactionAfterReply } from './reactions.js';
 import { BLOCKED, WAIT_NOTE, appliedNote, autonomyNote, isAgreement, mayChangeWithoutAsking } from './autonomy.js';
 
 const MAX_TOOL_ROUNDS = 8;
@@ -48,7 +49,7 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 // Confirm codes guard risky actions, so they come from a cryptographic source.
 const newCode = () => Array.from({ length: 4 }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
 
-function systemPrompt({ agent, role, isGroup, chatName, chat, requester, held }) {
+function systemPrompt({ agent, role, isGroup, chatName, chat, requester, held, reactions }) {
   const app = channelInfo(channelOf(chat))?.label || 'WhatsApp'; // 077: the test console and Ask box read as WhatsApp
   // 077: on a channel without phone numbers, someone who has not linked theirs is a participant until they do
   const unlinked = !requester && capsOf(chat) && !capsOf(chat).phoneNumbers
@@ -61,6 +62,7 @@ function systemPrompt({ agent, role, isGroup, chatName, chat, requester, held })
     autonomyNote(agent, role, { held }), // 093: how sure before changing things (the agent's setting; enforced in code)
     unlinked,
     `Write for ${app}: short plain text, *bold* sparingly, simple "-" lists, no markdown headings or tables.`,
+    reactionsNote(reactions || []), // 094: GIFs / stickers on its own (the agent's Tools page)
     faqContext(agent), // 054: the owner's FAQ as small, capped reference context
   ].filter(Boolean).join('\n\n');
 }
@@ -117,7 +119,10 @@ export async function runAgent(ctx) {
     }
     if (budget.action === 'fallback') model = budget.model;
   }
-  const { defs, run, meta } = await toolsFor(agent, role, { chat, owner: !!ctx.ownerTurn });
+  const { defs, run, meta, reactions } = await toolsFor(agent, role, { chat, owner: !!ctx.ownerTurn });
+  // 094: reactions on their own — the message's moment in code; a line for this turn when one fits
+  const rplan = reactionPlan(ctx, reactions);
+  ctx.reactionPlan = rplan;
   const codes = [];
   // 079: a people change about someone other than the sender waits for an organizer's confirm code (like previews);
   // 093: a low-risk one an organizer clearly asked for applies at once in clear / act (logged as changed without asking)
@@ -162,7 +167,7 @@ export async function runAgent(ctx) {
   // 089: lessons the owner approved, the most relevant to this message first (small budget); join-in lessons for judged turns
   const lessons = agent.lessons?.enabled === false ? '' : lessonsContext(agent, ctx.contextChat || chat, text);
   const joinNote = ctx.unaddressed && agent.lessons?.enabled !== false ? joinLessonsNote(agent, ctx.contextChat || chat) : '';
-  const turnText = `${memory ? `${memory}\n\n` : ''}${lessons ? `${lessons}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${card ? `${card}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}${ctx.unaddressed ? `\n\n${JUDGE_NOTE}${joinNote ? `\n${joinNote}` : ''}` : ''}${ctx.turnNote ? `\n\n${ctx.turnNote}` : ''}`;
+  const turnText = `${memory ? `${memory}\n\n` : ''}${lessons ? `${lessons}\n\n` : ''}${historyLine ? `${historyLine}\n\n` : ''}${card ? `${card}\n\n` : ''}${thread}New message from ${senderName}${ctx.senderTag ? ` (tag: ${ctx.senderTag})` : ''} (${role}):\n${text}${notes ? `\n${notes}` : ''}${ctx.unaddressed ? `\n\n${JUDGE_NOTE}${joinNote ? `\n${joinNote}` : ''}` : ''}${ctx.turnNote ? `\n\n${ctx.turnNote}` : ''}${rplan?.note ? `\n\n${rplan.note}` : ''}`;
   const messages = [{
     role: 'user',
     content: plan.attachments.length ? [...plan.attachments, { type: 'text', text: turnText }] : turnText,
@@ -189,7 +194,7 @@ export async function runAgent(ctx) {
     try {
       res = await modelChat({
         model, purpose: 'agent', maxTokens: agent.maxTokens, usage: usageTag(turnFeature(ctx, smart), { agent: agent.id, chat }),
-        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName, chat, requester: ctx.requester, held: !!agent.confirm || defs.some((d) => /^(people|events|orders|sending)__/.test(d.name)) }), tools: defs, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
+        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName, chat, requester: ctx.requester, held: !!agent.confirm || defs.some((d) => /^(people|events|orders|sending)__/.test(d.name)), reactions }), tools: defs, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
       });
     } catch (e) {
       if (smart?.tier === 'light' && e.code !== 'aborted') { // 088: the light model failed: the strong one answers
@@ -271,6 +276,10 @@ export async function runAgent(ctx) {
     reply = checked.reply;
     if (checked.cost == null) priced = false; else cost += checked.cost;
   }
+  // 094: [reaction: mood] tags never reach the chat; the reaction (asked for, or a moment's) goes out after the text
+  const tag = takeReactionTag(reply);
+  reply = tag.text;
+  ctx.reaction = ctx.source === 'panel' ? null : reactionAfterReply(ctx, rplan, { reply, hint: tag.hint });
   for (const code of codes) {
     reply += `\n\nOrganizer: reply *confirm ${code}* to apply, or *cancel ${code}* (valid ${agent.confirm?.ttlMinutes || 9} min).`;
   }

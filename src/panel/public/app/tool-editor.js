@@ -1,7 +1,7 @@
 // Tool service editor shared by an agent and Settings → Tool services (035). Module of the panel (063).
 // ---------- tool service editor: an agent's own services and Settings → Tool services (035) share it ----------
 import { api, can, field, h, splitLines, time, toast, tryApi } from './core.js';
-import { smallServer } from './shared.js';
+import { helpLink, smallServer } from './shared.js';
 export const globRe = (p) => new RegExp(`^${p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
 const kvLines = (o, sep) => Object.entries(o || {}).map(([k, v]) => `${k}${sep}${v}`).join('\n');
 const parseKv = (text, sep) => Object.fromEntries(splitLines(text).map((l) => { const i = l.indexOf(sep); return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : [l.trim(), '']; }));
@@ -10,12 +10,34 @@ export const ROLE_LABEL = { organizer: 'Organizers', participant: 'Participants'
 export const serverState = (key, sv) => markSaved({ key, type: sv.type || 'remote', url: sv.url || '', auth: sv.auth || (key ? 'token' : 'oauth'),
   org: sv.tokens?.organizer || '', part: sv.tokens?.participant || '', headers: kvLines(sv.headers, ': '), oauthId: sv.oauthClient?.id || '', oauthSecret: sv.oauthClient?.secret || '',
   pkg: sv.package || '', args: (sv.args || []).join('\n'), env: kvLines(sv.env, '='), allowScripts: !!sv.allowScripts,
-  defaults: { organizer: [...(sv.defaults?.organizer || ['*'])], participant: [...(sv.defaults?.participant || [])] } });
+  defaults: { organizer: [...(sv.defaults?.organizer || ['*'])], participant: [...(sv.defaults?.participant || [])] }, reactions: { media: 'auto', mode: 'off', style: '', ...(sv.reactions || {}) } });
 export function markSaved(s) { s.savedUrl = s.url; s.savedAuth = s.auth; s.savedType = s.type; s.savedPkg = s.pkg; s.isNew = !s.key; return s; }
 export const serverConfig = (s) => (s.type === 'local'
-  ? { type: 'local', package: s.pkg, args: splitLines(s.args), env: parseKv(s.env, '='), allowScripts: s.allowScripts }
-  : { type: 'remote', url: s.url, auth: s.auth, tokens: s.auth === 'token' ? { organizer: s.org, participant: s.part } : {}, headers: parseKv(s.headers, ':'),
+  ? { type: 'local', package: s.pkg, args: splitLines(s.args), env: parseKv(s.env, '='), allowScripts: s.allowScripts, reactions: s.reactions }
+  : { type: 'remote', url: s.url, auth: s.auth, tokens: s.auth === 'token' ? { organizer: s.org, participant: s.part } : {}, headers: parseKv(s.headers, ':'), reactions: s.reactions,
     ...(s.auth === 'oauth' && s.oauthId ? { oauthClient: { id: s.oauthId, secret: s.oauthSecret } } : {}) });
+/** A segmented choice (one of a few values), pressed state kept in place. */
+export const seg = (label, options, value, onPick) => {
+  const el = h('div', { class: 'seg', role: 'group', 'aria-label': label }, options.map(([v, l]) => h('button', {
+    type: 'button', class: value === v ? 'on' : '', 'aria-pressed': String(value === v), disabled: !can('admin'),
+    onclick: (e) => { onPick(v); el.querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === e.currentTarget); x.setAttribute('aria-pressed', String(x === e.currentTarget)); }); } }, l)));
+  return el;
+};
+// 094: reaction media services (GIFs, stickers) used on their own: off | sometimes | often, one line each
+export const REACTION_CHOICES = [['off', 'Off'], ['sometimes', 'Sometimes'], ['often', 'Often']];
+const KIND_WORD = { gif: 'GIFs', sticker: 'stickers', image: 'memes' };
+/**
+ * "Use on its own" for a reaction media service: a segmented choice and style keywords. state: { mode, style };
+ * dflt: the service's default ({ mode }) on an agent (adds "Default"), none in Settings.
+ */
+export function reactionChoice(state, kind, dflt = null, onChange = () => {}) {
+  const opts = [...(dflt ? [['inherit', `Default (${dflt.mode})`]] : []), ...REACTION_CHOICES];
+  const choice = seg('Use on its own', opts, state.mode, (v) => { state.mode = v; onChange(); });
+  const style = h('input', { value: state.style || '', maxlength: 200, disabled: !can('admin'), placeholder: dflt?.style || 'e.g. Telugu movie reactions, Brahmanandam', oninput: (e) => { state.style = e.target.value; onChange(); } });
+  return h('div', { class: 'reaction-use' }, h('div', { class: 'row spread' }, h('b', {}, `Use on its own · ${KIND_WORD[kind] || 'reactions'}`), helpLink('tool-services.md#reactions-gifs-and-stickers')), choice,
+    h('p', { class: 'small muted' }, 'Sometimes: celebrations, thanks to it, when asked. Often: also thanks, welcomes, jokes and praise. Never on serious topics; only mood words are searched.'),
+    field('Style keywords (optional)', style));
+}
 /** Tools of a service with a tick per role, an all/none tick per role and "Everyone: all tools" (#165).
  * rules: { has(role, tool), write(role, tools ticked, all tools) }. */
 export function toolGrid(box, tools, rules) {

@@ -32,6 +32,7 @@ import { claimTurn, releaseTurn, isDuplicate, noteSent, similarity } from './tur
 import { lessonFromCorrection, noteJudgedAnswer } from './lessons.js';
 import { noteMessage as noteCommitments } from './commitments.js';
 import { noteCues, noteWriter } from './person-insights.js';
+import { sendReaction } from './reactions.js';
 
 // 059: the built-in owner assistant is reached through the owner hand-off only, never by routing.
 const listAgents = () => allAgents().filter((b) => !isBuiltin(b));
@@ -497,7 +498,7 @@ async function deliver(channel, msg, agent, text, { voiceIn = false, voiceNow = 
 
 /** One agent turn for a routed message (inline for text; from the media queue for photos and voice notes). */
 async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, queued = false, judge = false, note = '', mayStayQuiet = false }) {
-  let media = null;
+  let media = null; let reaction = null; // 094: the GIF / sticker that follows the text
   /** @type {Promise<number>|null} */ let typingSince = null;
   try {
     if (queued) {
@@ -542,7 +543,7 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
         out = await runAgent(ctx);
       } catch (e) {
         activity('error', { agent: agent.id, chat: msg.chat, summary: `Agent failed: ${e.message}` });
-        quiet('model_error', agent.id);
+        quiet('model_error', agent.id); ctx.reaction = null; // never a GIF after an error
         out = judged ? '' : 'Sorry, I hit an error. Please try again in a minute.'; // nobody asked it: no error message
       }
       if (waited) channel.react?.(msg.chat, mref, '')?.catch?.(() => {});
@@ -550,12 +551,14 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
       if (v) { if (v === 'done') closeFollowups(msg.chat); quiet('not_for_me', agent.id); return; }
       if (judged && ctx.modelError) out = '';
       if (judged && out) { countStat('handled', { agent: agent.id }); logIn(); }
+      if (!ctx.modelError) reaction = ctx.reaction ? { ctx, ...ctx.reaction } : null;
       if (ctx.modelError) quiet('model_error', agent.id);
       else if (!out) quiet('no_reply', agent.id);
     }
     if (out) {
       const id = await deliver(channel, msg, agent, out, { voiceIn, voiceNow: queued, typingSince });
       if (judge && msg.isGroup) noteJudgedAnswer(id, agent.id, msg.chat); // 089: feedback on it teaches when to join in
+      if (reaction) await sendReaction(reaction.ctx, reaction);
     }
   } finally {
     media?.cleanup?.();

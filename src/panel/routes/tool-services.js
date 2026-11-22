@@ -9,7 +9,7 @@ import { listGlobalRows, getGlobalServer, saveGlobalServer, removeGlobalServer }
 import { probeServer, startSignIn, listConnections, disconnect, deleteServerConnections, OAUTH_ROLES, GLOBAL_SCOPE } from '../../core/mcp-oauth.js';
 import { installPackage, installedInfo, localServiceCheck } from '../../core/mcp-local.js';
 import { resetMcpPool, mcpConnection } from '../../core/mcp.js';
-import { serverConnection, oauthClientOf } from '../../core/tools.js';
+import { serverConnection, oauthClientOf, detectReaction } from '../../core/tools.js';
 import { referencedSecrets } from '../../core/schema.js';
 import { getSecret } from '../../core/store.js';
 import { isHttps } from '../http.js';
@@ -35,7 +35,12 @@ function globalView(row, agents = listAgents()) {
 
 export function toolServiceRoutes(route) {
   registryRoutes(route); // 052: browse the MCP Registry and add from it
-  route('GET', '/api/tool-services', async () => { const agents = listAgents(); return listGlobalRows().map((r) => globalView(r, agents)); });
+  // 094: `reaction`: the service finds reaction media (GIFs, stickers) — its search tool and media kind — or null
+  route('GET', '/api/tool-services', async () => {
+    const agents = listAgents();
+    return Promise.all(listGlobalRows().map(async (r) => ({ ...globalView(r, agents),
+      reaction: await detectReaction(r.config, () => serverConnection(r.config, { scope: GLOBAL_SCOPE, key: r.name, role: 'organizer', where: 'Settings → Tool services' })) })));
+  });
 
   route('PUT', '/api/tool-services/:name', async (req, res, body, q, p, user) => {
     const before = getGlobalServer(p.name);

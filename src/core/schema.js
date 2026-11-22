@@ -7,6 +7,9 @@ import { cleanOverride, REF_RE } from './providers/fallback-config.js';
 import { QUICK_WHO, FAQ_STRICTNESS } from './quick.js';
 import { AUTONOMY } from './autonomy.js';
 
+/** 094: how much an agent uses a reaction media service (GIFs, stickers) on its own. */
+export const REACTION_MODES = ['off', 'sometimes', 'often'];
+
 export const AGENT_DEFAULTS = Object.freeze({
   name: '',
   description: '',
@@ -39,6 +42,7 @@ export const AGENT_DEFAULTS = Object.freeze({
   schedules: [],
   memory: { enabled: true },
   globalMcp: { disabled: [] },
+  reactions: {}, // 094: per tool service { mode: inherit | off | sometimes | often, style }: reaction media (GIFs, stickers) on its own
   timezone: '',
   // Photos & voice (043): what the agent does with photos, PDFs and voice notes, and when it answers with voice.
   media: { photos: true, documents: true, stickers: false, voiceNotes: true, voiceReply: 'never', createImages: { organizer: true, participant: false } },
@@ -122,6 +126,19 @@ function tokenRef(v, field) {
   return s;
 }
 
+/**
+ * 094 ({ reactions } to spread into the service, or {} when all defaults): a tool service as reaction media (GIFs, stickers): media auto | on | off (is it one; auto = by its tools) and the
+ * default for agents: mode off | sometimes | often, style keywords added to every search.
+ */
+function serverReactions(r, f) {
+  const v = r && typeof r === 'object' ? r : {};
+  const media = v.media ?? 'auto';
+  if (!['auto', 'on', 'off'].includes(media)) fail(`${f}.reactions.media`, 'must be auto, on or off');
+  const mode = v.mode ?? 'off';
+  if (!REACTION_MODES.includes(mode)) fail(`${f}.reactions.mode`, 'must be off, sometimes or often');
+  const style = str(v.style, `${f}.reactions.style`, { max: 200 });
+  return media === 'auto' && mode === 'off' && !style ? {} : { reactions: { media, mode, style } }; // kept only when set
+}
 /** Validate one tool service (MCP server) definition: remote (URL + token/OAuth/none) or local (npm/GitHub package). */
 function validateServer(key, srv, f = key) {
   if (!SERVER_KEY_RE.test(key)) fail(f, 'name must be lowercase letters, digits or _');
@@ -138,12 +155,13 @@ function validateServer(key, srv, f = key) {
     if (!validPackageSpec(spec)) fail(`${f}.package`, 'must look like name, name@version, @scope/name or github:owner/repo#ref');
     const args = list(srv?.args ?? [], `${f}.args`).map((a) => str(a, `${f}.args`, { max: 500 }));
     if (args.length > 30) fail(`${f}.args`, 'at most 30 arguments');
-    return { type, package: spec, args, env: kvMap(srv?.env, `${f}.env`, ENV_NAME_RE, ['PATH', 'HOME']), allowScripts: !!srv?.allowScripts };
+    return { type, package: spec, args, env: kvMap(srv?.env, `${f}.env`, ENV_NAME_RE, ['PATH', 'HOME']), allowScripts: !!srv?.allowScripts, ...serverReactions(srv?.reactions, f) };
   }
   const authMode = srv?.auth ?? (t.organizer || t.participant ? 'token' : 'none');
   if (!['oauth', 'token', 'none'].includes(authMode)) fail(`${f}.auth`, 'must be oauth, token or none');
   const entry = { type, url: urlOrRef(srv?.url, `${f}.url`), auth: authMode, tokens: authMode === 'token' ? t : { organizer: '', participant: '' },
-    headers: kvMap(srv?.headers, `${f}.headers`, HEADER_NAME_RE, ['host', 'content-length', 'content-type', 'accept', 'authorization', 'mcp-session-id', 'mcp-protocol-version']) };
+    headers: kvMap(srv?.headers, `${f}.headers`, HEADER_NAME_RE, ['host', 'content-length', 'content-type', 'accept', 'authorization', 'mcp-session-id', 'mcp-protocol-version']),
+    ...serverReactions(srv?.reactions, f) };
   const oc = srv?.oauthClient;
   if (authMode === 'oauth' && oc && (oc.id || oc.secret)) {
     entry.oauthClient = { id: str(oc.id, `${f}.oauthClient.id`, { min: 1, max: 300 }).trim(), secret: tokenRef(oc.secret, `${f}.oauthClient.secret`) };
@@ -266,6 +284,16 @@ export function validateAgentConfig(input) {
   const off = list(c.globalMcp?.disabled, 'globalMcp.disabled');
   for (const k of off) if (!SERVER_KEY_RE.test(k)) fail('globalMcp.disabled', `"${k}" is not a tool service name`);
   out.globalMcp = { disabled: [...new Set(off)] };
+  const rx = c.reactions && typeof c.reactions === 'object' && !Array.isArray(c.reactions) ? c.reactions : {};
+  if (Object.keys(rx).length > 20) fail('reactions', 'at most 20 tool services');
+  out.reactions = {};
+  for (const [k, v] of Object.entries(rx)) {
+    if (!SERVER_KEY_RE.test(k)) fail('reactions', `"${k}" is not a tool service name`);
+    const mode = v?.mode ?? 'inherit';
+    if (mode !== 'inherit' && !REACTION_MODES.includes(mode)) fail(`reactions.${k}.mode`, 'must be inherit, off, sometimes or often');
+    const style = str(v?.style, `reactions.${k}.style`, { max: 200 });
+    if (mode !== 'inherit' || style) out.reactions[k] = { mode, style };
+  }
   const md = c.media && typeof c.media === 'object' ? c.media : {};
   const mdef = AGENT_DEFAULTS.media;
   const flag = (k) => (md[k] === undefined ? mdef[k] : !!md[k]);

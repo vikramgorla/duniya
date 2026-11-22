@@ -44,5 +44,11 @@
     "items": [],
     "strictness": "normal",
     "wholeGroup": false
+  },
+  "reactions": {
+    "gifs": {
+      "mode": "sometimes",
+      "style": ""
+    }
   }
 }

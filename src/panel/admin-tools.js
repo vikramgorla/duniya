@@ -666,6 +666,29 @@ export const TOOLS = [
     description: 'Tool services (MCP servers) defined once for all agents: their settings (secret names, never values), default tools per role, and which agents use them, switched them off (opted out) or replace them with their own service of the same name.',
     input: {},
     run: (a, x) => x.call('GET', '/api/tool-services') },
+  // 094: reaction media services (GIFs, stickers) used on their own — per agent, or the service's default for all agents
+  { name: 'set_reactions', calls: [['GET', '/api/agents/x'], ['PUT', '/api/agents/x'], ['GET', '/api/tool-services'], ['PUT', '/api/tool-services/x']],
+    description: 'How much a reaction media tool service (one that finds GIFs or stickers, e.g. "gifs"; list_global_tool_services shows "reaction" for them, get_agent_reactions per agent) is used on its own: mode off | sometimes (real celebrations, thanks to the agent, when asked) | often (thanks, celebrations, welcomes, jokes, praise, settled plans) and style keywords added to every search (e.g. "Telugu movie reactions, Brahmanandam"). With agent_id: that agent (mode "inherit" = the service\'s default); without: the global service\'s default for every agent, and media (auto | on | off) says whether the service counts as reaction media at all. Only mood keywords and the style go to the service, never names.',
+    input: { agent_id: str('Agent id (optional; empty = the global service\'s default)'), service: str('Tool service name, e.g. gifs'), mode: { type: 'string', enum: ['inherit', 'off', 'sometimes', 'often'] },
+      style: str('Style keywords (optional; empty clears)'), media: { type: 'string', enum: ['auto', 'on', 'off'], description: 'Global service only: is it reaction media (auto = by its tools)' } }, required: ['service'],
+    run: async (a, x) => {
+      const pick = (cur) => ({ ...cur, ...(a.mode !== undefined ? { mode: a.mode } : {}), ...(a.style !== undefined ? { style: a.style } : {}) });
+      if (a.agent_id) {
+        const cur = (await x.call('GET', `/api/agents/${enc(a.agent_id)}`)).config?.reactions || {};
+        const r = await x.call('PUT', `/api/agents/${enc(a.agent_id)}`, { reactions: { ...cur, [a.service]: pick(cur[a.service] || { mode: 'inherit', style: '' }) } });
+        return { agent: r.id, reactions: r.config?.reactions };
+      }
+      const g = (await x.call('GET', '/api/tool-services')).find((s) => s.name === a.service);
+      if (!g) throw new Error(`No global tool service named ${a.service}`);
+      if (a.mode === 'inherit') throw new Error('"inherit" is for an agent; a service\'s default is off, sometimes or often');
+      const reactions = { ...pick(g.config.reactions || {}), ...(a.media ? { media: a.media } : {}) };
+      const r = await x.call('PUT', `/api/tool-services/${enc(a.service)}`, { ...g.config, reactions });
+      return { service: r.name, reactions: r.config?.reactions };
+    } },
+  { name: 'get_agent_reactions', readOnly: true, calls: [['GET', '/api/agents/x/reactions']],
+    description: 'An agent\'s reaction media services (GIFs, stickers): the media kind, its own "use on its own" choice (inherit | off | sometimes | often, style) and the service\'s default.',
+    input: { agent_id: str('Agent id') }, required: ['agent_id'],
+    run: (a, x) => x.call('GET', `/api/agents/${enc(a.agent_id)}/reactions`) },
   { name: 'add_global_tool_service', openWorld: true, risky: true, calls: [['PUT', '/api/tool-services/x']],
     description: 'Add (or replace) a tool service available to every agent. config: remote { url, auth: "none" | "token" | "oauth", tokens: { organizer, participant } as ${SECRET} references, headers } or local { type: "local", package, args, env, allowScripts } (local: owner only). defaults: tool-name globs per role used where an agent has no explicit "<name>:" rules, e.g. { "organizer": ["*"], "participant": ["agenda_*"] } (default: organizers all, participants none). OAuth services still need Connect in the panel (Settings → Tool services). An agent opts out with update_agent { "globalMcp": { "disabled": ["<name>"] } }. Needs confirm_action.',
     input: { name: str('Service name (lowercase letters, digits, _)'), config: obj('Service settings, optionally with "defaults"') }, required: ['name', 'config'],
