@@ -57,8 +57,8 @@ after(() => { clips.close(); drawer.close(); t.close(); });
 
 const inChat = (chat) => order.filter((o) => o.chat === chat);
 const media = (chat) => inChat(chat).filter((o) => o.media);
-// a short answer goes as the GIF's caption (one message, the credit in italics under it): "text + gif"
-const withText = (m) => { const p = String(m.caption || '').split('\n\n'); return p.length > 1 && p.at(-1).startsWith('_') ? `${p.slice(0, -1).join('\n\n')} + ${m.kind}` : m.kind; };
+// a short answer goes as the GIF's caption (one message, nothing else in it): "text + gif"
+const withText = (m) => (m.caption ? `${m.caption} + ${m.kind}` : m.kind);
 const shape = (chat) => inChat(chat).map((o) => (o.media ? withText(o.media) : o.text));
 const say = (chat, text, o = {}) => t.route(t.msg({ chat, text, phone: '41790000007', senderName: 'Priya', ...o }));
 const use = (name, input = {}) => ({ type: 'tool_use', id: `u${Math.random().toString(36).slice(2)}`, name: `clips__${name}`, input });
@@ -84,7 +84,9 @@ test('the AI picks the mood with a tag it must give every turn: one message, the
   assert.deepEqual(shape(chat), ['Congrats Chary, mission accomplished! 🎉 + gif'], 'one message: the GIF, the answer as its caption');
   const m = media(chat)[0].media;
   assert.match(m.url, /\/\d\.mp4$/, 'the MP4, not the preview');
-  assert.match(m.caption, /Powered by ExampleClips/, 'the credit text the tool returned');
+  assert.doesNotMatch(m.caption, /Powered by|Clip \d|https?:/, 'no credit, title or link in the message');
+  assert.deepEqual((await t.api(owner, 'GET', '/api/credits')).body, [{ service: 'clips', credit: 'Powered by ExampleClips' }], 'the credit all results share, for the panel');
+  assert.equal((await t.api(owner, 'GET', '/api/tool-services')).body.find((g) => g.name === 'clips').credit, 'Powered by ExampleClips');
   assert.equal(queries.at(-1), 'party dance telugu movie', 'mood words + style words');
   const act = t.db.listActivity({ type: 'whatsapp.action' })[0];
   assert.match(act.summary, /Shared a GIF \(party dance\) from clips, chosen by the model/);
@@ -102,13 +104,13 @@ test('sharing on its own works for participants who have no tools of the service
   await t.api(owner, 'PUT', '/api/tool-services/clips', { url: url(clips), auth: 'none', defaults: { organizer: ['*'], participant: ['*'] } });
 });
 
-test('a long answer goes first, the GIF right after it with only the credit; stored as two messages', async () => {
+test('a long answer goes first, the GIF right after it with no caption; stored as two messages', async () => {
   const chat = CHATS[12];
   const long = `Congratulations! ${'What a day for everyone here, '.repeat(20)}`.trim();
   t.script.push(text(`${long} [share: party]`));
   await say(chat, 'raju we launched!! 🎉');
   assert.deepEqual(shape(chat), [long, 'gif']);
-  assert.doesNotMatch(media(chat)[0].media.caption, /Congratulations/);
+  assert.equal(media(chat)[0].media.caption, '');
 });
 
 test('no tag from the model (a light one): the fallback rules share on a clear moment', async () => {
@@ -323,4 +325,17 @@ test('the AI decides beyond any word list (good news in any words), and its [sha
   const agent = (await t.api(owner, 'GET', '/api/agents/raju/services')).body.find((x) => x.service === 'clips');
   assert.ok(agent.shared.ai >= 1 && agent.shared.rule >= 1, 'the card counts who picked them');
   await setRaju({ clips: { when: 'often', style: 'telugu movie' } });
+});
+
+test('media links and service credits never reach the chat: in the answer, or in a caption the AI writes', async () => {
+  const chat = CHATS[11];
+  t.script.push([use('find', { query: 'dance' })], text('Here: https://media.example/3.mp4 — Powered by ExampleClips'));
+  await say(chat, 'raju find me a dance clip');
+  assert.equal(inChat(chat).filter((o) => o.text).at(-1).text, 'Here:', 'the link and the credit are gone');
+  const send = { type: 'tool_use', id: 'sm1', name: 'whatsapp__send_media', input: { kind: 'gif', url: 'https://media.example/4.mp4', caption: 'Woo!\n\nPowered by ExampleClips https://media.example/4.mp4' } };
+  await t.api(owner, 'PUT', '/api/agents/raju', { tools: { participant: ['whatsapp:send_media'], organizer: [], deny: [] } });
+  t.script.push([send], text('Sent.'));
+  await say(chat, 'raju send that one');
+  assert.equal(media(chat).at(-1).media.caption, 'Woo!');
+  await t.api(owner, 'PUT', '/api/agents/raju', { tools: { participant: ['whatsapp:-'], organizer: [], deny: [] } });
 });

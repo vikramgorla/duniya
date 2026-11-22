@@ -109,6 +109,7 @@ const STATES = [
   { name: 'overview-whats-new', hash: 'overview', wait: 1500, js: WHATS_NEW },
   { name: 'whats-new-dialog', hash: 'overview', wait: 1500, js: `${WHATS_NEW} await T.click("See what's new", 'button', 1200);` },
   { name: 'settings-release-notes', hash: 'settings/release-notes', wait: 2000 },
+  { name: 'settings-credits', hash: 'settings/credits', wait: 1500 }, // 2.58.1: credits of media services
   // 073: Overview's update is one row; the whole story is Settings → Updates
   { name: 'overview-update-available', hash: 'overview', before: UPDATE_AVAILABLE, wait: 1500 },
   { name: 'settings-updates', hash: 'settings/updates', wait: 2000 },

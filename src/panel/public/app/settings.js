@@ -53,6 +53,10 @@ const SECTIONS = {
   'whatsapp-helpers': () => h('div', { class: 'card' }, h('h2', {}, 'WhatsApp helpers'), h('p', { class: 'small' }, 'Organizers of any agent can send:'),
     h('ul', { class: 'small' }, h('li', {}, h('code', {}, '!groupid'), ' in a group → replies with its id'), h('li', {}, h('code', {}, '!groups'), ' in a DM → lists all groups'))),
   // 065: what every version brought, newest first (the installed version's own notes)
+  // 2.58.1: what media services ask to be credited for (never added to messages)
+  credits: () => api('GET', '/api/credits').then((list) => h('div', { class: 'card' }, h('h2', {}, 'Credits'),
+    h('p', { class: 'small muted', style: 'margin-top:0' }, 'GIFs, stickers and pictures agents share come from these services. Messages carry no credit; it is shown here.'),
+    list.length ? h('ul', { class: 'small' }, list.map((c) => h('li', {}, h('b', {}, c.service), ` · ${c.credit}`))) : h('p', { class: 'small muted' }, 'No media service has given a credit yet.'))),
   'release-notes': () => api('GET', '/api/releases').then((notes) => h('div', { class: 'card' }, h('h2', {}, 'Release notes'),
     h('p', { class: 'small muted', style: 'margin-top:0' }, `You are running ${notes.running}. What each version brought, newest first.`), releaseList(notes.versions, { open: 1 }))),
 };
@@ -93,15 +97,15 @@ function checklistCard(checklist) {
 }
 const SETTINGS_GROUPS = [['Agents & chats', ['tool-services', 'owner-assistant', 'direct-messages', 'privacy-notice', 'photos-voice', 'sending-pace', 'modules']],
   ['People & sign-in', ['users', 'sign-in', 'google', 'assistants', 'password', 'my-google']], ['Server', ['updates', 'web-access', 'secrets', 'logging', 'small-mode']],
-  ['Help', ['getting-started', 'whatsapp-helpers', 'release-notes']]];
+  ['Help', ['getting-started', 'whatsapp-helpers', 'release-notes', 'credits']]];
 const SECTION_ICON = { 'tool-services': ['models', 'c4'], 'owner-assistant': ['agents', 'c5'], 'direct-messages': ['chats', 'c3'], 'privacy-notice': ['shield', 'c3'], 'photos-voice': ['image', 'c2'], 'sending-pace': ['pending', 'c1'], modules: ['people', 'c2'],
   users: ['people', 'c4'], 'sign-in': ['lock', 'c0'], google: ['globe', 'c4'], assistants: ['agents', 'c1'], password: ['secrets', 'c0'], 'my-google': ['people', 'c0'],
-  'web-access': ['globe', 'c3'], secrets: ['secrets', 'c1'], logging: ['activity', 'c0'], 'small-mode': ['server', 'c0'], updates: ['refresh', 'c5'], 'getting-started': ['overview', 'c5'], 'whatsapp-helpers': ['chats', 'c0'], 'release-notes': ['notes', 'c2'] };
+  'web-access': ['globe', 'c3'], secrets: ['secrets', 'c1'], logging: ['activity', 'c0'], 'small-mode': ['server', 'c0'], updates: ['refresh', 'c5'], 'getting-started': ['overview', 'c5'], 'whatsapp-helpers': ['chats', 'c0'], 'release-notes': ['notes', 'c2'], credits: ['image', 'c2'] };
 const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assistant': 'Your own chat, morning brief, alerts, weekly summary', 'direct-messages': 'Direct messages, earlier messages',
   'privacy-notice': 'What groups are told', 'photos-voice': 'Pictures, voice notes, speech', 'sending-pace': 'Read receipts, typing, new chats a day', modules: 'Events, orders and payments', users: 'Who can use this panel', 'sign-in': 'Passwords or Google only',
   google: 'Google sign-in client', assistants: 'ChatGPT, Claude and other MCP clients', password: 'Change your password', 'my-google': 'Link your Google account',
   'web-access': 'Domain, HTTPS, who may open the panel', secrets: 'Keys and tokens', logging: 'What is recorded, for how long', 'small-mode': 'Heavier features on a small server', updates: 'Version, automatic updates, last update',
-  'getting-started': 'The first-run guide', 'whatsapp-helpers': 'Commands in WhatsApp', 'release-notes': "What's new in each version" };
+  'getting-started': 'The first-run guide', 'whatsapp-helpers': 'Commands in WhatsApp', 'release-notes': "What's new in each version", credits: 'Who made the GIFs and pictures agents share' };
 
 /** Settings → Updates (073): the status line and actions come from updates.js (which also draws Overview's one row);
  *  the last update with its backup, the settings and Restart service are only here. */
@@ -323,7 +327,8 @@ async function toolServicesCard() {
           h('span', { class: 'pill ok' }, `used by ${g.agents.using.length} agent${g.agents.using.length === 1 ? '' : 's'}`),
           g.agents.optedOut.length ? h('span', { class: 'pill' }, `switched off in ${g.agents.optedOut.join(', ')}`) : null,
           g.agents.replacedBy.length ? h('span', { class: 'pill warn' }, `replaced by own service in ${g.agents.replacedBy.join(', ')}`) : null,
-          g.needs?.length ? h('span', { class: 'pill warn' }, `set in Settings → Secrets: ${g.needs.join(', ')}`) : null) : null;
+          g.needs?.length ? h('span', { class: 'pill warn' }, `set in Settings → Secrets: ${g.needs.join(', ')}`) : null,
+          g.credit ? h('span', { class: 'pill' }, `Credit: ${g.credit}`) : null) : null; // 2.58.1: shown here, never in messages
         const canEdit = can('admin') && (isOwner || it.s.savedType !== 'local');
         const extra = h('div', {}, status,
           h('div', { class: 'small muted' }, `Defaults: organizers ${sum(it.s, 'organizer')}; participants ${sum(it.s, 'participant')}. Discover tools to change them.`),

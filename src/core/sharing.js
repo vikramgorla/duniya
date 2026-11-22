@@ -10,7 +10,8 @@
 // - Code keeps what a prompt cannot be trusted with: serious topics never get one (a cheap veto), at most one per
 //   answer and none shortly after another, the limits, mood words only (names stripped). Code searches with the mood
 //   + style words, picks a result it did not post in that chat lately and sends it with the answer as its caption (one
-//   message; a long answer or a sticker: right after it), with the credit text the tool returns.
+//   message; a long answer or a sticker: right after it). Credits and media links never go in a message: the credit
+//   is shown in the panel (credits.js).
 // - A model that forgets the tag falls back to cheap rules (celebrations, thanks, requests; "often" also jokes,
 //   welcomes, praise), so a weak model still behaves.
 // - One per moment: at most one per answer, none when one went out in that chat in the last few minutes.
@@ -22,6 +23,7 @@ import { noteSent, sentWithin } from './turns.js';
 import { chatChannel } from './chat-tools.js';
 import { limitStop } from './tool-behaviour.js';
 import { countStat } from './stats.js';
+import { creditOf, learnCredit } from './credits.js';
 
 const GAP_MS = 3 * 60000; // none when one went out in the chat this recently (the duplicate guard's window)
 const KEEP_IDS = 30; // results not picked again in a chat
@@ -117,7 +119,7 @@ const WHEN_SHARE = {
 export function sharingNote(services) {
   if (!services.length) return '';
   const mode = services.some((s) => s.share === 'often') ? 'often' : 'sometimes';
-  return `Sharing: end every answer with one tag on its own line — [share: two to four generic English mood words, e.g. "happy dance", "festive lights", "thank you"] to add one fitting ${kindWords(services)} after your text, or [share: none]. Share ${WHEN_SHARE[mode]}. Never for serious, worried, upset, safety or money topics. Mood words only: never names or private details. The tag is never shown.`;
+  return `Sharing: end every answer with one tag on its own line — [share: two to four generic English mood words, e.g. "happy dance", "festive lights", "thank you"] to add one fitting ${kindWords(services)} after your text, or [share: none]. Share ${WHEN_SHARE[mode]}. Never for serious, worried, upset, safety or money topics. Mood words only: never names or private details. The tag is never shown. Never write links to GIFs or their credits: Duniya adds the GIF and keeps its credit in its panel.`;
 }
 
 /** This turn's plan: the services that share on their own, the code's veto (serious, too soon) and its fallback moment. */
@@ -167,8 +169,6 @@ function urlFor(r, kind) {
   const url = kind === 'gif' ? by(/mp4/i) || (r.fileSizeBytes > MAX_BYTES ? '' : by(/gif/i)) : kind === 'sticker' ? by(/webp|sticker/i) : by(/png|jpe?g|image|img/i);
   return url || (r.fileSizeBytes > MAX_BYTES ? '' : r.url) || '';
 }
-/** The credit text the tool returns with a result (an attribution line, a credit), shown as the caption. */
-const creditOf = (r) => clip(String(r.attribution || r.credit || r.credits || ''), 200);
 
 /**
  * Search with the mood words and the style words and pick a fitting result not posted here lately (a random one of
@@ -184,13 +184,15 @@ export async function findMedia(ctx, { svc, mood, by }) {
     const res = await svc.conn.call(svc.tool, { [svc.query]: query, ...(svc.limit ? { [svc.limit]: 12 } : {}) });
     if (res.isError) throw new Error(clip(res.text, 200));
     const seen = new Set(recentIds(chat, svc.key));
-    const usable = resultsOf(res).filter((r) => urlFor(r, svc.kind));
+    const results = resultsOf(res);
+    learnCredit(svc.key, results); // the credit is shown in the panel, never in the message
+    const usable = results.filter((r) => urlFor(r, svc.kind));
     const fresh = usable.filter((r) => !seen.has(String(r.id || urlFor(r, svc.kind))));
     const pool = (fresh.length ? fresh : usable).slice(0, 6);
     if (!pool.length) { activity('whatsapp.action', { agent: agent.id, chat, summary: `No ${KIND_WORD[svc.kind]} found for "${words}" (${svc.key})`, detail: { tool: 'share_media', service: svc.key, query } }); return null; }
     const pick = pool[randomInt(pool.length)];
     const url = urlFor(pick, svc.kind);
-    return { ctx, svc, by, words, query, url, id: String(pick.id || url), credit: creditOf(pick), seen };
+    return { ctx, svc, by, words, query, url, id: String(pick.id || url), credit: clip(creditOf(pick), 200), seen };
   } catch (e) {
     activity('whatsapp.action', { agent: agent.id, chat, summary: `Could not share a ${KIND_WORD[svc.kind]} from ${svc.key}: ${clip(e.message, 160)}`, detail: { tool: 'share_media', service: svc.key, error: clip(e.message, 300) } });
     return null;
@@ -202,13 +204,12 @@ const CAPTION_MAX = 500; // a longer answer goes as its own message, the media a
 export const fitsCaption = (m, text) => !!m && m.svc.kind !== 'sticker' && String(text || '').length <= CAPTION_MAX;
 
 /**
- * Post a found result: alone (its credit as the caption), or with the answer as its caption (`text`: one message,
- * the credit under it). Returns the stored message's id (or undefined) and records it as shared.
+ * Post a found result: alone (no caption), or with the answer as its caption (`text`: one message). Its credit goes
+ * to Activity and the panel, never into the chat. Returns the stored message's id (or undefined); records it as shared.
  */
 export async function postMedia(m, { text = '', quote = undefined } = {}) {
   const { ctx, svc, words } = m; const chat = ctx.chat; const agent = ctx.agent;
-  const caption = [text, m.credit && (text ? `_${m.credit}_` : m.credit)].filter(Boolean).join('\n\n');
-  const r = await chatChannel().sendMedia(chat, { kind: svc.kind, url: m.url, caption, ...(quote ? { quote } : {}) });
+  const r = await chatChannel().sendMedia(chat, { kind: svc.kind, url: m.url, caption: text, ...(quote ? { quote } : {}) });
   noteSent(chat, agent.id, { kind: 'share', url: m.url });
   countStat(m.by === 'the model' ? 'shared_ai' : 'shared_rule', { agent: agent.id }); // who picks them: the card shows it
   kvSet(recentKey(chat, svc.key), JSON.stringify([...m.seen].filter((x) => x !== m.id).concat(m.id).slice(-KEEP_IDS)));
@@ -216,6 +217,6 @@ export async function postMedia(m, { text = '', quote = undefined } = {}) {
   const id = ctx.ownerChat && chat === ctx.ownerChat ? undefined
     : logMessage({ chat, agent: agent.id, msgId: r?.msgId || null, sender: 'agent', name: 'Assistant', text: text ? `${text}\n${label}` : label, fromAgent: true });
   activity('whatsapp.action', { agent: agent.id, chat, summary: `Shared a ${KIND_WORD[svc.kind]} (${words}) from ${svc.key}, chosen by ${m.by}${text ? ', with the answer' : ''}`,
-    detail: { tool: 'share_media', service: svc.key, query: m.query, url: m.url, by: m.by, role: ctx.role } });
+    detail: { tool: 'share_media', service: svc.key, query: m.query, url: m.url, credit: m.credit, by: m.by, role: ctx.role } });
   return id;
 }

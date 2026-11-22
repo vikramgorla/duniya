@@ -62,6 +62,7 @@ export const SETTINGS_SECTIONS = [
   ['getting-started', 'Getting started', 'checklist first run setup guide'],
   ['whatsapp-helpers', 'WhatsApp helpers', 'groupid groups commands'],
   ['release-notes', 'Release notes', "what's new whats changelog changes version update"],
+  ['credits', 'Credits', 'attribution powered by gif sticker media service credit'],
 ];
 export const meter = (p) => h('div', { class: `meter ${p >= 85 ? 'hot' : ''}` }, h('i', { style: `width:${Math.min(100, p)}%` }));
 // ---------- server (011) ----------

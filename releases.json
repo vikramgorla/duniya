@@ -1,6 +1,15 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.58.1": {
+      "breaking": false,
+      "title": "Clean GIF messages",
+      "changes": [
+        { "type": "improved", "text": "A GIF now arrives with just the answer as its caption: no title, credit or link." },
+        { "type": "new", "text": "Credits of GIF and picture services are shown in the panel instead: on the service in Settings, Tool services, and in Settings, Help, Credits." },
+        { "type": "fixed", "text": "Links to GIFs and pictures no longer appear in agents' answers or captions." }
+      ]
+    },
     "2.58.0": {
       "breaking": false,
       "title": "Agents can search the web",
