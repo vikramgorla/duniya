@@ -17,7 +17,7 @@ import { capsOf, channelInfo, channelOf } from '../channels/index.js';
 export const chatModel = (agent, chat) => { const m = getChatPrefs(chat).model; return m && m !== 'inherit' ? m : agent.model; };
 import { buildContext, historyNote } from './memory.js';
 import { activity } from './events.js';
-import { toolsFor, matchesAny, organizerConnection } from './tools.js';
+import { toolsFor, organizerConnection } from './tools.js';
 import { checkBudget } from './budget.js';
 import { silenceReason } from './silences.js';
 import { countStat } from './stats.js';
@@ -26,6 +26,7 @@ import { faqContext } from './quick.js';
 import { peopleScope, senderCard } from './people-access.js';
 import { applyPeopleAction } from './people-tools.js';
 import { applyModuleAction } from '../modules/index.js';
+import { BLOCKED, WAIT_NOTE, appliedNote, autonomyNote, isAgreement, mayChangeWithoutAsking } from './autonomy.js';
 
 const MAX_TOOL_ROUNDS = 8;
 /** 092: the feature an agent turn's model calls count under on Usage: a test, a scheduled post, a judged group message, or an answer (light / strong). */
@@ -39,7 +40,7 @@ async function runTool(run, m, call, ctx) {
   if (ctx.source === 'panel' && fq.startsWith('media:')) { // 043: no pictures are made (or paid for) from the test console
     return { isError: false, text: JSON.stringify({ testConsole: true, notSent: true, note: `Test console: ${fq} was not carried out; in WhatsApp the picture would be created and sent.`, input: call.input }) };
   }
-  if (ctx.source !== 'panel' || !fq.startsWith('whatsapp:')) return run(call.name, call.input, { ...ctx, toolName: call.name });
+  if (ctx.source !== 'panel' || !fq.startsWith('whatsapp:')) return run(call.name, call.input, { ...ctx, toolName: call.name, toolFq: fq, toolInput: call.input || {} });
   if (WA_READ_ONLY.has(fq)) return run(call.name, call.input, { ...ctx, chat: ctx.contextChat || ctx.chat, toolName: call.name });
   return { isError: false, text: JSON.stringify({ testConsole: true, notSent: true, note: `Test console: ${fq} was not carried out; in WhatsApp it would run with this input.`, input: call.input }) };
 }
@@ -47,22 +48,17 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 // Confirm codes guard risky actions, so they come from a cryptographic source.
 const newCode = () => Array.from({ length: 4 }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
 
-function systemPrompt({ agent, role, isGroup, chatName, chat, requester }) {
+function systemPrompt({ agent, role, isGroup, chatName, chat, requester, held }) {
   const app = channelInfo(channelOf(chat))?.label || 'WhatsApp'; // 077: the test console and Ask box read as WhatsApp
   // 077: on a channel without phone numbers, someone who has not linked theirs is a participant until they do
   const unlinked = !requester && capsOf(chat) && !capsOf(chat).phoneNumbers
     ? `They have not linked their phone number on ${app}, so they count as a participant. If they say they are an organizer, ask them to open a direct chat with you and tap "Share my number".` : '';
   const now = new Date().toLocaleString('en-GB', { timeZone: agent.timezone || env.timezone });
-  const roleText = role === 'organizer'
-    ? (agent.confirm
-      ? 'They are an organizer: they may request changes. Make changes only through the matching preview tool, then summarise the preview clearly. The system adds a confirm code; never claim a change is done before it is confirmed.'
-      : 'They are an organizer.')
-    : 'They are a participant: they can ask questions. If they want something changed, say an organizer needs to do it.';
   return [
     agent.prompt.trim(),
     `Current time: ${now} (${agent.timezone || env.timezone}). Chat type: ${isGroup ? `${app} group (shared, keep personal details out)` : `${app} direct message`}${chatName ? ` named "${chatName}"` : ''}.`,
     'You see the recent conversation of this chat, a running summary of older discussion and saved notes. Use them to stay aware of what people have said and decided. When someone asks you to remember something, save it with the memory tool. If something older is not in your context, search the chat history before saying you do not know.',
-    roleText,
+    autonomyNote(agent, role, { held }), // 093: how sure before changing things (the agent's setting; enforced in code)
     unlinked,
     `Write for ${app}: short plain text, *bold* sparingly, simple "-" lists, no markdown headings or tables.`,
     faqContext(agent), // 054: the owner's FAQ as small, capped reference context
@@ -123,15 +119,23 @@ export async function runAgent(ctx) {
   }
   const { defs, run, meta } = await toolsFor(agent, role, { chat, owner: !!ctx.ownerTurn });
   const codes = [];
-  // 079: a people change about someone other than the sender waits for an organizer's confirm code (like previews)
-  ctx.hold = ({ kind, action, summary }) => {
+  // 079: a people change about someone other than the sender waits for an organizer's confirm code (like previews);
+  // 093: a low-risk one an organizer clearly asked for applies at once in clear / act (logged as changed without asking)
+  ctx.hold = ({ kind, action, summary, tool = '', input = {} }) => {
+    if (mayChangeWithoutAsking(ctx, tool, input)) {
+      const text = applyLocal(kind, action, agent);
+      changedWithoutAsking(ctx, tool || `${kind}:${action.op}`, input, '');
+      return `Done (the organizer's clear request is their approval; no confirm code needed): ${text}`;
+    }
     const code = newCode();
     addPending({ code, agent: agent.id, server: `local:${kind}`, confirmTool: kind, confirmId: JSON.stringify(action), tool: `${kind}:${action.op}`, chat,
       requester: ctx.requester, summary: String(summary).slice(0, 500), expires: Date.now() + (agent.confirm?.ttlMinutes || 9) * 60000 });
     codes.push(code);
     activity('confirm.created', { agent: agent.id, chat, summary: `${code}: ${kind}:${action.op}` });
-    return code;
+    return `Held for an organizer's confirmation: ${summary}. The confirm code is added to your answer; say that it applies after confirm.`;
   };
+  // 093: confirm ids previewed in this turn: applied at once (clear request) or waiting for a later yes
+  const applied = new Set(); const waiting = new Set();
   // 079: a short card about the sender from People (never message text), when the agent's People access allows it
   const card = ctx.personId ? senderCard(ctx.personId, peopleScope(agent, { owner: !!ctx.ownerTurn }), senderName) : '';
   for (const err of meta.get('__errors') || []) activity('error', { agent: agent.id, chat, summary: err });
@@ -185,7 +189,7 @@ export async function runAgent(ctx) {
     try {
       res = await modelChat({
         model, purpose: 'agent', maxTokens: agent.maxTokens, usage: usageTag(turnFeature(ctx, smart), { agent: agent.id, chat }),
-        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName, chat, requester: ctx.requester }), tools: defs, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
+        system: systemPrompt({ agent, role, isGroup, chatName: ctx.chatName, chat, requester: ctx.requester, held: !!agent.confirm || defs.some((d) => /^(people|events|orders|sending)__/.test(d.name)) }), tools: defs, messages, fallback, turn, onWait: ctx.onWait, ...(vision || {}),
       });
     } catch (e) {
       if (smart?.tier === 'light' && e.code !== 'aborted') { // 088: the light model failed: the strong one answers
@@ -225,7 +229,7 @@ export async function runAgent(ctx) {
     for (const call of calls) {
       const m = meta.get(call.name);
       const started = Date.now();
-      const out = await runTool(run, m, call, ctx);
+      const out = (m?.change === 'confirm' && confirmGate(ctx, call.input, applied, waiting)) || await runTool(run, m, call, ctx);
       let content = String(out.text ?? '').slice(0, 12000);
       activity(out.isError ? 'tool.error' : 'tool.call', {
         agent: agent.id, chat,
@@ -233,20 +237,27 @@ export async function runAgent(ctx) {
         detail: { tool: m?.fq || call.name, input: call.input, output: content.slice(0, 2000), role },
       });
 
-      if (!out.isError && m?.kind === 'mcp' && agent.confirm && matchesAny(m.fq, [agent.confirm.preview])) {
-        const confirmId = extractConfirmId(out.text, agent.confirm.idField || 'confirm_id');
-        if (confirmId) {
-          const code = newCode();
-          const [server, confirmTool] = agent.confirm.tool.split(':');
-          addPending({
-            code, agent: agent.id, server, confirmTool, confirmId, tool: m.fq, chat,
-            requester: ctx.requester, summary: content.slice(0, 500),
-            expires: Date.now() + (agent.confirm.ttlMinutes || 9) * 60000,
-          });
-          codes.push(code);
-          content = content.split(confirmId).join('[held for organizer confirmation]');
-          activity('confirm.created', { agent: agent.id, chat, summary: `${code}: ${m.fq}`, detail: { input: call.input } });
-        }
+      const confirmId = !out.isError && m?.change === 'preview' ? extractConfirmId(out.text, agent.confirm?.idField || 'confirm_id') : null;
+      if (confirmId && mayChangeWithoutAsking(ctx, m.fq, call.input)) {
+        // 093: a clear request from an organizer is the approval: Duniya confirms it now (the model never has to)
+        const done = await m.conn.call(m.confirmTool, { [agent.confirm?.idField || 'confirm_id']: confirmId });
+        if (done.isError) content += `\n\nDuniya: applying it failed: ${done.text.slice(0, 300)}`;
+        else { applied.add(confirmId); content += `\n\n${appliedNote(done.text, m.undo)}`; changedWithoutAsking(ctx, m.fq, call.input, m.undo); }
+        content = content.split(confirmId).join('[applied]');
+      } else if (confirmId && !agent.confirm) {
+        waiting.add(confirmId); // 093: the model's own confirm of it is blocked in this turn (confirmGate)
+        content += `\n\n${WAIT_NOTE}`;
+      } else if (confirmId) { // the agent's own confirm settings: held for "confirm CODE"
+        const code = newCode();
+        const [server, confirmTool] = agent.confirm.tool.split(':');
+        addPending({
+          code, agent: agent.id, server, confirmTool, confirmId, tool: m.fq, chat,
+          requester: ctx.requester, summary: content.slice(0, 500),
+          expires: Date.now() + (agent.confirm.ttlMinutes || 9) * 60000,
+        });
+        codes.push(code);
+        content = content.split(confirmId).join('[held for organizer confirmation]');
+        activity('confirm.created', { agent: agent.id, chat, summary: `${code}: ${m.fq}`, detail: { input: call.input } });
       }
       if (!out.isError && /^(people|events|orders|surveys|sending):/.test(m?.fq || '')) sources.push(content);
       results.push({ type: 'tool_result', tool_use_id: call.id, is_error: out.isError, content });
@@ -306,6 +317,25 @@ async function selfCheck({ agent, chat, ctx, reply, sources, model, fallback, tu
   return { reply: ok ? out : PLAIN, cost };
 }
 
+/** A held People or module change, carried out (after "confirm XXXX", or at once for a clear low-risk request). */
+const applyLocal = (kind, action, agent) => (kind === 'people' ? applyPeopleAction(action, agent) : applyModuleAction(kind, action, agent));
+/** 093: Activity entry for a change made without an extra confirmation (the owner sees every one; never message text). */
+function changedWithoutAsking(ctx, fq, input, undo) {
+  activity('change.auto', { agent: ctx.agent.id, chat: ctx.chat, summary: `Changed without asking (clear request): ${toolPhrase(fq.replace(/_preview$/, ''))}${undo ? ' · say undo to revert' : ''}`,
+    detail: { tool: fq, input, role: ctx.role, ...(undo ? { undo } : {}) } });
+}
+/**
+ * 093: the model calls a service's confirm tool itself. Allowed only for a preview shown in an earlier message that the
+ * sender now clearly agrees to ("yes", "ok", "go ahead" …) on a live turn; a preview from this same turn waits (ask
+ * mode, high risk, not an organizer). Returns the refusal, or null when the call may run.
+ */
+function confirmGate(ctx, input, applied, waiting) {
+  const ids = Object.values(input || {}).filter((v) => typeof v === 'string');
+  if (ids.some((id) => applied.has(id))) return { isError: false, text: 'Already applied in this turn.' };
+  if (ids.some((id) => waiting.has(id)) || ['panel', 'schedule'].includes(ctx.source) || ctx.unaddressed || !isAgreement(ctx.text)) return { isError: true, text: BLOCKED };
+  return null;
+}
+
 /** "confirm ABCD" / "cancel ABCD". Returns reply text, or undefined when it isn't for us. */
 export async function handleConfirmCommand({ agent, text, role, chat }) {
   const m = String(text).trim().match(/^(confirm|cancel)\s+([A-Z0-9]{4})$/i);
@@ -329,7 +359,7 @@ export async function applyPending(agent, row) {
   if (row.server.startsWith('local:')) { // 079: a held People change; 081: a held module change (events, orders)
     const kind = row.server.slice(6);
     let text; let failed = false;
-    try { text = kind === 'people' ? applyPeopleAction(JSON.parse(row.confirm_id), agent) : applyModuleAction(kind, JSON.parse(row.confirm_id), agent); } catch (e) { text = e.message; failed = true; }
+    try { text = applyLocal(kind, JSON.parse(row.confirm_id), agent); } catch (e) { text = e.message; failed = true; }
     activity(failed ? 'tool.error' : 'confirm.applied', { agent: agent.id, chat: row.chat, summary: `${row.code}: ${row.tool}${failed ? ' failed' : ''}` });
     return failed ? `Could not apply ${row.code}: ${text}` : `Done (${row.code}). ${text}`;
   }

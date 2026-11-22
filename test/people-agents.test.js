@@ -111,7 +111,8 @@ test('the sender card: name, nickname, household, tags and owner/agent notes —
   assert.ok((await api('GET', '/api/people?q=gits')).length, 'Show again');
 });
 
-test('changes to someone else wait for an organizer\'s confirm code; a note about yourself applies at once', async () => {
+test('changes to someone else wait for an organizer\'s confirm code (Ask first); a note about yourself applies at once', async () => {
+  await t.agents.updateAgent('panduga', { autonomy: 'ask' }); await t.agents.updateAgent('helper', { autonomy: 'ask' });
   let r = await toolTurn('g1@g.us', ORG, '!panduga', 'people__add_note', { person: gita.id, text: 'Brings the speakers' });
   assert.match(r.result, /Held for an organizer's confirmation/);
   const code = t.sent.at(-1).text.match(/confirm ([A-Z0-9]{4})/)[1];
@@ -134,6 +135,13 @@ test('changes to someone else wait for an organizer\'s confirm code; a note abou
   // participants cannot change anyone
   r = await toolTurn('g1@g.us', '41790000401', '!panduga', 'people__add_note', { person: gita.id, text: 'x' });
   assert.ok(r.isError);
+  // 093: Act on clear requests (the default): a note about someone else is low risk and applies at once, logged
+  await t.agents.updateAgent('panduga', { autonomy: 'clear' }); await t.agents.updateAgent('helper', { autonomy: 'clear' });
+  r = await toolTurn('g1@g.us', ORG, '!panduga', 'people__add_note', { person: gita.id, text: 'Lends the tent' });
+  assert.match(r.result, /^Done .*Note added to/);
+  assert.ok(!/confirm [A-Z0-9]{4}/.test(t.sent.at(-1).text));
+  assert.ok(people.timeline(gita.id).some((y) => y.text === 'Lends the tent'));
+  assert.match(t.db.listActivity({ limit: 5 }).find((a) => a.type === 'change.auto').summary, /^Changed without asking \(clear request\)/);
 });
 
 test('roles are people and lists: an organizer follows the person to Telegram; saved numbers move to people once', async () => {

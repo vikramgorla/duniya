@@ -169,6 +169,7 @@ const STATES = [
   { name: 'chats-messages-at', hash: 'chats/120363041122330003%40g.us', wait: 2500, js: "const r = await (await fetch('/api/agents/carpool/review')).json(); location.hash = 'chats/120363041122330003%40g.us/messages/' + r.answers[0].id; await T.until('.chatlog .hit'); await T.wait(300);" },
   { name: 'chats-memory', hash: 'chats/120363041122330003%40g.us/memory', wait: 2500 },
   { name: 'chats-group', hash: 'chats/120363041122330003%40g.us/group', wait: 2500, js: "await T.until('.wa-settings'); T.openAll();" },
+  { name: 'activity-type', hash: 'activity/type=change.auto', wait: 1500 }, // 093: changes made without asking
   { name: 'activity-chat', hash: 'activity/chat=120363041122330003%40g.us', wait: 2000, js: "[...document.querySelectorAll('#feed .fitem')].find((li) => li.textContent.includes('Reply'))?.click(); await T.until('.fopen .rv-acts, .fopen .fx'); await T.wait(300);" },
   { name: 'more-sheet', hash: 'overview', js: "(await import('/app/find.js')).openMore(); await T.wait(400);" },
   { name: 'more-sheet-account', hash: 'overview', js: "const { askSignOut } = await import('/app/core.js'); askSignOut(); await T.wait(400);" },

@@ -124,12 +124,12 @@ export async function fakeWhatsAppHub(factory) {
 
 /**
  * Answer one MCP request (streamable HTTP, JSON responses) with a fresh fake server: `tools` are names,
- * `call(name)` returns the text result. For tests that host MCP next to their own OAuth endpoints.
+ * `call(name, args)` returns the text result. For tests that host MCP next to their own OAuth endpoints.
  */
 export async function serveFakeMcp(req, res, raw, { name = 'fake', tools = [], call = () => 'ok' } = {}) {
   const s = new Server({ name, version: '1' }, { capabilities: { tools: {} } });
   s.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools.map((n) => ({ name: n, description: n, inputSchema: { type: 'object', properties: {} } })) }));
-  s.setRequestHandler(CallToolRequestSchema, async (r) => ({ content: [{ type: 'text', text: call(r.params.name) }] }));
+  s.setRequestHandler(CallToolRequestSchema, async (r) => ({ content: [{ type: 'text', text: call(r.params.name, r.params.arguments || {}) }] }));
   const tr = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await s.connect(tr);
   return tr.handleRequest(req, res, raw ? JSON.parse(raw) : undefined);

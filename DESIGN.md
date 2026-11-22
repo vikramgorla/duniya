@@ -119,7 +119,8 @@ Text meets WCAG AA (4.5:1, 3:1 for large text) in both themes; `npm run check:re
 `check:panel` refuses), `toast(msg, { bad, undo })`, `emptyState(art, title, text, action)`,
 `avatar()`, `pulse()`, `menu()` (⋯), `listDetail()`, `tiles` + stat tile, `table.stack` (cards on phones; every `td` has a `data-label`, empty for a full-width
 cell; `stack flat` for long lists), `.tscroll` (key/value tables that keep their columns), `label.tick` (a checkbox on
-its own with a 40 px tap area), `meter`, `spark(values)`, `pill`, `note`, `seg` (segmented control), `toggle`,
+its own with a 40 px tap area), `.choices` + `.choice` (pick one of a few options, each a title and one line; the chosen
+one is `aria-pressed=true` with a `--signal-deep` border, e.g. *How sure before changing things*), `meter`, `spark(values)`, `pill`, `note`, `seg` (segmented control), `toggle`,
 `btn` (`primary`, `danger`, `small`), `number-card`, `feed`, `bubble` (test console), `spinner`, `modelSelect()`
 (Auto / provider · Auto / specific model), `field(label, input, hint)`, `.qa-row` + `.qa-preview` (an editable row of
 user-written text with a live *Preview* filled with sample values; rows stack on phones).

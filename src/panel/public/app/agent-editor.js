@@ -16,6 +16,10 @@ const DM_LABEL = { members: 'Members of its groups', organizers: 'Organizers onl
 // 079: which people an agent's People tools and sender cards may see
 const PEOPLE_SHORT = { own: 'sees its chats’ people', everyone: 'sees everyone in People', off: 'no People access' };
 const PEOPLE_ACCESS = { own: 'Its own chats (default)', everyone: 'Everyone in People', off: 'Nobody' };
+// 093: how sure an agent must be before changing things (value, label, one line)
+const AUTONOMY = [['ask', 'Ask first', 'Shows the change and waits for a yes.'], ['clear', 'Act on clear requests', 'An organizer’s clear request is the go-ahead; it says what changed.'],
+  ['act', 'Act and report', 'Also makes changes that clearly follow; reports each one.']];
+const autonomyLabel = (v) => (AUTONOMY.find((a) => a[0] === v) || AUTONOMY[1])[1];
 // 076: how an agent answers in groups
 const GROUP_REPLIES = { followups: 'When woken + follow-ups', wake: 'Only when woken', auto: 'Whenever needed' };
 const tick = (input, label) => h('label', { class: 'tick' }, input, ` ${label}`);
@@ -53,7 +57,7 @@ const SECTIONS = [
   { group: 'How it works', id: 'model', icon: 'models', c: 'c4', title: () => 'Model', help: 'models.md', line: () => 'Which model answers, and what happens when it is unavailable.',
     sub: (x) => `${x.c.model === 'auto' ? 'Auto' : modelLabel(x.c.model, x.models)}${x.c.fallback?.mode === 'off' ? ' · no fallback' : ''}${x.c.selfCheck === false ? ' · no self-check' : ''}`, build: buildModel },
   { group: 'How it works', id: 'tools', icon: 'settings', c: 'c0', title: () => 'Tools', help: 'agents.md#tool-services-mcp', line: () => 'Tool services and WhatsApp actions, allowed per role in code.',
-    sub: (x) => { const t = [...Object.keys(x.c.mcpServers || {}), ...(x.b.globalTools || []).filter((g) => g.on).map((g) => g.name)]; return t.length ? t.join(', ') : 'None'; }, build: buildTools },
+    sub: (x) => { const t = [...Object.keys(x.c.mcpServers || {}), ...(x.b.globalTools || []).filter((g) => g.on).map((g) => g.name)]; return [x.bi ? '' : autonomyLabel(x.c.autonomy), t.length ? t.join(', ') : 'no tool services'].filter(Boolean).join(' · '); }, build: buildTools },
   { group: 'How it works', id: 'memory', icon: 'notes', c: 'c2', title: () => 'Memory', help: 'agents.md#memory', line: (x) => (x.bi ? 'Notes it saves when you ask, private to you.' : 'Chat memory and notes shared across its chats.'),
     sub: (x) => (x.c.memory?.enabled === false ? 'Off' : 'On'), build: buildMemory },
   { group: 'How it works', id: 'media', icon: 'image', c: 'c1', title: () => 'Photos & voice', help: 'settings.md', line: () => 'What it does with photos and voice notes, and whether it speaks.',
@@ -364,10 +368,11 @@ function buildTools(x, { save }) {
   const explicitFor = (key, role) => splitLines(rulesBox[role].value).filter((r) => r.startsWith(`${key}:`));
   const globalOff = new Set(c.globalMcp?.disabled || []);
   const confirm = { on: !!c.confirm, preview: c.confirm?.preview || '', tool: c.confirm?.tool || '', idField: c.confirm?.idField || 'confirm_id', ttl: c.confirm?.ttlMinutes || 9 };
+  let autonomy = c.autonomy || 'clear';
   const value = () => ({
     mcpServers: Object.fromEntries(servers.filter((s) => s.key).map((s) => [s.key, serverConfig(s)])), globalMcp: { disabled: [...globalOff] },
     tools: { participant: splitLines(rulesBox.participant.value), organizer: splitLines(rulesBox.organizer.value), deny: splitLines(rulesBox.deny.value) },
-    ...(bi ? {} : { confirm: confirm.on ? { preview: confirm.preview.trim(), tool: confirm.tool.trim(), idField: confirm.idField.trim(), ttlMinutes: Number(confirm.ttl) } : null }),
+    ...(bi ? {} : { autonomy, confirm: confirm.on ? { preview: confirm.preview.trim(), tool: confirm.tool.trim(), idField: confirm.idField.trim(), ttlMinutes: Number(confirm.ttl) } : null }),
   });
   const saveAll = async () => { const ok = await save(value()); if (ok) for (const sv of servers) markSaved(sv); return ok; };
   const srvList = h('div', {}); const globalBox = h('div', {}); const waBox = h('div', {});
@@ -414,7 +419,7 @@ function buildTools(x, { save }) {
     can('admin') ? api('GET', '/api/tool-services/registry/settings').catch(() => null) : null, bi ? [] : api('GET', '/api/modules/tools').catch(() => [])]).then(([cn, lo, wa, reg, mods]) => {
     conns = cn; locals = lo; waTools = bi ? wa.filter((t) => t.owner) : wa; registry = reg;
     drawServers(); drawGlobals(); drawB(waBox, 'whatsapp', waTools);
-    modBox.replaceChildren(...mods.map((m) => { const box = h('div', {}); drawB(box, m.id, m.tools); return block(m.label, h('p', { class: 'small muted' }, 'A module (Settings → Modules). Changes about someone other than the sender wait for an organizer\'s confirm code.'), box); }));
+    modBox.replaceChildren(...mods.map((m) => { const box = h('div', {}); drawB(box, m.id, m.tools); return block(m.label, h('p', { class: 'small muted' }, 'A module (Settings → Modules). Registrations, duties, payments and sends for someone else wait for an organizer\'s confirm code.'), box); }));
     addRow.replaceChildren(browseButton({ target: x.id, targetName: c.name || x.id, onAdded: () => location.reload() }, registry),
       can('admin') ? h('button', { class: 'btn small', type: 'button', onclick: () => { servers.push(serverState('', {})); drawServers(); } }, '+ Add by address') : null);
   });
@@ -423,11 +428,18 @@ function buildTools(x, { save }) {
     const on = check(confirm.on); on.onchange = () => { confirm.on = on.checked; };
     const inp = (k, ph) => h('input', { value: confirm[k], placeholder: ph, oninput: (e) => { confirm[k] = e.target.value; } });
     return h('details', { class: 'sblock' }, h('summary', {}, `Changes need confirmation${confirm.on ? ' · on' : ''}`),
-      tick(on, 'Hold changes until an organizer replies “confirm CODE”'),
+      tick(on, 'Hold changes that ask first until an organizer replies “confirm CODE”'),
       h('div', { class: 'grid2' }, field('Preview tools', inp('preview', 'panduga:*_preview')), field('Confirm tool', inp('tool', 'panduga:confirm')),
         field('Confirmation id field', inp('idField', 'confirm_id')), field('Valid for (minutes)', h('input', { type: 'number', value: confirm.ttl, oninput: (e) => { confirm.ttl = e.target.value; } }))));
   })();
+  // 093: three choices, one line each; the rule behind them and the log of changes made without asking under "?"
+  const pick = bi ? null : h('div', { class: 'choices autonomy', role: 'group', 'aria-label': 'How sure before changing things' }, AUTONOMY.map(([v, label, line]) => h('button', {
+    type: 'button', class: 'choice', 'aria-pressed': String(autonomy === v), disabled: !can('admin'),
+    onclick: (e) => { autonomy = v; pick.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); } }, h('b', {}, label), h('span', {}, line))));
+  const sure = bi ? null : block('How sure before changing things', pick, h('p', { class: 'small muted' }, 'Deletes, payments, sends and changes to someone else’s registration or duty always ask; participants never change things. ',
+    helpLink('agents.md#how-sure-before-changing-things'), ' ', h('a', { href: '#activity/type=change.auto' }, 'Changes made without asking ›')));
   return { ready, value, el: h('div', {},
+    sure,
     block('Its own tool services', srvList, addRow),
     block('Tool services for all agents', globalBox),
     block('WhatsApp actions', h('p', { class: 'small muted' }, bi ? 'In your own chat it acts at once; anything sent elsewhere waits for your confirm.' : 'Organizer-only actions happen at once when an organizer asks. Every action is in Activity.'), waBox),

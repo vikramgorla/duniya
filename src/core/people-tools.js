@@ -3,7 +3,7 @@
 // note, tag, add to a list. They replace the contacts__* tools of 078. Access is decided in code (people-access.js):
 // only people the agent may see (its own chats, lists shared with it, or everyone; owner turns see everyone), never
 // hidden people; participants only the people the owner marked Shared. Changes are for organizers, and a change to
-// anyone other than the sender is held for an organizer's "confirm XXXX" (the runner's confirm gate). Merge, hide and
+// anyone other than the sender goes to the runner's confirm gate (093: notes, tags and lists are low risk). Merge, hide and
 // erase are never agent tools.
 import { fail, clip, digits } from './config.js';
 import { addNote, householdsOf, listLists, listPeople, listsOf, personById, personByRef, seenNameOf, setListMember, setTags, tagsOf, tiesOf, timeline } from './people.js';
@@ -39,11 +39,10 @@ function visible(ref, ctx) {
   return p;
 }
 const short = (p, org) => ({ id: p.id, name: nameFor(p), ...(p.nickname ? { nickname: p.nickname } : {}), ...(p.phone ? { phone: `+${p.phone}` } : {}), ...(org ? { tags: tagsOf(p.id) } : {}) });
-/** A change to someone other than the sender waits for an organizer's confirm code. */
+/** A change to someone other than the sender goes to the runner's confirm gate (093: low risk may apply at once). */
 function change(p, ctx, action, summary) {
   if (p.id === ctx.personId || !ctx.hold) return applyPeopleAction(action, ctx.agent);
-  ctx.hold({ kind: 'people', action, summary });
-  return `Held for an organizer's confirmation: ${summary}. The confirm code is added to your answer; say that it applies after confirm.`;
+  return ctx.hold({ kind: 'people', action, summary, tool: ctx.toolFq, input: ctx.toolInput });
 }
 
 /** Carry out a people change (now, or after "confirm XXXX"). Returns a short result. */
@@ -92,7 +91,7 @@ export const peopleTools = [
   },
   {
     name: 'add_note',
-    description: 'Add a short note to a person (marked as written by this agent; organizers). Never copy message text into it. A note about someone other than the sender waits for an organizer\'s confirm code.',
+    description: 'Add a short note to a person (marked as written by this agent; organizers). Never copy message text into it. A note about someone other than the sender may wait for an organizer\'s confirm code (the agent\'s setting decides).',
     input_schema: { type: 'object', properties: { person: { type: 'string' }, text: { type: 'string', maxLength: 500 } }, required: ['person', 'text'] },
     roles: ['organizer'],
     async run({ person, text }, ctx) {
@@ -103,7 +102,7 @@ export const peopleTools = [
   },
   {
     name: 'tag_person',
-    description: 'Add or remove tags of a person (free words, e.g. "driver"; organizers). Changes to someone other than the sender wait for an organizer\'s confirm code.',
+    description: 'Add or remove tags of a person (free words, e.g. "driver"; organizers). Changes to someone other than the sender may wait for an organizer\'s confirm code (the agent\'s setting decides).',
     input_schema: { type: 'object', properties: { person: { type: 'string' }, add: { type: 'array', items: { type: 'string' } }, remove: { type: 'array', items: { type: 'string' } } }, required: ['person'] },
     roles: ['organizer'],
     async run({ person, add = [], remove = [] }, ctx) {
@@ -116,7 +115,7 @@ export const peopleTools = [
   },
   {
     name: 'add_to_list',
-    description: 'Add a person to one of the owner\'s named lists (by list name; organizers). Waits for an organizer\'s confirm code unless it is the sender.',
+    description: 'Add a person to one of the owner\'s named lists (by list name; organizers). Someone other than the sender may wait for an organizer\'s confirm code (the agent\'s setting decides).',
     input_schema: { type: 'object', properties: { person: { type: 'string' }, list: { type: 'string', description: 'List name' } }, required: ['person', 'list'] },
     roles: ['organizer'],
     async run({ person, list }, ctx) {

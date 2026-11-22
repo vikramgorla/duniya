@@ -72,7 +72,7 @@ export function statusRoutes(route, { channel } = {}) {
   // ---------- activity ----------
   // 072: a reply carries its rating (detail.msg is the stored answer), the same as in Review and the chat's messages
   route('GET', '/api/activity', async (req, res, body, q) => {
-    const rows = listActivity({ limit: q.get('limit'), agent: q.get('agent') || '', chat: q.get('chat') || '', before: Number(q.get('before') || 0) });
+    const rows = listActivity({ limit: q.get('limit'), agent: q.get('agent') || '', chat: q.get('chat') || '', type: q.get('type') || '', before: Number(q.get('before') || 0) });
     const rated = ratingsOf(rows.filter((r) => r.type === 'message.out' && r.detail?.msg).map((r) => r.detail.msg));
     return withChatNames(rated.size ? rows.map((r) => (r.type === 'message.out' && rated.has(r.detail?.msg) ? { ...r, rating: rated.get(r.detail.msg) } : r)) : rows, channel);
   });
