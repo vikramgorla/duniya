@@ -47,7 +47,7 @@ export function behaviourEditor(state, { dflt = null, media = '', onChange = () 
   const text = (k, title, ph, max) => field(title, h('input', { value: state[k] || '', maxlength: max, disabled: !can('admin'), placeholder: dflt?.[k] || ph, oninput: (e) => set(k, e.target.value.trim()) }));
   const num = (k, title) => field(title, h('input', { type: 'number', min: 0, max: 1000, value: state[k] ?? '', disabled: !can('admin'), placeholder: dflt ? String(dflt[k] || 'no limit') : 'no limit',
     oninput: (e) => set(k, e.target.value === '' ? '' : Math.max(0, Number(e.target.value) || 0)) }));
-  return h('details', { class: 'behaviour', open, ontoggle: onToggle ? (e) => onToggle(e.target.open) : null }, h('summary', {}, h('b', {}, 'How it uses it'), h('span', { class: 'small muted' }, ` · ${behaviourLine({ ...(dflt || {}), ...state }, media) || 'When useful'}`)),
+  return h('details', { class: 'behaviour', open, ontoggle: onToggle ? (e) => onToggle(e.target.open) : null }, h('summary', {}, h('span', { class: 'bh-title' }, h('b', {}, 'How it uses it'), h('span', { class: 'bh-now' }, behaviourLine({ ...(dflt || {}), ...state }, media) || 'When useful')), h('span', { class: 'bh-change' }, 'Change')),
     h('div', { class: 'row spread' }, h('span', { class: 'small muted' }, 'Read-only tools never ask; tools that declare themselves destructive always ask.'), helpLink('tool-services.md#how-agents-use-a-service')),
     choice('when', 'When to use it', WHEN, 'useful'), text('note', 'Note (optional)', 'e.g. only for this year’s event', 200),
     choice('changes', 'Changes it makes', CHANGES, ''),
@@ -81,7 +81,8 @@ export function toolGrid(box, tools, rules, risk = null) {
 }
 /**
  * One tool service as a fieldset. o: { base (API prefix with /probe, /discover, /connections, /local), conns, locals,
- * isOwner, save() → saved?, saveHint, rules and risk (see toolGrid), redraw(), remove(), keyLocked, extra (elements after the form) }.
+ * isOwner, save() → saved?, saveHint, rules and risk (see toolGrid), redraw(), remove(), keyLocked, top (How it uses it, right under
+ * the name), extra (elements after the form) }.
  */
 export function toolServiceEditor(s, o) {
   const enc = encodeURIComponent;
@@ -148,7 +149,7 @@ export function toolServiceEditor(s, o) {
     const pkg = h('input', { value: s.pkg, placeholder: '@scope/server@1.2.3 or github:owner/repo#tag', disabled: !o.isOwner, oninput: (e) => (s.pkg = e.target.value.trim()) });
     // 055: small servers do not run local tool services; saved ones stay in the config but are not started.
     const blocked = st?.blocked || (smallServer() ? 'This is a small server: local tool services are not run here, because each one is an extra Node.js process. Use a hosted tool service (one with a web address) instead, or switch on Small server mode in Settings → Server.' : '');
-    return h('fieldset', {}, legend,
+    return h('fieldset', {}, legend, o.top || null,
       h('div', { class: 'row' }, key, typeSel),
       blocked ? h('div', { class: 'note warn', id: 'local-blocked', style: 'margin-top:8px' }, h('b', {}, savedLocal ? 'Not started on this server. ' : 'Not available on this server. '), blocked,
         savedLocal ? ' It stays saved and starts again on a bigger server; remove it here if you no longer need it.' : '') : null,
@@ -164,7 +165,7 @@ export function toolServiceEditor(s, o) {
         h('button', { class: 'btn small danger mut', disabled: !o.isOwner, onclick: o.remove }, 'Remove')),
       o.extra || null, grid);
   }
-  return h('fieldset', {}, legend,
+  return h('fieldset', {}, legend, o.top || null,
     h('div', { class: 'row' }, key, typeSel), h('div', { class: 'row', style: 'margin-top:6px' }, url, check), field('Authentication', authSel), creds, advanced,
     h('div', { class: 'row', style: 'margin-top:8px' },
       discoverButton(s.auth === 'oauth' ? { auth: 'oauth', server: s.key } : { url: s.url, token: s.auth === 'token' ? s.org : '', headers: parseKv(s.headers, ':'), server: s.key }),

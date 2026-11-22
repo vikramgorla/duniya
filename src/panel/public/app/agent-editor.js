@@ -392,7 +392,7 @@ function buildTools(x, { save }) {
   let conns = []; let locals = []; let waTools = []; let registry = null;
   function drawServers() {
     srvList.replaceChildren(...servers.map((s, i) => toolServiceEditor(s, { base: `/api/agents/${x.enc}`, conns, locals, isOwner: S.user?.role === 'owner', save: saveAll, saveHint: 'Save to connect',
-      rules: { has: (role, name) => allowed(role, `${s.key}:${name}`), write: (role, names, tools) => writeRules(s.key, role, names, tools) }, redraw: drawServers, extra: behaviourBox(s.key), risk: bi ? null : riskOf(s.key), remove: () => { servers.splice(i, 1); drawServers(); } })),
+      rules: { has: (role, name) => allowed(role, `${s.key}:${name}`), write: (role, names, tools) => writeRules(s.key, role, names, tools) }, redraw: drawServers, top: behaviourBox(s.key), risk: bi ? null : riskOf(s.key), remove: () => { servers.splice(i, 1); drawServers(); } })),
     servers.length ? null : h('p', { class: 'small muted' }, 'No tool service of its own.'));
   }
   function drawGlobals() {
