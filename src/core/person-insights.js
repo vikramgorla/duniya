@@ -219,6 +219,29 @@ export function decideTie(key, accept, by = '') {
   return { ok: true, person: other.id };
 }
 /** A person was erased: what was learned about them goes. */
+const PREF_COLUMNS = ['lang', 'lang_set', 'hours_from', 'hours_to', 'hours_set', 'app', 'app_set', 'computed_at'];
+/**
+ * Two people became one: what was learned about `from` is `to`'s (suggested ties; preferences when `to` has none of
+ * their own). Returns what an undo needs.
+ */
+export function moveInsights(from, to) {
+  const prefs = db.prepare(`SELECT ${PREF_COLUMNS.join(', ')} FROM person_prefs WHERE person = ?`).get(from) || null;
+  const own = !!db.prepare('SELECT 1 FROM person_prefs WHERE person = ?').get(to);
+  if (own) db.prepare('DELETE FROM person_prefs WHERE person = ?').run(from); // the kept person's own preferences win
+  else db.prepare('UPDATE person_prefs SET person = ? WHERE person = ?').run(to, from);
+  const ties = db.prepare('SELECT key FROM tie_suggestions WHERE person = ?').all(from).map((r) => r.key);
+  db.prepare('UPDATE tie_suggestions SET person = ? WHERE person = ?').run(to, from);
+  pending.delete(from);
+  return { prefs, prefsMoved: !!prefs && !own, ties };
+}
+/** Undo of a merge: `person` gets back what moveInsights took: their preferences as they were and their suggested ties. */
+export function restoreInsights(taken, kept, person) {
+  if (!taken) return;
+  if (taken.prefsMoved) db.prepare('UPDATE person_prefs SET person = ? WHERE person = ?').run(person, kept);
+  else if (taken.prefs) db.prepare(`INSERT OR IGNORE INTO person_prefs (person, ${PREF_COLUMNS.join(', ')}) VALUES (?${', ?'.repeat(PREF_COLUMNS.length)})`).run(person, ...PREF_COLUMNS.map((c) => taken.prefs[c]));
+  const back = db.prepare('UPDATE tie_suggestions SET person = ? WHERE key = ? AND person = ?');
+  for (const key of taken.ties) back.run(person, key, kept);
+}
 export function forgetPersonInsights(person) {
   db.prepare('DELETE FROM person_prefs WHERE person = ?').run(person);
   db.prepare('DELETE FROM tie_suggestions WHERE person = ?').run(person);

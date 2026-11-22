@@ -103,6 +103,21 @@ test('in chat: the sender card names the next question; the agent records answer
   assert.equal(r.totals[2].average, 3.5);
   const res = await tool('get_survey_results').run({ survey: survey.id }, x);
   assert.equal(res.totals[0].options.find((o) => o.option === '14 June').count, 1);
+
+  // people have answered: a reworded choice keeps its answers (two can swap their words), one more can be added at
+  // the end, none can be removed
+  const srv = await import('../src/modules/surveys/index.js');
+  const qs = (await api('GET', `/api/surveys/${survey.id}`)).survey.questions;
+  const choices = (i, options) => qs.map((q, n) => (n === i ? { ...q, options } : q));
+  const counts = async (i) => Object.fromEntries((await api('GET', `/api/surveys/${survey.id}`)).totals[i].options.map((o) => [o.option, o.count]));
+  const before = await counts(1);
+  assert.notEqual(before.Dessert, before.Drinks, 'two choices with different counts');
+  await api('PUT', `/api/surveys/${survey.id}`, { questions: choices(1, ['Salad', 'Drinks', 'Dessert', 'Bread and butter']) }); // Dessert ↔ Drinks, one more
+  assert.deepEqual(await counts(1), { Salad: before.Salad, Drinks: before.Dessert, Dessert: before.Drinks, 'Bread and butter': 0 }, 'the answers went with their choices');
+  assert.deepEqual(srv.answer(survey.id, ravi.id, { q2: 'bread and butter' }).answered, 4, 'a choice with "and" in it is one choice');
+  assert.deepEqual((await api('GET', `/api/surveys/${survey.id}`)).people.find((y) => y.person === ravi.id).answers.q2, ['Bread and butter']);
+  const fewer = await t.api(owner, 'PUT', `/api/surveys/${survey.id}`, { questions: choices(1, ['Salad', 'Drinks']) });
+  assert.deepEqual([fewer.status, /a choice cannot be removed/.test(fewer.body.error)], [409, true]);
 });
 
 test('the link page is rate-limited per address', async () => {

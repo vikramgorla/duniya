@@ -120,6 +120,17 @@ export const promiseTools = [
 ];
 
 /** A person is erased: their commitments go. A chat's memory is erased: its commitments go. */
+/** Two people became one: `from`'s promises are `to`'s. Returns their ids, so that an undo gives exactly those back. */
+export function moveCommitments(from, to) {
+  const ids = db.prepare('SELECT id FROM commitments WHERE person = ?').all(from).map((r) => r.id);
+  db.prepare('UPDATE commitments SET person = ? WHERE person = ?').run(to, from);
+  return ids;
+}
+/** Undo of a merge: the promises that came with `person` are theirs again. */
+export function restoreCommitments(ids = [], kept, person) {
+  const back = db.prepare('UPDATE commitments SET person = ? WHERE id = ? AND person = ?');
+  for (const id of ids) back.run(person, id, kept);
+}
 export const forgetCommitments = ({ person = '', chat = '' }) => db.prepare(person ? 'DELETE FROM commitments WHERE person = ?' : 'DELETE FROM commitments WHERE chat = ?').run(person || chat);
 
 const callsToday = (agent) => Number(kvGet(`commitments:${agent}:${ownerDay()}`) || 0);

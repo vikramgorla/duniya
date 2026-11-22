@@ -166,7 +166,11 @@ test('a chat set up under the number after WhatsApp already wrote from the priva
   assert.deepEqual(t.agents.getAgent('helper').chats.filter((c) => c.includes('730')), [lid]);
   assert.ok(t.db.listActivity({ limit: 20 }).some((a) => /Direct chat with \+41790000730: WhatsApp now writes from its private id/.test(a.summary)));
   assert.equal(stored(lid).length, 2, 'its messages stay');
+  // rows left under the old id (an earlier release moved only messages and memory) join the chat on the next round
+  const { listCommitments } = await import('../src/core/commitments.js');
+  t.db.db.prepare("INSERT INTO commitments (agent, chat, person, who, what, due, status, by, created_at, updated_at) VALUES ('helper', ?, '', 'Vedika', 'send the photos', '', 'open', 'agent', 1, 1)").run(phoneChat);
   assert.deepEqual(await upkeepTick(t.channel).then(() => dc.adoptKnownTwin()), '', 'nothing left to join');
+  assert.deepEqual([listCommitments({ chat: lid }).map((c) => c.what), listCommitments({ chat: phoneChat }).length], [['send the photos'], 0], 'nothing is kept under an alias');
 });
 
 test('049: a number that is not on WhatsApp gets a warning but is still prepared', async () => {

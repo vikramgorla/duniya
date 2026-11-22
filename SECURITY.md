@@ -47,5 +47,6 @@ Neither is needed: the normal path is the one-time setup code and panel links.
 
 Both are read once at start, never written to the activity log or the service log, never sent to a model or an AI
 assistant, and never returned by any API (a test sweeps every read-only panel route with both set:
-`test/env-secrets.test.js`). Leave `ADMIN_PASSWORD` out of `app.env` once the owner exists if you prefer: nothing
-reads it again.
+`test/env-secrets.test.js`). Nothing reads `ADMIN_PASSWORD` again once the owner exists: the installer removes it
+from `app.env` as soon as the service has started (also a password left there by an earlier version, at the next
+run); with Docker, take it out of your `.env` after the first start.

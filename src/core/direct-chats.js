@@ -8,7 +8,7 @@ import { db, logMessage } from './db.js';
 import { digits, bad } from './config.js';
 import { TENANT, getSetting } from './store.js';
 import { getAgent, bindChat, agentForChat, listAgents } from './agents.js';
-import { mergeChats } from './chat-merge.js';
+import { mergeChats, moveChatRows } from './chat-merge.js';
 import { getChatPrefs, setChatPrefs, seenChats } from './chat-prefs.js';
 import { setCap } from './budget.js';
 import { lidPhone, personInfo } from './contacts.js';
@@ -93,9 +93,21 @@ function phoneTwin(msg) {
 /** The phone-form chat joins the LID chat WhatsApp uses: settings, agent, cap and memory; the prepared entry moves too. */
 async function adoptTwin(twin, chat, phone) {
   await mergeChats(twin, chat, `Direct chat with +${phone}: WhatsApp now writes from its private id`);
-  db.prepare('UPDATE OR REPLACE direct_chats SET chat = ?, lid = ? WHERE tenant_id = ? AND chat = ?').run(chat, splitChat(chat).jid, TENANT, twin);
+  db.prepare('UPDATE direct_chats SET lid = ? WHERE tenant_id = ? AND chat = ?').run(splitChat(chat).jid, TENANT, chat); // the prepared entry moved with the rest
   reload();
   addAlias(twin, chat);
+}
+
+let settledFor = null; // the alias list that was last settled
+/**
+ * Nothing is kept under an alias: once per start and after each merge, rows found under an old id (an earlier release
+ * moved only messages and memory; anything written there since) join the chat the alias points to.
+ */
+function settleAliases() {
+  const known = load();
+  if (settledFor === known) return;
+  settledFor = known;
+  for (const [alias, chat] of known.aliases) moveChatRows(alias, chat);
 }
 
 /** Phone-form direct chats that were set up: prepared, with settings, or with an agent. Empty once each joined its LID chat. */
@@ -109,6 +121,7 @@ function setUpPhoneChats() {
  * call (upkeep.js); returns the chat that stays, '' when there is none.
  */
 export async function adoptKnownTwin() {
+  settleAliases();
   const waiting = setUpPhoneChats();
   if (!waiting.size) return '';
   for (const c of seenChats({ groups: false })) {

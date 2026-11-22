@@ -181,7 +181,8 @@ Admin MCP: `get_person_preferences`, `set_person_preferences`.
 ## Hide, merge, export
 
 - **Merge…** (owner): choose the other entry of the same human; their apps, notes, ties, households, tags and lists
-  move here, and so do their event registrations, duties and orders. The page then offers **Undo merge** for 30 days. When there is evidence (a verified phone number of one
+  move here, and so do their event registrations, duties and orders, their promises, and what was learned about them
+  (suggested ties; language and hours when this entry has none). The page then offers **Undo merge** for 30 days. When there is evidence (a verified phone number of one
   person belongs to the other), the page suggests the merge: one tap.
 - **Export** (owner) downloads everything stored about the person as JSON: their page, names, notes, ties, households,
   tags, lists, registrations, duties, orders and payments, and their stored messages.

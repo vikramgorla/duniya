@@ -2,8 +2,8 @@
 // People operations (078, PRM core): merge two people (owner only, undoable for 30 days), export one person, erase one
 // person (079: admin MCP only, behind a confirm; the panel hides people instead). Merges are suggested only on evidence: an identity
 // whose verified phone is another person's number. Undo records are pruned on the upkeep tick (no timers).
-import { forgetPersonInsights } from './person-insights.js';
-import { forgetCommitments } from './commitments.js';
+import { forgetPersonInsights, moveInsights, restoreInsights } from './person-insights.js';
+import { forgetCommitments, moveCommitments, restoreCommitments } from './commitments.js';
 import { randomBytes } from 'node:crypto';
 import { db } from './db.js';
 import { fail, plural } from './config.js';
@@ -68,6 +68,7 @@ export function mergePeople(keep, other, by = 'panel') {
     }
     for (const t of ['household_members', 'person_tags', 'person_list_members']) run(`DELETE FROM ${t} WHERE tenant_id = ? AND person = ?`, o.id);
     snap.modules = moveModuleRows(o.id, k.id); // 081: registrations, duties, orders … (every module, on or off)
+    snap.learned = { commitments: moveCommitments(o.id, k.id), insights: moveInsights(o.id, k.id) }; // 091: their promises, suggested ties and preferences
     // 079: agent roles that name the merged person name the kept one
     for (const row of listAgentRows()) {
       const swap = (l = []) => [...new Set(l.map((e) => (e === o.id ? k.id : e)))];
@@ -110,6 +111,7 @@ export function undoMerge(mergeId, by = 'panel') {
     for (const l of s.added.lists) run('DELETE FROM person_list_members WHERE tenant_id = ? AND list = ? AND person = ?', l, m.kept);
     for (const c of s.chats || []) run('INSERT OR IGNORE INTO person_chats (tenant_id, person, chat, wrote, member, last_at) VALUES (?, ?, ?, ?, ?, ?)', o.id, c.chat, c.wrote, c.member, c.last_at);
     restoreModuleRows(s.modules, m.kept, o.id); // 081
+    restoreCommitments(s.learned?.commitments, m.kept, o.id); restoreInsights(s.learned?.insights, m.kept, o.id); // 091 (a merge of an earlier release took none)
     for (const l of s.lists) run('INSERT OR IGNORE INTO person_list_members (tenant_id, list, person) SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM person_lists WHERE tenant_id = ? AND id = ?)', l, o.id, TENANT, l);
     run('DELETE FROM person_merges WHERE tenant_id = ? AND id = ?', m.id);
   });
@@ -176,6 +178,12 @@ export function erasePerson(id, by = 'panel') {
       run('DELETE FROM contacts WHERE tenant_id = ? AND phone = ?', p.phone);
       run('DELETE FROM contact_lids WHERE tenant_id = ? AND phone = ?', p.phone);
     }
+    // someone known only by an app's own id (no number): their group tags and the names stored under that id
+    for (const appId of ids) {
+      db.prepare('DELETE FROM member_tags WHERE member = ?').run(appId);
+      run('DELETE FROM contact_lids WHERE tenant_id = ? AND lid = ?', appId);
+    }
+    for (const c of chats) run("UPDATE chats_seen SET name = '' WHERE tenant_id = ? AND chat = ?", c); // the chat stays as the owner set it up; their name goes
     const notes = Number(run('DELETE FROM person_notes WHERE tenant_id = ? AND person = ?', p.id).changes);
     const ties = Number(run('DELETE FROM person_ties WHERE tenant_id = ? AND (a = ? OR b = ?)', p.id, p.id).changes);
     const households = Number(run('DELETE FROM household_members WHERE tenant_id = ? AND person = ?', p.id).changes);

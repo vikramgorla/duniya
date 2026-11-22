@@ -3,7 +3,7 @@
 // (/usr/local/bin/duniya loads /etc/duniya/app.env and runs this file as the app user); in Docker:
 // `docker compose exec app duniya …`. Safe while the service runs: SQLite is in WAL mode with a busy timeout, and
 // this process never applies a staged restore.
-import { randomBytes } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 import { readFileSync, existsSync, statfsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
@@ -35,7 +35,7 @@ ${bold('Accounts')}
   show-setup-code                         The one-time code that creates the first owner account
 
 ${bold('Server')}
-  status                                  Version, uptime, WhatsApp numbers and agents
+  status                                  Version, uptime, channel accounts and agents
   doctor                                  Check address, HTTPS, ports, disk and memory, with fixes
   backup-now                              Make an encrypted backup now (to every place set up under Backups)
   restart                                 Restart the service (agents are offline for a few seconds)
@@ -74,8 +74,7 @@ const ago = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); if (s < 60) 
 const gb = (n) => `${(n / 1073741824).toFixed(n < 10737418240 ? 1 : 0)} GB`;
 function makePassword() {
   const A = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const b = randomBytes(16);
-  return Array.from(b, (x, i) => A[x % A.length] + (i % 4 === 3 && i < 15 ? '-' : '')).join('');
+  return Array.from({ length: 16 }, (_, i) => A[randomInt(A.length)] + (i % 4 === 3 && i < 15 ? '-' : '')).join(''); // randomInt: every character equally likely
 }
 function ask(question, { hidden = false } = {}) {
   return new Promise((res) => {
@@ -199,9 +198,9 @@ const commands = {
     line('Address', process.env.PUBLIC_URL || dim('only on this machine (http://127.0.0.1:8080)'));
     const undone = (await import('../src/core/updates.js')).rolledBack(); // 095
     if (undone) line('Update', red(undone.ok ? `${undone.from} did not start here and was rolled back to ${undone.to}` : `${undone.from} did not start here; putting ${undone.to} back failed`));
-    const nums = rt?.numbers || [];
-    if (!nums.length) line('WhatsApp', dim('no numbers yet'));
-    nums.forEach((n, i) => line(i ? '' : 'WhatsApp', `${n.label}: ${n.status === 'open' ? green(`connected${n.me ? ` as +${n.me}` : ''}`) : yellow(n.status === 'qr' ? 'waiting for the QR scan / pairing code' : n.status)}${rt.running ? '' : dim(' (last known)')}`));
+    const accounts = rt?.accounts || []; // every channel's: WhatsApp numbers, a Telegram bot
+    if (!accounts.length) line('Channels', dim('no account yet'));
+    accounts.forEach((a, i) => line(i ? '' : 'Channels', `${a.app} ${a.label}: ${a.status === 'open' ? green(`connected${/^\d+$/.test(a.me) ? ` as +${a.me}` : ''}`) : yellow(a.status === 'qr' ? 'waiting for the QR scan / pairing code' : a.status)}${rt.running ? '' : dim(' (last known)')}`));
     const agents = s.listAgentRows().filter((b) => b.id !== 'owner-assistant'); // 059: chat agents (the built-in owner assistant is not one)
     line('Agents', agents.length ? `${agents.filter((b) => b.config.enabled).length} on, ${agents.filter((b) => !b.config.enabled).length} off` : dim('none yet (Agents → New agent in the panel)'));
     for (const b of agents) line('', `${b.config.enabled ? green('●') : dim('○')} ${b.config.name || b.id} ${dim(`· ${(b.config.chats || []).length} chat${(b.config.chats || []).length === 1 ? '' : 's'}`)}`);
@@ -296,8 +295,7 @@ const commands = {
     if (rt?.running) ok(`Service running (up ${ago(Date.now() - rt.startedAt)})`); else bad('Service is not running', fixRestart);
     const port = Number(process.env.PANEL_PORT || 8080);
     try { const r = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: AbortSignal.timeout(4000) }); r.ok ? ok(`Panel answers on 127.0.0.1:${port}`) : bad(`Panel answered ${r.status}`, fixRestart); } catch { bad(`Panel does not answer on 127.0.0.1:${port}`, fixRestart); }
-    const nums = rt?.numbers || [];
-    for (const n of nums) n.status === 'open' ? ok(`WhatsApp ${n.label} connected`) : warn(`WhatsApp ${n.label}: ${n.status}`, 'Open the panel → Overview and link the number again (QR or pairing code)');
+    for (const a of rt?.accounts || []) a.status === 'open' ? ok(`${a.app} ${a.label} connected`) : warn(`${a.app} ${a.label}: ${a.status}`, 'Open the panel → Overview: it says what the account needs (a WhatsApp number: link it again with the QR or pairing code)');
 
     const pub = String(process.env.PUBLIC_URL || '').trim();
     if (!pub) warn('No public address: the panel is only reachable on this machine', kind === 'docker' ? 'Set DOMAIN and use the https profile (docs/deploy/docker.md)' : 'Re-run the installer with --ip-https or --domain NAME');
