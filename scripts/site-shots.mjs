@@ -125,7 +125,7 @@ const CARDS = [
   // 072: a chat's sections, each its own page
   ['card-wa-group', 'chats/120363041122330003%40g.us/group', "await T.until('.wa-card input'); await T.wait(600);", '.ap-sec', 900],
   ['card-memory', 'chats/120363041122330003%40g.us/memory', '', '.ap-sec', 900],
-  ['card-messages', 'chats/120363041122330003%40g.us/messages', "await T.until('.msg-ans .rv-acts'); await T.wait(300);", '.ap-sec', 900],
+  ['card-messages', 'chats/120363041122330003%40g.us/messages', "await T.until('.msg-ans .rv-acts'); await T.until('.msg-media img'); const it = document.querySelector('.msg-media.image')?.closest('[data-msg]'); let log = it?.parentElement; while (log && log.scrollHeight <= log.clientHeight) log = log.parentElement; if (log) log.scrollTop += it.getBoundingClientRect().top - log.getBoundingClientRect().top - 8; for (let t = 0; t < 5000 && ![...document.querySelectorAll('.msg-media img')].every((i) => i.complete); t += 100) await T.wait(100); await T.wait(300);", '.ap-sec', 900],
   ['card-chat-page', 'chats/120363041122330003%40g.us', '', '.chat-page', 900], // 068: a chat's page
 ];
 
