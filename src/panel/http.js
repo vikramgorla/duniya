@@ -49,6 +49,18 @@ export function send(res, status, body, headers = {}) {
   res.end(isObj ? JSON.stringify(body) : body);
 }
 /**
+ * A file from memory, whole or the byte range asked for (`Range: bytes=a-b`: video players, Safari above all, ask for
+ * parts and do not play without them). A range that does not fit gets 416.
+ */
+export function sendBytes(req, res, body, headers = {}) {
+  const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || '').trim());
+  if (!m || (!m[1] && !m[2])) return send(res, 200, body, { 'accept-ranges': 'bytes', ...headers });
+  const start = m[1] ? Number(m[1]) : Math.max(0, body.length - Number(m[2]));
+  const end = m[1] && m[2] ? Math.min(Number(m[2]), body.length - 1) : body.length - 1;
+  if (start > end || start >= body.length) return send(res, 416, '', { 'content-range': `bytes */${body.length}` });
+  return send(res, 206, body.subarray(start, end + 1), { 'accept-ranges': 'bytes', ...headers, 'content-range': `bytes ${start}-${end}/${body.length}` });
+}
+/**
  * A static panel file (058): compressed once (gzip + brotli, ~0.1 s), then served from memory with an ETag, so a
  * repeat load is a 304. A request for `?v=<version>` (how the panel shell links its scripts) is cached for good: a new
  * file has a new version. Only for files without user data or secrets (the panel shell and its two scripts).

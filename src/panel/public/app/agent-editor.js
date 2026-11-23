@@ -3,6 +3,7 @@
 // own: one Save, disabled until something changed, then "Saved" and Undo in the toast. Module of the panel (063).
 import { changeWithAi as changeWithAiDialog } from './ai-helper.js';
 import { answerActions } from './answers.js';
+import { messageMedia, wordsBeside } from './media.js';
 import { askCard } from './ask.js';
 import { peoplePicker, tagInput } from './tags.js';
 import { S, api, ask, avatar, can, field, fieldError, h, icon, lines, menu, partFailed, splitLines, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
@@ -195,7 +196,8 @@ function buildReview(x, { teach }) {
   const item = (a) => h('div', { class: 'rv' },
     h('div', { class: 'small muted' }, [a.question?.name, a.chatName, time(a.ts)].filter(Boolean).join(' · ')),
     a.question ? h('div', { class: 'rv-q' }, a.question.text) : null,
-    h('div', { class: 'rv-a', title: 'Tap to show all', onclick: (e) => e.currentTarget.classList.toggle('open') }, a.text),
+    messageMedia(a.chat, a.id, a.media, wordsBeside(a.text).label), // 096: the GIF it shared with the answer
+    h('div', { class: 'rv-a', title: 'Tap to show all', onclick: (e) => e.currentTarget.classList.toggle('open') }, a.media?.shown ? wordsBeside(a.text).text : a.text),
     answerActions({ ...a, agent: x.id }, { teach, extra: h('a', { class: 'btn small ghost rv-in', href: `#chats/${encodeURIComponent(a.chat)}/messages/${a.id}` }, 'In chat\u00a0›') }));
   async function load(older) {
     const r = await tryApi(() => api('GET', `/api/agents/${x.enc}/review?only=${only}${older && last ? `&before=${last}` : ''}`));

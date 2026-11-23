@@ -106,7 +106,7 @@ export const CHAT_TOOLS = [
     input: { chat: str('Chat id'), off: bool('true = never post the notice in this chat') }, required: ['chat', 'off'],
     run: (a, x) => x.call('PUT', `/api/chats/${enc(a.chat)}/prefs`, { noticeOff: !!a.off }) },
   { name: 'list_chat_messages', readOnly: true, calls: [['GET', '/api/chats/x/messages']],
-    description: 'Messages stored for a chat (newest first), optionally filtered by text. An agent\'s answer says which agent gave it and its rating (1 good, -1 wrong, 0 not rated; rate it with rate_agent_answer). Admins and owners only; each look is recorded in the activity log.',
+    description: 'Messages stored for a chat (newest first), optionally filtered by text. An agent\'s answer says which agent gave it and its rating (1 good, -1 wrong, 0 not rated; rate it with rate_agent_answer). A message with a photo, sticker, GIF, video, voice note or document has media: { type, mimetype, size, seconds?, fileName?, shown } (shown: the panel plays it in the chat\'s Messages; the file is not returned here). Admins and owners only; each look is recorded in the activity log.',
     input: { chat: str('Chat id'), search: str('Only messages containing this text (optional)'), limit: int('How many (default 30, max 200)', { minimum: 1, maximum: 200 }), before_id: int('Only older than this message id'),
       around_id: int('The messages around this message id (an answer from list_agent_answers or the activity log)') }, required: ['chat'],
     run: (a, x) => x.call('GET', `/api/chats/${enc(a.chat)}/messages?limit=${Math.min(Number(a.limit) || 30, 200)}${a.before_id ? `&before=${a.before_id}` : ''}${a.around_id ? `&around=${a.around_id}` : ''}${a.search ? `&q=${enc(a.search)}` : ''}`) },

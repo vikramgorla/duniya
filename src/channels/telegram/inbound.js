@@ -37,6 +37,8 @@ export function mediaOf(m) {
   if (m.voice) return sound(m.voice, 'audio/ogg', { ptt: true });
   if (m.audio) return sound(m.audio, 'audio/mpeg');
   if (m.sticker && !m.sticker.is_animated && !m.sticker.is_video) return { info: { type: 'sticker', mimetype: 'image/webp', size: m.sticker.file_size || 0 }, ref: m.sticker.file_id };
+  // 096: GIFs and videos (an animation comes with a document too: it is the GIF)
+  for (const [type, v] of [['gif', m.animation], ['video', m.video]]) if (v) return { info: { type, mimetype: v.mime_type || 'video/mp4', size: v.file_size || 0, seconds: v.duration || 0 }, ref: v.file_id };
   if (m.document) return { info: { type: 'document', mimetype: m.document.mime_type || '', size: m.document.file_size || 0, fileName: m.document.file_name || '' }, ref: m.document.file_id };
   return null;
 }

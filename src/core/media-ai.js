@@ -19,6 +19,8 @@ import { providers, providerModels, resolveModel, parseRef, accountById, warmMod
 import { recordUsage, priceFor, usageTag } from './usage.js';
 import { checkBudget } from './budget.js';
 import { activity } from './events.js';
+import { logMessage } from './db.js';
+import { mediaDetail, storedMedia } from './message-media.js';
 import { MAX_MEDIA_BYTES, sniffType } from './media.js';
 import { runJob, optionalPaused } from './resources.js';
 import { transcribeLocal, speakLocal, engineReady, hasFfmpeg, convertAudio, localStatus } from './speech-local.js';
@@ -402,8 +404,21 @@ function recentPhoto(chat, attachments) {
   return null;
 }
 
-/** The image job (queue): the provider chain, usage, and the WhatsApp send. `image`: { buffer, mimetype } to change. */
-export async function createImage(input, { agent, chat, image = null }) {
+/** A created picture goes to the chat and (096) into its stored messages, so the panel shows it. Returns what was sent. */
+async function postPicture(r, { agent, chat, caption, keep, said, size }) {
+  const ch = chatChannel();
+  if (!ch) throw new Error('WhatsApp is not available here');
+  const sent = await ch.sendMedia(chat, { kind: 'image', base64: r.buffer.toString('base64'), mimetype: r.mimetype, caption });
+  const media = storedMedia(sent);
+  const id = keep ? logMessage({ chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text: `[image${caption ? `: ${caption}` : ''}]`, fromAgent: true, media }) : 0;
+  activity('media.image', { agent: agent.id, chat, summary: said, detail: { size: size || 'default', bytes: r.buffer.length, ...(id ? { msg: id, ...mediaDetail(media) } : {}) } });
+  return sent;
+}
+/**
+ * The image job (queue): the provider chain, usage, and the send. `image`: { buffer, mimetype } to change. `keep`: the
+ * picture is stored with the chat's messages (096; not in the owner assistant's own chat, which lives elsewhere).
+ */
+export async function createImage(input, { agent, chat, image = null, keep = true }) {
   const prompt = String(input.prompt || '').trim();
   if (!prompt) throw Object.assign(new Error('Describe the picture'), { permanent: true });
   const size = SIZES.includes(input.size) && input.size !== 'auto' ? input.size : undefined;
@@ -418,10 +433,7 @@ export async function createImage(input, { agent, chat, image = null }) {
       const tokenPrice = priceFor(p.type, model);
       usageRow({ agent, chat, p, model, feature: 'image', usage: r.usage, cost: r.cost, perImage: r.cost === undefined && perImage === undefined && tokenPrice ? undefined : perImage });
       const caption = clip(input.caption || '', 300);
-      const ch = chatChannel();
-      if (!ch) throw new Error('WhatsApp is not available here');
-      const sent = await ch.sendMedia(chat, { kind: 'image', base64: r.buffer.toString('base64'), mimetype: r.mimetype, caption });
-      activity('media.image', { agent: agent.id, chat, summary: `Created a picture with ${p.name} · ${model}${image ? ' (edit)' : ''}: ${clip(prompt, 160)}`, detail: { size: size || 'default', bytes: r.buffer.length } });
+      const sent = await postPicture(r, { agent, chat, caption, keep, said: `Created a picture with ${p.name} · ${model}${image ? ' (edit)' : ''}: ${clip(prompt, 160)}`, size });
       return { sent: true, msgId: sent?.msgId || null, caption, note: 'The picture is already in the chat; do not describe how to download it.' };
     } catch (e) {
       errors.push(`${p.name}: ${e.message}`);

@@ -1,6 +1,7 @@
 // Chats screen: on/off per chat, direct chats; a chat's page with Messages, Memory and the WhatsApp group (072). Module of the panel (063).
 import { $, S, ago, api, ask, avatar, can, copyRow, emptyState, field, h, icon, menu, refreshStatus, tagPill, time, toast, toggle, tryApi, whoLabel } from './core.js';
 import { answerActions } from './answers.js';
+import { messageMedia, wordsBeside } from './media.js';
 import { chatFallbackEditor, chatFallbackLine } from './fallback.js';
 import { quietReason } from './quiet.js';
 import { listDetail } from './listdetail.js';
@@ -339,17 +340,26 @@ function messagesView(c, agents, q0 = '', at = 0) {
   } }, m.editable ? 'Edit' : 'Send a correction') : null);
   const acts = (m) => (admin ? h('span', { class: 'msg-acts' }, fix(m), del(m)) : null);
   const edited = (m) => (m.edited ? h('span', { class: 'muted', title: `Edited ${time(m.edited)}` }, ' · edited') : null);
+  // 096: a photo, GIF or voice note shows in place of its "[GIF]" line; a person's caption stays as words
+  function withMedia(m) {
+    const w = m.media?.shown ? wordsBeside(m.text) : { text: m.text, label: '' };
+    return { media: messageMedia(c.id, m.id, m.media, w.label), words: m.fromAgent ? w.text : [w.text, w.label].filter(Boolean).join('\n') };
+  }
+  // who wrote it: their page in People for admins, their number when nothing better is known
+  const writer = (m) => (m.sender && can('admin') ? h('a', { href: `#people/${encodeURIComponent(m.sender)}` }, m.name || `+${m.sender}`) : m.name || (m.sender ? `+${m.sender}` : 'someone'));
+  function personBubble(m, media, text) {
+    return h('div', { class: `bubble agent${m.id === at ? ' hit' : ''}`, 'data-msg': m.id, tabindex: admin ? '0' : null },
+      h('div', { class: 'small msg-who' }, writer(m), m.tag ? ` (${m.tag})` : '', ` · ${time(m.ts)}`, m.addressed ? ' · to the agent' : ''),
+      m.quoted ? h('div', { class: 'small msg-quote' }, m.quoted) : null, media, text ? h('span', {}, text) : null, edited(m), acts(m));
+  }
   function bubble(m, i) {
-    const text = highlight(m.text, searchWords(shown));
-    if (!m.fromAgent) {
-      return h('div', { class: `bubble agent${m.id === at ? ' hit' : ''}`, 'data-msg': m.id, tabindex: admin ? '0' : null },
-        h('div', { class: 'small msg-who' }, m.sender && can('admin') ? h('a', { href: `#people/${encodeURIComponent(m.sender)}` }, m.name || `+${m.sender}`) : m.name || (m.sender ? `+${m.sender}` : 'someone'), m.tag ? ` (${m.tag})` : '', ` · ${time(m.ts)}`, m.addressed ? ' · to the agent' : ''),
-        m.quoted ? h('div', { class: 'small msg-quote' }, m.quoted) : null, h('span', {}, text), edited(m), acts(m));
-    }
+    const { media, words } = withMedia(m);
+    const text = words ? highlight(words, searchWords(shown)) : null;
+    if (!m.fromAgent) return personBubble(m, media, text);
     const name = agentOf(m.agent); const av = avatar(name, m.agent || 'agent', 's');
     return h('div', { class: `msg-ans ${[...av.classList].find((k) => /^c\d$/.test(k)) || ''}${m.id === at ? ' hit' : ''}`, 'data-msg': m.id, tabindex: admin ? '0' : null },
       h('div', { class: 'small msg-who' }, av, m.agent && !m.agent.startsWith('owner') ? h('a', { href: `#agents/${encodeURIComponent(m.agent)}` }, name) : name, ` · ${time(m.ts)}`),
-      h('div', { class: 'bubble ans' }, text, edited(m)),
+      h('div', { class: 'bubble ans' }, media, text, edited(m)),
       admin && m.rateable ? answerActions({ id: m.id, agent: m.agent, rating: m.rating, text: m.text, question: questionOf(rows, i) }) : null, acts(m));
   }
   async function load(older) {

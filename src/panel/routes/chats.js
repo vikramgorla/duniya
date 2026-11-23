@@ -17,8 +17,13 @@ import { visibleChats } from '../../core/owner-assistant.js';
 import { maybePostNotice, noticePostedAt, setChatNoticeOff } from '../../core/privacy-notice.js';
 import { chatToolCatalog, editOwnMessage, editWindow } from '../../core/chat-tools.js';
 import { db } from '../../core/db.js';
+import { mediaFile, mediaView } from '../../core/message-media.js';
+import { sendBytes } from '../http.js';
 import { channelInfo, channelOf, isGroup, personOfChat, splitChatId } from '../../channels/index.js';
 
+const MEDIA_CACHE_S = 24 * 60 * 60; // seconds a browser keeps a message's picture (it never changes)
+/** A stored message's media as the panel sees it (096), or nothing. */
+const withMedia = (stored) => { const v = mediaView(stored); return v ? { media: v } : {}; };
 /** Leave out empty values and settings at their default. */
 const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && v !== '' && v !== false && v !== 0 && v !== 'inherit'));
 
@@ -111,10 +116,22 @@ export function chatRoutes(route, { channel } = {}) {
     const jids = new Map(list.map((m) => [m.id, m.senderJid]));
     const edits = editsOf(list.map((m) => m.id));
     const judged = judgedOf(list.filter((m) => m.fromAgent).map((m) => m.id)); // 089: answers it gave by itself (feedback on joining in) // 087: edited messages say so; agent answers say whether they can still be edited
-    const rows = list.map(({ senderJid: _jid, ...m }) => ({ ...m, ...(edits.has(m.id) ? { edited: edits.get(m.id).ts } : {}) })).map((m) => (m.fromAgent ? { ...m, rating: rated.get(m.id) || 0, rateable: rateable && !!m.agent && m.id > 0, editable: editWindow(chat, m.ts).open && m.id > 0, ...(judged.has(m.id) ? { judged: true } : {}) }
+    const rows = list.map(({ senderJid: _jid, media, ...m }) => ({ ...m, ...withMedia(media), ...(edits.has(m.id) ? { edited: edits.get(m.id).ts } : {}) })).map((m) => (m.fromAgent ? { ...m, rating: rated.get(m.id) || 0, rateable: rateable && !!m.agent && m.id > 0, editable: editWindow(chat, m.ts).open && m.id > 0, ...(judged.has(m.id) ? { judged: true } : {}) }
       : { ...m, name: personInfo({ phone: m.sender, jid: jids.get(m.id), fallbackName: m.name }).label, ...(memberTag(chat, { phone: m.sender, jid: jids.get(m.id) }, tags) ? { tag: memberTag(chat, { phone: m.sender, jid: jids.get(m.id) }, tags) } : {}) }));
     if (!query.get('before')) activity('access', { chat, summary: `Stored messages viewed by ${user.username}${query.get('q') ? ` (search “${String(query.get('q')).slice(0, 40)}”)` : ''}` });
     return rows;
+  }, { role: 'admin' });
+  // 096: the picture, GIF, video or voice note of a stored message, from the chat app (message-media.js). Part of
+  // looking at the chat's messages (recorded there), so not recorded one by one. Served only as the content types
+  // message-media.js allows, never sniffed, never run as a page; the browser keeps it for a day.
+  route('GET', '/api/chats/:chat/messages/:id/media', async ({ params, req, res }) => {
+    const chat = decodeURIComponent(params.chat);
+    const row = db.prepare('SELECT id, chat, media FROM messages WHERE chat = ? AND id = ?').get(chat, Number(params.id));
+    if (!row) throw fail('Message not found', 404);
+    const file = await mediaFile(channel, row);
+    sendBytes(req, res, file.body, { 'content-type': file.mimetype, 'cache-control': `private, max-age=${MEDIA_CACHE_S}, immutable`,
+      'content-disposition': 'inline', 'content-security-policy': "default-src 'none'; sandbox", 'cross-origin-resource-policy': 'same-origin' });
+    return null;
   }, { role: 'admin' });
   // #178: delete one stored message (admins and owners); the agent forgets it (the chat summary is rebuilt). WhatsApp is unchanged.
   route('DELETE', '/api/chats/:chat/messages/:id', async ({ params, user }) => {

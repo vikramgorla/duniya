@@ -395,6 +395,16 @@ test('channel (fake socket): incoming media placeholders, reactions and encrypte
   };
   await upsert({ imageMessage: { caption: 'our venue', mimetype: 'image/jpeg' } }, { id: 'IN1' });
   assert.equal(got.at(-1).text, '[image: our venue]'); assert.equal(got.at(-1).caption, 'our venue');
+  // 096: a stored reference keeps only what a download needs: no preview, no context, no caption
+  await upsert({ imageMessage: { caption: 'big', mimetype: 'image/jpeg', mediaKey: Buffer.alloc(32, 1), directPath: '/v/t62/x', fileLength: 900,
+    jpegThumbnail: Buffer.alloc(4000, 2), contextInfo: { quotedMessage: { conversation: 'x'.repeat(3000) } } } }, { id: 'IN1b' });
+  const ref = JSON.parse(got.at(-1).mediaRef, baileys.BufferJSON.reviver);
+  assert.deepEqual(Object.keys(ref.message.imageMessage).sort(), ['directPath', 'fileLength', 'mediaKey', 'mimetype']);
+  assert.equal(ref.key.id, 'IN1b');
+  assert.ok(got.at(-1).mediaRef.length < 600, 'about half a kilobyte');
+  await upsert({ videoMessage: { gifPlayback: true, mimetype: 'video/mp4', seconds: 3 } }, { id: 'IN1c' });
+  assert.equal(got.at(-1).text, '[GIF]');
+  assert.deepEqual(got.at(-1).mediaInfo, { type: 'gif', mimetype: 'video/mp4', size: 0, seconds: 3 });
   await upsert({ documentMessage: { fileName: 'menu.pdf' } }, { id: 'IN2' });
   assert.equal(got.at(-1).text, '[document: menu.pdf]');
   await upsert({ locationMessage: { degreesLatitude: 46.3, degreesLongitude: 6.9, name: 'Hall' } }, { id: 'IN3' });
