@@ -1,11 +1,11 @@
 /* Standalone server pages (064): sign-in results, the Google address help, the GitHub app hand-off. Served as a file so
    these pages need no 'unsafe-inline' in their Content-Security-Policy (http.js PAGE_CSP). Same tokens as the panel. */
-:root { --bg: #f2f1ec; --card: #fff; --ink: #101216; --muted: #5a5e67; --line: #e2e0d8; --code: #f2f1ec; --warn: #8f4500; --warn-soft: #ffeedd;
-  --info: #2c4fd6; --info-soft: #e8edff; --ok: #3f6b00; --ok-soft: #e9f7c4; --bad: #c42443; --bad-soft: #ffe6ea; --btn: #101216; --btn-ink: #fff; --focus: #101216;
+:root { --bg: #f2f1ec; --card: #fff; --ink: #101216; --muted: #5a5e67; --line: #e2e0d8; --code: #f2f1ec; --warn: #855600; --warn-soft: #fff2d2;
+  --info: #2c4fd6; --info-soft: #e8edff; --ok: #1f6b37; --ok-soft: #e1f3e4; --bad: #c42443; --bad-soft: #ffe6ea; --btn: #101216; --btn-ink: #fff; --focus: #101216;
   --mono: "SF Mono", ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace; color-scheme: light dark; }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #0b0c0f; --card: #121419; --ink: #eceef2; --muted: #9ba0ab; --line: #23262e; --code: #1b1e25; --warn: #ffb36b; --warn-soft: #3a2c14;
-    --info: #a5b6ff; --info-soft: #18264a; --ok: #c6f432; --ok-soft: rgba(198,244,50,.12); --bad: #ff8599; --bad-soft: rgba(255,80,110,.14); --btn: #c6f432; --btn-ink: #101216; --focus: #c6f432; }
+  :root { --bg: #0b0c0f; --card: #121419; --ink: #eceef2; --muted: #9ba0ab; --line: #23262e; --code: #1b1e25; --warn: #ffc94d; --warn-soft: #3a2f12;
+    --info: #a5b6ff; --info-soft: #18264a; --ok: #7fdc92; --ok-soft: rgba(127,220,146,.13); --bad: #ff8599; --bad-soft: rgba(255,80,110,.14); --btn: #ff7a2e; --btn-ink: #101216; --focus: #ff7a2e; }
 }
 * { box-sizing: border-box; }
 body { font: 15px/1.5 "Segoe UI Variable Text", -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--ink); }

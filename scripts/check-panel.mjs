@@ -17,8 +17,8 @@ import { FIRST_SCREEN, staticClosure } from '../src/panel/module-graph.js';
 // Budgets in brotli bytes. The first screen is what a phone downloads before Overview shows; everything else loads on
 // the first visit to its screen. A budget is raised only with its reason in the PR; every earlier raise and its reason
 // is in the history of these two lines (git log -L '/^const FIRST_BUDGET/,+1:scripts/check-panel.mjs').
-const FIRST_BUDGET = 64_600; // +0.2 KB: 096, the styles of a message's photo, GIF, video or voice note (one stylesheet, on the first screen)
-const TOTAL_BUDGET = 231_100; // +2.1 KB: 096, messages show their photos, stickers, GIFs, videos and voice notes (media.js, loaded with Chats, Review and Activity entries, and its styles)
+const FIRST_BUDGET = 64_100; // −0.5 KB (097): the mark is a file (/icons/logo-small.svg), no longer drawn by core.js
+const TOTAL_BUDGET = 230_600; // −0.5 KB (097): see FIRST_BUDGET
 
 const PUBLIC = resolve(import.meta.dirname, '../src/panel/public');
 const APP = resolve(PUBLIC, 'app');

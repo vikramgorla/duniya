@@ -7,9 +7,10 @@
 //
 // The demo panel (scripts/demo-panel.mjs) runs the real core + panel with seeded data, fake WhatsApp numbers
 // (+41 79 000 00 xx) and fake models; no network. Pages: 1440×900 (desktop) and 393×852 @2x (phone), WebP.
-// Cards: the element only, @2x. Videos: 1280×800 H.264 (-preset veryfast), with a WebP poster.
+// Cards: the element only, @2x. share.jpg: the 1200×630 link preview (og:image), drawn from the mark and the phone
+// overview, under 150 KB. Videos: 1280×800 H.264 (-preset veryfast), with a WebP poster.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -158,6 +159,41 @@ for (const [phone, size] of [[false, { width: 1440, height: 900, scale: 1 }], [t
     await open(page, hash, js);
     await capture(page, join(img, `${name}-${phone ? 'mobile' : 'desktop'}.webp`), null, phone ? 72 : 80);
   }
+  await page.close();
+}
+
+// the link-preview card (og:image): the mark, the promise and the phone overview just taken, so it follows the look
+const SHARE = { width: 1200, height: 630, quality: 82, maxBytes: 150 * 1024 };
+const dataUri = (file, type) => `data:${type};base64,${readFileSync(file).toString('base64')}`;
+function shareHtml() {
+  const mark = dataUri(resolve(import.meta.dirname, '../src/panel/public/icons/logo.svg'), 'image/svg+xml');
+  const phone = dataUri(join(img, 'overview-mobile.webp'), 'image/webp');
+  return `<!doctype html><html><head><style>
+  body { margin: 0; width: ${SHARE.width}px; height: ${SHARE.height}px; overflow: hidden; font-family: Inter, system-ui, sans-serif; color: #101216;
+    background: #f2f1ec radial-gradient(#d9d7cf 1px, transparent 1px) 0 0 / 22px 22px; }
+  .text { position: absolute; left: 80px; top: 100px; width: 640px; }
+  .brand { display: flex; align-items: center; gap: 18px; font-size: 44px; font-weight: 700; letter-spacing: -.02em; }
+  .brand img { width: 72px; height: 72px; }
+  h1 { font-size: 54px; line-height: 1.06; letter-spacing: -.03em; margin: 34px 0 20px; }
+  mark { background: linear-gradient(transparent 55%, #ffb88a 55%); color: inherit; }
+  p { font-size: 25px; color: #4a4d55; margin: 0 0 26px; line-height: 1.4; }
+  .chips span { display: inline-block; font-size: 19px; border: 1px solid #d6d4cc; background: #fff; border-radius: 99px; padding: 9px 16px; margin-right: 8px; }
+  .phone { position: absolute; right: 78px; top: 30px; width: 340px; height: 690px; border-radius: 48px; background: #101216; padding: 12px; box-sizing: border-box; }
+  .phone div { width: 100%; height: 100%; border-radius: 38px; overflow: hidden; background: url(${phone}) top / 100% auto no-repeat; }
+  </style></head><body>
+  <div class="text"><div class="brand"><img src="${mark}" alt="">Duniya</div>
+  <h1>AI helpers for your WhatsApp and Telegram groups, <mark>on your server.</mark></h1>
+  <p>Free and open source. A free server, any model, a calm panel.</p>
+  <div class="chips"><span>Silent until you switch a chat on</span><span>Runs on 1 GB</span></div></div>
+  <div class="phone"><div></div></div></body></html>`;
+}
+if (want('share')) {
+  const page = await newPage(cdp, { width: SHARE.width, height: SHARE.height, scale: 1, scheme: 'light' });
+  await page.goto(`data:text/html;base64,${Buffer.from(shareHtml()).toString('base64')}`);
+  await page.evaluate("Promise.all([...document.images].map((i) => i.decode())).then(() => document.fonts.ready).then(() => 0)");
+  const jpeg = await page.capture({ format: 'jpeg', quality: SHARE.quality });
+  if (jpeg.length > SHARE.maxBytes) console.log(`✗ share.jpg is ${Math.round(jpeg.length / 1024)} KB, over ${SHARE.maxBytes / 1024} KB: lower SHARE.quality`);
+  else { writeFileSync(join(img, 'share.jpg'), jpeg); console.log('✓', join(img, 'share.jpg')); }
   await page.close();
 }
 

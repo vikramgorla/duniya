@@ -122,8 +122,6 @@ export function searchStored({ chats, query = '', person = '', since = 0, before
 }
 
 // ---- chat history ----
-// 096 (2.61.0 only, remove in the next release): stored messages keep what their media is (message-media.js)
-if (!db.prepare('PRAGMA table_info(messages)').all().some((c) => c.name === 'media')) db.exec('ALTER TABLE messages ADD COLUMN media TEXT');
 const insMsg = db.prepare(`INSERT OR IGNORE INTO messages
   (channel, chat, agent, msg_id, sender, name, text, quoted, addressed, from_agent, ts, sender_jid, media)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);

@@ -103,8 +103,8 @@ export function createAdminMcp({ invoke, routeRole }) {
   const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const PARAMS = ['client_id', 'redirect_uri', 'response_type', 'code_challenge', 'code_challenge_method', 'state', 'scope', 'resource'];
   const hidden = (p) => PARAMS.filter((k) => p[k] != null && p[k] !== '').map((k) => `<input type=hidden name="${k}" value="${esc(p[k])}">`).join('');
-  // The Duniya mark (docs/site/img/logo.svg): robot in a chat bubble.
-  const LOGO = '<svg viewBox="0 0 64 64" width="40" height="40" aria-hidden="true"><path d="M23 5H41A17 17 0 0 1 58 22V44L59.5 59.5L44 55H23A17 17 0 0 1 6 38V22A17 17 0 0 1 23 5Z" fill="#4d9b00" stroke="#4d9b00" stroke-width="4" stroke-linejoin="round"/><g fill="#101216"><rect x="11.8" y="28.3" width="9" height="13.4" rx="4"/><rect x="43.2" y="28.3" width="9" height="13.4" rx="4"/><circle cx="32" cy="12.6" r="2.8"/></g><path d="M32 14.8v6.7" stroke="#101216" stroke-width="2.7" stroke-linecap="round"/><rect x="18" y="21.5" width="28" height="27" rx="13" fill="#fff" stroke="#101216" stroke-width="2.7"/><rect x="20.8" y="29.4" width="22.4" height="12.3" rx="6.15" fill="#101216"/><path d="M23.6 37.2a2.9 2.9 0 0 1 5.8 0M34.6 37.2a2.9 2.9 0 0 1 5.8 0" fill="none" stroke="#c6f432" stroke-width="2" stroke-linecap="round"/></svg>';
+  // The Duniya mark (DESIGN.md, Mark), the panel's own file
+  const LOGO = '<img src="/icons/logo-small.svg" width="40" height="40" alt="">';
   // 070: the shared page look (/page.css, /page.js) under PAGE_CSP: no inline style or script.
   function page(res, status, { title, body, formTo = '', bounce = false }) {
     const csp = PAGE_CSP.replace("form-action 'self'", `form-action 'self'${formTo ? ` ${formTo}` : ''}`);

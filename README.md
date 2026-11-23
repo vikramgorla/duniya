@@ -8,8 +8,8 @@
 
 <p align="center">
   <a href="https://github.com/vikramgorla/duniya/actions/workflows/ci.yml"><img src="https://github.com/vikramgorla/duniya/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/vikramgorla/duniya/releases/latest"><img src="https://img.shields.io/github/v/release/vikramgorla/duniya?label=release&color=4d9b00" alt="Latest release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-4d9b00" alt="MIT license"></a>
+  <a href="https://github.com/vikramgorla/duniya/releases/latest"><img src="https://img.shields.io/github/v/release/vikramgorla/duniya?label=release&color=b23c00" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-b23c00" alt="MIT license"></a>
 </p>
 
 <p align="center">
