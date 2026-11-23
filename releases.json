@@ -1,6 +1,20 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.62.0": {
+      "breaking": false,
+      "title": "A new look: the saffron Duniya robot",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Duniya has a new logo: a friendly white robot with chat bubbles on a saffron tile. It shows in the panel, on your phone’s home screen (add it again to get the new icon), the sign-in page and the website."
+        },
+        {
+          "type": "improved",
+          "text": "The panel and the website use the logo’s saffron as their accent colour, in light and dark mode. Warnings are now amber and “all good” stays green, so neither is mistaken for the accent."
+        }
+      ]
+    },
     "2.61.0": {
       "breaking": false,
       "title": "Photos, stickers, GIFs and voice notes show in the panel",

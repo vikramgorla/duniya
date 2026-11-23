@@ -31,36 +31,36 @@ add or change UI, check it against the principles and the checklist at the end.
 Futuristic but human. Inspired by the friendliness of modern AI assistants, **not** a copy of any of them, and
 deliberately not the generic "AI app" look (no purple-blue gradients everywhere, no glass on every surface, no ✨).
 
-- **Mark:** a friendly robot in a chat bubble — an assistant that lives in your chats. A solid green (`#4d9b00`,
-  "leaf", a yellow-green between the bubble greens of chat apps and our lime) rounded-square speech bubble with the
-  tail at the **lower right** holds a dominant ink (`#101216`) robot head: white helmet with an ink rim, ear pads, a
-  short antenna with a ball, an ink visor with two smiling lime (`--signal #c6f432`) arc eyes.
-  - **Files:** master `docs/site/img/logo.svg` (64-unit grid, transparent); small variant
-    `docs/site/img/logo-small.svg` for 16–32 px (no helmet rim, no antenna ball, bigger visor and eyes). The same
-    geometry is in `logo()` (panel), the consent pages (`admin-mcp.js`) and the install progress page
-    (`infra/oci/bootstrap.sh`). Home-screen icons in `src/panel/public/icons/` are rendered from the master:
-    `icon-192/512.png` and `apple-touch-icon.png` (mark at 80 % on porcelain `#f2f1ec`) and `maskable-512.png` (mark
-    at 50 %, so Android's circle and squircle masks never cut the tail).
-  - **Colours are fixed** in light and dark mode; the solid bubble and white helmet read on both grounds.
-  - **Sizes:** small variant at 16–32 px (favicons); master from 30 px up (header 30–32 px, sign-in 76 px, consent
-    page 40 px). Home-screen icons: mark at 80 % of the canvas on porcelain; 50 % on the maskable icon so the
-    tail stays inside Android's safe zone.
-  - **Clear space:** at least ⅛ of the mark on every side; never crop the tail.
-  - **Don't:** recolour the bubble or the robot, add gradients, shadows or outlines, stretch or rotate it, put it in
-    another container shape, or place it on busy photos.
+- **Mark (097):** a friendly robot that talks — an assistant that lives in your chats. A saffron rounded square
+  (a soft diagonal from `#fb6602` to `#ec4a00`) holds a white line robot: a round antenna, a helmet with ear pads, a
+  saffron face with two smiling arc eyes, three little "talking" strokes at the upper right, and two chat bubbles
+  (the front one with "…") below. White on saffron only: no third colour.
+  - **Files:** master `src/panel/public/icons/logo.svg` (1024-unit grid, traced from the chosen picture) and the small
+    variant `logo-small.svg` (64-unit grid: the robot's head only, thicker, for 16–40 px). The panel serves both
+    (`logo()` in `core.js`: small by default, `logo(true)` for the full mark; the consent pages use the small one); the
+    website holds identical copies in `docs/site/img/` (`ci-checks.mjs` compares them). The install progress page
+    (`infra/oci/bootstrap.sh`) inlines the small one (it runs before the panel exists). `npm run brand:icons` renders
+    the home-screen icons from the master and copies the marks to the website: `icon-192/512.png` (the mark as it is),
+    `apple-touch-icon.png` (a full square: iOS rounds it), `maskable-512.png` (a full square, robot at 74 %, inside
+    Android's safe circle).
+  - **Sizes:** small variant from 16 to 40 px (favicons, the panel header, cards); the full mark from 48 px up
+    (sign-in 76 px, the home-screen icons, README 80 px).
+  - **Clear space:** at least ⅛ of the mark on every side.
+  - **Don't:** recolour the tile or the robot, put the robot on another colour, add shadows or outlines, stretch or
+    rotate it, crop the tile, or place it on busy photos.
   - Illustrations (site hero orbit, chat mock avatars) may still use the five "people" colours: saffron `#ff7a3d`,
     rose `#f2477e`, teal `#13b3a1`, indigo `#5363ff`, lime `#9bd400`.
-- **Trademark:** Duniya works with WhatsApp, so the mark may *feel* like a chat app, but it must never be confusable
-  with WhatsApp's logo (a green circular speech bubble, tail at lower left, white phone handset) — app stores reject
-  look-alikes. Rules: the robot head is the dominant element; the bubble is a rounded square with the tail at the
-  lower right (never a circle with a lower-left tail); the green stays `#4d9b00`, never WhatsApp's `#25D366` /
-  `#128C7E` / `#075E54` family; no phone handset, no WhatsApp name or wordmark in the icon; the app name is "Duniya"
-  (never "WhatsApp …"). README and site footer say Duniya is not affiliated with WhatsApp or Meta.
+- **Trademark:** Duniya works with WhatsApp and Telegram but never looks like their logos: no green or blue speech
+  bubble as the tile, no phone handset or paper plane, no WhatsApp or Telegram name in the icon; the app name is
+  "Duniya" (never "WhatsApp …"). README and site footer say Duniya is not affiliated with WhatsApp, Telegram or Meta.
 - **Ground:** porcelain `#f2f1ec` with a faint 22 px dot grid (dark: near-black `#0b0c0f`); solid white cards
   (dark `#121419`), hairline borders, a soft shadow; 16 px card radius, 10 px controls.
-- **Ink + one signal:** primary actions and the active tab are **ink** (`#101216`); the single signal colour is
-  electric lime `--signal #c6f432`, used for "live" — the active-tab dot, LED status lights, the knob of an "on"
-  toggle, focus rings, the `AI` chip. In dark mode lime becomes the primary colour.
+- **Ink + one signal:** primary actions and the active tab are **ink** (`#101216`); the single signal colour is the
+  mark's saffron `--signal #f55600` (dark `#ff7a2e`), always with ink on it, never white text: the active-tab pill
+  and dot, the knob of an "on" toggle, focus rings, the `AI` chip, search marks, the loading bar. Saffron as text or a
+  thin line on a light ground is `--signal-deep #b23c00`; white text sits only on that (README badges, doc buttons).
+  In dark mode saffron becomes the primary colour. Status keeps its own colours so it never reads as the brand: "ok"
+  and live LEDs are green (`--ok`, `--led-ok`), warnings amber (`--warn`, `--amber`), errors red.
 - **Instrument details:** stats in large mono figures, LED dots with a glow for live state. Labels (eyebrows, table
   headers, legends, card-table labels, status chips) are **sentence case in the text font**, muted and semibold — never
   `UPPERCASE` monospace (066: it read as shouting on a phone). Monospace is for numbers, codes, keys and ids.
@@ -74,10 +74,10 @@ deliberately not the generic "AI app" look (no purple-blue gradients everywhere,
   WhatsApp or Telegram to begin") and compact status chips with an LED, written as a phrase: "WhatsApp connected"
   ("WhatsApp 2/2 · Telegram connected" with several accounts: every channel counts), "2 agents live", "3 chats on",
   "Nothing waiting".
-- **On the accent:** anything drawn on lime (`--signal`, and `--accent` in dark mode) — text, icons, badges — uses the
+- **On the accent:** anything drawn on saffron (`--signal`, and `--accent` in dark mode) — text, icons, badges — uses the
   dark on-accent ink (`--signal-ink` / `--accent-ink`), never `--ink` (it is near-white in dark mode). Icons need 3:1
   against what is behind them, text 4.5:1; `check:responsive` measures both, pills drawn by `::before` included.
-- **States:** ok = deep lime, warn = amber, bad = crimson, info = indigo — soft tinted backgrounds with a left rule
+- **States:** ok = green, warn = amber, bad = crimson, info = indigo — soft tinted backgrounds with a left rule
   for notes.
 - **Type:** Segoe UI Variable / SF Pro / Inter for text and headings (tight tracking); SF Mono / Cascadia /
   JetBrains Mono for labels and numbers.
@@ -215,7 +215,7 @@ it for the names its API returns, and panel modules import it.
 
 ## Meters (064)
 
-`meter(percent)` is a 6 px track; the fill is ink in light mode and lime in dark mode. From 85 % the fill turns red
+`meter(percent)` is a 6 px track; the fill is ink in light mode and saffron in dark mode. From 85 % the fill turns red
 (`hot`). It is used for what Duniya measures itself: spending caps (Usage, an agent's or chat's *Spending cap*) and the
 Server tiles (memory, disk, swap). Never draw a meter from a guess.
 
@@ -224,8 +224,8 @@ Server tiles (memory, disk, swap). Never draw a meter from a guess.
 *Search messages* lives in Find anything, not on a screen of its own: for the owner, the last row is *Search messages
 for "…"*; choosing it turns the list into results (a spinner row while it searches). A result is one row: the chat in
 bold · the sender and time muted, then a snippet of about 140 characters around the first hit. Searched words are
-marked with `<mark>` built from text nodes (`highlight()` in `find.js`, never HTML): lime with the on-accent ink and a
-1 px ink outline, so a mark also shows inside a lime bubble. *Show older matches* is the last row. A result opens the
+marked with `<mark>` built from text nodes (`highlight()` in `find.js`, never HTML): saffron with the on-accent ink and a
+1 px ink outline, so a mark also shows inside a saffron bubble. *Show older matches* is the last row. A result opens the
 chat's *Messages* (`#chats/<id>/messages`), filtered by the same words. An empty result says
 where it looked ("No stored message in the 6 chats that are on matches …").
 
@@ -330,7 +330,7 @@ The same thing looks and behaves the same wherever it appears, and every place l
 
 Pages the server renders outside the panel (sign-in results, Google and GitHub hand-offs, the admin MCP sign-in and
 consent) use `pageHead()`, `/page.css` and `/page.js` with the strict page CSP: no inline style or script. They use
-the same ground, ink buttons (lime in dark mode), notes and 16 px form fields as the panel, and the mark at 40 px.
+the same ground, ink buttons (saffron in dark mode), notes and 16 px form fields as the panel, and the mark at 40 px.
 
 ## Confirmations (064)
 
@@ -435,5 +435,5 @@ the reason and **Retry**. Every animation stops with *reduce motion*.
 - [ ] *One object, one look*: the object uses its one component (answers: `answerActions()`), links to the related
   places, and every new place has a deep link and a Find anything entry.
 - [ ] Provider, account and model names come from `names.js`; tool names are shown with `toolPhrase()`.
-- [ ] Nothing on lime uses `--ink`; labels are sentence case, not mono caps; icons in buttons are sized.
+- [ ] Nothing on saffron uses `--ink`; labels are sentence case, not mono caps; icons in buttons are sized.
 - [ ] Text from WhatsApp, tools or models is built from text nodes (marks with `highlight()`), never HTML.

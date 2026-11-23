@@ -54,21 +54,9 @@ export function icon(name) {
   p.setAttribute('stroke-width', '1.7'); p.setAttribute('stroke-linecap', 'round'); p.setAttribute('stroke-linejoin', 'round');
   svg.append(p); return svg;
 }
-/** Brand mark: a friendly robot in a solid green chat bubble (rounded square, tail at lower right). Fixed colours in
- * both themes. Same geometry as docs/site/img/logo.svg; see DESIGN.md (Mark, Trademark). */
-export function logo() {
-  const ns = 'http://www.w3.org/2000/svg'; const el = (t, a) => { const e = document.createElementNS(ns, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); return e; };
-  const ink = '#101216'; const green = '#4d9b00';
-  const svg = el('svg', { viewBox: '0 0 64 64', class: 'logo', 'aria-hidden': 'true' });
-  svg.append(
-    el('path', { d: 'M23 5H41A17 17 0 0 1 58 22V44L59.5 59.5L44 55H23A17 17 0 0 1 6 38V22A17 17 0 0 1 23 5Z', fill: green, stroke: green, 'stroke-width': 4, 'stroke-linejoin': 'round' }),
-    el('rect', { x: 11.8, y: 28.3, width: 9, height: 13.4, rx: 4, fill: ink }), el('rect', { x: 43.2, y: 28.3, width: 9, height: 13.4, rx: 4, fill: ink }),
-    el('circle', { cx: 32, cy: 12.6, r: 2.8, fill: ink }), el('path', { d: 'M32 14.8v6.7', stroke: ink, 'stroke-width': 2.7, 'stroke-linecap': 'round' }),
-    el('rect', { x: 18, y: 21.5, width: 28, height: 27, rx: 13, fill: '#fff', stroke: ink, 'stroke-width': 2.7 }),
-    el('rect', { x: 20.8, y: 29.4, width: 22.4, height: 12.3, rx: 6.15, fill: ink }),
-    el('path', { d: 'M23.6 37.2a2.9 2.9 0 0 1 5.8 0M34.6 37.2a2.9 2.9 0 0 1 5.8 0', fill: 'none', stroke: '#c6f432', 'stroke-width': 2, 'stroke-linecap': 'round' }));
-  return svg;
-}
+/** Brand mark (DESIGN.md, Mark): the small variant (the robot's head) up to 40 px, the full mark (robot and chat
+ * bubbles) when `full` (sign-in, the home-screen icon). Files in /icons/, the same as the website's. */
+export const logo = (full = false) => h('img', { class: 'logo', src: `/icons/${full ? 'logo' : 'logo-small'}.svg`, alt: '', 'aria-hidden': 'true', width: 32, height: 32 });
 /** A toast (064). opts.bad: an error (looks different, announced at once); opts.undo: a function, shows an Undo button. */
 export function toast(msg, { bad = false, undo = null } = {}) {
   let box = $('#toasts'); if (!box) { box = h('div', { id: 'toasts', class: 'toasts', role: 'status', 'aria-live': 'polite' }); document.body.append(box); }

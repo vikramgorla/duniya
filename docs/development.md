@@ -23,7 +23,7 @@ npm install && ADMIN_PASSWORD=dev-password-123 npm start     # panel on http://1
 | `node scripts/demo-panel.mjs` | seeded demo panel on :8099 (admin / demo-password-123), no network |
 | `DEMO_EMPTY=1 node scripts/demo-panel.mjs` | a fresh install (no provider, no agent, WhatsApp waiting for a scan; *Get code* links it): check the first run |
 | `npm run check:responsive` | every screen at 375 / 393 / 1440 px, light + dark: layout, tap targets, text size, and accessibility (every control named, AA text contrast, 3:1 for icons) (needs Chrome). CI runs its navigation states: `nav-stress` (fast tab switching on a slow network ends on the chosen screen, fully drawn), `load-failed` / `load-retry` (a hung request ends in Retry, and Retry recovers) |
-| `npm run site:shots` | retake the website screenshots and videos (needs Chrome + ffmpeg). The link-preview image `docs/site/img/share.jpg` (1200×630 JPEG, under 150 KB, `og:image`) is made by hand: redo it when the look changes |
+| `npm run site:shots` | retake the website screenshots and videos (needs Chrome + ffmpeg). It also draws the link-preview image `docs/site/img/share.jpg` (1200×630 JPEG, under 150 KB, `og:image`) from the mark and the phone overview. `npm run brand:icons` re-renders the home-screen icons from `src/panel/public/icons/logo.svg` and copies the marks to the website |
 | `npm run measure:load` | first load of Overview in headless Chrome on slow and fast networks and a phone-speed CPU: bytes and time, cold and warm |
 
 ## Spec Kit

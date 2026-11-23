@@ -146,7 +146,7 @@ function drawInstallHint(box = $('#ov-install')) {
     if ((await p.userChoice.catch(() => null))?.outcome === 'accepted') hide(); else drawInstallHint(box);
   };
   box.replaceChildren(h('div', { class: 'card install-hint' },
-    h('div', { class: 'row nowrap' }, logo(), h('div', { style: 'flex:1;min-width:0' }, h('div', { class: 'eyebrow' }, 'Install on your phone'), h('h2', { style: 'margin:2px 0 0' }, 'Duniya on your home screen')),
+    h('div', { class: 'row nowrap' }, logo(true), h('div', { style: 'flex:1;min-width:0' }, h('div', { class: 'eyebrow' }, 'Install on your phone'), h('h2', { style: 'margin:2px 0 0' }, 'Duniya on your home screen')),
       h('button', { class: 'btn small', title: 'Hide this hint on this device', onclick: hide }, 'Hide')),
     S.installPrompt ? h('button', { class: 'btn primary', onclick: install }, 'Install')
       : ios ? h('p', { class: 'small', style: 'margin-bottom:0' }, 'Tap ', h('b', {}, 'Share'), ' (the square with the arrow), then ', h('b', {}, 'Add to Home Screen'), '.')

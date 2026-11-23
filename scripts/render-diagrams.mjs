@@ -23,7 +23,7 @@ const MERMAID_VERSION = '11.17.2';
 const MERMAID_INTEGRITY = 'sha512-V6K3C8EBdEsPFZXSKMJe6ppQOENxuHARr9GvHX4hh47lAbhMRD9qf4oEK7LoaRQxULMa80/qt5gHO73aCleBBg==';
 const MAX_WIDTH = 900;
 const FONT = 'Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, "Helvetica Neue", Arial, sans-serif';
-const INK = '#101216', PORCELAIN = '#f2f1ec', LIME = '#c6f432', HAIRLINE = '#dddbd3';
+const INK = '#101216', PORCELAIN = '#f2f1ec', SAFFRON_SOFT = '#ffdcc4', HAIRLINE = '#dddbd3';
 
 /** sha256 of a diagram source (line endings normalised). */
 export const srcHash = (text) => createHash('sha256').update(text.replace(/\r\n/g, '\n')).digest('hex');
@@ -91,9 +91,9 @@ const CONFIG = {
     primaryColor: PORCELAIN, primaryBorderColor: INK, primaryTextColor: INK, secondaryColor: PORCELAIN, tertiaryColor: '#ffffff',
     lineColor: INK, textColor: INK, edgeLabelBackground: '#ffffff', nodeTextColor: INK,
     actorBkg: PORCELAIN, actorBorder: INK, actorTextColor: INK, actorLineColor: '#8a8c93', signalColor: INK, signalTextColor: INK,
-    noteBkgColor: LIME, noteBorderColor: INK, noteTextColor: INK,
+    noteBkgColor: SAFFRON_SOFT, noteBorderColor: INK, noteTextColor: INK,
   },
-  themeCSS: `.node polygon { fill: ${LIME}; } .edgeLabel rect, .labelBkg { fill: #ffffff; opacity: 1; } .edgeLabel text, .edgeLabel tspan { fill: #3b3d44; }`,
+  themeCSS: `.node polygon { fill: ${SAFFRON_SOFT}; } .edgeLabel rect, .labelBkg { fill: #ffffff; opacity: 1; } .edgeLabel text, .edgeLabel tspan { fill: #3b3d44; }`,
 };
 
 /** In the page: render one diagram, add the card background, padding, size and the source hash. */

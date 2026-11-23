@@ -1,9 +1,9 @@
-/* Duniya site — "Constellation" (see DESIGN.md): porcelain + ink, one lime signal, mono instrument labels, LED dots. */
+/* Duniya site — "Constellation" (see DESIGN.md): porcelain + ink, one saffron signal (the mark's), mono instrument labels, LED dots. */
 :root {
   --bg: #f2f1ec; --bg-2: #e8e6df; --card: #ffffff; --ink: #101216; --muted: #5f636c; --line: #e2e0d8; --line-2: #cfccc2;
-  --signal: #c6f432; --signal-deep: #4d6b00; --signal-soft: #eef9cc;
+  --signal: #f55600; --signal-deep: #b23c00; --signal-soft: #ffe8da;
   --people-1: #ff7a3d; --people-2: #f2477e; --people-3: #13b3a1; --people-4: #5363ff; --people-5: #9bd400;
-  --warn: #9a4b00; --warn-soft: #ffeedd; --info: #2c4fd6; --info-soft: #e8edff;
+  --warn: #855600; --warn-soft: #fff2d2; --info: #2c4fd6; --info-soft: #e8edff;
   --radius: 16px; --radius-s: 10px;
   --shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 1px 2px rgba(16,18,22,.04), 0 10px 30px -18px rgba(16,18,22,.25);
   --shot: 0 1px 2px rgba(16,18,22,.06), 0 30px 60px -30px rgba(16,18,22,.35);
@@ -16,7 +16,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #0b0c0f; --bg-2: #15171c; --card: #121419; --ink: #eceef2; --muted: #9196a1; --line: #23262e; --line-2: #343844;
-    --signal-soft: rgba(198,244,50,.12); --warn: #ffb36b; --warn-soft: rgba(255,150,70,.13); --info: #9fb2ff; --info-soft: rgba(110,140,255,.14);
+    --signal: #ff7a2e; --signal-deep: #ffa46b; --signal-soft: rgba(255,122,46,.14); --warn: #ffc94d; --warn-soft: rgba(255,190,60,.13); --info: #9fb2ff; --info-soft: rgba(110,140,255,.14);
     --shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 12px 32px -18px rgba(0,0,0,.8); --shot: 0 30px 60px -30px rgba(0,0,0,.9);
     --grid: radial-gradient(rgba(255,255,255,.07) 1px, transparent 1.2px); }
 }
@@ -34,7 +34,7 @@ code, kbd, .mono { font-family: var(--mono); }
 
 /* ---------- instrument bits ---------- */
 .label { font: 600 11.5px/1.2 var(--mono); text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
-.led { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 3px rgba(198,244,50,.25), 0 0 10px rgba(198,244,50,.8); display: inline-block; flex: none; }
+.led { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 25%, transparent), 0 0 10px color-mix(in srgb, var(--signal) 80%, transparent); display: inline-block; flex: none; }
 .led.off { background: var(--line-2); box-shadow: none; }
 .pill { display: inline-flex; align-items: center; gap: 6px; font: 700 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 5px 8px; border-radius: 6px; background: var(--bg-2); white-space: nowrap; }
 .pill.ok { background: var(--signal-soft); color: var(--signal-deep); }
@@ -43,7 +43,7 @@ code, kbd, .mono { font-family: var(--mono); }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 18px; border-radius: 10px; font: 600 15px/1.2 var(--font); text-decoration: none; border: 1px solid var(--line-2); background: var(--card); color: var(--ink); cursor: pointer; transition: transform .08s, background .15s, border-color .15s; }
 .btn:hover { border-color: var(--ink); } .btn:active { transform: scale(.97); }
 .btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.btn.primary .led { box-shadow: 0 0 8px rgba(198,244,50,.9); }
+.btn.primary .led { box-shadow: 0 0 8px color-mix(in srgb, var(--signal) 90%, transparent); }
 @media (prefers-color-scheme: dark) { .btn.primary { background: var(--signal); color: #101216; border-color: var(--signal); } .btn.primary .led { background: #101216; box-shadow: none; } }
 
 /* ---------- header ---------- */
@@ -135,7 +135,7 @@ section { padding: 84px 0; }
 kbd { border: 1px solid var(--line-2); border-bottom-width: 2px; }
 .ticks { list-style: none; padding: 0; margin: 0; display: grid; gap: 9px; }
 .ticks li { position: relative; padding-left: 26px; font-size: 15px; color: var(--muted); }
-.ticks li::before { content: ""; position: absolute; left: 3px; top: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 3px rgba(198,244,50,.25); }
+.ticks li::before { content: ""; position: absolute; left: 3px; top: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 25%, transparent); }
 .shot { border-radius: 12px; border: 1px solid var(--line); background: var(--card); overflow: hidden; }
 .shot img, .shot video { width: 100%; }
 a.shot { display: block; }

@@ -50,8 +50,8 @@ RENDER
 <!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
 <title>Setting up · Duniya</title>
 <style>
-:root{--bg:#f2f1ec;--card:#fff;--ink:#101216;--mute:#5f636c;--line:#e2e0d8;--signal:#9bd400;--bad:#c42443;--warn:#9a4b00;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
-@media (prefers-color-scheme:dark){:root{--bg:#0b0c0f;--card:#121419;--ink:#eceef2;--mute:#9196a1;--line:#23262e;--signal:#c6f432;--bad:#ff7d93;--warn:#ffb36b}}
+:root{--bg:#f2f1ec;--card:#fff;--ink:#101216;--mute:#5f636c;--line:#e2e0d8;--signal:#f55600;--bad:#c42443;--warn:#855600;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0c0f;--card:#121419;--ink:#eceef2;--mute:#9196a1;--line:#23262e;--signal:#ff7a2e;--bad:#ff7d93;--warn:#ffc94d}}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(rgba(127,127,127,.12) 1px,transparent 1.2px) 0 0/22px 22px,var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif}
 main{max-width:820px;margin:0 auto;padding:36px 18px}.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:19px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;margin-top:16px}
@@ -69,7 +69,7 @@ li.fail{color:var(--bad);font-weight:600}li.fail .d{background:var(--bad);border
 pre{background:#0d0f13;color:#d6dae3;border-radius:12px;padding:14px;max-height:50vh;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12px/1.5 var(--mono)}
 details summary{cursor:pointer;color:var(--mute);font-size:14px;margin-top:14px}a{color:inherit}
 </style></head><body><main>
-<div class=brand><svg viewBox="0 0 64 64" width=30 height=30 aria-hidden=true><path d="M23 5H41A17 17 0 0 1 58 22V44L59.5 59.5L44 55H23A17 17 0 0 1 6 38V22A17 17 0 0 1 23 5Z" fill="#4d9b00" stroke="#4d9b00" stroke-width="4" stroke-linejoin="round"/><g fill="#101216"><rect x="11.8" y="28.3" width="9" height="13.4" rx="4"/><rect x="43.2" y="28.3" width="9" height="13.4" rx="4"/><circle cx="32" cy="12.6" r="2.8"/></g><path d="M32 14.8v6.7" stroke="#101216" stroke-width="2.7" stroke-linecap="round"/><rect x="18" y="21.5" width="28" height="27" rx="13" fill="#fff" stroke="#101216" stroke-width="2.7"/><rect x="20.8" y="29.4" width="22.4" height="12.3" rx="6.15" fill="#101216"/><path d="M23.6 37.2a2.9 2.9 0 0 1 5.8 0M34.6 37.2a2.9 2.9 0 0 1 5.8 0" fill="none" stroke="#c6f432" stroke-width="2" stroke-linecap="round"/></svg>Duniya</div>
+<div class=brand><svg viewBox="0 0 64 64" width=30 height=30 aria-hidden=true><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb6602"/><stop offset="1" stop-color="#ec4a00"/></linearGradient></defs><rect width="64" height="64" rx="17" fill="url(#g)"/><g fill="#fff"><circle cx="32" cy="11" r="5"/><rect x="30.25" y="13" width="3.5" height="8"/><rect x="6.5" y="27" width="9.5" height="17" rx="4.75"/><rect x="48" y="27" width="9.5" height="17" rx="4.75"/><rect x="11.5" y="19" width="41" height="35" rx="14"/></g><rect x="17.5" y="25" width="29" height="22" rx="10" fill="#f25a00"/><path d="M21.6 38.5a4.4 4.4 0 0 1 8.8 0M33.6 38.5a4.4 4.4 0 0 1 8.8 0" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/></svg>Duniya</div>
 <div class=card><div class=eyebrow id=eyebrow>Setting up your server</div><h1 id=title>Starting…</h1><p id=sub>First boot takes about 10–15 minutes on the free VM. Keep this page open: it follows the setup and opens your admin panel when it is ready.</p>
 <ol id=steps></ol><div id=banner class=banner style="display:none"></div>
 <details id=logbox open><summary>Log</summary><pre id=log>Waiting for the first lines…</pre></details></div>

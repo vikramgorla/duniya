@@ -7,7 +7,7 @@ export async function renderLogin() {
   // 063: the session answer carries the status when signed in, so the first screen waits for one round trip, not two
   let info = {}; try { info = await (await fetch('/api/session?status=1')).json(); } catch {}
   S.google = !!info.google;
-  const brand = () => [h('div', { style: 'display:flex;justify-content:center;margin:4px 0 6px' }, Object.assign(logo(), { style: 'width:76px;height:76px' })),
+  const brand = () => [h('div', { style: 'display:flex;justify-content:center;margin:4px 0 6px' }, Object.assign(logo(true), { style: 'width:76px;height:76px' })),
     h('h2', { style: 'text-align:center;font-size:24px;margin-bottom:2px' }, 'Duniya')];
   const signup = /^#signup=([a-f0-9]{64})$/.exec(location.hash);
   if (signup) return renderSignup(app, brand, signup[1]);

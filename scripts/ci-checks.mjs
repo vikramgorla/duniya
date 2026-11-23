@@ -18,6 +18,7 @@
 // 10. Clean code (fails, 2.57): no new break of the clean-code rules (function size and branches, nesting, parameters,
 //     file length); code that broke them before is listed in scripts/clean-baseline.json and may only shrink
 //     (scripts/check-clean.mjs, npm run check:clean; npm run clean:baseline lowers it).
+// 11. Brand (fails, 097): the website's marks (docs/site/img/logo*.svg) are the panel's (src/panel/public/icons/).
 //  9. Repository (fails, 084): every project URL in tracked files (README, docs, website, infra, installer) uses the
 //     slug in package.json `repository` (scripts/repo-sync.mjs; fix with npm run repo:sync). specs/ keep their history.
 import { execFileSync } from 'node:child_process';
@@ -131,5 +132,11 @@ try {
   for (const e of errors) console.log(`::error::Clean code (AGENTS.md): ${e}`);
   for (const l of lower) console.log(`::error::Clean code: cleaner than scripts/clean-baseline.json, lower it with npm run clean:baseline: ${l}`);
   if (errors.length || lower.length) failed = true; else console.log('clean code: ok');
+}
+// 11. brand (097): the website's marks are the panel's (npm run brand:icons copies them)
+{
+  const drift = ['logo.svg', 'logo-small.svg'].filter((f) => read(`src/panel/public/icons/${f}`) !== read(`docs/site/img/${f}`));
+  for (const f of drift) { failed = true; console.log(`::error file=docs/site/img/${f}::docs/site/img/${f} differs from src/panel/public/icons/${f}: run npm run brand:icons.`); }
+  if (!drift.length) console.log('brand marks: ok');
 }
 process.exit(failed ? 1 : 0);
