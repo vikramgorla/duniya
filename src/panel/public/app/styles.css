@@ -4,7 +4,7 @@
   /* colour: porcelain ground, white cards, ink, one signal colour: the saffron of the mark (105) */
   --bg: #f2f1ec; --bg-2: #e8e6df; --card: #ffffff; --ink: #101216; --muted: #5a5e67;
   --line: #e2e0d8; --line-2: #cfccc2;
-  --signal: #f55600; --signal-ink: #101216; --signal-deep: #b23c00;
+  --signal: #f55600; --signal-ink: #101216; --signal-deep: #b23c00; --signal-on-light: #b23c00; /* saffron text on a light ground in both schemes (the dark-mode toast) */
   --accent: #101216; --accent-ink: #ffffff; --accent-soft: #eceae4;
   --ok: #1f6b37; --ok-soft: #e1f3e4; --warn: #855600; --warn-soft: #fff2d2; --bad: #c42443; --bad-soft: #ffe6ea;
   --info: #2c4fd6; --info-soft: #e8edff; --amber: #e9a400; /* warnings are amber, never the brand's saffron */
@@ -301,7 +301,7 @@ details.rel > .note, .rel-sum, .rel-group, .rel-more { margin: 0 0 var(--s3) 18p
 .toast.bad { background: #c42443; color: #fff; }
 .toast.bad::before { content: "!"; font: 700 12px/18px var(--mono); width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,.25); text-align: center; flex: none; }
 .toast button { font: inherit; font-weight: 700; color: var(--signal); background: none; border: 0; padding: 6px 6px; min-height: 40px; cursor: pointer; }
-@media (prefers-color-scheme: dark) { .toast button { color: var(--signal-deep); } }
+@media (prefers-color-scheme: dark) { .toast button { color: var(--signal-on-light); } }
 @keyframes toastin { from { opacity: 0; transform: translateY(10px); } }
 /* activity feed (066): day headings; one row per entry: marker · bold subject · time, muted type/agent/chat below */
 .feed { list-style: none; margin: 0; padding: 0; }
