@@ -34,6 +34,7 @@ import { lessonFromCorrection, noteJudgedAnswer } from './lessons.js';
 import { noteMessage as noteCommitments } from './commitments.js';
 import { noteCues, noteWriter } from './person-insights.js';
 import { findMedia, fitsCaption, postMedia } from './sharing.js';
+import { mediaDetail, storedMedia } from './message-media.js';
 
 // 059: the built-in owner assistant is reached through the owner hand-off only, never by routing.
 const listAgents = () => allAgents().filter((b) => !isBuiltin(b));
@@ -167,7 +168,7 @@ export function createHistoryHandler() {
 }
 /** A message from the phone's history as a stored row. */
 const historyRow = (m, agent) => ({ channel: m.channel, chat: m.chat, agent: agent?.id || '', msgId: m.msgId, sender: m.phone, name: m.senderName,
-  text: m.text, quoted: m.quoted, fromAgent: m.fromMe, ts: m.ts, senderJid: m.fromMe ? '' : m.senderJid });
+  text: m.text, quoted: m.quoted, fromAgent: m.fromMe, ts: m.ts, senderJid: m.fromMe ? '' : m.senderJid, media: storedMedia(m) });
 /** History the owner asked the phone for (#91): per chat to history-load, which stores it for chats that are on only. */
 function storeAskedHistory(msgs, chats) {
   const byChat = new Map(chats.map((c) => [c, []]));
@@ -255,7 +256,7 @@ export function createRouter(channel) {
     if (!msg.isGroup) {
       s.rowId = logMessage({
         channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: msg.msgId, sender: msg.phone,
-        name: msg.senderName, text: msg.text, quoted: msg.quoted, addressed: true, ts: msg.ts, senderJid: msg.senderJid,
+        name: msg.senderName, text: msg.text, quoted: msg.quoted, addressed: true, ts: msg.ts, senderJid: msg.senderJid, media: storedMedia(msg),
       });
     }
     learnAboutWriter(s, agent);
@@ -339,7 +340,7 @@ async function rememberOrIntercept(channel, s) {
   if (!msg.isGroup) return !!msg.personId && interceptMessage(msg, channel);
   s.rowId = logMessage({
     channel: msg.channel, chat: msg.chat, agent: groupAgent?.id || '', msgId: msg.msgId, sender: msg.phone,
-    name: msg.senderName, text: msg.text, quoted: msg.quoted, ts: msg.ts, senderJid: msg.senderJid,
+    name: msg.senderName, text: msg.text, quoted: msg.quoted, ts: msg.ts, senderJid: msg.senderJid, media: storedMedia(msg),
   });
   summarizeLater(msg.chat, groupAgent);
   return false;
@@ -504,8 +505,9 @@ async function sendVoiceNote(channel, msg, agent, { text, voice, media }) {
   const notice = !msg.isGroup ? dmNoticeOnce(msg.phone || msg.chat) : null; // 044: once per person
   if (notice) await channel.send(msg.chat, `_${notice}_`).catch(() => {}); // the answer is out: the notice is tried again with the next one
   countStat('reply', { agent: agent.id });
-  const id = logMessage({ channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true });
-  activity('message.out', { agent: agent.id, chat: msg.chat, summary: `🔊 ${text}`, detail: { voice: voice.by, ...(id ? { msg: id } : {}) } });
+  const played = storedMedia(sent); // 096: the voice note plays in the panel
+  const id = logMessage({ channel: msg.channel, chat: msg.chat, agent: agent.id, msgId: sent?.msgId || null, sender: 'agent', name: 'Assistant', text, fromAgent: true, media: played });
+  activity('message.out', { agent: agent.id, chat: msg.chat, summary: `🔊 ${text}`, detail: { voice: voice.by, ...(id ? { msg: id, ...mediaDetail(played) } : {}) } });
   await postAfter(media);
   return id;
 }
@@ -651,7 +653,8 @@ async function runTurn(channel, msg, { agent, role, addressed, rowId, quiet, que
     const logIn = () => activity('message.in', {
       agent: agent.id, chat: msg.chat,
       summary: `${whoOf(msg)} (${role}): ${voiceIn ? `🎤 ${text}` : text}`,
-      detail: { phone: msg.phone, isGroup: msg.isGroup, quoted: msg.quoted || undefined, ...(judge ? { judged: true } : {}), ...(media?.blocks?.length ? { attachments: media.blocks.map((b) => b.type) } : {}) },
+      detail: { phone: msg.phone, isGroup: msg.isGroup, quoted: msg.quoted || undefined, ...(judge ? { judged: true } : {}), ...(media?.blocks?.length ? { attachments: media.blocks.map((b) => b.type) } : {}),
+        ...(rowId && msg.mediaInfo ? { msg: rowId, ...mediaDetail(storedMedia(msg)) } : {}) }, // 096: the picture opens in Activity
     });
     if (!judged) { countStat('handled', { agent: agent.id }); logIn(); } // 076: a judged message is logged only when answered
     let answer = { out: confirmed, share: null, typingSince: null };
@@ -696,7 +699,7 @@ function registerMediaHandlers(channel) {
       if (p.imageFile) {
         try { image = { buffer: readFileSync(p.imageFile), mimetype: p.mimetype || 'image/png' }; } catch { throw Object.assign(new Error('The photo to change is gone (the server restarted); please send it again'), { permanent: true }); }
       }
-      try { await createImage(p.input, { agent, chat: p.chat, image }); } finally { if (p.imageFile && !image) rmSync(p.imageFile, { force: true }); }
+      try { await createImage(p.input, { agent, chat: p.chat, image, keep: !p.owner }); } finally { if (p.imageFile && !image) rmSync(p.imageFile, { force: true }); }
       if (p.imageFile) rmSync(p.imageFile, { force: true });
     },
     async stale(p) { if (p.imageFile) rmSync(p.imageFile, { force: true }); await channel.send(p.chat, 'Sorry, I couldn’t make that picture in time. Ask me again if you still want it.').catch(recordFailure('The apology for a late picture', { chat: p.chat })); },

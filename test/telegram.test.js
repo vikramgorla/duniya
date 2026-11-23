@@ -270,6 +270,9 @@ test('Telegram: a GIF goes out as an animation, so it plays', async () => {
   const r = await hub.sendMedia(chat(SUPER), { kind: 'gif', base64: 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', mimetype: 'image/gif' });
   assert.equal(fake.calls.at(-1).method, 'sendAnimation');
   assert.ok(r.msgId && !r.asStill);
+  // 096: what was sent, so the stored message shows the GIF in the panel (the animation, not the document beside it)
+  assert.deepEqual(r.mediaInfo, { type: 'gif', mimetype: 'video/mp4', size: 2048, seconds: 2 });
+  assert.match(r.mediaRef, /^anim-/);
 });
 
 test('Telegram: upkeep gives every group its turn; a group the bot was removed from while the server was off leaves Chats', async () => {

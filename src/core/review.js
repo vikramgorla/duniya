@@ -5,6 +5,7 @@
 import { db } from './db.js';
 import { fail } from './config.js';
 import { privateChats } from './chat-prefs.js';
+import { mediaView } from './message-media.js';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS reply_ratings (
@@ -42,13 +43,14 @@ export function listAnswers(agent, { before = 0, limit = 20, only = '' } = {}) {
   if (hidden.length) { where.push(`m.chat NOT IN (${hidden.map(() => '?').join(',')})`); args.push(...hidden); }
   if (only === 'down') where.push('r.rating < 0');
   if (only === 'unrated') where.push('r.rating IS NULL');
-  const rows = db.prepare(`SELECT m.id, m.chat, m.ts, m.text, r.rating, r.by FROM messages m LEFT JOIN reply_ratings r ON r.msg = m.id
+  const rows = db.prepare(`SELECT m.id, m.chat, m.ts, m.text, m.media, r.rating, r.by FROM messages m LEFT JOIN reply_ratings r ON r.msg = m.id
     WHERE ${where.join(' AND ')} ORDER BY m.id DESC LIMIT ?`).all(...args, lim);
   const asked = db.prepare(`SELECT name, sender, sender_jid, text, ts FROM messages WHERE chat = ? AND id < ? AND from_agent = 0 AND ts >= ?
     ORDER BY addressed DESC, id DESC LIMIT 1`);
   return rows.map((m) => {
     const q = asked.get(m.chat, m.id, m.ts - ASKED_WITHIN);
-    return { id: m.id, chat: m.chat, ts: m.ts, text: m.text, rating: m.rating || 0, ratedBy: m.by || '',
+    const media = mediaView(m.media); // 096: a GIF it shared shows with the answer
+    return { id: m.id, chat: m.chat, ts: m.ts, text: m.text, ...(media ? { media } : {}), rating: m.rating || 0, ratedBy: m.by || '',
       question: q ? { name: q.name, sender: q.sender, senderJid: q.sender_jid, text: q.text, ts: q.ts } : null };
   });
 }

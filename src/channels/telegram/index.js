@@ -454,7 +454,8 @@ function sends(bot, queue) {
       const [method, field] = mediaMethod(kind, m.mimetype, voiceNote);
       const sent = await queue.queued(n, (id) => upload(method, kind === 'sticker' ? { chat_id: id }
         : { chat_id: id, ...(cap ? { caption: cap.text, caption_entities: cap.entities } : {}), ...replyTo({ quote }) }, field, m));
-      return { ...sentId(sent), mimetype: m.mimetype, bytes: m.buffer.length };
+      const media = mediaOf(sent || {}); // 096: what it is, stored with the message
+      return { ...sentId(sent), ...(media ? { mediaInfo: media.info, mediaRef: media.ref } : {}), mimetype: m.mimetype, bytes: m.buffer.length };
     },
     async sendLocation(chat, { latitude, longitude, name = '', address = '' }) {
       const n = bot.nativeOf(chat); const lat = Number(latitude); const lng = Number(longitude);

@@ -1,6 +1,24 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.61.0": {
+      "breaking": false,
+      "title": "Photos, stickers, GIFs and voice notes show in the panel",
+      "changes": [
+        {
+          "type": "new",
+          "text": "A chat’s Messages show its photos, stickers, GIFs, videos and voice notes instead of “[image]” or “[GIF]”: pictures in place, GIFs playing, players for videos and voice notes. The same for what agents send, in Review and when you open an Activity entry."
+        },
+        {
+          "type": "improved",
+          "text": "A picture an agent creates is now kept with the chat’s messages, so the agent and you see it there."
+        },
+        {
+          "type": "improved",
+          "text": "Nothing is stored on your server: a picture comes from WhatsApp or Telegram when you look at it, a few at a time and smaller ones on small servers. What WhatsApp no longer has says “no longer available”."
+        }
+      ]
+    },
     "2.60.7": {
       "breaking": false,
       "title": "Tidier inside, nothing changes for you",

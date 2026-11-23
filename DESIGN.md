@@ -229,6 +229,15 @@ marked with `<mark>` built from text nodes (`highlight()` in `find.js`, never HT
 chat's *Messages* (`#chats/<id>/messages`), filtered by the same words. An empty result says
 where it looked ("No stored message in the 6 chats that are on matches …").
 
+## Pictures in messages (096)
+
+A message's photo, sticker, GIF, video or voice note shows inside its bubble, above its words (`messageMedia()` in
+`media.js`): the same in a chat's *Messages*, an agent's *Review* and an opened Activity entry. Photos and stickers
+are pictures (at most 260 px, stickers 120 px without a ground; a photo opens full size), GIFs are muted videos that
+loop while on screen, videos and voice notes use the browser's player with their length beside it. The
+placeholder line (`[GIF: happy]`) is not shown with the media; a person's caption stays as words. Nothing loads until
+it is near the screen; what the chat app no longer has says *no longer available* in muted text where the picture was.
+
 ## Review (070)
 
 An agent's *Review* section is a list of answers separated by hairlines (no cards): one muted line (who asked · chat ·

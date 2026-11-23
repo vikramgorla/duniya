@@ -19,6 +19,7 @@ import { isDuplicate, noteSent } from './turns.js';
 import { silenceReason } from './silences.js';
 import { forgetChanged } from './memory.js';
 import { withoutMediaClutter } from './credits.js';
+import { storedMedia } from './message-media.js';
 
 let channel = null;
 /** The channel hub the tools act through (set by the router and the panel at startup). */
@@ -119,9 +120,9 @@ const current = (chat, ctx) => () => (ctx.msgId ? messageByMsgId(chat, ctx.msgId
  * The agent's own sends are stored like its replies (context, edit/delete later). Not in the owner assistant's own
  * chat (059): that conversation lives in owner_messages, never in chat memory.
  */
-function remember(ctx, chat, msgId, text, quoted = '') {
+function remember(ctx, chat, msgId, text, { quoted = '', media = '' } = {}) {
   if (ctx.ownerChat && chat === ctx.ownerChat) return;
-  logMessage({ chat, agent: ctx.agent.id, msgId: msgId || null, sender: 'agent', name: 'Assistant', text, ...(quoted ? { quoted } : {}), fromAgent: true });
+  logMessage({ chat, agent: ctx.agent.id, msgId: msgId || null, sender: 'agent', name: 'Assistant', text, ...(quoted ? { quoted } : {}), fromAgent: true, media });
 }
 function people(input) {
   const list = Array.isArray(input.people) ? input.people : String(input.people || '').split(/[,\n]/);
@@ -171,7 +172,7 @@ const DEFS = [
       const caption = withoutMediaClutter(input.caption || '', [String(input.url || '')]);
       const r = await need().sendMedia(chat, { kind: input.kind, url: input.url, base64: input.base64, mimetype: input.mimetype, caption, fileName: input.file_name || '' });
       const label = `[${input.kind === 'audio' ? 'voice note' : input.kind}${caption ? `: ${clip(caption, 300)}` : ''}]`;
-      remember(ctx, chat, r.msgId, label);
+      remember(ctx, chat, r.msgId, label, { media: storedMedia(r) }); // 096: it shows in the panel's messages
       noteSent(chat, ctx.agent.id, what);
       return { chat, result: { sent: true, msgId: r.msgId, type: r.mimetype, ...(r.asStill ? { note: 'Sent as a still image (use an MP4 for a moving GIF)' } : {}) }, summary: `${label} ${r.bytes} bytes` };
     } },
@@ -215,7 +216,7 @@ const DEFS = [
       const ref = findMessage(chat, input.message, current(chat, ctx));
       const dup = duplicate(ctx, chat, { kind: 'text', text: String(input.text) }); if (dup) return dup;
       const r = await need().send(chat, String(input.text), { quote: ref });
-      remember(ctx, chat, r?.msgId, String(input.text), ref.text);
+      remember(ctx, chat, r?.msgId, String(input.text), { quoted: ref.text });
       noteSent(chat, ctx.agent.id, { kind: 'text', text: String(input.text) });
       return { chat, result: { sent: true, msgId: r?.msgId || null }, summary: `Replied to "${clip(ref.text, 60)}": ${clip(input.text, 120)}` };
     } },

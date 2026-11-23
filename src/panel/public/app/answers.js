@@ -3,6 +3,7 @@
 // Module of the panel (063), loaded with the screens that show answers.
 import { api, can, dropCache, h, toast, tryApi } from './core.js';
 import { trunc } from './shared.js';
+import { messageMedia } from './media.js';
 
 /** The words Teach starts the AI helper with; the cursor waits after "Better answer:". */
 const teachText = (a) => `Someone asked: “${trunc(a.question?.text || '(no question found)', 300)}”\nIt answered: “${trunc(a.text, 400)}”\nBetter answer: `;
@@ -43,8 +44,9 @@ export function answerActions(a, { teach = null, extra = null } = {}) {
 /** 072: an open Activity entry: a reply's rating row, links to where it happened (the answer in the chat's messages,
  *  the chat, the agent) and the details. */
 export function entryOpen(a, chatName, agentName) {
-  const msg = a.type === 'message.out' && a.detail?.msg;
+  const msg = a.detail?.msg;
   const admin = can('admin');
+  const media = admin && msg && a.chat ? messageMedia(a.chat, msg, a.detail.media) : null; // 096: the picture of the message
   const chat = a.chat && encodeURIComponent(a.chat); const agent = a.agent && a.agent !== 'owner-assistant' ? encodeURIComponent(a.agent) : '';
   const links = [msg && admin ? h('a', { class: 'btn small', href: `#chats/${chat}/messages/${msg}` }, 'See in messages') : null,
     chat ? h('a', { class: 'btn small ghost', href: `#chats/${chat}` }, `Open ${chatName}`) : null,
@@ -53,7 +55,7 @@ export function entryOpen(a, chatName, agentName) {
   const d = a.detail || {}; const c = d.check;
   const notes = [d.tier ? `${d.tier === 'light' ? 'Light' : 'Strong'} model: ${d.reason}.` : '',
     c ? (c.ok ? `Checked: ${c.facts} ${c.facts === 1 ? 'fact matches' : 'facts match'} the records.` : `Checked: ${c.wrong} of ${c.facts} did not match the records; ${c.rewritten ? 'rewritten' : 'a plain answer went out'}.`) : ''].filter(Boolean);
-  return [msg && agent && admin ? answerActions({ id: msg, agent: a.agent, rating: a.rating || 0, text: a.summary }) : null, links.length ? h('div', { class: 'row fx' }, links) : null,
+  return [media, a.type === 'message.out' && msg && agent && admin ? answerActions({ id: msg, agent: a.agent, rating: a.rating || 0, text: a.summary }) : null, links.length ? h('div', { class: 'row fx' }, links) : null,
     notes.length ? h('p', { class: 'small' }, notes.join(' ')) : null,
     h('details', {}, h('summary', { class: 'small muted' }, 'Details'), h('pre', {}, JSON.stringify({ type: a.type, ...(a.detail ? { detail: a.detail } : {}) }, null, 2)))].filter(Boolean);
 }

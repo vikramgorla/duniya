@@ -35,6 +35,10 @@ const CAPTIONED = ['imageMessage', 'videoMessage', 'documentMessage', 'documentW
 // Where a message keeps what it quotes, mentions and answers (its contextInfo), by kind.
 const WITH_CONTEXT = ['extendedTextMessage', 'imageMessage', 'videoMessage', 'documentMessage', 'audioMessage', 'stickerMessage', 'locationMessage'];
 const contextOf = (c) => WITH_CONTEXT.map((k) => c?.[k]?.contextInfo).find(Boolean);
+// What a later download does not need: previews and context can be kilobytes each (096: references are stored)
+const NOT_FOR_DOWNLOAD = new Set(['jpegThumbnail', 'contextInfo', 'scansSidecar', 'scanLengths', 'midQualityFileSha256', 'thumbnailDirectPath',
+  'thumbnailSha256', 'thumbnailEncSha256', 'streamingSidecar', 'waveform', 'pngThumbnail', 'firstFrameSidecar', 'caption']);
+const MEDIA_KIND = /^(image|video|audio|sticker|document)Message$/;
 
 /**
  * One WhatsApp number: a linked-device session via Baileys (075: the adapter in index.js holds one per number).
@@ -352,13 +356,27 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
     const num = (v) => (v == null ? 0 : Number(typeof v === 'object' && v.low !== undefined ? v.low + (v.high || 0) * 2 ** 32 : v));
     const doc = c.documentMessage || c.documentWithCaptionMessage?.message?.documentMessage;
     if (c.imageMessage) return { type: 'image', mimetype: c.imageMessage.mimetype || 'image/jpeg', size: num(c.imageMessage.fileLength) };
+    if (c.videoMessage) return { type: c.videoMessage.gifPlayback ? 'gif' : 'video', mimetype: c.videoMessage.mimetype || 'video/mp4', size: num(c.videoMessage.fileLength), seconds: num(c.videoMessage.seconds) };
     if (c.stickerMessage) return { type: 'sticker', mimetype: c.stickerMessage.mimetype || 'image/webp', size: num(c.stickerMessage.fileLength) };
     if (c.audioMessage) return { type: 'audio', mimetype: String(c.audioMessage.mimetype || 'audio/ogg').split(';')[0], size: num(c.audioMessage.fileLength), seconds: num(c.audioMessage.seconds), ptt: !!c.audioMessage.ptt };
     if (doc) return { type: 'document', mimetype: doc.mimetype || '', size: num(doc.fileLength), fileName: doc.fileName || '' };
     return null;
   }
-  /** Only what a later download needs (key + media message), serialisable, so a queued job survives a restart. */
-  const mediaRefOf = (msg) => JSON.stringify({ key: msg.key, message: msg.message }, BufferJSON.replacer);
+  /**
+   * Only what a later download needs (key + the media part of the message), serialisable, so a queued job survives a
+   * restart and a stored message can show its media later (096).
+   */
+  function mediaRefOf(msg) {
+    const c = normalizeMessageContent(msg.message) || {};
+    const kind = Object.keys(c).find((k) => MEDIA_KIND.test(k) && c[k]);
+    const part = kind ? { [kind]: Object.fromEntries(Object.entries(c[kind]).filter(([k, v]) => v != null && !NOT_FOR_DOWNLOAD.has(k))) } : msg.message;
+    return JSON.stringify({ key: msg.key, message: part }, BufferJSON.replacer);
+  }
+  /** What a sent message's media is (096: stored with the message), or nothing. */
+  function sentMedia(sent) {
+    const info = sent?.message ? mediaInfoOf(normalizeMessageContent(sent.message) || {}) : null;
+    return info ? { mediaInfo: info, mediaRef: mediaRefOf(sent) } : {};
+  }
   async function downloadRef(ref, declared = 0) {
     if (declared > MAX_MEDIA_BYTES) throw fail('Media is too large', 413);
     const m = typeof ref === 'string' ? JSON.parse(ref, BufferJSON.reviver) : ref;
@@ -492,8 +510,9 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
     const quotedMsg = ctx?.quotedMessage ? normalizeMessageContent(ctx.quotedMessage) : null;
     const quoted = quotedMsg ? (textOf(quotedMsg) || describe(quotedMsg)).slice(0, 500) : '';
     const selfIds = [sock.user?.id, sock.user?.lid].filter(Boolean).map(jidNormalizedUser);
-    const mediaInfo = includeOwn ? null : mediaInfoOf(c);
-    const media = mediaInfo ? { mediaInfo, mediaRef: mediaRefOf(msg), fetchMedia: () => downloadRef(msg, mediaInfo.size) } : {};
+    // own messages (history, the phone) keep what their media is for the panel (096), but agents never open them
+    const mediaInfo = mediaInfoOf(c);
+    const media = mediaInfo ? { mediaInfo, mediaRef: mediaRefOf(msg), ...(includeOwn ? {} : { fetchMedia: () => downloadRef(msg, mediaInfo.size) }) } : {};
     return {
       ...base, ...media, kind: 'text', text, quoted, media: !!shown, caption: shown ? said : '',
       mentioned: (ctx?.mentionedJid || []).some((j) => selfIds.includes(jidNormalizedUser(j))),
@@ -563,7 +582,7 @@ export function createWhatsAppSession({ number = 'main', label = 'Main', authDir
       else if (kind === 'audio') content = { audio: m.buffer, mimetype: m.mimetype === 'audio/ogg' ? 'audio/ogg; codecs=opus' : m.mimetype, ptt: !!voiceNote && m.mimetype === 'audio/ogg' };
       else content = { document: m.buffer, mimetype: m.mimetype, fileName: m.fileName, caption };
       const sent = await s.sendMessage(jid, content, quote ? { quoted: quotedOf(jid, quote) } : undefined);
-      return { ...sentId(sent), mimetype: m.mimetype, bytes: m.buffer.length, asStill: kind === 'gif' && m.mimetype === 'image/gif' };
+      return { ...sentId(sent), ...sentMedia(sent), mimetype: m.mimetype, bytes: m.buffer.length, asStill: kind === 'gif' && m.mimetype === 'image/gif' };
     },
     async sendLocation(jid, { latitude, longitude, name = '', address = '' }) {
       const lat = Number(latitude); const lng = Number(longitude);

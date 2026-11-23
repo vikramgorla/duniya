@@ -64,7 +64,9 @@ export function fakeBotApi({ token = FAKE_TOKEN, me = {} } = {}) {
         const list = ready(); f.updates = f.updates.filter((x) => x.update_id >= (params.offset || 0));
         return ok(list);
       }
-      case 'sendMessage': case 'sendPhoto': case 'sendAnimation': case 'sendVideo': case 'sendSticker': case 'sendVoice': case 'sendAudio': case 'sendDocument':
+      // an animation comes back as Telegram sends it: the GIF (as MP4) and a document beside it
+      case 'sendAnimation': return ok(message(params, { animation: { file_id: `anim-${nextMsg}`, mime_type: 'video/mp4', file_size: 2048, duration: 2 }, document: { file_id: `anim-${nextMsg}`, mime_type: 'video/mp4', file_size: 2048 } }));
+      case 'sendMessage': case 'sendPhoto': case 'sendVideo': case 'sendSticker': case 'sendVoice': case 'sendAudio': case 'sendDocument':
       case 'sendLocation': case 'sendVenue': case 'sendContact': return ok(message(params, method === 'sendMessage' ? { text: params.text } : {}));
       case 'sendPoll': { const msg = message(params, { poll: { id: `poll${nextMsg}`, question: params.question, options: params.options } }); return ok(msg); }
       case 'editMessageText': return ok(message(params, { message_id: params.message_id, text: params.text }));

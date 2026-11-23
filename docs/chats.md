@@ -37,6 +37,11 @@ the right in its agent's colour, with the agent's avatar and name (a link to the
 - Under every answer: **👍 / 👎**, and on a 👎 **Teach…** (the AI helper, pre-filled with the question, the answer and
   *Better answer:*). It is the same row as the agent's [Review](agents.md#review-and-teach) and an Activity reply: a
   rating made in one place shows in all three.
+- **Photos, stickers, GIFs, videos and voice notes** show in place: photos and stickers as pictures (tap to open
+  one full size), GIFs play by themselves while they are on screen, videos and voice notes have a player. A person's
+  caption stays under the picture; a document shows its name. The same goes for a GIF an agent shared, a picture it
+  made and its voice answers, in [Review](agents.md#review-and-teach) and when you open an Activity entry. See
+  [Pictures in messages](#pictures-in-messages) for where they come from.
 - Search the chat's stored messages, **Load older**, and **Load earlier from your phone** (see below).
 - **In chat ›** in Review and **See in messages** in Activity open the messages at that answer, marked; **Show the
   latest** goes back to the newest.
@@ -56,6 +61,17 @@ the agent to keep (**Delete** per note), **Rebuild summary** and **Erase memory*
 An agent's *Memory* section links to the memory of each of its chats.
 
 **Chats → a chat → Activity** opens Activity for that chat only (**✕ All chats** shows everything again).
+
+### Pictures in messages
+
+The server keeps what a message's media is and where WhatsApp or Telegram has it, never the file. When a picture
+scrolls into view the panel asks the server, and the server gets it from the chat app at that moment:
+
+- Nothing to set up and nothing stored on the server's disk; your browser keeps a picture for a day.
+- A few at a time, each within 30 seconds; files larger than the server shows (4 MB on a small server, 16 MB on a
+  large one) show their kind and size instead, as do documents.
+- WhatsApp keeps media for a limited time. What it no longer has says **no longer available** in place of the picture.
+- Only admins and owners see them, as the messages; chats that are off store nothing.
 
 ## WhatsApp group tools
 

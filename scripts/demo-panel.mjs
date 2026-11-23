@@ -10,8 +10,10 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, utimesSync } from 
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { lakePhoto, smileSticker } from './demo-media.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
+const DEMO_MEDIA = new Map([['photo', lakePhoto()], ['sticker', smileSticker()]]); // 096: a message's photo and sticker
 export const DEMO_PASSWORD = 'demo-password-123';
 
 /** What the fake AI helper proposes when asked to change the car-pooling agent (shows the review's diff, #32). */
@@ -278,6 +280,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
       async groupMembers(jid) { return find(jid)?.members || []; },
       async isMember(jid, phone) { return !!find(jid)?.members.some((m) => m.phone === phone); },
       async send() { return { msgId: `out-${Date.now()}` }; },
+      async downloadMedia(jid, ref) { if (!DEMO_MEDIA.has(ref)) throw new Error('media expired'); return DEMO_MEDIA.get(ref); },
       async typing() {},
       async lookupNumber(phone) { return { jid: `${String(phone).replace(/\D/g, '')}@s.whatsapp.net`, exists: true, lid: '' }; },
       async groupInfo(jid) {
@@ -350,16 +353,22 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   // messages & memory of the car-pooling group
   const conv = [
     [2, 'Marc', 'I drive to Geneva Friday, leaving Morges station 07:40. 3 seats.', false, false],
+    [2, 'Marc', '[image: The blue car, by the lake side of the station]', false, false, 'photo'],
     [3, 'Lea', '!ride any seat to Geneva on Friday morning?', true, false],
     [0, 'Car pooling', 'Friday 21 Nov: Marc drives from Morges station at 07:40, 3 seats. I saved a seat for you, Lea — 2 left.', false, true],
     [5, 'Sophie', 'Can someone take me back Thursday evening? Geneva Cornavin → Morges around 18:00', false, false],
     [8, 'Luca', '@Car pooling who drives tomorrow?', true, false],
     [0, 'Car pooling', 'Tomorrow (Thu 20 Nov): Luca 07:15 from Morges (full), Mia back from Cornavin at 18:10 (1 seat). Sophie, Mia could take you.', false, true],
     [9, 'Mia', 'Yes Sophie, meet at Cornavin 18:10 👍', false, false],
+    [5, 'Sophie', '[sticker]', false, false, 'sticker'],
   ];
+  // 096: the photo and the sticker come from the fake WhatsApp (downloadMedia), as from the real one
+  const { mediaView, storedMedia } = await imp('src/core/message-media.js');
+  const MEDIA_INFO = { photo: { type: 'image', mimetype: 'image/png', size: DEMO_MEDIA.get('photo').length }, sticker: { type: 'sticker', mimetype: 'image/png', size: DEMO_MEDIA.get('sticker').length } };
   let lastId = 0; const answers = []; const convIds = [];
-  conv.forEach(([p, name, text, addressed, fromAgent], i) => {
-    convIds[i] = lastId = db.logMessage({ chat: G(3), agent: fromAgent ? 'carpool' : '', msgId: `m${i}`, sender: fromAgent ? '' : P(p), name, text, addressed, fromAgent, ts: now - (conv.length - i) * 23 * MIN });
+  conv.forEach(([p, name, text, addressed, fromAgent, pic], i) => {
+    const media = pic ? storedMedia({ mediaInfo: MEDIA_INFO[pic], mediaRef: pic }) : '';
+    convIds[i] = lastId = db.logMessage({ chat: G(3), agent: fromAgent ? 'carpool' : '', msgId: `m${i}`, sender: fromAgent ? '' : P(p), name, text, addressed, fromAgent, ts: now - (conv.length - i) * 23 * MIN, media });
     if (fromAgent) answers.push(lastId);
   });
   // 070: Review — one answer rated good, one wrong (shows Teach)
@@ -403,11 +412,11 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
   const dayIn = (d) => new Date(now + d * 86400000).toISOString().slice(0, 10);
   const promise = db.db.prepare('INSERT INTO commitments (agent, chat, person, who, what, due, msg, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
   promise.run('carpool', G(3), pid[1], 'Marc', 'bring the child seat for Lea on Friday', dayIn(1), convIds[0], now - 5 * 3600000, now - 5 * 3600000);
-  promise.run('carpool', G(3), pid[2], 'Lea', 'pay Marc the CHF 12 for petrol', dayIn(0), convIds[1], now - 26 * 3600000, now - 26 * 3600000);
+  promise.run('carpool', G(3), pid[2], 'Lea', 'pay Marc the CHF 12 for petrol', dayIn(0), convIds[2], now - 26 * 3600000, now - 26 * 3600000);
   // 092: People → Promises across agents — overdue, undated and done ones too
   promise.run('family', G(2), pid[3], 'Ravi', 'book the community hall for Diwali', dayIn(-3), null, now - 6 * D, now - 6 * D);
   promise.run('family', G(2), pid[0], 'Anu', 'ask Grandma about the menu', '', null, now - 2 * D, now - 2 * D);
-  promise.run('carpool', G(3), pid[8], 'Mia', 'take Sophie back from Cornavin at 18:10', dayIn(-1), convIds[6], now - 30 * H, now - 30 * H);
+  promise.run('carpool', G(3), pid[8], 'Mia', 'take Sophie back from Cornavin at 18:10', dayIn(-1), convIds[7], now - 30 * H, now - 30 * H);
   db.db.prepare("UPDATE commitments SET status = 'done', by = 'chat' WHERE what LIKE 'take Sophie%'").run();
   promise.run('family', G(2), pid[6], 'Priya', 'send the photos from the picnic', dayIn(2), null, now - 3 * H, now - 3 * H);
   db.db.prepare("INSERT OR IGNORE INTO tie_suggestions (key, person, kind, name, word, agent, chat, status, created_at) VALUES (?, ?, 'child', 'Mira', 'daughter', 'carpool', ?, 'proposed', ?)").run(`${pid[0]}|child|mira`, pid[0], G(3), now - 2 * 3600000);
@@ -482,6 +491,8 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     // 072: the reply points at the stored answer (its rating shows in Activity, See in messages opens it)
     [23 * MIN - 8000, 'message.out', 'carpool', G(3), 'Tomorrow (Thu 20 Nov): Luca 07:15 from Morges (full), Mia back from Cornavin at 18:10 (1 seat). Sophie, Mia could take you.', { msg: answers[1] }],
     [22 * MIN, 'whatsapp.reaction', 'carpool', G(3), 'Mia reacted 👍 to the agent'],
+    // 096: a message with a photo opens with the photo
+    [21 * MIN, 'message.in', 'carpool', G(3), 'Marc (participant): [image: The blue car, by the lake side of the station]', { msg: convIds[1], media: mediaView(storedMedia({ mediaInfo: MEDIA_INFO.photo, mediaRef: 'photo' })) }],
     // 093: a change an organizer clearly asked for, made without an extra confirmation
     [15 * MIN, 'change.auto', 'carpool', G(3), 'Changed without asking (clear request): Add note (people)', { tool: 'people:add_note', role: 'organizer' }],
     [8 * MIN, 'message.in', 'football', `club#${G(8)}`, 'Arjun: !coach who brings snacks Saturday?'],

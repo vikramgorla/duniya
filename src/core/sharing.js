@@ -24,6 +24,7 @@ import { chatChannel } from './chat-tools.js';
 import { limitStop } from './tool-behaviour.js';
 import { countStat } from './stats.js';
 import { creditOf, postableResults } from './credits.js';
+import { mediaDetail, storedMedia } from './message-media.js';
 
 const GAP_MS = 3 * 60000; // none when one went out in the chat this recently (the duplicate guard's window)
 const KEEP_IDS = 30; // results not picked again in a chat
@@ -213,9 +214,10 @@ export async function postMedia(m, { text = '', quote = undefined } = {}) {
   countStat(m.by === 'the model' ? 'shared_ai' : 'shared_rule', { agent: agent.id }); // who picks them: the card shows it
   kvSet(recentKey(chat, svc.key), JSON.stringify([...m.seen].filter((x) => x !== m.id).concat(m.id).slice(-KEEP_IDS)));
   const label = `[${svc.kind}: ${words}]`;
+  const media = storedMedia(r); // 096: it shows in the panel's messages
   const id = ctx.ownerChat && chat === ctx.ownerChat ? undefined
-    : logMessage({ chat, agent: agent.id, msgId: r?.msgId || null, sender: 'agent', name: 'Assistant', text: text ? `${text}\n${label}` : label, fromAgent: true });
+    : logMessage({ chat, agent: agent.id, msgId: r?.msgId || null, sender: 'agent', name: 'Assistant', text: text ? `${text}\n${label}` : label, fromAgent: true, media });
   activity('whatsapp.action', { agent: agent.id, chat, summary: `Shared a ${KIND_WORD[svc.kind]} (${words}) from ${svc.key}, chosen by ${m.by}${text ? ', with the answer' : ''}`,
-    detail: { tool: 'share_media', service: svc.key, query: m.query, url: m.url, credit: m.credit, by: m.by, role: ctx.role } });
+    detail: { tool: 'share_media', service: svc.key, query: m.query, url: m.url, credit: m.credit, by: m.by, role: ctx.role, ...(id ? { msg: id, ...mediaDetail(media) } : {}) } });
   return id;
 }

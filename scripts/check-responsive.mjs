@@ -190,6 +190,7 @@ const STATES = [
   { name: 'chats-group', hash: 'chats/120363041122330003%40g.us/group', wait: 2500, js: "await T.until('.wa-settings'); T.openAll();" },
   { name: 'activity-type', hash: 'activity/type=change.auto', wait: 1500 }, // 093: changes made without asking
   { name: 'activity-chat', hash: 'activity/chat=120363041122330003%40g.us', wait: 2000, js: "[...document.querySelectorAll('#feed .fitem')].find((li) => li.textContent.includes('Reply'))?.click(); await T.until('.fopen .rv-acts, .fopen .fx'); await T.wait(300);" },
+  { name: 'activity-media', hash: 'activity/chat=120363041122330003%40g.us', wait: 2000, js: "[...document.querySelectorAll('#feed .fitem')].find((li) => li.textContent.includes('The blue car'))?.click(); await T.until('.fopen .msg-media img'); await T.wait(400);" },
   { name: 'more-sheet', hash: 'overview', js: "(await import('/app/find.js')).openMore(); await T.wait(400);" },
   { name: 'more-sheet-account', hash: 'overview', js: "const { askSignOut } = await import('/app/core.js'); askSignOut(); await T.wait(400);" },
   // 078: People — the list (search, filter), a person's page (ties, household, notes, tags, lists), a kid without an

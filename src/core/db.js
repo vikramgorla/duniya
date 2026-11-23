@@ -25,7 +25,7 @@ db.exec(`
   PRAGMA journal_size_limit = 33554432;
   CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY, channel TEXT, chat TEXT, agent TEXT, msg_id TEXT, sender TEXT, sender_jid TEXT, name TEXT,
-    text TEXT, quoted TEXT, addressed INTEGER DEFAULT 0, from_agent INTEGER DEFAULT 0, ts INTEGER
+    text TEXT, quoted TEXT, addressed INTEGER DEFAULT 0, from_agent INTEGER DEFAULT 0, ts INTEGER, media TEXT
   );
   CREATE TABLE IF NOT EXISTS activity (
     id INTEGER PRIMARY KEY, ts INTEGER, type TEXT, agent TEXT, chat TEXT, summary TEXT, detail TEXT
@@ -122,9 +122,11 @@ export function searchStored({ chats, query = '', person = '', since = 0, before
 }
 
 // ---- chat history ----
+// 096 (2.61.0 only, remove in the next release): stored messages keep what their media is (message-media.js)
+if (!db.prepare('PRAGMA table_info(messages)').all().some((c) => c.name === 'media')) db.exec('ALTER TABLE messages ADD COLUMN media TEXT');
 const insMsg = db.prepare(`INSERT OR IGNORE INTO messages
-  (channel, chat, agent, msg_id, sender, name, text, quoted, addressed, from_agent, ts, sender_jid)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  (channel, chat, agent, msg_id, sender, name, text, quoted, addressed, from_agent, ts, sender_jid, media)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 const recent = db.prepare('SELECT * FROM (SELECT * FROM messages WHERE chat = ? ORDER BY id DESC LIMIT ?) ORDER BY id');
 
 // 069: disk almost full (retention.js) or SQLite said so: stored messages and optional activity pause, never crash.
@@ -134,24 +136,27 @@ export const setWritesPaused = (on) => { paused = !!on; };
 /** A write failed because the disk is full: pause optional writes (retention.js resumes them when space is back). */
 export const diskFullError = (e) => { const full = /SQLITE_FULL|disk is full|ENOSPC/i.test(String(e?.message || e)); if (full) paused = true; return full; };
 
-/** Store a message once (dedup by chat + msgId). Returns the row id, or 0 if it was a duplicate or writes are paused. */
-export function logMessage({ channel = 'whatsapp', chat, agent = '', msgId = null, sender = '', name = '', text, quoted = '', addressed = false, fromAgent = false, ts = Date.now(), senderJid = '' }) {
+/**
+ * Store a message once (dedup by chat + msgId). Returns the row id, or 0 if it was a duplicate or writes are paused.
+ * `media` (096): what its media is, as message-media.js stores it ('' for none).
+ */
+export function logMessage(m) {
   if (paused) return 0;
   let r;
-  try {
-    r = insMsg.run(channel, chat, agent, msgId, sender, name, String(text ?? ''), String(quoted || '').slice(0, 500),
-      addressed ? 1 : 0, fromAgent ? 1 : 0, ts, senderJid || '');
-  } catch (e) { if (diskFullError(e)) return 0; throw e; }
+  try { r = insMsg.run(...messageValues({ ...m, ts: m.ts || Date.now() })); } catch (e) { if (diskFullError(e)) return 0; throw e; }
   return r.changes ? Number(r.lastInsertRowid) : 0;
 }
+/** A message's columns in the order the INSERTs list them (channel … media), with the defaults of a stored message. */
+const messageValues = (m) => [m.channel || 'whatsapp', m.chat, m.agent || '', m.msgId || null, m.sender || '', m.name || '', String(m.text ?? ''),
+  String(m.quoted || '').slice(0, 500), m.addressed ? 1 : 0, m.fromAgent ? 1 : 0, m.ts, m.senderJid || '', m.media || null];
 /**
  * #91: store messages that are OLDER than everything stored for the chat (history the phone sent on demand). They get
  * row ids below every existing row (ids may go negative), so "recent" (by id) and summary boundaries stay right.
  * `rows`: logMessage-style objects. Returns the stored rows ({ id, ts }), oldest first; duplicates are skipped.
  */
 const insMsgWithId = db.prepare(`INSERT OR IGNORE INTO messages
-  (id, channel, chat, agent, msg_id, sender, name, text, quoted, addressed, from_agent, ts, sender_jid)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  (id, channel, chat, agent, msg_id, sender, name, text, quoted, addressed, from_agent, ts, sender_jid, media)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 export function insertEarlierMessages(chat, rows) {
   const fresh = rows.filter((m) => !m.msgId || !messageByMsgId(chat, m.msgId)).sort((a, b) => (a.ts || 0) - (b.ts || 0));
   if (!fresh.length) return [];
@@ -162,8 +167,7 @@ export function insertEarlierMessages(chat, rows) {
     let id = Math.min(Number(min ?? 0), 0) - fresh.length - 1; // never 0 (0 means "no row" elsewhere)
     for (const m of fresh) {
       id++;
-      const r = insMsgWithId.run(id, m.channel || 'whatsapp', chat, m.agent || '', m.msgId || null, m.sender || '', m.name || '', String(m.text ?? ''),
-        String(m.quoted || '').slice(0, 500), m.addressed ? 1 : 0, m.fromAgent ? 1 : 0, m.ts || Date.now(), m.senderJid || '');
+      const r = insMsgWithId.run(id, ...messageValues({ ...m, chat, ts: m.ts || Date.now() }));
       if (r.changes) out.push({ id, ts: m.ts });
     }
     db.exec('COMMIT');
@@ -320,7 +324,7 @@ export function listMessages(chat, { before = 0, limit = 50, q = '', around = 0 
       ...db.prepare('SELECT * FROM messages WHERE chat = ? AND id <= ? ORDER BY id DESC LIMIT ?').all(chat, at, half)]
       : db.prepare(`SELECT * FROM messages WHERE ${where} ORDER BY id DESC LIMIT ?`).all(...args, lim);
   return rows.map((m) => ({ id: m.id, sender: m.sender, senderJid: m.sender_jid, name: m.name, text: m.text, quoted: m.quoted, fromAgent: !!m.from_agent,
-    agent: m.agent || '', addressed: !!m.addressed, ts: m.ts }));
+    agent: m.agent || '', addressed: !!m.addressed, ts: m.ts, media: m.media || '' }));
 }
 
 // ---- WhatsApp reactions and polls (026) ----
