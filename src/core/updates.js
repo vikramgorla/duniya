@@ -34,7 +34,8 @@ export function installKind() {
 
 export const newestTag = (tags) => tags.filter((t) => parseVersion(t)).sort(compareVersions).at(-1) || null;
 
-const DEFAULTS = { mode: process.env.UPDATE_MODE || 'notify', channel: 'stable', at: '04:00', keepPreUpdate: 3 };
+// 098: os: OS updates install by themselves every night (os-auto.js) unless the owner switches them off
+const DEFAULTS = { mode: process.env.UPDATE_MODE || 'notify', channel: 'stable', at: '04:00', keepPreUpdate: 3, os: 'auto' };
 export function getUpdateSettings() {
   const s = getSetting('updates', {}) || {};
   return { ...DEFAULTS, mode: process.env.UPDATE_MODE || 'notify', ...s };
@@ -42,6 +43,7 @@ export function getUpdateSettings() {
 export function setUpdateSettings(patch) {
   const next = { ...getUpdateSettings(), ...patch };
   if (!['off', 'notify', 'auto'].includes(next.mode)) throw fail('mode: off, notify or auto', 400, { field: 'mode' });
+  if (!['auto', 'off'].includes(next.os)) throw fail('os: auto or off', 400, { field: 'os' });
   if (!['stable', 'main'].includes(next.channel)) throw fail('channel: stable or main', 400, { field: 'channel' });
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(next.at)) throw fail('at: HH:MM', 400, { field: 'at' });
   next.keepPreUpdate = Number(next.keepPreUpdate);

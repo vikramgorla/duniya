@@ -134,8 +134,8 @@ Keeps all data, the WhatsApp link and the web address.
 2. **Update to vX.Y.Z** → confirm. Agents pause for about a minute; the page reloads by itself.
 3. Optional: **Settings → Updates** → *Install automatically* at a time of day, or *Off*.
 
-Or `sudo duniya update` (`--check` only looks), or re-run the installer (keeps `/etc/duniya/install.conf`). OS:
-**Server → OS updates & maintenance → Install OS updates** → **Restart server** when asked.
+Or `sudo duniya update` (`--check` only looks), or re-run the installer (keeps `/etc/duniya/install.conf`). OS updates
+install by themselves at night (**Server → OS updates & maintenance**; switch off there to install by hand).
 
 ### Change how the panel is reached
 

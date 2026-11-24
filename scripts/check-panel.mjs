@@ -18,7 +18,7 @@ import { FIRST_SCREEN, staticClosure } from '../src/panel/module-graph.js';
 // the first visit to its screen. A budget is raised only with its reason in the PR; every earlier raise and its reason
 // is in the history of these two lines (git log -L '/^const FIRST_BUDGET/,+1:scripts/check-panel.mjs').
 const FIRST_BUDGET = 64_100; // −0.5 KB (097): the mark is a file (/icons/logo-small.svg), no longer drawn by core.js
-const TOTAL_BUDGET = 230_600; // −0.5 KB (097): see FIRST_BUDGET
+const TOTAL_BUDGET = 230_900; // +0.3 KB (098): the automatic OS updates switch and its restart line on the Server screen (lazy module, not the first screen)
 
 const PUBLIC = resolve(import.meta.dirname, '../src/panel/public');
 const APP = resolve(PUBLIC, 'app');

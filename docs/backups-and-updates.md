@@ -9,6 +9,7 @@ without you.**
 - Encrypted with your passphrase **before** leaving the server: to this server, a private GitHub repo or S3.
 - Every update makes a local backup first (with a passphrase set); no backup, no update.
 - Breaking releases wait for an owner: panel, or `confirm CODE` on WhatsApp.
+- OS updates install by themselves at night, with a restart when one needs it (installer servers; on by default).
 
 ![Backups page](site/img/backups-desktop.webp)
 
@@ -153,7 +154,16 @@ A jump is *breaking* when the major version grows or a release in between is mar
 
 ### OS updates (installer servers)
 
-**Server → OS updates & maintenance → Install OS updates**, then **Restart server** when the page says so.
+OS updates install by themselves: **Server → OS updates & maintenance → Install OS updates automatically** is on by
+default. To install by hand instead: **Install OS updates**, then **Restart server** when the page says so.
+
+- **Automatic (098):** every night, from 30 minutes after the app's update time (**Settings → Updates**, 04:00 by
+  default, your time) and for three hours, the server installs the waiting OS updates once, with the same steps as the
+  button. When an update needs a restart (a new kernel), the server restarts in the same window, once a night: agents
+  are offline for 1–2 minutes and catch up afterwards. It waits while an app update or another maintenance action
+  runs. Activity shows *… requested by automatic OS updates*. Switch it off on the card to keep installing by hand.
+
+![OS updates & maintenance: the automatic switch with its night window, the updates waiting and the restart banner](site/img/card-os-updates.webp)
 
 - The list is grouped: **Will install** (the count on the **Server** tab), **Rolling out gradually** and **Held
   back** (with the reason, e.g. *On hold (apt-mark hold)*).

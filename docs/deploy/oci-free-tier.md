@@ -145,8 +145,7 @@ Nothing to do in Oracle: the app updates itself and **keeps everything**.
 3. **Update to vX.Y.Z** → confirm. Agents pause about a minute; the page reloads by itself.
 4. Optional: **Update settings** → *Install automatically* at a time of day.
 
-Or `sudo duniya update` over SSH. OS: **Server → OS updates & maintenance → Install OS updates** → **Restart
-server** if asked. The maintenance helper updates itself after an app update; a server whose helper predates 2.17 and
+Or `sudo duniya update` over SSH. OS updates install by themselves at night (**Server → OS updates & maintenance**). The maintenance helper updates itself after an app update; a server whose helper predates 2.17 and
 has no SSH key needs a [recreate](#recreate-from-scratch) once ([why](../upgrading.md#the-maintenance-helper)).
 
 ## Update the stack (infrastructure)

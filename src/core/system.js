@@ -315,6 +315,13 @@ function opsHelperVersion() {
 /** The helper version this app release ships (deploy/ops/duniya-ops in the app's checkout; read, never run). */
 const opsHelperBundled = () => helperVersionOf(read(`${ROOT}/deploy/ops/duniya-ops`));
 const RELEASE_RE = /^v\d{1,4}\.\d{1,4}\.\d{1,4}$/;
+const RUN_STALE_MS = 60 * 60000; // a run the helper never finished (a reboot cut it off) stops counting after an hour
+/** The maintenance action running now ({ action, startedAt }) or null. */
+export function opsRunning() {
+  let status = null;
+  try { status = JSON.parse(read(`${OPS_STATE_DIR}/status.json`) || 'null'); } catch { /* none */ }
+  return status?.state === 'running' && Date.now() - (status.startedAt || 0) < RUN_STALE_MS ? status : null;
+}
 export function opsStatus() {
   let status = null;
   try { status = JSON.parse(read(`${OPS_STATE_DIR}/status.json`) || 'null'); } catch { /* none */ }
@@ -346,8 +353,8 @@ export function requestOp(action, by = '', { files = {} } = {}) {
     if (!RELEASE_RE.test(v)) throw fail('The app version is not a release number');
     files = { ...files, 'helper-version': `${v}\n` }; // the helper accepts only vX.Y.Z and fetches that release itself
   }
-  const cur = opsStatus().status;
-  if (cur?.state === 'running' && Date.now() - (cur.startedAt || 0) < 60 * 60000) throw fail(`Already running: ${cur.action}`, 409);
+  const cur = opsRunning();
+  if (cur) throw fail(`Already running: ${cur.action}`, 409);
   mkdirSync(OPS_REQUEST_DIR, { recursive: true });
   for (const [name, content] of Object.entries(files)) writeFileSync(`${OPS_REQUEST_DIR}/${name}`, content, { mode: 0o640 }); // read by the helper
   writeFileSync(`${OPS_REQUEST_DIR}/request`, `${action}\n`);

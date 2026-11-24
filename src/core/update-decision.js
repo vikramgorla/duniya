@@ -21,6 +21,7 @@ import { releaseRange } from './releases.js';
 import { sendOwnerAlert, ownerNumber } from './owner-alerts.js';
 import { listLinks, registerConfirmHandler } from './owner-assistant.js';
 import { chatChannel } from './chat-tools.js';
+import { osAutoTick } from './os-auto.js';
 
 const DAY = 86400000;
 const SNOOZE_DAYS = 7;
@@ -202,6 +203,7 @@ async function deliverRollbackAlert() {
 export async function updateTick({ now = new Date() } = {}) {
   await deliverUpdateReport(now.getTime()).catch(recordFailure('The update result message'));
   await deliverRollbackAlert().catch(recordFailure('The alert that an update was rolled back'));
+  await osAutoTick(now.getTime()).catch(recordFailure('Automatic OS updates')); // 098: its own quiet window, after the app's
   const s = getUpdateSettings();
   if (s.mode === 'off') return { action: 'off' };
   const st0 = updateStatus();

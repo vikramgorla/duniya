@@ -12,6 +12,7 @@ import { applyPending } from '../../core/runner.js';
 import { referencedSecrets } from '../../core/schema.js';
 import { CHANNELS } from '../../channels/index.js';
 import { getSetting, listSecrets, setSecret, updateSettings } from '../../core/store.js';
+import { osAutoState } from '../../core/os-auto.js';
 import { logs as sysLogs, metricsHistory, opsStatus, osUpdates, requestOp, snapshot as sysSnapshot } from '../../core/system.js';
 import { PLAN_PROVIDERS, listPrices, setPrice, smartReport, usageReport } from '../../core/usage.js';
 
@@ -71,7 +72,7 @@ export function systemRoutes(route, { channel } = {}) {
   route('GET', '/api/system/history', async () => metricsHistory());
   route('GET', '/api/system/os-updates', async ({ query }) => osUpdates({ refresh: query.get('refresh') === '1' }), { role: 'admin' });
   route('GET', '/api/system/logs', async ({ query }) => sysLogs(query.get('unit') || 'whatsapp-agent-duniya', query.get('lines')), { role: 'admin' });
-  route('GET', '/api/system/ops', async () => opsStatus(), { role: 'owner' });
+  route('GET', '/api/system/ops', async () => ({ ...opsStatus(), auto: osAutoState() }), { role: 'owner' }); // 098: automatic OS updates
   route('POST', '/api/system/ops', async ({ body, user }) => requestOp(String(body.action || ''), user.username), { role: 'owner' });
 
   // ---------- channels (075): which channels exist, on/off (off = connections closed, adapter dropped) ----------
