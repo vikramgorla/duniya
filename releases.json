@@ -1,6 +1,16 @@
 {
   "$comment": "Release notes the app reads (045, 065). Every version has an entry: a one-line title, and changes = short owner-facing bullets { \"type\": \"new\" | \"improved\" | \"fixed\" | \"removed\", \"text\": \"…\" } (CI fails without them). breaking: true = the update cannot be applied without the owner's decision (automatic updates stop before it; add summary, actions, data, docs). data: migrated | not-migrated | unchanged. Read from the target release with `git show <tag>:releases.json`; the panel lists the entries between the running and the target version. See docs/development.md#release-notes and AGENTS.md (Definition of Done).",
   "versions": {
+    "2.63.0": {
+      "breaking": false,
+      "title": "OS updates install by themselves at night",
+      "changes": [
+        {
+          "type": "new",
+          "text": "Your server now installs its OS updates by itself every night, a little after the app’s update time, and restarts when an update needs it (agents are offline for 1–2 minutes). It is on by default; switch it off under Server → OS updates & maintenance."
+        }
+      ]
+    },
     "2.62.0": {
       "breaking": false,
       "title": "A new look: the saffron Duniya robot",

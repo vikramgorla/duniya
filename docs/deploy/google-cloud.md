@@ -95,8 +95,8 @@ Nothing to do in Google Cloud: the app updates itself and **keeps everything**.
 2. **Update to vX.Y.Z** → confirm. Agents pause about a minute.
 3. Optional: **Update settings** → *Install automatically*.
 
-Or `gcloud compute ssh duniya --zone us-central1-a -- sudo duniya update`. OS: **Server → OS updates &
-maintenance → Install OS updates** → **Restart server** if asked.
+Or `gcloud compute ssh duniya --zone us-central1-a -- sudo duniya update`. OS updates install by themselves at
+night (**Server → OS updates & maintenance**).
 
 ## Update the infrastructure
 

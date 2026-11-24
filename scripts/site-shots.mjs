@@ -102,6 +102,7 @@ const CARDS = [
   ['card-web-access', 'settings/web-access', '', 'box:Web address & access', 900],
   ['card-small-server', 'server', '', 'box:This server', 1100],
   ['card-small-mode', 'settings/small-mode', '', '#small-mode', 900],
+  ['card-os-updates', 'server', '', 'box:OS updates & maintenance', 1100], // 098: the OS updates card with the automatic switch
   ['card-health', 'server', 'T.openAll(document.querySelector("#health"));', '#health', 1100], // 069: Server → Health (073: its details open)
   ['card-person', 'people/41790000001', '', '.person-page', 600], // 073, 078: a person's page in People (ties, household, notes, tags, lists)
   ['card-people-list', 'people', '', '#main .card', 600], // 078: People — search, filters, rows with apps and last contact

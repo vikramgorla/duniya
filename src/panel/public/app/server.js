@@ -1,5 +1,5 @@
 // Server screen: metrics, health, OS updates, maintenance helper, logs, hosting. Module of the panel (063).
-import { $, S, ago, api, ask, can, field, h, partFailed, serverBadge, time, tryApi } from './core.js';
+import { $, S, ago, api, ask, can, field, h, partFailed, serverBadge, time, toggle, tryApi } from './core.js';
 import { docsUrl, SIZE_LABEL, bytes, meter, pct, plural } from './shared.js';
 function spark(values, max) {
   const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg');
@@ -130,7 +130,7 @@ export async function renderServer() {
       h('b', {}, `Restart needed to finish${reboot.kernel ? ' (new kernel)' : ' updates'}`),
       reboot.since ? ` · waiting since ${time(reboot.since)}` : '',
       reboot.packages?.length ? h('div', { class: 'small', style: 'margin-top:4px;overflow-wrap:anywhere' }, `For: ${reboot.packages.slice(0, 12).join(', ')}${reboot.packages.length > 12 ? ` and ${reboot.packages.length - 12} more` : ''}`) : null,
-      h('div', { class: 'small muted', style: 'margin-top:4px' }, 'Agents are offline for 1–2 minutes while the server restarts.'),
+      h('div', { class: 'small muted', style: 'margin-top:4px' }, ops?.auto?.on ? `It restarts by itself tonight between ${ops.auto.from} and ${ops.auto.until}, or now: agents are offline for 1–2 minutes.` : 'Agents are offline for 1–2 minutes while the server restarts.'),
       can('owner') && ops?.available ? h('div', { class: 'row', style: 'margin-top:8px' }, act('reboot', 'Restart server', 'danger', { title: 'Restart the whole server now?', text: 'This finishes the updates. Agents are offline for 1–2 minutes and catch up on messages afterwards.', body: reboot.packages?.length ? h('div', {}, h('b', { class: 'small' }, 'Waiting for the restart'), h('ul', { class: 'small' }, reboot.packages.slice(0, 30).map((p) => h('li', {}, p)))) : null })) : null) : null;
     const phasedHint = 'Ubuntu rolls these out gradually: it installs them automatically within days. They are not needed now.';
     const updates = !upd ? null : !upd.supported ? h('p', { class: 'small muted' }, 'OS update checks are available on Debian/Ubuntu servers.')
@@ -156,12 +156,19 @@ export async function renderServer() {
         : h('div', { class: 'note info', id: 'helper-update', style: 'margin-top:10px' },
           h('b', {}, 'This server has an older maintenance helper'), ' that cannot update itself yet. Run ', h('code', {}, 'sudo duniya update'),
           ' on the server once; after that it updates itself from here. No SSH access (for example an Oracle server created without an SSH key)? Reinstall instead: ', helperDoc, ' (your data comes back from a backup).');
+    // 098: automatic OS updates (on by default): install every night and restart when an update needs it
+    const auto = ops?.auto && ops.available ? h('div', { class: 'row spread nowrap', id: 'os-auto', style: 'margin:10px 0' },
+      h('span', {}, h('b', {}, 'Install OS updates automatically'), h('span', { class: 'small muted', style: 'display:block' },
+        ops.auto.on ? `Every night between ${ops.auto.from} and ${ops.auto.until} (your time), when updates are waiting. If one needs a restart, the server restarts then too: agents are offline for 1–2 minutes.`
+          : 'Off: OS updates wait for you to install them here.')),
+      toggle(ops.auto.on, (on) => tryApi(async () => { await api('PUT', '/api/updates/settings', { os: on ? 'auto' : 'off' }); opsCard(); }, on ? 'OS updates install automatically' : 'Automatic OS updates off'), false, 'Install OS updates automatically')) : null;
     opsBox.replaceChildren(h('div', { class: 'row spread' }, h('h2', { style: 'margin:0' }, 'OS updates & maintenance'),
       h('button', { class: 'btn small', onclick: async (e) => { e.target.disabled = true; await api('GET', '/api/system/os-updates?refresh=1').catch(() => {}); opsCard(); } }, 'Check')),
       failed ? partFailed(failed, '', opsCard) : null, restartBanner, updates,
       can('owner') ? (ops?.available ? h('div', {},
         run ? h('div', { class: 'note' }, h('span', { class: 'spinner' }), h('b', {}, ` ${ops.actions[run.action] || run.action}…`), ` started ${ago(run.startedAt)} ago`) : null,
         lastLine,
+        auto,
         h('div', { class: 'row', style: 'margin-top:8px' },
           act('os-update', 'Install OS updates', 'primary', { title: 'Install the OS updates now?', text: 'The server stays online. Updates Ubuntu is still rolling out gradually wait. A restart may be needed afterwards.', body: pkgList(upd?.install) }),
           upd?.phased?.length && ops.helperCurrent ? act('os-update-all', 'Include gradual updates now', '', { title: `Also install ${plural(upd.phased.length, 'gradual update')}?`, text: 'Ubuntu is still rolling these out gradually; normally they arrive within days.', body: pkgList(upd.phased) }) : null,
