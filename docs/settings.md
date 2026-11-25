@@ -21,7 +21,7 @@
 | `HISTORY_WAIT_MS` | 45000 | How long to wait for the phone to send a chat's recent messages after it is switched on (per 50 messages) |
 | `WA_MEDIA_MAX_MB` | 16 | Largest media file an agent may send or receive (photos, PDFs, voice notes) |
 | `MEDIA_JOB_MAX_AGE_MIN` | 15 | Photo / voice-note jobs older than this get a short apology instead of a late answer |
-| `UPDATE_MODE` | `notify` | `off`, `notify` or `auto` |
+| `UPDATE_MODE` | `auto` | `auto` (new releases install at night after a backup; breaking ones wait), `notify` or `off` |
 | `BACKUP_UPLOAD_MAX_MB` | 200 | Largest backup file accepted by "Restore from a file" |
 
 ---

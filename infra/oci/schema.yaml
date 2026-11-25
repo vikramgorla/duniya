@@ -1,7 +1,7 @@
 title: "Duniya: AI agents on WhatsApp and Telegram"
 description: "Self-hosted AI agents for WhatsApp and Telegram with an admin panel, on an Always Free VM."
 schemaVersion: 1.1.0
-version: "2.63.0"
+version: "2.64.0"
 locale: "en"
 
 variableGroups:
@@ -42,9 +42,10 @@ variables:
     required: true
   update_mode:
     type: enum
-    title: "Updates"
-    enum: [notify, auto, "off"]
-    default: notify
+    title: "App updates"
+    description: "auto: new releases install by themselves at night after a backup (a release that needs a decision waits for you). notify: you choose when. off: no checks. Change it later in the panel (Settings → Updates)."
+    enum: [auto, notify, "off"]
+    default: auto
   shape:
     type: enum
     title: "Shape"

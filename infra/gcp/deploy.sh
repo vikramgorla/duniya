@@ -26,13 +26,14 @@
 #                         --exposure cloudflare or tailscale
 #   --domain NAME         your own domain (public mode): printed DNS record + add it in the panel afterwards
 #   --admin-password PW   create owner "admin" with this password (default: a one-time setup code is shown)
+#   --update-mode MODE    auto (default: new releases install at night after a backup) | notify | off
 #   --repo URL / --branch NAME   what to install: owner/name or an https URL (default: this repository or
 #                                DUNIYA_REPO, main)
 #   --yes                 don't ask
 #   --dry-run             only print what would be done
 set -euo pipefail
 
-PROJECT=""; REGION="us-central1"; ZONE=""; NAME="duniya"; DOMAIN=""; ADMIN_PASSWORD=""
+PROJECT=""; REGION="us-central1"; ZONE=""; NAME="duniya"; DOMAIN=""; ADMIN_PASSWORD=""; UPDATE_MODE="auto"
 EXPOSURE_MODE="public"; CF_TOKEN=""; TS_AUTHKEY=""; NO_EXTERNAL_IP=0
 REPO="${DUNIYA_REPO:-https://github.com/vikramgorla/duniya.git}"; BRANCH="main"; ASSUME_YES=0; DRY_RUN=0
 FREE_REGIONS="us-central1 us-west1 us-east1"
@@ -43,7 +44,7 @@ say()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 note() { printf '    %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; exit 1; }
-usage() { sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; }
 run() { if [ "$DRY_RUN" -eq 1 ]; then printf '    [dry-run] %s\n' "$*"; else "$@"; fi; }
 ask() { # ask "question" default
   local a=""
@@ -64,6 +65,7 @@ while [ $# -gt 0 ]; do
     --tailscale-authkey) TS_AUTHKEY="${2:?}"; shift ;;
     --no-external-ip) NO_EXTERNAL_IP=1 ;;
     --admin-password) ADMIN_PASSWORD="${2:?}"; shift ;;
+    --update-mode) UPDATE_MODE="${2:?}"; shift ;;
     --repo) REPO="${2:?}"; shift ;;
     --branch) BRANCH="${2:?}"; shift ;;
     --yes|-y) ASSUME_YES=1 ;;
@@ -73,6 +75,7 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+case "$UPDATE_MODE" in auto|notify|off) ;; *) die "--update-mode must be auto, notify or off" ;; esac
 # owner/name (084: e.g. a fork, also via DUNIYA_REPO) → its GitHub URL
 if [[ "$REPO" =~ ^([A-Za-z0-9][A-Za-z0-9-]{0,38})/([A-Za-z0-9._-]+)$ ]]; then REPO="https://github.com/${BASH_REMATCH[1]}/${BASH_REMATCH[2]%.git}.git"; fi
 
@@ -179,7 +182,7 @@ fi
 # ---------- first-boot script (same bootstrap as the Oracle stack) ----------
 q() { printf "%s='%s'" "$1" "${2//\'/\'\\\'\'}"; }
 ENVFILE="$(printf '%s\n' "$(q REPO_URL "$REPO")" "$(q BRANCH "$BRANCH")" "$(q EXPOSURE "$BOOT_EXPOSURE")" "$(q DOMAIN '')" "$(q ADMIN_PASSWORD "$ADMIN_PASSWORD")" \
-  "$(q UPDATE_MODE notify)" "$(q CF_TUNNEL_TOKEN "$CF_TOKEN")" "$(q TS_AUTHKEY "$TS_AUTHKEY")")"
+  "$(q UPDATE_MODE "$UPDATE_MODE")" "$(q CF_TUNNEL_TOKEN "$CF_TOKEN")" "$(q TS_AUTHKEY "$TS_AUTHKEY")")"
 STARTUP="$(mktemp)"; trap 'rm -f "$STARTUP"' EXIT
 cat > "$STARTUP" <<EOF
 #!/bin/bash

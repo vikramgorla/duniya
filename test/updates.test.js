@@ -176,7 +176,8 @@ test('update routes are owner only; settings validated', async () => {
   const adm = await t.login('adm', 'admin-password-12');
   assert.equal((await t.api(adm, 'GET', '/api/updates')).status, 403);
   const g = (await t.api(owner, 'GET', '/api/updates')).body;
-  assert.equal(g.settings.mode, 'notify');
+  assert.equal(g.settings.mode, 'auto', '099: new releases install by themselves unless the owner chose otherwise');
+  assert.equal((await t.api(owner, 'PUT', '/api/updates/settings', { mode: 'notify' })).body.mode, 'notify');
   assert.equal((await t.api(owner, 'PUT', '/api/updates/settings', { mode: 'sometimes' })).status, 400);
   assert.equal((await t.api(owner, 'PUT', '/api/updates/settings', { mode: 'auto', channel: 'main', at: '05:15' })).body.at, '05:15');
 });

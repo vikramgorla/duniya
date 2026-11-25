@@ -42,7 +42,7 @@ jobs:
       TF_VAR_shape: ${{ vars.SHAPE || 'VM.Standard.E2.1.Micro' }}
       TF_VAR_exposure: ${{ vars.EXPOSURE || 'ip' }}
       TF_VAR_domain: ${{ vars.DOMAIN }}
-      TF_VAR_update_mode: ${{ vars.UPDATE_MODE || 'notify' }}
+      TF_VAR_update_mode: ${{ vars.UPDATE_MODE || 'auto' }}
       TF_VAR_repo_url: https://github.com/${{ github.repository }}.git
       TF_VAR_branch: ${{ github.event.repository.default_branch }}
 

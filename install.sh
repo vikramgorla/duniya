@@ -18,7 +18,8 @@
 #                            URL (default: this project; or set DUNIYA_REPO=owner/name). Re-runs keep the source.
 #   --branch NAME            branch to install (default: main)
 #   --git-token TOKEN        read-only token for a private repository
-#   --update-mode MODE       off | notify | auto (default: notify)
+#   --update-mode MODE       auto | notify | off (default: auto: new releases install by themselves at night after a
+#                            backup; breaking ones wait for you)
 #   --yes                    don't ask questions
 #   --dry-run                print what would happen and exit
 set -euo pipefail
@@ -33,7 +34,7 @@ CF_TOKEN=""
 TS_AUTHKEY=""
 ADMIN_PASSWORD=""
 GIT_TOKEN=""
-UPDATE_MODE="notify"
+UPDATE_MODE="auto"
 ASSUME_YES=0
 DRY_RUN=0
 APP_DIR=/opt/whatsapp-agent-duniya

@@ -79,7 +79,7 @@ variable "admin_password" {
 
 variable "update_mode" {
   type    = string
-  default = "notify"
+  default = "auto"
   validation {
     condition     = contains(["off", "notify", "auto"], var.update_mode)
     error_message = "update_mode must be off, notify or auto"

@@ -33,7 +33,7 @@ add secrets under **Settings → Secrets and variables → Actions**:
 | `CF_TUNNEL_TOKEN` | only for `EXPOSURE=tunnel` |
 | `OCI_COMPARTMENT_OCID`, `SSH_PUBLIC_KEY`, `GIT_CLONE_TOKEN` | optional |
 
-Variables (optional): `EXPOSURE` (`ip` default, `domain`, `tunnel`, `local`), `DOMAIN`, `SHAPE`, `UPDATE_MODE`,
+Variables (optional): `EXPOSURE` (`ip` default, `domain`, `tunnel`, `local`), `DOMAIN`, `SHAPE`, `UPDATE_MODE` (`auto` default, `notify`, `off`),
 `SSH_INGRESS_CIDR`, `STATE_BUCKET`.
 
 ## 2. Run `plan`, read it, then `apply`

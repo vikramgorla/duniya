@@ -18,6 +18,7 @@
 // 10. Clean code (fails, 2.57): no new break of the clean-code rules (function size and branches, nesting, parameters,
 //     file length); code that broke them before is listed in scripts/clean-baseline.json and may only shrink
 //     (scripts/check-clean.mjs, npm run check:clean; npm run clean:baseline lowers it).
+// 12. Update defaults (fails, 099): the installer, the Oracle stack and the Google script start with the app's update mode.
 // 11. Brand (fails, 097): the website's marks (docs/site/img/logo*.svg) are the panel's (src/panel/public/icons/).
 //  9. Repository (fails, 084): every project URL in tracked files (README, docs, website, infra, installer) uses the
 //     slug in package.json `repository` (scripts/repo-sync.mjs; fix with npm run repo:sync). specs/ keep their history.
@@ -138,5 +139,20 @@ try {
   const drift = ['logo.svg', 'logo-small.svg'].filter((f) => read(`src/panel/public/icons/${f}`) !== read(`docs/site/img/${f}`));
   for (const f of drift) { failed = true; console.log(`::error file=docs/site/img/${f}::docs/site/img/${f} differs from src/panel/public/icons/${f}: run npm run brand:icons.`); }
   if (!drift.length) console.log('brand marks: ok');
+}
+// 12. update defaults (099): every way to provision a server starts with the app's default update mode
+{
+  const app = /mode: process\.env\.UPDATE_MODE \|\| '(\w+)'/.exec(read('src/core/updates.js'))?.[1];
+  const found = {
+    'install.sh': /^UPDATE_MODE="(\w+)"/m.exec(read('install.sh'))?.[1],
+    'infra/oci/variables.tf': /variable "update_mode" \{[^}]*default = "(\w+)"/.exec(read('infra/oci/variables.tf'))?.[1],
+    'infra/oci/schema.yaml': /update_mode:[\s\S]*?default: (\w+)/.exec(read('infra/oci/schema.yaml'))?.[1],
+    'infra/oci/bootstrap.sh': /UPDATE_MODE:-(\w+)/.exec(read('infra/oci/bootstrap.sh'))?.[1],
+    'infra/gcp/deploy.sh': /UPDATE_MODE="(\w+)"/.exec(read('infra/gcp/deploy.sh'))?.[1],
+    '.github/workflows/infra.yml': /vars\.UPDATE_MODE \|\| '(\w+)'/.exec(read('.github/workflows/infra.yml'))?.[1],
+  };
+  const off = Object.entries(found).filter(([, v]) => v !== app);
+  for (const [f, v] of off) { failed = true; console.log(`::error file=${f}::default update mode ${v ?? '(not found)'} differs from the app's ${app} (src/core/updates.js)`); }
+  if (!off.length) console.log(`update defaults: ok (${app})`);
 }
 process.exit(failed ? 1 : 0);

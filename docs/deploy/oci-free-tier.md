@@ -138,12 +138,13 @@ maintenance helper updates itself. A shell is still handy for `sudo duniya docto
 
 ## Update the app
 
-Nothing to do in Oracle: the app updates itself and **keeps everything**.
+Nothing to do: new releases install by themselves at night and **keep everything** (the stack's *App updates*
+field, *auto* by default; a release that needs your decision waits for you). To update now:
 
 1. Panel → **Overview** → **Server** card → **Updates**.
 2. *Update available: vX.Y.Z* shows up by itself (the server checks every 10 minutes; **Check now** is optional).
 3. **Update to vX.Y.Z** → confirm. Agents pause about a minute; the page reloads by itself.
-4. Optional: **Update settings** → *Install automatically* at a time of day.
+4. Optional: **Settings → Updates** → another time of day, *Notify me* or *Off*.
 
 Or `sudo duniya update` over SSH. OS updates install by themselves at night (**Server → OS updates & maintenance**). The maintenance helper updates itself after an app update; a server whose helper predates 2.17 and
 has no SSH key needs a [recreate](#recreate-from-scratch) once ([why](../upgrading.md#the-maintenance-helper)).
