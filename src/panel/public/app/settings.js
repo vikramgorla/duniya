@@ -112,7 +112,7 @@ const SECTION_SUB = { 'tool-services': 'Tools every agent can use', 'owner-assis
 function updatesPage() { const box = h('div', {}); renderUpdates(box, { page: updatesCard }); return box; }
 function updatesCard(u, { line, check, reviewBtn, updateBtn, docker }) {
   const st = u.status || {}; const d = u.decision; const lr = st.lastResult; const rb = u.rolledBack;
-  const mode = h('select', {}, ['notify', 'auto', 'off'].map((m) => h('option', { value: m, selected: u.settings.mode === m }, { notify: 'Notify me', auto: 'Install automatically', off: 'Off' }[m])));
+  const mode = h('select', {}, ['auto', 'notify', 'off'].map((m) => h('option', { value: m, selected: u.settings.mode === m }, { auto: 'Install automatically (default)', notify: 'Notify me', off: 'Off' }[m])));
   const channel = h('select', {}, ['stable', 'main'].map((m) => h('option', { value: m, selected: u.settings.channel === m }, m === 'stable' ? 'Stable releases' : 'Latest (main)')));
   const at = h('input', { type: 'time', value: u.settings.at, step: 60 });
   const keep = h('input', { type: 'number', min: 1, max: 20, value: u.settings.keepPreUpdate ?? 3 });

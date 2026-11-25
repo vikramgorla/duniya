@@ -8,7 +8,8 @@ without you.**
 **In 30 seconds**
 - Encrypted with your passphrase **before** leaving the server: to this server, a private GitHub repo or S3.
 - Every update makes a local backup first (with a passphrase set); no backup, no update.
-- Breaking releases wait for an owner: panel, or `confirm CODE` on WhatsApp.
+- New releases install by themselves at night (the default); breaking ones wait for an owner: panel, or
+  `confirm CODE` on WhatsApp.
 - OS updates install by themselves at night, with a restart when one needs it (installer servers; on by default).
 
 ![Backups page](site/img/backups-desktop.webp)
@@ -75,8 +76,9 @@ fork; [switch it](upgrading.md#update-source)) and **Restart service**.
 and the new one, newest first, with what is **new**, **improved**, **fixed** or **removed** (long lists fold; releases
 that need your OK are marked, with what to do), and *Make a backup first*. Confirm with **Update to vX.Y.Z**: it
 installs in place, keeps all data, survives a reload.
-**Settings → Updates**: *Notify me*, *Install automatically* (time of day) or *Off*; stable or latest `main`
-(`--update-mode off|notify|auto`). Also `sudo duniya update [--check]` or re-running the installer.
+**Settings → Updates**: *Install automatically* (the default, at a time of day: 04:00 your time), *Notify me* or
+*Off*; stable or latest `main` (`--update-mode auto|notify|off` for the installer and the Google script, *App updates*
+in the Oracle stack). Also `sudo duniya update [--check]` or re-running the installer.
 
 An update takes a few seconds: packages are installed again only when one the app runs on changed (most releases
 change none), and then the update needs the npm registry.

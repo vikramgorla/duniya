@@ -155,7 +155,7 @@ SRC=/root/duniya-installer
 rm -rf "$SRC"
 for _ in 1 2 3 4 5; do git clone -q --depth 1 --branch "${BRANCH:-main}" "$URL" "$SRC" && break; sleep 10; done
 
-ARGS=(--yes --repo "$REPO_URL" --branch "${BRANCH:-main}" --update-mode "${UPDATE_MODE:-notify}")
+ARGS=(--yes --repo "$REPO_URL" --branch "${BRANCH:-main}" --update-mode "${UPDATE_MODE:-auto}")
 case "${EXPOSURE:-ip}" in
   domain) ARGS+=(--domain "$DOMAIN") ;;
   tunnel) ARGS+=(--cloudflare-token "$CF_TUNNEL_TOKEN") ;;

@@ -207,7 +207,7 @@ export async function startDemo({ port = 0, dataDir = mkdtempSync(join(tmpdir(),
     ANTHROPIC_BASE_URL: `${F}/anthropic`, OPENAI_API_BASE: `${F}/chatgpt`, OPENROUTER_API_BASE: `${F}/openrouter`,
     DUNIYA_INSTALL: 'systemd', DUNIYA_HOST: process.env.DUNIYA_HOST || 'oci', DUNIYA_OPS_HELPER: join(ops, 'helper'), DUNIYA_OPS_REQUEST_DIR: join(ops, 'req'), DUNIYA_OPS_STATE_DIR: join(ops, 'state'),
     DUNIYA_FAKE_APT: apt, DUNIYA_REBOOT_REQUIRED_FILE: join(ops, 'reboot-required'),
-    UPDATE_MODE: 'notify', TZ_DEFAULT: 'Europe/Zurich', PUBLIC_URL: 'https://duniya.example.org',
+    UPDATE_MODE: 'auto', TZ_DEFAULT: 'Europe/Zurich', PUBLIC_URL: 'https://duniya.example.org',
     // Web address & access card with its full form (036), without network lookups.
     DUNIYA_OPS_WEBCONFIG: join(ROOT, 'deploy/ops/webconfig.mjs'), DUNIYA_PUBLIC_IP: '203.0.113.10', DUNIYA_TLS_PORT: '1', DUNIYA_FAKE_CADDY_LOG: join(ops, 'caddy.log'),
   });

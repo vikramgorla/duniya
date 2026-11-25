@@ -130,9 +130,13 @@ Installer servers. Cloud and Docker: [Oracle](deploy/oci-free-tier.md) · [Googl
 
 Keeps all data, the WhatsApp link and the web address.
 
+Nothing to do: new releases install by themselves at night (04:00 your time, after a backup; a release that needs
+your decision waits for you). To update now or choose differently:
+
 1. Panel → **Overview** → **Server** card → the update row, or **Settings → Updates** (a server set up with the installer looks for new versions by itself every 10 minutes; **Check now** is optional).
 2. **Update to vX.Y.Z** → confirm. Agents pause for about a minute; the page reloads by itself.
-3. Optional: **Settings → Updates** → *Install automatically* at a time of day, or *Off*.
+3. Optional: **Settings → Updates** → another time of day, *Notify me* (you choose when) or *Off*; at install time
+   `--update-mode auto|notify|off`.
 
 Or `sudo duniya update` (`--check` only looks), or re-run the installer (keeps `/etc/duniya/install.conf`). OS updates
 install by themselves at night (**Server → OS updates & maintenance**; switch off there to install by hand).

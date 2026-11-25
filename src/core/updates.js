@@ -34,11 +34,12 @@ export function installKind() {
 
 export const newestTag = (tags) => tags.filter((t) => parseVersion(t)).sort(compareVersions).at(-1) || null;
 
-// 098: os: OS updates install by themselves every night (os-auto.js) unless the owner switches them off
-const DEFAULTS = { mode: process.env.UPDATE_MODE || 'notify', channel: 'stable', at: '04:00', keepPreUpdate: 3, os: 'auto' };
+// 099: new releases install by themselves (after a backup, breaking ones still wait); 098: so do OS updates (os-auto.js).
+// UPDATE_MODE (set by the installer) is read on every call so a changed app.env counts.
+const defaults = () => ({ mode: process.env.UPDATE_MODE || 'auto', channel: 'stable', at: '04:00', keepPreUpdate: 3, os: 'auto' });
 export function getUpdateSettings() {
   const s = getSetting('updates', {}) || {};
-  return { ...DEFAULTS, mode: process.env.UPDATE_MODE || 'notify', ...s };
+  return { ...defaults(), ...s };
 }
 export function setUpdateSettings(patch) {
   const next = { ...getUpdateSettings(), ...patch };
